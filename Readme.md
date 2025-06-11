@@ -1,6 +1,6 @@
 # Dart Way
 
-**Dart Way** is an open-source framework for ultra-fast fullstack development in Dart.  
+**Dart Way** is an open-source framework for ultra-fast application development with fullstack Dart.  
 It combines Flutter and Serverpod with a unified architecture, drastically reducing boilerplate and accelerating MVP delivery.
 
 🚀 MVP in 2–3 weeks  
@@ -12,7 +12,7 @@ It combines Flutter and Serverpod with a unified architecture, drastically reduc
 ## 📦 Core Modules
 
 - 🧠 [`dartway_core_serverpod`](https://github.com/novikov-it/dartway_core_serverpod)  
-  Core backend module providing generic API, ORM, pagination, filters, auth, and real-time sync.
+  Core module providing generic API, ORM, pagination, filters, auth, and real-time sync.
 
 - 💳 [`dartway_tinkoff_serverpod`](https://github.com/novikov-it/dartway_tinkoff_serverpod)  
   Integration with Tinkoff acquiring: payment creation, signature, webhooks, and status handling.
