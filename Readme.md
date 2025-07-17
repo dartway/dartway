@@ -10,13 +10,18 @@ It combines Flutter and Serverpod with a unified architecture, drastically reduc
 ---
 
 ## 📦 Core Modules
-
+- 🛠 [`dartway_app`](https://github.com/dartway/dartway_app)
+  A convenience package that brings together a variety of helpers to simplify and accelerate Flutter development (doesn't depend on any of other packages here)
 - 🧠 [`dartway_core_serverpod`](https://github.com/novikov-it/dartway_core_serverpod)  
   Core module providing generic API, ORM, pagination, filters, auth, and real-time sync.
+- 🔐 [`dartway_auth_serverpod`](https://github.com/dartway/dartway_auth_serverpod)
+  Serverpod auth module extension with Phone Auth and other useful tools and hacks
 
+## 🧩 Integrations
 - 💳 [`dartway_tinkoff_serverpod`](https://github.com/novikov-it/dartway_tinkoff_serverpod)  
   Integration with Tinkoff acquiring: payment creation, signature, webhooks, and status handling.
 
+## Coming soon
 - 🎨 `dartway_ui_kit` *(coming soon)*  
   Flutter UI components, theming system, and design consistency out of the box.
 
