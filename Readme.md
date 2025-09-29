@@ -7,6 +7,10 @@ It combines Flutter and Serverpod with a unified architecture, drastically reduc
 🛠️ Flutter + Serverpod  
 📦 Unified data layer, generic API, modular integrations
 
+## Quickstart
+Please, refer to the docs on our site https://dartway.dev/docs/quick-start
+
+Use [DartWay Project Template](https://github.com/dartway/dartway_project_template) for quick setup
 ---
 
 ## 📦 Core Modules
