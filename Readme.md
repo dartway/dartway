@@ -1,55 +1,78 @@
-# Dart Way
+# 🛠️ DartWay
 
-**Dart Way** is an open-source framework for ultra-fast application development with fullstack Dart.  
-It combines Flutter and Serverpod with a unified architecture, drastically reducing boilerplate and accelerating MVP delivery.
-
-🚀 MVP in 2–3 weeks  
-🛠️ Flutter + Serverpod  
-📦 Unified data layer, generic API, modular integrations
-
-## Quickstart
-Please, refer to the docs on our site https://dartway.dev/docs/quick-start
-
-Use [DartWay Project Template](https://github.com/dartway/dartway_project_template) for quick setup
----
-
-## 📦 Core Modules
-- 🛠 [`dartway_app`](https://github.com/dartway/dartway_app)
-  A convenience package that brings together a variety of helpers to simplify and accelerate Flutter development (doesn't depend on any of other packages here)
-- 🧠 [`dartway_core_serverpod`](https://github.com/novikov-it/dartway_core_serverpod)  
-  Core module providing generic API, ORM, pagination, filters, auth, and real-time sync.
-
-## 🧩 Integrations
-- 💳 [`dartway_tinkoff_serverpod`](https://github.com/novikov-it/dartway_tinkoff_serverpod)  
-  Integration with Tinkoff acquiring: payment creation, signature, webhooks, and status handling.
-
-## Coming soon
-- 🎨 `dartway_ui_kit` *(coming soon)*  
-  Flutter UI components, theming system, and design consistency out of the box.
-
-- 📚 `dartway_examples` *(coming soon)*  
-  Real-world usage examples and starter templates.
+**DartWay** — open-source fullstack Dart framework for ultra-fast MVP delivery with Flutter + Serverpod.  
+Build production-ready apps **3–4× faster**, with a unified data layer, modular architecture, and AI-first workflow.
 
 ---
 
-## 🧭 Why Dart Way?
+## 🚀 Key Features
 
-- 📐 Standardized architecture for scalability and team efficiency  
-- 🧱 Less boilerplate, more productivity  
-- 🔌 Easy to extend with additional modules and integrations
-
----
-
-## 🚀 Getting Started
-
-1. Explore [`dartway_core_serverpod`](https://github.com/novikov-it/dartway_core_serverpod)
-2. Add modules that fit your needs
-3. Build and ship MVPs 2–3x faster
-
-*(We’re working on `create-dartway-app` for instant setup)*
+- ⚡ **MVP in 2–3 weeks** — minimal boilerplate, full-stack Dart from client to server  
+- 🧱 **Unified architecture** — one language, one toolchain, one mindset  
+- 🔗 **Flutter + Serverpod** — beautiful UIs + scalable backend  
+- 📦 **Modular ecosystem** — reusable packages, real-time sync, integrations  
+- 🤖 **AI-First Design** — built for Cursor & Copilot workflows  
 
 ---
 
-## 📄 License
+## 🧭 Quickstart
 
-Licensed under the [Apache 2.0 License](./LICENSE)
+Use our quickstart guide to create your app in minutes:
+📘 [**dartway.dev/docs/quick-start**](https://dartway.dev/docs/quick-start)
+
+Project template referenced in the guide is here:
+👉 [**DartWay Project Template**](https://github.com/dartway/dartway_project_template)
+
+---
+
+## 🧩 Core Modules
+
+| Package | Description |
+|----------|-------------|
+| [**dartway_core_serverpod**](https://github.com/dartway/dartway_core_serverpod) | Core module: generic API, ORM, auth, filters, pagination, and real-time sync. |
+| [**dartway_flutter**](https://github.com/dartway/dartway_flutter) | Flutter helpers and toolbox for ultra-fast development. No backend dependencies include. |
+
+---
+
+## 💼 Integrations
+
+| Package | Description |
+|----------|-------------|
+| [**dartway_tinkoff_serverpod**](https://github.com/dartway-dev/dartway_tinkoff_serverpod) | Integration with Tinkoff acquiring — payment creation, signature, webhooks, and status handling. |
+
+---
+
+## 🌐 Ecosystem
+
+- 📚 **Documentation:** [dartway.dev](https://dartway.dev)
+- ⚠️ **Project updates:** [@dartway_dev on Telegram](https://t.me/dartway_dev)
+- 💬 **Community:** [@dartway_dev_community on Telegram](https://t.me/dartway_dev_community)
+- 🧠 **YouTube Crash Course:** coming soon — learn to build a full MVP with DartWay
+
+---
+
+## 🤝 Contribute
+
+We’re building DartWay as a global movement for full-stack Dart developers.  
+You can help by:
+
+- ⭐ Starring this repo  
+- 🐛 Reporting issues and suggesting features  
+- 🧩 Contributing to packages  
+- 🔥 Sharing DartWay with your community
+
+Join us on Telegram → [**Dart Way Dev Community**](https://t.me/dartway_dev_community)
+
+---
+
+## 🧭 Vision
+
+DartWay isn’t just a framework — it’s a **new way to build and deliver software**.  
+Our goal: make full-stack Dart the fastest, cleanest, and most enjoyable path to launch your next product.
+
+> _“Ship faster. Build cleaner. Stay in flow.”_
+
+---
+
+© 2025 DartWay.dev — licensed under the [Apache 2.0 License](./LICENSE)
+Made with 💙 by the [Dart Way](https://dartway.dev) team
