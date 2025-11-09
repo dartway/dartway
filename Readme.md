@@ -30,7 +30,9 @@ Project template referenced in the guide is here:
 | Package | Description |
 |----------|-------------|
 | [**dartway_core_serverpod**](https://github.com/dartway/dartway_core_serverpod) | Core module: generic API, ORM, auth, filters, pagination, and real-time sync. |
-| [**dartway_flutter**](https://github.com/dartway/dartway_flutter) | Flutter helpers and toolbox for ultra-fast development. No backend dependencies include. |
+| [**dartway_flutter**](https://github.com/dartway/dartway_flutter) | Flutter helpers and toolbox for ultra-fast development. No backend dependencies included. |
+| [**dartway_router**](https://github.com/dartway/dartway_router) | Our wrapper for GoRouter - enables easier route configuration and some helper tools. |
+
 
 ---
 
