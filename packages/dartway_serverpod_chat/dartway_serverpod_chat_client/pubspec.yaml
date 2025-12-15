@@ -13,4 +13,4 @@ dependencies:
     git:
       url: https://github.com/dartway/dartway.git
       ref: master
-      path: packages/dartway_serverpod_core_client
+      path: packages/dartway_serverpod_core/dartway_serverpod_core_client

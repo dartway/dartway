@@ -15,7 +15,7 @@ dependencies:
     git:
       url: https://github.com/dartway/dartway_serverpod_core.git
       ref: master
-      path: dartway_serverpod_core_shared
+      path: packages/dartway_serverpod_core/dartway_serverpod_core_shared
 
   collection: ^1.19.1
   crypto: ^3.0.6
