@@ -9,6 +9,6 @@ dependencies:
 
   dartway_serverpod_core_client:
     git:
-      url: https://github.com/dartway/dartway_serverpod_core.git
+      url: https://github.com/dartway/dartway.git
       ref: master
-      path: dartway_serverpod_core_client
+      path: packages/dartway_serverpod_core/dartway_serverpod_core_client
