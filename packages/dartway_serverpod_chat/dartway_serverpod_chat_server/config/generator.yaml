@@ -1,0 +1,5 @@
+type: module
+nickname: dartway_serverpod_chat
+
+client_package_path: ../dartway_serverpod_chat_client
+server_test_tools_path: test/integration/test_tools

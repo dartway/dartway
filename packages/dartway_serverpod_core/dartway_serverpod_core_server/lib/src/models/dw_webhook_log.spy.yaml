@@ -1,0 +1,14 @@
+class: DwWebServerLog
+table: dw_web_server_log
+fields:
+  createdAt: DateTime      # Timestamp when this log entry was created
+  method: String           # HTTP method of the request (e.g., GET, POST)
+  url: String              # Full request URL (including query parameters)
+  headers: String?         # JSON-encoded HTTP request headers
+  body: String?            # Raw body of the HTTP request (JSON or text)
+  statusCode: int?         # HTTP status code returned by the handler
+  status: String?          # Processing status (e.g., "success", "error", "timeout")
+  error: String?           # Error message or stack trace if an exception occurred
+  durationMs: int?         # Total processing time of the request in milliseconds
+  handler: String?         # Route name or handler identifier (e.g., CreateUserRoute)
+  ip: String?              # Client IP address that initiated the request

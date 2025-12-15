@@ -1,0 +1,13 @@
+class: UserProfile
+table: user_profile
+fields:
+  userInfoId: int?, relation(parent=serverpod_user_info)
+  phone: String
+  
+  agreedForMarketingCommunications: bool
+  conditionsAcceptedAt: DateTime
+
+  firstName: String
+  lastName: String?
+  imageUrl: String?
+  gender: UserGender?

@@ -1,0 +1,24 @@
+# ### Database bindings for a sign in with phone.
+# class: DwPhoneVerificationRequest
+# table: dw_phone_verification_request
+# fields:
+#   ### The type of request, e.g. registration, signIn, passwordReset, changePhoneNumber, other
+#   ### See [DwPhoneVerificationRequestType](dw_phone_verification_request_type.spy.yaml)
+#   requestType: DwPhoneVerificationRequestType
+#   ### The phoneNumber for verification
+#   phoneNumber: String
+#   ### The hashed otp
+#   hash: String
+#   ### The expiration time of the otp
+#   createdAt: DateTime, default = now
+#   expirationTime: DateTime
+
+#   stashData: DwAuthDataStash?, relation(optional)
+
+#   ### If the otp has been used
+#   isUsed: bool, default = false
+
+# indexes:
+#   serverpod_phone_auth_phone:
+#     fields: phoneNumber
+#     unique: false

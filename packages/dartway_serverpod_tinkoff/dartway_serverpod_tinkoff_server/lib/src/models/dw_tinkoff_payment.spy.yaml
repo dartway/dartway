@@ -1,0 +1,58 @@
+class: DwTinkoffPayment
+table: dw_tinkoff_payment
+
+# Поля модели
+fields:
+  # Время создания записи
+  # Устанавливается вручную при создании, база данных не выставляет его автоматически
+  createdAt: DateTime
+
+  # Время последнего обновления записи
+  # Обновляется вручную при изменении данных
+  updatedAt: DateTime
+
+  # Идентификатор терминала, выданный системой Тинькофф
+  terminalKey: String
+
+  # Текущий статус платежа в системе Тинькофф
+  # Примеры значений: NEW, CONFIRMED, CANCELED, REJECTED и т.д.
+  tinkoffRawStatus: String
+
+  # Нормализованный статус, приведённый к enum DwTinkoffPaymentStatus
+  # Значение может быть 'unknown', если API вернул неизвестный статус
+  tinkoffStatus: DwTinkoffPaymentStatus
+
+  # Уникальный идентификатор платежа от Тинькофф (PaymentId)
+  # Несмотря на числовую природу, хранится как строка для безопасности сериализации
+  tinkoffPaymentId: String
+
+  # Идентификатор клиента в системе Тинькофф (CustomerKey)
+  tinkoffCustomerId: String
+
+  # Внутренний идентификатор заказа в твоей системе
+  # Используется для связи платежа с конкретным заказом или сущностью
+  orderIdentifier: String
+
+  # Сумма платежа в копейках (minor units)
+  amount: int
+
+  # Сгенерированная Тинькофф ссылка для оплаты
+  paymentUrl: String
+
+# Индексы, ускоряющие выборку по ключевым полям
+indexes:
+  # Быстрый поиск по идентификатору заказа
+  tinkoff_payment_order_idx:
+    fields: orderIdentifier
+
+  # Быстрый поиск по идентификатору платежа в Тинькофф
+  tinkoff_payment_id_idx:
+    fields: tinkoffPaymentId
+
+  # Быстрый поиск по идентификатору клиента в Тинькофф
+  tinkoff_payment_customer_idx:
+    fields: tinkoffCustomerId
+
+  # Быстрый фильтр по статусу платежа
+  tinkoff_payment_status_idx:
+    fields: tinkoffStatus

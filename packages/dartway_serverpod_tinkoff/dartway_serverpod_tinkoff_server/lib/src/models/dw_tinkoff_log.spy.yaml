@@ -1,0 +1,49 @@
+class: DwTinkoffLog
+table: dw_tinkoff_log
+
+# Лог взаимодействия с API и webhook-событиями Тинькофф
+fields:
+  # Временная метка события (UTC)
+  timestamp: DateTime
+
+  # --- Данные запроса или webhook ---
+
+  # Идентификатор терминала
+  terminalKey: String?
+  # Тип события (запрос, вебхук, ошибка вебхука и т.д.)
+  logType: DwTinkoffLogType
+
+  # Метод API, если это исходящий запрос (например, initPayment, cancelPayment)
+  method: DwTinkoffApiMethod?
+  # Название endpoint-а, если это API-вызов (например, Init, Cancel, AddCustomer)
+  endpoint: String?
+  # Параметры запроса или тело webhook-события, сериализованные в строку (обычно JSON)
+  paramsString: String?
+
+
+  # --- Идентификаторы ---
+
+  # Идентификатор клиента в системе Тинькофф (CustomerKey)
+  tinkoffCustomerId: String?
+  paymentId: String?
+  paymentStatus: String?
+
+  # --- Ответ от API или результат обработки ---
+
+  # Успешен ли вызов (например, HTTP 200 или успешная обработка webhook)
+  isOk: bool?
+
+  # HTTP-статус код ответа (если применимо)
+  statusCode: int?
+
+  # Статус или сообщение из ответа API (или из webhook-обработки)
+  statusMessage: String?
+
+  # Краткое описание ошибки (например, "Timeout", "Signature invalid")
+  error: String?
+
+  # Подробности ошибки — stack trace, raw exception, JSON отладки
+  errorDetails: String?
+
+  # Ответ API или результат обработки webhook (в виде строки/JSON)
+  responseData: String?

@@ -1,0 +1,94 @@
+// final authResponse =
+//           saveContext.currentModel.password == null ? null : null;
+//       //  await Emails.authenticate(
+//       //     session,
+//       //     saveContext.currentModel.userIdentifier,
+//       //     saveContext.currentModel.password!,
+//       //   );
+
+//       final hasPriorVerification = saveContext.currentModel.accessToken == null
+//           ? false
+//           : await DwAuthVerification.db
+//               .findFirstRow(
+//                 session,
+//                 where: (verification) => verification.accessToken
+//                     .equals(saveContext.currentModel.accessToken),
+//                 include: DwAuthVerification.include(
+//                   dwAuthRequest: DwAuthRequest.include(),
+//                 ),
+//               )
+//               .then(
+//                 (value) =>
+//                     value != null &&
+//                     value.dwAuthRequest?.userIdentifier ==
+//                         saveContext.currentModel.userIdentifier,
+//               );
+
+//       final isConfirmed = authResponse?.success == true || hasPriorVerification;
+
+//       if (saveContext.currentModel.password != null &&
+//           authResponse?.success != true) {
+//         saveContext.currentModel.status = DwAuthRequestStatus.failed;
+//       } else if (isConfirmed) {
+//         saveContext.currentModel.status = DwAuthRequestStatus.confirmed;
+//       } else {
+//         saveContext.currentModel.status = DwAuthRequestStatus.pending;
+//       }
+
+//       if (saveContext.currentModel.status == DwAuthRequestStatus.confirmed) {
+//         switch (saveContext.currentModel.requestType) {
+//           case DwAuthRequestType.login:
+//             saveContext.beforeUpdates
+//                 .add(DwModelWrapper(object: authResponse!));
+//             break;
+//           case DwAuthRequestType.register:
+//             // TODO: Handle this case.
+//             throw UnimplementedError();
+//           case DwAuthRequestType.changePassword:
+//             // final emailAuth = await EmailAuth.db.findFirstRow(session,
+//             //     where: (auth) =>
+//             //         auth.email.equals(saveContext.currentModel.userIdentifier));
+//             // emailAuth!.hash = await AuthConfig.current.passwordHashGenerator(
+//             //   saveContext.currentModel.extraData!['newPassword'] as String,
+//             // );
+//             // await EmailAuth.db.updateRow(session, emailAuth);
+//             break;
+//           case DwAuthRequestType.changeIdentifier:
+//             // TODO: Handle this case.
+//             throw UnimplementedError();
+//           case DwAuthRequestType.addAuthProvider:
+//             // TODO: Handle this case.
+//             throw UnimplementedError();
+//           case DwAuthRequestType.removeAuthProvider:
+//             // TODO: Handle this case.
+//             throw UnimplementedError();
+//           case DwAuthRequestType.custom:
+//             // TODO: Handle this case.
+//             throw UnimplementedError();
+//         }
+//       }
+
+//       if (saveContext.currentModel.status == DwAuthRequestStatus.pending) {
+//         final verificationCode = await DwCore
+//             .instance.authConfig?.generateVerificationCodeMethod
+//             ?.call(
+//           session,
+//           verificationRequest: saveContext.currentModel,
+//         );
+
+//         if (verificationCode != null) {
+//           saveContext.extras[verificationCodeKey] = verificationCode;
+//           saveContext.currentModel.verificationHash =
+//               DwAuthUtils.hashVerificationCode(verificationCode);
+//         }
+//       }
+//     },
+//     afterSaveSideEffects: (session, saveContext) async {
+//       // if (saveContext.extras[verificationCodeKey] != null) {
+//       //   await DwCore.instance.authConfig?.sendVerificationCodeMethod?.call(
+//       //     session,
+//       //     verificationRequest: saveContext.currentModel,
+//       //     verificationCode: saveContext.extras[verificationCodeKey] as String,
+//       //   );
+//       // }
+//     },

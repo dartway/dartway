@@ -1,0 +1,312 @@
+{
+  "actions": [
+    {
+      "type": "alterTable",
+      "alterTable": {
+        "name": "dw_auth_key",
+        "schema": "public",
+        "addColumns": [],
+        "deleteColumns": [
+          "scopeNames",
+          "method"
+        ],
+        "modifyColumns": [],
+        "addIndexes": [],
+        "deleteIndexes": [],
+        "addForeignKeys": [],
+        "deleteForeignKeys": [],
+        "warnings": [
+          {
+            "type": "columnDropped",
+            "message": "Column \"scopeNames\" of table \"dw_auth_key\" will be dropped.",
+            "table": "dw_auth_key",
+            "columns": [
+              "scopeNames"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"method\" of table \"dw_auth_key\" will be dropped.",
+            "table": "dw_auth_key",
+            "columns": [
+              "method"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"errorMessage\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "errorMessage"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"errorData\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "errorData"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"verifiedAt\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "verifiedAt"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "uniqueIndexCreated",
+            "message": "Unique index \"dw_user_password_user_id_idx\" is added to table \"dw_user_password\". If there are existing rows with duplicate values, this migration will fail.",
+            "table": "dw_user_password",
+            "columns": [
+              "userId"
+            ],
+            "destrucive": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "alterTable",
+      "alterTable": {
+        "name": "dw_auth_request",
+        "schema": "public",
+        "addColumns": [
+          {
+            "name": "userId",
+            "columnType": 6,
+            "isNullable": true,
+            "dartType": "int?"
+          },
+          {
+            "name": "failReason",
+            "columnType": 0,
+            "isNullable": true,
+            "dartType": "protocol:DwAuthFailReason?"
+          }
+        ],
+        "deleteColumns": [
+          "errorMessage",
+          "errorData",
+          "verifiedAt"
+        ],
+        "modifyColumns": [
+          {
+            "columnName": "status",
+            "addNullable": false,
+            "removeNullable": false,
+            "changeDefault": true,
+            "newDefault": "'created'::text"
+          }
+        ],
+        "addIndexes": [],
+        "deleteIndexes": [],
+        "addForeignKeys": [],
+        "deleteForeignKeys": [],
+        "warnings": [
+          {
+            "type": "columnDropped",
+            "message": "Column \"scopeNames\" of table \"dw_auth_key\" will be dropped.",
+            "table": "dw_auth_key",
+            "columns": [
+              "scopeNames"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"method\" of table \"dw_auth_key\" will be dropped.",
+            "table": "dw_auth_key",
+            "columns": [
+              "method"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"errorMessage\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "errorMessage"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"errorData\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "errorData"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"verifiedAt\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "verifiedAt"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "uniqueIndexCreated",
+            "message": "Unique index \"dw_user_password_user_id_idx\" is added to table \"dw_user_password\". If there are existing rows with duplicate values, this migration will fail.",
+            "table": "dw_user_password",
+            "columns": [
+              "userId"
+            ],
+            "destrucive": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "alterTable",
+      "alterTable": {
+        "name": "dw_user_password",
+        "schema": "public",
+        "addColumns": [],
+        "deleteColumns": [],
+        "modifyColumns": [],
+        "addIndexes": [
+          {
+            "indexName": "dw_user_password_user_id_idx",
+            "elements": [
+              {
+                "type": 0,
+                "definition": "userId"
+              }
+            ],
+            "type": "btree",
+            "isUnique": true,
+            "isPrimary": false
+          }
+        ],
+        "deleteIndexes": [],
+        "addForeignKeys": [],
+        "deleteForeignKeys": [],
+        "warnings": [
+          {
+            "type": "columnDropped",
+            "message": "Column \"scopeNames\" of table \"dw_auth_key\" will be dropped.",
+            "table": "dw_auth_key",
+            "columns": [
+              "scopeNames"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"method\" of table \"dw_auth_key\" will be dropped.",
+            "table": "dw_auth_key",
+            "columns": [
+              "method"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"errorMessage\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "errorMessage"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"errorData\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "errorData"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "columnDropped",
+            "message": "Column \"verifiedAt\" of table \"dw_auth_request\" will be dropped.",
+            "table": "dw_auth_request",
+            "columns": [
+              "verifiedAt"
+            ],
+            "destrucive": true
+          },
+          {
+            "type": "uniqueIndexCreated",
+            "message": "Unique index \"dw_user_password_user_id_idx\" is added to table \"dw_user_password\". If there are existing rows with duplicate values, this migration will fail.",
+            "table": "dw_user_password",
+            "columns": [
+              "userId"
+            ],
+            "destrucive": false
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "type": "columnDropped",
+      "message": "Column \"scopeNames\" of table \"dw_auth_key\" will be dropped.",
+      "table": "dw_auth_key",
+      "columns": [
+        "scopeNames"
+      ],
+      "destrucive": true
+    },
+    {
+      "type": "columnDropped",
+      "message": "Column \"method\" of table \"dw_auth_key\" will be dropped.",
+      "table": "dw_auth_key",
+      "columns": [
+        "method"
+      ],
+      "destrucive": true
+    },
+    {
+      "type": "columnDropped",
+      "message": "Column \"errorMessage\" of table \"dw_auth_request\" will be dropped.",
+      "table": "dw_auth_request",
+      "columns": [
+        "errorMessage"
+      ],
+      "destrucive": true
+    },
+    {
+      "type": "columnDropped",
+      "message": "Column \"errorData\" of table \"dw_auth_request\" will be dropped.",
+      "table": "dw_auth_request",
+      "columns": [
+        "errorData"
+      ],
+      "destrucive": true
+    },
+    {
+      "type": "columnDropped",
+      "message": "Column \"verifiedAt\" of table \"dw_auth_request\" will be dropped.",
+      "table": "dw_auth_request",
+      "columns": [
+        "verifiedAt"
+      ],
+      "destrucive": true
+    },
+    {
+      "type": "uniqueIndexCreated",
+      "message": "Unique index \"dw_user_password_user_id_idx\" is added to table \"dw_user_password\". If there are existing rows with duplicate values, this migration will fail.",
+      "table": "dw_user_password",
+      "columns": [
+        "userId"
+      ],
+      "destrucive": false
+    }
+  ],
+  "migrationApiVersion": 1
+}

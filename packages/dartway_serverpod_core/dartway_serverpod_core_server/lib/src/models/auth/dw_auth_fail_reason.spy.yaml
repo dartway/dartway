@@ -1,0 +1,9 @@
+enum: DwAuthFailReason
+serialized: byName
+values:
+  - userAlreadyExists
+  - userNotFound
+  - passwordNotSet
+  - invalidPassword
+  - invalidAccessToken
+  - invalidVerificationCode

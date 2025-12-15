@@ -1,0 +1,8 @@
+enum: DwAuthRequestStatus
+serialized: byName
+values:
+    - created
+    - failed
+    - pendingVerification
+    - verified 
+    - completed

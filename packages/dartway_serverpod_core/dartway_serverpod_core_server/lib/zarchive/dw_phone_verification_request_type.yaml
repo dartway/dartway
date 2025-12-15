@@ -1,0 +1,9 @@
+# enum: DwPhoneVerificationRequestType
+# serialized: byName
+# values:
+#     - registration
+#     - signIn
+#     # Various options for easier onVerificationSuccessCallback configuration
+#     - passwordReset
+#     - changePhoneNumber
+#     - other

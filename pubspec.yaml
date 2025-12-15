@@ -1,0 +1,18 @@
+name: dartway
+publish_to: none
+environment:
+  sdk: ^3.6.0
+workspace:
+  - packages/dartway_code_checker
+  - packages/dartway_flutter
+  - packages/dartway_router
+  - packages/dartway_serverpod_core/dartway_serverpod_core_server
+  - packages/dartway_serverpod_core/dartway_serverpod_core_client
+  - packages/dartway_serverpod_core/dartway_serverpod_core_shared
+  - packages/dartway_serverpod_core/dartway_serverpod_core_flutter
+  - packages/dartway_serverpod_chat/dartway_serverpod_chat_server
+  - packages/dartway_serverpod_chat/dartway_serverpod_chat_client
+  - packages/dartway_serverpod_chat/dartway_serverpod_chat_flutter
+  - packages/dartway_serverpod_tinkoff/dartway_serverpod_tinkoff_server
+  - packages/dartway_serverpod_tinkoff/dartway_serverpod_tinkoff_client
+

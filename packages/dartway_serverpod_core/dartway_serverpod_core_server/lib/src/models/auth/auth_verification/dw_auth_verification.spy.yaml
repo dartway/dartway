@@ -1,0 +1,10 @@
+class: DwAuthVerification
+table: dw_auth_verification
+fields:
+  dwAuthRequest: DwAuthRequest?, relation
+  createdAt: DateTime, default=now
+  verificationCode: String?, !persist
+
+  failReason: DwAuthFailReason?
+
+  accessToken: String?

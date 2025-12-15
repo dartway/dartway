@@ -1,0 +1,14 @@
+### Provides a method of access for a user to authenticate with the server.
+class: DwAuthKey
+table: dw_auth_key
+fields:
+  ### The id of the user to provide access to.
+  userId: int
+  ### The hashed version of the key.
+  hash: String
+  ### The key sent to the server to authenticate.
+  key: String?, !persist
+
+indexes:
+  dw_auth_key_userId_idx:
+    fields: userId

@@ -1,0 +1,11 @@
+class: DwChatMessage
+table: dw_chat_message
+fields:
+    userId: int
+    chatChannelId: int, relation(parent=dw_chat_channel, onDelete=Cascade)
+    sentAt: DateTime,
+    text: String?
+    attachmentIds: List<int>? # List of Media IDs
+    customMessageType: DwChatCustomMessageType?
+    replyMessageId: int?
+    isDeleted: bool, default=false

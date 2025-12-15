@@ -1,0 +1,4 @@
+class: DwChatCustomMessageType
+fields:
+  type: String
+  additionalModelId: int?

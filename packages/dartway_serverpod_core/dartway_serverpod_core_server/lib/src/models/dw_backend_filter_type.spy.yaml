@@ -1,0 +1,13 @@
+enum: DwBackendFilterType
+serialized: byName
+values:
+  - equals
+  - greaterThan
+  - greaterThanOrEquals
+  - lessThan
+  - lessThanOrEquals
+  - like
+  - ilike
+  - inSet
+  - and
+  - or

@@ -1,0 +1,13 @@
+class: DwCloudFile
+table: dw_cloud_file
+
+fields:
+  createdBy: int? # userId 
+  bucket: String # Bucket name (can be separated by projects or environments)
+  path: String # Path inside the bucket (uploads/user_123/avatar.png)
+  publicUrl: String # Public URL of the file, if available
+  size: int? # File size in bytes
+  mimeType: String? # MIME type (image/png, application/pdf and etc.)
+  
+  createdAt: DateTime # When the file was uploaded
+  verifiedAt: DateTime? # When the file was verified (if there is a verify process)

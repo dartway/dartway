@@ -1,0 +1,6 @@
+chat:
+  - updatesStream:
+  - readChatMessages:
+  - typingToggle:
+module:
+  - hello:

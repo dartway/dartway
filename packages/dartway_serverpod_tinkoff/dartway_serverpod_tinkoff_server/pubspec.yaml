@@ -1,0 +1,13 @@
+name: dartway_serverpod_tinkoff_server
+description: Starting point for a Serverpod module.
+
+environment:
+  sdk: ^3.6.0
+resolution: workspace
+
+dependencies:
+  serverpod: 2.9.1
+  crypto: ^3.0.6
+
+dev_dependencies:
+  lints: '>=3.0.0 <6.0.0'

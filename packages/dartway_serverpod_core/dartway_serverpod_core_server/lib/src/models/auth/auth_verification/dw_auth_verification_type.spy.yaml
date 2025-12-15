@@ -1,0 +1,6 @@
+enum: DwAuthVerificationType
+values:
+  - code
+  - link
+  - oauth
+  - biometric

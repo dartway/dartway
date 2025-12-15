@@ -1,0 +1,10 @@
+type: module
+nickname: dartway_serverpod_core
+
+client_package_path: ../dartway_serverpod_core_client
+
+extraClasses:
+- /src/domain/api/dw_model_wrapper.dart:DwModelWrapper
+- /src/domain/api/dw_api_response.dart:DwApiResponse
+- /src/domain/api/dw_auth_data.dart:DwAuthData
+- /src/domain/api/dw_backend_filter.dart:DwBackendFilter

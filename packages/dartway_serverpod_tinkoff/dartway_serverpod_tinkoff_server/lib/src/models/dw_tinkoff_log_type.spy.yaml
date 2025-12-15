@@ -1,0 +1,11 @@
+enum: DwTinkoffLogType
+serialized: byName
+values:
+  # Исходящий запрос к API Тинькофф
+  - apiRequest
+
+  # Входящий webhook от Тинькофф
+  - webhook
+
+  # Ошибка при обработке webhook (валидация, парсинг и т.д.)
+  - webhookError

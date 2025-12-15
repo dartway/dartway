@@ -1,0 +1,9 @@
+enum: DwAuthProvider
+serialized: byName
+values:
+  - email
+  - phone
+  - google
+  - apple
+  - telegram
+  - other

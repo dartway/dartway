@@ -1,0 +1,11 @@
+dwCrud:
+  - getOne:
+  - getCount:
+  - getAll:
+  - saveModel:
+  - saveModelStream:
+  - delete:
+dwRealTime:
+dwUpload:
+  - getUploadDescription:
+  - verifyUpload:

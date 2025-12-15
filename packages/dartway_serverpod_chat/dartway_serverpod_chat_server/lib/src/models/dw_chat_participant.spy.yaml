@@ -1,0 +1,16 @@
+class: DwChatParticipant
+table: dw_chat_participant
+fields:
+    userId: int
+    # userProfile: DwUserProfile?, !persist
+    chatChannel: DwChatChannel?, relation(name=chat_participants, onDelete=Cascade)
+    lastMessage: DwChatMessage?, relation(optional=true)
+    lastMessageSentAt: DateTime?
+    unreadCount: int, default=0
+    lastReadMessage: DwChatMessage?, relation(optional=true)
+    isDeleted: bool, default=false
+
+indexes:
+  dw_chat_participants_idx:
+    fields: userId, chatChannelId
+    unique: true

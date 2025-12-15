@@ -1,0 +1,120 @@
+---
+description: Defining and working with models in DartWay (Serverpod-based)
+alwaysApply: true
+---
+
+# Defining Models
+
+Models are the **foundation of every DartWay backend**.  
+They define your domain entities, database schema, and serve as the single source of truth for both server and Flutter apps.
+
+👉 For the underlying system, DartWay relies fully on [Serverpod models](https://docs.serverpod.dev/concepts/database/models).  
+This document provides a DartWay-specific perspective and rules.
+
+---
+
+## 📘 Basics (Serverpod)
+
+- Models are defined in `.yaml` files under `lib/src/models/`.  
+- Running `dart run serverpod generate` produces:
+  - Dart classes for server & Flutter
+  - Database schema migrations (after `create-migration`)
+- Each model defines:
+  - Fields and their types
+  - Table name
+  - Relations (optional)
+
+Example (`user_profile.yaml`):
+```yaml
+class: UserProfile
+table: user_profile
+fields:
+  id: int, primary, auto
+  name: String
+  email: String, unique
+  balance: double
+  createdAt: DateTime
+```
+
+---
+
+## 🟦 DartWay Rules for Models
+
+1. **Nullable fields**  
+   - Only if the value is truly optional in the domain.  
+   - ❌ Don’t make fields nullable just for editing convenience. Use form states on Flutter side.
+
+2. **Base vs Event Models**  
+   - *Base Models* — represent current state of an entity (e.g. `UserProfile`).  
+   - *Event Models* — represent changes applied to base models (e.g. `BalanceEvent`).  
+     - Prevent concurrent update issues
+     - Provide traceability (audit log)
+     - Centralize complex business rules (fees, limits)
+
+   Example (`balance_event.yaml`):
+   ```yaml
+   class: BalanceEvent
+   table: balance_event
+   fields:
+     id: int, primary, auto
+     userId: int, relation(parent=user_profile)
+     amount: double
+     reason: String
+     createdAt: DateTime
+   ```
+
+3. **Consistency across server & client**  
+   - Generated Flutter models must be used directly — no hand-written duplicates.  
+   - Use **extensions in `/domain`** for business logic (e.g. computed getters).
+
+4. **Relations**  
+   - Always define explicit relations in YAML.  
+   - Supported: 1–1, 1–N, N–N.  
+   - Prefer `relation(parent=...)` or `relation(name=...)` to ensure schema consistency.
+
+### Bidirectional Relations
+
+For bidirectional relations between models, use the following pattern:
+
+**Parent side (one-to-many):**
+- Use `List<ChildModel>?` field type
+- Use `relation(name=relation_name)` syntax
+- Example: `comments: List<PostComment>?, relation(name=post_comments)`
+
+**Child side (many-to-one):**
+- Use the actual parent model type (not ID)
+- Use `relation(name=relation_name)` with the same name as parent
+- Example: `appPost: AppPost, relation(name=post_comments)`
+
+Both sides must use the same `relation_name` to establish the bidirectional connection.
+
+---
+
+## 🔄 Workflow with Models
+
+1. Define or edit a YAML model in `/models`.  
+2. Generate code:  
+   ```bash
+   dart run serverpod generate
+   ```
+3. Create migration:  
+   ```bash
+   dart run serverpod create-migration
+   ```
+   :::warning
+   If schema changed heavily, `--force` may be required. Use with care — it overwrites previous migrations.
+   :::
+4. Migrations will be applied automatically at server startup with the `--apply-migrations` flag.  
+5. Configure CRUD behavior in `/crud`.  
+6. Extend business rules in `/domain` or workflows in `/app`.
+
+---
+
+## ✅ Key Takeaways
+
+- Models are the **single source of truth**.  
+- Nullable only if business domain allows it.  
+- Use Event Models for transactional safety and audit.  
+- Define explicit relations.  
+- Always regenerate & migrate after changes.  
+- For details, see the [Serverpod Models Documentation](https://docs.serverpod.dev/docs/concepts/models).

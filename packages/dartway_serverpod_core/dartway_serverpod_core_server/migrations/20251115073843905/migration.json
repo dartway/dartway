@@ -1,0 +1,28 @@
+{
+  "actions": [
+    {
+      "type": "alterTable",
+      "alterTable": {
+        "name": "dw_auth_verification",
+        "schema": "public",
+        "addColumns": [
+          {
+            "name": "failReason",
+            "columnType": 0,
+            "isNullable": true,
+            "dartType": "protocol:DwAuthFailReason?"
+          }
+        ],
+        "deleteColumns": [],
+        "modifyColumns": [],
+        "addIndexes": [],
+        "deleteIndexes": [],
+        "addForeignKeys": [],
+        "deleteForeignKeys": [],
+        "warnings": []
+      }
+    }
+  ],
+  "warnings": [],
+  "migrationApiVersion": 1
+}

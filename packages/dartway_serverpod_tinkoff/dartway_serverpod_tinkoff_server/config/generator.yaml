@@ -1,0 +1,4 @@
+type: module
+nickname: dartway_serverpod_tinkoff
+
+client_package_path: ../dartway_serverpod_tinkoff_client

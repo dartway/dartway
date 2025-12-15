@@ -1,0 +1,4 @@
+class: DwChatReadMessageEvent
+fields:
+  userId: int
+  messageId: int

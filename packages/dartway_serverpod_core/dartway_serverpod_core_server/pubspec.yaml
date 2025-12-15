@@ -1,0 +1,35 @@
+name: dartway_serverpod_core_server
+description: Starting point for a Serverpod module.
+
+environment:
+  sdk: ^3.6.0
+resolution: workspace
+
+dependencies:
+  serverpod: ^2.9.1
+
+  # serverpod_cloud_storage_s3: # ^2.9.1
+  #   path: packages/serverpod_cloud_storage_s3
+
+  dartway_serverpod_core_shared:
+    git:
+      url: https://github.com/dartway/dartway_serverpod_core.git
+      ref: master
+      path: dartway_serverpod_core_shared
+
+  collection: ^1.19.1
+  crypto: ^3.0.6
+  bcrypt: ^1.1.3
+  minio: ^3.5.8
+  mime: ^2.0.0
+  amazon_cognito_identity_dart_2: ^3.8.1
+  path: ^1.9.1
+
+
+
+dev_dependencies:
+  lints: '>=3.0.0 <6.0.0'
+
+# dependency_overrides:
+#   dartway_serverpod_core_shared:
+#     path: ../dartway_serverpod_core_shared

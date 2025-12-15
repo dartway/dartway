@@ -1,0 +1,103 @@
+---
+description: Entry point into Server Guide — structure and architecture for DartWay backends
+alwaysApply: true
+---
+
+# Server Project Structure
+
+This document is the **entry point into the Server Guide**.  
+It defines how to organize a DartWay backend project (based on Serverpod) and connects to more detailed guides:
+- [Models](./defining_models)
+- [CRUD Configs](./crud_configs)
+- (upcoming) Event Models & Migrations
+
+---
+
+## 🎯 Core Principles
+
+- **Domain-first** → everything starts from models.  
+- **CRUD-only** → all logic goes through CRUD configs, not custom endpoints.  
+- **Consistency** → predictable patterns for every feature.  
+- **AI-friendly** → assistants can generate backend code safely.  
+
+---
+
+## 📂 Recommended Project Layout
+
+```yaml
+server/
+├─ lib/
+│  └─ src/
+│     ├─ app/         # application services, scenarios, workflows (session-aware)
+│     ├─ crud/        # CRUD configs per model (Save, Delete, Get)
+│     ├─ dartway/     # DartWay core utilities for server
+│     ├─ domain/      # pure domain extensions on models (no session, no IO)
+│     ├─ endpoints/   # (rare) custom endpoints
+│     ├─ generated/   # serverpod generated code (do not edit)
+│     ├─ models/      # YAML model definitions
+│     └─ web/         # serverpod web entry (keep minimal)
+└─ server.dart        # entry point for the server
+```
+
+---
+
+## 📦 Folders Explained
+
+- **/app** → application-level workflows and services.  
+  Session-aware, may call external APIs, send notifications, orchestrate flows.  
+  Can be invoked from CRUD configs, event models, or webhooks.  
+
+- **/crud** → contains CRUD configs (`SaveConfig`, `DeleteConfig`, `GetModelConfig`, `GetListConfig`).  
+  Place all validation, access control, pre/post-processing, and side effects here.  
+
+- **/dartway** → internal DartWay backend utilities (core building blocks).  
+
+- **/domain** → pure business rules as extensions on models.  
+  No dependencies on `Session`, no calls to external APIs, no persistence.  
+  Example: `UserProfile.hasPremiumAccess` computed from model fields.  
+
+- **/endpoints** → avoid creating them unless absolutely necessary (file upload, webhooks).  
+
+- **/generated** → auto-generated Serverpod code. Never edit manually.  
+
+- **/models** → all entities defined in `.yaml` files.  
+  This is the single source of truth for schema and sync with frontend.  
+
+- **/web** → serverpod web support folder. Keep minimal.  
+
+- **/test** → backend unit and integration tests (outside of `lib/`).  
+
+---
+
+## 🚦 Workflow Overview
+
+1. Define or update a **model** in `/models`.  
+2. Run `serverpod generate` to update generated code.  
+3. Create or update a migration:  
+   ```bash
+   dart run serverpod create-migration
+   ```
+   :::warning
+   If there are conflicts or schema resets, you may need `--force`.  
+   Use `--force` only when you are sure previous migrations can be overwritten (e.g. early MVP stage).  
+   :::
+4. Configure CRUD logic in `/crud`.  
+   - Add validation, access control, pre/post processing.  
+5. Extend logic in `/domain` (pure) or `/app` (session-aware workflows).  
+6. Apply migrations with:  
+   ```bash
+   dart run serverpod migrate
+   ```
+7. Add tests.  
+
+---
+
+## ✅ Key Takeaways
+
+- Models are the foundation → everything starts there.  
+- CRUD configs are the central place for backend logic.  
+- **Domain = pure extensions, no dependencies.**  
+- **App = workflows & services, session-aware.**  
+- Migrations must be created and applied after model changes (`--force` only in safe cases).  
+- Endpoints are last resort.  
+- Tests are mandatory.  

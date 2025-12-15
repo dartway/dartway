@@ -1,0 +1,5 @@
+class: DwChatInitialData
+fields:
+  messages: List<DwChatMessage>
+  participantIds: List<int>
+  lastReadMessageId: int?

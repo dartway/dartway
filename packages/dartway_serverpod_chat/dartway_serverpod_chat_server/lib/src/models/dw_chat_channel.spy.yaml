@@ -1,0 +1,10 @@
+class: DwChatChannel
+table: dw_chat_channel
+fields:
+    channel: String
+    chatParticipants: List<DwChatParticipant>?, relation(name=chat_participants)
+
+indexes:
+  channel_name_idx:
+    fields: channel
+    unique: true

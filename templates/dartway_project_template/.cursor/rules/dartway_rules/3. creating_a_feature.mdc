@@ -1,0 +1,90 @@
+---
+description: Step-by-step guide for creating a new feature in DartWay
+globs:
+alwaysApply: true
+---
+
+# Creating a Feature
+
+DartWay features must be **small and self-contained**.  
+Whenever possible, extract each functional widget into its own feature, unless they share truly critical state.  
+
+:::warning
+From outside the feature, you can only import the **root entry file** (page, widget, or context extension).  
+Never import internal widgets, providers, or services directly.
+:::
+
+---
+
+## 1. Navigation
+- Define how the user enters the feature (entry point).  
+- Define where the user can go after (exit points).  
+- If routing is required — add a route.  
+
+👉 See [Navigation Guide](../flutter/navigation).  
+
+---
+
+## 2. Interface (UI)
+- In the feature root, create the **entry point**:  
+  - Page/Screen (e.g. `TodoListPage`),  
+  - Widget (e.g. `UserAvatar`),  
+  - Context extension/action (e.g. `context.showInviteDialog()`).  
+- Sketch the UI layout: buttons, lists, input fields.  
+- Use UI Kit widgets for styling.  
+- Data can be mocked or hardcoded at this stage.  
+
+---
+
+## 3. State & Logic
+- Define what data the UI needs.  
+- Use DartWay methods for data access only:  
+  - `watchModel`, `readModel`, `watchMaybeModel`, `readMaybeModel`,  
+  - `saveModel`, `deleteModel`,  
+  - `watchModelList`, `readModelList`.  
+- For complex scenarios or data reuse inside the feature — create a **Riverpod provider**.  
+- For local state — combine **Riverpod**, **StatefulWidget**, and **flutter_hooks**.  
+- Describe all user actions (create, edit, delete…) before wiring them to the backend.  
+
+---
+
+## 4. Backend (CRUD Configs)
+Every user action must map to the CRUD layer.  
+DartWay does not use arbitrary endpoints — only CRUD + configs.  
+
+- Use `SaveConfig`, `DeleteConfig`, `GetModelConfig`, `GetListConfig`.  
+- All responses must be wrapped in `DwModelWrapper`.  
+- In each config define:  
+  - **Permissions** — who can access/change data.  
+  - **Validations** — reject invalid or incomplete input.  
+  - **Pre-processing** — enrich or transform data before save.  
+  - **Post-processing** — recalc counters, update related models.  
+  - **Side effects** — external API sync, notifications, updates for other users.  
+
+---
+
+## 5. Models & Database
+Now refine models to reflect the feature’s real needs:  
+- Add or extend models.  
+- Define fields and relations (1–1, 1–many, many–many).  
+- A field can be nullable only if it **can truly be absent in real business data**, not for UI convenience.  
+- Database schema must reflect **domain reality**, not temporary UI needs.  
+
+---
+
+## 6. Tests
+Every feature must include automated tests.  
+AI should always generate them alongside feature code.
+
+### Server-side
+- Unit tests for each CRUD config:  
+  - permissions  
+  - validations  
+  - pre- and post-processing  
+  - sideEffects (notifications, API calls, updates)  
+- Tests for event models, ensuring consistency and safety.  
+
+### Flutter-side
+- **Widget tests** for the entry point UI (page/widget/extension).  
+- **Provider tests** for feature logic (watch/read/save/delete).  
+- **Integration tests** for navigation and key user actions.  

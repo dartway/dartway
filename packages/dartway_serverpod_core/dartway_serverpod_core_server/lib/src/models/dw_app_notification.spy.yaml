@@ -1,0 +1,10 @@
+class: DwAppNotification
+table: dw_app_notification
+fields:
+    toUserId: int
+    identifier: String?
+    timestamp: DateTime, default = now
+    title: String
+    body: String?
+    goToPath: String?
+    isRead: bool, default = false

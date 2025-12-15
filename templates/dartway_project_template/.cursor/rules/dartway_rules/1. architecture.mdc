@@ -1,0 +1,82 @@
+---
+description: General architecture concept for DartWay applications
+globs:
+alwaysApply: true
+---
+
+# Architecture
+
+DartWay is a highly opinionated framework.  
+It means — we don't give you much freedom in *how* to do things.  
+
+Our goal is to provide a **good enough solution** for any common problem so you can build whatever you want **fast and without mess**.  
+Less options → more consistency → faster development.
+
+---
+
+## CRUD as the foundation
+
+The **key concept of DartWay** is the *model* and respective **CRUD operations**.  
+We provide:  
+- Generic **data layer** for Flutter apps.  
+- Generic **CRUD endpoints** on the server side.  
+
+All user interactions and API communication are expressed through CRUD.  
+This makes features predictable, data access unified, and assistants able to scaffold new features without confusion.  
+
+👉 For details, see [Domain & CRUD Principles](./domain_and_crud).
+
+---
+
+## Feature Architecture
+
+Every feature in DartWay is an **end-to-end flow** that spans both server and Flutter sides.  
+This ensures that data, logic, and UI stay consistent and predictable.
+
+### Server side
+1. **Models**  
+   Define entities and relations for your domain.  
+   Example: `UserProfile`, `BalanceEvent`.  
+
+2. **CRUD Configuration**  
+   Customize behavior of default CRUD operations with access rules, validations, pre/post-processing or event handling.  
+   Example: `SaveConfig`, `DeleteConfig`, `GetModelConfig`.
+
+### Flutter side
+
+Each feature lives in a **compact folder** that fully encapsulates its UI and logic.
+
+1. **Entry Point**  
+   Main widget or context extension that exposes the feature to the outside world.  
+   → This is the **only file** that can be imported externally.  
+
+2. **Widgets**  
+   UI elements of the feature — layout, transitions, interactions, and data bindings.  
+
+3. **Logic**  
+   Local state orchestration and helpers required only for this feature.  
+   May include enums, providers, notifiers, extensions, etc.  
+
+---
+
+Additionally, a feature may use **project-level layers**:
+
+1. **Core**  
+   Global utilities like router, app-wide providers or configs.  
+
+2. **Domain**  
+   Extensions on models and enums containing business logic that must stay consistent across features.  
+
+3. **UI Kit**  
+   Lean UI widgets and styling helpers, fully isolated from logic or state.  
+
+👉 For detailed step-by-step rules, see [Feature Architecture](../flutter/feature_architecture).
+
+---
+
+## Why It Matters
+
+- **Consistency** → features are always structured the same way.  
+- **Maintainability** → upgrades and refactors are predictable and safe.  
+- **AI-friendly** → automated code generation follows fixed patterns.  
+- **Scalability** → new features add value without adding chaos.  

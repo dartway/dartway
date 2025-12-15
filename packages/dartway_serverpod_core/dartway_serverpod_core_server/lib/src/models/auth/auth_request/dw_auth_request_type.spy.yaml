@@ -1,0 +1,10 @@
+enum: DwAuthRequestType
+serialized: byName
+values:
+  - login
+  - register
+  - changePassword
+  - changeIdentifier
+  - addAuthProvider
+  - removeAuthProvider
+  - custom

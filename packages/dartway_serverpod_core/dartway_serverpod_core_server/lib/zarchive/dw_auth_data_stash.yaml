@@ -1,0 +1,7 @@
+# class: DwAuthDataStash
+# table: dw_auth_data_stash
+# fields:
+#   type: String
+#   identifier: String
+#   createdAt: DateTime
+#   data: Map<String, String>
