@@ -2,12 +2,10 @@ import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class DwRelationUpdatesConfig<
-  Model extends SerializableModel,
-  RelationModel extends SerializableModel
-> {
+class DwRelationUpdatesConfig<Model extends SerializableModel,
+    RelationModel extends SerializableModel> {
   final Model Function(Model parentModel, List<DwModelWrapper> relatedModels)
-  copyWithRelatedModels;
+      copyWithRelatedModels;
   final String relationKey;
   final Set<int> Function(Model model)? parentIdsGetter;
 
@@ -24,10 +22,9 @@ class DwRelationUpdatesConfig<
       List<DwModelWrapper> wrappedModelUpdates,
       String relationKey,
       Model Function(Model parentModel, List<DwModelWrapper> relatedModels)
-      copyWithRelatedModels,
+          copyWithRelatedModels,
       Set<int>? Function(Model model)? parentIdsGetter,
-    )
-    relationUpdatesListener,
+    ) relationUpdatesListener,
   ) {
     DwRepository.addUpdatesListener<RelationModel>(
       (updates) => relationUpdatesListener(
@@ -47,7 +44,8 @@ class DwModelListStateConfig<Model extends SerializableModel>
   final String? apiGroupOverride;
   final Function(List<DwModelWrapper>)? customUpdatesListener;
   final List<DwRelationUpdatesConfig<Model, SerializableModel>>?
-  relationUpdatesConfigs;
+      relationUpdatesConfigs;
+  final int Function(Model a, Model b)? updatesSortingMethod;
 
   const DwModelListStateConfig({
     this.backendFilter,
@@ -55,6 +53,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
     this.apiGroupOverride,
     this.customUpdatesListener,
     this.relationUpdatesConfigs,
+    this.updatesSortingMethod,
   });
 
   @override
@@ -77,7 +76,8 @@ class DwModelListStateConfig<Model extends SerializableModel>
             pageSize == other.pageSize &&
             apiGroupOverride == other.apiGroupOverride &&
             customUpdatesListener == other.customUpdatesListener &&
-            relationUpdatesConfigs == other.relationUpdatesConfigs;
+            relationUpdatesConfigs == other.relationUpdatesConfigs &&
+            updatesSortingMethod == other.updatesSortingMethod;
   }
 
   @override
@@ -86,13 +86,15 @@ class DwModelListStateConfig<Model extends SerializableModel>
       pageSize.hashCode ^
       apiGroupOverride.hashCode ^
       customUpdatesListener.hashCode ^
-      relationUpdatesConfigs.hashCode;
+      relationUpdatesConfigs.hashCode ^
+      updatesSortingMethod.hashCode;
 
   DwModelListStateConfig<Model> copyWith({
     DwBackendFilter? backendFilter,
     int? pageSize,
     String? apiGroupOverride,
     Function(List<DwModelWrapper>)? customUpdatesListener,
+    int Function(Model a, Model b)? updatesSortingMethod,
   }) {
     return DwModelListStateConfig<Model>(
       backendFilter: backendFilter ?? this.backendFilter,
@@ -102,6 +104,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
           customUpdatesListener ?? this.customUpdatesListener,
       relationUpdatesConfigs:
           relationUpdatesConfigs ?? this.relationUpdatesConfigs,
+      updatesSortingMethod: updatesSortingMethod ?? this.updatesSortingMethod,
     );
   }
 
@@ -112,7 +115,8 @@ class DwModelListStateConfig<Model extends SerializableModel>
         'pageSize: $pageSize, '
         'apiGroupOverride: $apiGroupOverride, '
         'customUpdatesListener: $customUpdatesListener, '
-        'relationUpdatesConfigs: $relationUpdatesConfigs'
+        'relationUpdatesConfigs: $relationUpdatesConfigs, '
+        'updatesSortingMethod: $updatesSortingMethod'
         ')';
   }
 }

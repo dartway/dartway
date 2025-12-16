@@ -7,32 +7,42 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
   }
 
   DwModelWrapper.wrap({required this.model})
-    : modelId = null,
-      this.foreignKeys = {},
-      className =
-          DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
-          'unknown',
-      isDeleted = false;
+      : modelId = null,
+        this.foreignKeys = {},
+        className =
+            DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
+                'unknown',
+        isDeleted = false,
+        jsonSerialization = {
+          'className':
+              DwCoreServerpodClient.protocol.getClassNameForObject(model),
+          'data': model.toJson(),
+        };
 
   DwModelWrapper._({
     required this.model,
     required this.modelId,
     required this.foreignKeys,
     required this.isDeleted,
+    required this.jsonSerialization,
   }) : className =
-           DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
-           'unknown';
+            DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
+                'unknown';
 
   final String className;
   final SerializableModel model;
   final Map<String, int> foreignKeys;
   final int? modelId;
   final bool isDeleted;
+  final Map<String, dynamic> jsonSerialization;
+
   // final List<SerializableModel>? entities;
 
   String get nitMappingClassname => className.split('.').last;
 
-  factory DwModelWrapper.fromJson(Map<String, dynamic> jsonSerialization) {
+  factory DwModelWrapper.fromJson(
+    Map<String, dynamic> jsonSerialization,
+  ) {
     final foreignKeys = <String, int>{};
 
     for (var key in (jsonSerialization['data'] as Map<String, dynamic>).keys) {
@@ -49,6 +59,7 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
         jsonSerialization,
       ),
       isDeleted: jsonSerialization['isDeleted'] ?? false,
+      jsonSerialization: jsonSerialization,
     );
   }
 

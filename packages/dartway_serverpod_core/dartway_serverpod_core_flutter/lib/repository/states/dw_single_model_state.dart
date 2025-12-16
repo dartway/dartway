@@ -22,25 +22,25 @@ class DwSingleModelState<Model extends SerializableModel>
       "and timestamp $globalTimestamp",
     );
 
-    final res =
-        config.initialModel != null
-            ? null
-            : await dw.endpointCaller.dwCrud
-                .getOne(
-                  className: DwRepository.typeName<Model>(),
-                  filter: config.backendFilter,
-                  apiGroup: config.apiGroupOverride,
-                )
-                .then(
-                  (response) =>
-                      ref.processApiResponse<DwModelWrapper>(response),
-                );
+    final response = config.initialModel != null
+        ? null
+        : await dw.endpointCaller.dwCrud.getOne(
+            className: DwRepository.typeName<Model>(),
+            filter: config.backendFilter,
+            apiGroup: config.apiGroupOverride,
+          );
+
+    final fetchedWrappedModel = response != null
+        ? ref.processApiResponse<DwModelWrapper>(response)
+        : null;
 
     DwRepository.addUpdatesListener<Model>(_updatesListener);
 
     return config.initialModel != null
         ? config.initialModel as Model
-        : (res == null ? null : res.model as Model);
+        : (fetchedWrappedModel == null
+            ? null
+            : fetchedWrappedModel.model as Model);
   }
 
   /// Reads the model either from state or from backend.

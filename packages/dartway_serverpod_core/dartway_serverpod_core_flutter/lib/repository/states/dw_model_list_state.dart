@@ -83,16 +83,90 @@ class DwModelListState<Model extends SerializableModel>
   }
 
   void _updatesListener(List<DwModelWrapper> wrappedModelUpdates) async {
+    // Collect all IDs from the incoming updates to identify what's new or changed
     final ids = wrappedModelUpdates.map((e) => e.modelId).toSet();
 
-    state = state.whenData((value) {
-      return [
-        ...wrappedModelUpdates
-            .where((e) => !e.isDeleted)
-            .map((e) => e.model as Model),
-        ...value.where((e) => !ids.contains((e as dynamic).id)),
-      ];
-    });
+    // If a custom sorting method is provided, sort the updates accordingly
+    if (arg.updatesSortingMethod != null) {
+      wrappedModelUpdates.sort(
+        (a, b) => arg.updatesSortingMethod!(a.model as Model, b.model as Model),
+      );
+    }
+
+    // Wait for the current state to be loaded from the future
+    final current = await future;
+
+    // Keep only those current items that are not affected by updates (matching modelId)
+    final currentList = current
+        .where((e) => !ids.contains((e as dynamic).id)) // filter by id match
+        .cast<Model>() // cast to the correct type
+        .toList(); // convert to list
+
+    final res = <Model>[]; // Final merged result list
+
+    int i = 0; // index for currentList
+    int j = 0; // index for wrappedModelUpdates
+
+    // Merge both lists in a single pass using sorted order if provided
+    while (i < currentList.length || j < wrappedModelUpdates.length) {
+      // Safely get current entity or null if out of bounds
+      final Model? currentEntity =
+          i < currentList.length ? currentList[i] : null;
+
+      // Safely get next update or null if out of bounds
+      final DwModelWrapper? update =
+          j < wrappedModelUpdates.length ? wrappedModelUpdates[j] : null;
+
+      // If no more updates, just add remaining current entities
+      if (update == null) {
+        res.add(currentEntity!);
+        i++;
+        continue;
+      }
+
+      // If no more current entities, just add valid updates
+      if (currentEntity == null) {
+        if (!update.isDeleted && // not marked for deletion
+            (arg.backendFilter == null || // passes backend filter
+                arg.backendFilter!.filterUpdate(update.jsonSerialization))) {
+          res.add(update.model as Model);
+        }
+        j++;
+        continue;
+      }
+
+      // Compare order: update vs current entity using sorting method (or default to insert update first)
+      final cmp = arg.updatesSortingMethod
+              ?.call(update.model as Model, currentEntity) ??
+          -1;
+
+      if (cmp <= 0) {
+        // Insert update if not deleted and passes filter
+        if (!update.isDeleted &&
+            (arg.backendFilter == null ||
+                arg.backendFilter!.filterUpdate(update.jsonSerialization))) {
+          res.add(update.model as Model);
+        }
+        j++; // move to next update
+      } else {
+        res.add(currentEntity); // insert current entity
+        i++; // move to next current
+      }
+    }
+
+    // Push the merged list to state
+    state = AsyncValue.data(res);
+
+    // final ids = wrappedModelUpdates.map((e) => e.modelId).toSet();
+
+    // state = state.whenData((value) {
+    //   return [
+    //     ...wrappedModelUpdates
+    //         .where((e) => !e.isDeleted)
+    //         .map((e) => e.model as Model),
+    //     ...value.where((e) => !ids.contains((e as dynamic).id)),
+    //   ];
+    // });
 
     // return await future.then((value) async {
     //   state = AsyncValue.data([
@@ -108,15 +182,14 @@ class DwModelListState<Model extends SerializableModel>
     List<DwModelWrapper> wrappedModelUpdates,
     String foreignKey,
     Model Function(Model parentModel, List<DwModelWrapper> relatedModels)
-    copyWithRelatedModels,
+        copyWithRelatedModels,
     Set<int>? Function(Model model)? parentIdsGetter,
   ) async {
     state = state.whenData((value) {
       return value.map((model) {
-        final parentIds =
-            parentIdsGetter != null
-                ? parentIdsGetter.call(model)
-                : <int>{(model as dynamic).id};
+        final parentIds = parentIdsGetter != null
+            ? parentIdsGetter.call(model)
+            : <int>{(model as dynamic).id};
 
         final relatedModels = wrappedModelUpdates.where(
           (e) => (parentIds ?? {}).contains(e.foreignKeys[foreignKey]),
