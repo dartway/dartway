@@ -7,6 +7,21 @@ import 'package:serverpod/serverpod.dart';
 /// Universal web request logger for Serverpod routes.
 /// Handles reading the body once, error handling, and DB logging.
 class DwWebServerLogger {
+  static const String _sensitiveValue = '***HIDDEN***';
+
+  static const List<String> knownSensitiveKeys = [
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'x-webhook-secret',
+    'x-api-key',
+    'password',
+    'pass',
+    'pwd',
+    'token',
+    'secret',
+  ];
+
   /// Wraps any HTTP handler with logging and error tracking.
   ///
   /// [action] receives the already-read body (may be null for GET requests).
@@ -29,6 +44,7 @@ class DwWebServerLogger {
     HttpRequest request, {
     required String handler,
     required Future<Map<String, dynamic>> Function(String? body) action,
+    List<String> sensitiveKeys = knownSensitiveKeys,
   }) async {
     final start = DateTime.now();
 
@@ -89,6 +105,10 @@ class DwWebServerLogger {
           headersMap[name] = values.join(',');
         });
 
+        final sanitizedHeaders = _sanitizeHeaders(headersMap, sensitiveKeys);
+
+        final sanitizedBody = _sanitizeBody(requestBody, sensitiveKeys);
+
         final durationMs = DateTime.now().difference(start).inMilliseconds;
 
         await DwWebServerLog.db.insertRow(
@@ -97,8 +117,8 @@ class DwWebServerLogger {
             createdAt: start,
             method: request.method,
             url: request.uri.toString(),
-            headers: jsonEncode(headersMap),
-            body: requestBody,
+            headers: jsonEncode(sanitizedHeaders),
+            body: sanitizedBody,
             statusCode: statusCode,
             status: status,
             error: error,
@@ -114,6 +134,54 @@ class DwWebServerLogger {
           stackTrace: st,
         );
       }
+    }
+  }
+
+  static bool _isSensitiveKey(String key, List<String> keys) {
+    final lower = key.toLowerCase();
+
+    return keys.any(
+      (k) => lower == k.toLowerCase(),
+    );
+  }
+
+  static Map<String, String> _sanitizeHeaders(
+    Map<String, String> headers,
+    List<String> extraKeys,
+  ) {
+    return headers.map((key, value) {
+      return MapEntry(
+        key,
+        _isSensitiveKey(key, extraKeys) ? _sensitiveValue : value,
+      );
+    });
+  }
+
+  static String? _sanitizeBody(
+    String? body,
+    List<String> extraKeys,
+  ) {
+    if (body == null) return null;
+
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) return null;
+
+      void sanitizeMap(Map<String, dynamic> map) {
+        for (final key in map.keys.toList()) {
+          if (_isSensitiveKey(key, extraKeys)) {
+            map[key] = _sensitiveValue;
+          } else if (map[key] is Map<String, dynamic>) {
+            sanitizeMap(map[key] as Map<String, dynamic>);
+          }
+        }
+      }
+
+      sanitizeMap(decoded);
+      return jsonEncode(decoded);
+    } catch (_) {
+      // Non-JSON bodies are never logged
+      return null;
     }
   }
 }
