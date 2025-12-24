@@ -1,24 +1,23 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-class DwGetListConfig<T extends TableRow> {
+import 'dw_get_config_interface.dart';
+
+class DwGetListConfig<T extends TableRow> extends DwGetConfigInterface<T> {
   const DwGetListConfig({
-    this.include,
-    this.additionalModelsFetchFunction,
-    this.defaultOrderByList,
+    required super.accessFilter,
+    super.include,
+    // this.additionalModelsFetchFunction,
+    super.defaultOrderByList,
   });
-
-  final Include? include;
-  final List<Order>? defaultOrderByList;
-
-  final Future<List<TableRow>> Function(Session session, List<T> models)?
-  additionalModelsFetchFunction;
 
   Future<DwApiResponse<int>> getCount(
     Session session, {
     Expression? whereClause,
   }) async {
-    final result = await session.db.count<T>(where: whereClause);
+    final result = await session.db.count<T>(
+      where: await getWhereExpression(session, whereClause: whereClause),
+    );
 
     return DwApiResponse<int>(isOk: true, value: result);
   }
@@ -30,7 +29,7 @@ class DwGetListConfig<T extends TableRow> {
     int? offset,
   }) async {
     final resultItems = await session.db.find<T>(
-      where: whereClause,
+      where: await getWhereExpression(session, whereClause: whereClause),
       include: include,
       orderByList: defaultOrderByList,
       limit: limit,
@@ -40,11 +39,11 @@ class DwGetListConfig<T extends TableRow> {
     return DwApiResponse<List<DwModelWrapper>>(
       isOk: true,
       value: resultItems.map((e) => DwModelWrapper(object: e)).toList(),
-      updatedModels:
-          [
-            if (additionalModelsFetchFunction != null)
-              ...(await additionalModelsFetchFunction!(session, resultItems)),
-          ].map((e) => DwModelWrapper(object: e)).toList(),
+      updatedModels: null,
+      //  [
+      //   if (additionalModelsFetchFunction != null)
+      //     ...(await additionalModelsFetchFunction!(session, resultItems)),
+      // ].map((e) => DwModelWrapper(object: e)).toList(),
     );
   }
 }

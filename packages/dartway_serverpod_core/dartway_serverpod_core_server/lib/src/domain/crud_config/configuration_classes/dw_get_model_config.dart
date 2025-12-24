@@ -1,22 +1,22 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-class DwGetModelConfig<T extends TableRow> {
+import 'dw_get_config_interface.dart';
+
+class DwGetModelConfig<T extends TableRow> extends DwGetConfigInterface<T> {
   const DwGetModelConfig({
+    required super.accessFilter,
     required this.filterPrototype,
     this.createIfMissing,
-    this.include,
-    this.additionalModelsFetchFunction,
+    super.include,
+    super.defaultOrderByList,
+    // super.additionalModelsFetchFunction,
   });
 
   final DwBackendFilter filterPrototype;
-  final Include? include;
 
   final Future<T?> Function(Session session, DwBackendFilter filter)?
-  createIfMissing;
-
-  final Future<List<TableRow>> Function(Session session, T model)?
-  additionalModelsFetchFunction;
+      createIfMissing;
 
   Future<T?> _getObject(
     Session session,
@@ -24,8 +24,12 @@ class DwGetModelConfig<T extends TableRow> {
     DwBackendFilter filter,
   ) async {
     return await session.db.findFirstRow(
-          where: filter.prepareWhere(table),
+          where: await getWhereExpression(
+            session,
+            whereClause: filter.prepareWhere(table),
+          ),
           include: include,
+          orderByList: defaultOrderByList,
         ) ??
         await createIfMissing?.call(session, filter);
   }
@@ -39,17 +43,17 @@ class DwGetModelConfig<T extends TableRow> {
     return DwApiResponse<DwModelWrapper>(
       isOk: true,
       value: DwModelWrapper.wrap(result),
-      updatedModels:
-          result != null
-              ? [
-                DwModelWrapper(object: result),
-                if (additionalModelsFetchFunction != null)
-                  ...(await additionalModelsFetchFunction!(
-                    session,
-                    result,
-                  )).map((e) => DwModelWrapper(object: e)),
-              ]
-              : null,
+      updatedModels: result != null
+          ? [
+              DwModelWrapper(object: result),
+              // if (additionalModelsFetchFunction != null)
+              //   ...(await additionalModelsFetchFunction!(
+              //     session,
+              //     result,
+              //   ))
+              //       .map((e) => DwModelWrapper(object: e)),
+            ]
+          : null,
     );
   }
 }

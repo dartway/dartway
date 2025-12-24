@@ -34,8 +34,7 @@ class DwCore<UserProfileClass extends TableRow> {
   late final Future<UserProfileClass> Function(
     Session session, {
     required DwAuthRequest registrationRequest,
-  })
-  _userProfileConstructor;
+  }) _userProfileConstructor;
   late final DwAlerts alerts;
 
   /// Auth module (optional)
@@ -60,8 +59,7 @@ class DwCore<UserProfileClass extends TableRow> {
     required Future<UserProfileClass> Function(
       Session session, {
       required DwAuthRequest registrationRequest,
-    })
-    userProfileConstructor,
+    }) userProfileConstructor,
     required DwAlerts dwAlerts,
     DwAuthConfig? authConfig,
     DwCloudStorageConfig? cloudStorageConfig,
@@ -76,14 +74,12 @@ class DwCore<UserProfileClass extends TableRow> {
       userProfileInclude: userProfileInclude,
       userProfileConstructor: userProfileConstructor,
       alerts: dwAlerts,
-      auth:
-          authConfig != null
-              ? DwAuth<UserProfileClass>(config: authConfig)
-              : null,
-      cloudStorage:
-          cloudStorageConfig != null
-              ? DwCloudStorage(config: cloudStorageConfig)
-              : null,
+      auth: authConfig != null
+          ? DwAuth<UserProfileClass>(config: authConfig)
+          : null,
+      cloudStorage: cloudStorageConfig != null
+          ? DwCloudStorage(config: cloudStorageConfig)
+          : null,
     );
 
     _instance = instance;
@@ -97,30 +93,25 @@ class DwCore<UserProfileClass extends TableRow> {
     required Future<UserProfileClass> Function(
       Session session, {
       required DwAuthRequest registrationRequest,
-    })
-    userProfileConstructor,
+    }) userProfileConstructor,
     required this.alerts,
     required this.auth,
     required this.cloudStorage,
-  }) : _userProfileInclude = userProfileInclude,
-       _userProfileConstructor = userProfileConstructor {
-    _userInfoIdColumn =
-        userProfileTable.columns.firstWhereOrThrow(
-              (column) =>
-                  column is ColumnInt &&
-                  column.columnName == DwCoreConst.userProfileIdColumnName,
-              'User profile table must have an int ${DwCoreConst.userProfileIdColumnName} column',
-            )
-            as ColumnInt;
+  })  : _userProfileInclude = userProfileInclude,
+        _userProfileConstructor = userProfileConstructor {
+    _userInfoIdColumn = userProfileTable.columns.firstWhereOrThrow(
+      (column) =>
+          column is ColumnInt &&
+          column.columnName == DwCoreConst.userProfileIdColumnName,
+      'User profile table must have an int ${DwCoreConst.userProfileIdColumnName} column',
+    ) as ColumnInt;
 
-    _userIdentifierColumn =
-        userProfileTable.columns.firstWhereOrThrow(
-              (column) =>
-                  column is ColumnString &&
-                  column.columnName == DwCoreConst.userIdentifierColumnName,
-              'User profile table must have a String ${DwCoreConst.userIdentifierColumnName} column',
-            )
-            as ColumnString;
+    _userIdentifierColumn = userProfileTable.columns.firstWhereOrThrow(
+      (column) =>
+          column is ColumnString &&
+          column.columnName == DwCoreConst.userIdentifierColumnName,
+      'User profile table must have a String ${DwCoreConst.userIdentifierColumnName} column',
+    ) as ColumnString;
 
     _crudConfiguration[DwCoreConst.dartwayInternalApi] = Map.fromEntries(
       [
@@ -131,6 +122,8 @@ class DwCore<UserProfileClass extends TableRow> {
           table: userProfileTable,
           getModelConfigs: [
             DwGetModelConfig<UserProfileClass>(
+              accessFilter: (session) async => _userInfoIdColumn
+                  .equals((await session.authenticated)?.userId ?? 0),
               filterPrototype: DwBackendFilter.equalsPrototype(
                 fieldName: DwCoreConst.userProfileIdColumnName,
               ),
