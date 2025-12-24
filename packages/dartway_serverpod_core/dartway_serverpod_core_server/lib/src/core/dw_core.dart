@@ -28,19 +28,21 @@ import '../crud/dw_auth_request_config.dart';
 class DwCore<UserProfileClass extends TableRow> {
   final Table userProfileTable;
   final Map<String, Map<String, DwCrudConfig>> _crudConfiguration = {};
+
   late final ColumnInt _userInfoIdColumn;
   late final ColumnString _userIdentifierColumn;
-  late final Include? _userProfileInclude;
-  late final Future<UserProfileClass> Function(
+
+  final Include? _userProfileInclude;
+  final Future<UserProfileClass> Function(
     Session session, {
     required DwAuthRequest registrationRequest,
   }) _userProfileConstructor;
-  late final DwAlerts alerts;
+  final DwAlerts alerts;
 
   /// Auth module (optional)
-  late final DwAuth<UserProfileClass>? auth;
+  final DwAuth<UserProfileClass>? auth;
 
-  late final DwCloudStorage? cloudStorage;
+  final DwCloudStorage? cloudStorage;
 
   static DwCore? _instance;
 
@@ -61,7 +63,7 @@ class DwCore<UserProfileClass extends TableRow> {
       required DwAuthRequest registrationRequest,
     }) userProfileConstructor,
     required DwAlerts dwAlerts,
-    DwAuthConfig? authConfig,
+    DwAuthConfig<UserProfileClass>? dwAuthConfig,
     DwCloudStorageConfig? cloudStorageConfig,
   }) {
     if (_instance != null) {
@@ -74,8 +76,8 @@ class DwCore<UserProfileClass extends TableRow> {
       userProfileInclude: userProfileInclude,
       userProfileConstructor: userProfileConstructor,
       alerts: dwAlerts,
-      auth: authConfig != null
-          ? DwAuth<UserProfileClass>(config: authConfig)
+      auth: dwAuthConfig != null
+          ? DwAuth<UserProfileClass>(config: dwAuthConfig)
           : null,
       cloudStorage: cloudStorageConfig != null
           ? DwCloudStorage(config: cloudStorageConfig)

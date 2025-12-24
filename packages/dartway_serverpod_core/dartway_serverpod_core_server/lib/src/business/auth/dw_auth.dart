@@ -6,7 +6,9 @@ import 'dw_auth_utils.dart';
 class DwAuth<UserProfileClass extends TableRow> {
   final DwAuthConfig config;
 
-  DwAuth({required this.config});
+  DwAuth({
+    required this.config,
+  });
 
   Future<bool> setUserPassword(
     Session session, {
@@ -81,9 +83,23 @@ class DwAuth<UserProfileClass extends TableRow> {
     Session session,
     int userId, {
     bool updateSession = true,
+    bool skipTriggers = false,
   }) async {
     var key = DwAuthUtils.generateRandomString();
     var hash = DwAuthUtils.hashAuthKey(key);
+
+    if (config.onSignInTrigger != null) {
+      final existingAuthKeys = await DwAuthKey.db.find(
+        session,
+        where: (t) => t.userId.equals(userId),
+      );
+
+      await config.onSignInTrigger!(
+        session,
+        userId: userId,
+        isFirstSignIn: existingAuthKeys.isEmpty,
+      );
+    }
 
     var authKey = DwAuthKey(userId: userId, hash: hash, key: key);
 

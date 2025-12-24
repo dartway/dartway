@@ -1,5 +1,5 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
-import 'package:serverpod/server.dart';
+import 'package:serverpod/serverpod.dart';
 
 import 'dw_auth_utils.dart';
 
@@ -21,7 +21,7 @@ import 'dw_auth_utils.dart';
 //   DwAuthRequest verificationRequest,
 // );
 
-class DwAuthConfig {
+class DwAuthConfig<UserProfileClass extends TableRow> {
   final Map<String, String> passwords;
 
   String get authKeySalt =>
@@ -41,22 +41,28 @@ class DwAuthConfig {
     this.generateVerificationCodeMethod =
         DwAuthUtils.defaultVerificationCodeGenerationMethod,
     this.sendVerificationCodeMethod,
+    this.onSignInTrigger,
   });
+
+  /// Callback for triggering actions when a user signs in.
+  final Future<void> Function(
+    Session session, {
+    required int userId,
+    required bool isFirstSignIn,
+  })? onSignInTrigger;
 
   /// Callback for generating a verification code.
   final Future<String> Function(
     Session session, {
     required DwAuthRequest verificationRequest,
-  })?
-  generateVerificationCodeMethod;
+  })? generateVerificationCodeMethod;
 
   /// Callback for sending validation message.
   final Future<void> Function(
     Session session, {
     required DwAuthRequest verificationRequest,
     required String verificationCode,
-  })?
-  sendVerificationCodeMethod;
+  })? sendVerificationCodeMethod;
 
   // static DwAuthConfig _config = DwAuthConfig(
   //   secretHashKey: 'DwHashSecret',
