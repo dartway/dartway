@@ -141,6 +141,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
 
         return [
           DwModelWrapper(
+            // TODO: try to replace with DwAuthKey
             object: DwAuthData(
               key: authKey.key!,
               keyId: authKey.id!,
