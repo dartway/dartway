@@ -5,11 +5,10 @@ import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-typedef DwAsyncProviderFactory =
-    List<ProviderListenable<AsyncValue>> Function(
-      WidgetRef ref,
-      int? userProfileId,
-    );
+typedef DwAsyncProviderFactory = List<ProviderListenable<AsyncValue>> Function(
+  WidgetRef ref,
+  int? userProfileId,
+);
 
 class DwUserAsyncScope<UserProfileClass extends SerializableModel>
     extends ConsumerStatefulWidget {
@@ -19,6 +18,9 @@ class DwUserAsyncScope<UserProfileClass extends SerializableModel>
 
   /// Function, which returns a list of async providers to subscribe to by `ref` and `userProfileId`.
   final DwAsyncProviderFactory? asyncProviderFactory;
+
+  final FutureOr<void> Function(WidgetRef ref, UserProfileClass? userProfile)?
+      postLoadTrigger;
 
   final bool skipOnSignIn;
 
@@ -30,6 +32,7 @@ class DwUserAsyncScope<UserProfileClass extends SerializableModel>
       child: CircularProgressIndicator(),
     ),
     this.asyncProviderFactory,
+    this.postLoadTrigger,
     this.skipOnSignIn = true,
   });
 
@@ -44,6 +47,7 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
   bool _isLoading = false;
   bool _delayed = false;
   bool _isAsyncLoading = false;
+  int? _postLoadTriggeredLastTimeForUserId;
 
   final List<ProviderSubscription> _subscriptions = [];
 
@@ -113,12 +117,24 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
     }
   }
 
-  void _updateProfileState() {
+  void _updateProfileState({bool withPostLoadTrigger = true}) {
     Future.microtask(() {
       if (!mounted) return;
-      ref.read(widget.userProfileProvider.notifier).state =
-          ref.read(dw.sessionProvider!).signedInUserProfile
-              as UserProfileClass?;
+
+      final profile = ref.read(dw.sessionProvider!).signedInUserProfile
+          as UserProfileClass?;
+
+      ref.read(widget.userProfileProvider.notifier).state = profile;
+
+      if (withPostLoadTrigger && widget.postLoadTrigger != null) {
+        if (_postLoadTriggeredLastTimeForUserId != _currentUserId) {
+          _postLoadTriggeredLastTimeForUserId = _currentUserId;
+          final result = widget.postLoadTrigger!(ref, profile);
+          if (result is Future<void>) {
+            unawaited(result);
+          }
+        }
+      }
     });
   }
 
@@ -130,7 +146,7 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
       if (prevId != nextId) {
         _loadProfile(nextId);
       } else {
-        _updateProfileState();
+        _updateProfileState(withPostLoadTrigger: false);
       }
     });
 
