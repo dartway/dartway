@@ -111,21 +111,27 @@ class DwCrudEndpoint extends Endpoint {
   }) async {
     try {
       final model = wrappedModel.object;
+      final className = wrappedModel.dwMappingClassname;
 
       if (model is! TableRow) {
-        throw UnsupportedError(
-          'Received item of unsupported type: ${model.runtimeType}. Only TableRow could be saved to database',
-        );
-      }
+        // throw UnsupportedError(
+        //   'Received item of unsupported type: ${model.runtimeType}. Only TableRow could be saved to database',
+        // );
+        final caller = DwCore.instance.getDtoConfig(className, api: apiGroup);
 
-      final className = wrappedModel.dwMappingClassname;
-      final caller =
-          DwCore.instance.getCrudConfig(className, api: apiGroup)?.saveConfig;
+        if (caller == null || caller is! DwDtoSaveConfig) {
+          return DwApiResponse.notConfigured(source: 'saveModel $className');
+        }
+        return await caller.save(session, model);
+      } else {
+        final caller =
+            DwCore.instance.getCrudConfig(className, api: apiGroup)?.saveConfig;
 
-      if (caller == null) {
-        return DwApiResponse.notConfigured(source: 'saveModel $className');
+        if (caller == null) {
+          return DwApiResponse.notConfigured(source: 'saveModel $className');
+        }
+        return await caller.save(session, model);
       }
-      return await caller.save(session, model);
     } catch (ex, st) {
       return returnError(
         'Unexpected error during saveModel ${wrappedModel.dwMappingClassname}',

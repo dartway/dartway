@@ -6,6 +6,7 @@ import '../business/auth/dw_auth.dart';
 import '../business/cloud_storage/dw_cloud_storage.dart';
 import '../crud/dw_auth_key_config.dart';
 import '../crud/dw_auth_request_config.dart';
+import '../domain/dto_config/dw_dto_config.dart';
 
 // TODO: add documentation
 /// The core class for the DartWay framework.
@@ -28,6 +29,7 @@ import '../crud/dw_auth_request_config.dart';
 class DwCore<UserProfileClass extends TableRow> {
   final Table userProfileTable;
   final Map<String, Map<String, DwCrudConfig>> _crudConfiguration = {};
+  final Map<String, Map<String, DwDtoConfig>> _dtoConfiguration = {};
 
   late final ColumnInt _userInfoIdColumn;
   late final ColumnString _userIdentifierColumn;
@@ -57,6 +59,7 @@ class DwCore<UserProfileClass extends TableRow> {
   static DwCore<UserProfileClass> init<UserProfileClass extends TableRow>({
     required Table userProfileTable,
     required List<DwCrudConfig> crudConfigurations,
+    required List<DwDtoConfig> dtoConfigurations,
     Include? userProfileInclude,
     required Future<UserProfileClass> Function(
       Session session, {
@@ -73,6 +76,7 @@ class DwCore<UserProfileClass extends TableRow> {
     final instance = DwCore<UserProfileClass>._(
       userProfileTable: userProfileTable,
       crudConfigurations: crudConfigurations,
+      dtoConfigurations: dtoConfigurations,
       userProfileInclude: userProfileInclude,
       userProfileConstructor: userProfileConstructor,
       alerts: dwAlerts,
@@ -91,6 +95,7 @@ class DwCore<UserProfileClass extends TableRow> {
   DwCore._({
     required this.userProfileTable,
     required List<DwCrudConfig> crudConfigurations,
+    required List<DwDtoConfig> dtoConfigurations,
     required Include? userProfileInclude,
     required Future<UserProfileClass> Function(
       Session session, {
@@ -136,6 +141,10 @@ class DwCore<UserProfileClass extends TableRow> {
       ].map((config) => MapEntry(config.className, config)),
     );
 
+    _dtoConfiguration[DwCoreConst.defaultApi] = Map.fromEntries(
+      dtoConfigurations.map((config) => MapEntry(config.className, config)),
+    );
+
     _crudConfiguration[DwCoreConst.defaultApi] = Map.fromEntries(
       crudConfigurations.map((config) => MapEntry(config.className, config)),
     );
@@ -143,6 +152,10 @@ class DwCore<UserProfileClass extends TableRow> {
 
   DwCrudConfig<TableRow>? getCrudConfig(String className, {String? api}) =>
       _crudConfiguration[api ?? DwCoreConst.defaultApi]?[className];
+
+  DwDtoConfig<SerializableModel>? getDtoConfig(String className,
+          {String? api}) =>
+      _dtoConfiguration[api ?? DwCoreConst.defaultApi]?[className];
 
   Future<UserProfileClass?> getUserProfile(Session session, int userId) async {
     final profile = await session.db.findFirstRow<UserProfileClass>(
