@@ -15,6 +15,7 @@ export 'src/domain/crud_config/configuration_classes/dw_get_model_list_config.da
 export 'src/domain/crud_config/configuration_classes/dw_save_config.dart';
 export 'src/domain/crud_config/configuration_classes/dw_save_context.dart';
 export 'src/domain/crud_config/dw_crud_config.dart';
+export 'src/domain/dto_config/configs/dw_dto_save_config.dart';
 export 'src/generated/endpoints.dart';
 export 'src/generated/protocol.dart';
 export 'src/utils/web_logs/dw_web_server_logger.dart';

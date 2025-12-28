@@ -26,31 +26,31 @@ class DwSaveConfig<T extends TableRow> {
 
   /// Проверка прав (insert & update).
   final Future<bool> Function(Session session, DwSaveContext<T> saveContext)
-  allowSave;
+      allowSave;
 
   /// Валидация модели. Возвращает текст ошибки или null.
   final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
-  validateSave;
+      validateSave;
 
   /// Подготовка модели перед сохранением.
   /// Выполняется внутри транзакции.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
-  beforeSaveTransaction;
+      beforeSaveTransaction;
 
   /// Дополнительные модификации в БД.
   /// Выполняется внутри транзакции.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
-  afterSaveTransaction;
+      afterSaveTransaction;
 
   /// Обогащение модели после сохранения.
   /// Выполняется **вне транзакции**, может быть долгой или асинхронной.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
-  afterSaveTransform;
+      afterSaveTransform;
 
   /// Побочные эффекты: уведомления, async-таски и пр.
   /// Выполняется **вне транзакции**, неблокирующе.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
-  afterSaveSideEffects;
+      afterSaveSideEffects;
 
   /// Универсальный метод сохранения модели.
   Future<DwApiResponse<DwModelWrapper>> save(Session session, T model) async {
@@ -97,16 +97,15 @@ class DwSaveConfig<T extends TableRow> {
         }
 
         // основной insert / update
-        saveContext.currentModel =
-            saveContext.isInsert
-                ? await session.db.insertRow<T>(
-                  saveContext.currentModel,
-                  transaction: transaction,
-                )
-                : await session.db.updateRow<T>(
-                  saveContext.currentModel,
-                  transaction: transaction,
-                );
+        saveContext.currentModel = saveContext.isInsert
+            ? await session.db.insertRow<T>(
+                saveContext.currentModel,
+                transaction: transaction,
+              )
+            : await session.db.updateRow<T>(
+                saveContext.currentModel,
+                transaction: transaction,
+              );
 
         // afterSave — дополнительные действия в БД
         if (afterSaveTransaction != null) {
