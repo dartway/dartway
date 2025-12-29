@@ -10,12 +10,11 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
-
-import '../auth_verification/dw_auth_verification_type.dart' as _i5;
-import '../dw_auth_fail_reason.dart' as _i6;
-import 'dw_auth_provider.dart' as _i4;
-import 'dw_auth_request_status.dart' as _i2;
-import 'dw_auth_request_type.dart' as _i3;
+import '../../auth/auth_request/dw_auth_request_status.dart' as _i2;
+import '../../auth/auth_request/dw_auth_request_type.dart' as _i3;
+import '../../auth/auth_request/dw_auth_provider.dart' as _i4;
+import '../../auth/auth_verification/dw_auth_verification_type.dart' as _i5;
+import '../../auth/dw_auth_fail_reason.dart' as _i6;
 
 abstract class DwAuthRequest
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {

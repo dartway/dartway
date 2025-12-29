@@ -20,6 +20,14 @@ class DwCrudEndpoint extends Endpoint {
     return DwApiResponse(isOk: false, value: null, error: errorMessage);
   }
 
+  Stream<SerializableModel> subscribeOnUpdates(
+    Session session, {
+    required String channel,
+  }) async* {
+    print("subscribeOnUpdates for $channel");
+    yield* session.messages.createStream<SerializableModel>(channel);
+  }
+
   Future<DwApiResponse<DwModelWrapper>> getOne(
     Session session, {
     required String className,

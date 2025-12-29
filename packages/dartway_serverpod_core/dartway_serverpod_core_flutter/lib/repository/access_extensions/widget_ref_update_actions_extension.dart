@@ -58,22 +58,22 @@ extension WidgetRefUpdateActionsExtension on WidgetRef {
         .then((response) => processApiResponse<bool>(response));
   }
 
-  updateRepository(
-    List<DwModelWrapper> wrappedModels,
-    // {
-    // bool updateListeners = true,
-    // }
-  ) {
-    // for (var wrapper in wrappedModels) {
-    //   // for (var repo in NitRepository.getAllModelProviders(wrapper)) {
-    //   //   read(repo.notifier).state = wrapper.isDeleted ? null : wrapper.model;
-    //   // }
+  // updateRepository(
+  //   List<DwModelWrapper> wrappedModels,
+  // {
+  // bool updateListeners = true,
+  // }
+  // ) {
+  // for (var wrapper in wrappedModels) {
+  //   // for (var repo in NitRepository.getAllModelProviders(wrapper)) {
+  //   //   read(repo.notifier).state = wrapper.isDeleted ? null : wrapper.model;
+  //   // }
 
-    // }
-    // if (updateListeners) {
-    DwRepository.updateListeningStates(wrappedModelUpdates: wrappedModels);
-    // }
-  }
+  // }
+  // if (updateListeners) {
+  // DwRepository.updateListeningStates(wrappedModelUpdates: wrappedModels);
+  // }
+  // }
 
   K processApiResponse<K>(
     DwApiResponse<K> response,
@@ -92,9 +92,8 @@ extension WidgetRefUpdateActionsExtension on WidgetRef {
     // }
 
     if ((response.updatedModels ?? []).isNotEmpty) {
-      updateRepository(
-        response.updatedModels ?? [],
-        // updateListeners: updateListeners,
+      DwRepository.updateListeningStates(
+        wrappedModelUpdates: response.updatedModels ?? [],
       );
     }
 
@@ -105,9 +104,7 @@ extension WidgetRefUpdateActionsExtension on WidgetRef {
     return response.value! as K;
   }
 
-  updateFromStream(DwModelWrapper update) {
-    if (update.modelId != null) {
-      updateRepository([update]);
-    }
-  }
+  // updateFromStream(DwModelWrapper update) {
+
+  // }
 }

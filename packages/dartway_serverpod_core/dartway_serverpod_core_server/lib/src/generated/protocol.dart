@@ -8,16 +8,9 @@
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
 
-import 'package:dartway_serverpod_core_server/src/domain/api/dw_model_wrapper.dart'
-    as _i18;
-import 'package:serverpod/protocol.dart' as _i2;
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
-
-import '/src/domain/api/dw_api_response.dart' as _i19;
-import '/src/domain/api/dw_auth_data.dart' as _i20;
-import '/src/domain/api/dw_backend_filter.dart' as _i21;
-import '/src/domain/api/dw_model_wrapper.dart' as _i17;
+import 'package:serverpod/protocol.dart' as _i2;
 import 'auth/auth_request/dw_auth_provider.dart' as _i3;
 import 'auth/auth_request/dw_auth_request.dart' as _i4;
 import 'auth/auth_request/dw_auth_request_status.dart' as _i5;
@@ -32,7 +25,12 @@ import 'dw_app_notification.dart' as _i13;
 import 'dw_backend_filter_type.dart' as _i14;
 import 'dw_updates_transport.dart' as _i15;
 import 'dw_webhook_log.dart' as _i16;
-
+import '/src/domain/api/dw_model_wrapper.dart' as _i17;
+import 'package:dartway_serverpod_core_server/src/domain/api/dw_model_wrapper.dart'
+    as _i18;
+import '/src/domain/api/dw_api_response.dart' as _i19;
+import '/src/domain/api/dw_auth_data.dart' as _i20;
+import '/src/domain/api/dw_backend_filter.dart' as _i21;
 export 'auth/auth_request/dw_auth_provider.dart';
 export 'auth/auth_request/dw_auth_request.dart';
 export 'auth/auth_request/dw_auth_request_status.dart';
@@ -123,12 +121,12 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        ),
+        )
       ],
       managed: true,
     ),
@@ -167,7 +165,7 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
@@ -180,7 +178,7 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'userId',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: false,
@@ -274,12 +272,12 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        ),
+        )
       ],
       managed: true,
     ),
@@ -332,7 +330,7 @@ class Protocol extends _i1.SerializationManagerServer {
           onUpdate: _i2.ForeignKeyAction.noAction,
           onDelete: _i2.ForeignKeyAction.noAction,
           matchType: null,
-        ),
+        )
       ],
       indexes: [
         _i2.IndexDefinition(
@@ -342,12 +340,12 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        ),
+        )
       ],
       managed: true,
     ),
@@ -422,12 +420,12 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        ),
+        )
       ],
       managed: true,
     ),
@@ -478,7 +476,7 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
@@ -491,7 +489,7 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'userId',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
@@ -589,19 +587,22 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            ),
+            )
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        ),
+        )
       ],
       managed: true,
     ),
   ];
 
   @override
-  T deserialize<T>(dynamic data, [Type? t]) {
+  T deserialize<T>(
+    dynamic data, [
+    Type? t,
+  ]) {
     t ??= T;
     if (t == _i3.DwAuthProvider) {
       return _i3.DwAuthProvider.fromJson(data) as T;
@@ -693,27 +694,22 @@ class Protocol extends _i1.SerializationManagerServer {
     }
     if (t == _i1.getType<Map<String, String>?>()) {
       return (data != null
-              ? (data as Map).map(
-                (k, v) =>
-                    MapEntry(deserialize<String>(k), deserialize<String>(v)),
-              )
-              : null)
-          as T;
+          ? (data as Map).map((k, v) =>
+              MapEntry(deserialize<String>(k), deserialize<String>(v)))
+          : null) as T;
     }
     if (t == List<_i17.DwModelWrapper>) {
       return (data as List)
-              .map((e) => deserialize<_i17.DwModelWrapper>(e))
-              .toList()
-          as T;
+          .map((e) => deserialize<_i17.DwModelWrapper>(e))
+          .toList() as T;
     }
     if (t == _i17.DwModelWrapper) {
       return _i17.DwModelWrapper.fromJson(data) as T;
     }
     if (t == List<_i18.DwModelWrapper>) {
       return (data as List)
-              .map((e) => deserialize<_i18.DwModelWrapper>(e))
-              .toList()
-          as T;
+          .map((e) => deserialize<_i18.DwModelWrapper>(e))
+          .toList() as T;
     }
     if (t == _i19.DwApiResponse) {
       return _i19.DwApiResponse.fromJson(data) as T;

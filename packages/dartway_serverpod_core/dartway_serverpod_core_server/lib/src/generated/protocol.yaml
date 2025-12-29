@@ -1,4 +1,5 @@
 dwCrud:
+  - subscribeOnUpdates:
   - getOne:
   - getCount:
   - getAll:
