@@ -9,12 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../private/dw_singleton.dart';
 import '../session/logic/dw_session_state.dart';
 import '../session/logic/dw_session_state_model.dart';
+import '../socket_state/dw_socket_state.dart';
 
-class DwCore<
-  ServerpodClientClass extends ServerpodClientShared,
-  UserProfileClass extends SerializableModel
->
-    extends DwFlutter {
+class DwCore<ServerpodClientClass extends ServerpodClientShared,
+    UserProfileClass extends SerializableModel> extends DwFlutter {
   DwCore({
     required super.config,
     required this.client,
@@ -37,27 +35,21 @@ class DwCore<
     }
     endpointCaller = dartwayCaller as dartway.Caller;
 
-    sessionProvider =
-        (client.authenticationKeyManager == null)
-            ? null
-            : StateNotifierProvider<
-              DwSessionStateNotifier<UserProfileClass>,
-              DwSessionStateModel<UserProfileClass>
-            >(
-              (ref) => DwSessionStateNotifier<UserProfileClass>(
-                ref,
-                client.authenticationKeyManager as DwAuthenticationKeyManager,
-              ),
-            );
+    sessionProvider = (client.authenticationKeyManager == null)
+        ? null
+        : StateNotifierProvider<DwSessionStateNotifier<UserProfileClass>,
+            DwSessionStateModel<UserProfileClass>>(
+            (ref) => DwSessionStateNotifier<UserProfileClass>(
+              ref,
+              client.authenticationKeyManager as DwAuthenticationKeyManager,
+            ),
+          );
   }
 
   final ServerpodClientClass client;
   final DwAlerts dwAlerts;
-  late final StateNotifierProvider<
-    DwSessionStateNotifier<UserProfileClass>,
-    DwSessionStateModel<UserProfileClass>
-  >?
-  sessionProvider;
+  late final StateNotifierProvider<DwSessionStateNotifier<UserProfileClass>,
+      DwSessionStateModel<UserProfileClass>>? sessionProvider;
 
   late final dartway.Caller endpointCaller;
 
@@ -100,6 +92,7 @@ class DwCore<
 
     if (sessionProvider != null) {
       await ref.read(sessionProvider!.notifier).initialize();
+      await ref.read(dwSocketStateProvider.notifier).init(client: client);
     }
 
     if (kDebugMode) {

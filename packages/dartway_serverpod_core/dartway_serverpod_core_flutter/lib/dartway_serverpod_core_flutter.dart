@@ -17,4 +17,5 @@ export 'repository/states/dw_single_model_state.dart';
 export 'session/dw_session_extensions.dart';
 export 'session/dw_user_async_scope.dart';
 export 'session/logic/dw_authentification_key_manager.dart';
+export 'socket_state/dw_channel_subscription_widget.dart';
 export 'utils/dw_file_upload_handler.dart';
