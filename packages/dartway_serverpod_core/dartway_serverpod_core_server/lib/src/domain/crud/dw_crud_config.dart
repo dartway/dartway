@@ -1,7 +1,9 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-class DwCrudConfig<T extends TableRow> {
+import 'domain/dw_crud_entity.dart';
+
+class DwCrudConfig<T extends TableRow> with DwCrudEntity<T> {
   const DwCrudConfig({
     required this.table,
     this.getModelConfigs,
@@ -17,13 +19,11 @@ class DwCrudConfig<T extends TableRow> {
   final List<DwGetModelConfig<T>>? getModelConfigs;
 
   /// Rules for fetching lists of models.
-  final DwGetListConfig<T>? getListConfig;
+  final DwGetModelListConfig<T>? getListConfig;
 
   /// Rules for creating or updating models (insert + update).
   final DwSaveConfig<T>? saveConfig;
 
   /// Rules for deleting models.
   final DwDeleteConfig<T>? deleteConfig;
-
-  String get className => T.toString();
 }

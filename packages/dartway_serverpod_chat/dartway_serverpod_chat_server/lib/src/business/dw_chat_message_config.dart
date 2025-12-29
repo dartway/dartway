@@ -7,7 +7,7 @@ import '../crud/dw_chat_participant_config.dart';
 
 final chatMessageCrudConfig = DwCrudConfig<DwChatMessage>(
   table: DwChatMessage.t,
-  getListConfig: DwGetListConfig(
+  getListConfig: DwGetModelListConfig(
     defaultOrderByList: [Order(column: DwChatMessage.t.sentAt)],
     // TODO: implement attachments fetching
     // additionalModelsFetchFunction: (session, models) async {
@@ -31,70 +31,73 @@ final chatMessageCrudConfig = DwCrudConfig<DwChatMessage>(
     allowDelete: (session, model) async => session.isUser(model.userId),
   ),
   saveConfig: DwSaveConfig(
-    allowSave:
-        (session, saveContext) async =>
-            session.isUser(saveContext.currentModel.userId),
+    allowSave: (session, saveContext) async =>
+        session.isUser(saveContext.currentModel.userId),
     afterSaveTransaction: (session, saveContext) async {
       final chatParticipants = await DwChatParticipant.db.find(
         session,
-        where:
-            (t) =>
-                t.chatChannelId.equals(saveContext.currentModel.chatChannelId),
+        where: (t) =>
+            t.chatChannelId.equals(saveContext.currentModel.chatChannelId),
         include: chatParticipantInclude,
       );
 
       List<DwChatParticipant> updatedParticipants = [];
 
       if (saveContext.isInsert) {
-        updatedParticipants = await DwChatParticipant.db.update(session, [
-          for (var p in chatParticipants)
-            p.copyWith(
-              lastMessage: saveContext.currentModel,
-              lastMessageId: saveContext.currentModel.id,
-              lastMessageSentAt: saveContext.currentModel.sentAt,
-              unreadCount:
-                  saveContext.currentUserId == p.userId
-                      ? p.unreadCount
-                      : p.unreadCount + 1,
-            ),
-        ], transaction: saveContext.transaction);
-      } else {
-        final isLastMessage =
-            saveContext.currentModel.id ==
-            chatParticipants.firstOrNull?.lastMessageId;
-
-        if (!saveContext.currentModel.isDeleted) {
-          if (isLastMessage) {
-            updatedParticipants = await DwChatParticipant.db.update(session, [
+        updatedParticipants = await DwChatParticipant.db.update(
+            session,
+            [
               for (var p in chatParticipants)
                 p.copyWith(
                   lastMessage: saveContext.currentModel,
                   lastMessageId: saveContext.currentModel.id,
                   lastMessageSentAt: saveContext.currentModel.sentAt,
+                  unreadCount: saveContext.currentUserId == p.userId
+                      ? p.unreadCount
+                      : p.unreadCount + 1,
                 ),
-            ], transaction: saveContext.transaction);
+            ],
+            transaction: saveContext.transaction);
+      } else {
+        final isLastMessage = saveContext.currentModel.id ==
+            chatParticipants.firstOrNull?.lastMessageId;
+
+        if (!saveContext.currentModel.isDeleted) {
+          if (isLastMessage) {
+            updatedParticipants = await DwChatParticipant.db.update(
+                session,
+                [
+                  for (var p in chatParticipants)
+                    p.copyWith(
+                      lastMessage: saveContext.currentModel,
+                      lastMessageId: saveContext.currentModel.id,
+                      lastMessageSentAt: saveContext.currentModel.sentAt,
+                    ),
+                ],
+                transaction: saveContext.transaction);
           }
         } else {
           if (!isLastMessage) {
-            updatedParticipants = await DwChatParticipant.db.update(session, [
-              for (var p in chatParticipants)
-                p.copyWith(
-                  unreadCount:
-                      p.unreadCount > 0
+            updatedParticipants = await DwChatParticipant.db.update(
+                session,
+                [
+                  for (var p in chatParticipants)
+                    p.copyWith(
+                      unreadCount: p.unreadCount > 0
                           ? p.unreadCount - 1
                           : 0, //TODO: можно сделать лучше
-                ),
-            ], transaction: saveContext.transaction);
+                    ),
+                ],
+                transaction: saveContext.transaction);
           } else {
             // Логика удаления: находим новое последнее НЕУДАЛЁННОЕ сообщение
             final newLastMessage = await DwChatMessage.db.findFirstRow(
               session,
-              where:
-                  (t) =>
-                      t.chatChannelId.equals(
-                        saveContext.currentModel.chatChannelId,
-                      ) &
-                      t.isDeleted.equals(false),
+              where: (t) =>
+                  t.chatChannelId.equals(
+                    saveContext.currentModel.chatChannelId,
+                  ) &
+                  t.isDeleted.equals(false),
               orderDescending: true,
               orderBy: (t) => t.id,
             );
@@ -102,18 +105,20 @@ final chatMessageCrudConfig = DwCrudConfig<DwChatMessage>(
             // if (newLastMessage == null) {
             //   return;
             // }
-            updatedParticipants = await DwChatParticipant.db.update(session, [
-              for (var p in chatParticipants)
-                p.copyWith(
-                  lastMessage: newLastMessage,
-                  lastMessageId: newLastMessage?.id,
-                  lastMessageSentAt: newLastMessage?.sentAt,
-                  unreadCount:
-                      p.unreadCount > 0
+            updatedParticipants = await DwChatParticipant.db.update(
+                session,
+                [
+                  for (var p in chatParticipants)
+                    p.copyWith(
+                      lastMessage: newLastMessage,
+                      lastMessageId: newLastMessage?.id,
+                      lastMessageSentAt: newLastMessage?.sentAt,
+                      unreadCount: p.unreadCount > 0
                           ? p.unreadCount - 1
                           : 0, //TODO: можно сделать лучше
-                ),
-            ], transaction: saveContext.transaction);
+                    ),
+                ],
+                transaction: saveContext.transaction);
           }
         }
       }
@@ -130,10 +135,9 @@ final chatMessageCrudConfig = DwCrudConfig<DwChatMessage>(
 
       final otherParticipants = await DwChatParticipant.db.find(
         session,
-        where:
-            (t) =>
-                t.chatChannelId.equals(saveContext.currentModel.chatChannelId) &
-                t.userId.notEquals(saveContext.currentModel.userId),
+        where: (t) =>
+            t.chatChannelId.equals(saveContext.currentModel.chatChannelId) &
+            t.userId.notEquals(saveContext.currentModel.userId),
         include: chatParticipantInclude,
       );
 
