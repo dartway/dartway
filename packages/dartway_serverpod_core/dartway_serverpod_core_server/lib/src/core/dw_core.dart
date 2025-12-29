@@ -6,7 +6,7 @@ import '../business/auth/dw_auth.dart';
 import '../business/cloud_storage/dw_cloud_storage.dart';
 import '../crud/dw_auth_key_config.dart';
 import '../crud/dw_auth_request_config.dart';
-import '../domain/dto_config/dw_dto_config.dart';
+import '../domain/crud/domain/dw_crud_entity.dart';
 
 // TODO: add documentation
 /// The core class for the DartWay framework.
@@ -29,7 +29,7 @@ import '../domain/dto_config/dw_dto_config.dart';
 class DwCore<UserProfileClass extends TableRow> {
   final Table userProfileTable;
   final Map<String, Map<String, DwCrudConfig>> _crudConfiguration = {};
-  final Map<String, Map<String, DwDtoConfig>> _dtoConfiguration = {};
+  final Map<String, Map<String, DwCrudEntity>> _dtoConfiguration = {};
 
   late final ColumnInt _userInfoIdColumn;
   late final ColumnString _userIdentifierColumn;
@@ -59,7 +59,7 @@ class DwCore<UserProfileClass extends TableRow> {
   static DwCore<UserProfileClass> init<UserProfileClass extends TableRow>({
     required Table userProfileTable,
     required List<DwCrudConfig> crudConfigurations,
-    required List<DwDtoConfig> dtoConfigurations,
+    required List<DwCrudEntity> dtoConfigurations,
     Include? userProfileInclude,
     required Future<UserProfileClass> Function(
       Session session, {
@@ -95,7 +95,7 @@ class DwCore<UserProfileClass extends TableRow> {
   DwCore._({
     required this.userProfileTable,
     required List<DwCrudConfig> crudConfigurations,
-    required List<DwDtoConfig> dtoConfigurations,
+    required List<DwCrudEntity> dtoConfigurations,
     required Include? userProfileInclude,
     required Future<UserProfileClass> Function(
       Session session, {
@@ -153,7 +153,7 @@ class DwCore<UserProfileClass extends TableRow> {
   DwCrudConfig<TableRow>? getCrudConfig(String className, {String? api}) =>
       _crudConfiguration[api ?? DwCoreConst.defaultApi]?[className];
 
-  DwDtoConfig<SerializableModel>? getDtoConfig(String className,
+  DwCrudEntity<SerializableModel>? getDtoConfig(String className,
           {String? api}) =>
       _dtoConfiguration[api ?? DwCoreConst.defaultApi]?[className];
 

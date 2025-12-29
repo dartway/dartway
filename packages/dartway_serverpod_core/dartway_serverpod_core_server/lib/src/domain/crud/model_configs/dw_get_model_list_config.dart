@@ -1,10 +1,12 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-import 'dw_get_config_interface.dart';
+import '../domain/dw_get_interface.dart';
+import '../domain/dw_get_list_interface.dart';
 
-class DwGetListConfig<T extends TableRow> extends DwGetConfigInterface<T> {
-  const DwGetListConfig({
+class DwGetModelListConfig<Model extends TableRow>
+    extends DwGetConfigInterface<Model> implements DwGetListInterface<Model> {
+  const DwGetModelListConfig({
     required super.accessFilter,
     super.include,
     // this.additionalModelsFetchFunction,
@@ -15,7 +17,7 @@ class DwGetListConfig<T extends TableRow> extends DwGetConfigInterface<T> {
     Session session, {
     Expression? whereClause,
   }) async {
-    final result = await session.db.count<T>(
+    final result = await session.db.count<Model>(
       where: await getWhereExpression(session, whereClause: whereClause),
     );
 
@@ -28,7 +30,7 @@ class DwGetListConfig<T extends TableRow> extends DwGetConfigInterface<T> {
     int? limit,
     int? offset,
   }) async {
-    final resultItems = await session.db.find<T>(
+    final resultItems = await session.db.find<Model>(
       where: await getWhereExpression(session, whereClause: whereClause),
       include: include,
       orderByList: defaultOrderByList,

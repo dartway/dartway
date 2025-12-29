@@ -2,6 +2,8 @@ import 'package:collection/collection.dart';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../domain/crud/domain/dw_get_list_interface.dart';
+
 class DwCrudEndpoint extends Endpoint {
   final _deepEquality = const DeepCollectionEquality();
 
@@ -90,15 +92,27 @@ class DwCrudEndpoint extends Endpoint {
     int? offset,
     String? apiGroup,
   }) async {
-    final caller = DwCore.instance.getCrudConfig(className, api: apiGroup);
+    final crudConfig = DwCore.instance.getCrudConfig(className, api: apiGroup);
 
-    if (caller?.getListConfig == null) {
+    DwGetListInterface? caller = crudConfig?.getListConfig;
+
+    if (caller == null) {
+      final dtoConfig = DwCore.instance.getDtoConfig(className, api: apiGroup);
+      if (dtoConfig is DwDtoGetListConfig) {
+        caller = dtoConfig;
+      }
+    }
+
+    if (caller == null) {
       return DwApiResponse.notConfigured(source: 'получение списка $className');
     }
 
-    return await caller!.getListConfig!.getModelList(
+    final table =
+        caller is DwDtoGetListConfig ? caller.queryTable : crudConfig!.table;
+
+    return await caller.getModelList(
       session,
-      whereClause: filter?.prepareWhere(caller.table),
+      whereClause: filter?.prepareWhere(table),
       limit: limit,
       offset: offset,
     );

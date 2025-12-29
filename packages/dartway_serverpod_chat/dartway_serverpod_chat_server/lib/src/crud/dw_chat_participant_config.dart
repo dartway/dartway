@@ -11,7 +11,7 @@ final chatParticipantInclude = DwChatParticipant.include(
 
 final chatParticipantCrudConfig = DwCrudConfig<DwChatParticipant>(
   table: DwChatParticipant.t,
-  getListConfig: DwGetListConfig<DwChatParticipant>(
+  getListConfig: DwGetModelListConfig<DwChatParticipant>(
     defaultOrderByList: [
       Order(
         column: DwChatParticipant.t.lastMessageSentAt,

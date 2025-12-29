@@ -1,7 +1,7 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-import 'dw_get_config_interface.dart';
+import '../domain/dw_get_interface.dart';
 
 class DwGetModelConfig<T extends TableRow> extends DwGetConfigInterface<T> {
   const DwGetModelConfig({

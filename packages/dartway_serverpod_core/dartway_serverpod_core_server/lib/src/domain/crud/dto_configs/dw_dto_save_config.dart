@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-import '../dw_dto_config.dart';
+import '../domain/dw_crud_entity.dart';
 
-class DwDtoSaveConfig<DTO extends SerializableModel> extends DwDtoConfig<DTO> {
+class DwDtoSaveConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
   const DwDtoSaveConfig({
     required this.saveProcessing,
     this.afterSaveSideEffects,
@@ -45,7 +45,7 @@ class DwDtoSaveConfig<DTO extends SerializableModel> extends DwDtoConfig<DTO> {
 
     return DwApiResponse(
       isOk: true,
-      value: null,
+      value: DwModelWrapper(object: dto),
       updatedModels: updatedModels,
     );
   }
