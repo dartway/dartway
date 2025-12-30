@@ -39,7 +39,10 @@ class DwDtoGetListConfig<DTO extends SerializableModel, Model extends TableRow>
     int? offset,
   }) async {
     final resultItems = await session.db.find<Model>(
-      where: await getWhereExpression(session, whereClause: whereClause),
+      where: await getWhereExpression(
+        session,
+        whereClause: whereClause,
+      ),
       include: include,
       orderByList: defaultOrderByList,
       limit: limit,

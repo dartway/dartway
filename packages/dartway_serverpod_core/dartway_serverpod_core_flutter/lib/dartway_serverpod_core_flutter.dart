@@ -9,7 +9,9 @@ export 'repository/access_extensions/widget_ref_model_list_state_extension.dart'
 export 'repository/access_extensions/widget_ref_update_actions_extension.dart';
 export 'repository/access_extensions/widget_ref_watch_and_read_extension.dart';
 export 'repository/domain/dw_backend_filters_mixin.dart';
+export 'repository/domain/dw_cursor_pagination.dart';
 export 'repository/domain/dw_model_list_state_config.dart';
+export 'repository/domain/dw_offset_pagination.dart';
 export 'repository/domain/dw_single_model_state_config.dart';
 export 'repository/dw_repository.dart';
 export 'session/dw_session_extensions.dart';

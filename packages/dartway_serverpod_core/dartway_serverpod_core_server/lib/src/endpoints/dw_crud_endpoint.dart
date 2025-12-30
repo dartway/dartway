@@ -120,7 +120,9 @@ class DwCrudEndpoint extends Endpoint {
 
     return await caller.getModelList(
       session,
-      whereClause: filter?.prepareWhere(table),
+      whereClause: filter?.prepareWhere(
+        table,
+      ),
       limit: limit,
       offset: offset,
     );
@@ -141,7 +143,7 @@ class DwCrudEndpoint extends Endpoint {
         // );
         final caller = DwCore.instance.getDtoConfig(className, api: apiGroup);
 
-        if (caller == null || caller is! DwDtoSaveConfig) {
+        if (caller == null || caller is! DwDtoActionConfig) {
           return DwApiResponse.notConfigured(source: 'saveModel $className');
         }
         return await caller.save(session, model);
