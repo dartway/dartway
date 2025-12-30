@@ -5,14 +5,14 @@ import 'package:serverpod/serverpod.dart';
 
 import '../domain/dw_crud_entity.dart';
 
-class DwDtoSaveConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
-  const DwDtoSaveConfig({
-    required this.saveProcessing,
+class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
+  const DwDtoActionConfig({
+    required this.actionProcessing,
     this.afterSaveSideEffects,
   });
 
   final Future<List<DwModelWrapper>> Function(
-      Session session, Transaction transaction, DTO dto) saveProcessing;
+      Session session, Transaction transaction, DTO dto) actionProcessing;
 
   final Future<void> Function(
     Session session,
@@ -27,7 +27,7 @@ class DwDtoSaveConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
 
     try {
       await session.db.transaction((transaction) async {
-        updatedModels = await saveProcessing(session, transaction, dto);
+        updatedModels = await actionProcessing(session, transaction, dto);
       });
     } on DatabaseException catch (e) {
       // TODO: Добавить логирование ошибки и алертинг

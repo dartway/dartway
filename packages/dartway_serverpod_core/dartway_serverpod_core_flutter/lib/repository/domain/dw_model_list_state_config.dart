@@ -2,6 +2,8 @@ import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'dw_pagination_strategy.dart';
+
 class DwRelationUpdatesConfig<Model extends SerializableModel,
     RelationModel extends SerializableModel> {
   final Model Function(Model parentModel, List<DwModelWrapper> relatedModels)
@@ -40,20 +42,22 @@ class DwRelationUpdatesConfig<Model extends SerializableModel,
 class DwModelListStateConfig<Model extends SerializableModel>
     implements DwInfiniteListViewConfig<Model> {
   final DwBackendFilter? backendFilter;
-  final int? pageSize;
+  // final int? pageSize;
   final String? apiGroupOverride;
   final Function(List<DwModelWrapper>)? customUpdatesListener;
   final List<DwRelationUpdatesConfig<Model, SerializableModel>>?
       relationUpdatesConfigs;
   final int Function(Model a, Model b)? updatesSortingMethod;
+  final DwPaginationStrategy? paginationStrategy;
 
   const DwModelListStateConfig({
     this.backendFilter,
-    this.pageSize,
+    // this.pageSize,
     this.apiGroupOverride,
     this.customUpdatesListener,
     this.relationUpdatesConfigs,
     this.updatesSortingMethod,
+    this.paginationStrategy,
   });
 
   @override
@@ -73,7 +77,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
     return identical(this, other) ||
         other is DwModelListStateConfig<Model> &&
             backendFilter == other.backendFilter &&
-            pageSize == other.pageSize &&
+            paginationStrategy == other.paginationStrategy &&
             apiGroupOverride == other.apiGroupOverride &&
             customUpdatesListener == other.customUpdatesListener &&
             relationUpdatesConfigs == other.relationUpdatesConfigs &&
@@ -83,7 +87,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
   @override
   int get hashCode =>
       backendFilter.hashCode ^
-      pageSize.hashCode ^
+      paginationStrategy.hashCode ^
       apiGroupOverride.hashCode ^
       customUpdatesListener.hashCode ^
       relationUpdatesConfigs.hashCode ^
@@ -98,7 +102,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
   }) {
     return DwModelListStateConfig<Model>(
       backendFilter: backendFilter ?? this.backendFilter,
-      pageSize: pageSize ?? this.pageSize,
+      paginationStrategy: paginationStrategy ?? this.paginationStrategy,
       apiGroupOverride: apiGroupOverride ?? this.apiGroupOverride,
       customUpdatesListener:
           customUpdatesListener ?? this.customUpdatesListener,
@@ -112,7 +116,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
   String toString() {
     return 'DwModelListStateConfig<$Model>('
         'backendFilter: $backendFilter, '
-        'pageSize: $pageSize, '
+        'paginationStrategy: $paginationStrategy, '
         'apiGroupOverride: $apiGroupOverride, '
         'customUpdatesListener: $customUpdatesListener, '
         'relationUpdatesConfigs: $relationUpdatesConfigs, '

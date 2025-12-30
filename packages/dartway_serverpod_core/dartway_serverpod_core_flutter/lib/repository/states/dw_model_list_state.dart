@@ -3,12 +3,14 @@ import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/dw_no_pagination.dart';
+import '../domain/dw_pagination_strategy.dart';
+
 class DwModelListState<Model extends SerializableModel>
     extends FamilyAsyncNotifier<List<Model>, DwModelListStateConfig<Model>>
 // implements ModelManagerInterface<Model>
 {
-  late int _nextPage;
-
+  late DwPaginationStrategy _paginationStrategy;
   @override
   Future<List<Model>> build(DwModelListStateConfig config) async {
     ref.onDispose(() {
@@ -19,9 +21,6 @@ class DwModelListState<Model extends SerializableModel>
         relationConfig.removeUpdatesListener();
       }
     });
-
-    _nextPage = 0;
-
     final globalTimestamp = ref.watch(
       DwRepository.globalRefreshTriggerProvider,
     );
@@ -29,6 +28,10 @@ class DwModelListState<Model extends SerializableModel>
     debugPrint(
       "Building state for ${DwRepository.typeName<Model>()} with timestamp $globalTimestamp",
     );
+
+    _paginationStrategy = config.paginationStrategy ?? DwNoPagination();
+
+    _paginationStrategy.reset();
 
     final data = await _loadData();
 
@@ -49,37 +52,86 @@ class DwModelListState<Model extends SerializableModel>
   }
 
   Future<bool> loadNextPage() async {
-    return await future.then((currentState) async {
-      final data = await _loadData();
+    if (_paginationStrategy.hasMore == false) return false;
 
-      state = AsyncValue.data(<Model>[...currentState, ..._processData(data)]);
+    final current = await future;
+    final data = await _loadData();
 
-      return data.length == arg.pageSize;
-    });
+    state = AsyncValue.data([
+      ...current,
+      ..._processData(data),
+    ]);
+
+    return _paginationStrategy.hasMore;
+
+    // return await future.then((currentState) async {
+    //   final data = await _loadData();
+
+    //   state = AsyncValue.data(<Model>[...currentState, ..._processData(data)]);
+
+    //   return data.length == arg.pageSize;
+    // });
   }
 
   _processData(List<DwModelWrapper> data) => data.map((e) => e.model as Model);
 
   Future<List<DwModelWrapper>> _loadData() async {
-    final result = await dw.endpointCaller.dwCrud
-        .getAll(
-          className: DwRepository.typeName<Model>(),
-          filter: arg.backendFilter,
-          limit: arg.pageSize,
-          offset: arg.pageSize != null ? (_nextPage++ * arg.pageSize!) : null,
-        )
-        .then(
-          (response) => ref.processApiResponse<List<DwModelWrapper>>(
-            response,
-            // updateListeners: false,
+    if (!_paginationStrategy.hasMore) return [];
+
+    final params = _paginationStrategy.buildParams();
+
+    final filter = DwBackendFilter.and(
+      <DwBackendFilter>[
+        if (arg.backendFilter != null) arg.backendFilter!,
+        if (params.afterId != null)
+          DwBackendFilter.value(
+            type: DwBackendFilterType.greaterThan,
+            fieldName: 'id',
+            fieldValue: params.afterId,
           ),
-        );
+        if (params.beforeId != null)
+          DwBackendFilter.value(
+            type: DwBackendFilterType.lessThan,
+            fieldName: 'id',
+            fieldValue: params.beforeId,
+          ),
+      ],
+    );
 
-    if (result == null) return <DwModelWrapper>[];
+    final response = await dw.endpointCaller.dwCrud.getAll(
+      className: DwRepository.typeName<Model>(),
+      filter: filter,
+      limit: params.limit,
+      offset: params.offset,
+    );
 
-    // ref.updateRepository(result, updateListeners: false);
+    final result = ref.processApiResponse(response);
 
-    return result;
+    final data = result ?? [];
+
+    _paginationStrategy.onPageLoaded(data);
+
+    return data;
+
+    // final result = await dw.endpointCaller.dwCrud
+    //     .getAll(
+    //       className: DwRepository.typeName<Model>(),
+    //       filter: arg.backendFilter,
+    //       limit: arg.pageSize,
+    //       offset: arg.pageSize != null ? (_nextPage++ * arg.pageSize!) : null,
+    //     )
+    //     .then(
+    //       (response) => ref.processApiResponse<List<DwModelWrapper>>(
+    //         response,
+    //         // updateListeners: false,
+    //       ),
+    //     );
+
+    // if (result == null) return <DwModelWrapper>[];
+
+    // // ref.updateRepository(result, updateListeners: false);
+
+    // return result;
   }
 
   void _updatesListener(List<DwModelWrapper> wrappedModelUpdates) async {
