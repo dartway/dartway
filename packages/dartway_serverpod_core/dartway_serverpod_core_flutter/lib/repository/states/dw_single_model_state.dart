@@ -31,7 +31,7 @@ class DwSingleModelState<Model extends SerializableModel>
           );
 
     final fetchedWrappedModel = response != null
-        ? ref.processApiResponse<DwModelWrapper>(response)
+        ? ref.processApiResponse<DwModelWrapper?>(response)
         : null;
 
     DwRepository.addUpdatesListener<Model>(_updatesListener);

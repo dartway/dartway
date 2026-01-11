@@ -12,6 +12,8 @@ export 'repository/domain/dw_backend_filters_mixin.dart';
 export 'repository/domain/dw_model_list_state_config.dart';
 export 'repository/domain/dw_single_model_state_config.dart';
 export 'repository/dw_repository.dart';
+export 'repository/states/dw_model_list_state.dart';
+export 'repository/states/dw_single_model_state.dart';
 export 'session/dw_session_extensions.dart';
 export 'session/dw_user_async_scope.dart';
 export 'session/logic/dw_authentification_key_manager.dart';
