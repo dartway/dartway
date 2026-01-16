@@ -15,7 +15,7 @@ part 'zones/auth_routes.dart';
 enum AppParams<T> with DwNavigationParamsMixin<T> { bookId<int>() }
 
 final DwRouter<AppSession> appRouter = DwRouter(
-  refreshListenable: AppSession.instance,
+  routerState: AppSession.instance,
   navigationZones: <List<DwNavigationRoute<AppSession>>>[
     AppRoutes.values,
     AuthRoutes.values,

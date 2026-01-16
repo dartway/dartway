@@ -1,12 +1,12 @@
 part of '../app_router.dart';
 
 enum AuthRoutes implements DwNavigationRoute<AppSession> {
-  auth(SimpleNavigationRouteDescriptor(page: AuthPage()));
+  auth(DwNavigationRouteDescriptor.simple(pageWidget: AuthPage()));
 
   const AuthRoutes(this.descriptor);
 
   @override
-  final DwNavigationRouteDescriptor descriptor;
+  final DwNavigationRouteDescriptor<AppSession> descriptor;
 
   @override
   String get zoneRoot => '';

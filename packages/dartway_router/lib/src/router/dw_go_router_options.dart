@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 class DwGoRouterOptions {
   static const int defaultRedirectLimit = 5;
-  static const Duration defaultTransitionDuration = Duration(milliseconds: 300);
 
   const DwGoRouterOptions({
     this.navigatorKey,

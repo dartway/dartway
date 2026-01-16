@@ -18,7 +18,7 @@ final appRouterProvider = Provider<DwRouter<RouterRefreshNotifier>>((ref) {
   final notifier = ref.watch(routerRefreshNotifierProvider);
 
   return DwRouter<RouterRefreshNotifier>(
-    refreshListenable: notifier,
+    routerState: notifier,
     navigationZones: [AppRoutes.values, AuthRoutes.values],
     pageBuilder: DwPageBuilder.fade,
     options: DwGoRouterOptions(
