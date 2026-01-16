@@ -1,12 +1,12 @@
 part of '../app_router.dart';
 
 enum AuthRoutes implements DwNavigationRoute<RouterRefreshNotifier> {
-  auth(SimpleNavigationRouteDescriptor(page: AuthPage()));
+  auth(DwNavigationRouteDescriptor.simple(pageWidget: AuthPage()));
 
   const AuthRoutes(this.descriptor);
 
   @override
-  final DwNavigationRouteDescriptor descriptor;
+  final DwNavigationRouteDescriptor<RouterRefreshNotifier> descriptor;
 
   @override
   String get zoneRoot => '';

@@ -1,23 +1,21 @@
 part of '../app_router.dart';
 
 enum AppRoutes implements DwNavigationRoute<RouterRefreshNotifier> {
-  catalog(
-    SimpleNavigationRouteDescriptor(page: BookListPage(), isZoneRoot: true),
-  ),
+  catalog(DwNavigationRouteDescriptor.zoneRoot(pageWidget: BookListPage())),
   bookDetail(
-    ParameterizedNavigationRouteDescriptor(
-      page: BookDetailPage(),
+    DwNavigationRouteDescriptor.parameterized(
+      pageWidget: BookDetailPage(),
       parameter: AppParams.bookId,
       parent: catalog,
       extraPathSegment: 'books',
     ),
   ),
-  profile(SimpleNavigationRouteDescriptor(page: ProfilePage()));
+  profile(DwNavigationRouteDescriptor.simple(pageWidget: ProfilePage()));
 
   const AppRoutes(this.descriptor);
 
   @override
-  final DwNavigationRouteDescriptor descriptor;
+  final DwNavigationRouteDescriptor<RouterRefreshNotifier> descriptor;
 
   @override
   String get zoneRoot => '';
