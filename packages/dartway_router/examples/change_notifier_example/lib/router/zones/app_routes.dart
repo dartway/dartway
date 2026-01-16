@@ -24,7 +24,7 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-    (appSession) => !appSession.isAuthorized ? AuthRoutes.auth.fullPath : null,
+    (appSession) => !appSession.isLoggedIn ? AuthRoutes.auth.fullPath : null,
   ];
 
   @override

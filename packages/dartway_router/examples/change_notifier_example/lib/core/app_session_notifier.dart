@@ -7,17 +7,17 @@ class AppSession extends ChangeNotifier {
 
   static AppSession get instance => _instance;
 
-  bool _isAuthorized = false;
+  bool _isLoggedIn = false;
 
-  bool get isAuthorized => _isAuthorized;
+  bool get isLoggedIn => _isLoggedIn;
 
-  void authorize() {
-    _isAuthorized = true;
+  void login() {
+    _isLoggedIn = true;
     notifyListeners();
   }
 
   void logout() {
-    _isAuthorized = false;
+    _isLoggedIn = false;
     notifyListeners();
   }
 }

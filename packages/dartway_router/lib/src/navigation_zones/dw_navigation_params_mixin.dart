@@ -12,11 +12,17 @@ mixin DwNavigationParamsMixin<T> on Enum {
   // Path
   // ---------------------------
 
-  T fromPath(BuildContext context) {
+  T? fromPathOrNull(BuildContext context) {
     final value = GoRouterState.of(context).pathParameters[name];
-    final result = _cast(value);
+    return _cast(value);
+  }
+
+  T fromPath(BuildContext context) {
+    final result = fromPathOrNull(context);
     if (result == null) {
-      throw ArgumentError('Missing required path param "$name" for route');
+      throw ArgumentError(
+        'Missing required path param "$name" for route',
+      );
     }
     return result;
   }
@@ -25,9 +31,19 @@ mixin DwNavigationParamsMixin<T> on Enum {
   // Query
   // ---------------------------
 
-  T? fromQuery(BuildContext context) {
+  T? fromQueryOrNull(BuildContext context) {
     final value = GoRouterState.of(context).uri.queryParameters[name];
     return _cast(value);
+  }
+
+  T fromQuery(BuildContext context) {
+    final result = fromQueryOrNull(context);
+    if (result == null) {
+      throw ArgumentError(
+        'Missing required query param "$name" for route',
+      );
+    }
+    return result;
   }
 
   // ---------------------------

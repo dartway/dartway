@@ -1,6 +1,6 @@
 part of '../app_router.dart';
 
-enum AuthRoutes implements DwNavigationRoute<AppSession> {
+enum AuthRoutes implements DwNavigationRoute<RouterRefreshNotifier> {
   auth(SimpleNavigationRouteDescriptor(page: AuthPage()));
 
   const AuthRoutes(this.descriptor);
@@ -15,7 +15,7 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
   DwShellRoutePageBuilder? get shellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppSession>> get zoneGuards => [
-    (appSession) => appSession.isLoggedIn ? AppRoutes.catalog.fullPath : null,
+  List<DwNavigationGuard<RouterRefreshNotifier>> get zoneGuards => [
+    (notifier) => notifier.isLoggedIn ? AppRoutes.catalog.fullPath : null,
   ];
 }
