@@ -16,7 +16,7 @@ extension WidgetRefUpdateActionsExtension on WidgetRef {
           apiGroup: apiGroupOverride,
         )
         .then((response) => processApiResponse<DwModelWrapper>(response))
-        .then((res) => res.model as Model);
+        .then((res) => res!.model as Model);
   }
 
   // Future<DwModelWrapper?> saveModel<T extends SerializableModel>(
@@ -55,7 +55,7 @@ extension WidgetRefUpdateActionsExtension on WidgetRef {
           modelId: modelId,
           apiGroup: apiGroupOverride,
         )
-        .then((response) => processApiResponse<bool>(response));
+        .then((response) => processApiResponse<bool>(response) ?? false);
   }
 
   // updateRepository(
@@ -75,7 +75,7 @@ extension WidgetRefUpdateActionsExtension on WidgetRef {
   // }
   // }
 
-  K processApiResponse<K>(
+  K? processApiResponse<K>(
     DwApiResponse<K> response,
     // {
     // bool updateListeners = true,
@@ -101,7 +101,7 @@ extension WidgetRefUpdateActionsExtension on WidgetRef {
       throw Exception(response.error);
     }
 
-    return response.value! as K;
+    return response.value;
   }
 
   // updateFromStream(DwModelWrapper update) {

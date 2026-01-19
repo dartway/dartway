@@ -82,7 +82,7 @@ extension RefUpdateActionsExtension on Ref {
       throw Exception(response.error);
     }
 
-    return response.value! as K;
+    return response.value;
   }
 
   // updateFromStream(DwModelWrapper update) {
