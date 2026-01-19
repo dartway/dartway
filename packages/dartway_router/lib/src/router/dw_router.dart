@@ -245,7 +245,7 @@ class DwRouter<RouterState extends Listenable> {
         // Use the centralized page builder with a unique key
         return pageBuilder(
           context,
-          ValueKey('${route.name}-${state.fullPath}'),
+          ValueKey('${route.name}-${state.uri.path}'),
           route.descriptor.pageWidget,
         );
       },

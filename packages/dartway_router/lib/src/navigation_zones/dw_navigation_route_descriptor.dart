@@ -125,7 +125,7 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
   /// This creates a route accessible at `/` (assuming zoneRoot is empty).
   const factory DwNavigationRouteDescriptor.zoneRoot({
     required Widget pageWidget,
-  }) = _ZoneRootRouteDescriptor;
+  }) = _ZoneRootRouteDescriptor<RouterState>;
 
   /// Creates a simple route descriptor without parameters.
   ///

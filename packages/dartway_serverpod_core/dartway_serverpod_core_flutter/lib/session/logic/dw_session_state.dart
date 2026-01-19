@@ -8,24 +8,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dw_session_state_model.dart';
 
 StateNotifierProvider<DwSessionStateNotifier<T>, DwSessionStateModel<T>>
-createDwSessionProvider<T extends SerializableModel>(
+    createDwSessionProvider<T extends SerializableModel>(
   DwAuthenticationKeyManager keyManager,
 ) {
-  return StateNotifierProvider<
-    DwSessionStateNotifier<T>,
-    DwSessionStateModel<T>
-  >((ref) => DwSessionStateNotifier<T>(ref, keyManager));
+  return StateNotifierProvider<DwSessionStateNotifier<T>,
+          DwSessionStateModel<T>>(
+      (ref) => DwSessionStateNotifier<T>(ref, keyManager));
 }
 
 class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
     extends StateNotifier<DwSessionStateModel<UserProfileClass>> {
   DwSessionStateNotifier(this.ref, this.keyManager)
-    : super(
-        DwSessionStateModel<UserProfileClass>(
-          signedInUserProfile: null,
-          signedInUserId: null,
-        ),
-      );
+      : super(
+          DwSessionStateModel<UserProfileClass>(
+            signedInUserProfile: null,
+            signedInUserId: null,
+          ),
+        );
 
   final Ref ref;
   final DwAuthenticationKeyManager keyManager;
@@ -49,7 +48,7 @@ class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
     }
 
     DwRepository.addUpdatesListener<DwAuthData>(_handleAuthDataUpdates);
-    DwRepository.addUpdatesListener<DwAuthKey>(_handleAuthKeyUpdates);
+    // DwRepository.addUpdatesListener<DwAuthKey>(_handleAuthKeyUpdates);
     DwRepository.addUpdatesListener<UserProfileClass>(
       _handleUserProfileUpdates,
     );
@@ -63,7 +62,7 @@ class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
   void dispose() {
     // Отписываемся от репозитория
     DwRepository.removeUpdatesListener<DwAuthData>(_handleAuthDataUpdates);
-    DwRepository.removeUpdatesListener<DwAuthKey>(_handleAuthKeyUpdates);
+    // DwRepository.removeUpdatesListener<DwAuthKey>(_handleAuthKeyUpdates);
     DwRepository.removeUpdatesListener<UserProfileClass>(
       _handleUserProfileUpdates,
     );
@@ -88,14 +87,13 @@ class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
     }
   }
 
-  void _handleAuthKeyUpdates(List<DwModelWrapper> wrappedModelUpdates) async {
-    for (var wrappedModel in wrappedModelUpdates) {
-      if (wrappedModel.model is DwAuthKey && wrappedModel.isDeleted) {
-        unawaited(keyManager.remove());
-        state = state.copyWith(signedInUserProfile: null, signedInUserId: null);
-      }
-    }
-  }
+  // void _handleAuthKeyUpdates(List<DwModelWrapper> wrappedModelUpdates) async {
+  //   for (var wrappedModel in wrappedModelUpdates) {
+  //     if (wrappedModel.model is DwAuthKey && wrappedModel.isDeleted) {
+  //       _resetAuthState();
+  //     }
+  //   }
+  // }
 
   void _handleUserProfileUpdates(
     List<DwModelWrapper> wrappedModelUpdates,
@@ -130,13 +128,21 @@ class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
 
   Future<void> signOut() async {
     if (state.signedInUserId != null && state.signedInUserProfile != null) {
-      final response = await dw.endpointCaller.dwCrud.delete(
+      await dw.endpointCaller.dwCrud.delete(
         className: 'DwAuthKey',
         modelId: keyManager.authKeyId!,
         apiGroup: DwCoreConst.dartwayInternalApi,
       );
+      unawaited(keyManager.remove());
+      state = state.copyWith(signedInUserProfile: null, signedInUserId: null);
+      // _resetAuthState();
 
-      ref.processApiResponse<bool>(response);
+      // ref.processApiResponse<bool>(response);
     }
   }
+
+  // _resetAuthState() {
+  //   unawaited(keyManager.remove());
+  //   state = state.copyWith(signedInUserProfile: null, signedInUserId: null);
+  // }
 }

@@ -38,10 +38,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
       if (saveContext.currentModel.status ==
           DwAuthRequestStatus.pendingVerification) {
         final verificationCode = await DwCore
-            .instance
-            .auth!
-            .config
-            .generateVerificationCodeMethod
+            .instance.auth!.config.generateVerificationCodeMethod
             ?.call(session, verificationRequest: saveContext.currentModel);
 
         if (verificationCode != null) {
@@ -51,7 +48,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
         }
       } else if (saveContext.currentModel.status ==
           DwAuthRequestStatus.verified) {
-        saveContext.afterUpdates.addAll(
+        saveContext.beforeUpdates.addAll(
           await saveContext.currentModel.onVerified(
             session,
             userProfile: userProfile,

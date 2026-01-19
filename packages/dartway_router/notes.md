@@ -18,7 +18,7 @@ if (zone.first.shellRouteBuilder == null) {
 
 Сейчас — норм, просто знай об этом.
 
-2. ValueKey('${route.name}-${state.fullPath}')
+2. ValueKey('${route.name}-${state.uri.path}')
 
 Это рабочий и разумный ключ, но:
 
