@@ -1,8 +1,15 @@
 name: dartway_router
 description: "Go Router wrapper with easy routes configuration and convenience classes for navigation"
-version: 0.0.1
-homepage: https://github.com/dartway/dartway_router
+version: 1.0.0
+repository: https://github.com/dartway/packages/dartway_router
+homepage: https://dartway.dev
 license: Apache-2.0
+publisher: dartway.dev
+topics:
+  - flutter
+  - routing
+  - navigation
+  - go-router
 
 environment:
   sdk: ^3.6.0
