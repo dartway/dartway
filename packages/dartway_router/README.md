@@ -58,32 +58,50 @@ enum AppParams<T> with DwNavigationParamsMixin<T> {
 }
 ```
 
-### 3. Define Your Routes
+### 3. Define Your Routes (Two Zones)
 
-Create route enums that implement `DwNavigationRoute`:
+We use **two zones**: a public **auth zone** (login) and a protected **app zone** (home, profile, etc.). The app zone uses a guard that checks `AppSession` and redirects unauthenticated users to login.
+
+**Auth zone** (e.g. login screen):
 
 ```dart
-import 'package:dartway_router/dartway_router.dart';
-import 'package:flutter/material.dart';
+enum AuthRoutes implements DwNavigationRoute<AppSession> {
+  login(
+    DwNavigationRouteDescriptor.zoneRoot(pageWidget: LoginPage()),
+  );
 
+  const AuthRoutes(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<AppSession> descriptor;
+
+  @override
+  String get zoneRoot => 'auth';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<AppSession>> get zoneGuards => [];
+}
+```
+
+**App zone** (protected; guard uses `AppSession`):
+
+```dart
 enum AppRoutes implements DwNavigationRoute<AppSession> {
-  // Zone root route (entry point of the zone)
   home(
     DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage()),
   ),
-  
-  // Simple route without parameters
   profile(
     DwNavigationRouteDescriptor.simple(pageWidget: ProfilePage()),
   ),
-  
-  // Parameterized route with a path parameter
   userDetail(
     DwNavigationRouteDescriptor.parameterized(
       pageWidget: UserDetailPage(),
       parameter: AppParams.userId,
       parent: home,
-      extraPathSegment: 'users', // Optional: adds 'users' prefix
+      extraPathSegment: 'users',
     ),
   );
 
@@ -99,11 +117,20 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
   DwShellRoutePageBuilder? get shellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppSession>> get zoneGuards => [];
+  List<DwNavigationGuard<AppSession>> get zoneGuards => [
+    (session) {
+      if (!session.isAuthenticated) {
+        return AuthRoutes.login.fullPath;
+      }
+      return null; // Allow navigation
+    },
+  ];
 }
 ```
 
 ### 4. Create the Router
+
+Pass both zones and `routerState` (required for guards). Start at login; the guard will redirect to login when the user is not authenticated.
 
 ```dart
 final appSession = AppSession();
@@ -111,11 +138,12 @@ final appSession = AppSession();
 final router = DwRouter<AppSession>(
   routerState: appSession,
   navigationZones: [
-    AppRoutes.values,
+    AuthRoutes.values,   // Auth zone (login)
+    AppRoutes.values,    // App zone (protected by guard)
   ],
   pageBuilder: DwPageBuilder.material,
   options: DwGoRouterOptions(
-    initialLocation: AppRoutes.home.fullPath,
+    initialLocation: AuthRoutes.login.fullPath,
     debugLogDiagnostics: true,
   ),
 );
@@ -147,11 +175,24 @@ class MyApp extends StatelessWidget {
 
 ### 6. Navigate and Extract Parameters
 
+Use `AppSession` on login/logout and navigate between zones:
+
 ```dart
-// Navigate to a route
+// On login screen: after successful login
+void onLoginPressed() {
+  appSession.login();
+  context.goNamed(AppRoutes.home.name);
+}
+
+// On profile/settings: logout
+void onLogoutPressed() {
+  appSession.logout();
+  context.goNamed(AuthRoutes.login.name);
+}
+
+// Navigate within app zone
 context.goNamed(AppRoutes.profile.name);
 
-// Navigate with parameters
 context.goNamed(
   AppRoutes.userDetail.name,
   pathParameters: AppParams.userId.set(123),
@@ -176,15 +217,15 @@ Navigation zones allow you to group related routes together. Each zone can have:
 - Common route guards (e.g., authentication checks)
 - A zone root route
 
-Example with multiple zones:
+Example with multiple zones (e.g. auth zone + protected app zone, as in Quick Start):
 
 ```dart
 final router = DwRouter<AppSession>(
   routerState: appSession,
   navigationZones: [
-    AppRoutes.values,      // Authenticated zone
-    AuthRoutes.values,      // Public/auth zone
-    AdminRoutes.values,     // Admin zone
+    AuthRoutes.values,   // Public/auth zone (login)
+    AppRoutes.values,    // Authenticated zone (guard uses AppSession)
+    AdminRoutes.values,  // Optional: admin zone
   ],
   pageBuilder: DwPageBuilder.material,
 );
