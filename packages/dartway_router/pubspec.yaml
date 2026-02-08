@@ -1,10 +1,11 @@
 name: dartway_router
-description: "Go Router wrapper with easy routes configuration and convenience classes for navigation"
+description: >
+  Opinionated wrapper around go_router that makes routing explicit,
+  predictable, and scalable for real-world Flutter apps.
 version: 1.0.0
 repository: https://github.com/dartway/packages/dartway_router
 homepage: https://dartway.dev
 license: Apache-2.0
-publisher: dartway.dev
 topics:
   - flutter
   - routing
@@ -14,7 +15,6 @@ topics:
 environment:
   sdk: ^3.6.0
   flutter: ">=1.17.0"
-resolution: workspace
 
 dependencies:
   flutter:
