@@ -2,6 +2,8 @@
 
 A powerful, type-safe navigation package for Flutter that wraps Go Router with an intuitive enum-based API. Build navigation systems with compile-time safety, route guards, and flexible page transitions.
 
+**Two full example projects** are available in the package repository in the [`examples/`](https://github.com/dartway/dartway/tree/master/packages/dartway_router/examples) folder: **change_notifier_example** (state via `ChangeNotifier`) and **riverpod_example** (state via Riverpod).
+
 ## Features
 
 - **🎯 Type-Safe Navigation**: Enum-based routes with compile-time checking
