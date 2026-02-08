@@ -150,10 +150,11 @@ class DwSocketState extends _$DwSocketState {
   }
 
   Future<void> unsubscribeAllChannels() async {
-    for (var sub in _channelSubs.values) {
+    final subs = _channelSubs.values.toList();
+    _channelSubs.clear();
+    for (var sub in subs) {
       await sub.cancel();
     }
-    _channelSubs.clear();
     debugPrint("❌ Unsubscribed from all channels");
   }
 }

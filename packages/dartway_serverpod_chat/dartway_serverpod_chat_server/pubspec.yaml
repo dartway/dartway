@@ -19,8 +19,8 @@ dev_dependencies:
   test: '^1.24.2'
   serverpod_test: 2.9.1
 
-# dependency_overrides:
-#   dartway_serverpod_core_server:
-#     path: ../../dartway_serverpod_core/dartway_serverpod_core_server
-#   dartway_serverpod_core_shared:
-#     path: ../../dartway_serverpod_core/dartway_serverpod_core_shared
+dependency_overrides:
+  dartway_serverpod_core_server:
+    path: ../../dartway_serverpod_core/dartway_serverpod_core_server
+  dartway_serverpod_core_shared:
+    path: ../../dartway_serverpod_core/dartway_serverpod_core_shared

@@ -47,6 +47,12 @@ dev_dependencies:
   riverpod_generator: ^2.6.3
   flutter_gen_runner: ^5.10.0
 
+dependency_overrides:
+  dartway_serverpod_chat_client:
+    path: ../../dartway_serverpod_chat/dartway_serverpod_chat_client
+  dartway_serverpod_core_flutter:
+    path: ../../dartway_serverpod_core/dartway_serverpod_core_flutter
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
