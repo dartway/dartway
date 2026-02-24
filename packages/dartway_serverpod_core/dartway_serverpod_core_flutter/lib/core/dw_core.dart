@@ -6,13 +6,31 @@ import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.da
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../app/session/domain/dw_session_state_model.dart';
+import '../app/session/service/dw_session_service.dart';
+import '../app/session/state/dw_session_state_notifier.dart';
+import '../app/socket/service/dw_socket_service.dart';
 import '../private/dw_singleton.dart';
-import '../session/logic/dw_session_state.dart';
-import '../session/logic/dw_session_state_model.dart';
-import '../socket_state/dw_socket_state.dart';
 
-class DwCore<ServerpodClientClass extends ServerpodClientShared,
-    UserProfileClass extends SerializableModel> extends DwFlutter {
+class DwCore<
+  ServerpodClientClass extends ServerpodClientShared,
+  UserProfileClass extends SerializableModel
+>
+    extends DwFlutter {
+  final ServerpodClientClass client;
+  final DwAlerts dwAlerts;
+  late final DwSessionService<UserProfileClass>? sessionService;
+  late final DwSocketService? socketService;
+  late final NotifierProvider<
+    DwSessionStateNotifier<UserProfileClass>,
+    DwSessionStateModel<UserProfileClass>
+  >?
+  sessionProvider;
+
+  late final dartway.Caller endpointCaller;
+
+  final int? Function(UserProfileClass? user) getUserId;
+
   DwCore({
     required super.config,
     required this.client,
@@ -34,30 +52,38 @@ class DwCore<ServerpodClientClass extends ServerpodClientShared,
       );
     }
     endpointCaller = dartwayCaller as dartway.Caller;
+    socketService = DwSocketService(
+      client: client,
+      endpointCaller: endpointCaller,
+      onStatusChanged: (_) {},
+    );
 
-    sessionProvider = (client.authenticationKeyManager == null)
-        ? null
-        : StateNotifierProvider<DwSessionStateNotifier<UserProfileClass>,
-            DwSessionStateModel<UserProfileClass>>(
-            (ref) => DwSessionStateNotifier<UserProfileClass>(
-              ref,
-              client.authenticationKeyManager as DwAuthenticationKeyManager,
-            ),
+    if (client.authenticationKeyManager != null &&
+        client.authenticationKeyManager is DwAuthenticationKeyManager) {
+      sessionService = DwSessionService<UserProfileClass>(
+        keyManager:
+            client.authenticationKeyManager! as DwAuthenticationKeyManager,
+        onUserChanged: (profile, id) {
+          socketService!.onUserChanged(
+            null, // можно хранить prev внутри сервиса
+            id,
           );
+        },
+        fetchUserProfile: (_) async {},
+        deleteAuthKey: (_) async {},
+      );
+      sessionProvider =
+          NotifierProvider<
+            DwSessionStateNotifier<UserProfileClass>,
+            DwSessionStateModel<UserProfileClass>
+          >(DwSessionStateNotifier<UserProfileClass>.new);
+    } else {
+      sessionProvider = null;
+      sessionService = null;
+    }
   }
 
-  final ServerpodClientClass client;
-  final DwAlerts dwAlerts;
-  late final StateNotifierProvider<DwSessionStateNotifier<UserProfileClass>,
-      DwSessionStateModel<UserProfileClass>>? sessionProvider;
-
-  late final dartway.Caller endpointCaller;
-
-  final int? Function(UserProfileClass? user) getUserId;
-
   Future<void> initDwCore({
-    // TODO: remove ref
-    required WidgetRef ref,
     // TODO: remove initRepositoryFunction
     required Function() initRepositoryFunction,
   }) async {
@@ -90,9 +116,9 @@ class DwCore<ServerpodClientClass extends ServerpodClientShared,
       DwRepository.setupRepository(defaultModel: entry.value);
     }
 
-    if (sessionProvider != null) {
-      await ref.read(sessionProvider!.notifier).initialize();
-      await ref.read(dwSocketStateProvider.notifier).init(client: client);
+    if (sessionService != null) {
+      await sessionService!.initialize();
+      socketService!.init();
     }
 
     if (kDebugMode) {

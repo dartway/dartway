@@ -5,14 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/dw_no_pagination.dart';
 import '../domain/dw_pagination_strategy.dart';
+import '../dw_global_refresh_state_provider.dart';
 
 class DwModelListState<Model extends SerializableModel>
-    extends FamilyAsyncNotifier<List<Model>, DwModelListStateConfig<Model>>
-// implements ModelManagerInterface<Model>
-{
+    extends AsyncNotifier<List<Model>> {
   late DwPaginationStrategy _paginationStrategy;
+  DwModelListStateConfig<Model> config;
+
+  DwModelListState(this.config);
+
   @override
-  Future<List<Model>> build(DwModelListStateConfig config) async {
+  Future<List<Model>> build() async {
     ref.onDispose(() {
       DwRepository.removeUpdatesListener<Model>(
         config.customUpdatesListener ?? _updatesListener,
@@ -21,9 +24,7 @@ class DwModelListState<Model extends SerializableModel>
         relationConfig.removeUpdatesListener();
       }
     });
-    final globalTimestamp = ref.watch(
-      DwRepository.globalRefreshTriggerProvider,
-    );
+    final globalTimestamp = ref.watch(dwGlobalRefreshStateProvider);
 
     debugPrint(
       "Building state for ${DwRepository.typeName<Model>()} with timestamp $globalTimestamp",
@@ -44,8 +45,7 @@ class DwModelListState<Model extends SerializableModel>
         debugPrint(
           'Adding relation updates listener for ${relationConfig.relationModelType}',
         );
-        (relationConfig as DwRelationUpdatesConfig<Model, SerializableModel>)
-            .addUpdatesListener(_relationUpdatesListener);
+        (relationConfig).addUpdatesListener(_relationUpdatesListener);
       }
     }
     return _processData(data).toList();
@@ -57,10 +57,7 @@ class DwModelListState<Model extends SerializableModel>
     final current = await future;
     final data = await _loadData();
 
-    state = AsyncValue.data([
-      ...current,
-      ..._processData(data),
-    ]);
+    state = AsyncValue.data([...current, ..._processData(data)]);
 
     return _paginationStrategy.hasMore;
 
@@ -80,23 +77,21 @@ class DwModelListState<Model extends SerializableModel>
 
     final params = _paginationStrategy.buildParams();
 
-    final filter = DwBackendFilter.and(
-      <DwBackendFilter>[
-        if (arg.backendFilter != null) arg.backendFilter!,
-        if (params.afterId != null)
-          DwBackendFilter.value(
-            type: DwBackendFilterType.greaterThan,
-            fieldName: 'id',
-            fieldValue: params.afterId,
-          ),
-        if (params.beforeId != null)
-          DwBackendFilter.value(
-            type: DwBackendFilterType.lessThan,
-            fieldName: 'id',
-            fieldValue: params.beforeId,
-          ),
-      ],
-    );
+    final filter = DwBackendFilter.and(<DwBackendFilter>[
+      if (config.backendFilter != null) config.backendFilter!,
+      if (params.afterId != null)
+        DwBackendFilter.value(
+          type: DwBackendFilterType.greaterThan,
+          fieldName: 'id',
+          fieldValue: params.afterId,
+        ),
+      if (params.beforeId != null)
+        DwBackendFilter.value(
+          type: DwBackendFilterType.lessThan,
+          fieldName: 'id',
+          fieldValue: params.beforeId,
+        ),
+    ]);
 
     final response = await dw.endpointCaller.dwCrud.getAll(
       className: DwRepository.typeName<Model>(),
@@ -106,7 +101,7 @@ class DwModelListState<Model extends SerializableModel>
       offset: params.offset,
     );
 
-    final result = ref.processApiResponse(response);
+    final result = DwRepository.processApiResponse(response);
 
     final data = result ?? [];
 
@@ -140,9 +135,10 @@ class DwModelListState<Model extends SerializableModel>
     final ids = wrappedModelUpdates.map((e) => e.modelId).toSet();
 
     // If a custom sorting method is provided, sort the updates accordingly
-    if (arg.updatesSortingMethod != null) {
+    if (config.updatesSortingMethod != null) {
       wrappedModelUpdates.sort(
-        (a, b) => arg.updatesSortingMethod!(a.model as Model, b.model as Model),
+        (a, b) =>
+            config.updatesSortingMethod!(a.model as Model, b.model as Model),
       );
     }
 
@@ -163,12 +159,14 @@ class DwModelListState<Model extends SerializableModel>
     // Merge both lists in a single pass using sorted order if provided
     while (i < currentList.length || j < wrappedModelUpdates.length) {
       // Safely get current entity or null if out of bounds
-      final Model? currentEntity =
-          i < currentList.length ? currentList[i] : null;
+      final Model? currentEntity = i < currentList.length
+          ? currentList[i]
+          : null;
 
       // Safely get next update or null if out of bounds
-      final DwModelWrapper? update =
-          j < wrappedModelUpdates.length ? wrappedModelUpdates[j] : null;
+      final DwModelWrapper? update = j < wrappedModelUpdates.length
+          ? wrappedModelUpdates[j]
+          : null;
 
       // If no more updates, just add remaining current entities
       if (update == null) {
@@ -180,8 +178,8 @@ class DwModelListState<Model extends SerializableModel>
       // If no more current entities, just add valid updates
       if (currentEntity == null) {
         if (!update.isDeleted && // not marked for deletion
-            (arg.backendFilter == null || // passes backend filter
-                arg.backendFilter!.filterUpdate(update.jsonSerialization))) {
+            (config.backendFilter == null || // passes backend filter
+                config.backendFilter!.filterUpdate(update.jsonSerialization))) {
           res.add(update.model as Model);
         }
         j++;
@@ -189,15 +187,18 @@ class DwModelListState<Model extends SerializableModel>
       }
 
       // Compare order: update vs current entity using sorting method (or default to insert update first)
-      final cmp = arg.updatesSortingMethod
-              ?.call(update.model as Model, currentEntity) ??
+      final cmp =
+          config.updatesSortingMethod?.call(
+            update.model as Model,
+            currentEntity,
+          ) ??
           -1;
 
       if (cmp <= 0) {
         // Insert update if not deleted and passes filter
         if (!update.isDeleted &&
-            (arg.backendFilter == null ||
-                arg.backendFilter!.filterUpdate(update.jsonSerialization))) {
+            (config.backendFilter == null ||
+                config.backendFilter!.filterUpdate(update.jsonSerialization))) {
           res.add(update.model as Model);
         }
         j++; // move to next update
@@ -235,7 +236,7 @@ class DwModelListState<Model extends SerializableModel>
     List<DwModelWrapper> wrappedModelUpdates,
     String foreignKey,
     Model Function(Model parentModel, List<DwModelWrapper> relatedModels)
-        copyWithRelatedModels,
+    copyWithRelatedModels,
     Set<int>? Function(Model model)? parentIdsGetter,
   ) async {
     state = state.whenData((value) {

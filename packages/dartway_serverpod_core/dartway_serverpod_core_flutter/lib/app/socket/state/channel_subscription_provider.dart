@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:serverpod_client/serverpod_client.dart';
 
-import 'dw_socket_state.dart';
+import 'dw_socket_state_provider.dart';
 
-final channelSubscriptionProvider =
-    Provider.family<void, String>((ref, channel) {
+final channelSubscriptionProvider = Provider.family<void, String>((
+  ref,
+  channel,
+) {
   final socketState = ref.watch(dwSocketStateProvider);
   final notifier = ref.read(dwSocketStateProvider.notifier);
 

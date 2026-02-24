@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'logic/dw_app_loading_options.dart';
-import 'logic/dw_routing_config.dart';
 import 'widgets/dw_app_bootstrapper.dart';
 
 // Default fallback if user does not provide an error handler.
@@ -30,10 +29,7 @@ void _defaultErrorHandler(Object error, StackTrace stackTrace) {
 class DwAppRunner {
   /// Optional sequence of initialization steps.
   /// Each must return `true` to continue the pipeline.
-  final List<FutureOr<void> Function(WidgetRef ref)>? appInitializers;
-
-  /// Optional routing configuration (e.g., GoRouter, custom setup).
-  final DwRoutingConfig routingOptions;
+  final List<FutureOr<void> Function()>? appInitializers;
 
   /// Loading/error screen configuration.
   final DwAppLoadingOptions appLoadingOptions;
@@ -52,7 +48,6 @@ class DwAppRunner {
     required this.child,
     this.onError = _defaultErrorHandler,
     this.appInitializers,
-    this.routingOptions = const DwRoutingConfig(),
     this.appLoadingOptions = const DwAppLoadingOptions.withNativeSplash(),
     this.supportedLocales = const [],
   });
@@ -66,8 +61,6 @@ class DwAppRunner {
     if (appLoadingOptions.useNativeSplash) {
       FlutterNativeSplash.preserve(widgetsBinding: binding);
     }
-
-    routingOptions.init();
   }
 
   void run() {
@@ -82,7 +75,7 @@ class DwAppRunner {
         };
 
         final initializers = [
-          (_) async {
+          () async {
             for (final locale in supportedLocales) {
               await initializeDateFormatting(locale.languageCode);
             }
@@ -90,7 +83,7 @@ class DwAppRunner {
           },
           if (appInitializers != null) ...appInitializers!,
           if (appLoadingOptions.useNativeSplash)
-            (_) async {
+            () async {
               FlutterNativeSplash.remove();
               return true;
             },

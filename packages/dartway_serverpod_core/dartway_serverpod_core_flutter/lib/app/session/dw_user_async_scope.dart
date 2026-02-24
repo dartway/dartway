@@ -4,30 +4,34 @@ import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.da
 import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 
-typedef DwAsyncProviderFactory = List<ProviderListenable<AsyncValue>> Function(
-  WidgetRef ref,
-  int? userProfileId,
-);
+typedef DwAsyncProviderFactory =
+    List<ProviderListenable<AsyncValue>> Function(
+      WidgetRef ref,
+      int? userProfileId,
+    );
 
 class DwUserAsyncScope<UserProfileClass extends SerializableModel>
     extends ConsumerStatefulWidget {
   final Widget child;
   final Widget profileLoadingWidget;
-  final StateProvider<UserProfileClass?> userProfileProvider;
+  // final StateProvider<UserProfileClass?> userProfileProvider;
+  final Function(UserProfileClass? userProfile) whenProfileReadyCallback;
 
   /// Function, which returns a list of async providers to subscribe to by `ref` and `userProfileId`.
   final DwAsyncProviderFactory? asyncProviderFactory;
 
   final FutureOr<void> Function(WidgetRef ref, UserProfileClass? userProfile)?
-      postLoadTrigger;
+  postLoadTrigger;
 
   final bool skipOnSignIn;
 
   const DwUserAsyncScope({
     super.key,
     required this.child,
-    required this.userProfileProvider,
+    required this.whenProfileReadyCallback,
+    // required this.userProfileProvider,
     this.profileLoadingWidget = const Center(
       child: CircularProgressIndicator(),
     ),
@@ -121,10 +125,12 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
     Future.microtask(() {
       if (!mounted) return;
 
-      final profile = ref.read(dw.sessionProvider!).signedInUserProfile
-          as UserProfileClass?;
+      final profile =
+          ref.read(dw.sessionProvider!).signedInUserProfile
+              as UserProfileClass?;
 
-      ref.read(widget.userProfileProvider.notifier).state = profile;
+      // ref.read(widget.userProfileProvider.notifier).state = profile;
+      widget.whenProfileReadyCallback(profile);
 
       if (withPostLoadTrigger && widget.postLoadTrigger != null) {
         if (_postLoadTriggeredLastTimeForUserId != _currentUserId) {

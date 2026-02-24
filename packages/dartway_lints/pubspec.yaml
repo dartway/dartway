@@ -1,0 +1,10 @@
+name: dartway_lints
+description: Custom lint rules for DartWay projects.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  custom_lint_builder: ^0.7.0

@@ -4,7 +4,9 @@
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 
+import '../private/dw_singleton.dart';
 import 'domain/dw_model_list_state_config.dart';
 import 'domain/dw_single_model_state_config.dart';
 import 'states/dw_model_list_state.dart';
@@ -12,14 +14,11 @@ import 'states/dw_single_model_state.dart';
 
 class DwRepository {
   static const int mockModelId = 0;
-  static final globalRefreshTriggerProvider = StateProvider<DateTime>(
-    (ref) => DateTime.now(),
-  );
 
   static final Map<Type, String> _typeNamesMapping = {};
 
   static final Map<String, List<Function(List<DwModelWrapper>)>>
-      _updateListeners = <String, List<Function(List<DwModelWrapper>)>>{};
+  _updateListeners = <String, List<Function(List<DwModelWrapper>)>>{};
 
   static String typeName<T extends SerializableModel>() {
     final name = _typeNamesMapping[T];
@@ -98,39 +97,130 @@ class DwRepository {
     }
   }
 
-  static final _modelListStateProviders = <Type,
-      AsyncNotifierProviderFamily<DwModelListState, List<dynamic>,
-          DwModelListStateConfig>>{};
+  static final _modelListStateProviders =
+      <
+        Type,
+        AsyncNotifierProviderFamily<
+          DwModelListState,
+          List<dynamic>,
+          DwModelListStateConfig
+        >
+      >{};
 
-  static AsyncNotifierProviderFamily<DwModelListState<T>, List<T>,
-          DwModelListStateConfig<T>>
-      modelListStateProvider<T extends SerializableModel>() {
+  static AsyncNotifierProviderFamily<
+    DwModelListState<T>,
+    List<T>,
+    DwModelListStateConfig<T>
+  >
+  modelListStateProvider<T extends SerializableModel>() {
     if (_modelListStateProviders[T] == null) {
-      _modelListStateProviders[T] = AsyncNotifierProviderFamily<
+      _modelListStateProviders[T] =
+          AsyncNotifierProvider.family<
+            DwModelListState<T>,
+            List<T>,
+            DwModelListStateConfig<T>
+          >(DwModelListState<T>.new);
+    }
+
+    return _modelListStateProviders[T]
+        as AsyncNotifierProviderFamily<
           DwModelListState<T>,
           List<T>,
-          DwModelListStateConfig<T>>(DwModelListState<T>.new);
-    }
-
-    return _modelListStateProviders[T] as AsyncNotifierProviderFamily<
-        DwModelListState<T>, List<T>, DwModelListStateConfig<T>>;
+          DwModelListStateConfig<T>
+        >;
   }
 
-  static final _singleModelStateProviders = <Type,
-      AsyncNotifierProviderFamily<DwSingleModelState, dynamic,
-          DwSingleModelStateConfig>>{};
+  static final _singleModelStateProviders =
+      <
+        Type,
+        AsyncNotifierProviderFamily<
+          DwSingleModelState,
+          dynamic,
+          DwSingleModelStateConfig
+        >
+      >{};
 
-  static AsyncNotifierProviderFamily<DwSingleModelState<T>, T?,
-          DwSingleModelStateConfig<T>>
-      singleModelProvider<T extends SerializableModel>() {
+  static AsyncNotifierProviderFamily<
+    DwSingleModelState<T>,
+    T?,
+    DwSingleModelStateConfig<T>
+  >
+  singleModelProvider<T extends SerializableModel>() {
     if (_singleModelStateProviders[T] == null) {
-      _singleModelStateProviders[T] = AsyncNotifierProviderFamily<
-          DwSingleModelState<T>,
-          T?,
-          DwSingleModelStateConfig<T>>(DwSingleModelState<T>.new);
+      _singleModelStateProviders[T] =
+          AsyncNotifierProvider.family<
+            DwSingleModelState<T>,
+            T?,
+            DwSingleModelStateConfig<T>
+          >(DwSingleModelState<T>.new);
     }
 
-    return _singleModelStateProviders[T] as AsyncNotifierProviderFamily<
-        DwSingleModelState<T>, T?, DwSingleModelStateConfig<T>>;
+    return _singleModelStateProviders[T]
+        as AsyncNotifierProviderFamily<
+          DwSingleModelState<T>,
+          T?,
+          DwSingleModelStateConfig<T>
+        >;
+  }
+
+  Future<Model> saveModel<Model extends SerializableModel>(
+    Model model, {
+    String? apiGroupOverride,
+  }) async {
+    return await dw.endpointCaller.dwCrud
+        .saveModel(
+          wrappedModel: DwModelWrapper.wrap(model: model),
+          apiGroup: apiGroupOverride,
+        )
+        .then((response) => processApiResponse<DwModelWrapper>(response))
+        .then((res) => res!.model as Model);
+  }
+
+  Future<bool> deleteModel<T extends SerializableModel>(
+    T model, {
+    String? apiGroupOverride,
+  }) async {
+    // TODO: подумать, как сделать это получше, может апи поменять или засылать objectWrapper.deleted просто
+
+    final modelId = model.toJson()['id'];
+    if (modelId == null) {
+      // notifyUser(NitNotification.warning(
+      //   'Мое',
+      // ));
+      return true;
+    }
+    return await dw.endpointCaller.dwCrud
+        .delete(
+          className: DwModelWrapper.getClassNameForObject(model),
+          modelId: modelId,
+          apiGroup: apiGroupOverride,
+        )
+        .then((response) => processApiResponse<bool>(response) ?? false);
+  }
+
+  static K? processApiResponse<K>(
+    DwApiResponse<K> response,
+    // {
+    // bool updateListeners = true,
+    // }
+  ) {
+    debugPrint(response.toJson().toString());
+    // if (response.error != null) {
+    //   dw.notify.error(response.error!);
+    // } else if (response.warning != null) {
+    //   dw.notify.warning(response.warning!);
+    // }
+
+    if ((response.updatedModels ?? []).isNotEmpty) {
+      DwRepository.updateListeningStates(
+        wrappedModelUpdates: response.updatedModels ?? [],
+      );
+    }
+
+    if (response.error != null) {
+      throw Exception(response.error);
+    }
+
+    return response.value;
   }
 }

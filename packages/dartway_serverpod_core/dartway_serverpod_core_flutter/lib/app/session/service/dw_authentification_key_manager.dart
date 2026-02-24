@@ -4,7 +4,8 @@
 
 import 'dart:convert';
 
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
+import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dw_auth_storage_interface.dart';
@@ -29,10 +30,9 @@ class DwAuthenticationKeyManager extends AuthenticationKeyManager {
   DwAuthenticationKeyManager({this.runMode = 'production', Storage? storage})
     : _storage = storage ?? SharedPreferenceStorage();
 
-  int? get authKeyId =>
-      _authenticationKey != null
-          ? int.tryParse(_authenticationKey!.split(':').first)
-          : null;
+  int? get authKeyId => _authenticationKey != null
+      ? int.tryParse(_authenticationKey!.split(':').first)
+      : null;
 
   @override
   Future<String?> get() async {

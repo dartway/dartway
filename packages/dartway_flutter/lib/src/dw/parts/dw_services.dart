@@ -7,8 +7,8 @@ class _DwServices {
 
   // static _DwServices get i => _instance;
 
-  late SharedPreferences _prefs;
-  SharedPreferences get sharedPreferences => _prefs;
+  late DwSharedPreferences _prefs;
+  DwSharedPreferences get sharedPreferences => _prefs;
 
   late final TelegramApp _telegramWebApp;
   TelegramApp get telegramWebApp => _telegramWebApp;
@@ -17,7 +17,7 @@ class _DwServices {
 
   _init({required DwConfig config}) async {
     if (config.useSharedPreferences) {
-      _prefs = await SharedPreferences.getInstance();
+      _prefs = DwSharedPreferences(await SharedPreferences.getInstance());
     }
 
     if (config.telegramWebAppConfig != null) {

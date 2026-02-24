@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'channel_subscription_provider.dart';
+import 'state/channel_subscription_provider.dart';
 
 class DwChannelSubscriptionWidget extends ConsumerStatefulWidget {
   final String channel;
