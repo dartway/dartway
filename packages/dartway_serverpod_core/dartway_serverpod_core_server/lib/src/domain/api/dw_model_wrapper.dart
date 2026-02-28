@@ -36,9 +36,12 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
   factory DwModelWrapper.fromJson(
     Map<String, dynamic> jsonSerialization,
   ) {
-    return DwModelWrapper(
-      object: _protocol.deserializeByClassName(jsonSerialization),
-    );
+    final object = _protocol.deserializeByClassName(jsonSerialization);
+    final deleted = jsonSerialization['isDeleted'] as bool? ?? false;
+    if (deleted) {
+      return DwModelWrapper.deleted(object: object);
+    }
+    return DwModelWrapper(object: object);
   }
 
   @override
@@ -59,11 +62,23 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     };
   }
 
+  DwModelWrapper._internal({
+    required this.object,
+    required this.className,
+    required this.modelId,
+    required this.isDeleted,
+  });
+
   DwModelWrapper copyWith({
     SerializableModel? object,
+    bool? isDeleted,
   }) {
-    return DwModelWrapper(
-      object: object ?? this.object,
+    final newObject = object ?? this.object;
+    return DwModelWrapper._internal(
+      object: newObject,
+      className: _protocol.getClassNameForObject(newObject) ?? 'unknown',
+      modelId: newObject is TableRow ? newObject.id : null,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

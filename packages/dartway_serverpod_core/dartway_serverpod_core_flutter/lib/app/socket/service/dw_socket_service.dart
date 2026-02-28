@@ -30,10 +30,12 @@ class DwSocketService {
     _connectionHandler!.connect();
   }
 
-  void dispose() async {
+  Future<void> dispose() async {
     await _mainStreamSub?.cancel();
+    _mainStreamSub = null;
     await unsubscribeAllChannels();
     _connectionHandler?.client.closeStreamingConnection();
+    _connectionHandler = null;
   }
 
   void onUserChanged(int? previousUserId, int? nextUserId) {

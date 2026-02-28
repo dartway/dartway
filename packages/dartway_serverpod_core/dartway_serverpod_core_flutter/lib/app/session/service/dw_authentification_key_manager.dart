@@ -30,9 +30,12 @@ class DwAuthenticationKeyManager extends AuthenticationKeyManager {
   DwAuthenticationKeyManager({this.runMode = 'production', Storage? storage})
     : _storage = storage ?? SharedPreferenceStorage();
 
-  int? get authKeyId => _authenticationKey != null
-      ? int.tryParse(_authenticationKey!.split(':').first)
-      : null;
+  int? get authKeyId {
+    if (_authenticationKey == null) return null;
+    final parts = _authenticationKey!.split(':');
+    if (parts.length < 2) return null;
+    return int.tryParse(parts.first);
+  }
 
   @override
   Future<String?> get() async {

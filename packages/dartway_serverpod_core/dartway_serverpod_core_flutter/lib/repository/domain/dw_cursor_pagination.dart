@@ -25,10 +25,13 @@ class DwCursorPagination implements DwPaginationStrategy {
       return;
     }
 
-    _oldestId = data
+    final idsWithValues = data
         .where((e) => e.modelId != null)
-        .map((e) => e.modelId!)
-        .reduce((a, b) => a < b ? a : b);
+        .map((e) => e.modelId!);
+
+    if (idsWithValues.isNotEmpty) {
+      _oldestId = idsWithValues.reduce((a, b) => a < b ? a : b);
+    }
 
     _hasMore = data.length == limit;
   }

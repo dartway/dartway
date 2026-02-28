@@ -46,7 +46,8 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     final foreignKeys = <String, int>{};
 
     for (var key in (jsonSerialization['data'] as Map<String, dynamic>).keys) {
-      if (key.substring(key.length - 2) == 'Id' &&
+      if (key.length > 2 &&
+          key.substring(key.length - 2) == 'Id' &&
           jsonSerialization['data'][key] is int) {
         foreignKeys[key] = jsonSerialization['data'][key] as int;
       }
@@ -68,6 +69,7 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     return {
       'className': DwCoreServerpodClient.protocol.getClassNameForObject(model),
       'data': model.toJson(),
+      'isDeleted': isDeleted,
     };
   }
 
@@ -76,11 +78,40 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     return {
       'className': DwCoreServerpodClient.protocol.getClassNameForObject(model),
       'data': model.toJson(),
+      'isDeleted': isDeleted,
     };
   }
 
   /// Необходим для работы методов copyWith в ChatInitialData и DwAppNotification
   DwModelWrapper copyWith({SerializableModel? model}) {
-    return DwModelWrapper.wrap(model: model ?? this.model);
+    final newModel = model ?? this.model;
+    return DwModelWrapper._(
+      model: newModel,
+      modelId: model != null ? newModel.toJson()['id'] : modelId,
+      foreignKeys: model != null ? _extractForeignKeys(newModel) : foreignKeys,
+      isDeleted: isDeleted,
+      jsonSerialization: model != null
+          ? {
+              'className':
+                  DwCoreServerpodClient.protocol.getClassNameForObject(newModel),
+              'data': newModel.toJson(),
+            }
+          : jsonSerialization,
+    );
+  }
+
+  static Map<String, int> _extractForeignKeys(SerializableModel model) {
+    final foreignKeys = <String, int>{};
+    final json = model.toJson();
+    if (json is Map<String, dynamic>) {
+      for (var key in json.keys) {
+        if (key.length > 2 &&
+            key.substring(key.length - 2) == 'Id' &&
+            json[key] is int) {
+          foreignKeys[key] = json[key] as int;
+        }
+      }
+    }
+    return foreignKeys;
   }
 }

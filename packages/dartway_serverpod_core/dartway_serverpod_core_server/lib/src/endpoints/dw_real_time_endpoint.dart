@@ -4,6 +4,11 @@ import 'package:serverpod/serverpod.dart';
 class DwRealTimeEndpoint extends Endpoint {
   static userUpdatesChannel(int userId) => 'userUpdates$userId';
 
+  /// Stores the listener per session so we can remove it later with the
+  /// exact same reference.
+  final Map<StreamingSession, void Function(SerializableModel)>
+      _sessionListeners = {};
+
   @override
   Future<void> streamOpened(StreamingSession session) async {
     final userId = await session.currentUserProfileId;
@@ -18,26 +23,22 @@ class DwRealTimeEndpoint extends Endpoint {
 
     session.log('Subscribing to channel $channel');
 
-    session.messages.addListener(
-      channel,
-      (update) => _listener(session, update),
-    );
-  }
+    final listener = (SerializableModel update) {
+      sendStreamMessage(session, update);
+    };
 
-  _listener(StreamingSession session, SerializableModel update) {
-    // We expect that everything is already wrapped the right way
-    sendStreamMessage(session, update);
+    _sessionListeners[session] = listener;
+
+    session.messages.addListener(channel, listener);
   }
 
   @override
   Future<void> streamClosed(StreamingSession session) async {
     final channel = getUserObject(session);
+    final listener = _sessionListeners.remove(session);
 
-    if (channel != null) {
-      session.messages.removeListener(
-        getUserObject(session),
-        (update) => _listener(session, update),
-      );
+    if (channel != null && listener != null) {
+      session.messages.removeListener(channel, listener);
     }
   }
 }

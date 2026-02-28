@@ -49,6 +49,8 @@ class DwApiResponse<T> implements SerializableModel {
     } else if (K == DwApiResponse<List<DwModelWrapper>>) {
       return DwApiResponse<List<DwModelWrapper>>.fromJson(jsonSerialization)
           as K;
+    } else if (K == DwApiResponse<DwModelWrapper?>) {
+      return DwApiResponse<DwModelWrapper?>.fromJson(jsonSerialization) as K;
     }
 
     return null;
@@ -92,14 +94,20 @@ class DwApiResponse<T> implements SerializableModel {
   toJson() {
     return {
       'isOk': isOk,
-      'value':
-          value is SerializableModel
-              ? (value as SerializableModel).toJson()
-              : value,
+      'value': _serializeValue(value),
       if (warning != null) 'warning': warning,
       if (error != null) 'error': error,
       if (updatedModels != null)
         'updatedModels': updatedModels?.toJson(valueToJson: (v) => v.toJson()),
     };
+  }
+
+  static dynamic _serializeValue(dynamic value) {
+    if (value is SerializableModel) {
+      return value.toJson();
+    } else if (value is List) {
+      return value.map((e) => _serializeValue(e)).toList();
+    }
+    return value;
   }
 }

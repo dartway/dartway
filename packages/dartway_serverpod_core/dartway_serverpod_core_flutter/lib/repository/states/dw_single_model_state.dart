@@ -77,14 +77,17 @@ class DwSingleModelState<Model extends SerializableModel>
 
   void _updatesListener(List<DwModelWrapper> wrappedModelUpdates) async {
     return await future.then((currentState) async {
+      if (currentState == null) return;
+
+      final currentId = (currentState as dynamic).id;
       final match = wrappedModelUpdates.firstWhereOrNull(
-        (e) => e.modelId == (currentState as dynamic).id,
+        (e) => e.modelId == currentId,
       );
 
       if (match != null) {
         debugPrint(
           "Updating singleState ${DwRepository.typeName<Model>()} "
-          "with id ${(currentState as dynamic).id}",
+          "with id $currentId",
         );
         state = AsyncValue.data(match.isDeleted ? null : match.model as Model);
       }

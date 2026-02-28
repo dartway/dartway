@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,21 +37,27 @@ class DwNotificationsListener extends ConsumerStatefulWidget {
 
 class _DwNotificationsListenerState
     extends ConsumerState<DwNotificationsListener> {
+  StreamSubscription<dynamic>? _streamSubscription;
+
   @override
   void initState() {
     super.initState();
 
     final service = ref.read(dwNotificationsServiceProvider);
-    service.stream.listen((event) {
+    _streamSubscription = service.stream.listen((event) {
       final handler = widget.handlers[event.runtimeType];
       final safeContext = DwNotificationsListener.overlay.context;
 
       if (handler != null && safeContext.mounted) {
-        // WidgetsBinding.instance.addPostFrameCallback((_) {
         handler.show(safeContext, event);
-        // });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _streamSubscription?.cancel();
+    super.dispose();
   }
 
   @override

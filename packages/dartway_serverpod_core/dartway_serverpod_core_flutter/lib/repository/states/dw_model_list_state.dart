@@ -48,7 +48,7 @@ class DwModelListState<Model extends SerializableModel>
         (relationConfig).addUpdatesListener(_relationUpdatesListener);
       }
     }
-    return _processData(data).toList();
+    return List<Model>.from(_processData(data));
   }
 
   Future<bool> loadNextPage() async {
@@ -57,7 +57,7 @@ class DwModelListState<Model extends SerializableModel>
     final current = await future;
     final data = await _loadData();
 
-    state = AsyncValue.data(<Model>[...current, ..._processData(data)]);
+    state = AsyncValue.data(List<Model>.from(<Model>[...current, ..._processData(data)]));
 
     return _paginationStrategy.hasMore;
 
@@ -209,7 +209,7 @@ class DwModelListState<Model extends SerializableModel>
     }
 
     // Push the merged list to state
-    state = AsyncValue.data(res);
+    state = AsyncValue.data(List<Model>.from(res));
 
     // final ids = wrappedModelUpdates.map((e) => e.modelId).toSet();
 

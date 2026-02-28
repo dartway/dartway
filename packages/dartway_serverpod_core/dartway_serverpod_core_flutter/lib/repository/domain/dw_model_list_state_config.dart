@@ -11,7 +11,10 @@ class DwRelationUpdatesConfig<Model extends SerializableModel,
   final String relationKey;
   final Set<int> Function(Model model)? parentIdsGetter;
 
-  const DwRelationUpdatesConfig({
+  /// Stores the wrapped listener so it can be removed later.
+  Function(List<DwModelWrapper>)? _wrappedListener;
+
+  DwRelationUpdatesConfig({
     required this.copyWithRelatedModels,
     required this.relationKey,
     this.parentIdsGetter,
@@ -28,14 +31,20 @@ class DwRelationUpdatesConfig<Model extends SerializableModel,
       Set<int>? Function(Model model)? parentIdsGetter,
     ) relationUpdatesListener,
   ) {
-    DwRepository.addUpdatesListener<RelationModel>(
-      (updates) => relationUpdatesListener(
-        updates,
-        relationKey,
-        copyWithRelatedModels,
-        parentIdsGetter,
-      ),
+    _wrappedListener = (updates) => relationUpdatesListener(
+      updates,
+      relationKey,
+      copyWithRelatedModels,
+      parentIdsGetter,
     );
+    DwRepository.addUpdatesListener<RelationModel>(_wrappedListener!);
+  }
+
+  void removeUpdatesListener() {
+    if (_wrappedListener != null) {
+      DwRepository.removeUpdatesListener<RelationModel>(_wrappedListener!);
+      _wrappedListener = null;
+    }
   }
 }
 
