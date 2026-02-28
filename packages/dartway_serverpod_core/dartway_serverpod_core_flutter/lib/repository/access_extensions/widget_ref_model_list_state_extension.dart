@@ -14,10 +14,12 @@ extension WidgetRefModelListStateExtensions on WidgetRef {
       customConfig ?? DwModelListStateConfig<T>(backendFilter: backendFilter),
     ),
   ).whenData(
-    (data) =>
-        frontendFilter == null
-            ? data
-            : data.where((e) => _filter(e, frontendFilter)).toList(),
+    (data) {
+      final typed = List<T>.from(data);
+      return frontendFilter == null
+          ? typed
+          : typed.where((e) => _filter(e, frontendFilter)).toList();
+    },
   );
 
   loadNextPageForCustomizedModelListMore<T extends SerializableModel>({

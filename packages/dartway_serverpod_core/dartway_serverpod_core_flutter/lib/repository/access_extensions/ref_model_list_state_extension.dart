@@ -18,9 +18,10 @@ extension RefModelListStateExtensions on Ref {
           .future,
     );
 
+    final typed = List<T>.from(items);
     return frontendFilter == null
-        ? items
-        : items.where((e) => _filter(e, frontendFilter)).toList();
+        ? typed
+        : typed.where((e) => _filter(e, frontendFilter)).toList();
   }
 
   loadNextPageForCustomizedModelListMore<T extends SerializableModel>({

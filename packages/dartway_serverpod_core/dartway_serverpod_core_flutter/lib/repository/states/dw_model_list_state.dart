@@ -240,7 +240,7 @@ class DwModelListState<Model extends SerializableModel>
     Set<int>? Function(Model model)? parentIdsGetter,
   ) async {
     state = state.whenData((value) {
-      return value.map((model) {
+      return List<Model>.from(value.map((model) {
         final parentIds = parentIdsGetter != null
             ? parentIdsGetter.call(model)
             : <int>{(model as dynamic).id};
@@ -252,7 +252,7 @@ class DwModelListState<Model extends SerializableModel>
         if (relatedModels.isEmpty) return model;
 
         return copyWithRelatedModels(model, relatedModels.toList());
-      }).toList();
+      }));
     });
 
     // return await future.then((value) async {
