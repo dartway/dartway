@@ -47,7 +47,7 @@ class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
 
     _service.initialize();
 
-    return const DwSessionStateModel(
+    return DwSessionStateModel<UserProfileClass>(
       signedInUserProfile: null,
       signedInUserId: null,
     );
