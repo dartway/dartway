@@ -45,6 +45,8 @@ class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
 
     ref.onDispose(_service.dispose);
 
+    _service.initialize();
+
     return const DwSessionStateModel(
       signedInUserProfile: null,
       signedInUserId: null,
