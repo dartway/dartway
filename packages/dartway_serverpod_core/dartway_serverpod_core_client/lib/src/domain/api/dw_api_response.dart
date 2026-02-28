@@ -84,8 +84,7 @@ class DwApiResponse<T> implements SerializableModel {
                         (e) => DwCoreServerpodClient.protocol
                             .deserialize<DwModelWrapper>(e),
                       )
-                      .toList()
-                  as dynamic,
+                      .toList(),
     );
   }
 

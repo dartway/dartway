@@ -57,7 +57,7 @@ class DwModelListState<Model extends SerializableModel>
     final current = await future;
     final data = await _loadData();
 
-    state = AsyncValue.data([...current, ..._processData(data)]);
+    state = AsyncValue.data(<Model>[...current, ..._processData(data)]);
 
     return _paginationStrategy.hasMore;
 
@@ -70,7 +70,8 @@ class DwModelListState<Model extends SerializableModel>
     // });
   }
 
-  _processData(List<DwModelWrapper> data) => data.map((e) => e.model as Model);
+  Iterable<Model> _processData(List<DwModelWrapper> data) =>
+      data.map((e) => e.model as Model);
 
   Future<List<DwModelWrapper>> _loadData() async {
     if (!_paginationStrategy.hasMore) return [];
@@ -146,10 +147,9 @@ class DwModelListState<Model extends SerializableModel>
     final current = await future;
 
     // Keep only those current items that are not affected by updates (matching modelId)
-    final currentList = current
-        .where((e) => !ids.contains((e as dynamic).id)) // filter by id match
-        .cast<Model>() // cast to the correct type
-        .toList(); // convert to list
+    final List<Model> currentList = current
+        .where((e) => !ids.contains((e as dynamic).id))
+        .toList();
 
     final res = <Model>[]; // Final merged result list
 

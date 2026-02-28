@@ -48,7 +48,7 @@ class DwApiResponse<T> implements SerializableModel {
           ? null
           : (jsonSerialization['updatedModels'] as List)
               .map((e) => _protocol.deserialize<DwModelWrapper>(e))
-              .toList() as dynamic,
+              .toList(),
     );
   }
 

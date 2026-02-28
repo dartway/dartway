@@ -97,15 +97,10 @@ class DwRepository {
     }
   }
 
-  static final _modelListStateProviders =
-      <
-        Type,
-        AsyncNotifierProviderFamily<
-          DwModelListState,
-          List<dynamic>,
-          DwModelListStateConfig
-        >
-      >{};
+  // Providers are stored with erased types but cast back to proper generics
+  // on retrieval in modelListStateProvider<T>(). This is safe because each
+  // provider is created with correct generic parameters.
+  static final Map<Type, Object> _modelListStateProviders = {};
 
   static AsyncNotifierProviderFamily<
     DwModelListState<T>,
@@ -130,15 +125,9 @@ class DwRepository {
         >;
   }
 
-  static final _singleModelStateProviders =
-      <
-        Type,
-        AsyncNotifierProviderFamily<
-          DwSingleModelState,
-          dynamic,
-          DwSingleModelStateConfig
-        >
-      >{};
+  // Same pattern as _modelListStateProviders - erased for storage,
+  // cast back on retrieval in singleModelProvider<T>().
+  static final Map<Type, Object> _singleModelStateProviders = {};
 
   static AsyncNotifierProviderFamily<
     DwSingleModelState<T>,
