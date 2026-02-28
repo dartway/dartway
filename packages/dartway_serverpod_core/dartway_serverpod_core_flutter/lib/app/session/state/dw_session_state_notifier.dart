@@ -8,19 +8,14 @@ import '../domain/dw_session_state_model.dart';
 import '../service/dw_authentification_key_manager.dart';
 import '../service/dw_session_service.dart';
 
-final dwAuthenticationKeyManagerProvider = Provider<DwAuthenticationKeyManager>(
-  (ref) {
-    throw UnimplementedError('Override dwAuthenticationKeyManagerProvider');
-  },
-);
-
 class DwSessionStateNotifier<UserProfileClass extends SerializableModel>
     extends Notifier<DwSessionStateModel<UserProfileClass>> {
   late DwSessionService<UserProfileClass> _service;
 
   @override
   DwSessionStateModel<UserProfileClass> build() {
-    final keyManager = ref.read(dwAuthenticationKeyManagerProvider);
+    final keyManager =
+        dw.client.authenticationKeyManager as DwAuthenticationKeyManager;
 
     _service = DwSessionService<UserProfileClass>(
       keyManager: keyManager,
