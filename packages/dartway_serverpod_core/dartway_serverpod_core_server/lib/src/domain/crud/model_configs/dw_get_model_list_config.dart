@@ -27,13 +27,14 @@ class DwGetModelListConfig<Model extends TableRow>
   Future<DwApiResponse<List<DwModelWrapper>>> getModelList(
     Session session, {
     Expression? whereClause,
+    List<Order>? orderByList,
     int? limit,
     int? offset,
   }) async {
     final resultItems = await session.db.find<Model>(
       where: await getWhereExpression(session, whereClause: whereClause),
       include: include,
-      orderByList: defaultOrderByList,
+      orderByList: orderByList ?? defaultOrderByList,
       limit: limit,
       offset: offset,
     );

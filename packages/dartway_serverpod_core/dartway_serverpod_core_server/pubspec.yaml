@@ -3,7 +3,6 @@ description: Starting point for a Serverpod module.
 
 environment:
   sdk: ^3.6.0
-resolution: workspace
 
 dependencies:
   serverpod: ^2.9.1
@@ -30,6 +29,6 @@ dependencies:
 dev_dependencies:
   lints: '>=3.0.0 <6.0.0'
 
-# dependency_overrides:
-#   dartway_serverpod_core_shared:
-#     path: ../dartway_serverpod_core_shared
+dependency_overrides:
+  dartway_serverpod_core_shared:
+    path: ../dartway_serverpod_core_shared

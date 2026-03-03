@@ -15,8 +15,10 @@ import '../endpoints/dw_real_time_endpoint.dart' as _i3;
 import '../endpoints/dw_upload_endpoint.dart' as _i4;
 import 'package:dartway_serverpod_core_server/src/domain/api/dw_backend_filter.dart'
     as _i5;
-import 'package:dartway_serverpod_core_server/src/domain/api/dw_model_wrapper.dart'
+import 'package:dartway_serverpod_core_server/src/domain/api/dw_order_by.dart'
     as _i6;
+import 'package:dartway_serverpod_core_server/src/domain/api/dw_model_wrapper.dart'
+    as _i7;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -118,6 +120,11 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<_i5.DwBackendFilter?>(),
               nullable: true,
             ),
+            'orderByList': _i1.ParameterDescription(
+              name: 'orderByList',
+              type: _i1.getType<List<_i6.DwOrderBy>?>(),
+              nullable: true,
+            ),
             'limit': _i1.ParameterDescription(
               name: 'limit',
               type: _i1.getType<int?>(),
@@ -142,6 +149,7 @@ class Endpoints extends _i1.EndpointDispatch {
             session,
             className: params['className'],
             filter: params['filter'],
+            orderByList: params['orderByList'],
             limit: params['limit'],
             offset: params['offset'],
             apiGroup: params['apiGroup'],
@@ -152,7 +160,7 @@ class Endpoints extends _i1.EndpointDispatch {
           params: {
             'wrappedModel': _i1.ParameterDescription(
               name: 'wrappedModel',
-              type: _i1.getType<_i6.DwModelWrapper>(),
+              type: _i1.getType<_i7.DwModelWrapper>(),
               nullable: false,
             ),
             'apiGroup': _i1.ParameterDescription(
@@ -227,7 +235,7 @@ class Endpoints extends _i1.EndpointDispatch {
           params: {
             'wrappedModel': _i1.ParameterDescription(
               name: 'wrappedModel',
-              type: _i1.getType<_i6.DwModelWrapper>(),
+              type: _i1.getType<_i7.DwModelWrapper>(),
               nullable: false,
             ),
             'channelName': _i1.ParameterDescription(

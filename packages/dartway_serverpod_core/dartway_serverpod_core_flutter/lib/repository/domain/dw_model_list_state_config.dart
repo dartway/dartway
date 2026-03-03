@@ -42,6 +42,7 @@ class DwRelationUpdatesConfig<Model extends SerializableModel,
 class DwModelListStateConfig<Model extends SerializableModel>
     implements DwInfiniteListViewConfig<Model> {
   final DwBackendFilter? backendFilter;
+  final List<DwOrderBy>? orderByList;
   // final int? pageSize;
   final String? apiGroupOverride;
   final Function(List<DwModelWrapper>)? customUpdatesListener;
@@ -52,6 +53,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
 
   const DwModelListStateConfig({
     this.backendFilter,
+    this.orderByList,
     // this.pageSize,
     this.apiGroupOverride,
     this.customUpdatesListener,

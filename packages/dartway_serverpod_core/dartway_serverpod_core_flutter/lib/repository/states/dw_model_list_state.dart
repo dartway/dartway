@@ -101,6 +101,7 @@ class DwModelListState<Model extends SerializableModel>
     final response = await dw.endpointCaller.dwCrud.getAll(
       className: DwRepository.typeName<Model>(),
       filter: filter,
+      orderByList: arg.orderByList,
       limit: params.limit,
       offset: params.offset,
     );

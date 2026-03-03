@@ -35,6 +35,7 @@ class DwDtoGetListConfig<DTO extends SerializableModel, Model extends TableRow>
   Future<DwApiResponse<List<DwModelWrapper>>> getModelList(
     Session session, {
     Expression? whereClause,
+    List<Order>? orderByList,
     int? limit,
     int? offset,
   }) async {
@@ -44,7 +45,7 @@ class DwDtoGetListConfig<DTO extends SerializableModel, Model extends TableRow>
         whereClause: whereClause,
       ),
       include: include,
-      orderByList: defaultOrderByList,
+      orderByList: orderByList ?? defaultOrderByList,
       limit: limit,
       offset: offset,
     );

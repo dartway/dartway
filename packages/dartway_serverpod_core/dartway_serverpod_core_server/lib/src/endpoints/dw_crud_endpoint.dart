@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../domain/api/dw_order_by.dart';
 import '../domain/crud/domain/dw_get_list_interface.dart';
 
 class DwCrudEndpoint extends Endpoint {
@@ -96,6 +97,7 @@ class DwCrudEndpoint extends Endpoint {
     Session session, {
     required String className,
     DwBackendFilter? filter,
+    List<DwOrderBy>? orderByList,
     int? limit,
     int? offset,
     String? apiGroup,
@@ -123,6 +125,7 @@ class DwCrudEndpoint extends Endpoint {
       whereClause: filter?.prepareWhere(
         table,
       ),
+      orderByList: orderByList?.map((e) => e.prepareOrderBy(table)).toList(),
       limit: limit,
       offset: offset,
     );

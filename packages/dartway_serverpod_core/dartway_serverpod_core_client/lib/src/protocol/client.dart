@@ -18,8 +18,10 @@ import 'package:dartway_serverpod_core_client/src/domain/api/dw_model_wrapper.da
     as _i5;
 import 'package:dartway_serverpod_core_client/src/domain/api/dw_backend_filter.dart'
     as _i6;
-import 'package:dartway_serverpod_core_client/src/protocol/cloud_files/dw_cloud_file.dart'
+import 'package:dartway_serverpod_core_client/src/domain/api/dw_order_by.dart'
     as _i7;
+import 'package:dartway_serverpod_core_client/src/protocol/cloud_files/dw_cloud_file.dart'
+    as _i8;
 
 /// {@category Endpoint}
 class EndpointDwCrud extends _i1.EndpointRef {
@@ -71,6 +73,7 @@ class EndpointDwCrud extends _i1.EndpointRef {
   _i2.Future<_i4.DwApiResponse<List<_i5.DwModelWrapper>>> getAll({
     required String className,
     _i6.DwBackendFilter? filter,
+    List<_i7.DwOrderBy>? orderByList,
     int? limit,
     int? offset,
     String? apiGroup,
@@ -81,6 +84,7 @@ class EndpointDwCrud extends _i1.EndpointRef {
         {
           'className': className,
           'filter': filter,
+          'orderByList': orderByList,
           'limit': limit,
           'offset': offset,
           'apiGroup': apiGroup,
@@ -155,8 +159,8 @@ class EndpointDwUpload extends _i1.EndpointRef {
         {'path': path},
       );
 
-  _i2.Future<_i7.DwCloudFile?> verifyUpload({required String path}) =>
-      caller.callServerEndpoint<_i7.DwCloudFile?>(
+  _i2.Future<_i8.DwCloudFile?> verifyUpload({required String path}) =>
+      caller.callServerEndpoint<_i8.DwCloudFile?>(
         'dartway_serverpod_core.dwUpload',
         'verifyUpload',
         {'path': path},
