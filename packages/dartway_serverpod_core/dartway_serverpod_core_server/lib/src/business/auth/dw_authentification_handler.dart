@@ -13,6 +13,7 @@ Future<AuthenticationInfo?> dwAuthenticationHandler(
   try {
     // Get the secret and user id
     var parts = key.split(':');
+    if (parts.length < 2) return null;
     var keyIdStr = parts[0];
     var keyId = int.tryParse(keyIdStr);
     if (keyId == null) return null;

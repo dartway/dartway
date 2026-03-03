@@ -61,8 +61,8 @@ class DwBackendFilter implements SerializableModel {
       children: jsonSerialization['children'] == null
           ? null
           : (jsonSerialization['children'] as List)
-              .map((e) => DwBackendFilter.fromJson(e))
-              .toList() as dynamic,
+              .map((e) => DwBackendFilter.fromJson(e as Map<String, dynamic>))
+              .toList(),
       negate: jsonSerialization['negate'] as bool,
     );
   }

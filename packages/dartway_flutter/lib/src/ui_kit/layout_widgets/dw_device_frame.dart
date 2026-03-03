@@ -24,28 +24,26 @@ class DwDeviceFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConditionalParentWidget(
-      condition:
-          customWrapCondition != null
-              ? customWrapCondition!(context)
-              : !context.isMobile,
-      parentBuilder:
-          (child) => Scaffold(
-            body: Row(
-              children: [
-                Expanded(flex: leftSidePanelFlex, child: leftSidePanel),
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: DeviceFrame(
-                    device: Devices.ios.iPhone13ProMax,
-                    isFrameVisible: true,
-                    orientation: Orientation.portrait,
-                    screen: SafeArea(child: child),
-                  ),
-                ),
-                Expanded(flex: rightSidePanelFlex, child: rightSidePanel),
-              ],
+      condition: customWrapCondition != null
+          ? customWrapCondition!(context)
+          : !context.isMobile,
+      parentBuilder: (child) => Scaffold(
+        body: Row(
+          children: [
+            Expanded(flex: leftSidePanelFlex, child: leftSidePanel),
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: DeviceFrame(
+                device: Devices.ios.iPhone13ProMax,
+                isFrameVisible: true,
+                orientation: Orientation.portrait,
+                screen: SafeArea(child: child),
+              ),
             ),
-          ),
+            Expanded(flex: rightSidePanelFlex, child: rightSidePanel),
+          ],
+        ),
+      ),
       child: body,
     );
   }

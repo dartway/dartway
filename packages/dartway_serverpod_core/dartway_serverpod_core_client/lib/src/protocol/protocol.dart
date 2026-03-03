@@ -59,14 +59,12 @@ class Protocol extends _i1.SerializationManager {
   static final Protocol _instance = Protocol._();
 
   @override
-  T deserialize<T>(
-    dynamic data, [
-    Type? t,
-  ]) {
+  T deserialize<T>(dynamic data, [Type? t]) {
     t ??= T;
     if (data is Map<String, dynamic>) {
-      final manualDeserialization =
-          _i19.DwApiResponse.manualDeserialization<T>(data);
+      final manualDeserialization = _i19.DwApiResponse.manualDeserialization<T>(
+        data,
+      );
       if (manualDeserialization != null) return manualDeserialization;
     }
     if (t == _i2.DwAuthProvider) {
@@ -159,27 +157,35 @@ class Protocol extends _i1.SerializationManager {
     }
     if (t == _i1.getType<Map<String, String>?>()) {
       return (data != null
-          ? (data as Map).map((k, v) =>
-              MapEntry(deserialize<String>(k), deserialize<String>(v)))
-          : null) as T;
+              ? (data as Map).map(
+                  (k, v) =>
+                      MapEntry(deserialize<String>(k), deserialize<String>(v)),
+                )
+              : null)
+          as T;
     }
     if (t == List<_i16.DwModelWrapper>) {
       return (data as List)
-          .map((e) => deserialize<_i16.DwModelWrapper>(e))
-          .toList() as T;
+              .map((e) => deserialize<_i16.DwModelWrapper>(e))
+              .toList()
+          as T;
     }
     if (t == _i16.DwModelWrapper) {
       return _i16.DwModelWrapper.fromJson(data) as T;
     }
     if (t == List<_i17.DwModelWrapper>) {
       return (data as List)
-          .map((e) => deserialize<_i17.DwModelWrapper>(e))
-          .toList() as T;
+              .map((e) => deserialize<_i17.DwModelWrapper>(e))
+              .toList()
+          as T;
     }
     if (t == _i1.getType<List<_i18.DwOrderBy>?>()) {
       return (data != null
-          ? (data as List).map((e) => deserialize<_i18.DwOrderBy>(e)).toList()
-          : null) as T;
+              ? (data as List)
+                    .map((e) => deserialize<_i18.DwOrderBy>(e))
+                    .toList()
+              : null)
+          as T;
     }
     if (t == _i19.DwApiResponse) {
       return _i19.DwApiResponse.fromJson(data) as T;

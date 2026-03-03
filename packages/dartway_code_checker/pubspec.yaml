@@ -4,8 +4,7 @@ version: 1.0.0
 # repository: https://github.com/my_org/my_repo
 
 environment:
-  sdk: ">=3.6.0 <4.0.0"
-resolution: workspace
+  sdk: ^3.9.0
 
 executables:
   check_flutter_app: bin/check_flutter_app.dart

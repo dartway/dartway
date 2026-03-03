@@ -4,23 +4,19 @@ version: 0.0.1
 homepage:
 
 environment:
-  sdk: ^3.6.0
-  flutter: ">=1.17.0"
+  sdk: ">=3.9.0 <4.0.0"
+  flutter: ">=3.35.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_web_plugins:
-    sdk: flutter
 
   collection: ^1.19.1
-  flutter_riverpod: ^2.5.0
-  intl: ^0.19.0
-  go_router: ^14.0.0
+  flutter_riverpod: ^3.0.0
+  intl: ^0.20.2
   flutter_native_splash: ^2.3.0
   shared_preferences: ^2.3.0
-  shared_preferences_riverpod: ^0.3.0
-  skeletonizer: ^1.1.1
+  skeletonizer: ^2.1.0
   conditional_parent_widget: ^0.0.2
   adaptive_breakpoints: ^0.1.7
   device_frame: ^1.3.0

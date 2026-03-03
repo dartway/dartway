@@ -6,6 +6,7 @@ import 'package:dartway_flutter/src/private/dw_singleton.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'services/dw_shared_preferences.dart';
 import 'telegram_app/telegram_app.dart';
 
 part 'parts/dw_navigation.dart';

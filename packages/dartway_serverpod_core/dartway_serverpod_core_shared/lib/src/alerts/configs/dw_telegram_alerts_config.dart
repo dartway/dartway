@@ -1,9 +1,9 @@
 import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 
 class DwTelegramAlertsConfig {
-  late final String alertsChatId;
-  late final String alertsToken;
-  late final String? alertsMessageThreadId;
+  final String alertsChatId;
+  final String alertsToken;
+  final String? alertsMessageThreadId;
 
   DwTelegramAlertsConfig({
     required this.alertsChatId,

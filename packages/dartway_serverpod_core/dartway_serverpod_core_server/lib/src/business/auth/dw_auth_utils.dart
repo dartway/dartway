@@ -57,7 +57,7 @@ class DwAuthUtils {
 
   // /// Generates a new DwPhoneAuthConfig.current.validationCodeLength digit OTP.
   static String randomDigits(int length) {
-    return Random().nextString(length: length, chars: '0123456789');
+    return _random.nextString(length: length, chars: '0123456789');
   }
 }
 

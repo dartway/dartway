@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class DwAppBootstrapper extends ConsumerStatefulWidget {
-  final List<FutureOr<void> Function(WidgetRef ref)>? appInitializers;
+  final List<FutureOr<void> Function()>? appInitializers;
 
   final void Function(Object error, StackTrace stackTrace) onError;
   final Widget errorScreen;
@@ -52,7 +52,7 @@ class DwAppRootState extends ConsumerState<DwAppBootstrapper> {
       // -----------------------------------------------------------------------
       if (widget.appInitializers != null) {
         for (final init in widget.appInitializers!) {
-          await init(ref);
+          await init();
         }
       }
 
