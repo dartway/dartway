@@ -8,6 +8,10 @@
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
 
+import 'package:dartway_serverpod_core_client/src/domain/api/dw_model_wrapper.dart'
+    as _i17;
+import 'package:dartway_serverpod_core_client/src/domain/api/dw_order_by.dart'
+    as _i18;
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
@@ -55,14 +59,12 @@ class Protocol extends _i1.SerializationManager {
   static final Protocol _instance = Protocol._();
 
   @override
-  T deserialize<T>(
-    dynamic data, [
-    Type? t,
-  ]) {
+  T deserialize<T>(dynamic data, [Type? t]) {
     t ??= T;
     if (data is Map<String, dynamic>) {
-      final manualDeserialization =
-          _i19.DwApiResponse.manualDeserialization<T>(data);
+      final manualDeserialization = _i19.DwApiResponse.manualDeserialization<T>(
+        data,
+      );
       if (manualDeserialization != null) return manualDeserialization;
     }
     if (t == _i2.DwAuthProvider) {
@@ -155,20 +157,38 @@ class Protocol extends _i1.SerializationManager {
     }
     if (t == _i1.getType<Map<String, String>?>()) {
       return (data != null
-          ? (data as Map).map((k, v) =>
-              MapEntry(deserialize<String>(k), deserialize<String>(v)))
-          : null) as T;
+              ? (data as Map).map(
+                  (k, v) =>
+                      MapEntry(deserialize<String>(k), deserialize<String>(v)),
+                )
+              : null)
+          as T;
     }
     if (t == List<_i16.DwModelWrapper>) {
       return (data as List)
-          .map((e) => deserialize<_i16.DwModelWrapper>(e))
-          .toList() as T;
+              .map((e) => deserialize<_i16.DwModelWrapper>(e))
+              .toList()
+          as T;
     }
     if (t == _i16.DwModelWrapper) {
       return _i16.DwModelWrapper.fromJson(data) as T;
     }
-    if (t == _i19.DwAuthData) {
-      return _i19.DwAuthData.fromJson(data) as T;
+    if (t == List<_i17.DwModelWrapper>) {
+      return (data as List)
+              .map((e) => deserialize<_i17.DwModelWrapper>(e))
+              .toList()
+          as T;
+    }
+    if (t == _i1.getType<List<_i18.DwOrderBy>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_i18.DwOrderBy>(e))
+                    .toList()
+              : null)
+          as T;
+    }
+    if (t == _i19.DwApiResponse) {
+      return _i19.DwApiResponse.fromJson(data) as T;
     }
     if (t == _i20.DwAuthData) {
       return _i20.DwAuthData.fromJson(data) as T;
@@ -182,8 +202,11 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i1.getType<_i16.DwModelWrapper?>()) {
       return (data != null ? _i16.DwModelWrapper.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i19.DwAuthData?>()) {
-      return (data != null ? _i19.DwAuthData.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i19.DwApiResponse?>()) {
+      return (data != null ? _i19.DwApiResponse.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i20.DwAuthData?>()) {
+      return (data != null ? _i20.DwAuthData.fromJson(data) : null) as T;
     }
     if (t == _i1.getType<_i21.DwBackendFilter?>()) {
       return (data != null ? _i21.DwBackendFilter.fromJson(data) : null) as T;

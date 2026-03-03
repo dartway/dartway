@@ -7,10 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
 typedef DwAsyncProviderFactory =
-    List<ProviderListenable<AsyncValue>> Function(
-      WidgetRef ref,
-      int? userProfileId,
-    );
+    List<ProviderBase<AsyncValue>> Function(WidgetRef ref, int? userProfileId);
 
 class DwUserAsyncScope<UserProfileClass extends SerializableModel>
     extends ConsumerStatefulWidget {

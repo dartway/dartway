@@ -188,11 +188,9 @@ class DwRepository {
   }
 
   static K? processApiResponse<K>(
-    DwApiResponse<K> response,
-    // {
-    // bool updateListeners = true,
-    // }
-  ) {
+    DwApiResponse<K> response, {
+    bool updateListeners = true,
+  }) {
     debugPrint(response.toJson().toString());
     // if (response.error != null) {
     //   dw.notify.error(response.error!);
@@ -200,7 +198,7 @@ class DwRepository {
     //   dw.notify.warning(response.warning!);
     // }
 
-    if ((response.updatedModels ?? []).isNotEmpty) {
+    if (updateListeners && (response.updatedModels ?? []).isNotEmpty) {
       DwRepository.updateListeningStates(
         wrappedModelUpdates: response.updatedModels ?? [],
       );

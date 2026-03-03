@@ -57,7 +57,9 @@ class DwModelListState<Model extends SerializableModel>
     final current = await future;
     final data = await _loadData();
 
-    state = AsyncValue.data(List<Model>.from(<Model>[...current, ..._processData(data)]));
+    state = AsyncValue.data(
+      List<Model>.from(<Model>[...current, ..._processData(data)]),
+    );
 
     return _paginationStrategy.hasMore;
 
@@ -97,7 +99,7 @@ class DwModelListState<Model extends SerializableModel>
     final response = await dw.endpointCaller.dwCrud.getAll(
       className: DwRepository.typeName<Model>(),
       filter: filter,
-      orderByList: arg.orderByList,
+      orderByList: config.orderByList,
       limit: params.limit,
       offset: params.offset,
     );
@@ -240,19 +242,21 @@ class DwModelListState<Model extends SerializableModel>
     Set<int>? Function(Model model)? parentIdsGetter,
   ) async {
     state = state.whenData((value) {
-      return List<Model>.from(value.map((model) {
-        final parentIds = parentIdsGetter != null
-            ? parentIdsGetter.call(model)
-            : <int>{(model as dynamic).id};
+      return List<Model>.from(
+        value.map((model) {
+          final parentIds = parentIdsGetter != null
+              ? parentIdsGetter.call(model)
+              : <int>{(model as dynamic).id};
 
-        final relatedModels = wrappedModelUpdates.where(
-          (e) => (parentIds ?? {}).contains(e.foreignKeys[foreignKey]),
-        );
+          final relatedModels = wrappedModelUpdates.where(
+            (e) => (parentIds ?? {}).contains(e.foreignKeys[foreignKey]),
+          );
 
-        if (relatedModels.isEmpty) return model;
+          if (relatedModels.isEmpty) return model;
 
-        return copyWithRelatedModels(model, relatedModels.toList());
-      }));
+          return copyWithRelatedModels(model, relatedModels.toList());
+        }),
+      );
     });
 
     // return await future.then((value) async {

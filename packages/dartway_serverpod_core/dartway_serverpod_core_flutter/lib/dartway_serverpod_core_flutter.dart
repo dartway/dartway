@@ -15,6 +15,7 @@ export 'repository/domain/dw_cursor_pagination.dart';
 export 'repository/domain/dw_model_list_state_config.dart';
 export 'repository/domain/dw_offset_pagination.dart';
 export 'repository/domain/dw_single_model_state_config.dart';
+export 'repository/dw_global_refresh_state_provider.dart';
 export 'repository/dw_repository.dart';
 export 'repository/states/dw_model_list_state.dart';
 export 'repository/states/dw_single_model_state.dart';

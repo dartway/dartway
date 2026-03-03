@@ -1,4 +1,0 @@
-class: DwChatTypingMessageEvent
-fields:
-  userId: int
-  isTyping: bool
