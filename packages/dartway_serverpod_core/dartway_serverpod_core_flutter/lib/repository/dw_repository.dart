@@ -152,7 +152,7 @@ class DwRepository {
         >;
   }
 
-  Future<Model> saveModel<Model extends SerializableModel>(
+  static Future<Model> saveModel<Model extends SerializableModel>(
     Model model, {
     String? apiGroupOverride,
   }) async {
@@ -165,7 +165,7 @@ class DwRepository {
         .then((res) => res!.model as Model);
   }
 
-  Future<bool> deleteModel<T extends SerializableModel>(
+  static Future<bool> deleteModel<T extends SerializableModel>(
     T model, {
     String? apiGroupOverride,
   }) async {
