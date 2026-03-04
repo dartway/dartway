@@ -54,39 +54,26 @@ class DwApiResponse<T> implements SerializableModel {
     }
 
     return null;
-
-    // if (T.toString().startsWith('ApiResponse')) {
-    // print('Exact option for $K deserialization not configured');
-    // throw UnimplementedError();
-    // }
   }
-  // print(T.toString());
 
-  factory DwApiResponse.fromJson(
-    Map<String, dynamic> jsonSerialization,
-    // Type t;
-  ) {
-    // final t = jsonSerialization['value'];
-    // try {
+  factory DwApiResponse.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwApiResponse(
       isOk: jsonSerialization['isOk'] as bool,
-      value:
-          jsonSerialization['value'] == null
-              ? null
-              : DwCoreServerpodClient.protocol.deserialize<T>(
-                jsonSerialization['value'],
-              ),
+      value: jsonSerialization['value'] == null
+          ? null
+          : DwCoreServerpodClient.protocol.deserialize<T>(
+              jsonSerialization['value'],
+            ),
       warning: jsonSerialization['warning'] as String?,
       error: jsonSerialization['error'] as String?,
-      updatedModels:
-          jsonSerialization['updatedModels'] == null
-              ? null
-              : (jsonSerialization['updatedModels'] as List)
-                      .map(
-                        (e) => DwCoreServerpodClient.protocol
-                            .deserialize<DwModelWrapper>(e),
-                      )
-                      .toList(),
+      updatedModels: jsonSerialization['updatedModels'] == null
+          ? null
+          : (jsonSerialization['updatedModels'] as List)
+                .map(
+                  (e) => DwCoreServerpodClient.protocol
+                      .deserialize<DwModelWrapper>(e),
+                )
+                .toList(),
     );
   }
 
