@@ -52,11 +52,7 @@ class DwCore<
       );
     }
     endpointCaller = dartwayCaller as dartway.Caller;
-    socketService = DwSocketService(
-      client: client,
-      endpointCaller: endpointCaller,
-      onStatusChanged: (_) {},
-    );
+    socketService = DwSocketService();
 
     if (client.authenticationKeyManager != null &&
         client.authenticationKeyManager is DwAuthenticationKeyManager) {
@@ -118,8 +114,9 @@ class DwCore<
 
     if (sessionService != null) {
       await sessionService!.initialize();
-      socketService!.init();
     }
+
+    socketService!.init();
 
     if (kDebugMode) {
       debugPrint('[DwCore] initialized for $UserProfileClass');

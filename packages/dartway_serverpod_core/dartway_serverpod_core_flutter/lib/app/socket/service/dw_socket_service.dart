@@ -1,28 +1,28 @@
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
+import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../repository/dw_repository.dart';
 
 class DwSocketService {
-  DwSocketService({
-    required this.client,
-    required this.endpointCaller,
-    required this.onStatusChanged,
-  });
+  DwSocketService();
 
-  final ServerpodClientShared client;
-  final dynamic
-  endpointCaller; // dartway.Caller, чтобы не тащить зависимость выше
-  final void Function(StreamingConnectionStatus status) onStatusChanged;
+  // final ServerpodClientShared client;
+  // final dynamic endpointCaller;
 
   StreamingConnectionHandler? _connectionHandler;
   StreamSubscription<SerializableModel>? _mainStreamSub;
   final Map<String, StreamSubscription<SerializableModel>> _channelSubs = {};
 
+  final ValueNotifier<StreamingConnectionStatus> statusNotifier = ValueNotifier(
+    StreamingConnectionStatus.disconnected,
+  );
+
   void init() {
     _connectionHandler = StreamingConnectionHandler(
-      client: client,
+      client: dw.client,
       retryEverySeconds: 1,
       listener: (_) => _refresh(),
     );
@@ -54,7 +54,7 @@ class DwSocketService {
       _startMainStream();
     }
 
-    onStatusChanged(status);
+    statusNotifier.value = status;
   }
 
   void _processUpdatedModels(List<DwModelWrapper> updatedModels) {
@@ -76,9 +76,9 @@ class DwSocketService {
   Future<void> _startMainStream() async {
     await _mainStreamSub?.cancel();
 
-    endpointCaller.dwRealTime.resetStream();
+    dw.endpointCaller.dwRealTime.resetStream();
 
-    _mainStreamSub = endpointCaller.dwRealTime.stream.listen(_processUpdate);
+    _mainStreamSub = dw.endpointCaller.dwRealTime.stream.listen(_processUpdate);
   }
 
   Future<void> subscribeToChannel(String channel) async {
@@ -89,7 +89,7 @@ class DwSocketService {
 
     if (_channelSubs.containsKey(channel)) return;
 
-    final sub = endpointCaller.dwCrud
+    final sub = dw.endpointCaller.dwCrud
         .subscribeOnUpdates(channel: channel)
         .listen(
           _processUpdate,

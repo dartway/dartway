@@ -1,52 +1,38 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:serverpod_client/serverpod_client.dart';
+// import 'package:flutter_riverpod/flutter_riverpod.dart';
+// import 'package:serverpod_client/serverpod_client.dart';
 
-import '../../../private/dw_singleton.dart';
-import '../domain/dw_socket_state_model.dart';
-import '../service/dw_socket_service.dart';
+// import '../../../private/dw_singleton.dart';
+// import '../domain/dw_socket_state_model.dart';
+// import '../service/dw_socket_service.dart';
 
-final dwSocketStateProvider =
-    NotifierProvider<DwSocketStateNotifier, DwSocketStateModel>(
-      DwSocketStateNotifier.new,
-    );
+// final dwSocketStateProvider =
+//     NotifierProvider<DwSocketStateNotifier, DwSocketStateModel>(
+//       DwSocketStateNotifier.new,
+//     );
 
-class DwSocketStateNotifier extends Notifier<DwSocketStateModel> {
-  late final DwSocketService _service;
+// class DwSocketStateNotifier extends Notifier<DwSocketStateModel> {
+//   late final DwSocketService _service;
 
-  @override
-  DwSocketStateModel build() {
-    final client = dw.client;
-    final endpointCaller = dw.endpointCaller;
+//   @override
+//   DwSocketStateModel build() {
+//     _service = dw.socketService!;
 
-    _service = DwSocketService(
-      client: client,
-      endpointCaller: endpointCaller,
-      onStatusChanged: (status) {
-        state = state.copyWith(websocketStatus: status);
-      },
-    );
+//     void listener() {
+//       state = state.copyWith(websocketStatus: _service.status.value);
+//     }
 
-    ref.onDispose(_service.dispose);
+//     _service.status.addListener(listener);
 
-    // слушаем сессию
-    if (dw.sessionService != null) {
-      // предполагаем, что sessionService теперь в core
-      // и имеет onUserChanged callback
-      // либо можно подписаться через отдельный callback
-    }
+//     ref.onDispose(() {
+//       _service.status.removeListener(listener);
+//     });
 
-    return const DwSocketStateModel(
-      websocketStatus: StreamingConnectionStatus.disconnected,
-    );
-  }
+//     return DwSocketStateModel(websocketStatus: _service.status.value);
+//   }
 
-  Future<void> init() async {
-    _service.init();
-  }
+//   Future<void> subscribeToChannel(String channel) =>
+//       _service.subscribeToChannel(channel);
 
-  Future<void> subscribeToChannel(String channel) =>
-      _service.subscribeToChannel(channel);
-
-  Future<void> unsubscribeFromChannel(String channel) =>
-      _service.unsubscribeFromChannel(channel);
-}
+//   Future<void> unsubscribeFromChannel(String channel) =>
+//       _service.unsubscribeFromChannel(channel);
+// }
