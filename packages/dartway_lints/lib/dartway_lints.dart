@@ -7,33 +7,45 @@ PluginBase createPlugin() => _DartwayLintsPlugin();
 class _DartwayLintsPlugin extends PluginBase {
   @override
   List<LintRule> getLintRules(CustomLintConfigs configs) => const [
-        ForbiddenColorUsageRule(),
-      ];
+    ForbiddenUiStyleUsageRule(),
+    // ForbiddenUiKitImportRule(),
+    // ForbiddenFeatureImportRule(),
+  ];
 }
 
-class ForbiddenColorUsageRule extends DartLintRule {
-  const ForbiddenColorUsageRule() : super(code: _code);
+bool _isUiKitFile(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  return normalized.split('/').contains('ui_kit');
+}
+
+////////////////////////////////////////////////////////////////
+/// RULE 1
+/// forbidden_ui_style_usage
+////////////////////////////////////////////////////////////////
+
+class ForbiddenUiStyleUsageRule extends DartLintRule {
+  const ForbiddenUiStyleUsageRule() : super(code: _code);
 
   static const _code = LintCode(
     name: 'forbidden_ui_style_usage',
     problemMessage:
         'UI styles (Color, TextStyle, BorderRadius, Theme access) must not be used outside ui_kit.',
-    errorSeverity: ErrorSeverity.WARNING,
+    errorSeverity: DiagnosticSeverity.WARNING,
   );
 
   @override
   void run(
     CustomLintResolver resolver,
-    ErrorReporter reporter,
+    DiagnosticReporter reporter,
     CustomLintContext context,
   ) {
-    final path = resolver.path.replaceAll('\\', '/');
+    final path = resolver.path;
 
-    if (path.contains('/ui_kit/')) return;
+    if (_isUiKitFile(path)) return;
 
-    // 1️⃣ Constructor usage
+    /// Color(), TextStyle(), BorderRadius()
     context.registry.addInstanceCreationExpression((node) {
-      final typeName = node.constructorName.type.toSource();
+      final typeName = node.constructorName.type.name.lexeme;
 
       if (typeName == 'Color' ||
           typeName == 'TextStyle' ||
@@ -42,7 +54,7 @@ class ForbiddenColorUsageRule extends DartLintRule {
       }
     });
 
-    // 2️⃣ Static usage: Colors.red / BorderRadius.circular
+    /// Colors.red / BorderRadius.circular
     context.registry.addPrefixedIdentifier((node) {
       final prefix = node.prefix.name;
 
@@ -51,7 +63,7 @@ class ForbiddenColorUsageRule extends DartLintRule {
       }
     });
 
-    // 3️⃣ context.textTheme / colorTheme / colorScheme
+    /// context.textTheme / colorTheme / colorScheme
     context.registry.addPropertyAccess((node) {
       final target = node.target;
       final property = node.propertyName.name;
@@ -67,246 +79,110 @@ class ForbiddenColorUsageRule extends DartLintRule {
   }
 }
 
-// PluginBase createPlugin() => _DartwayLintsPlugin();
+////////////////////////////////////////////////////////////////
+/// RULE 2
+/// forbidden_ui_kit_import
+////////////////////////////////////////////////////////////////
 
-// class _DartwayLintsPlugin extends PluginBase {
-//   @override
-//   List<LintRule> getLintRules(CustomLintConfigs configs) => const [
-//         ForbiddenColorUsageRule(),
-//       ];
-// }
-
-// class ForbiddenColorUsageRule extends DartLintRule {
-//   const ForbiddenColorUsageRule() : super(code: _code);
+// class ForbiddenUiKitImportRule extends DartLintRule {
+//   const ForbiddenUiKitImportRule() : super(code: _code);
 
 //   static const _code = LintCode(
-//     name: 'forbidden_ui_style_usage',
+//     name: 'forbidden_ui_kit_import',
 //     problemMessage:
-//         'UI styles (Color, TextStyle, BorderRadius, Theme access) must not be used outside ui_kit.',
-//     errorSeverity: ErrorSeverity.WARNING,
+//         'Import ui_kit only via ui_kit.dart. Direct imports are forbidden.',
+//     errorSeverity: DiagnosticSeverity.WARNING,
 //   );
 
 //   @override
 //   void run(
 //     CustomLintResolver resolver,
-//     ErrorReporter reporter,
+//     DiagnosticReporter reporter,
 //     CustomLintContext context,
 //   ) {
-//     final filePath = resolver.path.replaceAll('\\', '/');
+//     final path = resolver.path;
 
-//     // Разрешаем всё внутри ui_kit
-//     if (filePath.contains('/ui_kit/')) return;
+//     if (_isUiKitFile(path)) return;
 
-//     /// 1️⃣ Color(), TextStyle(), BorderRadius()
-//     context.registry.addInstanceCreationExpression((node) {
-//       final type = node.constructorName.type;
+//     context.registry.addImportDirective((node) {
+//       final uri = node.uri.stringValue;
 
-//       final name = type.name.lexeme;
+//       if (uri == null) return;
 
-//       if (name == 'Color' ||
-//           name == 'TextStyle' ||
-//           name == 'BorderRadius') {
-//         reporter.reportErrorForNode(code, node);
-//       }
-//     });
-
-//     /// 2️⃣ Colors.red / BorderRadius.circular
-//     context.registry.addPrefixedIdentifier((node) {
-//       final prefix = node.prefix.name;
-
-//       if (prefix == 'Colors' || prefix == 'BorderRadius') {
-//         reporter.reportErrorForNode(code, node);
-//       }
-//     });
-
-//     /// 3️⃣ context.textTheme / colorTheme / colorScheme
-//     context.registry.addPropertyAccess((node) {
-//       final target = node.target;
-//       final property = node.propertyName.name;
-
-//       if (target is SimpleIdentifier &&
-//           target.name == 'context' &&
-//           (property == 'textTheme' ||
-//               property == 'colorTheme' ||
-//               property == 'colorScheme')) {
-//         reporter.reportErrorForNode(code, node);
+//       if (uri.contains('/ui_kit/') && !uri.endsWith('ui_kit.dart')) {
+//         reporter.atNode(node, code);
 //       }
 //     });
 //   }
 // }
 
-// import 'package:analyzer/error/error.dart' hide LintCode;
-// import 'package:analyzer/error/listener.dart';
-// import 'package:custom_lint_builder/custom_lint_builder.dart';
+////////////////////////////////////////////////////////////////
+/// RULE 3
+/// forbidden_feature_import
+////////////////////////////////////////////////////////////////
 
-// PluginBase createPlugin() => _DartwayLintsPlugin();
-
-// class _DartwayLintsPlugin extends PluginBase {
-//   @override
-//   List<LintRule> getLintRules(CustomLintConfigs configs) => [
-//         const ForbiddenColorUsageRule(),
-//       ];
-// }
-
-// class ForbiddenColorUsageRule extends DartLintRule {
-//   const ForbiddenColorUsageRule() : super(code: _code);
+// class ForbiddenFeatureImportRule extends DartLintRule {
+//   const ForbiddenFeatureImportRule() : super(code: _code);
 
 //   static const _code = LintCode(
-//     name: 'forbidden_ui_style_usage',
+//     name: 'forbidden_feature_import',
 //     problemMessage:
-//         'UI styles (Color, TextStyle, BorderRadius, Theme access) must not be used outside ui_kit.',
-//     errorSeverity: ErrorSeverity.WARNING,
+//         'Features must not import widgets or logic from other features.',
+//     errorSeverity: DiagnosticSeverity.WARNING,
 //   );
 
 //   @override
 //   void run(
 //     CustomLintResolver resolver,
-//     ErrorReporter reporter,
+//     DiagnosticReporter reporter,
 //     CustomLintContext context,
 //   ) {
 //     final path = resolver.path.replaceAll('\\', '/');
-//     if (path.contains('/ui_kit/')) return;
+//     final parts = path.split('/');
 
-//     // 1️⃣ Constructor usage: Color(), TextStyle(), BorderRadius()
-//     context.registry.addInstanceCreationExpression((node) {
-//       final type = node.constructorName.type;
+//     int featureIndex = -1;
 
-//       final name = type.name.lexeme;
+//     final widgetsIndex = parts.lastIndexOf('widgets');
+//     final logicIndex = parts.lastIndexOf('logic');
 
-//       if (name == 'Color' || name == 'TextStyle' || name == 'BorderRadius') {
-//         reporter.atNode(node, code);
+//     if (widgetsIndex > 0) featureIndex = widgetsIndex - 1;
+//     if (logicIndex > 0) featureIndex = logicIndex - 1;
+
+//     if (featureIndex < 0) return;
+
+//     final currentFeature = parts[featureIndex];
+
+//     context.registry.addImportDirective((node) {
+//       final uri = node.uri.stringValue;
+//       if (uri == null) return;
+
+//       /// ---- RELATIVE IMPORT ----
+//       final relativeMatch = RegExp(
+//         r"\.\./([^/]+)/(widgets|logic)/",
+//       ).firstMatch(uri);
+
+//       if (relativeMatch != null) {
+//         final targetFeature = relativeMatch.group(1);
+
+//         if (targetFeature != currentFeature) {
+//           reporter.atNode(node, code);
+//         }
+
+//         return;
 //       }
-//     });
 
-//     // 2️⃣ Static usage: Colors.red, BorderRadius.circular
-//     context.registry.addPrefixedIdentifier((node) {
-//       final prefix = node.prefix.name;
+//       /// ---- PACKAGE IMPORT ----
+//       final packageMatch = RegExp(
+//         r"/(app|auth|common|admin)/([^/]+)/(widgets|logic)/",
+//       ).firstMatch(uri);
 
-//       if (prefix == 'Colors' || prefix == 'BorderRadius') {
-//         reporter.atNode(node, code);
-//       }
-//     });
+//       if (packageMatch != null) {
+//         final targetFeature = packageMatch.group(2);
 
-//     // 3️⃣ context.textTheme / context.colorTheme / context.colorScheme
-//     context.registry.addPropertyAccess((node) {
-//       final target = node.target;
-//       final property = node.propertyName.name;
-
-//       if (target == null) return;
-
-//       if (target.toSource() == 'context') {
-//         if (property == 'textTheme' ||
-//             property == 'colorTheme' ||
-//             property == 'colorScheme') {
+//         if (targetFeature != currentFeature) {
 //           reporter.atNode(node, code);
 //         }
 //       }
 //     });
-//   }
-// }
-
-// import 'dart:async';
-// import 'dart:isolate';
-
-// import 'package:analyzer/dart/analysis/analysis_context.dart';
-// import 'package:analyzer/dart/ast/ast.dart';
-// import 'package:analyzer/dart/ast/visitor.dart';
-// import 'package:analyzer/error/error.dart' hide LintCode;
-// import 'package:analyzer/error/listener.dart';
-// import 'package:analyzer_plugin/plugin/plugin.dart';
-// import 'package:analyzer_plugin/protocol/protocol_common.dart' hide AnalysisError;
-// import 'package:analyzer_plugin/protocol/protocol_generated.dart';
-// import 'package:analyzer_plugin/utilities/change_builder/change_builder_core.dart';
-
-// void main(List<String> args, SendPort sendPort) {
-//   AnalyzerPluginStarter(DartwayLintsPlugin()).start(sendPort);
-// }
-
-// class DartwayLintsPlugin extends ServerPlugin {
-//   DartwayLintsPlugin();
-
-//   @override
-//   String get name => 'dartway_lints';
-
-//   @override
-//   String get version => '1.0.0';
-
-//   @override
-//   Future<void> analyzeFile({
-//     required AnalysisContext context,
-//     required String path,
-//   }) async {
-//     if (path.contains('/ui_kit/')) return;
-
-//     final resolvedUnit = await context.currentSession.getResolvedUnit(path);
-//     if (resolvedUnit is! ResolvedUnitResult) return;
-
-//     final unit = resolvedUnit.unit;
-
-//     final visitor = _Visitor(
-//       path: path,
-//       addError: (node) {
-//         final error = AnalysisError(
-//           AnalysisErrorSeverity.WARNING,
-//           AnalysisErrorType.LINT,
-//           node.offset,
-//           node.length,
-//           'UI styles (Color, TextStyle, BorderRadius, Theme access) must not be used outside ui_kit.',
-//           'forbidden_ui_style_usage',
-//         );
-
-//         context.reportErrors(path, [error]);
-//       },
-//     );
-
-//     unit.accept(visitor);
-//   }
-// }
-
-// class _Visitor extends RecursiveAstVisitor<void> {
-//   final String path;
-//   final void Function(AstNode node) addError;
-
-//   _Visitor({
-//     required this.path,
-//     required this.addError,
-//   });
-
-//   @override
-//   void visitInstanceCreationExpression(InstanceCreationExpression node) {
-//     final name = node.constructorName.type.name.lexeme;
-
-//     if (name == 'Color' || name == 'TextStyle' || name == 'BorderRadius') {
-//       addError(node);
-//     }
-
-//     super.visitInstanceCreationExpression(node);
-//   }
-
-//   @override
-//   void visitPrefixedIdentifier(PrefixedIdentifier node) {
-//     final prefix = node.prefix.name;
-
-//     if (prefix == 'Colors' || prefix == 'BorderRadius') {
-//       addError(node);
-//     }
-
-//     super.visitPrefixedIdentifier(node);
-//   }
-
-//   @override
-//   void visitPropertyAccess(PropertyAccess node) {
-//     final target = node.target;
-//     final property = node.propertyName.name;
-
-//     if (target != null && target.toSource() == 'context') {
-//       if (property == 'textTheme' ||
-//           property == 'colorTheme' ||
-//           property == 'colorScheme') {
-//         addError(node);
-//       }
-//     }
-
-//     super.visitPropertyAccess(node);
 //   }
 // }
