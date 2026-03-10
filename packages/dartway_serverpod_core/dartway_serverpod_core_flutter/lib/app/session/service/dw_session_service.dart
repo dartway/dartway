@@ -24,9 +24,13 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
   /// Абстракция для удаления authKey (чтобы не зависеть от dw singleton)
   final Future<void> Function(int authKeyId) deleteAuthKey;
 
+  int? _currentUserId;
+
   Future<void> initialize() async {
     final (int? id, UserProfileClass? profile) = await keyManager
         .loadLocalUserProfile<UserProfileClass>();
+
+    _currentUserId = id;
 
     onUserChanged(profile, id);
 
@@ -57,19 +61,32 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
   }
 
   void _handleUserProfileUpdates(List<DwModelWrapper> updates) async {
+    final currentUserId = _currentUserId;
+
+    if (currentUserId == null) return;
+
     for (final wrapped in updates) {
-      if (wrapped.model is UserProfileClass) {
-        final profile = wrapped.model as UserProfileClass;
-        await keyManager.storeUserProfile(profile);
-        onUserChanged(profile, wrapped.modelId);
-        return;
+      if (wrapped.model is! UserProfileClass) continue;
+
+      if (wrapped.modelId == null || wrapped.modelId != currentUserId) {
+        continue;
       }
+
+      final profile = wrapped.model as UserProfileClass;
+
+      await keyManager.storeUserProfile(profile);
+
+      onUserChanged(profile, currentUserId);
+
+      return;
     }
   }
 
   Future<void> _signIn(DwAuthData authData) async {
     final user = authData.userProfile as UserProfileClass;
     final id = authData.userId;
+
+    _currentUserId = id;
 
     await keyManager.put('${authData.keyId}:${authData.key}');
     await keyManager.storeUserProfile(user);
@@ -79,11 +96,15 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
 
   Future<void> signOut() async {
     final authKeyId = keyManager.authKeyId;
+
     if (authKeyId != null) {
       await deleteAuthKey(authKeyId);
     }
 
+    _currentUserId = null;
+
     await keyManager.remove();
+
     onUserChanged(null, null);
   }
 }

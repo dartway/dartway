@@ -89,7 +89,9 @@ class DwRepository {
 
     for (var className in updateMap.keys) {
       debugPrint(
-        'Updating Listening States for $className with ${updateMap[className]!.length} objects. Active listeners: ${_updateListeners.keys}.',
+        'Updating Listening States for $className with ${updateMap[className]!.length} objects, ids: ${updateMap[className]!.map((e) => e.modelId?.toString()).join(', ')}. Active listeners: ${_updateListeners.keys}.',
+
+        // 'Updating Listening States for $className . Active listeners: ${_updateListeners.keys}.',
       );
       for (var listener in _updateListeners[className] ?? []) {
         listener(updateMap[className]);
