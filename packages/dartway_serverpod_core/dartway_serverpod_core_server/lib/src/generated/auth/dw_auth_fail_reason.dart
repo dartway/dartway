@@ -17,7 +17,8 @@ enum DwAuthFailReason implements _i1.SerializableModel {
   passwordNotSet,
   invalidPassword,
   invalidAccessToken,
-  invalidVerificationCode;
+  invalidVerificationCode,
+  userBlocked;
 
   static DwAuthFailReason fromJson(String name) {
     switch (name) {
@@ -33,6 +34,8 @@ enum DwAuthFailReason implements _i1.SerializableModel {
         return DwAuthFailReason.invalidAccessToken;
       case 'invalidVerificationCode':
         return DwAuthFailReason.invalidVerificationCode;
+      case 'userBlocked':
+        return DwAuthFailReason.userBlocked;
       default:
         throw ArgumentError(
             'Value "$name" cannot be converted to "DwAuthFailReason"');
