@@ -31,7 +31,12 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
       );
 
       // Pre-auth validation hook (e.g. check if user is deleted or blocked).
-      final preAuthValidation = DwCore.instance.auth?.config.preAuthValidation;
+      final preAuthValidation = DwCore.instance.auth?.config.preAuthValidation
+          as Future<DwAuthFailReason?> Function(
+            Session session, {
+            required DwAuthRequest authRequest,
+            required TableRow? userProfile,
+          })?;
       if (preAuthValidation != null) {
         final failReason = await preAuthValidation(
           session,

@@ -51,7 +51,7 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
   final Future<DwAuthFailReason?> Function(
     Session session, {
     required DwAuthRequest authRequest,
-    required TableRow? userProfile,
+    required UserProfileClass? userProfile,
   })? preAuthValidation;
 
   /// Callback for triggering actions when a user signs in.
