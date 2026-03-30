@@ -55,6 +55,9 @@ class DwCore<UserProfileClass extends TableRow> {
     return _instance!;
   }
 
+  /// Typed access to the singleton, preserving the [UserProfileClass] generic.
+  static DwCore<T> instanceOf<T extends TableRow>() => instance as DwCore<T>;
+
   /// Initialize DartWay Core
   static DwCore<UserProfileClass> init<UserProfileClass extends TableRow>({
     required Table userProfileTable,

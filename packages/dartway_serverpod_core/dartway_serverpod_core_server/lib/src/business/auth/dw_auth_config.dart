@@ -42,7 +42,17 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
         DwAuthUtils.defaultVerificationCodeGenerationMethod,
     this.sendVerificationCodeMethod,
     this.onSignInTrigger,
+    this.preAuthValidation,
   });
+
+  /// Callback invoked BEFORE verification code is sent or auth key is created.
+  /// Return a [DwAuthFailReason] to reject the request, or `null` to proceed.
+  /// Use this to block deleted, banned, or otherwise restricted users.
+  final Future<DwAuthFailReason?> Function(
+    Session session, {
+    required DwAuthRequest authRequest,
+    required UserProfileClass? userProfile,
+  })? preAuthValidation;
 
   /// Callback for triggering actions when a user signs in.
   final Future<void> Function(
