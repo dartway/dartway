@@ -37,19 +37,16 @@ dependencies:
     git:
       url: https://github.com/dartway/dartway.git
       path: packages/dartway_flutter
-      ref: master
   
   dartway_router:
     git:
       url: https://github.com/dartway/dartway.git
       path: packages/dartway_router
-      ref: master
 
   dartway_serverpod_core_flutter:
     git:
       url: https://github.com/dartway/dartway.git
       path: packages/dartway_serverpod_core/dartway_serverpod_core_flutter
-      ref: master
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
