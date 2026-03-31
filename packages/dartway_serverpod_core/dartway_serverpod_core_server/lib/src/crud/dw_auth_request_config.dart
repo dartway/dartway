@@ -22,54 +22,49 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
       return true;
     },
     // TODO: !!! ensure password is not visible in logs or database
-    beforeSaveTransaction: (
-      Session session,
-      DwSaveContext<DwAuthRequest> saveContext,
-    ) async {
-      final userProfile = await saveContext.currentModel.findRelatedUserProfile(
-        session,
-      );
+    beforeSaveTransaction:
+        (Session session, DwSaveContext<DwAuthRequest> saveContext) async {
+          final failReason = await DwCore.instance.prevalidateAuthAttempt(
+            session,
+            saveContext.currentModel,
+          );
+          if (failReason != null) {
+            saveContext.currentModel.setFailed(session, failReason);
+            return;
+          }
 
-      // Pre-auth validation hook (e.g. check if user is deleted or blocked).
-      final preAuthValidation = DwCore.instance.auth?.config.preAuthValidation;
-      if (preAuthValidation != null) {
-        final failReason = await preAuthValidation(
-          session,
-          authRequest: saveContext.currentModel,
-          userProfile: userProfile,
-        );
-        if (failReason != null) {
-          saveContext.currentModel.setFailed(session, failReason);
-          return;
-        }
-      }
+          final userProfile = await saveContext.currentModel
+              .findRelatedUserProfile(session);
 
-      await saveContext.currentModel.tryVerify(
-        session,
-        userProfile: userProfile,
-      );
-
-      if (saveContext.currentModel.status ==
-          DwAuthRequestStatus.pendingVerification) {
-        final verificationCode = await DwCore
-            .instance.auth!.config.generateVerificationCodeMethod
-            ?.call(session, verificationRequest: saveContext.currentModel);
-
-        if (verificationCode != null) {
-          saveContext.extras[verificationCodeKey] = verificationCode;
-          saveContext.currentModel.verificationHash =
-              DwAuthUtils.hashVerificationCode(verificationCode);
-        }
-      } else if (saveContext.currentModel.status ==
-          DwAuthRequestStatus.verified) {
-        saveContext.beforeUpdates.addAll(
-          await saveContext.currentModel.onVerified(
+          await saveContext.currentModel.tryVerify(
             session,
             userProfile: userProfile,
-          ),
-        );
-      }
-    },
+          );
+
+          if (saveContext.currentModel.status ==
+              DwAuthRequestStatus.pendingVerification) {
+            final verificationCode = await DwCore
+                .instance
+                .auth!
+                .config
+                .generateVerificationCodeMethod
+                ?.call(session, verificationRequest: saveContext.currentModel);
+
+            if (verificationCode != null) {
+              saveContext.extras[verificationCodeKey] = verificationCode;
+              saveContext.currentModel.verificationHash =
+                  DwAuthUtils.hashVerificationCode(verificationCode);
+            }
+          } else if (saveContext.currentModel.status ==
+              DwAuthRequestStatus.verified) {
+            saveContext.beforeUpdates.addAll(
+              await saveContext.currentModel.onVerified(
+                session,
+                userProfile: userProfile,
+              ),
+            );
+          }
+        },
     afterSaveTransaction:
         (Session session, DwSaveContext<DwAuthRequest> saveContext) async {},
     afterSaveSideEffects: (session, saveContext) async {

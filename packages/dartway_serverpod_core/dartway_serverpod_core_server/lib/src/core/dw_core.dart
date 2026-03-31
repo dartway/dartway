@@ -38,7 +38,8 @@ class DwCore<UserProfileClass extends TableRow> {
   final Future<UserProfileClass> Function(
     Session session, {
     required DwAuthRequest registrationRequest,
-  }) _userProfileConstructor;
+  })
+  _userProfileConstructor;
   final DwAlerts alerts;
 
   /// Auth module (optional)
@@ -55,9 +56,6 @@ class DwCore<UserProfileClass extends TableRow> {
     return _instance!;
   }
 
-  /// Typed access to the singleton, preserving the [UserProfileClass] generic.
-  static DwCore<T> instanceOf<T extends TableRow>() => instance as DwCore<T>;
-
   /// Initialize DartWay Core
   static DwCore<UserProfileClass> init<UserProfileClass extends TableRow>({
     required Table userProfileTable,
@@ -67,7 +65,8 @@ class DwCore<UserProfileClass extends TableRow> {
     required Future<UserProfileClass> Function(
       Session session, {
       required DwAuthRequest registrationRequest,
-    }) userProfileConstructor,
+    })
+    userProfileConstructor,
     required DwAlerts dwAlerts,
     DwAuthConfig<UserProfileClass>? dwAuthConfig,
     DwCloudStorageConfig? cloudStorageConfig,
@@ -92,6 +91,7 @@ class DwCore<UserProfileClass extends TableRow> {
     );
 
     _instance = instance;
+
     return instance;
   }
 
@@ -103,25 +103,30 @@ class DwCore<UserProfileClass extends TableRow> {
     required Future<UserProfileClass> Function(
       Session session, {
       required DwAuthRequest registrationRequest,
-    }) userProfileConstructor,
+    })
+    userProfileConstructor,
     required this.alerts,
     required this.auth,
     required this.cloudStorage,
-  })  : _userProfileInclude = userProfileInclude,
-        _userProfileConstructor = userProfileConstructor {
-    _userInfoIdColumn = userProfileTable.columns.firstWhereOrThrow(
-      (column) =>
-          column is ColumnInt &&
-          column.columnName == DwCoreConst.userProfileIdColumnName,
-      'User profile table must have an int ${DwCoreConst.userProfileIdColumnName} column',
-    ) as ColumnInt;
+  }) : _userProfileInclude = userProfileInclude,
+       _userProfileConstructor = userProfileConstructor {
+    _userInfoIdColumn =
+        userProfileTable.columns.firstWhereOrThrow(
+              (column) =>
+                  column is ColumnInt &&
+                  column.columnName == DwCoreConst.userProfileIdColumnName,
+              'User profile table must have an int ${DwCoreConst.userProfileIdColumnName} column',
+            )
+            as ColumnInt;
 
-    _userIdentifierColumn = userProfileTable.columns.firstWhereOrThrow(
-      (column) =>
-          column is ColumnString &&
-          column.columnName == DwCoreConst.userIdentifierColumnName,
-      'User profile table must have a String ${DwCoreConst.userIdentifierColumnName} column',
-    ) as ColumnString;
+    _userIdentifierColumn =
+        userProfileTable.columns.firstWhereOrThrow(
+              (column) =>
+                  column is ColumnString &&
+                  column.columnName == DwCoreConst.userIdentifierColumnName,
+              'User profile table must have a String ${DwCoreConst.userIdentifierColumnName} column',
+            )
+            as ColumnString;
 
     _crudConfiguration[DwCoreConst.dartwayInternalApi] = Map.fromEntries(
       [
@@ -132,8 +137,9 @@ class DwCore<UserProfileClass extends TableRow> {
           table: userProfileTable,
           getModelConfigs: [
             DwGetModelConfig<UserProfileClass>(
-              accessFilter: (session) async => _userInfoIdColumn
-                  .equals((await session.authenticated)?.userId ?? 0),
+              accessFilter: (session) async => _userInfoIdColumn.equals(
+                (await session.authenticated)?.userId ?? 0,
+              ),
               filterPrototype: DwBackendFilter.equalsPrototype(
                 fieldName: DwCoreConst.userProfileIdColumnName,
               ),
@@ -156,9 +162,10 @@ class DwCore<UserProfileClass extends TableRow> {
   DwCrudConfig<TableRow>? getCrudConfig(String className, {String? api}) =>
       _crudConfiguration[api ?? DwCoreConst.defaultApi]?[className];
 
-  DwCrudEntity<SerializableModel>? getDtoConfig(String className,
-          {String? api}) =>
-      _dtoConfiguration[api ?? DwCoreConst.defaultApi]?[className];
+  DwCrudEntity<SerializableModel>? getDtoConfig(
+    String className, {
+    String? api,
+  }) => _dtoConfiguration[api ?? DwCoreConst.defaultApi]?[className];
 
   Future<UserProfileClass?> getUserProfile(Session session, int userId) async {
     final profile = await session.db.findFirstRow<UserProfileClass>(
@@ -207,5 +214,24 @@ class DwCore<UserProfileClass extends TableRow> {
     );
 
     return profile.id!;
+  }
+
+  Future<DwAuthFailReason?> prevalidateAuthAttempt(
+    Session session,
+    DwAuthRequest authRequest,
+  ) async {
+    final preAuthValidation = auth?.config.preAuthValidation;
+    if (preAuthValidation != null) {
+      final userProfile = await getUserProfileByIdentifier(
+        session,
+        authRequest.userIdentifier,
+      );
+      return await preAuthValidation(
+        session,
+        authRequest: authRequest,
+        userProfile: userProfile,
+      );
+    }
+    return null;
   }
 }

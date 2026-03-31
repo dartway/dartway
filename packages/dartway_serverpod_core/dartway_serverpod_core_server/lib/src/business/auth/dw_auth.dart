@@ -4,11 +4,9 @@ import 'package:serverpod/serverpod.dart';
 import 'dw_auth_utils.dart';
 
 class DwAuth<UserProfileClass extends TableRow> {
-  final DwAuthConfig config;
+  final DwAuthConfig<UserProfileClass> config;
 
-  DwAuth({
-    required this.config,
-  });
+  DwAuth({required this.config});
 
   Future<bool> setUserPassword(
     Session session, {
