@@ -56,17 +56,35 @@ class DwCore<
 
     if (client.authenticationKeyManager != null &&
         client.authenticationKeyManager is DwAuthenticationKeyManager) {
+      int? socketUserId;
       sessionService = DwSessionService<UserProfileClass>(
         keyManager:
             client.authenticationKeyManager! as DwAuthenticationKeyManager,
-        onUserChanged: (profile, id) {
-          socketService!.onUserChanged(
-            null, // можно хранить prev внутри сервиса
-            id,
+        onUserChanged: (_, id) {
+          final previousUserId = socketUserId;
+          socketUserId = id;
+          socketService!.onUserChanged(previousUserId, id);
+        },
+        fetchUserProfile: (userId) async {
+          final response = await endpointCaller.dwCrud.getOne(
+            className: DwRepository.typeName<UserProfileClass>(),
+            filter: DwBackendFilter<int>.value(
+              type: DwBackendFilterType.equals,
+              fieldName: 'id',
+              fieldValue: userId,
+            ),
+            apiGroup: DwCoreConst.dartwayInternalApi,
+          );
+
+          DwRepository.processApiResponse<DwModelWrapper?>(response);
+        },
+        deleteAuthKey: (authKeyId) async {
+          await endpointCaller.dwCrud.delete(
+            className: 'DwAuthKey',
+            modelId: authKeyId,
+            apiGroup: DwCoreConst.dartwayInternalApi,
           );
         },
-        fetchUserProfile: (_) async {},
-        deleteAuthKey: (_) async {},
       );
       sessionProvider =
           NotifierProvider<

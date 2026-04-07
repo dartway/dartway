@@ -5,18 +5,21 @@ import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart
 import '../../../repository/dw_repository.dart';
 import 'dw_authentification_key_manager.dart';
 
+typedef DwSessionUserChangedListener<
+  UserProfileClass extends SerializableModel
+> = void Function(UserProfileClass? profile, int? id);
+
 class DwSessionService<UserProfileClass extends SerializableModel> {
   DwSessionService({
     required this.keyManager,
-    required this.onUserChanged,
+    required DwSessionUserChangedListener<UserProfileClass> onUserChanged,
     required this.fetchUserProfile,
     required this.deleteAuthKey,
-  });
+  }) {
+    addUserChangedListener(onUserChanged, fireImmediately: false);
+  }
 
   final DwAuthenticationKeyManager keyManager;
-
-  /// Вызывается при любом изменении пользователя
-  final void Function(UserProfileClass? profile, int? id) onUserChanged;
 
   /// Абстракция для догрузки профиля
   final Future<void> Function(int userId) fetchUserProfile;
@@ -25,19 +28,61 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
   final Future<void> Function(int authKeyId) deleteAuthKey;
 
   int? _currentUserId;
+  UserProfileClass? _currentUserProfile;
+  Future<void>? _initializeFuture;
+  bool _isInitialized = false;
+  bool _repositoryListenersRegistered = false;
+  final List<DwSessionUserChangedListener<UserProfileClass>>
+  _userChangedListeners = [];
+
+  int? get currentUserId => _currentUserId;
+  UserProfileClass? get currentUserProfile => _currentUserProfile;
+
+  void addUserChangedListener(
+    DwSessionUserChangedListener<UserProfileClass> listener, {
+    bool fireImmediately = true,
+  }) {
+    _userChangedListeners.add(listener);
+    if (fireImmediately) {
+      listener(_currentUserProfile, _currentUserId);
+    }
+  }
+
+  void removeUserChangedListener(
+    DwSessionUserChangedListener<UserProfileClass> listener,
+  ) {
+    _userChangedListeners.remove(listener);
+  }
 
   Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    final pendingInitialize = _initializeFuture;
+    if (pendingInitialize != null) {
+      await pendingInitialize;
+      return;
+    }
+
+    _initializeFuture = _doInitialize();
+
+    try {
+      await _initializeFuture;
+      _isInitialized = true;
+    } catch (_) {
+      _removeRepositoryUpdateListeners();
+      rethrow;
+    } finally {
+      _initializeFuture = null;
+    }
+  }
+
+  Future<void> _doInitialize() async {
     final (int? id, UserProfileClass? profile) = await keyManager
         .loadLocalUserProfile<UserProfileClass>();
 
-    _currentUserId = id;
+    _setCurrentUser(profile, id);
 
-    onUserChanged(profile, id);
-
-    DwRepository.addUpdatesListener<DwAuthData>(_handleAuthDataUpdates);
-    DwRepository.addUpdatesListener<UserProfileClass>(
-      _handleUserProfileUpdates,
-    );
+    _addRepositoryUpdateListeners();
 
     if (id != null) {
       await fetchUserProfile(id);
@@ -45,10 +90,29 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
   }
 
   void dispose() {
+    _removeRepositoryUpdateListeners();
+    _isInitialized = false;
+    _initializeFuture = null;
+  }
+
+  void _addRepositoryUpdateListeners() {
+    if (_repositoryListenersRegistered) return;
+
+    DwRepository.addUpdatesListener<DwAuthData>(_handleAuthDataUpdates);
+    DwRepository.addUpdatesListener<UserProfileClass>(
+      _handleUserProfileUpdates,
+    );
+    _repositoryListenersRegistered = true;
+  }
+
+  void _removeRepositoryUpdateListeners() {
+    if (!_repositoryListenersRegistered) return;
+
     DwRepository.removeUpdatesListener<DwAuthData>(_handleAuthDataUpdates);
     DwRepository.removeUpdatesListener<UserProfileClass>(
       _handleUserProfileUpdates,
     );
+    _repositoryListenersRegistered = false;
   }
 
   void _handleAuthDataUpdates(List<DwModelWrapper> updates) async {
@@ -76,7 +140,7 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
 
       await keyManager.storeUserProfile(profile);
 
-      onUserChanged(profile, currentUserId);
+      _setCurrentUser(profile, currentUserId);
 
       return;
     }
@@ -86,12 +150,10 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
     final user = authData.userProfile as UserProfileClass;
     final id = authData.userId;
 
-    _currentUserId = id;
-
     await keyManager.put('${authData.keyId}:${authData.key}');
     await keyManager.storeUserProfile(user);
 
-    onUserChanged(user, id);
+    _setCurrentUser(user, id);
   }
 
   Future<void> signOut() async {
@@ -105,6 +167,15 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
 
     await keyManager.remove();
 
-    onUserChanged(null, null);
+    _setCurrentUser(null, null);
+  }
+
+  void _setCurrentUser(UserProfileClass? profile, int? id) {
+    _currentUserProfile = profile;
+    _currentUserId = id;
+
+    for (final listener in List.of(_userChangedListeners)) {
+      listener(profile, id);
+    }
   }
 }

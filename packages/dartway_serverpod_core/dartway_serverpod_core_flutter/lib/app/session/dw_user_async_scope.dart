@@ -7,14 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
 typedef DwAsyncProviderFactory =
-    List<ProviderBase<AsyncValue>> Function(WidgetRef ref, int? userProfileId);
+    List<ProviderListenable<AsyncValue<dynamic>>> Function(
+      WidgetRef ref,
+      int? userProfileId,
+    );
 
 class DwUserAsyncScope<UserProfileClass extends SerializableModel>
     extends ConsumerStatefulWidget {
   final Widget child;
   final Widget profileLoadingWidget;
-  // final StateProvider<UserProfileClass?> userProfileProvider;
   final Function(UserProfileClass? userProfile) whenProfileReadyCallback;
+  final Function(bool isLoading)? profileLoadingStateCallback;
 
   /// Function, which returns a list of async providers to subscribe to by `ref` and `userProfileId`.
   final DwAsyncProviderFactory? asyncProviderFactory;
@@ -28,7 +31,7 @@ class DwUserAsyncScope<UserProfileClass extends SerializableModel>
     super.key,
     required this.child,
     required this.whenProfileReadyCallback,
-    // required this.userProfileProvider,
+    this.profileLoadingStateCallback,
     this.profileLoadingWidget = const Center(
       child: CircularProgressIndicator(),
     ),
@@ -50,7 +53,9 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
   bool _isAsyncLoading = false;
   int? _postLoadTriggeredLastTimeForUserId;
 
-  final List<ProviderSubscription> _subscriptions = [];
+  final List<ProviderSubscription<AsyncValue<dynamic>>> _subscriptions = [];
+  final Map<ProviderSubscription<AsyncValue<dynamic>>, bool>
+  _subscriptionLoadingStates = {};
 
   @override
   void initState() {
@@ -73,16 +78,17 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
       sub.close();
     }
     _subscriptions.clear();
+    _subscriptionLoadingStates.clear();
+    _setAsyncLoading(false);
 
     if (widget.asyncProviderFactory == null) return;
 
     final providers = widget.asyncProviderFactory!(ref, userProfileId);
     for (final provider in providers) {
-      final sub = ref.listenManual(provider, (_, next) {
-        final isLoadingNow = next.isLoading;
-        if (isLoadingNow != _isAsyncLoading) {
-          setState(() => _isAsyncLoading = isLoadingNow);
-        }
+      late final ProviderSubscription<AsyncValue<dynamic>> sub;
+      sub = ref.listenManual(provider, (_, next) {
+        _subscriptionLoadingStates[sub] = next.isLoading;
+        _syncAsyncLoadingState();
       });
       _subscriptions.add(sub);
     }
@@ -90,6 +96,8 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
 
   void _loadProfile(int? newUserId, {bool skipDelay = false}) {
     if (_isLoading) return;
+
+    _updateProfileLoadingState(true);
 
     final prevUserId = _currentUserId;
     final isSignIn = prevUserId == null && newUserId != null;
@@ -126,8 +134,8 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
           ref.read(dw.sessionProvider!).signedInUserProfile
               as UserProfileClass?;
 
-      // ref.read(widget.userProfileProvider.notifier).state = profile;
       widget.whenProfileReadyCallback(profile);
+      _updateProfileLoadingState(false);
 
       if (withPostLoadTrigger && widget.postLoadTrigger != null) {
         if (_postLoadTriggeredLastTimeForUserId != _currentUserId) {
@@ -139,6 +147,22 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
         }
       }
     });
+  }
+
+  void _updateProfileLoadingState(bool isLoading) {
+    Future.microtask(() {
+      if (!mounted) return;
+      widget.profileLoadingStateCallback?.call(isLoading);
+    });
+  }
+
+  void _syncAsyncLoadingState() {
+    _setAsyncLoading(_subscriptionLoadingStates.values.any((e) => e));
+  }
+
+  void _setAsyncLoading(bool isLoading) {
+    if (_isAsyncLoading == isLoading) return;
+    setState(() => _isAsyncLoading = isLoading);
   }
 
   @override

@@ -4,8 +4,6 @@ import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../dw_global_refresh_state_provider.dart';
-
 class DwSingleModelState<Model extends SerializableModel>
     extends AsyncNotifier<Model?> {
   DwSingleModelStateConfig<Model> config;
