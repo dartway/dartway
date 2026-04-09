@@ -4,10 +4,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class DwAppBootstrapper extends ConsumerStatefulWidget {
   final List<FutureOr<void> Function()>? appInitializers;
+  final bool useNativeSplash;
 
   final void Function(Object error, StackTrace stackTrace) onError;
   final Widget errorScreen;
@@ -17,6 +19,7 @@ class DwAppBootstrapper extends ConsumerStatefulWidget {
   const DwAppBootstrapper({
     super.key,
     required this.appInitializers,
+    required this.useNativeSplash,
     required this.onError,
     required this.errorScreen,
     required this.loadingScreen,
@@ -40,34 +43,24 @@ class DwAppRootState extends ConsumerState<DwAppBootstrapper> {
   // Executes initialization pipeline
   Future<void> _runInitializers() async {
     try {
-      // -----------------------------------------------------------------------
-      // 1. Locale & date formatting initialization
-      // -----------------------------------------------------------------------
-      // for (final locale in widget.supportedLocales) {
-      //   await initializeDateFormatting(locale.languageCode);
-      // }
-
-      // -----------------------------------------------------------------------
-      // 2. Run user-defined initializers (Dw.init, analytics, cache, DB, etc.)
-      // -----------------------------------------------------------------------
       if (widget.appInitializers != null) {
         for (final init in widget.appInitializers!) {
           await init();
         }
       }
 
-      // -----------------------------------------------------------------------
-      // 3. Remove splash
-      // -----------------------------------------------------------------------
-      // if (widget.appLoadingOptions.useNativeSplash) {
-      //   FlutterNativeSplash.remove();
-      // }
-
-      // Done
-      setState(() => _initialized = true);
+      if (mounted) {
+        setState(() => _initialized = true);
+      }
     } catch (error, stack) {
       widget.onError(error, stack);
-      setState(() => _failed = true);
+      if (mounted) {
+        setState(() => _failed = true);
+      }
+    } finally {
+      if (widget.useNativeSplash) {
+        FlutterNativeSplash.remove();
+      }
     }
   }
 

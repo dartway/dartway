@@ -82,17 +82,13 @@ class DwAppRunner {
             return true;
           },
           if (appInitializers != null) ...appInitializers!,
-          if (appLoadingOptions.useNativeSplash)
-            () async {
-              FlutterNativeSplash.remove();
-              return true;
-            },
         ];
 
         runApp(
           ProviderScope(
             child: DwAppBootstrapper(
               appInitializers: initializers,
+              useNativeSplash: appLoadingOptions.useNativeSplash,
               onError: onError,
               errorScreen: appLoadingOptions.errorScreen,
               loadingScreen: appLoadingOptions.loadingScreen,
