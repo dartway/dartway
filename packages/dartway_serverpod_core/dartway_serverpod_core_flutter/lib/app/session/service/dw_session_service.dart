@@ -80,7 +80,9 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
     final (int? id, UserProfileClass? profile) = await keyManager
         .loadLocalUserProfile<UserProfileClass>();
 
-    _setCurrentUser(profile, id);
+    if (profile != null) {
+      _setCurrentUser(profile, id);
+    }
 
     _addRepositoryUpdateListeners();
 

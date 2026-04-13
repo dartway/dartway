@@ -51,6 +51,7 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
   bool _isLoading = false;
   bool _delayed = false;
   bool _isAsyncLoading = false;
+  bool _loadingCallbackScheduled = false;
   int? _postLoadTriggeredLastTimeForUserId;
 
   final List<ProviderSubscription<AsyncValue<dynamic>>> _subscriptions = [];
@@ -177,10 +178,12 @@ class _DwSignedInUserScopeState<UserProfileClass extends SerializableModel>
       }
     });
 
-    if (_isLoading) {
+    if (_isLoading && !_loadingCallbackScheduled) {
+      _loadingCallbackScheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         _updateProfileState();
         await Future.delayed(const Duration(milliseconds: 200));
+        _loadingCallbackScheduled = false;
         if (mounted) setState(() => _isLoading = false);
       });
     }
