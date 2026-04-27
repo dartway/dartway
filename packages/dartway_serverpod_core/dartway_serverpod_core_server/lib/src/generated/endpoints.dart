@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
@@ -66,16 +67,16 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-          ) async =>
-              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getOne(
-            session,
-            className: params['className'],
-            filter: params['filter'],
-            apiGroup: params['apiGroup'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getOne(
+                session,
+                className: params['className'],
+                filter: params['filter'],
+                apiGroup: params['apiGroup'],
+              ),
         ),
         'getCount': _i1.MethodConnector(
           name: 'getCount',
@@ -96,16 +97,16 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-          ) async =>
-              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getCount(
-            session,
-            className: params['className'],
-            filter: params['filter'],
-            apiGroup: params['apiGroup'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getCount(
+                session,
+                className: params['className'],
+                filter: params['filter'],
+                apiGroup: params['apiGroup'],
+              ),
         ),
         'getAll': _i1.MethodConnector(
           name: 'getAll',
@@ -141,19 +142,19 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-          ) async =>
-              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getAll(
-            session,
-            className: params['className'],
-            filter: params['filter'],
-            orderByList: params['orderByList'],
-            limit: params['limit'],
-            offset: params['offset'],
-            apiGroup: params['apiGroup'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getAll(
+                session,
+                className: params['className'],
+                filter: params['filter'],
+                orderByList: params['orderByList'],
+                limit: params['limit'],
+                offset: params['offset'],
+                apiGroup: params['apiGroup'],
+              ),
         ),
         'saveModel': _i1.MethodConnector(
           name: 'saveModel',
@@ -169,15 +170,15 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-          ) async =>
-              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).saveModel(
-            session,
-            wrappedModel: params['wrappedModel'],
-            apiGroup: params['apiGroup'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).saveModel(
+                session,
+                wrappedModel: params['wrappedModel'],
+                apiGroup: params['apiGroup'],
+              ),
         ),
         'delete': _i1.MethodConnector(
           name: 'delete',
@@ -198,16 +199,16 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-          ) async =>
-              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).delete(
-            session,
-            className: params['className'],
-            modelId: params['modelId'],
-            apiGroup: params['apiGroup'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).delete(
+                session,
+                className: params['className'],
+                modelId: params['modelId'],
+                apiGroup: params['apiGroup'],
+              ),
         ),
         'subscribeOnUpdates': _i1.MethodStreamConnector(
           name: 'subscribeOnUpdates',
@@ -216,19 +217,20 @@ class Endpoints extends _i1.EndpointDispatch {
               name: 'channel',
               type: _i1.getType<String>(),
               nullable: false,
-            )
+            ),
           },
           streamParams: {},
           returnType: _i1.MethodStreamReturnType.streamType,
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-            Map<String, Stream> streamParams,
-          ) =>
-              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).subscribeOnUpdates(
-            session,
-            channel: params['channel'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+                Map<String, Stream> streamParams,
+              ) => (endpoints['dwCrud'] as _i2.DwCrudEndpoint)
+                  .subscribeOnUpdates(
+                    session,
+                    channel: params['channel'],
+                  ),
         ),
         'saveModelStream': _i1.MethodStreamConnector(
           name: 'saveModelStream',
@@ -251,17 +253,17 @@ class Endpoints extends _i1.EndpointDispatch {
           },
           streamParams: {},
           returnType: _i1.MethodStreamReturnType.streamType,
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-            Map<String, Stream> streamParams,
-          ) =>
-              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).saveModelStream(
-            session,
-            wrappedModel: params['wrappedModel'],
-            channelName: params['channelName'],
-            apiGroup: params['apiGroup'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+                Map<String, Stream> streamParams,
+              ) => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).saveModelStream(
+                session,
+                wrappedModel: params['wrappedModel'],
+                channelName: params['channelName'],
+                apiGroup: params['apiGroup'],
+              ),
         ),
       },
     );
@@ -281,17 +283,17 @@ class Endpoints extends _i1.EndpointDispatch {
               name: 'path',
               type: _i1.getType<String>(),
               nullable: false,
-            )
+            ),
           },
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-          ) async =>
-              (endpoints['dwUpload'] as _i4.DwUploadEndpoint)
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['dwUpload'] as _i4.DwUploadEndpoint)
                   .getUploadDescription(
-            session,
-            path: params['path'],
-          ),
+                    session,
+                    path: params['path'],
+                  ),
         ),
         'verifyUpload': _i1.MethodConnector(
           name: 'verifyUpload',
@@ -300,16 +302,17 @@ class Endpoints extends _i1.EndpointDispatch {
               name: 'path',
               type: _i1.getType<String>(),
               nullable: false,
-            )
+            ),
           },
-          call: (
-            _i1.Session session,
-            Map<String, dynamic> params,
-          ) async =>
-              (endpoints['dwUpload'] as _i4.DwUploadEndpoint).verifyUpload(
-            session,
-            path: params['path'],
-          ),
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['dwUpload'] as _i4.DwUploadEndpoint).verifyUpload(
+                    session,
+                    path: params['path'],
+                  ),
         ),
       },
     );

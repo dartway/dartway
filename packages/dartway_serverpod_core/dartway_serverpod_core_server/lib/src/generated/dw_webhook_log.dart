@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
@@ -46,8 +47,9 @@ abstract class DwWebServerLog
   factory DwWebServerLog.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwWebServerLog(
       id: jsonSerialization['id'] as int?,
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+      createdAt: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['createdAt'],
+      ),
       method: jsonSerialization['method'] as String,
       url: jsonSerialization['url'] as String,
       headers: jsonSerialization['headers'] as String?,
@@ -113,6 +115,7 @@ abstract class DwWebServerLog
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwWebServerLog',
       if (id != null) 'id': id,
       'createdAt': createdAt.toJson(),
       'method': method,
@@ -131,6 +134,7 @@ abstract class DwWebServerLog
   @override
   Map<String, dynamic> toJsonForProtocol() {
     return {
+      '__className__': 'dartway_serverpod_core.DwWebServerLog',
       if (id != null) 'id': id,
       'createdAt': createdAt.toJson(),
       'method': method,
@@ -193,19 +197,19 @@ class _DwWebServerLogImpl extends DwWebServerLog {
     String? handler,
     String? ip,
   }) : super._(
-          id: id,
-          createdAt: createdAt,
-          method: method,
-          url: url,
-          headers: headers,
-          body: body,
-          statusCode: statusCode,
-          status: status,
-          error: error,
-          durationMs: durationMs,
-          handler: handler,
-          ip: ip,
-        );
+         id: id,
+         createdAt: createdAt,
+         method: method,
+         url: url,
+         headers: headers,
+         body: body,
+         statusCode: statusCode,
+         status: status,
+         error: error,
+         durationMs: durationMs,
+         handler: handler,
+         ip: ip,
+       );
 
   /// Returns a shallow copy of this [DwWebServerLog]
   /// with some or all fields replaced by the given arguments.
@@ -242,9 +246,70 @@ class _DwWebServerLogImpl extends DwWebServerLog {
   }
 }
 
+class DwWebServerLogUpdateTable extends _i1.UpdateTable<DwWebServerLogTable> {
+  DwWebServerLogUpdateTable(super.table);
+
+  _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
+      _i1.ColumnValue(
+        table.createdAt,
+        value,
+      );
+
+  _i1.ColumnValue<String, String> method(String value) => _i1.ColumnValue(
+    table.method,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> url(String value) => _i1.ColumnValue(
+    table.url,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> headers(String? value) => _i1.ColumnValue(
+    table.headers,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> body(String? value) => _i1.ColumnValue(
+    table.body,
+    value,
+  );
+
+  _i1.ColumnValue<int, int> statusCode(int? value) => _i1.ColumnValue(
+    table.statusCode,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> status(String? value) => _i1.ColumnValue(
+    table.status,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> error(String? value) => _i1.ColumnValue(
+    table.error,
+    value,
+  );
+
+  _i1.ColumnValue<int, int> durationMs(int? value) => _i1.ColumnValue(
+    table.durationMs,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> handler(String? value) => _i1.ColumnValue(
+    table.handler,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> ip(String? value) => _i1.ColumnValue(
+    table.ip,
+    value,
+  );
+}
+
 class DwWebServerLogTable extends _i1.Table<int?> {
   DwWebServerLogTable({super.tableRelation})
-      : super(tableName: 'dw_web_server_log') {
+    : super(tableName: 'dw_web_server_log') {
+    updateTable = DwWebServerLogUpdateTable(this);
     createdAt = _i1.ColumnDateTime(
       'createdAt',
       this,
@@ -291,6 +356,8 @@ class DwWebServerLogTable extends _i1.Table<int?> {
     );
   }
 
+  late final DwWebServerLogUpdateTable updateTable;
+
   late final _i1.ColumnDateTime createdAt;
 
   late final _i1.ColumnString method;
@@ -315,19 +382,19 @@ class DwWebServerLogTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        createdAt,
-        method,
-        url,
-        headers,
-        body,
-        statusCode,
-        status,
-        error,
-        durationMs,
-        handler,
-        ip,
-      ];
+    id,
+    createdAt,
+    method,
+    url,
+    headers,
+    body,
+    statusCode,
+    status,
+    error,
+    durationMs,
+    handler,
+    ip,
+  ];
 }
 
 class DwWebServerLogInclude extends _i1.IncludeObject {
@@ -386,7 +453,7 @@ class DwWebServerLogRepository {
   /// );
   /// ```
   Future<List<DwWebServerLog>> find(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwWebServerLogTable>? where,
     int? limit,
     int? offset,
@@ -394,6 +461,8 @@ class DwWebServerLogRepository {
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwWebServerLogTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<DwWebServerLog>(
       where: where?.call(DwWebServerLog.t),
@@ -403,6 +472,8 @@ class DwWebServerLogRepository {
       limit: limit,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -424,13 +495,15 @@ class DwWebServerLogRepository {
   /// );
   /// ```
   Future<DwWebServerLog?> findFirstRow(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwWebServerLogTable>? where,
     int? offset,
     _i1.OrderByBuilder<DwWebServerLogTable>? orderBy,
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwWebServerLogTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<DwWebServerLog>(
       where: where?.call(DwWebServerLog.t),
@@ -439,18 +512,24 @@ class DwWebServerLogRepository {
       orderDescending: orderDescending,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
   /// Finds a single [DwWebServerLog] by its [id] or null if no such row exists.
   Future<DwWebServerLog?> findById(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     int id, {
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<DwWebServerLog>(
       id,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -460,14 +539,20 @@ class DwWebServerLogRepository {
   ///
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// insert, none of the rows will be inserted.
+  ///
+  /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
+  /// rows are silently skipped, and only the successfully inserted rows are
+  /// returned.
   Future<List<DwWebServerLog>> insert(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwWebServerLog> rows, {
     _i1.Transaction? transaction,
+    bool ignoreConflicts = false,
   }) async {
     return session.db.insert<DwWebServerLog>(
       rows,
       transaction: transaction,
+      ignoreConflicts: ignoreConflicts,
     );
   }
 
@@ -475,7 +560,7 @@ class DwWebServerLogRepository {
   ///
   /// The returned [DwWebServerLog] will have its `id` field set.
   Future<DwWebServerLog> insertRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwWebServerLog row, {
     _i1.Transaction? transaction,
   }) async {
@@ -491,7 +576,7 @@ class DwWebServerLogRepository {
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
   Future<List<DwWebServerLog>> update(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwWebServerLog> rows, {
     _i1.ColumnSelections<DwWebServerLogTable>? columns,
     _i1.Transaction? transaction,
@@ -507,7 +592,7 @@ class DwWebServerLogRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<DwWebServerLog> updateRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwWebServerLog row, {
     _i1.ColumnSelections<DwWebServerLogTable>? columns,
     _i1.Transaction? transaction,
@@ -519,11 +604,51 @@ class DwWebServerLogRepository {
     );
   }
 
+  /// Updates a single [DwWebServerLog] by its [id] with the specified [columnValues].
+  /// Returns the updated row or null if no row with the given id exists.
+  Future<DwWebServerLog?> updateById(
+    _i1.DatabaseSession session,
+    int id, {
+    required _i1.ColumnValueListBuilder<DwWebServerLogUpdateTable> columnValues,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateById<DwWebServerLog>(
+      id,
+      columnValues: columnValues(DwWebServerLog.t.updateTable),
+      transaction: transaction,
+    );
+  }
+
+  /// Updates all [DwWebServerLog]s matching the [where] expression with the specified [columnValues].
+  /// Returns the list of updated rows.
+  Future<List<DwWebServerLog>> updateWhere(
+    _i1.DatabaseSession session, {
+    required _i1.ColumnValueListBuilder<DwWebServerLogUpdateTable> columnValues,
+    required _i1.WhereExpressionBuilder<DwWebServerLogTable> where,
+    int? limit,
+    int? offset,
+    _i1.OrderByBuilder<DwWebServerLogTable>? orderBy,
+    _i1.OrderByListBuilder<DwWebServerLogTable>? orderByList,
+    bool orderDescending = false,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateWhere<DwWebServerLog>(
+      columnValues: columnValues(DwWebServerLog.t.updateTable),
+      where: where(DwWebServerLog.t),
+      limit: limit,
+      offset: offset,
+      orderBy: orderBy?.call(DwWebServerLog.t),
+      orderByList: orderByList?.call(DwWebServerLog.t),
+      orderDescending: orderDescending,
+      transaction: transaction,
+    );
+  }
+
   /// Deletes all [DwWebServerLog]s in the list and returns the deleted rows.
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
   Future<List<DwWebServerLog>> delete(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwWebServerLog> rows, {
     _i1.Transaction? transaction,
   }) async {
@@ -535,7 +660,7 @@ class DwWebServerLogRepository {
 
   /// Deletes a single [DwWebServerLog].
   Future<DwWebServerLog> deleteRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwWebServerLog row, {
     _i1.Transaction? transaction,
   }) async {
@@ -547,7 +672,7 @@ class DwWebServerLogRepository {
 
   /// Deletes all rows matching the [where] expression.
   Future<List<DwWebServerLog>> deleteWhere(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     required _i1.WhereExpressionBuilder<DwWebServerLogTable> where,
     _i1.Transaction? transaction,
   }) async {
@@ -560,7 +685,7 @@ class DwWebServerLogRepository {
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwWebServerLogTable>? where,
     int? limit,
     _i1.Transaction? transaction,
@@ -568,6 +693,22 @@ class DwWebServerLogRepository {
     return session.db.count<DwWebServerLog>(
       where: where?.call(DwWebServerLog.t),
       limit: limit,
+      transaction: transaction,
+    );
+  }
+
+  /// Acquires row-level locks on [DwWebServerLog] rows matching the [where] expression.
+  Future<void> lockRows(
+    _i1.DatabaseSession session, {
+    required _i1.WhereExpressionBuilder<DwWebServerLogTable> where,
+    required _i1.LockMode lockMode,
+    required _i1.Transaction transaction,
+    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+  }) async {
+    return session.db.lockRows<DwWebServerLog>(
+      where: where(DwWebServerLog.t),
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
       transaction: transaction,
     );
   }

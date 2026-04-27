@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 
 class DwBackendFilter<T> implements SerializableModel {

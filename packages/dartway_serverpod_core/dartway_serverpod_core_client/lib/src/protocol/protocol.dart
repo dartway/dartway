@@ -7,19 +7,10 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
-import 'package:dartway_serverpod_core_client/src/domain/api/dw_model_wrapper.dart'
-    as _i17;
-import 'package:dartway_serverpod_core_client/src/domain/api/dw_order_by.dart'
-    as _i18;
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
-
-import '/src/domain/api/dw_api_response.dart' as _i19;
-import '/src/domain/api/dw_auth_data.dart' as _i20;
-import '/src/domain/api/dw_backend_filter.dart' as _i21;
-import '/src/domain/api/dw_model_wrapper.dart' as _i16;
-import '/src/domain/api/dw_order_by.dart' as _i22;
 import 'auth/auth_request/dw_auth_provider.dart' as _i2;
 import 'auth/auth_request/dw_auth_request.dart' as _i3;
 import 'auth/auth_request/dw_auth_request_status.dart' as _i4;
@@ -34,7 +25,15 @@ import 'dw_app_notification.dart' as _i12;
 import 'dw_backend_filter_type.dart' as _i13;
 import 'dw_updates_transport.dart' as _i14;
 import 'dw_webhook_log.dart' as _i15;
-
+import '/src/domain/api/dw_model_wrapper.dart' as _i16;
+import 'package:dartway_serverpod_core_client/src/domain/api/dw_model_wrapper.dart'
+    as _i17;
+import 'package:dartway_serverpod_core_client/src/domain/api/dw_order_by.dart'
+    as _i18;
+import '/src/domain/api/dw_api_response.dart' as _i19;
+import '/src/domain/api/dw_auth_data.dart' as _i20;
+import '/src/domain/api/dw_backend_filter.dart' as _i21;
+import '/src/domain/api/dw_order_by.dart' as _i22;
 export 'auth/auth_request/dw_auth_provider.dart';
 export 'auth/auth_request/dw_auth_request.dart';
 export 'auth/auth_request/dw_auth_request_status.dart';
@@ -44,12 +43,12 @@ export 'auth/auth_verification/dw_auth_verification_type.dart';
 export 'auth/dw_auth_fail_reason.dart';
 export 'auth/dw_auth_key.dart';
 export 'auth/dw_user_password.dart';
-export 'client.dart';
 export 'cloud_files/dw_cloud_file.dart';
 export 'dw_app_notification.dart';
 export 'dw_backend_filter_type.dart';
 export 'dw_updates_transport.dart';
 export 'dw_webhook_log.dart';
+export 'client.dart';
 
 class Protocol extends _i1.SerializationManager {
   Protocol._();
@@ -58,15 +57,43 @@ class Protocol extends _i1.SerializationManager {
 
   static final Protocol _instance = Protocol._();
 
+  static String? getClassNameFromObjectJson(dynamic data) {
+    if (data is! Map) return null;
+    final className = data['__className__'] as String?;
+    if (className == null) return null;
+    if (!className.startsWith('dartway_serverpod_core.')) return className;
+    return className.substring(23);
+  }
+
   @override
-  T deserialize<T>(dynamic data, [Type? t]) {
+  T deserialize<T>(
+    dynamic data, [
+    Type? t,
+  ]) {
     t ??= T;
+
     if (data is Map<String, dynamic>) {
-      final manualDeserialization = _i19.DwApiResponse.manualDeserialization<T>(
-        data,
-      );
-      if (manualDeserialization != null) return manualDeserialization;
+      final manualDeserialization =
+          _i19.DwApiResponse.manualDeserialization<T>(data);
+      if (manualDeserialization != null) {
+        return manualDeserialization;
+      }
     }
+
+    final dataClassName = getClassNameFromObjectJson(data);
+    if (dataClassName != null && dataClassName != getClassNameForType(t)) {
+      try {
+        return deserializeByClassName({
+          'className': dataClassName,
+          'data': data,
+        });
+      } on FormatException catch (_) {
+        // If the className is not recognized (e.g., older client receiving
+        // data with a new subtype), fall back to deserializing without the
+        // className, using the expected type T.
+      }
+    }
+
     if (t == _i2.DwAuthProvider) {
       return _i2.DwAuthProvider.fromJson(data) as T;
     }
@@ -155,6 +182,12 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i1.getType<_i15.DwWebServerLog?>()) {
       return (data != null ? _i15.DwWebServerLog.fromJson(data) : null) as T;
     }
+    if (t == Map<String, String>) {
+      return (data as Map).map(
+            (k, v) => MapEntry(deserialize<String>(k), deserialize<String>(v)),
+          )
+          as T;
+    }
     if (t == _i1.getType<Map<String, String>?>()) {
       return (data != null
               ? (data as Map).map(
@@ -177,6 +210,10 @@ class Protocol extends _i1.SerializationManager {
       return (data as List)
               .map((e) => deserialize<_i17.DwModelWrapper>(e))
               .toList()
+          as T;
+    }
+    if (t == List<_i18.DwOrderBy>) {
+      return (data as List).map((e) => deserialize<_i18.DwOrderBy>(e)).toList()
           as T;
     }
     if (t == _i1.getType<List<_i18.DwOrderBy>?>()) {
@@ -217,66 +254,82 @@ class Protocol extends _i1.SerializationManager {
     return super.deserialize<T>(data, t);
   }
 
+  static String? getClassNameForType(Type type) {
+    return switch (type) {
+      _i16.DwModelWrapper => 'DwModelWrapper',
+      _i19.DwApiResponse => 'DwApiResponse',
+      _i20.DwAuthData => 'DwAuthData',
+      _i21.DwBackendFilter => 'DwBackendFilter',
+      _i22.DwOrderBy => 'DwOrderBy',
+      _i2.DwAuthProvider => 'DwAuthProvider',
+      _i3.DwAuthRequest => 'DwAuthRequest',
+      _i4.DwAuthRequestStatus => 'DwAuthRequestStatus',
+      _i5.DwAuthRequestType => 'DwAuthRequestType',
+      _i6.DwAuthVerification => 'DwAuthVerification',
+      _i7.DwAuthVerificationType => 'DwAuthVerificationType',
+      _i8.DwAuthFailReason => 'DwAuthFailReason',
+      _i9.DwAuthKey => 'DwAuthKey',
+      _i10.DwUserPassword => 'DwUserPassword',
+      _i11.DwCloudFile => 'DwCloudFile',
+      _i12.DwAppNotification => 'DwAppNotification',
+      _i13.DwBackendFilterType => 'DwBackendFilterType',
+      _i14.DwUpdatesTransport => 'DwUpdatesTransport',
+      _i15.DwWebServerLog => 'DwWebServerLog',
+      _ => null,
+    };
+  }
+
   @override
   String? getClassNameForObject(Object? data) {
     String? className = super.getClassNameForObject(data);
     if (className != null) return className;
-    if (data is _i16.DwModelWrapper) {
-      return 'DwModelWrapper';
+
+    if (data is Map<String, dynamic> && data['__className__'] is String) {
+      return (data['__className__'] as String).replaceFirst(
+        'dartway_serverpod_core.',
+        '',
+      );
     }
-    if (data is _i19.DwApiResponse) {
-      return 'DwApiResponse';
-    }
-    if (data is _i20.DwAuthData) {
-      return 'DwAuthData';
-    }
-    if (data is _i21.DwBackendFilter) {
-      return 'DwBackendFilter';
-    }
-    if (data is _i22.DwOrderBy) {
-      return 'DwOrderBy';
-    }
-    if (data is _i2.DwAuthProvider) {
-      return 'DwAuthProvider';
-    }
-    if (data is _i3.DwAuthRequest) {
-      return 'DwAuthRequest';
-    }
-    if (data is _i4.DwAuthRequestStatus) {
-      return 'DwAuthRequestStatus';
-    }
-    if (data is _i5.DwAuthRequestType) {
-      return 'DwAuthRequestType';
-    }
-    if (data is _i6.DwAuthVerification) {
-      return 'DwAuthVerification';
-    }
-    if (data is _i7.DwAuthVerificationType) {
-      return 'DwAuthVerificationType';
-    }
-    if (data is _i8.DwAuthFailReason) {
-      return 'DwAuthFailReason';
-    }
-    if (data is _i9.DwAuthKey) {
-      return 'DwAuthKey';
-    }
-    if (data is _i10.DwUserPassword) {
-      return 'DwUserPassword';
-    }
-    if (data is _i11.DwCloudFile) {
-      return 'DwCloudFile';
-    }
-    if (data is _i12.DwAppNotification) {
-      return 'DwAppNotification';
-    }
-    if (data is _i13.DwBackendFilterType) {
-      return 'DwBackendFilterType';
-    }
-    if (data is _i14.DwUpdatesTransport) {
-      return 'DwUpdatesTransport';
-    }
-    if (data is _i15.DwWebServerLog) {
-      return 'DwWebServerLog';
+
+    switch (data) {
+      case _i16.DwModelWrapper():
+        return 'DwModelWrapper';
+      case _i19.DwApiResponse():
+        return 'DwApiResponse';
+      case _i20.DwAuthData():
+        return 'DwAuthData';
+      case _i21.DwBackendFilter():
+        return 'DwBackendFilter';
+      case _i22.DwOrderBy():
+        return 'DwOrderBy';
+      case _i2.DwAuthProvider():
+        return 'DwAuthProvider';
+      case _i3.DwAuthRequest():
+        return 'DwAuthRequest';
+      case _i4.DwAuthRequestStatus():
+        return 'DwAuthRequestStatus';
+      case _i5.DwAuthRequestType():
+        return 'DwAuthRequestType';
+      case _i6.DwAuthVerification():
+        return 'DwAuthVerification';
+      case _i7.DwAuthVerificationType():
+        return 'DwAuthVerificationType';
+      case _i8.DwAuthFailReason():
+        return 'DwAuthFailReason';
+      case _i9.DwAuthKey():
+        return 'DwAuthKey';
+      case _i10.DwUserPassword():
+        return 'DwUserPassword';
+      case _i11.DwCloudFile():
+        return 'DwCloudFile';
+      case _i12.DwAppNotification():
+        return 'DwAppNotification';
+      case _i13.DwBackendFilterType():
+        return 'DwBackendFilterType';
+      case _i14.DwUpdatesTransport():
+        return 'DwUpdatesTransport';
+      case _i15.DwWebServerLog():
+        return 'DwWebServerLog';
     }
     return null;
   }
@@ -345,5 +398,17 @@ class Protocol extends _i1.SerializationManager {
       return deserialize<_i15.DwWebServerLog>(data['data']);
     }
     return super.deserializeByClassName(data);
+  }
+
+  /// Maps any `Record`s known to this [Protocol] to their JSON representation
+  ///
+  /// Throws in case the record type is not known.
+  ///
+  /// This method will return `null` (only) for `null` inputs.
+  Map<String, dynamic>? mapRecordToJson(Record? record) {
+    if (record == null) {
+      return null;
+    }
+    throw Exception('Unsupported record type ${record.runtimeType}');
   }
 }

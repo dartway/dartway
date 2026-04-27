@@ -7,13 +7,15 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
-
+// ignore_for_file: invalid_use_of_internal_member
 // ignore_for_file: unnecessary_null_comparison
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
 import '../../auth/auth_request/dw_auth_request.dart' as _i2;
 import '../../auth/dw_auth_fail_reason.dart' as _i3;
+import 'package:dartway_serverpod_core_server/src/generated/protocol.dart'
+    as _i4;
 
 abstract class DwAuthVerification
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
@@ -43,15 +45,18 @@ abstract class DwAuthVerification
       dwAuthRequestId: jsonSerialization['dwAuthRequestId'] as int,
       dwAuthRequest: jsonSerialization['dwAuthRequest'] == null
           ? null
-          : _i2.DwAuthRequest.fromJson(
-              (jsonSerialization['dwAuthRequest'] as Map<String, dynamic>)),
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+          : _i4.Protocol().deserialize<_i2.DwAuthRequest>(
+              jsonSerialization['dwAuthRequest'],
+            ),
+      createdAt: jsonSerialization['createdAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
       verificationCode: jsonSerialization['verificationCode'] as String?,
       failReason: jsonSerialization['failReason'] == null
           ? null
           : _i3.DwAuthFailReason.fromJson(
-              (jsonSerialization['failReason'] as String)),
+              (jsonSerialization['failReason'] as String),
+            ),
       accessToken: jsonSerialization['accessToken'] as String?,
     );
   }
@@ -93,6 +98,7 @@ abstract class DwAuthVerification
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAuthVerification',
       if (id != null) 'id': id,
       'dwAuthRequestId': dwAuthRequestId,
       if (dwAuthRequest != null) 'dwAuthRequest': dwAuthRequest?.toJson(),
@@ -106,6 +112,7 @@ abstract class DwAuthVerification
   @override
   Map<String, dynamic> toJsonForProtocol() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAuthVerification',
       if (id != null) 'id': id,
       'dwAuthRequestId': dwAuthRequestId,
       if (dwAuthRequest != null)
@@ -117,8 +124,9 @@ abstract class DwAuthVerification
     };
   }
 
-  static DwAuthVerificationInclude include(
-      {_i2.DwAuthRequestInclude? dwAuthRequest}) {
+  static DwAuthVerificationInclude include({
+    _i2.DwAuthRequestInclude? dwAuthRequest,
+  }) {
     return DwAuthVerificationInclude._(dwAuthRequest: dwAuthRequest);
   }
 
@@ -160,14 +168,14 @@ class _DwAuthVerificationImpl extends DwAuthVerification {
     _i3.DwAuthFailReason? failReason,
     String? accessToken,
   }) : super._(
-          id: id,
-          dwAuthRequestId: dwAuthRequestId,
-          dwAuthRequest: dwAuthRequest,
-          createdAt: createdAt,
-          verificationCode: verificationCode,
-          failReason: failReason,
-          accessToken: accessToken,
-        );
+         id: id,
+         dwAuthRequestId: dwAuthRequestId,
+         dwAuthRequest: dwAuthRequest,
+         createdAt: createdAt,
+         verificationCode: verificationCode,
+         failReason: failReason,
+         accessToken: accessToken,
+       );
 
   /// Returns a shallow copy of this [DwAuthVerification]
   /// with some or all fields replaced by the given arguments.
@@ -192,16 +200,46 @@ class _DwAuthVerificationImpl extends DwAuthVerification {
       verificationCode: verificationCode is String?
           ? verificationCode
           : this.verificationCode,
-      failReason:
-          failReason is _i3.DwAuthFailReason? ? failReason : this.failReason,
+      failReason: failReason is _i3.DwAuthFailReason?
+          ? failReason
+          : this.failReason,
       accessToken: accessToken is String? ? accessToken : this.accessToken,
     );
   }
 }
 
+class DwAuthVerificationUpdateTable
+    extends _i1.UpdateTable<DwAuthVerificationTable> {
+  DwAuthVerificationUpdateTable(super.table);
+
+  _i1.ColumnValue<int, int> dwAuthRequestId(int value) => _i1.ColumnValue(
+    table.dwAuthRequestId,
+    value,
+  );
+
+  _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
+      _i1.ColumnValue(
+        table.createdAt,
+        value,
+      );
+
+  _i1.ColumnValue<_i3.DwAuthFailReason, _i3.DwAuthFailReason> failReason(
+    _i3.DwAuthFailReason? value,
+  ) => _i1.ColumnValue(
+    table.failReason,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> accessToken(String? value) => _i1.ColumnValue(
+    table.accessToken,
+    value,
+  );
+}
+
 class DwAuthVerificationTable extends _i1.Table<int?> {
   DwAuthVerificationTable({super.tableRelation})
-      : super(tableName: 'dw_auth_verification') {
+    : super(tableName: 'dw_auth_verification') {
+    updateTable = DwAuthVerificationUpdateTable(this);
     dwAuthRequestId = _i1.ColumnInt(
       'dwAuthRequestId',
       this,
@@ -221,6 +259,8 @@ class DwAuthVerificationTable extends _i1.Table<int?> {
       this,
     );
   }
+
+  late final DwAuthVerificationUpdateTable updateTable;
 
   late final _i1.ColumnInt dwAuthRequestId;
 
@@ -247,12 +287,12 @@ class DwAuthVerificationTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        dwAuthRequestId,
-        createdAt,
-        failReason,
-        accessToken,
-      ];
+    id,
+    dwAuthRequestId,
+    createdAt,
+    failReason,
+    accessToken,
+  ];
 
   @override
   _i1.Table? getRelationTable(String relationField) {
@@ -325,7 +365,7 @@ class DwAuthVerificationRepository {
   /// );
   /// ```
   Future<List<DwAuthVerification>> find(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthVerificationTable>? where,
     int? limit,
     int? offset,
@@ -334,6 +374,8 @@ class DwAuthVerificationRepository {
     _i1.OrderByListBuilder<DwAuthVerificationTable>? orderByList,
     _i1.Transaction? transaction,
     DwAuthVerificationInclude? include,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<DwAuthVerification>(
       where: where?.call(DwAuthVerification.t),
@@ -344,6 +386,8 @@ class DwAuthVerificationRepository {
       offset: offset,
       transaction: transaction,
       include: include,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -365,7 +409,7 @@ class DwAuthVerificationRepository {
   /// );
   /// ```
   Future<DwAuthVerification?> findFirstRow(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthVerificationTable>? where,
     int? offset,
     _i1.OrderByBuilder<DwAuthVerificationTable>? orderBy,
@@ -373,6 +417,8 @@ class DwAuthVerificationRepository {
     _i1.OrderByListBuilder<DwAuthVerificationTable>? orderByList,
     _i1.Transaction? transaction,
     DwAuthVerificationInclude? include,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<DwAuthVerification>(
       where: where?.call(DwAuthVerification.t),
@@ -382,20 +428,26 @@ class DwAuthVerificationRepository {
       offset: offset,
       transaction: transaction,
       include: include,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
   /// Finds a single [DwAuthVerification] by its [id] or null if no such row exists.
   Future<DwAuthVerification?> findById(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     int id, {
     _i1.Transaction? transaction,
     DwAuthVerificationInclude? include,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<DwAuthVerification>(
       id,
       transaction: transaction,
       include: include,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -405,14 +457,20 @@ class DwAuthVerificationRepository {
   ///
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// insert, none of the rows will be inserted.
+  ///
+  /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
+  /// rows are silently skipped, and only the successfully inserted rows are
+  /// returned.
   Future<List<DwAuthVerification>> insert(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthVerification> rows, {
     _i1.Transaction? transaction,
+    bool ignoreConflicts = false,
   }) async {
     return session.db.insert<DwAuthVerification>(
       rows,
       transaction: transaction,
+      ignoreConflicts: ignoreConflicts,
     );
   }
 
@@ -420,7 +478,7 @@ class DwAuthVerificationRepository {
   ///
   /// The returned [DwAuthVerification] will have its `id` field set.
   Future<DwAuthVerification> insertRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthVerification row, {
     _i1.Transaction? transaction,
   }) async {
@@ -436,7 +494,7 @@ class DwAuthVerificationRepository {
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
   Future<List<DwAuthVerification>> update(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthVerification> rows, {
     _i1.ColumnSelections<DwAuthVerificationTable>? columns,
     _i1.Transaction? transaction,
@@ -452,7 +510,7 @@ class DwAuthVerificationRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<DwAuthVerification> updateRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthVerification row, {
     _i1.ColumnSelections<DwAuthVerificationTable>? columns,
     _i1.Transaction? transaction,
@@ -464,11 +522,53 @@ class DwAuthVerificationRepository {
     );
   }
 
+  /// Updates a single [DwAuthVerification] by its [id] with the specified [columnValues].
+  /// Returns the updated row or null if no row with the given id exists.
+  Future<DwAuthVerification?> updateById(
+    _i1.DatabaseSession session,
+    int id, {
+    required _i1.ColumnValueListBuilder<DwAuthVerificationUpdateTable>
+    columnValues,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateById<DwAuthVerification>(
+      id,
+      columnValues: columnValues(DwAuthVerification.t.updateTable),
+      transaction: transaction,
+    );
+  }
+
+  /// Updates all [DwAuthVerification]s matching the [where] expression with the specified [columnValues].
+  /// Returns the list of updated rows.
+  Future<List<DwAuthVerification>> updateWhere(
+    _i1.DatabaseSession session, {
+    required _i1.ColumnValueListBuilder<DwAuthVerificationUpdateTable>
+    columnValues,
+    required _i1.WhereExpressionBuilder<DwAuthVerificationTable> where,
+    int? limit,
+    int? offset,
+    _i1.OrderByBuilder<DwAuthVerificationTable>? orderBy,
+    _i1.OrderByListBuilder<DwAuthVerificationTable>? orderByList,
+    bool orderDescending = false,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateWhere<DwAuthVerification>(
+      columnValues: columnValues(DwAuthVerification.t.updateTable),
+      where: where(DwAuthVerification.t),
+      limit: limit,
+      offset: offset,
+      orderBy: orderBy?.call(DwAuthVerification.t),
+      orderByList: orderByList?.call(DwAuthVerification.t),
+      orderDescending: orderDescending,
+      transaction: transaction,
+    );
+  }
+
   /// Deletes all [DwAuthVerification]s in the list and returns the deleted rows.
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
   Future<List<DwAuthVerification>> delete(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthVerification> rows, {
     _i1.Transaction? transaction,
   }) async {
@@ -480,7 +580,7 @@ class DwAuthVerificationRepository {
 
   /// Deletes a single [DwAuthVerification].
   Future<DwAuthVerification> deleteRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthVerification row, {
     _i1.Transaction? transaction,
   }) async {
@@ -492,7 +592,7 @@ class DwAuthVerificationRepository {
 
   /// Deletes all rows matching the [where] expression.
   Future<List<DwAuthVerification>> deleteWhere(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     required _i1.WhereExpressionBuilder<DwAuthVerificationTable> where,
     _i1.Transaction? transaction,
   }) async {
@@ -505,7 +605,7 @@ class DwAuthVerificationRepository {
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthVerificationTable>? where,
     int? limit,
     _i1.Transaction? transaction,
@@ -513,6 +613,22 @@ class DwAuthVerificationRepository {
     return session.db.count<DwAuthVerification>(
       where: where?.call(DwAuthVerification.t),
       limit: limit,
+      transaction: transaction,
+    );
+  }
+
+  /// Acquires row-level locks on [DwAuthVerification] rows matching the [where] expression.
+  Future<void> lockRows(
+    _i1.DatabaseSession session, {
+    required _i1.WhereExpressionBuilder<DwAuthVerificationTable> where,
+    required _i1.LockMode lockMode,
+    required _i1.Transaction transaction,
+    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+  }) async {
+    return session.db.lockRows<DwAuthVerification>(
+      where: where(DwAuthVerification.t),
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
       transaction: transaction,
     );
   }
@@ -524,7 +640,7 @@ class DwAuthVerificationAttachRowRepository {
   /// Creates a relation between the given [DwAuthVerification] and [DwAuthRequest]
   /// by setting the [DwAuthVerification]'s foreign key `dwAuthRequestId` to refer to the [DwAuthRequest].
   Future<void> dwAuthRequest(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthVerification dwAuthVerification,
     _i2.DwAuthRequest dwAuthRequest, {
     _i1.Transaction? transaction,
@@ -536,8 +652,9 @@ class DwAuthVerificationAttachRowRepository {
       throw ArgumentError.notNull('dwAuthRequest.id');
     }
 
-    var $dwAuthVerification =
-        dwAuthVerification.copyWith(dwAuthRequestId: dwAuthRequest.id);
+    var $dwAuthVerification = dwAuthVerification.copyWith(
+      dwAuthRequestId: dwAuthRequest.id,
+    );
     await session.db.updateRow<DwAuthVerification>(
       $dwAuthVerification,
       columns: [DwAuthVerification.t.dwAuthRequestId],

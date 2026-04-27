@@ -7,23 +7,27 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '/src/domain/api/dw_model_wrapper.dart' as _i2;
+import 'package:dartway_serverpod_core_client/src/protocol/protocol.dart'
+    as _i3;
 
 abstract class DwUpdatesTransport implements _i1.SerializableModel {
   DwUpdatesTransport._({required this.wrappedModelUpdates});
 
-  factory DwUpdatesTransport(
-          {required List<_i2.DwModelWrapper> wrappedModelUpdates}) =
-      _DwUpdatesTransportImpl;
+  factory DwUpdatesTransport({
+    required List<_i2.DwModelWrapper> wrappedModelUpdates,
+  }) = _DwUpdatesTransportImpl;
 
   factory DwUpdatesTransport.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwUpdatesTransport(
-        wrappedModelUpdates: (jsonSerialization['wrappedModelUpdates'] as List)
-            .map((e) => _i2.DwModelWrapper.fromJson(e))
-            .toList());
+      wrappedModelUpdates: _i3.Protocol().deserialize<List<_i2.DwModelWrapper>>(
+        jsonSerialization['wrappedModelUpdates'],
+      ),
+    );
   }
 
   List<_i2.DwModelWrapper> wrappedModelUpdates;
@@ -35,8 +39,10 @@ abstract class DwUpdatesTransport implements _i1.SerializableModel {
   @override
   Map<String, dynamic> toJson() {
     return {
-      'wrappedModelUpdates':
-          wrappedModelUpdates.toJson(valueToJson: (v) => v.toJson())
+      '__className__': 'dartway_serverpod_core.DwUpdatesTransport',
+      'wrappedModelUpdates': wrappedModelUpdates.toJson(
+        valueToJson: (v) => v.toJson(),
+      ),
     };
   }
 
@@ -47,9 +53,9 @@ abstract class DwUpdatesTransport implements _i1.SerializableModel {
 }
 
 class _DwUpdatesTransportImpl extends DwUpdatesTransport {
-  _DwUpdatesTransportImpl(
-      {required List<_i2.DwModelWrapper> wrappedModelUpdates})
-      : super._(wrappedModelUpdates: wrappedModelUpdates);
+  _DwUpdatesTransportImpl({
+    required List<_i2.DwModelWrapper> wrappedModelUpdates,
+  }) : super._(wrappedModelUpdates: wrappedModelUpdates);
 
   /// Returns a shallow copy of this [DwUpdatesTransport]
   /// with some or all fields replaced by the given arguments.
@@ -57,7 +63,9 @@ class _DwUpdatesTransportImpl extends DwUpdatesTransport {
   @override
   DwUpdatesTransport copyWith({List<_i2.DwModelWrapper>? wrappedModelUpdates}) {
     return DwUpdatesTransport(
-        wrappedModelUpdates: wrappedModelUpdates ??
-            this.wrappedModelUpdates.map((e0) => e0.copyWith()).toList());
+      wrappedModelUpdates:
+          wrappedModelUpdates ??
+          this.wrappedModelUpdates.map((e0) => e0.copyWith()).toList(),
+    );
   }
 }

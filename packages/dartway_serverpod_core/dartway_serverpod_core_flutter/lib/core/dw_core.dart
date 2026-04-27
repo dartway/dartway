@@ -54,12 +54,12 @@ class DwCore<
     endpointCaller = dartwayCaller as dartway.Caller;
     socketService = DwSocketService();
 
-    if (client.authenticationKeyManager != null &&
-        client.authenticationKeyManager is DwAuthenticationKeyManager) {
+    final keyProvider = client.authKeyProvider;
+
+    if (keyProvider is DwAuthenticationKeyManager) {
       int? socketUserId;
       sessionService = DwSessionService<UserProfileClass>(
-        keyManager:
-            client.authenticationKeyManager! as DwAuthenticationKeyManager,
+        keyManager: keyProvider,
         onUserChanged: (_, id) {
           final previousUserId = socketUserId;
           socketUserId = id;

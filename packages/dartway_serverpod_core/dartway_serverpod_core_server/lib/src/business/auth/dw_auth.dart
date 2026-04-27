@@ -106,7 +106,7 @@ class DwAuth<UserProfileClass extends TableRow> {
     if (updateSession) {
       session.updateAuthenticated(
         AuthenticationInfo(
-          userId,
+          userId.toString(),
           const <Scope>{},
           authId: '${insertedAuthKey.id}',
         ),

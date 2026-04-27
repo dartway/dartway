@@ -10,6 +10,7 @@ export 'src/dw/configs/dw_telegram_web_app_config.dart';
 export 'src/dw/dw.dart';
 // App initialization
 export 'src/dw_app_runner/dw_app_runner.dart';
+export 'src/dw_app_runner/logic/dw_app_loading_options.dart';
 // Notifications
 export 'src/notifications/domain/dw_ui_notification.dart';
 export 'src/notifications/ui/dw_notifications_listener.dart';

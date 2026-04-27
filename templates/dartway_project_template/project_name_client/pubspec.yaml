@@ -2,10 +2,10 @@ name: project_name_client
 description: Starting point for a Serverpod client.
 
 environment:
-  sdk: '>=3.5.0 <4.0.0'
+  sdk: '^3.11.0'
 
 dependencies:
-  serverpod_client: 2.9.1
+  serverpod_client: 3.4.7
 
   dartway_serverpod_core_client:
     git:

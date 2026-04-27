@@ -3,7 +3,7 @@ description: Shared constants, enums, and models for DartWay Core (used by both 
 version: 1.0.0
 
 environment:
-  sdk: ^3.9.0
+  sdk: ^3.11.0
 
 # Add regular dependencies here.
 dependencies:
