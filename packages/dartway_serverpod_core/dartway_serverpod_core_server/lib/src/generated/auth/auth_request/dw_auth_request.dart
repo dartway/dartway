@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
@@ -15,6 +16,8 @@ import '../../auth/auth_request/dw_auth_request_type.dart' as _i3;
 import '../../auth/auth_request/dw_auth_provider.dart' as _i4;
 import '../../auth/auth_verification/dw_auth_verification_type.dart' as _i5;
 import '../../auth/dw_auth_fail_reason.dart' as _i6;
+import 'package:dartway_serverpod_core_server/src/generated/protocol.dart'
+    as _i7;
 
 abstract class DwAuthRequest
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
@@ -33,8 +36,8 @@ abstract class DwAuthRequest
     _i2.DwAuthRequestStatus? status,
     this.failReason,
     this.extraData,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        status = status ?? _i2.DwAuthRequestStatus.created;
+  }) : createdAt = createdAt ?? DateTime.now(),
+       status = status ?? _i2.DwAuthRequestStatus.created;
 
   factory DwAuthRequest({
     int? id,
@@ -56,33 +59,41 @@ abstract class DwAuthRequest
   factory DwAuthRequest.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwAuthRequest(
       id: jsonSerialization['id'] as int?,
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+      createdAt: jsonSerialization['createdAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
       requestType: _i3.DwAuthRequestType.fromJson(
-          (jsonSerialization['requestType'] as String)),
+        (jsonSerialization['requestType'] as String),
+      ),
       userIdentifier: jsonSerialization['userIdentifier'] as String,
       userId: jsonSerialization['userId'] as int?,
       authProvider: _i4.DwAuthProvider.fromJson(
-          (jsonSerialization['authProvider'] as String)),
+        (jsonSerialization['authProvider'] as String),
+      ),
       verificationType: jsonSerialization['verificationType'] == null
           ? null
           : _i5.DwAuthVerificationType.fromJson(
-              (jsonSerialization['verificationType'] as int)),
+              (jsonSerialization['verificationType'] as int),
+            ),
       password: jsonSerialization['password'] as String?,
       newPassword: jsonSerialization['newPassword'] as String?,
       accessToken: jsonSerialization['accessToken'] as String?,
       verificationHash: jsonSerialization['verificationHash'] as String?,
-      status: _i2.DwAuthRequestStatus.fromJson(
-          (jsonSerialization['status'] as String)),
+      status: jsonSerialization['status'] == null
+          ? null
+          : _i2.DwAuthRequestStatus.fromJson(
+              (jsonSerialization['status'] as String),
+            ),
       failReason: jsonSerialization['failReason'] == null
           ? null
           : _i6.DwAuthFailReason.fromJson(
-              (jsonSerialization['failReason'] as String)),
-      extraData:
-          (jsonSerialization['extraData'] as Map?)?.map((k, v) => MapEntry(
-                k as String,
-                v as String,
-              )),
+              (jsonSerialization['failReason'] as String),
+            ),
+      extraData: jsonSerialization['extraData'] == null
+          ? null
+          : _i7.Protocol().deserialize<Map<String, String>>(
+              jsonSerialization['extraData'],
+            ),
     );
   }
 
@@ -144,6 +155,7 @@ abstract class DwAuthRequest
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAuthRequest',
       if (id != null) 'id': id,
       'createdAt': createdAt.toJson(),
       'requestType': requestType.toJson(),
@@ -165,6 +177,7 @@ abstract class DwAuthRequest
   @override
   Map<String, dynamic> toJsonForProtocol() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAuthRequest',
       if (id != null) 'id': id,
       'createdAt': createdAt.toJson(),
       'requestType': requestType.toJson(),
@@ -231,21 +244,21 @@ class _DwAuthRequestImpl extends DwAuthRequest {
     _i6.DwAuthFailReason? failReason,
     Map<String, String>? extraData,
   }) : super._(
-          id: id,
-          createdAt: createdAt,
-          requestType: requestType,
-          userIdentifier: userIdentifier,
-          userId: userId,
-          authProvider: authProvider,
-          verificationType: verificationType,
-          password: password,
-          newPassword: newPassword,
-          accessToken: accessToken,
-          verificationHash: verificationHash,
-          status: status,
-          failReason: failReason,
-          extraData: extraData,
-        );
+         id: id,
+         createdAt: createdAt,
+         requestType: requestType,
+         userIdentifier: userIdentifier,
+         userId: userId,
+         authProvider: authProvider,
+         verificationType: verificationType,
+         password: password,
+         newPassword: newPassword,
+         accessToken: accessToken,
+         verificationHash: verificationHash,
+         status: status,
+         failReason: failReason,
+         extraData: extraData,
+       );
 
   /// Returns a shallow copy of this [DwAuthRequest]
   /// with some or all fields replaced by the given arguments.
@@ -284,25 +297,96 @@ class _DwAuthRequestImpl extends DwAuthRequest {
           ? verificationHash
           : this.verificationHash,
       status: status ?? this.status,
-      failReason:
-          failReason is _i6.DwAuthFailReason? ? failReason : this.failReason,
+      failReason: failReason is _i6.DwAuthFailReason?
+          ? failReason
+          : this.failReason,
       extraData: extraData is Map<String, String>?
           ? extraData
-          : this.extraData?.map((
+          : this.extraData?.map(
+              (
                 key0,
                 value0,
-              ) =>
-                  MapEntry(
-                    key0,
-                    value0,
-                  )),
+              ) => MapEntry(
+                key0,
+                value0,
+              ),
+            ),
     );
   }
 }
 
+class DwAuthRequestUpdateTable extends _i1.UpdateTable<DwAuthRequestTable> {
+  DwAuthRequestUpdateTable(super.table);
+
+  _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
+      _i1.ColumnValue(
+        table.createdAt,
+        value,
+      );
+
+  _i1.ColumnValue<_i3.DwAuthRequestType, _i3.DwAuthRequestType> requestType(
+    _i3.DwAuthRequestType value,
+  ) => _i1.ColumnValue(
+    table.requestType,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> userIdentifier(String value) =>
+      _i1.ColumnValue(
+        table.userIdentifier,
+        value,
+      );
+
+  _i1.ColumnValue<int, int> userId(int? value) => _i1.ColumnValue(
+    table.userId,
+    value,
+  );
+
+  _i1.ColumnValue<_i4.DwAuthProvider, _i4.DwAuthProvider> authProvider(
+    _i4.DwAuthProvider value,
+  ) => _i1.ColumnValue(
+    table.authProvider,
+    value,
+  );
+
+  _i1.ColumnValue<_i5.DwAuthVerificationType, _i5.DwAuthVerificationType>
+  verificationType(_i5.DwAuthVerificationType? value) => _i1.ColumnValue(
+    table.verificationType,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> verificationHash(String? value) =>
+      _i1.ColumnValue(
+        table.verificationHash,
+        value,
+      );
+
+  _i1.ColumnValue<_i2.DwAuthRequestStatus, _i2.DwAuthRequestStatus> status(
+    _i2.DwAuthRequestStatus value,
+  ) => _i1.ColumnValue(
+    table.status,
+    value,
+  );
+
+  _i1.ColumnValue<_i6.DwAuthFailReason, _i6.DwAuthFailReason> failReason(
+    _i6.DwAuthFailReason? value,
+  ) => _i1.ColumnValue(
+    table.failReason,
+    value,
+  );
+
+  _i1.ColumnValue<Map<String, String>, Map<String, String>> extraData(
+    Map<String, String>? value,
+  ) => _i1.ColumnValue(
+    table.extraData,
+    value,
+  );
+}
+
 class DwAuthRequestTable extends _i1.Table<int?> {
   DwAuthRequestTable({super.tableRelation})
-      : super(tableName: 'dw_auth_request') {
+    : super(tableName: 'dw_auth_request') {
+    updateTable = DwAuthRequestUpdateTable(this);
     createdAt = _i1.ColumnDateTime(
       'createdAt',
       this,
@@ -346,11 +430,13 @@ class DwAuthRequestTable extends _i1.Table<int?> {
       this,
       _i1.EnumSerialization.byName,
     );
-    extraData = _i1.ColumnSerializable(
+    extraData = _i1.ColumnSerializable<Map<String, String>>(
       'extraData',
       this,
     );
   }
+
+  late final DwAuthRequestUpdateTable updateTable;
 
   late final _i1.ColumnDateTime createdAt;
 
@@ -370,22 +456,22 @@ class DwAuthRequestTable extends _i1.Table<int?> {
 
   late final _i1.ColumnEnum<_i6.DwAuthFailReason> failReason;
 
-  late final _i1.ColumnSerializable extraData;
+  late final _i1.ColumnSerializable<Map<String, String>> extraData;
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        createdAt,
-        requestType,
-        userIdentifier,
-        userId,
-        authProvider,
-        verificationType,
-        verificationHash,
-        status,
-        failReason,
-        extraData,
-      ];
+    id,
+    createdAt,
+    requestType,
+    userIdentifier,
+    userId,
+    authProvider,
+    verificationType,
+    verificationHash,
+    status,
+    failReason,
+    extraData,
+  ];
 }
 
 class DwAuthRequestInclude extends _i1.IncludeObject {
@@ -444,7 +530,7 @@ class DwAuthRequestRepository {
   /// );
   /// ```
   Future<List<DwAuthRequest>> find(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthRequestTable>? where,
     int? limit,
     int? offset,
@@ -452,6 +538,8 @@ class DwAuthRequestRepository {
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwAuthRequestTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<DwAuthRequest>(
       where: where?.call(DwAuthRequest.t),
@@ -461,6 +549,8 @@ class DwAuthRequestRepository {
       limit: limit,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -482,13 +572,15 @@ class DwAuthRequestRepository {
   /// );
   /// ```
   Future<DwAuthRequest?> findFirstRow(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthRequestTable>? where,
     int? offset,
     _i1.OrderByBuilder<DwAuthRequestTable>? orderBy,
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwAuthRequestTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<DwAuthRequest>(
       where: where?.call(DwAuthRequest.t),
@@ -497,18 +589,24 @@ class DwAuthRequestRepository {
       orderDescending: orderDescending,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
   /// Finds a single [DwAuthRequest] by its [id] or null if no such row exists.
   Future<DwAuthRequest?> findById(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     int id, {
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<DwAuthRequest>(
       id,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -518,14 +616,20 @@ class DwAuthRequestRepository {
   ///
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// insert, none of the rows will be inserted.
+  ///
+  /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
+  /// rows are silently skipped, and only the successfully inserted rows are
+  /// returned.
   Future<List<DwAuthRequest>> insert(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthRequest> rows, {
     _i1.Transaction? transaction,
+    bool ignoreConflicts = false,
   }) async {
     return session.db.insert<DwAuthRequest>(
       rows,
       transaction: transaction,
+      ignoreConflicts: ignoreConflicts,
     );
   }
 
@@ -533,7 +637,7 @@ class DwAuthRequestRepository {
   ///
   /// The returned [DwAuthRequest] will have its `id` field set.
   Future<DwAuthRequest> insertRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthRequest row, {
     _i1.Transaction? transaction,
   }) async {
@@ -549,7 +653,7 @@ class DwAuthRequestRepository {
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
   Future<List<DwAuthRequest>> update(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthRequest> rows, {
     _i1.ColumnSelections<DwAuthRequestTable>? columns,
     _i1.Transaction? transaction,
@@ -565,7 +669,7 @@ class DwAuthRequestRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<DwAuthRequest> updateRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthRequest row, {
     _i1.ColumnSelections<DwAuthRequestTable>? columns,
     _i1.Transaction? transaction,
@@ -577,11 +681,51 @@ class DwAuthRequestRepository {
     );
   }
 
+  /// Updates a single [DwAuthRequest] by its [id] with the specified [columnValues].
+  /// Returns the updated row or null if no row with the given id exists.
+  Future<DwAuthRequest?> updateById(
+    _i1.DatabaseSession session,
+    int id, {
+    required _i1.ColumnValueListBuilder<DwAuthRequestUpdateTable> columnValues,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateById<DwAuthRequest>(
+      id,
+      columnValues: columnValues(DwAuthRequest.t.updateTable),
+      transaction: transaction,
+    );
+  }
+
+  /// Updates all [DwAuthRequest]s matching the [where] expression with the specified [columnValues].
+  /// Returns the list of updated rows.
+  Future<List<DwAuthRequest>> updateWhere(
+    _i1.DatabaseSession session, {
+    required _i1.ColumnValueListBuilder<DwAuthRequestUpdateTable> columnValues,
+    required _i1.WhereExpressionBuilder<DwAuthRequestTable> where,
+    int? limit,
+    int? offset,
+    _i1.OrderByBuilder<DwAuthRequestTable>? orderBy,
+    _i1.OrderByListBuilder<DwAuthRequestTable>? orderByList,
+    bool orderDescending = false,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateWhere<DwAuthRequest>(
+      columnValues: columnValues(DwAuthRequest.t.updateTable),
+      where: where(DwAuthRequest.t),
+      limit: limit,
+      offset: offset,
+      orderBy: orderBy?.call(DwAuthRequest.t),
+      orderByList: orderByList?.call(DwAuthRequest.t),
+      orderDescending: orderDescending,
+      transaction: transaction,
+    );
+  }
+
   /// Deletes all [DwAuthRequest]s in the list and returns the deleted rows.
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
   Future<List<DwAuthRequest>> delete(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthRequest> rows, {
     _i1.Transaction? transaction,
   }) async {
@@ -593,7 +737,7 @@ class DwAuthRequestRepository {
 
   /// Deletes a single [DwAuthRequest].
   Future<DwAuthRequest> deleteRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthRequest row, {
     _i1.Transaction? transaction,
   }) async {
@@ -605,7 +749,7 @@ class DwAuthRequestRepository {
 
   /// Deletes all rows matching the [where] expression.
   Future<List<DwAuthRequest>> deleteWhere(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     required _i1.WhereExpressionBuilder<DwAuthRequestTable> where,
     _i1.Transaction? transaction,
   }) async {
@@ -618,7 +762,7 @@ class DwAuthRequestRepository {
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthRequestTable>? where,
     int? limit,
     _i1.Transaction? transaction,
@@ -626,6 +770,22 @@ class DwAuthRequestRepository {
     return session.db.count<DwAuthRequest>(
       where: where?.call(DwAuthRequest.t),
       limit: limit,
+      transaction: transaction,
+    );
+  }
+
+  /// Acquires row-level locks on [DwAuthRequest] rows matching the [where] expression.
+  Future<void> lockRows(
+    _i1.DatabaseSession session, {
+    required _i1.WhereExpressionBuilder<DwAuthRequestTable> where,
+    required _i1.LockMode lockMode,
+    required _i1.Transaction transaction,
+    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+  }) async {
+    return session.db.lockRows<DwAuthRequest>(
+      where: where(DwAuthRequest.t),
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
       transaction: transaction,
     );
   }

@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
@@ -45,8 +46,9 @@ abstract class DwCloudFile implements _i1.SerializableModel {
       publicUrl: jsonSerialization['publicUrl'] as String,
       size: jsonSerialization['size'] as int?,
       mimeType: jsonSerialization['mimeType'] as String?,
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+      createdAt: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['createdAt'],
+      ),
       verifiedAt: jsonSerialization['verifiedAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['verifiedAt']),
@@ -91,6 +93,7 @@ abstract class DwCloudFile implements _i1.SerializableModel {
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwCloudFile',
       if (id != null) 'id': id,
       if (createdBy != null) 'createdBy': createdBy,
       'bucket': bucket,
@@ -123,16 +126,16 @@ class _DwCloudFileImpl extends DwCloudFile {
     required DateTime createdAt,
     DateTime? verifiedAt,
   }) : super._(
-          id: id,
-          createdBy: createdBy,
-          bucket: bucket,
-          path: path,
-          publicUrl: publicUrl,
-          size: size,
-          mimeType: mimeType,
-          createdAt: createdAt,
-          verifiedAt: verifiedAt,
-        );
+         id: id,
+         createdBy: createdBy,
+         bucket: bucket,
+         path: path,
+         publicUrl: publicUrl,
+         size: size,
+         mimeType: mimeType,
+         createdAt: createdAt,
+         verifiedAt: verifiedAt,
+       );
 
   /// Returns a shallow copy of this [DwCloudFile]
   /// with some or all fields replaced by the given arguments.

@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
@@ -46,8 +47,9 @@ abstract class DwCloudFile
       publicUrl: jsonSerialization['publicUrl'] as String,
       size: jsonSerialization['size'] as int?,
       mimeType: jsonSerialization['mimeType'] as String?,
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+      createdAt: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['createdAt'],
+      ),
       verifiedAt: jsonSerialization['verifiedAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['verifiedAt']),
@@ -97,6 +99,7 @@ abstract class DwCloudFile
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwCloudFile',
       if (id != null) 'id': id,
       if (createdBy != null) 'createdBy': createdBy,
       'bucket': bucket,
@@ -112,6 +115,7 @@ abstract class DwCloudFile
   @override
   Map<String, dynamic> toJsonForProtocol() {
     return {
+      '__className__': 'dartway_serverpod_core.DwCloudFile',
       if (id != null) 'id': id,
       if (createdBy != null) 'createdBy': createdBy,
       'bucket': bucket,
@@ -168,16 +172,16 @@ class _DwCloudFileImpl extends DwCloudFile {
     required DateTime createdAt,
     DateTime? verifiedAt,
   }) : super._(
-          id: id,
-          createdBy: createdBy,
-          bucket: bucket,
-          path: path,
-          publicUrl: publicUrl,
-          size: size,
-          mimeType: mimeType,
-          createdAt: createdAt,
-          verifiedAt: verifiedAt,
-        );
+         id: id,
+         createdBy: createdBy,
+         bucket: bucket,
+         path: path,
+         publicUrl: publicUrl,
+         size: size,
+         mimeType: mimeType,
+         createdAt: createdAt,
+         verifiedAt: verifiedAt,
+       );
 
   /// Returns a shallow copy of this [DwCloudFile]
   /// with some or all fields replaced by the given arguments.
@@ -208,8 +212,55 @@ class _DwCloudFileImpl extends DwCloudFile {
   }
 }
 
+class DwCloudFileUpdateTable extends _i1.UpdateTable<DwCloudFileTable> {
+  DwCloudFileUpdateTable(super.table);
+
+  _i1.ColumnValue<int, int> createdBy(int? value) => _i1.ColumnValue(
+    table.createdBy,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> bucket(String value) => _i1.ColumnValue(
+    table.bucket,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> path(String value) => _i1.ColumnValue(
+    table.path,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> publicUrl(String value) => _i1.ColumnValue(
+    table.publicUrl,
+    value,
+  );
+
+  _i1.ColumnValue<int, int> size(int? value) => _i1.ColumnValue(
+    table.size,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> mimeType(String? value) => _i1.ColumnValue(
+    table.mimeType,
+    value,
+  );
+
+  _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
+      _i1.ColumnValue(
+        table.createdAt,
+        value,
+      );
+
+  _i1.ColumnValue<DateTime, DateTime> verifiedAt(DateTime? value) =>
+      _i1.ColumnValue(
+        table.verifiedAt,
+        value,
+      );
+}
+
 class DwCloudFileTable extends _i1.Table<int?> {
   DwCloudFileTable({super.tableRelation}) : super(tableName: 'dw_cloud_file') {
+    updateTable = DwCloudFileUpdateTable(this);
     createdBy = _i1.ColumnInt(
       'createdBy',
       this,
@@ -244,6 +295,8 @@ class DwCloudFileTable extends _i1.Table<int?> {
     );
   }
 
+  late final DwCloudFileUpdateTable updateTable;
+
   late final _i1.ColumnInt createdBy;
 
   late final _i1.ColumnString bucket;
@@ -262,16 +315,16 @@ class DwCloudFileTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        createdBy,
-        bucket,
-        path,
-        publicUrl,
-        size,
-        mimeType,
-        createdAt,
-        verifiedAt,
-      ];
+    id,
+    createdBy,
+    bucket,
+    path,
+    publicUrl,
+    size,
+    mimeType,
+    createdAt,
+    verifiedAt,
+  ];
 }
 
 class DwCloudFileInclude extends _i1.IncludeObject {
@@ -330,7 +383,7 @@ class DwCloudFileRepository {
   /// );
   /// ```
   Future<List<DwCloudFile>> find(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwCloudFileTable>? where,
     int? limit,
     int? offset,
@@ -338,6 +391,8 @@ class DwCloudFileRepository {
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwCloudFileTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<DwCloudFile>(
       where: where?.call(DwCloudFile.t),
@@ -347,6 +402,8 @@ class DwCloudFileRepository {
       limit: limit,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -368,13 +425,15 @@ class DwCloudFileRepository {
   /// );
   /// ```
   Future<DwCloudFile?> findFirstRow(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwCloudFileTable>? where,
     int? offset,
     _i1.OrderByBuilder<DwCloudFileTable>? orderBy,
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwCloudFileTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<DwCloudFile>(
       where: where?.call(DwCloudFile.t),
@@ -383,18 +442,24 @@ class DwCloudFileRepository {
       orderDescending: orderDescending,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
   /// Finds a single [DwCloudFile] by its [id] or null if no such row exists.
   Future<DwCloudFile?> findById(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     int id, {
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<DwCloudFile>(
       id,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -404,14 +469,20 @@ class DwCloudFileRepository {
   ///
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// insert, none of the rows will be inserted.
+  ///
+  /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
+  /// rows are silently skipped, and only the successfully inserted rows are
+  /// returned.
   Future<List<DwCloudFile>> insert(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwCloudFile> rows, {
     _i1.Transaction? transaction,
+    bool ignoreConflicts = false,
   }) async {
     return session.db.insert<DwCloudFile>(
       rows,
       transaction: transaction,
+      ignoreConflicts: ignoreConflicts,
     );
   }
 
@@ -419,7 +490,7 @@ class DwCloudFileRepository {
   ///
   /// The returned [DwCloudFile] will have its `id` field set.
   Future<DwCloudFile> insertRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwCloudFile row, {
     _i1.Transaction? transaction,
   }) async {
@@ -435,7 +506,7 @@ class DwCloudFileRepository {
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
   Future<List<DwCloudFile>> update(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwCloudFile> rows, {
     _i1.ColumnSelections<DwCloudFileTable>? columns,
     _i1.Transaction? transaction,
@@ -451,7 +522,7 @@ class DwCloudFileRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<DwCloudFile> updateRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwCloudFile row, {
     _i1.ColumnSelections<DwCloudFileTable>? columns,
     _i1.Transaction? transaction,
@@ -463,11 +534,51 @@ class DwCloudFileRepository {
     );
   }
 
+  /// Updates a single [DwCloudFile] by its [id] with the specified [columnValues].
+  /// Returns the updated row or null if no row with the given id exists.
+  Future<DwCloudFile?> updateById(
+    _i1.DatabaseSession session,
+    int id, {
+    required _i1.ColumnValueListBuilder<DwCloudFileUpdateTable> columnValues,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateById<DwCloudFile>(
+      id,
+      columnValues: columnValues(DwCloudFile.t.updateTable),
+      transaction: transaction,
+    );
+  }
+
+  /// Updates all [DwCloudFile]s matching the [where] expression with the specified [columnValues].
+  /// Returns the list of updated rows.
+  Future<List<DwCloudFile>> updateWhere(
+    _i1.DatabaseSession session, {
+    required _i1.ColumnValueListBuilder<DwCloudFileUpdateTable> columnValues,
+    required _i1.WhereExpressionBuilder<DwCloudFileTable> where,
+    int? limit,
+    int? offset,
+    _i1.OrderByBuilder<DwCloudFileTable>? orderBy,
+    _i1.OrderByListBuilder<DwCloudFileTable>? orderByList,
+    bool orderDescending = false,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateWhere<DwCloudFile>(
+      columnValues: columnValues(DwCloudFile.t.updateTable),
+      where: where(DwCloudFile.t),
+      limit: limit,
+      offset: offset,
+      orderBy: orderBy?.call(DwCloudFile.t),
+      orderByList: orderByList?.call(DwCloudFile.t),
+      orderDescending: orderDescending,
+      transaction: transaction,
+    );
+  }
+
   /// Deletes all [DwCloudFile]s in the list and returns the deleted rows.
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
   Future<List<DwCloudFile>> delete(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwCloudFile> rows, {
     _i1.Transaction? transaction,
   }) async {
@@ -479,7 +590,7 @@ class DwCloudFileRepository {
 
   /// Deletes a single [DwCloudFile].
   Future<DwCloudFile> deleteRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwCloudFile row, {
     _i1.Transaction? transaction,
   }) async {
@@ -491,7 +602,7 @@ class DwCloudFileRepository {
 
   /// Deletes all rows matching the [where] expression.
   Future<List<DwCloudFile>> deleteWhere(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     required _i1.WhereExpressionBuilder<DwCloudFileTable> where,
     _i1.Transaction? transaction,
   }) async {
@@ -504,7 +615,7 @@ class DwCloudFileRepository {
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwCloudFileTable>? where,
     int? limit,
     _i1.Transaction? transaction,
@@ -512,6 +623,22 @@ class DwCloudFileRepository {
     return session.db.count<DwCloudFile>(
       where: where?.call(DwCloudFile.t),
       limit: limit,
+      transaction: transaction,
+    );
+  }
+
+  /// Acquires row-level locks on [DwCloudFile] rows matching the [where] expression.
+  Future<void> lockRows(
+    _i1.DatabaseSession session, {
+    required _i1.WhereExpressionBuilder<DwCloudFileTable> where,
+    required _i1.LockMode lockMode,
+    required _i1.Transaction transaction,
+    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+  }) async {
+    return session.db.lockRows<DwCloudFile>(
+      where: where(DwCloudFile.t),
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
       transaction: transaction,
     );
   }

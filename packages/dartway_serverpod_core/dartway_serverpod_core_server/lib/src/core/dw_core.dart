@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_use_of_internal_member
+
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:dartway_serverpod_core_server/src/crud/dw_auth_verification_config.dart';
 import 'package:serverpod/serverpod.dart';
@@ -27,6 +29,9 @@ import '../domain/crud/domain/dw_crud_entity.dart';
 /// - [getUserProfile]: Gets the user profile.
 /// - [getUserProfileByIdentifier]: Gets the user profile by identifier.
 class DwCore<UserProfileClass extends TableRow> {
+  static int? _authenticatedUserId(Session session) =>
+      int.tryParse(session.authenticated?.userIdentifier ?? '');
+
   final Table userProfileTable;
   final Map<String, Map<String, DwCrudConfig>> _crudConfiguration = {};
   final Map<String, Map<String, DwCrudEntity>> _dtoConfiguration = {};
@@ -138,7 +143,7 @@ class DwCore<UserProfileClass extends TableRow> {
           getModelConfigs: [
             DwGetModelConfig<UserProfileClass>(
               accessFilter: (session) async => _userInfoIdColumn.equals(
-                (await session.authenticated)?.userId ?? 0,
+                _authenticatedUserId(session) ?? 0,
               ),
               filterPrototype: DwBackendFilter.equalsPrototype(
                 fieldName: DwCoreConst.userProfileIdColumnName,
@@ -197,7 +202,7 @@ class DwCore<UserProfileClass extends TableRow> {
   }
 
   Future<UserProfileClass?> currentUserProfile(Session session) async {
-    final userId = (await session.authenticated)?.userId;
+    final userId = _authenticatedUserId(session);
     if (userId == null) return null;
     return getUserProfile(session, userId);
   }

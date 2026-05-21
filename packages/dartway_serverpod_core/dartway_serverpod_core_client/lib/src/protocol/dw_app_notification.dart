@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
@@ -21,8 +22,8 @@ abstract class DwAppNotification implements _i1.SerializableModel {
     this.body,
     this.goToPath,
     bool? isRead,
-  })  : timestamp = timestamp ?? DateTime.now(),
-        isRead = isRead ?? false;
+  }) : timestamp = timestamp ?? DateTime.now(),
+       isRead = isRead ?? false;
 
   factory DwAppNotification({
     int? id,
@@ -40,12 +41,15 @@ abstract class DwAppNotification implements _i1.SerializableModel {
       id: jsonSerialization['id'] as int?,
       toUserId: jsonSerialization['toUserId'] as int,
       identifier: jsonSerialization['identifier'] as String?,
-      timestamp:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['timestamp']),
+      timestamp: jsonSerialization['timestamp'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['timestamp']),
       title: jsonSerialization['title'] as String,
       body: jsonSerialization['body'] as String?,
       goToPath: jsonSerialization['goToPath'] as String?,
-      isRead: jsonSerialization['isRead'] as bool,
+      isRead: jsonSerialization['isRead'] == null
+          ? null
+          : _i1.BoolJsonExtension.fromJson(jsonSerialization['isRead']),
     );
   }
 
@@ -84,6 +88,7 @@ abstract class DwAppNotification implements _i1.SerializableModel {
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAppNotification',
       if (id != null) 'id': id,
       'toUserId': toUserId,
       if (identifier != null) 'identifier': identifier,
@@ -114,15 +119,15 @@ class _DwAppNotificationImpl extends DwAppNotification {
     String? goToPath,
     bool? isRead,
   }) : super._(
-          id: id,
-          toUserId: toUserId,
-          identifier: identifier,
-          timestamp: timestamp,
-          title: title,
-          body: body,
-          goToPath: goToPath,
-          isRead: isRead,
-        );
+         id: id,
+         toUserId: toUserId,
+         identifier: identifier,
+         timestamp: timestamp,
+         title: title,
+         body: body,
+         goToPath: goToPath,
+         isRead: isRead,
+       );
 
   /// Returns a shallow copy of this [DwAppNotification]
   /// with some or all fields replaced by the given arguments.

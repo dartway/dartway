@@ -25,7 +25,7 @@ class DwButtonNew<T> extends StatelessWidget {
     FocusNode? focusNode,
     bool autofocus,
     Clip? clipBehavior,
-    MaterialStatesController? statesController,
+    WidgetStatesController? statesController,
     bool? isSemanticButton,
     required Widget child,
   })?
@@ -41,7 +41,7 @@ class DwButtonNew<T> extends StatelessWidget {
     FocusNode? focusNode,
     bool autofocus,
     Clip? clipBehavior,
-    MaterialStatesController? statesController,
+    WidgetStatesController? statesController,
     required Widget icon,
     required Widget label,
     IconAlignment? iconAlignment,

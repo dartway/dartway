@@ -34,7 +34,7 @@ Future<AuthenticationInfo?> dwAuthenticationHandler(
     if (authKey.hash != expectedHash) return null;
 
     return AuthenticationInfo(
-      authKey.userId,
+      authKey.userId.toString(),
       const <Scope>{},
       authId: keyIdStr,
     );

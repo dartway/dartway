@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
@@ -34,10 +35,12 @@ abstract class DwUserPassword
       id: jsonSerialization['id'] as int?,
       userId: jsonSerialization['userId'] as int,
       passwordHash: jsonSerialization['passwordHash'] as String,
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
-      updatedAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['updatedAt']),
+      createdAt: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['createdAt'],
+      ),
+      updatedAt: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['updatedAt'],
+      ),
     );
   }
 
@@ -72,6 +75,7 @@ abstract class DwUserPassword
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwUserPassword',
       if (id != null) 'id': id,
       'userId': userId,
       'passwordHash': passwordHash,
@@ -83,6 +87,7 @@ abstract class DwUserPassword
   @override
   Map<String, dynamic> toJsonForProtocol() {
     return {
+      '__className__': 'dartway_serverpod_core.DwUserPassword',
       if (id != null) 'id': id,
       'userId': userId,
       'passwordHash': passwordHash,
@@ -131,12 +136,12 @@ class _DwUserPasswordImpl extends DwUserPassword {
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : super._(
-          id: id,
-          userId: userId,
-          passwordHash: passwordHash,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-        );
+         id: id,
+         userId: userId,
+         passwordHash: passwordHash,
+         createdAt: createdAt,
+         updatedAt: updatedAt,
+       );
 
   /// Returns a shallow copy of this [DwUserPassword]
   /// with some or all fields replaced by the given arguments.
@@ -159,9 +164,36 @@ class _DwUserPasswordImpl extends DwUserPassword {
   }
 }
 
+class DwUserPasswordUpdateTable extends _i1.UpdateTable<DwUserPasswordTable> {
+  DwUserPasswordUpdateTable(super.table);
+
+  _i1.ColumnValue<int, int> userId(int value) => _i1.ColumnValue(
+    table.userId,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> passwordHash(String value) => _i1.ColumnValue(
+    table.passwordHash,
+    value,
+  );
+
+  _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
+      _i1.ColumnValue(
+        table.createdAt,
+        value,
+      );
+
+  _i1.ColumnValue<DateTime, DateTime> updatedAt(DateTime value) =>
+      _i1.ColumnValue(
+        table.updatedAt,
+        value,
+      );
+}
+
 class DwUserPasswordTable extends _i1.Table<int?> {
   DwUserPasswordTable({super.tableRelation})
-      : super(tableName: 'dw_user_password') {
+    : super(tableName: 'dw_user_password') {
+    updateTable = DwUserPasswordUpdateTable(this);
     userId = _i1.ColumnInt(
       'userId',
       this,
@@ -180,6 +212,8 @@ class DwUserPasswordTable extends _i1.Table<int?> {
     );
   }
 
+  late final DwUserPasswordUpdateTable updateTable;
+
   late final _i1.ColumnInt userId;
 
   late final _i1.ColumnString passwordHash;
@@ -190,12 +224,12 @@ class DwUserPasswordTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        userId,
-        passwordHash,
-        createdAt,
-        updatedAt,
-      ];
+    id,
+    userId,
+    passwordHash,
+    createdAt,
+    updatedAt,
+  ];
 }
 
 class DwUserPasswordInclude extends _i1.IncludeObject {
@@ -254,7 +288,7 @@ class DwUserPasswordRepository {
   /// );
   /// ```
   Future<List<DwUserPassword>> find(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwUserPasswordTable>? where,
     int? limit,
     int? offset,
@@ -262,6 +296,8 @@ class DwUserPasswordRepository {
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwUserPasswordTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<DwUserPassword>(
       where: where?.call(DwUserPassword.t),
@@ -271,6 +307,8 @@ class DwUserPasswordRepository {
       limit: limit,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -292,13 +330,15 @@ class DwUserPasswordRepository {
   /// );
   /// ```
   Future<DwUserPassword?> findFirstRow(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwUserPasswordTable>? where,
     int? offset,
     _i1.OrderByBuilder<DwUserPasswordTable>? orderBy,
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwUserPasswordTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<DwUserPassword>(
       where: where?.call(DwUserPassword.t),
@@ -307,18 +347,24 @@ class DwUserPasswordRepository {
       orderDescending: orderDescending,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
   /// Finds a single [DwUserPassword] by its [id] or null if no such row exists.
   Future<DwUserPassword?> findById(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     int id, {
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<DwUserPassword>(
       id,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -328,14 +374,20 @@ class DwUserPasswordRepository {
   ///
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// insert, none of the rows will be inserted.
+  ///
+  /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
+  /// rows are silently skipped, and only the successfully inserted rows are
+  /// returned.
   Future<List<DwUserPassword>> insert(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwUserPassword> rows, {
     _i1.Transaction? transaction,
+    bool ignoreConflicts = false,
   }) async {
     return session.db.insert<DwUserPassword>(
       rows,
       transaction: transaction,
+      ignoreConflicts: ignoreConflicts,
     );
   }
 
@@ -343,7 +395,7 @@ class DwUserPasswordRepository {
   ///
   /// The returned [DwUserPassword] will have its `id` field set.
   Future<DwUserPassword> insertRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwUserPassword row, {
     _i1.Transaction? transaction,
   }) async {
@@ -359,7 +411,7 @@ class DwUserPasswordRepository {
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
   Future<List<DwUserPassword>> update(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwUserPassword> rows, {
     _i1.ColumnSelections<DwUserPasswordTable>? columns,
     _i1.Transaction? transaction,
@@ -375,7 +427,7 @@ class DwUserPasswordRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<DwUserPassword> updateRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwUserPassword row, {
     _i1.ColumnSelections<DwUserPasswordTable>? columns,
     _i1.Transaction? transaction,
@@ -387,11 +439,51 @@ class DwUserPasswordRepository {
     );
   }
 
+  /// Updates a single [DwUserPassword] by its [id] with the specified [columnValues].
+  /// Returns the updated row or null if no row with the given id exists.
+  Future<DwUserPassword?> updateById(
+    _i1.DatabaseSession session,
+    int id, {
+    required _i1.ColumnValueListBuilder<DwUserPasswordUpdateTable> columnValues,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateById<DwUserPassword>(
+      id,
+      columnValues: columnValues(DwUserPassword.t.updateTable),
+      transaction: transaction,
+    );
+  }
+
+  /// Updates all [DwUserPassword]s matching the [where] expression with the specified [columnValues].
+  /// Returns the list of updated rows.
+  Future<List<DwUserPassword>> updateWhere(
+    _i1.DatabaseSession session, {
+    required _i1.ColumnValueListBuilder<DwUserPasswordUpdateTable> columnValues,
+    required _i1.WhereExpressionBuilder<DwUserPasswordTable> where,
+    int? limit,
+    int? offset,
+    _i1.OrderByBuilder<DwUserPasswordTable>? orderBy,
+    _i1.OrderByListBuilder<DwUserPasswordTable>? orderByList,
+    bool orderDescending = false,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateWhere<DwUserPassword>(
+      columnValues: columnValues(DwUserPassword.t.updateTable),
+      where: where(DwUserPassword.t),
+      limit: limit,
+      offset: offset,
+      orderBy: orderBy?.call(DwUserPassword.t),
+      orderByList: orderByList?.call(DwUserPassword.t),
+      orderDescending: orderDescending,
+      transaction: transaction,
+    );
+  }
+
   /// Deletes all [DwUserPassword]s in the list and returns the deleted rows.
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
   Future<List<DwUserPassword>> delete(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwUserPassword> rows, {
     _i1.Transaction? transaction,
   }) async {
@@ -403,7 +495,7 @@ class DwUserPasswordRepository {
 
   /// Deletes a single [DwUserPassword].
   Future<DwUserPassword> deleteRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwUserPassword row, {
     _i1.Transaction? transaction,
   }) async {
@@ -415,7 +507,7 @@ class DwUserPasswordRepository {
 
   /// Deletes all rows matching the [where] expression.
   Future<List<DwUserPassword>> deleteWhere(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     required _i1.WhereExpressionBuilder<DwUserPasswordTable> where,
     _i1.Transaction? transaction,
   }) async {
@@ -428,7 +520,7 @@ class DwUserPasswordRepository {
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwUserPasswordTable>? where,
     int? limit,
     _i1.Transaction? transaction,
@@ -436,6 +528,22 @@ class DwUserPasswordRepository {
     return session.db.count<DwUserPassword>(
       where: where?.call(DwUserPassword.t),
       limit: limit,
+      transaction: transaction,
+    );
+  }
+
+  /// Acquires row-level locks on [DwUserPassword] rows matching the [where] expression.
+  Future<void> lockRows(
+    _i1.DatabaseSession session, {
+    required _i1.WhereExpressionBuilder<DwUserPasswordTable> where,
+    required _i1.LockMode lockMode,
+    required _i1.Transaction transaction,
+    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+  }) async {
+    return session.db.lockRows<DwUserPassword>(
+      where: where(DwUserPassword.t),
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
       transaction: transaction,
     );
   }

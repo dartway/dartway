@@ -1,6 +1,11 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
+// TODO(serverpod-legacy-streams): This endpoint still uses Serverpod's
+// deprecated streaming endpoint lifecycle. Keep it as-is while the app upgrade
+// is in progress, then migrate it to streaming methods.
 class DwRealTimeEndpoint extends Endpoint {
   static userUpdatesChannel(int userId) => 'userUpdates$userId';
 

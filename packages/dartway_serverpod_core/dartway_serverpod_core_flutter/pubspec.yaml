@@ -5,14 +5,14 @@ publish_to: none
 homepage:
 
 environment:
-  sdk: ^3.9.0
-  flutter: ">=3.35.0"
+  sdk: ^3.11.0
+  flutter: ^3.41.0
 
 dependencies:
   flutter:
     sdk: flutter
   
-  serverpod_client: ^2.9.1
+  serverpod_client: 3.4.7
 
   dartway_flutter:
     git: 

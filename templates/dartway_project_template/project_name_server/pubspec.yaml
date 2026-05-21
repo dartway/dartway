@@ -4,10 +4,10 @@ description: Starting point for a Serverpod server.
 # homepage: https://www.example.com
 
 environment:
-  sdk: '>=3.5.0 <4.0.0'
+  sdk: '^3.11.0'
 
 dependencies:
-  serverpod: 2.9.1
+  serverpod: 3.4.7
 
   dartway_serverpod_core_server:
     git:
@@ -22,7 +22,7 @@ dependencies:
 dev_dependencies:
   lints: '>=3.0.0 <7.0.0'
   test: '^1.24.2'
-  serverpod_test: 2.9.1
+  serverpod_test: 3.4.7
 
 # dependency_overrides:
 #   # Подключаются при доработке модулей для работы с локальными версиями

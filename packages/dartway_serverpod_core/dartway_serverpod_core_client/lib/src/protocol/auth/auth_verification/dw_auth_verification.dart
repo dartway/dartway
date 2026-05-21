@@ -7,11 +7,14 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import '../../auth/auth_request/dw_auth_request.dart' as _i2;
 import '../../auth/dw_auth_fail_reason.dart' as _i3;
+import 'package:dartway_serverpod_core_client/src/protocol/protocol.dart'
+    as _i4;
 
 abstract class DwAuthVerification implements _i1.SerializableModel {
   DwAuthVerification._({
@@ -40,15 +43,18 @@ abstract class DwAuthVerification implements _i1.SerializableModel {
       dwAuthRequestId: jsonSerialization['dwAuthRequestId'] as int,
       dwAuthRequest: jsonSerialization['dwAuthRequest'] == null
           ? null
-          : _i2.DwAuthRequest.fromJson(
-              (jsonSerialization['dwAuthRequest'] as Map<String, dynamic>)),
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+          : _i4.Protocol().deserialize<_i2.DwAuthRequest>(
+              jsonSerialization['dwAuthRequest'],
+            ),
+      createdAt: jsonSerialization['createdAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
       verificationCode: jsonSerialization['verificationCode'] as String?,
       failReason: jsonSerialization['failReason'] == null
           ? null
           : _i3.DwAuthFailReason.fromJson(
-              (jsonSerialization['failReason'] as String)),
+              (jsonSerialization['failReason'] as String),
+            ),
       accessToken: jsonSerialization['accessToken'] as String?,
     );
   }
@@ -85,6 +91,7 @@ abstract class DwAuthVerification implements _i1.SerializableModel {
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAuthVerification',
       if (id != null) 'id': id,
       'dwAuthRequestId': dwAuthRequestId,
       if (dwAuthRequest != null) 'dwAuthRequest': dwAuthRequest?.toJson(),
@@ -113,14 +120,14 @@ class _DwAuthVerificationImpl extends DwAuthVerification {
     _i3.DwAuthFailReason? failReason,
     String? accessToken,
   }) : super._(
-          id: id,
-          dwAuthRequestId: dwAuthRequestId,
-          dwAuthRequest: dwAuthRequest,
-          createdAt: createdAt,
-          verificationCode: verificationCode,
-          failReason: failReason,
-          accessToken: accessToken,
-        );
+         id: id,
+         dwAuthRequestId: dwAuthRequestId,
+         dwAuthRequest: dwAuthRequest,
+         createdAt: createdAt,
+         verificationCode: verificationCode,
+         failReason: failReason,
+         accessToken: accessToken,
+       );
 
   /// Returns a shallow copy of this [DwAuthVerification]
   /// with some or all fields replaced by the given arguments.
@@ -145,8 +152,9 @@ class _DwAuthVerificationImpl extends DwAuthVerification {
       verificationCode: verificationCode is String?
           ? verificationCode
           : this.verificationCode,
-      failReason:
-          failReason is _i3.DwAuthFailReason? ? failReason : this.failReason,
+      failReason: failReason is _i3.DwAuthFailReason?
+          ? failReason
+          : this.failReason,
       accessToken: accessToken is String? ? accessToken : this.accessToken,
     );
   }

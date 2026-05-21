@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
@@ -68,6 +69,7 @@ abstract class DwAuthKey
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAuthKey',
       if (id != null) 'id': id,
       'userId': userId,
       'hash': hash,
@@ -78,6 +80,7 @@ abstract class DwAuthKey
   @override
   Map<String, dynamic> toJsonForProtocol() {
     return {
+      '__className__': 'dartway_serverpod_core.DwAuthKey',
       if (id != null) 'id': id,
       'userId': userId,
       'hash': hash,
@@ -124,11 +127,11 @@ class _DwAuthKeyImpl extends DwAuthKey {
     required String hash,
     String? key,
   }) : super._(
-          id: id,
-          userId: userId,
-          hash: hash,
-          key: key,
-        );
+         id: id,
+         userId: userId,
+         hash: hash,
+         key: key,
+       );
 
   /// Returns a shallow copy of this [DwAuthKey]
   /// with some or all fields replaced by the given arguments.
@@ -149,8 +152,23 @@ class _DwAuthKeyImpl extends DwAuthKey {
   }
 }
 
+class DwAuthKeyUpdateTable extends _i1.UpdateTable<DwAuthKeyTable> {
+  DwAuthKeyUpdateTable(super.table);
+
+  _i1.ColumnValue<int, int> userId(int value) => _i1.ColumnValue(
+    table.userId,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> hash(String value) => _i1.ColumnValue(
+    table.hash,
+    value,
+  );
+}
+
 class DwAuthKeyTable extends _i1.Table<int?> {
   DwAuthKeyTable({super.tableRelation}) : super(tableName: 'dw_auth_key') {
+    updateTable = DwAuthKeyUpdateTable(this);
     userId = _i1.ColumnInt(
       'userId',
       this,
@@ -161,6 +179,8 @@ class DwAuthKeyTable extends _i1.Table<int?> {
     );
   }
 
+  late final DwAuthKeyUpdateTable updateTable;
+
   /// The id of the user to provide access to.
   late final _i1.ColumnInt userId;
 
@@ -169,10 +189,10 @@ class DwAuthKeyTable extends _i1.Table<int?> {
 
   @override
   List<_i1.Column> get columns => [
-        id,
-        userId,
-        hash,
-      ];
+    id,
+    userId,
+    hash,
+  ];
 }
 
 class DwAuthKeyInclude extends _i1.IncludeObject {
@@ -231,7 +251,7 @@ class DwAuthKeyRepository {
   /// );
   /// ```
   Future<List<DwAuthKey>> find(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthKeyTable>? where,
     int? limit,
     int? offset,
@@ -239,6 +259,8 @@ class DwAuthKeyRepository {
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwAuthKeyTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.find<DwAuthKey>(
       where: where?.call(DwAuthKey.t),
@@ -248,6 +270,8 @@ class DwAuthKeyRepository {
       limit: limit,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -269,13 +293,15 @@ class DwAuthKeyRepository {
   /// );
   /// ```
   Future<DwAuthKey?> findFirstRow(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthKeyTable>? where,
     int? offset,
     _i1.OrderByBuilder<DwAuthKeyTable>? orderBy,
     bool orderDescending = false,
     _i1.OrderByListBuilder<DwAuthKeyTable>? orderByList,
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findFirstRow<DwAuthKey>(
       where: where?.call(DwAuthKey.t),
@@ -284,18 +310,24 @@ class DwAuthKeyRepository {
       orderDescending: orderDescending,
       offset: offset,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
   /// Finds a single [DwAuthKey] by its [id] or null if no such row exists.
   Future<DwAuthKey?> findById(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     int id, {
     _i1.Transaction? transaction,
+    _i1.LockMode? lockMode,
+    _i1.LockBehavior? lockBehavior,
   }) async {
     return session.db.findById<DwAuthKey>(
       id,
       transaction: transaction,
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
     );
   }
 
@@ -305,14 +337,20 @@ class DwAuthKeyRepository {
   ///
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// insert, none of the rows will be inserted.
+  ///
+  /// If [ignoreConflicts] is set to `true`, rows that conflict with existing
+  /// rows are silently skipped, and only the successfully inserted rows are
+  /// returned.
   Future<List<DwAuthKey>> insert(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthKey> rows, {
     _i1.Transaction? transaction,
+    bool ignoreConflicts = false,
   }) async {
     return session.db.insert<DwAuthKey>(
       rows,
       transaction: transaction,
+      ignoreConflicts: ignoreConflicts,
     );
   }
 
@@ -320,7 +358,7 @@ class DwAuthKeyRepository {
   ///
   /// The returned [DwAuthKey] will have its `id` field set.
   Future<DwAuthKey> insertRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthKey row, {
     _i1.Transaction? transaction,
   }) async {
@@ -336,7 +374,7 @@ class DwAuthKeyRepository {
   /// This is an atomic operation, meaning that if one of the rows fails to
   /// update, none of the rows will be updated.
   Future<List<DwAuthKey>> update(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthKey> rows, {
     _i1.ColumnSelections<DwAuthKeyTable>? columns,
     _i1.Transaction? transaction,
@@ -352,7 +390,7 @@ class DwAuthKeyRepository {
   /// Optionally, a list of [columns] can be provided to only update those
   /// columns. Defaults to all columns.
   Future<DwAuthKey> updateRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthKey row, {
     _i1.ColumnSelections<DwAuthKeyTable>? columns,
     _i1.Transaction? transaction,
@@ -364,11 +402,51 @@ class DwAuthKeyRepository {
     );
   }
 
+  /// Updates a single [DwAuthKey] by its [id] with the specified [columnValues].
+  /// Returns the updated row or null if no row with the given id exists.
+  Future<DwAuthKey?> updateById(
+    _i1.DatabaseSession session,
+    int id, {
+    required _i1.ColumnValueListBuilder<DwAuthKeyUpdateTable> columnValues,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateById<DwAuthKey>(
+      id,
+      columnValues: columnValues(DwAuthKey.t.updateTable),
+      transaction: transaction,
+    );
+  }
+
+  /// Updates all [DwAuthKey]s matching the [where] expression with the specified [columnValues].
+  /// Returns the list of updated rows.
+  Future<List<DwAuthKey>> updateWhere(
+    _i1.DatabaseSession session, {
+    required _i1.ColumnValueListBuilder<DwAuthKeyUpdateTable> columnValues,
+    required _i1.WhereExpressionBuilder<DwAuthKeyTable> where,
+    int? limit,
+    int? offset,
+    _i1.OrderByBuilder<DwAuthKeyTable>? orderBy,
+    _i1.OrderByListBuilder<DwAuthKeyTable>? orderByList,
+    bool orderDescending = false,
+    _i1.Transaction? transaction,
+  }) async {
+    return session.db.updateWhere<DwAuthKey>(
+      columnValues: columnValues(DwAuthKey.t.updateTable),
+      where: where(DwAuthKey.t),
+      limit: limit,
+      offset: offset,
+      orderBy: orderBy?.call(DwAuthKey.t),
+      orderByList: orderByList?.call(DwAuthKey.t),
+      orderDescending: orderDescending,
+      transaction: transaction,
+    );
+  }
+
   /// Deletes all [DwAuthKey]s in the list and returns the deleted rows.
   /// This is an atomic operation, meaning that if one of the rows fail to
   /// be deleted, none of the rows will be deleted.
   Future<List<DwAuthKey>> delete(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     List<DwAuthKey> rows, {
     _i1.Transaction? transaction,
   }) async {
@@ -380,7 +458,7 @@ class DwAuthKeyRepository {
 
   /// Deletes a single [DwAuthKey].
   Future<DwAuthKey> deleteRow(
-    _i1.Session session,
+    _i1.DatabaseSession session,
     DwAuthKey row, {
     _i1.Transaction? transaction,
   }) async {
@@ -392,7 +470,7 @@ class DwAuthKeyRepository {
 
   /// Deletes all rows matching the [where] expression.
   Future<List<DwAuthKey>> deleteWhere(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     required _i1.WhereExpressionBuilder<DwAuthKeyTable> where,
     _i1.Transaction? transaction,
   }) async {
@@ -405,7 +483,7 @@ class DwAuthKeyRepository {
   /// Counts the number of rows matching the [where] expression. If omitted,
   /// will return the count of all rows in the table.
   Future<int> count(
-    _i1.Session session, {
+    _i1.DatabaseSession session, {
     _i1.WhereExpressionBuilder<DwAuthKeyTable>? where,
     int? limit,
     _i1.Transaction? transaction,
@@ -413,6 +491,22 @@ class DwAuthKeyRepository {
     return session.db.count<DwAuthKey>(
       where: where?.call(DwAuthKey.t),
       limit: limit,
+      transaction: transaction,
+    );
+  }
+
+  /// Acquires row-level locks on [DwAuthKey] rows matching the [where] expression.
+  Future<void> lockRows(
+    _i1.DatabaseSession session, {
+    required _i1.WhereExpressionBuilder<DwAuthKeyTable> where,
+    required _i1.LockMode lockMode,
+    required _i1.Transaction transaction,
+    _i1.LockBehavior lockBehavior = _i1.LockBehavior.wait,
+  }) async {
+    return session.db.lockRows<DwAuthKey>(
+      where: where(DwAuthKey.t),
+      lockMode: lockMode,
+      lockBehavior: lockBehavior,
       transaction: transaction,
     );
   }

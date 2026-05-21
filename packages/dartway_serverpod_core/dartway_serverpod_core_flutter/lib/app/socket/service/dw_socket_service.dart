@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
@@ -6,6 +8,10 @@ import 'package:flutter/foundation.dart';
 
 import '../../../repository/dw_repository.dart';
 
+// TODO(serverpod-legacy-streams): This service still relies on Serverpod's
+// deprecated StreamingConnectionHandler / streaming endpoint API. Keep it for
+// compatibility during the current upgrade, then replace it with streaming
+// methods.
 class DwSocketService {
   DwSocketService();
 

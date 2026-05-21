@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
@@ -45,8 +46,9 @@ abstract class DwWebServerLog implements _i1.SerializableModel {
   factory DwWebServerLog.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwWebServerLog(
       id: jsonSerialization['id'] as int?,
-      createdAt:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+      createdAt: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['createdAt'],
+      ),
       method: jsonSerialization['method'] as String,
       url: jsonSerialization['url'] as String,
       headers: jsonSerialization['headers'] as String?,
@@ -107,6 +109,7 @@ abstract class DwWebServerLog implements _i1.SerializableModel {
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'dartway_serverpod_core.DwWebServerLog',
       if (id != null) 'id': id,
       'createdAt': createdAt.toJson(),
       'method': method,
@@ -145,19 +148,19 @@ class _DwWebServerLogImpl extends DwWebServerLog {
     String? handler,
     String? ip,
   }) : super._(
-          id: id,
-          createdAt: createdAt,
-          method: method,
-          url: url,
-          headers: headers,
-          body: body,
-          statusCode: statusCode,
-          status: status,
-          error: error,
-          durationMs: durationMs,
-          handler: handler,
-          ip: ip,
-        );
+         id: id,
+         createdAt: createdAt,
+         method: method,
+         url: url,
+         headers: headers,
+         body: body,
+         statusCode: statusCode,
+         status: status,
+         error: error,
+         durationMs: durationMs,
+         handler: handler,
+         ip: ip,
+       );
 
   /// Returns a shallow copy of this [DwWebServerLog]
   /// with some or all fields replaced by the given arguments.

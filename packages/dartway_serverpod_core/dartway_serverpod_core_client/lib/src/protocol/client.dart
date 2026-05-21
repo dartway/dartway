@@ -7,21 +7,21 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'dart:async' as _i2;
-import 'package:serverpod_serialization/src/serialization.dart' as _i3;
 import 'package:dartway_serverpod_core_client/src/domain/api/dw_api_response.dart'
-    as _i4;
+    as _i3;
 import 'package:dartway_serverpod_core_client/src/domain/api/dw_model_wrapper.dart'
-    as _i5;
+    as _i4;
 import 'package:dartway_serverpod_core_client/src/domain/api/dw_backend_filter.dart'
-    as _i6;
+    as _i5;
 import 'package:dartway_serverpod_core_client/src/domain/api/dw_order_by.dart'
-    as _i7;
+    as _i6;
 import 'package:dartway_serverpod_core_client/src/protocol/cloud_files/dw_cloud_file.dart'
-    as _i8;
+    as _i7;
 
 /// {@category Endpoint}
 class EndpointDwCrud extends _i1.EndpointRef {
@@ -30,87 +30,88 @@ class EndpointDwCrud extends _i1.EndpointRef {
   @override
   String get name => 'dartway_serverpod_core.dwCrud';
 
-  _i2.Stream<_i3.SerializableModel> subscribeOnUpdates(
-          {required String channel}) =>
-      caller.callStreamingServerEndpoint<_i2.Stream<_i3.SerializableModel>,
-          _i3.SerializableModel>(
+  _i2.Stream<_i1.SerializableModel> subscribeOnUpdates({
+    required String channel,
+  }) =>
+      caller.callStreamingServerEndpoint<
+        _i2.Stream<_i1.SerializableModel>,
+        _i1.SerializableModel
+      >(
         'dartway_serverpod_core.dwCrud',
         'subscribeOnUpdates',
         {'channel': channel},
         {},
       );
 
-  _i2.Future<_i4.DwApiResponse<_i5.DwModelWrapper>> getOne({
+  _i2.Future<_i3.DwApiResponse<_i4.DwModelWrapper>> getOne({
     required String className,
-    required _i6.DwBackendFilter filter,
+    required _i5.DwBackendFilter filter,
     String? apiGroup,
-  }) =>
-      caller.callServerEndpoint<_i4.DwApiResponse<_i5.DwModelWrapper>>(
-        'dartway_serverpod_core.dwCrud',
-        'getOne',
-        {
-          'className': className,
-          'filter': filter,
-          'apiGroup': apiGroup,
-        },
-      );
+  }) => caller.callServerEndpoint<_i3.DwApiResponse<_i4.DwModelWrapper>>(
+    'dartway_serverpod_core.dwCrud',
+    'getOne',
+    {
+      'className': className,
+      'filter': filter,
+      'apiGroup': apiGroup,
+    },
+  );
 
-  _i2.Future<_i4.DwApiResponse<int>> getCount({
+  _i2.Future<_i3.DwApiResponse<int>> getCount({
     required String className,
-    _i6.DwBackendFilter? filter,
+    _i5.DwBackendFilter? filter,
     String? apiGroup,
-  }) =>
-      caller.callServerEndpoint<_i4.DwApiResponse<int>>(
-        'dartway_serverpod_core.dwCrud',
-        'getCount',
-        {
-          'className': className,
-          'filter': filter,
-          'apiGroup': apiGroup,
-        },
-      );
+  }) => caller.callServerEndpoint<_i3.DwApiResponse<int>>(
+    'dartway_serverpod_core.dwCrud',
+    'getCount',
+    {
+      'className': className,
+      'filter': filter,
+      'apiGroup': apiGroup,
+    },
+  );
 
-  _i2.Future<_i4.DwApiResponse<List<_i5.DwModelWrapper>>> getAll({
+  _i2.Future<_i3.DwApiResponse<List<_i4.DwModelWrapper>>> getAll({
     required String className,
-    _i6.DwBackendFilter? filter,
-    List<_i7.DwOrderBy>? orderByList,
+    _i5.DwBackendFilter? filter,
+    List<_i6.DwOrderBy>? orderByList,
     int? limit,
     int? offset,
     String? apiGroup,
-  }) =>
-      caller.callServerEndpoint<_i4.DwApiResponse<List<_i5.DwModelWrapper>>>(
-        'dartway_serverpod_core.dwCrud',
-        'getAll',
-        {
-          'className': className,
-          'filter': filter,
-          'orderByList': orderByList,
-          'limit': limit,
-          'offset': offset,
-          'apiGroup': apiGroup,
-        },
-      );
+  }) => caller.callServerEndpoint<_i3.DwApiResponse<List<_i4.DwModelWrapper>>>(
+    'dartway_serverpod_core.dwCrud',
+    'getAll',
+    {
+      'className': className,
+      'filter': filter,
+      'orderByList': orderByList,
+      'limit': limit,
+      'offset': offset,
+      'apiGroup': apiGroup,
+    },
+  );
 
-  _i2.Future<_i4.DwApiResponse<_i5.DwModelWrapper>> saveModel({
-    required _i5.DwModelWrapper wrappedModel,
+  _i2.Future<_i3.DwApiResponse<_i4.DwModelWrapper>> saveModel({
+    required _i4.DwModelWrapper wrappedModel,
     String? apiGroup,
-  }) =>
-      caller.callServerEndpoint<_i4.DwApiResponse<_i5.DwModelWrapper>>(
-        'dartway_serverpod_core.dwCrud',
-        'saveModel',
-        {
-          'wrappedModel': wrappedModel,
-          'apiGroup': apiGroup,
-        },
-      );
+  }) => caller.callServerEndpoint<_i3.DwApiResponse<_i4.DwModelWrapper>>(
+    'dartway_serverpod_core.dwCrud',
+    'saveModel',
+    {
+      'wrappedModel': wrappedModel,
+      'apiGroup': apiGroup,
+    },
+  );
 
-  _i2.Stream<_i3.SerializableModel> saveModelStream({
-    required _i5.DwModelWrapper wrappedModel,
+  _i2.Stream<_i1.SerializableModel> saveModelStream({
+    required _i4.DwModelWrapper wrappedModel,
     required String channelName,
     String? apiGroup,
   }) =>
-      caller.callStreamingServerEndpoint<_i2.Stream<_i3.SerializableModel>,
-          _i3.SerializableModel>(
+      caller.callStreamingServerEndpoint<
+        _i2.Stream<_i1.SerializableModel>,
+        _i1.SerializableModel
+      >(
         'dartway_serverpod_core.dwCrud',
         'saveModelStream',
         {
@@ -121,20 +122,19 @@ class EndpointDwCrud extends _i1.EndpointRef {
         {},
       );
 
-  _i2.Future<_i4.DwApiResponse<bool>> delete({
+  _i2.Future<_i3.DwApiResponse<bool>> delete({
     required String className,
     required int modelId,
     String? apiGroup,
-  }) =>
-      caller.callServerEndpoint<_i4.DwApiResponse<bool>>(
-        'dartway_serverpod_core.dwCrud',
-        'delete',
-        {
-          'className': className,
-          'modelId': modelId,
-          'apiGroup': apiGroup,
-        },
-      );
+  }) => caller.callServerEndpoint<_i3.DwApiResponse<bool>>(
+    'dartway_serverpod_core.dwCrud',
+    'delete',
+    {
+      'className': className,
+      'modelId': modelId,
+      'apiGroup': apiGroup,
+    },
+  );
 }
 
 /// {@category Endpoint}
@@ -159,8 +159,8 @@ class EndpointDwUpload extends _i1.EndpointRef {
         {'path': path},
       );
 
-  _i2.Future<_i8.DwCloudFile?> verifyUpload({required String path}) =>
-      caller.callServerEndpoint<_i8.DwCloudFile?>(
+  _i2.Future<_i7.DwCloudFile?> verifyUpload({required String path}) =>
+      caller.callServerEndpoint<_i7.DwCloudFile?>(
         'dartway_serverpod_core.dwUpload',
         'verifyUpload',
         {'path': path},
@@ -182,8 +182,8 @@ class Caller extends _i1.ModuleEndpointCaller {
 
   @override
   Map<String, _i1.EndpointRef> get endpointRefLookup => {
-        'dartway_serverpod_core.dwCrud': dwCrud,
-        'dartway_serverpod_core.dwRealTime': dwRealTime,
-        'dartway_serverpod_core.dwUpload': dwUpload,
-      };
+    'dartway_serverpod_core.dwCrud': dwCrud,
+    'dartway_serverpod_core.dwRealTime': dwRealTime,
+    'dartway_serverpod_core.dwUpload': dwUpload,
+  };
 }

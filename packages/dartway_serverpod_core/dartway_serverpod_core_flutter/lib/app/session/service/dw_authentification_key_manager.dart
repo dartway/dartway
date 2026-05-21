@@ -6,7 +6,6 @@ import 'dart:convert';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dw_auth_storage_interface.dart';
 
@@ -14,9 +13,8 @@ const _authKeyPrefsKey = 'dartway_authentication_key';
 const _userProfilePrefsKey = 'dw_user_profile_key';
 const _prefsVersion = 1;
 
-/// Implementation of a Serverpod [AuthenticationKeyManager] specifically for
-/// Flutter. Authentication key is stored in the [SharedPreferences].
-class DwAuthenticationKeyManager extends AuthenticationKeyManager {
+/// Persistent auth key provider for DartWay Flutter clients.
+class DwAuthenticationKeyManager implements ClientAuthKeyProvider {
   bool _initialized = false;
   String? _authenticationKey;
 
@@ -38,6 +36,8 @@ class DwAuthenticationKeyManager extends AuthenticationKeyManager {
   }
 
   @override
+  Future<String?> get authHeaderValue async => toHeaderValue(await get());
+
   Future<String?> get() async {
     if (!_initialized) {
       _authenticationKey = await _storage.getString(
@@ -49,18 +49,21 @@ class DwAuthenticationKeyManager extends AuthenticationKeyManager {
     return _authenticationKey;
   }
 
-  @override
   Future<void> put(String key) async {
     _authenticationKey = key;
 
     await _storage.setString('${_authKeyPrefsKey}_$runMode', key);
   }
 
-  @override
   Future<void> remove() async {
     _authenticationKey = null;
     await _storage.remove('${_userProfilePrefsKey}_$runMode');
     await _storage.remove('${_authKeyPrefsKey}_$runMode');
+  }
+
+  Future<String?> toHeaderValue(String? key) async {
+    if (key == null) return null;
+    return wrapAsBearerAuthHeaderValue(key);
   }
 
   Future<(int?, UserProfileClass?)>
