@@ -4,6 +4,8 @@ version: 0.0.1
 publish_to: none
 homepage:
 
+resolution: workspace
+
 environment:
   sdk: ^3.11.0
   flutter: ^3.41.0
@@ -11,15 +13,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
+
   serverpod_client: 3.4.7
 
   dartway_flutter:
-    git: 
+    git:
       url: https://github.com/dartway/dartway.git
       path: packages/dartway_flutter
 
-  
+
   dartway_serverpod_core_client:
     git:
       url: https://github.com/dartway/dartway.git
@@ -48,13 +50,13 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
 
-dependency_overrides:
-  dartway_serverpod_core_client:
-    path: ../dartway_serverpod_core_client
-  dartway_serverpod_core_shared:
-    path: ../dartway_serverpod_core_shared
-  dartway_flutter:
-    path: ../../dartway_flutter
+# dependency_overrides:
+#   dartway_serverpod_core_client:
+#     path: ../dartway_serverpod_core_client
+#   dartway_serverpod_core_shared:
+#     path: ../dartway_serverpod_core_shared
+#   dartway_flutter:
+#     path: ../../dartway_flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

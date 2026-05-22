@@ -2,6 +2,8 @@ name: dartway_serverpod_core_shared
 description: Shared constants, enums, and models for DartWay Core (used by both flutter app and server).
 version: 1.0.0
 
+resolution: workspace
+
 environment:
   sdk: ^3.11.0
 

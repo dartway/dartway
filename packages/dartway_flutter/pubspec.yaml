@@ -3,6 +3,8 @@ description: "A comprehensive Flutter toolkit for rapid app development with UI 
 version: 0.0.1
 homepage:
 
+resolution: workspace
+
 environment:
   sdk: ^3.11.0
   flutter: ^3.41.0

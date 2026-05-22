@@ -1,6 +1,0 @@
-class: WaterIntake
-table: water_intake
-fields:
-  userProfile: UserProfile?, relation
-  intakeAmount: int
-  intakeTime: DateTime

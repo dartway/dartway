@@ -1,0 +1,8 @@
+name: dartway_framework
+environment:
+  sdk: ^3.11.0
+  flutter: ^3.41.0
+
+workspace:
+  - packages/*
+  - packages/dartway_serverpod_core/*
