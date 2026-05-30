@@ -28,6 +28,27 @@ extension DwAuthRequestVerification on DwAuthRequest {
     Session session, {
     required SerializableModel? userProfile,
   }) async {
+    // External providers (Apple, …): validate the provider credential, then
+    // register on first sign-in or log in when the user already exists.
+    if (authProvider != DwAuthProvider.email) {
+      final verifyExternal =
+          DwCore.instance.auth!.config.verifyExternalCredential;
+      if (verifyExternal == null) {
+        return setFailed(session, DwAuthFailReason.invalidAccessToken);
+      }
+      final failReason = await verifyExternal(session, authRequest: this);
+      if (failReason != null) return setFailed(session, failReason);
+      requestType = userProfile == null
+          ? DwAuthRequestType.register
+          : DwAuthRequestType.login;
+      status = DwAuthRequestStatus.verified;
+      session.log(
+        'Auth verified for $userIdentifier via ${authProvider.name}',
+        level: LogLevel.info,
+      );
+      return;
+    }
+
     // TODO: add alternative logic for registration requests
     if (requestType != DwAuthRequestType.register && userProfile == null) {
       return setFailed(session, DwAuthFailReason.userNotFound);

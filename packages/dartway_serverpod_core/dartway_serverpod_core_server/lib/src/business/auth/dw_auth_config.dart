@@ -43,6 +43,7 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.sendVerificationCodeMethod,
     this.onSignInTrigger,
     this.preAuthValidation,
+    this.verifyExternalCredential,
   });
 
   /// Callback invoked BEFORE verification code is sent or auth key is created.
@@ -53,6 +54,15 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     required DwAuthRequest authRequest,
     required UserProfileClass? userProfile,
   })? preAuthValidation;
+
+  /// Validates an external auth provider's credential (e.g. an Apple identity
+  /// token) carried on a non-email [DwAuthRequest]. Return `null` when the
+  /// credential is valid — dartway then logs the user in, or registers them on
+  /// first sign-in — or a [DwAuthFailReason] to reject the attempt.
+  final Future<DwAuthFailReason?> Function(
+    Session session, {
+    required DwAuthRequest authRequest,
+  })? verifyExternalCredential;
 
   /// Callback for triggering actions when a user signs in.
   final Future<void> Function(

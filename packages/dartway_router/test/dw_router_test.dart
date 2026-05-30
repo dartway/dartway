@@ -296,5 +296,33 @@ void main() {
         expect(router.navigationZones.length, 2);
       });
     });
+
+    group('duplicate page keys', () {
+      testWidgets(
+          'pushing the same route twice does not trip the Navigator '
+          'duplicate page key assertion', (tester) async {
+        final router = DwRouter<TestRouterState>(
+          navigationZones: [
+            TestRoutes.values,
+          ],
+          pageBuilder: DwPageBuilder.material,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp.router(routerConfig: router.router),
+        );
+        await tester.pumpAndSettle();
+
+        // The same location pushed twice puts two pages on the stack.
+        // go_router assigns each pushed page its own unique pageKey, so the
+        // Navigator must not see two pages sharing a key.
+        router.router.pushNamed('profile');
+        await tester.pumpAndSettle();
+        router.router.pushNamed('profile');
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      });
+    });
   });
 }

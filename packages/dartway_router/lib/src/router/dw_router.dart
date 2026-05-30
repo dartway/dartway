@@ -242,10 +242,14 @@ class DwRouter<RouterState extends Listenable> {
       name: route.name,
       path: route.routePath,
       pageBuilder: (context, state) {
-        // Use the centralized page builder with a unique key
+        // Use go_router's own per-page key, which is unique for every entry on
+        // the stack (a random key for imperative pushes, preserved across
+        // rebuilds). Deriving the key from name + path instead would collide
+        // whenever the same location appears twice on the stack and trip the
+        // Navigator's _debugCheckDuplicatedPageKeys assertion.
         return pageBuilder(
           context,
-          ValueKey('${route.name}-${state.uri.path}'),
+          state.pageKey,
           route.descriptor.pageWidget,
         );
       },
