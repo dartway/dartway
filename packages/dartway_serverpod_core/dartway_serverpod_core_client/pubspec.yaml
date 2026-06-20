@@ -9,5 +9,5 @@ environment:
   sdk: ^3.11.0
 
 dependencies:
-  serverpod_client: 3.4.7
+  serverpod_client: ^3.4.8
   collection: ^1.19.1
