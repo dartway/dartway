@@ -1,0 +1,113 @@
+---
+title: Project Structure
+description: Entry point into Flutter Guide — structure and architecture for DartWay apps
+alwaysApply: true
+---
+
+# Flutter Project Structure
+
+This document is the **entry point into the Flutter Guide**.  
+It defines how to organize a DartWay Flutter application and connects to more detailed guides:
+- [Feature Architecture](./feature_architecture)
+- [UI Kit](./ui_kit)
+- [Navigation](./navigation)
+- (upcoming) State & Providers
+
+---
+
+## 🎯 Core Principles
+
+- **Feature-based** → everything is split into small, isolated features.  
+- **Minimal boilerplate** → no abstractions just for the sake of architecture.  
+- **Generic data layer** → no repositories, no manual sync, everything goes through DartWay data layer.  
+- **AI-friendly** → the structure is optimized for assistants (Cursor, ChatGPT).  
+
+---
+
+## 📂 Recommended Project Layout
+
+```yaml
+lib/
+├─ admin/       # Features for admin panel
+├─ app/         # Main application features
+│ ├─ home/
+│ │ ├─ home_page/
+│ │ ├─ promotion_block/
+│ │ └─ ...
+│ ├─ profile/
+│ └─ ...
+├─ auth/        # Authentication (login, signup, tokens)
+├─ common/      # Shared utilities, configs, navigation
+├─ core/        # Global configuration (router, providers, services)
+├─ domain/      # Business logic on top of models (shared, cross-feature)
+├─ ui_kit/      # Unified entry point for design system
+│   └─ ui_kit.dart
+├─ build_info.dart # build configuration vars (generated automatically)
+└─ main.dart    # App entry point
+```
+
+👉 For large apps, you may create multiple `app_*` modules (e.g. `/app_orders`, `/app_chat`) — the same rules apply.
+
+---
+
+## 📦 Features
+
+Every feature is a small, self-contained folder with:
+- **Entry Point** → exactly one public file (page, widget, or context extension).  
+- **Widgets** → UI parts for layout and interactions.  
+- **Logic** → local providers, enums, helpers (scoped to this feature).  
+- **Domain Extensions** → cross-feature business logic belongs in `/domain`, never inside features.  
+- **UI Kit** → all styling and reusable visuals come only from `ui_kit.dart`.  
+
+👉 For details and examples, see [Feature Architecture](./feature_architecture).
+
+---
+
+## 🎨 UI Kit
+
+- UI Kit is the **only allowed source of styles**.  
+- Inside `app/`, `auth/`, `common/` you must **not use directly**:  
+  `Color`, `TextStyle`, `BorderRadius`, `context.textTheme`, `context.colorScheme`.  
+- All features import only `ui_kit.dart`.  
+
+👉 See [UI Kit Guide](./ui_kit).
+
+---
+
+## 🧭 Navigation
+
+- Routes are defined with `NavigationZoneRoute` enums.  
+- Use context extensions (`context.goTo`, `context.pushTo`).  
+- Redirects and guards are configured centrally in router.  
+
+👉 See [Navigation Guide](./navigation).
+
+---
+
+## 🧪 Tests
+
+- Every feature must include tests:
+  - **Widget tests** for pages and components.  
+  - **Provider tests** for logic.  
+- Place them in `/test/feature_name/...`.  
+
+Tests ensure stability and make AI-generated code safer to adopt.
+
+---
+
+## 📈 Scaling the Project
+
+- Keep features small. If a widget grows into a mini-flow, extract it as its own feature.  
+- For large domains, split into `app_*` modules while keeping the same folder rules.  
+- Domain logic must always remain in `/domain`, never spread across features.  
+- All visuals remain in `/ui_kit`, ensuring consistent design.  
+
+---
+
+## ✅ Key Takeaways
+
+- Start from this structure in every DartWay Flutter project.  
+- Features are the building blocks — each with one public entry point.  
+- Styling = UI Kit, business logic = Domain, navigation = Router.  
+- Tests are mandatory.  
+- Follow this consistently → predictable, maintainable, AI-friendly apps.  

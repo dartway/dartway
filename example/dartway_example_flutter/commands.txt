@@ -1,0 +1,4 @@
+publish to stage
+aws --profile nit --endpoint-url=https://storage.yandexcloud.net/ s3 cp --recursive build/web/ s3://nextlevel.stageserver.ru --exclude "**/.env"
+
+dart run dartway_code_checker:check_flutter_app

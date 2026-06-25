@@ -1,0 +1,7 @@
+class: FeedPost
+table: feed_post
+fields:
+  authorProfile: UserProfile?, relation
+  title: String
+  text: String
+  createdAt: DateTime

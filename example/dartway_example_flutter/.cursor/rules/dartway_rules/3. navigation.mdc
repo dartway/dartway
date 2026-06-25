@@ -1,0 +1,208 @@
+---
+description: Guidelines for using DartWay Router in Flutter projects
+alwaysApply: true
+---
+
+# Navigation
+
+:::warning
+DartWay Router (`dartway_router`) is actively evolving.  
+These guidelines describe the current best practices, but some rules may be refined in future versions.
+:::
+
+These are the official rules for using **DartWay Router** in DartWay projects.  
+They apply to all frontend codebases built with Flutter.
+
+---
+
+## ✅ General Rules
+
+* Always use **enum-based routes** — no string route names allowed.  
+* Each app must define its routes inside a `router/` folder:
+
+```
+lib/
+  router/
+    app_router.dart
+    zones/
+      app_routes.dart
+```
+
+* Do not mix navigation logic with UI widgets — keep route definitions isolated.  
+
+---
+
+## 📦 Route Definitions
+
+* Define all routes as enums implementing `NavigationZoneRoute`.  
+* Use `SimpleNavigationRouteDescriptor` for static pages.  
+* Use `ParameterizedNavigationRouteDescriptor` for pages with path parameters.  
+* Every enum must implement:
+
+```dart
+@override
+final NavigationRouteDescriptor descriptor;
+
+@override
+String get root => '';
+```
+
+---
+
+## 🔑 Parameters
+
+* All parameters must be defined as enums with `NavigationParamsMixin`.  
+* Use generic enum syntax for type safety.  
+* Do not use raw strings or maps for parameters.  
+
+Example:
+
+```dart
+enum AppParams<T> with NavigationParamsMixin<T> {
+  userId<int>(),
+  categoryId<int>(),
+  searchQuery<String>(),
+  isEnabled<bool>(),
+}
+```
+
+---
+
+## 🏗️ Router Initialization
+
+* Always configure the router in a dedicated `app_router.dart` file.  
+* Use `DwRouter.config()` builder pattern to add zones and set defaults.  
+* Provide the router via Riverpod using `dwRouterStateProvider`:  
+
+```dart
+final appRouterProvider = dwRouterStateProvider(
+  DwRouter.config()
+    .addNavigationZones([AppRoutes.values])
+    .setInitialLocation(AppRoutes.home.routePath)
+    .setPageFactory(DwPageBuilders.material)
+);
+```
+
+* Initialize `MaterialApp.router` with the router from `ref.watch(appRouterProvider)`.  
+
+---
+
+## 🔄 Navigation Usage
+
+* Always use **context extensions** (`context.goTo`, `context.pushTo`, `context.replaceWith`) — never call `router.go()` directly.  
+* When passing parameters:  
+
+```dart
+context.pushTo(
+  AppRoutes.userDetail,
+  pathParameters: AppParams.userId.set(123),
+);
+```
+
+* Access parameters in widgets only via `ref.watchNavigationParam(...)` or `ref.readNavigationParam(...)`.  
+
+---
+
+## 🔀 Redirects & Guards
+
+* Use `.setRedirect()` in `DwRouter.config()` to handle conditional navigation.  
+
+Example:
+
+```dart
+DwRouter.config()
+  .addNavigationZones([AppRoutes.values])
+  .setRedirect((context, currentRoute) {
+    final isAuthenticated = ref.read(authProvider).isAuthenticated;
+    if (!isAuthenticated && currentRoute == AppRoutes.profile) {
+      return AppRoutes.home;
+    }
+    return null;
+  });
+```
+
+* Do not scatter redirect logic across widgets — keep it centralized in router config.  
+
+---
+
+## 🎨 UI Integration
+
+* Use `DwBottomNavigationBar` for bottom navigation — do not reinvent it.  
+* All menu items must be created via `DwMenuItem` (icon, svg, or custom).  
+* For badges: use `NotificationBadge` or provide a custom widget.  
+
+---
+
+## 🎭 Transitions
+
+* Use built-in factories (`DwPageBuilders.material`, `.fade`, `.slide`, `.scale`) whenever possible.  
+* Custom transitions must be wrapped in a `CustomTransitionPage`.  
+* Keep transition duration ≤ 400ms.  
+
+---
+
+## ⚡ Best Practices
+
+* Keep navigation zones small and modular — each major app area should have its own enum.  
+* Place business logic outside navigation (no conditional checks in UI).  
+* Redirects and guards should be configured in the router builder, not scattered across widgets.  
+* Always set an initial location explicitly with `.setInitialLocation(...)`.  
+* Provide a `.setNotFoundPage(...)` to handle unknown routes gracefully.  
+* Use the generic parameter enum syntax for type safety.  
+* Prefer `ref.watchNavigationParam()` over `ref.readNavigationParam()` for reactive UI updates.  
+
+---
+
+## 📖 Complete Example
+
+```dart
+// app_router.dart
+import 'package:dartway_router/dartway_router.dart';
+import 'pages/home_page.dart';
+import 'pages/profile_page.dart';
+import 'pages/user_detail_page.dart';
+
+// Navigation parameters
+enum AppParams<T> with NavigationParamsMixin<T> {
+  userId<int>(),
+  categoryId<int>(),
+}
+
+// Route definitions
+enum AppRoutes implements NavigationZoneRoute {
+  home(SimpleNavigationRouteDescriptor(page: HomePage())),
+  profile(SimpleNavigationRouteDescriptor(page: ProfilePage())),
+  userDetail(ParameterizedNavigationRouteDescriptor(
+    page: UserDetailPage(),
+    parameter: AppParams.userId,
+  ));
+
+  const AppRoutes(this.descriptor);
+
+  @override
+  final NavigationRouteDescriptor descriptor;
+
+  @override
+  String get root => '';
+}
+
+// Router provider
+final appRouterProvider = dwRouterStateProvider(
+  DwRouter.config()
+    .addNavigationZones([AppRoutes.values])
+    .setInitialLocation(AppRoutes.home.routePath)
+    .setPageFactory(DwPageBuilders.material)
+    .setNotFoundPage(const NotFoundPageWidget())
+);
+```
+
+---
+
+## 🚨 Common Mistakes to Avoid
+
+* Don’t use string-based route names.  
+* Don’t forget to implement the required `descriptor` and `root` properties.  
+* Don’t use raw parameter maps — always use the type-safe parameter system.  
+* Don’t call `router.go()` directly — use context extensions.  
+* Don’t forget to provide a not-found page.  
+* Don’t mix navigation logic with UI components.  
