@@ -7,6 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
@@ -15,7 +16,7 @@ import '../user_profile/user_gender.dart' as _i2;
 abstract class UserProfile implements _i1.SerializableModel {
   UserProfile._({
     this.id,
-    this.userInfoId,
+    required this.userIdentifier,
     required this.phone,
     required this.agreedForMarketingCommunications,
     required this.conditionsAcceptedAt,
@@ -27,7 +28,7 @@ abstract class UserProfile implements _i1.SerializableModel {
 
   factory UserProfile({
     int? id,
-    int? userInfoId,
+    required String userIdentifier,
     required String phone,
     required bool agreedForMarketingCommunications,
     required DateTime conditionsAcceptedAt,
@@ -40,12 +41,14 @@ abstract class UserProfile implements _i1.SerializableModel {
   factory UserProfile.fromJson(Map<String, dynamic> jsonSerialization) {
     return UserProfile(
       id: jsonSerialization['id'] as int?,
-      userInfoId: jsonSerialization['userInfoId'] as int?,
+      userIdentifier: jsonSerialization['userIdentifier'] as String,
       phone: jsonSerialization['phone'] as String,
-      agreedForMarketingCommunications:
-          jsonSerialization['agreedForMarketingCommunications'] as bool,
+      agreedForMarketingCommunications: _i1.BoolJsonExtension.fromJson(
+        jsonSerialization['agreedForMarketingCommunications'],
+      ),
       conditionsAcceptedAt: _i1.DateTimeJsonExtension.fromJson(
-          jsonSerialization['conditionsAcceptedAt']),
+        jsonSerialization['conditionsAcceptedAt'],
+      ),
       firstName: jsonSerialization['firstName'] as String,
       lastName: jsonSerialization['lastName'] as String?,
       imageUrl: jsonSerialization['imageUrl'] as String?,
@@ -60,7 +63,7 @@ abstract class UserProfile implements _i1.SerializableModel {
   /// the id will be null.
   int? id;
 
-  int? userInfoId;
+  String userIdentifier;
 
   String phone;
 
@@ -81,7 +84,7 @@ abstract class UserProfile implements _i1.SerializableModel {
   @_i1.useResult
   UserProfile copyWith({
     int? id,
-    int? userInfoId,
+    String? userIdentifier,
     String? phone,
     bool? agreedForMarketingCommunications,
     DateTime? conditionsAcceptedAt,
@@ -93,8 +96,9 @@ abstract class UserProfile implements _i1.SerializableModel {
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'UserProfile',
       if (id != null) 'id': id,
-      if (userInfoId != null) 'userInfoId': userInfoId,
+      'userIdentifier': userIdentifier,
       'phone': phone,
       'agreedForMarketingCommunications': agreedForMarketingCommunications,
       'conditionsAcceptedAt': conditionsAcceptedAt.toJson(),
@@ -116,7 +120,7 @@ class _Undefined {}
 class _UserProfileImpl extends UserProfile {
   _UserProfileImpl({
     int? id,
-    int? userInfoId,
+    required String userIdentifier,
     required String phone,
     required bool agreedForMarketingCommunications,
     required DateTime conditionsAcceptedAt,
@@ -125,16 +129,16 @@ class _UserProfileImpl extends UserProfile {
     String? imageUrl,
     _i2.UserGender? gender,
   }) : super._(
-          id: id,
-          userInfoId: userInfoId,
-          phone: phone,
-          agreedForMarketingCommunications: agreedForMarketingCommunications,
-          conditionsAcceptedAt: conditionsAcceptedAt,
-          firstName: firstName,
-          lastName: lastName,
-          imageUrl: imageUrl,
-          gender: gender,
-        );
+         id: id,
+         userIdentifier: userIdentifier,
+         phone: phone,
+         agreedForMarketingCommunications: agreedForMarketingCommunications,
+         conditionsAcceptedAt: conditionsAcceptedAt,
+         firstName: firstName,
+         lastName: lastName,
+         imageUrl: imageUrl,
+         gender: gender,
+       );
 
   /// Returns a shallow copy of this [UserProfile]
   /// with some or all fields replaced by the given arguments.
@@ -142,7 +146,7 @@ class _UserProfileImpl extends UserProfile {
   @override
   UserProfile copyWith({
     Object? id = _Undefined,
-    Object? userInfoId = _Undefined,
+    String? userIdentifier,
     String? phone,
     bool? agreedForMarketingCommunications,
     DateTime? conditionsAcceptedAt,
@@ -153,9 +157,10 @@ class _UserProfileImpl extends UserProfile {
   }) {
     return UserProfile(
       id: id is int? ? id : this.id,
-      userInfoId: userInfoId is int? ? userInfoId : this.userInfoId,
+      userIdentifier: userIdentifier ?? this.userIdentifier,
       phone: phone ?? this.phone,
-      agreedForMarketingCommunications: agreedForMarketingCommunications ??
+      agreedForMarketingCommunications:
+          agreedForMarketingCommunications ??
           this.agreedForMarketingCommunications,
       conditionsAcceptedAt: conditionsAcceptedAt ?? this.conditionsAcceptedAt,
       firstName: firstName ?? this.firstName,

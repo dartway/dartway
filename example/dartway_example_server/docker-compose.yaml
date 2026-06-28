@@ -1,0 +1,17 @@
+services:
+  # Development database. Matches config/development.yaml (localhost:8090,
+  # database "dartway_example", user "postgres"). Redis is disabled in the
+  # development config, so only Postgres is started here.
+  postgres:
+    image: postgres:16
+    ports:
+      - '8090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dartway_example
+      POSTGRES_PASSWORD: 'dartway_dev_pw'
+    volumes:
+      - dartway_example_data:/var/lib/postgresql/data
+
+volumes:
+  dartway_example_data:

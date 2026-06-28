@@ -7,10 +7,12 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'user_profile/user_profile.dart' as _i2;
+import 'package:dartway_example_client/src/protocol/protocol.dart' as _i3;
 
 abstract class WaterIntake implements _i1.SerializableModel {
   WaterIntake._({
@@ -35,11 +37,13 @@ abstract class WaterIntake implements _i1.SerializableModel {
       userProfileId: jsonSerialization['userProfileId'] as int,
       userProfile: jsonSerialization['userProfile'] == null
           ? null
-          : _i2.UserProfile.fromJson(
-              (jsonSerialization['userProfile'] as Map<String, dynamic>)),
+          : _i3.Protocol().deserialize<_i2.UserProfile>(
+              jsonSerialization['userProfile'],
+            ),
       intakeAmount: jsonSerialization['intakeAmount'] as int,
-      intakeTime:
-          _i1.DateTimeJsonExtension.fromJson(jsonSerialization['intakeTime']),
+      intakeTime: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['intakeTime'],
+      ),
     );
   }
 
@@ -69,6 +73,7 @@ abstract class WaterIntake implements _i1.SerializableModel {
   @override
   Map<String, dynamic> toJson() {
     return {
+      '__className__': 'WaterIntake',
       if (id != null) 'id': id,
       'userProfileId': userProfileId,
       if (userProfile != null) 'userProfile': userProfile?.toJson(),
@@ -93,12 +98,12 @@ class _WaterIntakeImpl extends WaterIntake {
     required int intakeAmount,
     required DateTime intakeTime,
   }) : super._(
-          id: id,
-          userProfileId: userProfileId,
-          userProfile: userProfile,
-          intakeAmount: intakeAmount,
-          intakeTime: intakeTime,
-        );
+         id: id,
+         userProfileId: userProfileId,
+         userProfile: userProfile,
+         intakeAmount: intakeAmount,
+         intakeTime: intakeTime,
+       );
 
   /// Returns a shallow copy of this [WaterIntake]
   /// with some or all fields replaced by the given arguments.

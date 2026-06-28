@@ -7,17 +7,17 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
 import 'package:serverpod/protocol.dart' as _i2;
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart'
     as _i3;
-import 'package:serverpod_auth_server/serverpod_auth_server.dart' as _i4;
-import 'feed_post/feed_post.dart' as _i5;
-import 'user_profile/user_gender.dart' as _i6;
-import 'user_profile/user_profile.dart' as _i7;
-import 'water_intake.dart' as _i8;
+import 'feed_post/feed_post.dart' as _i4;
+import 'user_profile/user_gender.dart' as _i5;
+import 'user_profile/user_profile.dart' as _i6;
+import 'water_intake.dart' as _i7;
 export 'feed_post/feed_post.dart';
 export 'user_profile/user_gender.dart';
 export 'user_profile/user_profile.dart';
@@ -79,7 +79,7 @@ class Protocol extends _i1.SerializationManagerServer {
           onUpdate: _i2.ForeignKeyAction.noAction,
           onDelete: _i2.ForeignKeyAction.noAction,
           matchType: null,
-        )
+        ),
       ],
       indexes: [
         _i2.IndexDefinition(
@@ -89,12 +89,12 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            )
+            ),
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        )
+        ),
       ],
       managed: true,
     ),
@@ -112,10 +112,10 @@ class Protocol extends _i1.SerializationManagerServer {
           columnDefault: 'nextval(\'user_profile_id_seq\'::regclass)',
         ),
         _i2.ColumnDefinition(
-          name: 'userInfoId',
-          columnType: _i2.ColumnType.bigint,
-          isNullable: true,
-          dartType: 'int?',
+          name: 'userIdentifier',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
         ),
         _i2.ColumnDefinition(
           name: 'phone',
@@ -160,18 +160,7 @@ class Protocol extends _i1.SerializationManagerServer {
           dartType: 'protocol:UserGender?',
         ),
       ],
-      foreignKeys: [
-        _i2.ForeignKeyDefinition(
-          constraintName: 'user_profile_fk_0',
-          columns: ['userInfoId'],
-          referenceTable: 'serverpod_user_info',
-          referenceTableSchema: 'public',
-          referenceColumns: ['id'],
-          onUpdate: _i2.ForeignKeyAction.noAction,
-          onDelete: _i2.ForeignKeyAction.noAction,
-          matchType: null,
-        )
-      ],
+      foreignKeys: [],
       indexes: [
         _i2.IndexDefinition(
           indexName: 'user_profile_pkey',
@@ -180,12 +169,12 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            )
+            ),
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        )
+        ),
       ],
       managed: true,
     ),
@@ -231,7 +220,7 @@ class Protocol extends _i1.SerializationManagerServer {
           onUpdate: _i2.ForeignKeyAction.noAction,
           onDelete: _i2.ForeignKeyAction.noAction,
           matchType: null,
-        )
+        ),
       ],
       indexes: [
         _i2.IndexDefinition(
@@ -241,19 +230,24 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'id',
-            )
+            ),
           ],
           type: 'btree',
           isUnique: true,
           isPrimary: true,
-        )
+        ),
       ],
       managed: true,
     ),
     ..._i3.Protocol.targetTableDefinitions,
-    ..._i4.Protocol.targetTableDefinitions,
     ..._i2.Protocol.targetTableDefinitions,
   ];
+
+  static String? getClassNameFromObjectJson(dynamic data) {
+    if (data is! Map) return null;
+    final className = data['__className__'] as String?;
+    return className;
+  }
 
   @override
   T deserialize<T>(
@@ -261,35 +255,47 @@ class Protocol extends _i1.SerializationManagerServer {
     Type? t,
   ]) {
     t ??= T;
-    if (t == _i5.FeedPost) {
-      return _i5.FeedPost.fromJson(data) as T;
+
+    final dataClassName = getClassNameFromObjectJson(data);
+    if (dataClassName != null && dataClassName != getClassNameForType(t)) {
+      try {
+        return deserializeByClassName({
+          'className': dataClassName,
+          'data': data,
+        });
+      } on FormatException catch (_) {
+        // If the className is not recognized (e.g., older client receiving
+        // data with a new subtype), fall back to deserializing without the
+        // className, using the expected type T.
+      }
     }
-    if (t == _i6.UserGender) {
-      return _i6.UserGender.fromJson(data) as T;
+
+    if (t == _i4.FeedPost) {
+      return _i4.FeedPost.fromJson(data) as T;
     }
-    if (t == _i7.UserProfile) {
-      return _i7.UserProfile.fromJson(data) as T;
+    if (t == _i5.UserGender) {
+      return _i5.UserGender.fromJson(data) as T;
     }
-    if (t == _i8.WaterIntake) {
-      return _i8.WaterIntake.fromJson(data) as T;
+    if (t == _i6.UserProfile) {
+      return _i6.UserProfile.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i5.FeedPost?>()) {
-      return (data != null ? _i5.FeedPost.fromJson(data) : null) as T;
+    if (t == _i7.WaterIntake) {
+      return _i7.WaterIntake.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i6.UserGender?>()) {
-      return (data != null ? _i6.UserGender.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i4.FeedPost?>()) {
+      return (data != null ? _i4.FeedPost.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i7.UserProfile?>()) {
-      return (data != null ? _i7.UserProfile.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i5.UserGender?>()) {
+      return (data != null ? _i5.UserGender.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i8.WaterIntake?>()) {
-      return (data != null ? _i8.WaterIntake.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i6.UserProfile?>()) {
+      return (data != null ? _i6.UserProfile.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i7.WaterIntake?>()) {
+      return (data != null ? _i7.WaterIntake.fromJson(data) : null) as T;
     }
     try {
       return _i3.Protocol().deserialize<T>(data, t);
-    } on _i1.DeserializationTypeNotFoundException catch (_) {}
-    try {
-      return _i4.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     try {
       return _i2.Protocol().deserialize<T>(data, t);
@@ -297,21 +303,37 @@ class Protocol extends _i1.SerializationManagerServer {
     return super.deserialize<T>(data, t);
   }
 
+  static String? getClassNameForType(Type type) {
+    return switch (type) {
+      _i4.FeedPost => 'FeedPost',
+      _i5.UserGender => 'UserGender',
+      _i6.UserProfile => 'UserProfile',
+      _i7.WaterIntake => 'WaterIntake',
+      _ => null,
+    };
+  }
+
   @override
   String? getClassNameForObject(Object? data) {
     String? className = super.getClassNameForObject(data);
     if (className != null) return className;
-    if (data is _i5.FeedPost) {
-      return 'FeedPost';
+
+    if (data is Map<String, dynamic> && data['__className__'] is String) {
+      return (data['__className__'] as String).replaceFirst(
+        'dartway_example.',
+        '',
+      );
     }
-    if (data is _i6.UserGender) {
-      return 'UserGender';
-    }
-    if (data is _i7.UserProfile) {
-      return 'UserProfile';
-    }
-    if (data is _i8.WaterIntake) {
-      return 'WaterIntake';
+
+    switch (data) {
+      case _i4.FeedPost():
+        return 'FeedPost';
+      case _i5.UserGender():
+        return 'UserGender';
+      case _i6.UserProfile():
+        return 'UserProfile';
+      case _i7.WaterIntake():
+        return 'WaterIntake';
     }
     className = _i2.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -319,11 +341,7 @@ class Protocol extends _i1.SerializationManagerServer {
     }
     className = _i3.Protocol().getClassNameForObject(data);
     if (className != null) {
-      return 'dartway_core_serverpod.$className';
-    }
-    className = _i4.Protocol().getClassNameForObject(data);
-    if (className != null) {
-      return 'serverpod_auth.$className';
+      return 'dartway_serverpod_core.$className';
     }
     return null;
   }
@@ -335,28 +353,24 @@ class Protocol extends _i1.SerializationManagerServer {
       return super.deserializeByClassName(data);
     }
     if (dataClassName == 'FeedPost') {
-      return deserialize<_i5.FeedPost>(data['data']);
+      return deserialize<_i4.FeedPost>(data['data']);
     }
     if (dataClassName == 'UserGender') {
-      return deserialize<_i6.UserGender>(data['data']);
+      return deserialize<_i5.UserGender>(data['data']);
     }
     if (dataClassName == 'UserProfile') {
-      return deserialize<_i7.UserProfile>(data['data']);
+      return deserialize<_i6.UserProfile>(data['data']);
     }
     if (dataClassName == 'WaterIntake') {
-      return deserialize<_i8.WaterIntake>(data['data']);
+      return deserialize<_i7.WaterIntake>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
       return _i2.Protocol().deserializeByClassName(data);
     }
-    if (dataClassName.startsWith('dartway_core_serverpod.')) {
+    if (dataClassName.startsWith('dartway_serverpod_core.')) {
       data['className'] = dataClassName.substring(23);
       return _i3.Protocol().deserializeByClassName(data);
-    }
-    if (dataClassName.startsWith('serverpod_auth.')) {
-      data['className'] = dataClassName.substring(15);
-      return _i4.Protocol().deserializeByClassName(data);
     }
     return super.deserializeByClassName(data);
   }
@@ -370,24 +384,18 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
     {
-      var table = _i4.Protocol().getTableForType(t);
-      if (table != null) {
-        return table;
-      }
-    }
-    {
       var table = _i2.Protocol().getTableForType(t);
       if (table != null) {
         return table;
       }
     }
     switch (t) {
-      case _i5.FeedPost:
-        return _i5.FeedPost.t;
-      case _i7.UserProfile:
-        return _i7.UserProfile.t;
-      case _i8.WaterIntake:
-        return _i8.WaterIntake.t;
+      case _i4.FeedPost:
+        return _i4.FeedPost.t;
+      case _i6.UserProfile:
+        return _i6.UserProfile.t;
+      case _i7.WaterIntake:
+        return _i7.WaterIntake.t;
     }
     return null;
   }
@@ -398,4 +406,19 @@ class Protocol extends _i1.SerializationManagerServer {
 
   @override
   String getModuleName() => 'dartway_example';
+
+  /// Maps any `Record`s known to this [Protocol] to their JSON representation
+  ///
+  /// Throws in case the record type is not known.
+  ///
+  /// This method will return `null` (only) for `null` inputs.
+  Map<String, dynamic>? mapRecordToJson(Record? record) {
+    if (record == null) {
+      return null;
+    }
+    try {
+      return _i3.Protocol().mapRecordToJson(record);
+    } catch (_) {}
+    throw Exception('Unsupported record type ${record.runtimeType}');
+  }
 }

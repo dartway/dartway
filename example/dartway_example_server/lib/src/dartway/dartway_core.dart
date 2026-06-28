@@ -45,6 +45,7 @@ Future<UserProfile> _buildUserProfile(
   final extra = registrationRequest.extraData ?? const <String, String>{};
 
   return UserProfile(
+    userIdentifier: registrationRequest.userIdentifier,
     phone: registrationRequest.userIdentifier,
     firstName: extra['firstName'] ?? '',
     conditionsAcceptedAt: DateTime.now(),
