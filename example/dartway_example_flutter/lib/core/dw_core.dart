@@ -1,6 +1,7 @@
 import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:flutter/foundation.dart';
 import 'package:serverpod_flutter/serverpod_flutter.dart';
 
 import '../build_info.dart';
@@ -22,4 +23,6 @@ final DwCore<Client, UserProfile> dw = DwCore<Client, UserProfile>(
     ..authKeyProvider = DwAuthenticationKeyManager(),
   dwAlerts: dwAlerts,
   getUserId: (userProfile) => userProfile?.id,
+  onStreamingStatusChanged: (status) =>
+      debugPrint('[example] streaming status → $status'),
 );

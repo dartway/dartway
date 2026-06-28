@@ -7,16 +7,21 @@ import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../repository/dw_repository.dart';
+import 'streaming_error_classifier.dart';
 
 // TODO(serverpod-legacy-streams): This service still relies on Serverpod's
 // deprecated StreamingConnectionHandler / streaming endpoint API. Keep it for
 // compatibility during the current upgrade, then replace it with streaming
 // methods.
 class DwSocketService {
-  DwSocketService();
+  DwSocketService({this.onStatusChanged});
 
   // final ServerpodClientShared client;
   // final dynamic endpointCaller;
+
+  /// Optional outbound hook fired on every streaming status change. Default is
+  /// `null` (no-op) — the framework raises no alerts on its own.
+  final void Function(StreamingConnectionStatus status)? onStatusChanged;
 
   StreamingConnectionHandler? _connectionHandler;
   StreamSubscription<SerializableModel>? _mainStreamSub;
@@ -27,13 +32,26 @@ class DwSocketService {
   );
 
   void init() {
-    _connectionHandler = StreamingConnectionHandler(
-      client: dw.client,
-      retryEverySeconds: 1,
-      listener: (_) => _refresh(),
-    );
+    // Run the handler (and its retry timer) inside a child zone so retry errors
+    // inherit this zone instead of the app's root zone from DwAppRunner.
+    runZonedGuarded(() {
+      _connectionHandler = StreamingConnectionHandler(
+        client: dw.client,
+        retryEverySeconds: 1,
+        listener: (_) => _refresh(),
+      );
 
-    _connectionHandler!.connect();
+      _connectionHandler!.connect();
+    }, _onConnectionZoneError);
+  }
+
+  void _onConnectionZoneError(Object error, StackTrace stack) {
+    if (isStreamingConnectionError(error)) {
+      debugPrint('[DwSocketService] swallowed streaming connection error: $error');
+      return; // connection-level noise → swallow, never surface it
+    }
+    // Real error → forward to the parent (app) zone so genuine bugs are not hidden.
+    Zone.current.handleUncaughtError(error, stack);
   }
 
   Future<void> dispose() async {
@@ -61,6 +79,7 @@ class DwSocketService {
     }
 
     statusNotifier.value = status;
+    onStatusChanged?.call(status);
   }
 
   void _processUpdatedModels(List<DwModelWrapper> updatedModels) {
