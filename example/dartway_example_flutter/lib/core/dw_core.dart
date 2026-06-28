@@ -4,25 +4,34 @@ import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:flutter/foundation.dart';
 import 'package:serverpod_flutter/serverpod_flutter.dart';
 
-import '../build_info.dart';
-
 /// Telegram/email/etc. alerts sink. Configure with a [DwTelegramAlertsConfig]
 /// when you want runtime error reports; the default no-op is fine for a fresh
 /// project.
 final dwAlerts = DwAlerts.init();
 
+/// App version label shown by [AppScaffold]. Assigned from the development
+/// parameters passed in `main` via [DartwayExampleApp]; no generated build file.
+String exampleAppVersion = 'local';
+
 /// Application-level DartWay core, typed with this project's Serverpod [Client]
 /// and [UserProfile] model. Exposes `dw.notify`, `dw.sessionProvider`,
-/// `dw.client`, etc. across the app.
-final DwCore<Client, UserProfile> dw = DwCore<Client, UserProfile>(
-  config: const DwConfig(
-    defaultModelGetter: DwRepository.getDefault,
-  ),
-  client: Client(BuildInfo.backendUrl)
-    ..connectivityMonitor = FlutterConnectivityMonitor()
-    ..authKeyProvider = DwAuthenticationKeyManager(),
-  dwAlerts: dwAlerts,
-  getUserId: (userProfile) => userProfile?.id,
-  onStreamingStatusChanged: (status) =>
-      debugPrint('[example] streaming status → $status'),
-);
+/// `dw.client`, etc. across the app. Built once by [initExampleDwCore] so the
+/// backend URL can be supplied as a runtime development parameter.
+late final DwCore<Client, UserProfile> dw;
+
+/// Builds the global [dw] core using the development [backendUrl]. Called once
+/// from `DartwayExampleApp.run` before any widget reads `dw`.
+void initExampleDwCore({required String backendUrl}) {
+  dw = DwCore<Client, UserProfile>(
+    config: const DwConfig(
+      defaultModelGetter: DwRepository.getDefault,
+    ),
+    client: Client(backendUrl)
+      ..connectivityMonitor = FlutterConnectivityMonitor()
+      ..authKeyProvider = DwAuthenticationKeyManager(),
+    dwAlerts: dwAlerts,
+    getUserId: (userProfile) => userProfile?.id,
+    onStreamingStatusChanged: (status) =>
+        debugPrint('[example] streaming status → $status'),
+  );
+}

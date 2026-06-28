@@ -1,54 +1,16 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
-import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
+import 'dart:io';
 
-import 'core/default_models.dart';
-import 'core/dw_core.dart';
-import 'core/router/router.dart';
-import 'ui_kit/ui_kit.dart';
+import 'package:flutter/foundation.dart';
+
+import 'dartway_example_app.dart';
 
 void main() {
-  DwAppRunner(
-    appInitializers: [
-      () => dw.initDwCore(initRepositoryFunction: DefaultModels.initRepository),
-    ],
-    child: const ProjectNameApp(),
-  ).run();
-}
+  // Concrete development parameters live here; the app itself stays environment
+  // agnostic. Android devices/emulators reach the dev host via its LAN IP,
+  // every other platform talks to localhost.
+  final backendUrl = !kIsWeb && Platform.isAndroid
+      ? 'http://192.168.0.100:8080/'
+      : 'http://localhost:8080/';
 
-class ProjectNameApp extends ConsumerWidget {
-  const ProjectNameApp({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(appRouterProvider);
-
-    return MaterialApp.router(
-      title: 'Awesome DartWay Project',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 4, 49, 57),
-        ),
-        extensions: const [
-          DwFlutterTheme(
-            multiLinkText: AppText.body,
-            multiLinkTextLink: AppText.link,
-            primaryButton: AppButton.primary,
-            secondaryButton: AppButton.secondary,
-            textButton: AppButton.text,
-          ),
-        ],
-      ),
-      builder: (context, child) => DwNotificationsListener(
-        handlers: {DwUiNotification: DwUiNotificationHandler()},
-        child: DwUserAsyncScope<UserProfile>(
-          skipOnSignIn: false,
-          whenProfileReadyCallback: (_) {},
-          child: child ?? const SizedBox.shrink(),
-        ),
-      ),
-      routerConfig: router.router,
-    );
-  }
+  DartwayExampleApp(backendUrl: backendUrl, appVersion: 'local').run();
 }
