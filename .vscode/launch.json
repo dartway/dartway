@@ -1,0 +1,24 @@
+{
+  // Run the example backend and frontend separately.
+  // Backend reads config/ relative to its cwd, so cwd must be the server package.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Example: Server",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/example/dartway_example_server/bin/main.dart",
+      "cwd": "${workspaceFolder}/example/dartway_example_server",
+      // Drop "--apply-migrations" once the schema is applied and unchanged.
+      "args": ["--apply-migrations"]
+    },
+    {
+      "name": "Example: App (Chrome)",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/example/dartway_example_flutter/lib/main.dart",
+      "cwd": "${workspaceFolder}/example/dartway_example_flutter",
+      "deviceId": "chrome"
+    }
+  ]
+}
