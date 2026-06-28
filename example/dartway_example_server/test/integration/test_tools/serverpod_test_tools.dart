@@ -7,7 +7,7 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
-
+// ignore_for_file: invalid_use_of_internal_member
 // ignore_for_file: no_leading_underscores_for_local_identifiers
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
@@ -60,6 +60,29 @@ export 'package:serverpod_test/serverpod_test_public_exports.dart';
 ///
 /// [serverpodStartTimeout] The timeout to use when starting Serverpod, which connects to the database among other things. Defaults to `Duration(seconds: 30)`.
 ///
+/// [testServerOutputMode] Options for controlling test server output during test execution. Defaults to `TestServerOutputMode.normal`.
+/// ```dart
+/// /// Options for controlling test server output during test execution.
+/// enum TestServerOutputMode {
+///   /// Default mode - only stderr is printed (stdout suppressed).
+///   /// This hides normal startup/shutdown logs while preserving error messages.
+///   normal,
+///
+///   /// All logging - both stdout and stderr are printed.
+///   /// Useful for debugging when you need to see all server output.
+///   verbose,
+///
+///   /// No logging - both stdout and stderr are suppressed.
+///   /// Completely silent mode, useful when you don't want any server output.
+///   silent,
+/// }
+/// ```
+///
+/// [configOverride] A function to override the server configuration. This function is called with
+/// the default server configuration after it is loaded from the config/ directory
+/// and before it is used to start the server. Use this to override particular
+/// settings in the server configuration.
+///
 /// [testGroupTagsOverride] By default Serverpod test tools tags the `withServerpod` test group with `"integration"`.
 /// This is to provide a simple way to only run unit or integration tests.
 /// This property allows this tag to be overridden to something else. Defaults to `['integration']`.
@@ -70,6 +93,7 @@ void withServerpod(
   String testGroupName,
   _i1.TestClosure<TestEndpoints> testClosure, {
   bool? applyMigrations,
+  _i2.ServerpodConfig Function(_i2.ServerpodConfig)? configOverride,
   bool? enableSessionLogging,
   _i2.ExperimentalFeatures? experimentalFeatures,
   _i1.RollbackDatabase? rollbackDatabase,
@@ -78,6 +102,7 @@ void withServerpod(
   _i2.ServerpodLoggingMode? serverpodLoggingMode,
   Duration? serverpodStartTimeout,
   List<String>? testGroupTagsOverride,
+  _i1.TestServerOutputMode? testServerOutputMode,
 }) {
   _i1.buildWithServerpod<_InternalTestEndpoints>(
     testGroupName,
@@ -89,13 +114,16 @@ void withServerpod(
       applyMigrations: applyMigrations,
       isDatabaseEnabled: true,
       serverpodLoggingMode: serverpodLoggingMode,
+      testServerOutputMode: testServerOutputMode,
       experimentalFeatures: experimentalFeatures,
+      configOverride: configOverride,
       runtimeParametersBuilder: runtimeParametersBuilder,
     ),
     maybeRollbackDatabase: rollbackDatabase,
     maybeEnableSessionLogging: enableSessionLogging,
     maybeTestGroupTagsOverride: testGroupTagsOverride,
     maybeServerpodStartTimeout: serverpodStartTimeout,
+    maybeTestServerOutputMode: testServerOutputMode,
   )(testClosure);
 }
 
@@ -134,22 +162,25 @@ class _DevelopmentEndpoint {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
-        endpoint: 'development',
-        method: 'testNotification',
-      );
+            endpoint: 'development',
+            method: 'testNotification',
+          );
       try {
         var _localCallContext = await _endpointDispatch.getMethodCallContext(
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'development',
           methodName: 'testNotification',
-          parameters:
-              _i1.testObjectToJson({'notificationText': notificationText}),
+          parameters: _i1.testObjectToJson({
+            'notificationText': notificationText,
+          }),
           serializationManager: _serializationManager,
         );
-        var _localReturnValue = await (_localCallContext.method.call(
-          _localUniqueSession,
-          _localCallContext.arguments,
-        ) as _i3.Future<void>);
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<void>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

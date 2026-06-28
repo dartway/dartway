@@ -6,7 +6,7 @@ class DefaultModels {
     DwRepository.setupRepository(
       defaultModel: UserProfile(
         id: DwRepository.mockModelId,
-        userInfoId: DwRepository.mockModelId,
+        userIdentifier: '79999999999',
         firstName: 'Dartway',
         phone: '79999999999',
         agreedForMarketingCommunications: true,

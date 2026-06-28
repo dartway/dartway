@@ -1,3 +1,6 @@
+// Pass-through exports of the framework packages a DartWay app would otherwise
+// have to import in parallel — importing dartway_serverpod_core_flutter is enough.
+export 'package:dartway_flutter/dartway_flutter.dart';
 export 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 export 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 

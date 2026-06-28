@@ -7,14 +7,14 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: type_literal_in_constant_pattern
 // ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'dart:async' as _i2;
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart'
     as _i3;
-import 'package:serverpod_auth_client/serverpod_auth_client.dart' as _i4;
-import 'protocol.dart' as _i5;
+import 'protocol.dart' as _i4;
 
 /// {@category Endpoint}
 class EndpointDevelopment extends _i1.EndpointRef {
@@ -33,41 +33,41 @@ class EndpointDevelopment extends _i1.EndpointRef {
 
 class Modules {
   Modules(Client client) {
-    dartway_core_serverpod = _i3.Caller(client);
-    auth = _i4.Caller(client);
+    dartway_serverpod_core = _i3.Caller(client);
   }
 
-  late final _i3.Caller dartway_core_serverpod;
-
-  late final _i4.Caller auth;
+  late final _i3.Caller dartway_serverpod_core;
 }
 
 class Client extends _i1.ServerpodClientShared {
   Client(
     String host, {
     dynamic securityContext,
-    _i1.AuthenticationKeyManager? authenticationKeyManager,
+    @Deprecated(
+      'Use authKeyProvider instead. This will be removed in future releases.',
+    )
+    super.authenticationKeyManager,
     Duration? streamingConnectionTimeout,
     Duration? connectionTimeout,
     Function(
       _i1.MethodCallContext,
       Object,
       StackTrace,
-    )? onFailedCall,
+    )?
+    onFailedCall,
     Function(_i1.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
-          host,
-          _i5.Protocol(),
-          securityContext: securityContext,
-          authenticationKeyManager: authenticationKeyManager,
-          streamingConnectionTimeout: streamingConnectionTimeout,
-          connectionTimeout: connectionTimeout,
-          onFailedCall: onFailedCall,
-          onSucceededCall: onSucceededCall,
-          disconnectStreamsOnLostInternetConnection:
-              disconnectStreamsOnLostInternetConnection,
-        ) {
+         host,
+         _i4.Protocol(),
+         securityContext: securityContext,
+         streamingConnectionTimeout: streamingConnectionTimeout,
+         connectionTimeout: connectionTimeout,
+         onFailedCall: onFailedCall,
+         onSucceededCall: onSucceededCall,
+         disconnectStreamsOnLostInternetConnection:
+             disconnectStreamsOnLostInternetConnection,
+       ) {
     development = EndpointDevelopment(this);
     modules = Modules(this);
   }
@@ -77,12 +77,12 @@ class Client extends _i1.ServerpodClientShared {
   late final Modules modules;
 
   @override
-  Map<String, _i1.EndpointRef> get endpointRefLookup =>
-      {'development': development};
+  Map<String, _i1.EndpointRef> get endpointRefLookup => {
+    'development': development,
+  };
 
   @override
   Map<String, _i1.ModuleEndpointCaller> get moduleLookup => {
-        'dartway_core_serverpod': modules.dartway_core_serverpod,
-        'auth': modules.auth,
-      };
+    'dartway_serverpod_core': modules.dartway_serverpod_core,
+  };
 }

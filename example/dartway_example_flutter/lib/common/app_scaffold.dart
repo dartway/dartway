@@ -1,7 +1,7 @@
 import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
-import 'package:dartway_example_flutter/build_info.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
 
 /// App page scaffold. Pages live in the app navigation zone, which is only
@@ -41,12 +41,12 @@ class AppScaffold extends StatelessWidget {
               padding: bodyInsets,
               child: SizedBox.expand(child: body),
             ),
-            const Positioned(
+            Positioned(
               right: 4,
               bottom: 4,
               child: Text(
-                BuildInfo.version,
-                style: TextStyle(fontSize: 8, color: Colors.blueGrey),
+                exampleAppVersion,
+                style: const TextStyle(fontSize: 8, color: Colors.blueGrey),
               ),
             ),
           ],

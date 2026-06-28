@@ -1,7 +1,9 @@
 class: UserProfile
 table: user_profile
 fields:
-  userInfoId: int?, relation(parent=serverpod_user_info)
+  # Login identifier required by DartWay auth (see DwCore on the server). Holds
+  # the phone number for this example.
+  userIdentifier: String
   phone: String
   
   agreedForMarketingCommunications: bool

@@ -42,8 +42,8 @@ lib/
 ├─ domain/      # Business logic on top of models (shared, cross-feature)
 ├─ ui_kit/      # Unified entry point for design system
 │   └─ ui_kit.dart
-├─ build_info.dart # build configuration vars (generated automatically)
-└─ main.dart    # App entry point
+├─ dartway_example_app.dart # App wiring (DwAppRunner + MaterialApp)
+└─ main.dart    # App entry point — passes concrete dev parameters
 ```
 
 👉 For large apps, you may create multiple `app_*` modules (e.g. `/app_orders`, `/app_chat`) — the same rules apply.

@@ -31,11 +31,19 @@ class DwCore<
 
   final int? Function(UserProfileClass? user) getUserId;
 
+  /// Optional outbound hook fired whenever the streaming connection status
+  /// changes. Default `null` (no-op) — apps may wire it to their own status UI
+  /// or telemetry. Connection-level retry errors are swallowed internally and
+  /// never reach the global error handler.
+  final void Function(dartway.StreamingConnectionStatus status)?
+  onStreamingStatusChanged;
+
   DwCore({
     required super.config,
     required this.client,
     required this.dwAlerts,
     required this.getUserId,
+    this.onStreamingStatusChanged,
   }) {
     setDwInstance(this);
 
@@ -52,7 +60,7 @@ class DwCore<
       );
     }
     endpointCaller = dartwayCaller as dartway.Caller;
-    socketService = DwSocketService();
+    socketService = DwSocketService(onStatusChanged: onStreamingStatusChanged);
 
     final keyProvider = client.authKeyProvider;
 
