@@ -27,6 +27,14 @@ class DartwayExampleApp {
     initExampleDwCore(backendUrl: backendUrl);
 
     DwAppRunner(
+      // Zone-level connection errors (e.g. the streaming retry) are swallowed;
+      // real errors still reach the report sink. Real apps route the latter to
+      // their alert sink instead of debugPrint.
+      onError: dwConnectionAwareErrorHandler(
+        onConnectionError: (error) =>
+            debugPrint('[zone] swallowed connection error: $error'),
+        onUnexpectedError: (error, st) => debugPrint('[zone] $error\n$st'),
+      ),
       appInitializers: [
         () => dw.initDwCore(
           initRepositoryFunction: DefaultModels.initRepository,

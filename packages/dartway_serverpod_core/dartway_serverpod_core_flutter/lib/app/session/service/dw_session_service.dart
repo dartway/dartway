@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../repository/dw_repository.dart';
+import '../../socket/service/streaming_error_classifier.dart';
 import 'dw_authentification_key_manager.dart';
 
 typedef DwSessionUserChangedListener<
@@ -87,7 +89,16 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
     _addRepositoryUpdateListeners();
 
     if (id != null) {
-      await fetchUserProfile(id);
+      try {
+        await fetchUserProfile(id);
+      } catch (error) {
+        // A failed *refresh* is non-fatal when we already started from a cached
+        // profile and the failure is connection-level (timeout/offline): keep
+        // the cached profile — fresh data arrives once connectivity returns.
+        // Otherwise (no cache, or a non-connection error) propagate as before.
+        if (profile == null || !isStreamingConnectionError(error)) rethrow;
+        debugPrint('[DwSessionService] kept cached profile; refresh failed: $error');
+      }
     }
   }
 

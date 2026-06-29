@@ -1,4 +1,3 @@
-import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:flutter/foundation.dart';
@@ -26,7 +25,18 @@ void initExampleDwCore({required String backendUrl}) {
     config: const DwConfig(
       defaultModelGetter: DwRepository.getDefault,
     ),
-    client: Client(backendUrl)
+    client: Client(
+      backendUrl,
+      // Connection-level failures (timeout/offline) → a toast, not an alert;
+      // everything else → the app's report sink. Built from the framework's
+      // helper, so no classifier duplication.
+      onFailedCall: dwConnectionAwareOnFailedCall(
+        onConnectionError: (_, _) =>
+            dw.notify.error('Ошибка сети. Попробуйте снова.'),
+        onUnexpectedError: (ctx, error, _) =>
+            debugPrint('[FAILED] ${ctx.endpointName}.${ctx.methodName}: $error'),
+      ),
+    )
       ..connectivityMonitor = FlutterConnectivityMonitor()
       ..authKeyProvider = DwAuthenticationKeyManager(),
     dwAlerts: dwAlerts,
