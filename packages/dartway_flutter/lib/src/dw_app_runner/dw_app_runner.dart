@@ -21,7 +21,7 @@ void _defaultErrorHandler(Object error, StackTrace stackTrace) {
 /// - Manage optional native splash screen
 /// - Initialize locale/date formatting
 /// - Execute ordered async initializers
-/// - Provide a global error pipeline (FlutterError + Zone)
+/// - Provide a global error pipeline (FlutterError + PlatformDispatcher)
 /// - Render loading/error screens during initialization
 ///
 /// This class is intentionally decoupled from DartWay Core.
@@ -55,51 +55,54 @@ class DwAppRunner {
   // ---------------------------------------------------------------------------
   // Pre-initialization: binding, splash, routing
   // ---------------------------------------------------------------------------
-  void _preInit() {
+  WidgetsBinding _preInit() {
     final binding = WidgetsFlutterBinding.ensureInitialized();
 
     if (appLoadingOptions.useNativeSplash) {
       FlutterNativeSplash.preserve(widgetsBinding: binding);
     }
+
+    return binding;
   }
 
   void run() {
-    // TODO: clarify if this is the best way to handle errors
-    runZonedGuarded(
-      () {
-        _preInit();
+    final binding = _preInit();
 
-        // Handle Flutter framework errors
-        FlutterError.onError = (FlutterErrorDetails details) {
-          onError(details.exception, details.stack ?? StackTrace.empty);
-        };
+    // Global error pipeline WITHOUT a custom error zone. A guarded zone makes
+    // `runApp` run in a different zone than the binding was initialized in
+    // (notably on web), triggering Flutter's "Zone mismatch" warning.
+    // FlutterError.onError covers framework errors; platformDispatcher.onError
+    // catches uncaught async errors that reach the root zone — the modern,
+    // zone-safe equivalent of runZonedGuarded.
+    FlutterError.onError = (FlutterErrorDetails details) {
+      onError(details.exception, details.stack ?? StackTrace.empty);
+    };
+    binding.platformDispatcher.onError = (error, stack) {
+      onError(error, stack);
+      return true;
+    };
 
-        final initializers = [
-          () async {
-            for (final locale in supportedLocales) {
-              await initializeDateFormatting(locale.languageCode);
-            }
-            return true;
-          },
-          if (appInitializers != null) ...appInitializers!,
-        ];
-
-        runApp(
-          ProviderScope(
-            child: DwAppBootstrapper(
-              appInitializers: initializers,
-              useNativeSplash: appLoadingOptions.useNativeSplash,
-              onError: onError,
-              errorScreen: appLoadingOptions.errorScreen,
-              loadingScreen: appLoadingOptions.loadingScreen,
-              child: child,
-            ),
-          ),
-        );
+    final initializers = [
+      () async {
+        for (final locale in supportedLocales) {
+          await initializeDateFormatting(locale.languageCode);
+        }
+        return true;
       },
-      (error, stackTrace) {
-        onError(error, stackTrace);
-      },
+      if (appInitializers != null) ...appInitializers!,
+    ];
+
+    runApp(
+      ProviderScope(
+        child: DwAppBootstrapper(
+          appInitializers: initializers,
+          useNativeSplash: appLoadingOptions.useNativeSplash,
+          onError: onError,
+          errorScreen: appLoadingOptions.errorScreen,
+          loadingScreen: appLoadingOptions.loadingScreen,
+          child: child,
+        ),
+      ),
     );
   }
 }
