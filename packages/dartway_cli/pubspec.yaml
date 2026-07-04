@@ -1,0 +1,15 @@
+name: dartway_cli
+description: "DartWay command-line tool: create projects from the canonical template, install the AI toolkit, run convention checks."
+version: 0.1.0
+repository: https://github.com/dartway/dartway
+resolution: workspace
+
+environment:
+  sdk: ^3.11.0
+
+executables:
+  dartway:
+
+dependencies:
+  args: ^2.6.0
+  path: ^1.9.0
