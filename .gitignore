@@ -12,3 +12,5 @@ build/
 
 # Claude Code local (machine-specific) settings
 .claude/settings.local.json
+# Project management — private nested repo (dartway_manager)
+project/
