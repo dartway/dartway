@@ -76,7 +76,7 @@ class ScheduleSessionList extends ConsumerWidget {
     List<SessionBooking> myBookings,
   ) {
     for (final booking in myBookings) {
-      if (booking.sessionId == session.id &&
+      if (booking.clubSessionId == session.id &&
           booking.status == BookingStatus.booked) {
         return booking;
       }

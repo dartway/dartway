@@ -1,7 +1,9 @@
 class: SessionBooking
 table: session_booking
 fields:
-  session: ClubSession?, relation
+  # Named clubSession (not `session`): Serverpod's generated helpers already
+  # take a `session` parameter, a relation with that name would collide.
+  clubSession: ClubSession?, relation
   clientProfile: UserProfile?, relation
   status: BookingStatus
   createdAt: DateTime

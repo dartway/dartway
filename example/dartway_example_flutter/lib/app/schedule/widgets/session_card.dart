@@ -56,7 +56,7 @@ class SessionCard extends ConsumerWidget {
                 dwCallback: DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     SessionBooking(
-                      sessionId: session.id!,
+                      clubSessionId: session.id!,
                       clientProfileId: ref.readUserProfile.id!,
                       status: BookingStatus.booked,
                       createdAt: DateTime.now(),

@@ -17,7 +17,7 @@ class BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clubSession = booking.session;
+    final clubSession = booking.clubSession;
     final startsAt = clubSession?.startsAt;
 
     return Card(

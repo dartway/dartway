@@ -35,8 +35,8 @@ class MyBookingsPage extends ConsumerWidget {
               }
 
               final sorted = [...bookings]..sort(
-                  (a, b) => (b.session?.startsAt ?? b.createdAt)
-                      .compareTo(a.session?.startsAt ?? a.createdAt),
+                  (a, b) => (b.clubSession?.startsAt ?? b.createdAt)
+                      .compareTo(a.clubSession?.startsAt ?? a.createdAt),
                 );
 
               return ListView.separated(

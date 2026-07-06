@@ -19,7 +19,7 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
   getListConfig: DwGetModelListConfig(
     accessFilter: _bookingAccessFilter,
     include: SessionBooking.include(
-      session: ClubSession.include(
+      clubSession: ClubSession.include(
         service: ClubService.include(),
         coachProfile: UserProfile.include(),
       ),
@@ -32,7 +32,7 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
     validateSave: (session, saveContext) async {
       final booking = saveContext.currentModel;
       final clubSession =
-          await ClubSession.db.findById(session, booking.sessionId);
+          await ClubSession.db.findById(session, booking.clubSessionId);
       if (clubSession == null) {
         return 'Session not found';
       }
@@ -44,7 +44,7 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
         final takenSpots = await SessionBooking.db.count(
           session,
           where: (t) =>
-              t.sessionId.equals(booking.sessionId) &
+              t.clubSessionId.equals(booking.clubSessionId) &
               t.status.equals(BookingStatus.booked),
         );
         if (takenSpots >= clubSession.capacity) {
@@ -53,7 +53,7 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
         final ownActiveBookings = await SessionBooking.db.count(
           session,
           where: (t) =>
-              t.sessionId.equals(booking.sessionId) &
+              t.clubSessionId.equals(booking.clubSessionId) &
               t.clientProfileId.equals(booking.clientProfileId) &
               t.status.equals(BookingStatus.booked),
         );

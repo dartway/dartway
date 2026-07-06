@@ -37,7 +37,7 @@ class DefaultModels {
     DwRepository.setupRepository(
       defaultModel: SessionBooking(
         id: DwRepository.mockModelId,
-        sessionId: DwRepository.mockModelId,
+        clubSessionId: DwRepository.mockModelId,
         clientProfileId: DwRepository.mockModelId,
         status: BookingStatus.booked,
         createdAt: DateTime.now(),

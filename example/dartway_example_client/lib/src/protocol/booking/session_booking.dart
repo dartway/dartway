@@ -19,8 +19,8 @@ import 'package:dartway_example_client/src/protocol/protocol.dart' as _i5;
 abstract class SessionBooking implements _i1.SerializableModel {
   SessionBooking._({
     this.id,
-    required this.sessionId,
-    this.session,
+    required this.clubSessionId,
+    this.clubSession,
     required this.clientProfileId,
     this.clientProfile,
     required this.status,
@@ -29,8 +29,8 @@ abstract class SessionBooking implements _i1.SerializableModel {
 
   factory SessionBooking({
     int? id,
-    required int sessionId,
-    _i2.ClubSession? session,
+    required int clubSessionId,
+    _i2.ClubSession? clubSession,
     required int clientProfileId,
     _i3.UserProfile? clientProfile,
     required _i4.BookingStatus status,
@@ -40,11 +40,11 @@ abstract class SessionBooking implements _i1.SerializableModel {
   factory SessionBooking.fromJson(Map<String, dynamic> jsonSerialization) {
     return SessionBooking(
       id: jsonSerialization['id'] as int?,
-      sessionId: jsonSerialization['sessionId'] as int,
-      session: jsonSerialization['session'] == null
+      clubSessionId: jsonSerialization['clubSessionId'] as int,
+      clubSession: jsonSerialization['clubSession'] == null
           ? null
           : _i5.Protocol().deserialize<_i2.ClubSession>(
-              jsonSerialization['session'],
+              jsonSerialization['clubSession'],
             ),
       clientProfileId: jsonSerialization['clientProfileId'] as int,
       clientProfile: jsonSerialization['clientProfile'] == null
@@ -66,9 +66,9 @@ abstract class SessionBooking implements _i1.SerializableModel {
   /// the id will be null.
   int? id;
 
-  int sessionId;
+  int clubSessionId;
 
-  _i2.ClubSession? session;
+  _i2.ClubSession? clubSession;
 
   int clientProfileId;
 
@@ -83,8 +83,8 @@ abstract class SessionBooking implements _i1.SerializableModel {
   @_i1.useResult
   SessionBooking copyWith({
     int? id,
-    int? sessionId,
-    _i2.ClubSession? session,
+    int? clubSessionId,
+    _i2.ClubSession? clubSession,
     int? clientProfileId,
     _i3.UserProfile? clientProfile,
     _i4.BookingStatus? status,
@@ -95,8 +95,8 @@ abstract class SessionBooking implements _i1.SerializableModel {
     return {
       '__className__': 'SessionBooking',
       if (id != null) 'id': id,
-      'sessionId': sessionId,
-      if (session != null) 'session': session?.toJson(),
+      'clubSessionId': clubSessionId,
+      if (clubSession != null) 'clubSession': clubSession?.toJson(),
       'clientProfileId': clientProfileId,
       if (clientProfile != null) 'clientProfile': clientProfile?.toJson(),
       'status': status.toJson(),
@@ -115,16 +115,16 @@ class _Undefined {}
 class _SessionBookingImpl extends SessionBooking {
   _SessionBookingImpl({
     int? id,
-    required int sessionId,
-    _i2.ClubSession? session,
+    required int clubSessionId,
+    _i2.ClubSession? clubSession,
     required int clientProfileId,
     _i3.UserProfile? clientProfile,
     required _i4.BookingStatus status,
     required DateTime createdAt,
   }) : super._(
          id: id,
-         sessionId: sessionId,
-         session: session,
+         clubSessionId: clubSessionId,
+         clubSession: clubSession,
          clientProfileId: clientProfileId,
          clientProfile: clientProfile,
          status: status,
@@ -137,8 +137,8 @@ class _SessionBookingImpl extends SessionBooking {
   @override
   SessionBooking copyWith({
     Object? id = _Undefined,
-    int? sessionId,
-    Object? session = _Undefined,
+    int? clubSessionId,
+    Object? clubSession = _Undefined,
     int? clientProfileId,
     Object? clientProfile = _Undefined,
     _i4.BookingStatus? status,
@@ -146,8 +146,10 @@ class _SessionBookingImpl extends SessionBooking {
   }) {
     return SessionBooking(
       id: id is int? ? id : this.id,
-      sessionId: sessionId ?? this.sessionId,
-      session: session is _i2.ClubSession? ? session : this.session?.copyWith(),
+      clubSessionId: clubSessionId ?? this.clubSessionId,
+      clubSession: clubSession is _i2.ClubSession?
+          ? clubSession
+          : this.clubSession?.copyWith(),
       clientProfileId: clientProfileId ?? this.clientProfileId,
       clientProfile: clientProfile is _i3.UserProfile?
           ? clientProfile

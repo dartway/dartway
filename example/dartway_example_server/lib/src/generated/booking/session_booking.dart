@@ -21,8 +21,8 @@ abstract class SessionBooking
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
   SessionBooking._({
     this.id,
-    required this.sessionId,
-    this.session,
+    required this.clubSessionId,
+    this.clubSession,
     required this.clientProfileId,
     this.clientProfile,
     required this.status,
@@ -31,8 +31,8 @@ abstract class SessionBooking
 
   factory SessionBooking({
     int? id,
-    required int sessionId,
-    _i2.ClubSession? session,
+    required int clubSessionId,
+    _i2.ClubSession? clubSession,
     required int clientProfileId,
     _i3.UserProfile? clientProfile,
     required _i4.BookingStatus status,
@@ -42,11 +42,11 @@ abstract class SessionBooking
   factory SessionBooking.fromJson(Map<String, dynamic> jsonSerialization) {
     return SessionBooking(
       id: jsonSerialization['id'] as int?,
-      sessionId: jsonSerialization['sessionId'] as int,
-      session: jsonSerialization['session'] == null
+      clubSessionId: jsonSerialization['clubSessionId'] as int,
+      clubSession: jsonSerialization['clubSession'] == null
           ? null
           : _i5.Protocol().deserialize<_i2.ClubSession>(
-              jsonSerialization['session'],
+              jsonSerialization['clubSession'],
             ),
       clientProfileId: jsonSerialization['clientProfileId'] as int,
       clientProfile: jsonSerialization['clientProfile'] == null
@@ -70,9 +70,9 @@ abstract class SessionBooking
   @override
   int? id;
 
-  int sessionId;
+  int clubSessionId;
 
-  _i2.ClubSession? session;
+  _i2.ClubSession? clubSession;
 
   int clientProfileId;
 
@@ -90,8 +90,8 @@ abstract class SessionBooking
   @_i1.useResult
   SessionBooking copyWith({
     int? id,
-    int? sessionId,
-    _i2.ClubSession? session,
+    int? clubSessionId,
+    _i2.ClubSession? clubSession,
     int? clientProfileId,
     _i3.UserProfile? clientProfile,
     _i4.BookingStatus? status,
@@ -102,8 +102,8 @@ abstract class SessionBooking
     return {
       '__className__': 'SessionBooking',
       if (id != null) 'id': id,
-      'sessionId': sessionId,
-      if (session != null) 'session': session?.toJson(),
+      'clubSessionId': clubSessionId,
+      if (clubSession != null) 'clubSession': clubSession?.toJson(),
       'clientProfileId': clientProfileId,
       if (clientProfile != null) 'clientProfile': clientProfile?.toJson(),
       'status': status.toJson(),
@@ -116,8 +116,8 @@ abstract class SessionBooking
     return {
       '__className__': 'SessionBooking',
       if (id != null) 'id': id,
-      'sessionId': sessionId,
-      if (session != null) 'session': session?.toJsonForProtocol(),
+      'clubSessionId': clubSessionId,
+      if (clubSession != null) 'clubSession': clubSession?.toJsonForProtocol(),
       'clientProfileId': clientProfileId,
       if (clientProfile != null)
         'clientProfile': clientProfile?.toJsonForProtocol(),
@@ -127,11 +127,11 @@ abstract class SessionBooking
   }
 
   static SessionBookingInclude include({
-    _i2.ClubSessionInclude? session,
+    _i2.ClubSessionInclude? clubSession,
     _i3.UserProfileInclude? clientProfile,
   }) {
     return SessionBookingInclude._(
-      session: session,
+      clubSession: clubSession,
       clientProfile: clientProfile,
     );
   }
@@ -167,16 +167,16 @@ class _Undefined {}
 class _SessionBookingImpl extends SessionBooking {
   _SessionBookingImpl({
     int? id,
-    required int sessionId,
-    _i2.ClubSession? session,
+    required int clubSessionId,
+    _i2.ClubSession? clubSession,
     required int clientProfileId,
     _i3.UserProfile? clientProfile,
     required _i4.BookingStatus status,
     required DateTime createdAt,
   }) : super._(
          id: id,
-         sessionId: sessionId,
-         session: session,
+         clubSessionId: clubSessionId,
+         clubSession: clubSession,
          clientProfileId: clientProfileId,
          clientProfile: clientProfile,
          status: status,
@@ -189,8 +189,8 @@ class _SessionBookingImpl extends SessionBooking {
   @override
   SessionBooking copyWith({
     Object? id = _Undefined,
-    int? sessionId,
-    Object? session = _Undefined,
+    int? clubSessionId,
+    Object? clubSession = _Undefined,
     int? clientProfileId,
     Object? clientProfile = _Undefined,
     _i4.BookingStatus? status,
@@ -198,8 +198,10 @@ class _SessionBookingImpl extends SessionBooking {
   }) {
     return SessionBooking(
       id: id is int? ? id : this.id,
-      sessionId: sessionId ?? this.sessionId,
-      session: session is _i2.ClubSession? ? session : this.session?.copyWith(),
+      clubSessionId: clubSessionId ?? this.clubSessionId,
+      clubSession: clubSession is _i2.ClubSession?
+          ? clubSession
+          : this.clubSession?.copyWith(),
       clientProfileId: clientProfileId ?? this.clientProfileId,
       clientProfile: clientProfile is _i3.UserProfile?
           ? clientProfile
@@ -213,8 +215,8 @@ class _SessionBookingImpl extends SessionBooking {
 class SessionBookingUpdateTable extends _i1.UpdateTable<SessionBookingTable> {
   SessionBookingUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> sessionId(int value) => _i1.ColumnValue(
-    table.sessionId,
+  _i1.ColumnValue<int, int> clubSessionId(int value) => _i1.ColumnValue(
+    table.clubSessionId,
     value,
   );
 
@@ -241,8 +243,8 @@ class SessionBookingTable extends _i1.Table<int?> {
   SessionBookingTable({super.tableRelation})
     : super(tableName: 'session_booking') {
     updateTable = SessionBookingUpdateTable(this);
-    sessionId = _i1.ColumnInt(
-      'sessionId',
+    clubSessionId = _i1.ColumnInt(
+      'clubSessionId',
       this,
     );
     clientProfileId = _i1.ColumnInt(
@@ -262,9 +264,9 @@ class SessionBookingTable extends _i1.Table<int?> {
 
   late final SessionBookingUpdateTable updateTable;
 
-  late final _i1.ColumnInt sessionId;
+  late final _i1.ColumnInt clubSessionId;
 
-  _i2.ClubSessionTable? _session;
+  _i2.ClubSessionTable? _clubSession;
 
   late final _i1.ColumnInt clientProfileId;
 
@@ -274,17 +276,17 @@ class SessionBookingTable extends _i1.Table<int?> {
 
   late final _i1.ColumnDateTime createdAt;
 
-  _i2.ClubSessionTable get session {
-    if (_session != null) return _session!;
-    _session = _i1.createRelationTable(
-      relationFieldName: 'session',
-      field: SessionBooking.t.sessionId,
+  _i2.ClubSessionTable get clubSession {
+    if (_clubSession != null) return _clubSession!;
+    _clubSession = _i1.createRelationTable(
+      relationFieldName: 'clubSession',
+      field: SessionBooking.t.clubSessionId,
       foreignField: _i2.ClubSession.t.id,
       tableRelation: tableRelation,
       createTable: (foreignTableRelation) =>
           _i2.ClubSessionTable(tableRelation: foreignTableRelation),
     );
-    return _session!;
+    return _clubSession!;
   }
 
   _i3.UserProfileTable get clientProfile {
@@ -303,7 +305,7 @@ class SessionBookingTable extends _i1.Table<int?> {
   @override
   List<_i1.Column> get columns => [
     id,
-    sessionId,
+    clubSessionId,
     clientProfileId,
     status,
     createdAt,
@@ -311,8 +313,8 @@ class SessionBookingTable extends _i1.Table<int?> {
 
   @override
   _i1.Table? getRelationTable(String relationField) {
-    if (relationField == 'session') {
-      return session;
+    if (relationField == 'clubSession') {
+      return clubSession;
     }
     if (relationField == 'clientProfile') {
       return clientProfile;
@@ -323,20 +325,20 @@ class SessionBookingTable extends _i1.Table<int?> {
 
 class SessionBookingInclude extends _i1.IncludeObject {
   SessionBookingInclude._({
-    _i2.ClubSessionInclude? session,
+    _i2.ClubSessionInclude? clubSession,
     _i3.UserProfileInclude? clientProfile,
   }) {
-    _session = session;
+    _clubSession = clubSession;
     _clientProfile = clientProfile;
   }
 
-  _i2.ClubSessionInclude? _session;
+  _i2.ClubSessionInclude? _clubSession;
 
   _i3.UserProfileInclude? _clientProfile;
 
   @override
   Map<String, _i1.Include?> get includes => {
-    'session': _session,
+    'clubSession': _clubSession,
     'clientProfile': _clientProfile,
   };
 
@@ -663,24 +665,26 @@ class SessionBookingAttachRowRepository {
   const SessionBookingAttachRowRepository._();
 
   /// Creates a relation between the given [SessionBooking] and [ClubSession]
-  /// by setting the [SessionBooking]'s foreign key `sessionId` to refer to the [ClubSession].
-  Future<void> session(
+  /// by setting the [SessionBooking]'s foreign key `clubSessionId` to refer to the [ClubSession].
+  Future<void> clubSession(
     _i1.DatabaseSession session,
     SessionBooking sessionBooking,
-    _i2.ClubSession session, {
+    _i2.ClubSession clubSession, {
     _i1.Transaction? transaction,
   }) async {
     if (sessionBooking.id == null) {
       throw ArgumentError.notNull('sessionBooking.id');
     }
-    if (session.id == null) {
-      throw ArgumentError.notNull('session.id');
+    if (clubSession.id == null) {
+      throw ArgumentError.notNull('clubSession.id');
     }
 
-    var $sessionBooking = sessionBooking.copyWith(sessionId: session.id);
+    var $sessionBooking = sessionBooking.copyWith(
+      clubSessionId: clubSession.id,
+    );
     await session.db.updateRow<SessionBooking>(
       $sessionBooking,
-      columns: [SessionBooking.t.sessionId],
+      columns: [SessionBooking.t.clubSessionId],
       transaction: transaction,
     );
   }

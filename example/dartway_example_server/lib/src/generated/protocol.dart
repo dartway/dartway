@@ -445,7 +445,7 @@ class Protocol extends _i1.SerializationManagerServer {
           columnDefault: 'nextval(\'session_booking_id_seq\'::regclass)',
         ),
         _i2.ColumnDefinition(
-          name: 'sessionId',
+          name: 'clubSessionId',
           columnType: _i2.ColumnType.bigint,
           isNullable: false,
           dartType: 'int',
@@ -472,7 +472,7 @@ class Protocol extends _i1.SerializationManagerServer {
       foreignKeys: [
         _i2.ForeignKeyDefinition(
           constraintName: 'session_booking_fk_0',
-          columns: ['sessionId'],
+          columns: ['clubSessionId'],
           referenceTable: 'club_session',
           referenceTableSchema: 'public',
           referenceColumns: ['id'],

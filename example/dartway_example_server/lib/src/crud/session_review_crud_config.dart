@@ -9,7 +9,7 @@ final sessionReviewCrudConfig = DwCrudConfig<SessionReview>(
     accessFilter: (session) async => null,
     include: SessionReview.include(
       booking: SessionBooking.include(
-        session: ClubSession.include(service: ClubService.include()),
+        clubSession: ClubSession.include(service: ClubService.include()),
       ),
     ),
   ),

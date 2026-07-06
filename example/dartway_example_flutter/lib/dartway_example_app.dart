@@ -8,12 +8,19 @@ import 'core/dw_core.dart';
 import 'core/router/router.dart';
 import 'ui_kit/ui_kit.dart';
 
+/// Wraps the running app with an extra shell (used by the showcase target).
+typedef ShowcaseShellBuilder = Widget Function(
+  BuildContext context,
+  Widget appChild,
+);
+
 /// The DartWay example application. All app wiring lives here; `main` only
 /// supplies concrete development parameters (backend URL, version) and runs it.
 class DartwayExampleApp {
   const DartwayExampleApp({
     required this.backendUrl,
     this.appVersion = 'local',
+    this.showcaseShellBuilder,
   });
 
   /// Backend base URL the Serverpod client connects to.
@@ -21,6 +28,10 @@ class DartwayExampleApp {
 
   /// Version label shown in the corner of every page.
   final String appVersion;
+
+  /// Null in production (`main.dart`): the app renders exactly as before.
+  /// The showcase target (`main_showcase.dart`) injects its chrome here.
+  final ShowcaseShellBuilder? showcaseShellBuilder;
 
   void run() {
     exampleAppVersion = appVersion;
@@ -40,13 +51,15 @@ class DartwayExampleApp {
           initRepositoryFunction: DefaultModels.initRepository,
         ),
       ],
-      child: const _ExampleMaterialApp(),
+      child: _ExampleMaterialApp(showcaseShellBuilder: showcaseShellBuilder),
     ).run();
   }
 }
 
 class _ExampleMaterialApp extends ConsumerWidget {
-  const _ExampleMaterialApp();
+  const _ExampleMaterialApp({this.showcaseShellBuilder});
+
+  final ShowcaseShellBuilder? showcaseShellBuilder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -68,14 +81,18 @@ class _ExampleMaterialApp extends ConsumerWidget {
           ),
         ],
       ),
-      builder: (context, child) => DwNotificationsListener(
-        handlers: {DwUiNotification: DwUiNotificationHandler()},
-        child: DwUserAsyncScope<UserProfile>(
+      builder: (context, child) {
+        final appChild = DwUserAsyncScope<UserProfile>(
           skipOnSignIn: false,
           whenProfileReadyCallback: (_) {},
           child: child ?? const SizedBox.shrink(),
-        ),
-      ),
+        );
+
+        return DwNotificationsListener(
+          handlers: {DwUiNotification: DwUiNotificationHandler()},
+          child: showcaseShellBuilder?.call(context, appChild) ?? appChild,
+        );
+      },
       routerConfig: router.router,
     );
   }

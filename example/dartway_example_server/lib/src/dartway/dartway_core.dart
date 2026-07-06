@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:dartway_example_server/src/crud/app_setting_crud_config.dart';
 import 'package:dartway_example_server/src/crud/chat_channel_crud_config.dart';
@@ -13,7 +15,16 @@ import 'package:serverpod/serverpod.dart';
 
 late final DwCore<UserProfile> dw;
 
+/// Fixed dev OTP. The showcase user switcher relies on it — keep in sync with
+/// showcaseDevOtpCode in dartway_example_flutter (lib/showcase/logic/).
+const _devVerificationCode = '000000';
+
+String _randomVerificationCode() =>
+    List.generate(6, (_) => Random.secure().nextInt(10)).join();
+
 void initDartwayCore(Serverpod serverpod) {
+  final isDevelopmentRun = serverpod.runMode == 'development';
+
   dw = DwCore.init<UserProfile>(
     userProfileTable: UserProfile.t,
     userProfileInclude: UserProfile.include(),
@@ -33,6 +44,13 @@ void initDartwayCore(Serverpod serverpod) {
     dwAlerts: DwAlerts.init(),
     dwAuthConfig: DwAuthConfig(
       passwords: serverpod.server.passwords,
+      // Dev: fixed code so the showcase shell can sign in programmatically.
+      // Production keeps random 6-digit codes (framework default behavior).
+      generateVerificationCodeMethod: (
+        session, {
+        required DwAuthRequest verificationRequest,
+      }) async =>
+          isDevelopmentRun ? _devVerificationCode : _randomVerificationCode(),
       // Dev: log the code to the server console instead of sending an SMS.
       // Wire a real SMS/email sender here for production.
       sendVerificationCodeMethod: (
