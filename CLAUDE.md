@@ -14,6 +14,8 @@
 | `docs/` | Markdown-контент документации — целевой источник для сайта dartway.dev. **Внимание:** пайплайн docs/ → сайт ещё не настроен — сайт пока тянет контент из легаси-репо `dartway_guidelines` (см. `website/update_docs.dart`) |
 | `website/` | Сайт dartway.dev (Docusaurus → GitHub Pages). **Публичный вложенный git-репо** (`novikov-it/dartway.dev`), gitignored — коммитить и пушить отдельно, изнутри `website/` |
 | `project/` | Управление проектом: стратегия, roadmap, очередь задач — вход через `/next`. **Приватный вложенный git-репо** (`dartway/dartway_manager`), в публичный монорепо не коммитится (gitignored) — коммитить и пушить его отдельно, изнутри `project/` |
+| `platform/` | **DartWay Studio** — закрытая платформа (живое превью + паспорта экранов; дальше фидбек/трекер/агенты). **Приватный вложенный git-репо** (`dartway/dartway_studio`), gitignored — коммитить и пушить отдельно, изнутри `platform/`. Открытая часть связки — `packages/dartway_studio_bridge` |
+| `packages/dartway_studio_bridge` | Открытый мост приложение ↔ Studio: модели спеков экранов (в коде приложения) + runtime postMessage-протокол (host в приложении, client в Studio) |
 
 ## Закон синхронизации (Definition of Done)
 

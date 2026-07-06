@@ -17,3 +17,6 @@ project/
 
 # dartway.dev website — public nested repo (novikov-it/dartway.dev)
 website/
+
+# DartWay Studio platform — private nested repo (dartway/dartway_studio)
+platform/
