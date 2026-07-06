@@ -3,7 +3,7 @@ import 'package:dartway_example_server/src/dartway/dartway_session_extension.dar
 import 'package:dartway_example_server/src/generated/protocol.dart';
 
 /// CRUD configuration for the ChatChannel model (staff chat).
-/// Secure-by-default showcase: clients never see the chat — that is a single
+/// Secure-by-default demo: clients never see the chat — that is a single
 /// access filter line, not scattered UI checks.
 final chatChannelCrudConfig = DwCrudConfig<ChatChannel>(
   table: ChatChannel.t,

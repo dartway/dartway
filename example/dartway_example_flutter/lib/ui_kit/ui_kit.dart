@@ -19,7 +19,6 @@ part '3_special/auth/checkbox_form_field.dart';
 part '3_special/auth/pin_code_text_field.dart';
 part '3_special/chat/chat_bubble_container.dart';
 part '3_special/common/connection_status_indicator.dart';
-part '3_special/showcase/showcase_chrome_style.dart';
 part 'theme/app_button.dart';
 part 'theme/app_text.dart';
 part 'utils/date_labels.dart';

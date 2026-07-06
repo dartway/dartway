@@ -9,19 +9,12 @@ import 'core/router/router.dart';
 import 'studio/studio_bridge_binding.dart';
 import 'ui_kit/ui_kit.dart';
 
-/// Wraps the running app with an extra shell (used by the showcase target).
-typedef ShowcaseShellBuilder = Widget Function(
-  BuildContext context,
-  Widget appChild,
-);
-
 /// The DartWay example application. All app wiring lives here; `main` only
 /// supplies concrete development parameters (backend URL, version) and runs it.
 class DartwayExampleApp {
   const DartwayExampleApp({
     required this.backendUrl,
     this.appVersion = 'local',
-    this.showcaseShellBuilder,
   });
 
   /// Backend base URL the Serverpod client connects to.
@@ -29,10 +22,6 @@ class DartwayExampleApp {
 
   /// Version label shown in the corner of every page.
   final String appVersion;
-
-  /// Null in production (`main.dart`): the app renders exactly as before.
-  /// The showcase target (`main_showcase.dart`) injects its chrome here.
-  final ShowcaseShellBuilder? showcaseShellBuilder;
 
   void run() {
     exampleAppVersion = appVersion;
@@ -52,15 +41,13 @@ class DartwayExampleApp {
           initRepositoryFunction: DefaultModels.initRepository,
         ),
       ],
-      child: _ExampleMaterialApp(showcaseShellBuilder: showcaseShellBuilder),
+      child: const _ExampleMaterialApp(),
     ).run();
   }
 }
 
 class _ExampleMaterialApp extends ConsumerWidget {
-  const _ExampleMaterialApp({this.showcaseShellBuilder});
-
-  final ShowcaseShellBuilder? showcaseShellBuilder;
+  const _ExampleMaterialApp();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -95,7 +82,7 @@ class _ExampleMaterialApp extends ConsumerWidget {
 
         return DwNotificationsListener(
           handlers: {DwUiNotification: DwUiNotificationHandler()},
-          child: showcaseShellBuilder?.call(context, appChild) ?? appChild,
+          child: appChild,
         );
       },
       routerConfig: router.router,

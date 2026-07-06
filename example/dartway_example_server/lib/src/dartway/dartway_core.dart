@@ -15,8 +15,8 @@ import 'package:serverpod/serverpod.dart';
 
 late final DwCore<UserProfile> dw;
 
-/// Fixed dev OTP. The showcase user switcher relies on it — keep in sync with
-/// showcaseDevOtpCode in dartway_example_flutter (lib/showcase/logic/).
+/// Fixed dev OTP. The Studio persona switcher relies on it — keep in sync with
+/// studioDevOtpCode in dartway_example_flutter (lib/studio/logic/).
 const _devVerificationCode = '000000';
 
 String _randomVerificationCode() =>
@@ -44,8 +44,8 @@ void initDartwayCore(Serverpod serverpod) {
     dwAlerts: DwAlerts.init(),
     dwAuthConfig: DwAuthConfig(
       passwords: serverpod.server.passwords,
-      // Dev: fixed code so the showcase shell can sign in programmatically.
-      // Production keeps random 6-digit codes (framework default behavior).
+      // Dev: fixed code so DartWay Studio can sign personas in
+      // programmatically. Production keeps random 6-digit codes.
       generateVerificationCodeMethod: (
         session, {
         required DwAuthRequest verificationRequest,
