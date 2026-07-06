@@ -11,7 +11,8 @@
 | `packages/dartway_lints`, `packages/dartway_code_checker` | Enforcement конвенций (custom_lint + CLI-чекер) |
 | `example/` | Канонический проект — источник правды для доков, шаблона и учебного трека |
 | `toolkit/` | Claude-обвязка для app-проектов (скиллы `dartway-*`, токены `__*__`, установщик) |
-| `docs/` | Markdown-контент документации (сайт dartway.dev подтягивает при сборке) |
+| `docs/` | Markdown-контент документации — целевой источник для сайта dartway.dev. **Внимание:** пайплайн docs/ → сайт ещё не настроен — сайт пока тянет контент из легаси-репо `dartway_guidelines` (см. `website/update_docs.dart`) |
+| `website/` | Сайт dartway.dev (Docusaurus → GitHub Pages). **Публичный вложенный git-репо** (`novikov-it/dartway.dev`), gitignored — коммитить и пушить отдельно, изнутри `website/` |
 | `project/` | Управление проектом: стратегия, roadmap, очередь задач — вход через `/next`. **Приватный вложенный git-репо** (`dartway/dartway_manager`), в публичный монорепо не коммитится (gitignored) — коммитить и пушить его отдельно, изнутри `project/` |
 
 ## Закон синхронизации (Definition of Done)
