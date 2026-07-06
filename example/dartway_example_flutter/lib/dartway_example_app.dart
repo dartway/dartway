@@ -6,6 +6,7 @@ import 'package:dartway_example_client/dartway_example_client.dart';
 import 'core/default_models.dart';
 import 'core/dw_core.dart';
 import 'core/router/router.dart';
+import 'studio/studio_bridge_binding.dart';
 import 'ui_kit/ui_kit.dart';
 
 /// Wraps the running app with an extra shell (used by the showcase target).
@@ -82,10 +83,14 @@ class _ExampleMaterialApp extends ConsumerWidget {
         ],
       ),
       builder: (context, child) {
-        final appChild = DwUserAsyncScope<UserProfile>(
-          skipOnSignIn: false,
-          whenProfileReadyCallback: (_) {},
-          child: child ?? const SizedBox.shrink(),
+        // The Studio bridge is inert unless the app runs embedded in the
+        // DartWay Studio preview frame.
+        final appChild = StudioBridgeBinding(
+          child: DwUserAsyncScope<UserProfile>(
+            skipOnSignIn: false,
+            whenProfileReadyCallback: (_) {},
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
 
         return DwNotificationsListener(

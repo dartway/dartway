@@ -355,6 +355,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0"
+  dartway_studio_bridge:
+    dependency: "direct main"
+    description:
+      path: "../../packages/dartway_studio_bridge"
+      relative: true
+    source: path
+    version: "0.1.0"
   dartx:
     dependency: transitive
     description:
