@@ -45,16 +45,16 @@ Models are declared in `.spy.yaml` on the server (see `example/dartway_example_s
 
 ## 3. Configure CRUD — instead of writing endpoints
 
-One declarative config per model (see `example/dartway_example_server/lib/src/crud/feed_post_crud_config.dart`):
+One declarative config per model (see `example/dartway_example_server/lib/src/crud/news_post_crud_config.dart`):
 
 ```dart
-final feedPostCrudConfig = DwCrudConfig<FeedPost>(
-  table: FeedPost.t,
-  getListConfig: DwGetModelListConfig<FeedPost>(
+final newsPostCrudConfig = DwCrudConfig<NewsPost>(
+  table: NewsPost.t,
+  getListConfig: DwGetModelListConfig(
     accessFilter: (session) async => null,
-    include: FeedPost.include(authorProfile: UserProfile.include()),
+    include: NewsPost.include(authorProfile: UserProfile.include()),
   ),
-  saveConfig: DwSaveConfig<FeedPost>(
+  saveConfig: DwSaveConfig<NewsPost>(
     allowSave: (session, ctx) async =>
         session.isUser(ctx.currentModel.authorProfileId),
     validateSave: (session, ctx) async =>
@@ -68,24 +68,24 @@ Register it in `DwCore.init(...)` — done. `getAll`, `getOne`, `save`, `delete`
 ## 4. Show live data in Flutter
 
 ```dart
-class FeedPostList extends ConsumerWidget {
+class NewsPostList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watchModelList<FeedPost>().dwBuildListAsync(
+    return ref.watchModelList<NewsPost>().dwBuildListAsync(
       loadingItemsCount: 5,
       childBuilder: (posts) => ListView.builder(
         itemCount: posts.length,
-        itemBuilder: (context, i) => FeedPostCard(post: posts[i]),
+        itemBuilder: (context, i) => NewsPostCard(post: posts[i]),
       ),
     );
   }
 }
 ```
 
-No repositories, services, providers or API code — the list is typed, paginated and updates in real time when anyone saves a `FeedPost`.
+No repositories, services, providers or API code — the list is typed, paginated and updates in real time when anyone saves a `NewsPost`.
 
 ## Next steps
 
-- Explore the `example/` app: auth (OTP), profiles, file uploads, real-time channels.
+- Explore the `example/` app — a fitness club: schedule and bookings with capacity rules, a staff-only chat (realtime + secure-by-default), club news, OTP auth, roles, dev seed (`bin/seed_dev.dart`).
 - Read about the security model: access filters and save hooks. <!-- TODO(docs): security-model.md -->
 - Project conventions and AI-agent toolkit: [`toolkit/`](../toolkit/).

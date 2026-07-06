@@ -1,13 +1,12 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/app/profile/profile_page/widgets/profile_settings_widget.dart';
 import 'package:dartway_example_flutter/common/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/core/router/router.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
-
-import '../water_intake/water_intake_widget.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -23,7 +22,13 @@ class ProfilePage extends ConsumerWidget {
           children: [
             const ProfileSettingsWidget(),
             const Gap(24),
-            const WaterIntakeWidget(),
+            DwButton.secondary(
+              'Our services',
+              dwCallback: DwUiAction.create(
+                (context) => GoRouter.of(context)
+                    .goNamed(AppNavigationZone.services.name),
+              ),
+            ),
             const Gap(24),
             DwButton.text(
               'Sign out',

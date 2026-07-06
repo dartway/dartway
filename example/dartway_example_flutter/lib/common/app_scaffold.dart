@@ -1,8 +1,10 @@
-import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
-import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
+import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/core/user_profile_roles.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// App page scaffold. Pages live in the app navigation zone, which is only
 /// reachable when signed in (see the router redirect guards), so no per-page
@@ -41,13 +43,10 @@ class AppScaffold extends StatelessWidget {
               padding: bodyInsets,
               child: SizedBox.expand(child: body),
             ),
-            Positioned(
+            const Positioned(
               right: 4,
               bottom: 4,
-              child: Text(
-                exampleAppVersion,
-                style: const TextStyle(fontSize: 8, color: Colors.blueGrey),
-              ),
+              child: AppVersionLabel(),
             ),
           ],
         ),
@@ -59,24 +58,46 @@ class AppScaffold extends StatelessWidget {
   }
 }
 
-class _AppBottomNavigationBar extends StatelessWidget {
+class _AppBottomNavigationBar extends ConsumerWidget {
   const _AppBottomNavigationBar();
 
   @override
-  Widget build(BuildContext context) {
-    const tabs = [AppNavigationZone.home, AppNavigationZone.profile];
-    final currentIndex = tabs.indexWhere((tab) => tab.isActive(context));
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The chat tab is staff-only in the UI; the server-side access filter is
+    // the real protection.
+    final isStaffMember = ref.watchUserProfile.isStaffMember;
+
+    final tabs = [
+      (route: AppNavigationZone.schedule, icon: Icons.calendar_month),
+      (route: AppNavigationZone.bookings, icon: Icons.event_available),
+      (route: AppNavigationZone.news, icon: Icons.article),
+      if (isStaffMember) (route: AppNavigationZone.chat, icon: Icons.chat),
+      (route: AppNavigationZone.profile, icon: Icons.person),
+    ];
+    final currentIndex = tabs.indexWhere((tab) => tab.route.isActive(context));
 
     return BottomNavigationBar(
       currentIndex: currentIndex < 0 ? 0 : currentIndex,
-      onTap: (index) => GoRouter.of(context).goNamed(tabs[index].name),
-      selectedItemColor: Colors.blue,
-      unselectedItemColor: Colors.lightBlueAccent,
+      onTap: (index) => GoRouter.of(context).goNamed(tabs[index].route.name),
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: Theme.of(context).colorScheme.primary,
+      unselectedItemColor: Theme.of(context).colorScheme.outline,
       showUnselectedLabels: true,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Profile'),
+      items: [
+        for (final tab in tabs)
+          BottomNavigationBarItem(
+            icon: Icon(tab.icon),
+            label: _tabLabel(tab.route),
+          ),
       ],
     );
   }
+
+  String _tabLabel(AppNavigationZone route) => switch (route) {
+        AppNavigationZone.schedule => 'Schedule',
+        AppNavigationZone.bookings => 'My bookings',
+        AppNavigationZone.news => 'News',
+        AppNavigationZone.chat => 'Team chat',
+        _ => 'Profile',
+      };
 }

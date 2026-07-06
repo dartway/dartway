@@ -11,7 +11,8 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import '../user_profile/user_gender.dart' as _i2;
+import '../user_profile/enums/user_role.dart' as _i2;
+import '../user_profile/user_gender.dart' as _i3;
 
 abstract class UserProfile implements _i1.SerializableModel {
   UserProfile._({
@@ -24,7 +25,8 @@ abstract class UserProfile implements _i1.SerializableModel {
     this.lastName,
     this.imageUrl,
     this.gender,
-  });
+    _i2.UserRole? role,
+  }) : role = role ?? _i2.UserRole.client;
 
   factory UserProfile({
     int? id,
@@ -35,7 +37,8 @@ abstract class UserProfile implements _i1.SerializableModel {
     required String firstName,
     String? lastName,
     String? imageUrl,
-    _i2.UserGender? gender,
+    _i3.UserGender? gender,
+    _i2.UserRole? role,
   }) = _UserProfileImpl;
 
   factory UserProfile.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -54,7 +57,10 @@ abstract class UserProfile implements _i1.SerializableModel {
       imageUrl: jsonSerialization['imageUrl'] as String?,
       gender: jsonSerialization['gender'] == null
           ? null
-          : _i2.UserGender.fromJson((jsonSerialization['gender'] as String)),
+          : _i3.UserGender.fromJson((jsonSerialization['gender'] as String)),
+      role: jsonSerialization['role'] == null
+          ? null
+          : _i2.UserRole.fromJson((jsonSerialization['role'] as String)),
     );
   }
 
@@ -77,7 +83,9 @@ abstract class UserProfile implements _i1.SerializableModel {
 
   String? imageUrl;
 
-  _i2.UserGender? gender;
+  _i3.UserGender? gender;
+
+  _i2.UserRole role;
 
   /// Returns a shallow copy of this [UserProfile]
   /// with some or all fields replaced by the given arguments.
@@ -91,7 +99,8 @@ abstract class UserProfile implements _i1.SerializableModel {
     String? firstName,
     String? lastName,
     String? imageUrl,
-    _i2.UserGender? gender,
+    _i3.UserGender? gender,
+    _i2.UserRole? role,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -106,6 +115,7 @@ abstract class UserProfile implements _i1.SerializableModel {
       if (lastName != null) 'lastName': lastName,
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (gender != null) 'gender': gender?.toJson(),
+      'role': role.toJson(),
     };
   }
 
@@ -127,7 +137,8 @@ class _UserProfileImpl extends UserProfile {
     required String firstName,
     String? lastName,
     String? imageUrl,
-    _i2.UserGender? gender,
+    _i3.UserGender? gender,
+    _i2.UserRole? role,
   }) : super._(
          id: id,
          userIdentifier: userIdentifier,
@@ -138,6 +149,7 @@ class _UserProfileImpl extends UserProfile {
          lastName: lastName,
          imageUrl: imageUrl,
          gender: gender,
+         role: role,
        );
 
   /// Returns a shallow copy of this [UserProfile]
@@ -154,6 +166,7 @@ class _UserProfileImpl extends UserProfile {
     Object? lastName = _Undefined,
     Object? imageUrl = _Undefined,
     Object? gender = _Undefined,
+    _i2.UserRole? role,
   }) {
     return UserProfile(
       id: id is int? ? id : this.id,
@@ -166,7 +179,8 @@ class _UserProfileImpl extends UserProfile {
       firstName: firstName ?? this.firstName,
       lastName: lastName is String? ? lastName : this.lastName,
       imageUrl: imageUrl is String? ? imageUrl : this.imageUrl,
-      gender: gender is _i2.UserGender? ? gender : this.gender,
+      gender: gender is _i3.UserGender? ? gender : this.gender,
+      role: role ?? this.role,
     );
   }
 }

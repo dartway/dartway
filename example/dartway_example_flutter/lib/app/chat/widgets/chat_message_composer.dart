@@ -1,0 +1,54 @@
+import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:gap/gap.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+
+class ChatMessageComposer extends HookConsumerWidget {
+  const ChatMessageComposer({required this.channel, super.key});
+
+  final ChatChannel channel;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final draftText = useState('');
+
+    Future<void> sendMessage() async {
+      final text = draftText.value.trim();
+      if (text.isEmpty) return;
+
+      await DwRepository.saveModel(
+        ChatMessage(
+          channelId: channel.id!,
+          authorProfileId: ref.readUserProfile.id!,
+          messageText: text,
+          createdAt: DateTime.now(),
+        ),
+      );
+      draftText.value = '';
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: AppTextFormField(
+            value: draftText.value,
+            onChanged: (value) => draftText.value = value,
+            hintText: 'Message the team...',
+            maxLines: 3,
+            minLines: 1,
+          ),
+        ),
+        const Gap(8),
+        IconButton.filled(
+          onPressed: draftText.value.trim().isEmpty ? null : sendMessage,
+          icon: const Icon(Icons.send),
+        ),
+      ],
+    );
+  }
+}

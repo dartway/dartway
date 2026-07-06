@@ -1,0 +1,6 @@
+enum: BookingStatus
+serialized: byName
+values:
+  - booked
+  - cancelled
+  - attended

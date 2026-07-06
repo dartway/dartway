@@ -1,0 +1,7 @@
+class: ChatMessage
+table: chat_message
+fields:
+  channel: ChatChannel?, relation
+  authorProfile: UserProfile?, relation
+  messageText: String
+  createdAt: DateTime

@@ -1,0 +1,7 @@
+class: SessionReview
+table: session_review
+fields:
+  booking: SessionBooking?, relation
+  rating: int
+  reviewText: String?
+  createdAt: DateTime

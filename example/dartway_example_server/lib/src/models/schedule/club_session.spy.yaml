@@ -1,0 +1,8 @@
+class: ClubSession
+table: club_session
+fields:
+  service: ClubService?, relation
+  coachProfile: UserProfile?, relation
+  startsAt: DateTime
+  # 1 = personal appointment, N = group class capacity.
+  capacity: int

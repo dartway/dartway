@@ -1,0 +1,7 @@
+class: NewsPost
+table: news_post
+fields:
+  authorProfile: UserProfile?, relation
+  title: String
+  text: String
+  createdAt: DateTime

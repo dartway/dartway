@@ -1,16 +1,40 @@
 part of '../router.dart';
 
-/// Main app zone. `home` is the zone root. Guard redirects signed-out users to
-/// the auth zone. Add parameterized routes with
+/// Main app zone. `schedule` is the zone root. Guard redirects signed-out
+/// users to the auth zone. Add parameterized routes with
 /// `DwNavigationRouteDescriptor.parameterized` + a [DwNavigationParamsMixin] enum.
 enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
-  home(
-    DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage()),
+  schedule(
+    DwNavigationRouteDescriptor.zoneRoot(pageWidget: SchedulePage()),
+  ),
+  bookings(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: MyBookingsPage(),
+      parent: schedule,
+    ),
+  ),
+  news(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: NewsPage(),
+      parent: schedule,
+    ),
+  ),
+  chat(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: StaffChatPage(),
+      parent: schedule,
+    ),
+  ),
+  services(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: ServicesPage(),
+      parent: profile,
+    ),
   ),
   profile(
     DwNavigationRouteDescriptor.simple(
       pageWidget: ProfilePage(),
-      parent: home,
+      parent: schedule,
     ),
   );
 

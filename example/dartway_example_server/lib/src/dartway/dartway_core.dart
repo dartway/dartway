@@ -1,7 +1,13 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
-import 'package:dartway_example_server/src/crud/feed_post_crud_config.dart';
+import 'package:dartway_example_server/src/crud/app_setting_crud_config.dart';
+import 'package:dartway_example_server/src/crud/chat_channel_crud_config.dart';
+import 'package:dartway_example_server/src/crud/chat_message_crud_config.dart';
+import 'package:dartway_example_server/src/crud/club_service_crud_config.dart';
+import 'package:dartway_example_server/src/crud/club_session_crud_config.dart';
+import 'package:dartway_example_server/src/crud/news_post_crud_config.dart';
+import 'package:dartway_example_server/src/crud/session_booking_crud_config.dart';
+import 'package:dartway_example_server/src/crud/session_review_crud_config.dart';
 import 'package:dartway_example_server/src/crud/user_profile_crud_config.dart';
-import 'package:dartway_example_server/src/crud/water_intake_crud_config.dart';
 import 'package:dartway_example_server/src/generated/protocol.dart';
 import 'package:serverpod/serverpod.dart';
 
@@ -13,8 +19,14 @@ void initDartwayCore(Serverpod serverpod) {
     userProfileInclude: UserProfile.include(),
     crudConfigurations: [
       userProfileCrudConfig,
-      feedPostCrudConfig,
-      waterIntakeCrudConfig,
+      clubServiceCrudConfig,
+      clubSessionCrudConfig,
+      sessionBookingCrudConfig,
+      sessionReviewCrudConfig,
+      chatChannelCrudConfig,
+      chatMessageCrudConfig,
+      newsPostCrudConfig,
+      appSettingCrudConfig,
     ],
     dtoConfigurations: [],
     userProfileConstructor: _buildUserProfile,
@@ -38,6 +50,8 @@ void initDartwayCore(Serverpod serverpod) {
 }
 
 /// Builds a new [UserProfile] when a user registers via the DartWay auth flow.
+/// New users always start as [UserRole.client]; staff and admin roles are
+/// assigned by the admin (see the role guard in the UserProfile CRUD config).
 Future<UserProfile> _buildUserProfile(
   Session session, {
   required DwAuthRequest registrationRequest,

@@ -1,8 +1,12 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../app/home/home_page/home_page.dart';
+import '../../app/bookings/my_bookings_page.dart';
+import '../../app/chat/staff_chat_page.dart';
+import '../../app/news/news_page.dart';
 import '../../app/profile/profile_page/profile_page.dart';
+import '../../app/schedule/schedule_page.dart';
+import '../../app/services/services_page.dart';
 import '../../auth/auth_page.dart';
 import 'app_router_state.dart';
 
@@ -27,7 +31,7 @@ final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
     ],
     pageBuilder: DwPageBuilder.fade,
     options: DwGoRouterOptions(
-      initialLocation: AppNavigationZone.home.fullPath,
+      initialLocation: AppNavigationZone.schedule.fullPath,
       debugLogDiagnostics: false,
     ),
   );

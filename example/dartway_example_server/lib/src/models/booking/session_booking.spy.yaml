@@ -1,0 +1,7 @@
+class: SessionBooking
+table: session_booking
+fields:
+  session: ClubSession?, relation
+  clientProfile: UserProfile?, relation
+  status: BookingStatus
+  createdAt: DateTime

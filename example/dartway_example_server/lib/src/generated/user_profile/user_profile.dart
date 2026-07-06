@@ -11,7 +11,8 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
-import '../user_profile/user_gender.dart' as _i2;
+import '../user_profile/enums/user_role.dart' as _i2;
+import '../user_profile/user_gender.dart' as _i3;
 
 abstract class UserProfile
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
@@ -25,7 +26,8 @@ abstract class UserProfile
     this.lastName,
     this.imageUrl,
     this.gender,
-  });
+    _i2.UserRole? role,
+  }) : role = role ?? _i2.UserRole.client;
 
   factory UserProfile({
     int? id,
@@ -36,7 +38,8 @@ abstract class UserProfile
     required String firstName,
     String? lastName,
     String? imageUrl,
-    _i2.UserGender? gender,
+    _i3.UserGender? gender,
+    _i2.UserRole? role,
   }) = _UserProfileImpl;
 
   factory UserProfile.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -55,7 +58,10 @@ abstract class UserProfile
       imageUrl: jsonSerialization['imageUrl'] as String?,
       gender: jsonSerialization['gender'] == null
           ? null
-          : _i2.UserGender.fromJson((jsonSerialization['gender'] as String)),
+          : _i3.UserGender.fromJson((jsonSerialization['gender'] as String)),
+      role: jsonSerialization['role'] == null
+          ? null
+          : _i2.UserRole.fromJson((jsonSerialization['role'] as String)),
     );
   }
 
@@ -80,7 +86,9 @@ abstract class UserProfile
 
   String? imageUrl;
 
-  _i2.UserGender? gender;
+  _i3.UserGender? gender;
+
+  _i2.UserRole role;
 
   @override
   _i1.Table<int?> get table => t;
@@ -97,7 +105,8 @@ abstract class UserProfile
     String? firstName,
     String? lastName,
     String? imageUrl,
-    _i2.UserGender? gender,
+    _i3.UserGender? gender,
+    _i2.UserRole? role,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -112,6 +121,7 @@ abstract class UserProfile
       if (lastName != null) 'lastName': lastName,
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (gender != null) 'gender': gender?.toJson(),
+      'role': role.toJson(),
     };
   }
 
@@ -128,6 +138,7 @@ abstract class UserProfile
       if (lastName != null) 'lastName': lastName,
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (gender != null) 'gender': gender?.toJson(),
+      'role': role.toJson(),
     };
   }
 
@@ -173,7 +184,8 @@ class _UserProfileImpl extends UserProfile {
     required String firstName,
     String? lastName,
     String? imageUrl,
-    _i2.UserGender? gender,
+    _i3.UserGender? gender,
+    _i2.UserRole? role,
   }) : super._(
          id: id,
          userIdentifier: userIdentifier,
@@ -184,6 +196,7 @@ class _UserProfileImpl extends UserProfile {
          lastName: lastName,
          imageUrl: imageUrl,
          gender: gender,
+         role: role,
        );
 
   /// Returns a shallow copy of this [UserProfile]
@@ -200,6 +213,7 @@ class _UserProfileImpl extends UserProfile {
     Object? lastName = _Undefined,
     Object? imageUrl = _Undefined,
     Object? gender = _Undefined,
+    _i2.UserRole? role,
   }) {
     return UserProfile(
       id: id is int? ? id : this.id,
@@ -212,7 +226,8 @@ class _UserProfileImpl extends UserProfile {
       firstName: firstName ?? this.firstName,
       lastName: lastName is String? ? lastName : this.lastName,
       imageUrl: imageUrl is String? ? imageUrl : this.imageUrl,
-      gender: gender is _i2.UserGender? ? gender : this.gender,
+      gender: gender is _i3.UserGender? ? gender : this.gender,
+      role: role ?? this.role,
     );
   }
 }
@@ -258,12 +273,18 @@ class UserProfileUpdateTable extends _i1.UpdateTable<UserProfileTable> {
     value,
   );
 
-  _i1.ColumnValue<_i2.UserGender, _i2.UserGender> gender(
-    _i2.UserGender? value,
+  _i1.ColumnValue<_i3.UserGender, _i3.UserGender> gender(
+    _i3.UserGender? value,
   ) => _i1.ColumnValue(
     table.gender,
     value,
   );
+
+  _i1.ColumnValue<_i2.UserRole, _i2.UserRole> role(_i2.UserRole value) =>
+      _i1.ColumnValue(
+        table.role,
+        value,
+      );
 }
 
 class UserProfileTable extends _i1.Table<int?> {
@@ -302,6 +323,12 @@ class UserProfileTable extends _i1.Table<int?> {
       this,
       _i1.EnumSerialization.byName,
     );
+    role = _i1.ColumnEnum(
+      'role',
+      this,
+      _i1.EnumSerialization.byName,
+      hasDefault: true,
+    );
   }
 
   late final UserProfileUpdateTable updateTable;
@@ -320,7 +347,9 @@ class UserProfileTable extends _i1.Table<int?> {
 
   late final _i1.ColumnString imageUrl;
 
-  late final _i1.ColumnEnum<_i2.UserGender> gender;
+  late final _i1.ColumnEnum<_i3.UserGender> gender;
+
+  late final _i1.ColumnEnum<_i2.UserRole> role;
 
   @override
   List<_i1.Column> get columns => [
@@ -333,6 +362,7 @@ class UserProfileTable extends _i1.Table<int?> {
     lastName,
     imageUrl,
     gender,
+    role,
   ];
 }
 

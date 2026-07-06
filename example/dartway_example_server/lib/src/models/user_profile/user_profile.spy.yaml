@@ -13,3 +13,7 @@ fields:
   lastName: String?
   imageUrl: String?
   gender: UserGender?
+
+  # Access role: client (default), staff (club employees, see staff chat),
+  # admin (full access). Enforced by CRUD config access filters.
+  role: UserRole, default=client
