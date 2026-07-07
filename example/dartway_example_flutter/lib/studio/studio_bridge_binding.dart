@@ -51,13 +51,20 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
     );
     if (_host == null) return;
 
-    // Features are discovered from mounted DwFeature widgets after the frame
-    // settles — re-scan on route and session changes (chat features, say,
-    // only mount for staff).
+    // Features are discovered from mounted DwFeature widgets. A route change
+    // may mount the new screen a frame or two later (and its content can load
+    // asynchronously), so re-scan over a short window until it settles.
     void reportFeaturesSoon() {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _host?.reportFeatures(currentPath(), scanMountedFeatures()),
-      );
+      for (final delay in const [
+        Duration(milliseconds: 50),
+        Duration(milliseconds: 400),
+        Duration(milliseconds: 1000),
+      ]) {
+        Future<void>.delayed(delay, () {
+          if (!mounted) return;
+          _host?.reportFeatures(currentPath(), scanMountedFeatures());
+        });
+      }
     }
 
     void onRouteChanged() {
