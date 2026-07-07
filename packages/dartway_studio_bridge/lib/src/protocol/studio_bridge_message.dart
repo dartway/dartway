@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../models/dw_feature_spec.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
 import 'studio_bridge_protocol.dart';
@@ -47,6 +48,8 @@ sealed class StudioBridgeMessage {
         RouteChangedMessage.fromPayload(payload),
       StudioBridgeProtocol.sessionChanged =>
         SessionChangedMessage.fromPayload(payload),
+      StudioBridgeProtocol.featuresChanged =>
+        FeaturesChangedMessage.fromPayload(payload),
       StudioBridgeProtocol.studioConnect => const StudioConnectMessage(),
       StudioBridgeProtocol.navigateRequest =>
         NavigateRequestMessage.fromPayload(payload),

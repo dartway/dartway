@@ -39,17 +39,27 @@ class StudioBridgeClient {
         // The app (re)started — whatever we knew is stale; re-handshake.
         _connected = false;
         _sendConnect();
-      case ManifestMessage(:final manifest, :final currentPath, :final session):
+      case ManifestMessage(
+          :final manifest,
+          :final currentPath,
+          :final session,
+          :final features,
+        ):
         _connected = true;
         _events.add(StudioProjectConnected(
           manifest: manifest,
           currentPath: currentPath,
           session: session,
+          features: features,
         ));
       case RouteChangedMessage(:final path):
         _events.add(StudioProjectRouteChanged(path));
       case SessionChangedMessage(:final session):
         _events.add(StudioProjectSessionChanged(session));
+      case FeaturesChangedMessage(:final path, :final features):
+        _events.add(
+          StudioProjectFeaturesChanged(path: path, features: features),
+        );
       default:
         break; // Studio → app messages echoed back are ignored.
     }

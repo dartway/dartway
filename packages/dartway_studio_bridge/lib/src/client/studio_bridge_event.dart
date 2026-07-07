@@ -1,3 +1,4 @@
+import '../models/dw_feature_spec.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
 
@@ -13,11 +14,13 @@ class StudioProjectConnected extends StudioProjectEvent {
     required this.manifest,
     required this.currentPath,
     required this.session,
+    this.features = const [],
   });
 
   final StudioProjectManifest manifest;
   final String currentPath;
   final StudioSessionState session;
+  final List<DwFeatureSpec> features;
 }
 
 /// The app's router moved to a new location.
@@ -32,4 +35,15 @@ class StudioProjectSessionChanged extends StudioProjectEvent {
   const StudioProjectSessionChanged(this.session);
 
   final StudioSessionState session;
+}
+
+/// The features mounted on the current screen changed.
+class StudioProjectFeaturesChanged extends StudioProjectEvent {
+  const StudioProjectFeaturesChanged({
+    required this.path,
+    required this.features,
+  });
+
+  final String path;
+  final List<DwFeatureSpec> features;
 }

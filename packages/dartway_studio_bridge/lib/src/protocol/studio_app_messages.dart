@@ -15,11 +15,15 @@ class ManifestMessage extends StudioBridgeMessage {
     required this.manifest,
     required this.currentPath,
     required this.session,
+    this.features = const [],
   });
 
   final StudioProjectManifest manifest;
   final String currentPath;
   final StudioSessionState session;
+
+  /// Features mounted on the current screen at connect time.
+  final List<DwFeatureSpec> features;
 
   @override
   String get type => StudioBridgeProtocol.manifest;
@@ -29,6 +33,7 @@ class ManifestMessage extends StudioBridgeMessage {
         'manifest': manifest.toJson(),
         'currentPath': currentPath,
         'session': session.toJson(),
+        'features': [for (final f in features) f.toJson()],
       };
 
   factory ManifestMessage.fromPayload(Map<String, dynamic> payload) =>
@@ -40,6 +45,7 @@ class ManifestMessage extends StudioBridgeMessage {
         session: StudioSessionState.fromJson(
           payload['session'] as Map<String, dynamic>? ?? const {},
         ),
+        features: DwFeatureSpec.listFromJson(payload['features']),
       );
 }
 
@@ -57,6 +63,30 @@ class RouteChangedMessage extends StudioBridgeMessage {
 
   factory RouteChangedMessage.fromPayload(Map<String, dynamic> payload) =>
       RouteChangedMessage(payload['path'] as String? ?? '/');
+}
+
+/// App → Studio: the features mounted on the current screen changed
+/// (discovered from `DwFeature` widgets after the route settles).
+class FeaturesChangedMessage extends StudioBridgeMessage {
+  const FeaturesChangedMessage({required this.path, required this.features});
+
+  final String path;
+  final List<DwFeatureSpec> features;
+
+  @override
+  String get type => StudioBridgeProtocol.featuresChanged;
+
+  @override
+  Map<String, dynamic> payloadToJson() => {
+        'path': path,
+        'features': [for (final f in features) f.toJson()],
+      };
+
+  factory FeaturesChangedMessage.fromPayload(Map<String, dynamic> payload) =>
+      FeaturesChangedMessage(
+        path: payload['path'] as String? ?? '/',
+        features: DwFeatureSpec.listFromJson(payload['features']),
+      );
 }
 
 /// App → Studio: the session changed (sign-in, sign-out, switch progress).

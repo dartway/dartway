@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../models/dw_feature_spec.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
 import '../protocol/studio_bridge_message.dart';
@@ -26,6 +27,7 @@ class StudioBridgeHost {
     this._delegate,
     this._currentPath,
     this._currentSession,
+    this._currentFeatures,
   ) {
     _subscription = _channel.messages.listen(_onMessage);
     _channel.send(const AppReadyMessage());
@@ -43,6 +45,7 @@ class StudioBridgeHost {
     required StudioBridgeHostDelegate delegate,
     required String Function() currentPath,
     required StudioSessionState Function() currentSession,
+    List<DwFeatureSpec> Function()? currentFeatures,
     List<String> allowedStudioOrigins = const [],
   }) {
     final channel =
@@ -54,6 +57,7 @@ class StudioBridgeHost {
       delegate,
       currentPath,
       currentSession,
+      currentFeatures ?? () => const [],
     );
   }
 
@@ -62,6 +66,7 @@ class StudioBridgeHost {
   final StudioBridgeHostDelegate _delegate;
   final String Function() _currentPath;
   final StudioSessionState Function() _currentSession;
+  final List<DwFeatureSpec> Function() _currentFeatures;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
   void _onMessage(StudioBridgeMessage message) {
@@ -71,6 +76,7 @@ class StudioBridgeHost {
           manifest: _manifest,
           currentPath: _currentPath(),
           session: _currentSession(),
+          features: _currentFeatures(),
         ));
       case NavigateRequestMessage(:final path):
         _delegate.onNavigateRequest(path);
@@ -87,6 +93,9 @@ class StudioBridgeHost {
 
   void reportSession(StudioSessionState session) =>
       _channel.send(SessionChangedMessage(session));
+
+  void reportFeatures(String path, List<DwFeatureSpec> features) =>
+      _channel.send(FeaturesChangedMessage(path: path, features: features));
 
   void detach() {
     _subscription.cancel();

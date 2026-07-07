@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -9,8 +10,20 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// Upcoming sessions grouped by day. Both lists are live: a booking made on
 /// another device updates the cards without any refresh code.
-class ScheduleSessionList extends ConsumerWidget {
+class ScheduleSessionList extends ConsumerWidget implements DwFeature {
   const ScheduleSessionList({super.key});
+
+  @override
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+        id: 'schedule-session-list',
+        title: StudioText('Realtime session list', 'Живой список занятий'),
+        description: StudioText(
+          'ref.watchModelList<ClubSession>() with a backend filter — realtime '
+              'sync, pagination and loading states out of the box.',
+          'ref.watchModelList<ClubSession>() с backend-фильтром — realtime-'
+              'синк, пагинация и лоадеры из коробки.',
+        ),
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

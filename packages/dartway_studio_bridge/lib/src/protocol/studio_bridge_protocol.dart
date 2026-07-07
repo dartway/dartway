@@ -17,6 +17,7 @@ abstract final class StudioBridgeProtocol {
   static const manifest = 'manifest';
   static const routeChanged = 'routeChanged';
   static const sessionChanged = 'sessionChanged';
+  static const featuresChanged = 'featuresChanged';
 
   // Studio → app.
   static const studioConnect = 'studioConnect';

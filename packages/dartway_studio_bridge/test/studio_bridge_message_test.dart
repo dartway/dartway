@@ -44,6 +44,26 @@ void main() {
       expect((decoded as RouteChangedMessage).path, '/auth');
     });
 
+    test('featuresChanged carries path and features', () {
+      final decoded = _roundTrip(
+        const FeaturesChangedMessage(
+          path: '/schedule',
+          features: [
+            DwFeatureSpec(
+              id: 'schedule-list',
+              title: StudioText('List', 'Список'),
+              description: StudioText('desc', 'опис'),
+            ),
+          ],
+        ),
+      );
+      expect(decoded, isA<FeaturesChangedMessage>());
+      final msg = decoded as FeaturesChangedMessage;
+      expect(msg.path, '/schedule');
+      expect(msg.features.single.id, 'schedule-list');
+      expect(msg.features.single.title.ru, 'Список');
+    });
+
     test('sessionChanged carries the session', () {
       final decoded = _roundTrip(
         const SessionChangedMessage(

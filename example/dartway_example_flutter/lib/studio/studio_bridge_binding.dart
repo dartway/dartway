@@ -45,16 +45,35 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       delegate: this,
       currentPath: currentPath,
       currentSession: () => ref.read(studioSessionStateProvider),
+      // The connect snapshot carries the current screen's features so a
+      // freshly connected Studio sees them without waiting for navigation.
+      currentFeatures: scanMountedFeatures,
     );
     if (_host == null) return;
 
-    void onRouteChanged() => _host?.reportRoute(currentPath());
+    // Features are discovered from mounted DwFeature widgets after the frame
+    // settles — re-scan on route and session changes (chat features, say,
+    // only mount for staff).
+    void reportFeaturesSoon() {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _host?.reportFeatures(currentPath(), scanMountedFeatures()),
+      );
+    }
+
+    void onRouteChanged() {
+      _host?.reportRoute(currentPath());
+      reportFeaturesSoon();
+    }
+
     delegate.addListener(onRouteChanged);
     _removeRouteListener = () => delegate.removeListener(onRouteChanged);
 
     ref.listenManual(
       studioSessionStateProvider,
-      (previous, next) => _host?.reportSession(next),
+      (previous, next) {
+        _host?.reportSession(next);
+        reportFeaturesSoon();
+      },
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -7,10 +8,22 @@ import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-class ChatMessageComposer extends HookConsumerWidget {
+class ChatMessageComposer extends HookConsumerWidget implements DwFeature {
   const ChatMessageComposer({required this.channel, super.key});
 
   final ChatChannel channel;
+
+  @override
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+        id: 'chat-message-composer',
+        title: StudioText('Message composer', 'Отправка сообщений'),
+        description: StudioText(
+          'Sending is a single DwRepository.saveModel(ChatMessage) — the list '
+              'above updates in realtime, no extra wiring.',
+          'Отправка — один DwRepository.saveModel(ChatMessage); список выше '
+              'обновляется в realtime, без лишней обвязки.',
+        ),
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
