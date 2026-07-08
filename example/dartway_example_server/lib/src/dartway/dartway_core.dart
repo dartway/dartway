@@ -15,16 +15,10 @@ import 'package:serverpod/serverpod.dart';
 
 late final DwCore<UserProfile> dw;
 
-/// Fixed dev OTP. The Studio persona switcher relies on it — keep in sync with
-/// studioDevOtpCode in dartway_example_flutter (lib/studio/logic/).
-const _devVerificationCode = '000000';
-
 String _randomVerificationCode() =>
     List.generate(6, (_) => Random.secure().nextInt(10)).join();
 
 void initDartwayCore(Serverpod serverpod) {
-  final isDevelopmentRun = serverpod.runMode == 'development';
-
   dw = DwCore.init<UserProfile>(
     userProfileTable: UserProfile.t,
     userProfileInclude: UserProfile.include(),
@@ -44,13 +38,21 @@ void initDartwayCore(Serverpod serverpod) {
     dwAlerts: DwAlerts.init(),
     dwAuthConfig: DwAuthConfig(
       passwords: serverpod.server.passwords,
-      // Dev: fixed code so DartWay Studio can sign personas in
-      // programmatically. Production keeps random 6-digit codes.
+      // Test/reviewer accounts carry a fixed, admin-rotated code
+      // (UserProfile.testVerificationCode, serverOnly — never sent to clients);
+      // everyone else gets a fresh random code. Works in any run mode, so store
+      // reviewers can sign in, while real users are never handed a fixed code.
       generateVerificationCodeMethod: (
         session, {
         required DwAuthRequest verificationRequest,
-      }) async =>
-          isDevelopmentRun ? _devVerificationCode : _randomVerificationCode(),
+      }) async {
+        final profile = await UserProfile.db.findFirstRow(
+          session,
+          where: (t) =>
+              t.userIdentifier.equals(verificationRequest.userIdentifier),
+        );
+        return profile?.testVerificationCode ?? _randomVerificationCode();
+      },
       // Dev: log the code to the server console instead of sending an SMS.
       // Wire a real SMS/email sender here for production.
       sendVerificationCodeMethod: (

@@ -27,6 +27,7 @@ abstract class UserProfile
     this.imageUrl,
     this.gender,
     _i2.UserRole? role,
+    this.testVerificationCode,
   }) : role = role ?? _i2.UserRole.client;
 
   factory UserProfile({
@@ -40,6 +41,7 @@ abstract class UserProfile
     String? imageUrl,
     _i3.UserGender? gender,
     _i2.UserRole? role,
+    String? testVerificationCode,
   }) = _UserProfileImpl;
 
   factory UserProfile.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -62,6 +64,8 @@ abstract class UserProfile
       role: jsonSerialization['role'] == null
           ? null
           : _i2.UserRole.fromJson((jsonSerialization['role'] as String)),
+      testVerificationCode:
+          jsonSerialization['testVerificationCode'] as String?,
     );
   }
 
@@ -90,6 +94,8 @@ abstract class UserProfile
 
   _i2.UserRole role;
 
+  String? testVerificationCode;
+
   @override
   _i1.Table<int?> get table => t;
 
@@ -107,6 +113,7 @@ abstract class UserProfile
     String? imageUrl,
     _i3.UserGender? gender,
     _i2.UserRole? role,
+    String? testVerificationCode,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -122,6 +129,8 @@ abstract class UserProfile
       if (imageUrl != null) 'imageUrl': imageUrl,
       if (gender != null) 'gender': gender?.toJson(),
       'role': role.toJson(),
+      if (testVerificationCode != null)
+        'testVerificationCode': testVerificationCode,
     };
   }
 
@@ -186,6 +195,7 @@ class _UserProfileImpl extends UserProfile {
     String? imageUrl,
     _i3.UserGender? gender,
     _i2.UserRole? role,
+    String? testVerificationCode,
   }) : super._(
          id: id,
          userIdentifier: userIdentifier,
@@ -197,6 +207,7 @@ class _UserProfileImpl extends UserProfile {
          imageUrl: imageUrl,
          gender: gender,
          role: role,
+         testVerificationCode: testVerificationCode,
        );
 
   /// Returns a shallow copy of this [UserProfile]
@@ -214,6 +225,7 @@ class _UserProfileImpl extends UserProfile {
     Object? imageUrl = _Undefined,
     Object? gender = _Undefined,
     _i2.UserRole? role,
+    Object? testVerificationCode = _Undefined,
   }) {
     return UserProfile(
       id: id is int? ? id : this.id,
@@ -228,6 +240,9 @@ class _UserProfileImpl extends UserProfile {
       imageUrl: imageUrl is String? ? imageUrl : this.imageUrl,
       gender: gender is _i3.UserGender? ? gender : this.gender,
       role: role ?? this.role,
+      testVerificationCode: testVerificationCode is String?
+          ? testVerificationCode
+          : this.testVerificationCode,
     );
   }
 }
@@ -285,6 +300,12 @@ class UserProfileUpdateTable extends _i1.UpdateTable<UserProfileTable> {
         table.role,
         value,
       );
+
+  _i1.ColumnValue<String, String> testVerificationCode(String? value) =>
+      _i1.ColumnValue(
+        table.testVerificationCode,
+        value,
+      );
 }
 
 class UserProfileTable extends _i1.Table<int?> {
@@ -329,6 +350,10 @@ class UserProfileTable extends _i1.Table<int?> {
       _i1.EnumSerialization.byName,
       hasDefault: true,
     );
+    testVerificationCode = _i1.ColumnString(
+      'testVerificationCode',
+      this,
+    );
   }
 
   late final UserProfileUpdateTable updateTable;
@@ -351,6 +376,8 @@ class UserProfileTable extends _i1.Table<int?> {
 
   late final _i1.ColumnEnum<_i2.UserRole> role;
 
+  late final _i1.ColumnString testVerificationCode;
+
   @override
   List<_i1.Column> get columns => [
     id,
@@ -363,6 +390,7 @@ class UserProfileTable extends _i1.Table<int?> {
     imageUrl,
     gender,
     role,
+    testVerificationCode,
   ];
 }
 

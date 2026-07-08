@@ -136,11 +136,19 @@ Future<UserProfile> _ensureProfile(
   String phone,
   String firstName, {
   required UserRole role,
+  // Seeded users are the Studio demo personas, so they carry a fixed test code.
+  String? testVerificationCode = '000000',
 }) async {
   final existing = (await UserProfile.db.find(session,
           where: (t) => t.userIdentifier.equals(phone), limit: 1))
       .firstOrNull;
-  if (existing != null) return existing;
+  if (existing != null) {
+    if (existing.testVerificationCode != testVerificationCode) {
+      existing.testVerificationCode = testVerificationCode;
+      return UserProfile.db.updateRow(session, existing);
+    }
+    return existing;
+  }
 
   return UserProfile.db.insertRow(
     session,
@@ -151,6 +159,7 @@ Future<UserProfile> _ensureProfile(
       role: role,
       agreedForMarketingCommunications: false,
       conditionsAcceptedAt: DateTime.now(),
+      testVerificationCode: testVerificationCode,
     ),
   );
 }

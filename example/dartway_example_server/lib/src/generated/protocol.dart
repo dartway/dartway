@@ -643,6 +643,12 @@ class Protocol extends _i1.SerializationManagerServer {
           dartType: 'protocol:UserRole',
           columnDefault: '\'client\'::text',
         ),
+        _i2.ColumnDefinition(
+          name: 'testVerificationCode',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
       ],
       foreignKeys: [],
       indexes: [
