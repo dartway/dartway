@@ -6,6 +6,8 @@ import 'package:dartway_example_flutter/app/profile/profile_page/widgets/profile
 import 'package:dartway_example_flutter/common/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
+import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/core/user_profile_roles.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class ProfilePage extends ConsumerWidget {
@@ -22,6 +24,16 @@ class ProfilePage extends ConsumerWidget {
           children: [
             const ProfileSettingsWidget(),
             const Gap(24),
+            if (ref.watchUserProfile.isClubAdmin) ...[
+              DwButton.secondary(
+                'Admin panel',
+                dwCallback: DwUiAction.create(
+                  (context) => GoRouter.of(context)
+                      .goNamed(AdminNavigationZone.admin.name),
+                ),
+              ),
+              const Gap(24),
+            ],
             DwButton.secondary(
               'Our services',
               dwCallback: DwUiAction.create(

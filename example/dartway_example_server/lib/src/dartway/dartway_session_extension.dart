@@ -20,3 +20,8 @@ extension DwSessionExtension on Session {
 /// see everything, clients see nothing.
 Future<Expression<dynamic>?> staffOnlyAccessFilter(Session session) async =>
     await session.isStaffMember ? null : Constant.bool(false);
+
+/// Access filter for admin-only models (e.g. the users table): the admin sees
+/// everything, everyone else sees nothing.
+Future<Expression<dynamic>?> adminOnlyAccessFilter(Session session) async =>
+    await session.isClubAdmin ? null : Constant.bool(false);

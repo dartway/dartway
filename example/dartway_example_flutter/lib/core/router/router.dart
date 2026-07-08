@@ -1,6 +1,7 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../app/admin/admin_page.dart';
 import '../../app/bookings/my_bookings_page.dart';
 import '../../app/chat/staff_chat_page.dart';
 import '../../app/news/news_page.dart';
@@ -12,6 +13,7 @@ import 'app_router_state.dart';
 
 export 'app_router_state.dart';
 
+part 'navigation_zones/admin_navigation_zone.dart';
 part 'navigation_zones/app_navigation_zone.dart';
 part 'navigation_zones/auth_navigation_zone.dart';
 
@@ -27,6 +29,7 @@ final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
     routerState: routerState,
     navigationZones: [
       AppNavigationZone.values,
+      AdminNavigationZone.values,
       AuthNavigationZone.values,
     ],
     pageBuilder: DwPageBuilder.fade,
