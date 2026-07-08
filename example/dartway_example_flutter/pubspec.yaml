@@ -100,9 +100,8 @@ dependency_overrides:
 # following page: https://dart.dev/tools/pub/pubspec
 
 flutter_native_splash:
-  color: "#190022"                
-  image: assets/dartway_splash_logo.png    
-  branding: assets/dartway_splash_branding.png   
+  color: "#05060C"                
+  image: assets/dartway_splash_logo.png
 
   android: true
   ios: true
@@ -110,7 +109,7 @@ flutter_native_splash:
 
   android_12:
     image: assets/dartway_splash_logo.png
-    icon_background_color: "#190022"
+    icon_background_color: "#05060C"
 
 flutter_gen:
   output: lib/ui_kit/gen/
