@@ -1,13 +1,13 @@
 name: dartway_flutter
-description: "A comprehensive Flutter toolkit for rapid app development with UI components, utilities, and app scaffolding"
-version: 0.0.1
-homepage:
+description: "The Flutter shell of a DartWay app: bootstrap runner, notifications, base UI kit with theming, and AsyncValue utilities."
+version: 0.9.0
+repository: https://github.com/dartway/dartway
 
 resolution: workspace
 
 environment:
   sdk: ^3.11.0
-  flutter: ^3.41.0
+  flutter: '>=3.41.0'
 
 dependencies:
   flutter:
@@ -23,6 +23,10 @@ dependencies:
   adaptive_breakpoints: ^0.1.7
   device_frame: ^1.3.0
   telegram_web_app: ^0.3.3
+
+  # Feature declarations (DwFeature) re-exported for every DartWay app; the
+  # bridge package stays a lightweight standalone integration surface.
+  dartway_studio_bridge: ^0.2.0
 
 dev_dependencies:
   flutter_test:

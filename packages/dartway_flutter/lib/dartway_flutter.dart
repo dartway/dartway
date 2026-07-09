@@ -4,6 +4,12 @@
 // Recommended UI packages
 export 'package:conditional_parent_widget/conditional_parent_widget.dart';
 
+// Feature declarations: mark a widget as a product feature (DwFeature) and
+// discover the mounted ones at runtime. Useful on its own (feature catalogs,
+// analytics, docs) and consumed by DartWay Studio over the bridge.
+export 'package:dartway_studio_bridge/dartway_studio_bridge.dart'
+    show DwFeature, DwFeatureSpec, scanMountedFeatures;
+
 // DwApp configuration
 export 'src/dw/configs/dw_config.dart';
 export 'src/dw/configs/dw_telegram_web_app_config.dart';
