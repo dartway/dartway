@@ -3,8 +3,16 @@
 Command-line tool for the [DartWay](https://dartway.dev) framework.
 
 ```bash
+dart pub global activate dartway_cli
+```
+
+Or straight from the monorepo (the `stable` channel):
+
+```bash
 dart pub global activate --source git https://github.com/dartway/dartway.git --git-path packages/dartway_cli --git-ref stable
 ```
+
+Note: `dartway create` fetches the project template from the monorepo git repository (`stable` channel) regardless of how the CLI itself was installed.
 
 ## Commands
 
@@ -30,11 +38,20 @@ Options: `--base-branch` (this project's base branch for PR/commit skills, defau
 
 ### `dartway check`
 
-Runs DartWay convention checks (`dartway_code_checker`) on the project's Flutter package. Extra arguments are passed through to the checker.
+Runs the built-in DartWay convention checks on the project's Flutter package: ui_kit hygiene (part-of directives, no text constants, no raw styles outside ui_kit), feature structure (one entry point, only `widgets/`+`logic/` subfolders, no cross-feature widget/logic imports) and file length as a soft signal (>120 lines — info, >200 — warning). Only error-severity findings fail the run; warnings and infos are advisory.
 
 ```bash
 dartway check
-dartway check --type featureStructure
+dartway check --type forbiddenUiUsage
+dartway check --level error
+```
+
+### `dartway stats`
+
+Prints code-size statistics (files, lines, avg/max/min) per feature folder of the Flutter package.
+
+```bash
+dartway stats
 ```
 
 ## Environment variables

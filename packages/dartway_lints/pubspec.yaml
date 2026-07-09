@@ -1,7 +1,7 @@
 name: dartway_lints
-description: Custom lint rules for DartWay projects.
-version: 1.0.0
-publish_to: none
+description: "Custom lint rules enforcing DartWay conventions: the UI kit is the single source of styles — raw Color/TextStyle/BorderRadius and direct theme access are flagged outside ui_kit/."
+version: 0.1.0
+repository: https://github.com/dartway/dartway
 
 resolution: workspace
 

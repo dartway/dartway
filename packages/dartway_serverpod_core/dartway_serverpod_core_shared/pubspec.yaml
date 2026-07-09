@@ -1,16 +1,15 @@
 name: dartway_serverpod_core_shared
-description: Shared constants, enums, and models for DartWay Core (used by both flutter app and server).
-version: 1.0.0
+description: "Pure-Dart shared layer of the DartWay core: alert formatting, Telegram alerts, configuration keys and cross-stack utilities used by both the server and the Flutter app."
+version: 0.1.0
+repository: https://github.com/dartway/dartway
 
 resolution: workspace
 
 environment:
   sdk: ^3.11.0
 
-# Add regular dependencies here.
 dependencies:
   http: ^1.5.0
-  # path: ^1.8.0
 
 dev_dependencies:
   lints: ^6.1.0

@@ -1,5 +1,7 @@
 name: dartway_serverpod_core_server
-description: Starting point for a Serverpod module.
+description: "Server side of the DartWay core — a Serverpod module: generic model-driven CRUD with realtime subscriptions, declarative access/validation configs, phone auth, cloud storage (S3/MinIO) and Telegram alerts."
+version: 0.1.0
+repository: https://github.com/dartway/dartway
 
 resolution: workspace
 
@@ -9,13 +11,7 @@ environment:
 dependencies:
   serverpod: ^3.4.8
 
-  # serverpod_cloud_storage_s3: # 3.4.7
-  #   path: packages/serverpod_cloud_storage_s3
-
-  dartway_serverpod_core_shared:
-    git:
-      url: https://github.com/dartway/dartway.git
-      path: packages/dartway_serverpod_core/dartway_serverpod_core_shared
+  dartway_serverpod_core_shared: ^0.1.0
 
   collection: ^1.19.1
   crypto: ^3.0.6
@@ -25,11 +21,5 @@ dependencies:
   amazon_cognito_identity_dart_2: ^4.0.0
   path: ^1.9.1
 
-
-
 dev_dependencies:
   lints: ^6.1.0
-
-# dependency_overrides:
-#   dartway_serverpod_core_shared:
-#     path: ../dartway_serverpod_core_shared

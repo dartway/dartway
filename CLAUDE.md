@@ -8,7 +8,8 @@
 |---|---|
 | `packages/dartway_serverpod_core/` | Ядро (4 пакета: server / client / flutter / shared) — generic CRUD, real-time, auth, фильтры |
 | `packages/dartway_flutter` | Flutter-тулбокс: DwAppRunner, UI kit, нотификации |
-| `packages/dartway_lints`, `packages/dartway_code_checker` | Enforcement конвенций (custom_lint + CLI-чекер) |
+| `packages/dartway_lints` | Enforcement конвенций (custom_lint-правила) |
+| `packages/dartway_cli` | CLI: `create` / `setup-ai` / `check` (встроенный чекер конвенций) / `stats` |
 | `example/` | Канонический проект — источник правды для доков, шаблона и учебного трека |
 | `toolkit/` | Claude-обвязка для app-проектов (скиллы `dartway-*`, токены `__*__`, установщик) |
 | `docs/` | Markdown-контент документации — целевой источник для сайта dartway.dev. **Внимание:** пайплайн docs/ → сайт ещё не настроен — сайт пока тянет контент из легаси-репо `dartway_guidelines` (см. `website/update_docs.dart`) |

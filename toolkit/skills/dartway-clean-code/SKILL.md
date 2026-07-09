@@ -2,8 +2,9 @@
 name: dartway-clean-code
 description: >-
   DartwayTeam strict clean-code rules for ALL Flutter/Dart work (DartWay-проекты):
-  self-explanatory naming (min 2 words), files ≤120 lines / single
-  responsibility, never pass BuildContext or WidgetRef as params, no _buildXxx()
+  self-explanatory naming (min 2 words), single responsibility per file
+  (length is a soft signal: >120 lines undesirable, >200 warning — split by
+  responsibility, not by line count), never pass BuildContext or WidgetRef as params, no _buildXxx()
   widget-returning methods, no ref.invalidate, no GlobalKey tree lookups, no
   outer padding/margin inside a widget, no private widget classes in public
   feature files; plus SOLID, KISS, DRY, YAGNI, Law of Demeter, composition over
@@ -50,9 +51,11 @@ final updatedOrder = getNewOrder();  // рядом: initialOrder
 class DeliveryCard { final String deliveryStatus; final int itemsCount; final VoidCallback onTap; }
 ```
 
-## 1.2 Файл ≤ ~120 строк и одна ответственность
+## 1.2 Одна ответственность на файл; длина — мягкий ориентир
 
 **Зачем:** один файл — одна причина для изменения. Модель + репозиторий + стейт + UI в одном файле невозможно ни читать, ни переиспользовать.
+
+**Длина — индикатор, а не закон:** >120 строк — нежелательно, повод присмотреться; >200 — ворнинг, вероятно, файл собрал несколько ответственностей. Но **осмысленный связный файл на 220 строк лучше бессмысленного попила** на кусочки без собственной ответственности. Дели по ответственности, а не по счётчику строк.
 
 ```
 // ❌ order_screen.dart: OrderItemModel + OrderRepository + OrderState + OrderListScreen
@@ -62,6 +65,9 @@ class DeliveryCard { final String deliveryStatus; final int itemsCount; final Vo
 //   data/order_repository.dart
 //   state/order_state.dart
 //   ui/order_list_screen.dart
+
+// ✅ тоже ок: цельный экран на 220 строк с одной ответственностью —
+//    не пили его на header_part_1.dart / header_part_2.dart ради лимита
 ```
 
 ## 1.3 Не передавай `BuildContext` / `WidgetRef` как параметры
@@ -405,7 +411,7 @@ class ItemsListPage extends ConsumerWidget {
 ## Чек-лист перед сдачей кода
 
 - [ ] **Имена** осмысленные, ≥2 слов; нет `model`/`data`/`list`/`s`/`n`/`cb`/`order2`.
-- [ ] **Файл** ≤ ~120 строк и одна ответственность (модель/репозиторий/стейт/UI раздельно).
+- [ ] **Файл** — одна ответственность (модель/репозиторий/стейт/UI раздельно); >120 строк — присмотреться, >200 — вероятно, пора делить (но по ответственности, не по счётчику).
 - [ ] **Нет** `BuildContext`/`WidgetRef` в параметрах сервисов и функций.
 - [ ] **Нет** `_buildXxx()`-методов, возвращающих виджет — это отдельные виджет-классы.
 - [ ] **Нет** `ref.invalidate(...)` — рефреш через стейт.

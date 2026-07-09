@@ -1,6 +1,6 @@
 name: dartway_flutter
 description: "The Flutter shell of a DartWay app: bootstrap runner, notifications, base UI kit with theming, and AsyncValue utilities."
-version: 0.9.0
+version: 0.1.0
 repository: https://github.com/dartway/dartway
 
 resolution: workspace

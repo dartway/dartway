@@ -4,6 +4,7 @@ import 'package:args/command_runner.dart';
 import 'package:dartway_cli/src/commands/check_command.dart';
 import 'package:dartway_cli/src/commands/create_command.dart';
 import 'package:dartway_cli/src/commands/setup_ai_command.dart';
+import 'package:dartway_cli/src/commands/stats_command.dart';
 
 Future<void> main(List<String> args) async {
   final runner =
@@ -13,7 +14,8 @@ Future<void> main(List<String> args) async {
         )
         ..addCommand(CreateCommand())
         ..addCommand(SetupAiCommand())
-        ..addCommand(CheckCommand());
+        ..addCommand(CheckCommand())
+        ..addCommand(StatsCommand());
 
   try {
     exitCode = await runner.run(args) ?? 0;

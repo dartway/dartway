@@ -25,5 +25,3 @@ export 'repository/dw_repository.dart';
 export 'repository/states/dw_model_list_state.dart';
 export 'repository/states/dw_single_model_state.dart';
 export 'utils/dw_file_upload_handler.dart';
-export 'zarchiv/ref_update_actions_extension.dart';
-export 'zarchiv/widget_ref_update_actions_extension.dart';

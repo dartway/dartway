@@ -75,12 +75,11 @@ dev_dependencies:
   riverpod_generator: ^3.0.0
   flutter_gen_runner: ^5.10.0
 
-  dartway_code_checker:
+  dartway_cli:
     git:
       url: https://github.com/dartway/dartway.git
       ref: master
-      path: packages/dartway_code_checker
-    # path: ../../dartway/packages/dartway_code_checker
+      path: packages/dartway_cli
 
 # Внутри монорепо темплейт собирается против ЛОКАЛЬНЫХ пакетов фреймворка.
 # При копировании в самостоятельный проект — удалить весь блок dependency_overrides.
@@ -95,8 +94,8 @@ dependency_overrides:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_shared
   dartway_studio_bridge:
     path: ../../packages/dartway_studio_bridge
-  dartway_code_checker:
-    path: ../../packages/dartway_code_checker
+  dartway_cli:
+    path: ../../packages/dartway_cli
 
 
 # For information on the generic Dart part of this file, see the

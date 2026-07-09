@@ -1,6 +1,6 @@
 name: dartway_studio_bridge
 description: "Open bridge between a DartWay app and DartWay Studio: in-code screen spec registry models and the runtime postMessage protocol."
-version: 0.2.0
+version: 0.1.0
 repository: https://github.com/dartway/dartway
 
 resolution: workspace
