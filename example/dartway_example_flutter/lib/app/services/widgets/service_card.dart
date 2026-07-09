@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class ServiceCard extends StatelessWidget {
@@ -26,7 +27,10 @@ class ServiceCard extends StatelessWidget {
             AppText.caption(service.description),
             const Gap(8),
             AppText.caption(
-              '${service.durationMinutes} min · ${service.price} ₽',
+              context.l10n.serviceDurationPrice(
+                service.durationMinutes,
+                service.price,
+              ),
             ),
           ],
         ),

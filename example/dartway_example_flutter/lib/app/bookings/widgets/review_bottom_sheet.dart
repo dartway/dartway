@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// The server validates the business rule (own attended booking, one review
@@ -15,13 +16,14 @@ class ReviewBottomSheet extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final rating = useState(5);
     final reviewText = useState('');
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppText.title('How was your session?'),
+        AppText.title(l10n.reviewSheetTitle),
         const Gap(16),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -40,13 +42,13 @@ class ReviewBottomSheet extends HookConsumerWidget {
         AppTextFormField(
           value: reviewText.value,
           onChanged: (value) => reviewText.value = value,
-          labelText: 'Review',
-          hintText: 'Tell us what you liked (optional)',
+          labelText: l10n.reviewLabel,
+          hintText: l10n.reviewHint,
           maxLines: 3,
         ),
         const Gap(24),
         DwButton.primary(
-          'Submit review',
+          l10n.submitReview,
           dwCallback: DwUiAction.create(
             (context) async {
               await DwRepository.saveModel(
@@ -61,7 +63,7 @@ class ReviewBottomSheet extends HookConsumerWidget {
               );
               if (context.mounted) Navigator.of(context).pop();
             },
-            onSuccessNotification: 'Thanks for your feedback!',
+            onSuccessNotification: l10n.thanksForFeedback,
           ),
         ),
       ],

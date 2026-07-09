@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
@@ -20,6 +21,7 @@ class SessionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final coachName = session.coachProfile?.firstName ?? '';
 
     return Card(
@@ -31,7 +33,9 @@ class SessionCard extends ConsumerWidget {
             Column(
               children: [
                 AppText.title(session.startsAt.timeLabel),
-                AppText.caption('${session.service?.durationMinutes ?? 0} min'),
+                AppText.caption(
+                  l10n.minutesShort(session.service?.durationMinutes ?? 0),
+                ),
               ],
             ),
             const Gap(16),
@@ -40,19 +44,20 @@ class SessionCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.body(
-                    session.service?.title ?? 'Session',
+                    session.service?.title ?? l10n.sessionFallbackTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (coachName.isNotEmpty) AppText.caption('with $coachName'),
-                  AppText.caption('up to ${session.capacity} people'),
+                  if (coachName.isNotEmpty)
+                    AppText.caption(l10n.withCoach(coachName)),
+                  AppText.caption(l10n.upToPeople(session.capacity)),
                 ],
               ),
             ),
             const Gap(12),
             if (activeBooking == null)
               DwButton.primary(
-                'Book',
+                l10n.book,
                 dwCallback: DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     SessionBooking(
@@ -62,17 +67,17 @@ class SessionCard extends ConsumerWidget {
                       createdAt: DateTime.now(),
                     ),
                   ),
-                  onSuccessNotification: 'You are booked!',
+                  onSuccessNotification: l10n.youAreBooked,
                 ),
               )
             else
               DwButton.secondary(
-                'Cancel',
+                l10n.cancel,
                 dwCallback: DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     activeBooking!.copyWith(status: BookingStatus.cancelled),
                   ),
-                  onSuccessNotification: 'Booking cancelled',
+                  onSuccessNotification: l10n.bookingCancelled,
                 ),
               ),
           ],

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0
+
+- **Breaking:** passport texts are single-language plain strings — `StudioText`
+  and `StudioLanguage` are removed; `StudioScreenSpec`, `StudioZoneSpec` and
+  `DwFeatureSpec` fields are now `String` / `List<String>`, and
+  `StudioManifestIndex.crumbLabel` takes no language. Specs are authored in
+  whatever language the project team writes; Studio shows them as is.
+- **Breaking:** protocol version bumped to 2 (v1 messages are ignored by both
+  sides).
+- App locale switching: `StudioProjectManifest.supportedLocales`,
+  `currentLocale` in the connect snapshot, the `localeRequest` (Studio → app)
+  and `localeChanged` (app → Studio) messages,
+  `StudioBridgeHostDelegate.onLocaleRequest`, `StudioBridgeHost.reportLocale`,
+  `StudioBridgeClient.requestLocale` and the `StudioProjectLocaleChanged`
+  event. Apps declaring fewer than two locales are treated as non-switchable.
+- `StudioZoneSpec.allowedPersonaIds`: a role-gated zone lists the demo
+  personas that can enter it (empty = any), so Studio can switch the session
+  to a capable persona before navigating. The app's guards stay the real
+  protection.
+
 ## 0.1.0
 
 - Initial release: spec models (`StudioText`, `StudioScreenSpec`,

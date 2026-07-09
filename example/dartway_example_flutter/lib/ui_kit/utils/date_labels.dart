@@ -1,13 +1,11 @@
 part of '../ui_kit.dart';
 
-const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
+/// Locale-aware date labels. Formatting follows `Intl.defaultLocale`, which
+/// the app locale controller keeps in sync with the active UI language.
 extension DateTimeLabels on DateTime {
-  String get timeLabel =>
-      '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+  String get timeLabel => DateFormat.Hm().format(this);
 
-  String get dayLabel => '${_weekdayLabels[weekday - 1]}, '
-      '${day.toString().padLeft(2, '0')}.${month.toString().padLeft(2, '0')}';
+  String get dayLabel => DateFormat('EEE, dd.MM').format(this);
 
   bool isSameDayAs(DateTime other) =>
       year == other.year && month == other.month && day == other.day;

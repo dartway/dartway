@@ -5,6 +5,7 @@ import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/bookings/widgets/booking_card.dart';
 import 'package:dartway_example_flutter/common/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
@@ -18,7 +19,7 @@ class MyBookingsPage extends ConsumerWidget {
         .toSet();
 
     return AppScaffold.main(
-      appBar: AppBar(title: AppText.title('My bookings')),
+      appBar: AppBar(title: AppText.title(context.l10n.tabBookings)),
       body: ref
           .watchModelList<SessionBooking>(
             backendFilter: AppBackendFilters.clientBookings(
@@ -30,7 +31,7 @@ class MyBookingsPage extends ConsumerWidget {
             childBuilder: (bookings) {
               if (bookings.isEmpty) {
                 return Center(
-                  child: AppText.body('No bookings yet — pick a session!'),
+                  child: AppText.body(context.l10n.noBookingsYet),
                 );
               }
 

@@ -9,13 +9,14 @@ class AppReadyMessage extends StudioBridgeMessage {
 }
 
 /// App → Studio: the handshake response — the full manifest plus the current
-/// route and session so Studio renders correctly right away.
+/// route, session and locale so Studio renders correctly right away.
 class ManifestMessage extends StudioBridgeMessage {
   const ManifestMessage({
     required this.manifest,
     required this.currentPath,
     required this.session,
     this.features = const [],
+    this.currentLocale = '',
   });
 
   final StudioProjectManifest manifest;
@@ -24,6 +25,9 @@ class ManifestMessage extends StudioBridgeMessage {
 
   /// Features mounted on the current screen at connect time.
   final List<DwFeatureSpec> features;
+
+  /// Active UI locale, empty when the app is not localized.
+  final String currentLocale;
 
   @override
   String get type => StudioBridgeProtocol.manifest;
@@ -34,6 +38,7 @@ class ManifestMessage extends StudioBridgeMessage {
         'currentPath': currentPath,
         'session': session.toJson(),
         'features': [for (final f in features) f.toJson()],
+        'currentLocale': currentLocale,
       };
 
   factory ManifestMessage.fromPayload(Map<String, dynamic> payload) =>
@@ -46,6 +51,7 @@ class ManifestMessage extends StudioBridgeMessage {
           payload['session'] as Map<String, dynamic>? ?? const {},
         ),
         features: DwFeatureSpec.listFromJson(payload['features']),
+        currentLocale: payload['currentLocale'] as String? ?? '',
       );
 }
 
@@ -87,6 +93,22 @@ class FeaturesChangedMessage extends StudioBridgeMessage {
         path: payload['path'] as String? ?? '/',
         features: DwFeatureSpec.listFromJson(payload['features']),
       );
+}
+
+/// App → Studio: the app's UI locale changed.
+class LocaleChangedMessage extends StudioBridgeMessage {
+  const LocaleChangedMessage(this.locale);
+
+  final String locale;
+
+  @override
+  String get type => StudioBridgeProtocol.localeChanged;
+
+  @override
+  Map<String, dynamic> payloadToJson() => {'locale': locale};
+
+  factory LocaleChangedMessage.fromPayload(Map<String, dynamic> payload) =>
+      LocaleChangedMessage(payload['locale'] as String? ?? '');
 }
 
 /// App → Studio: the session changed (sign-in, sign-out, switch progress).

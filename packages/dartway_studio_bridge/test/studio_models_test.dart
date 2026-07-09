@@ -2,61 +2,50 @@ import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('StudioText', () {
-    test('resolve picks the language', () {
-      const text = StudioText('Schedule', 'Расписание');
-      expect(text.resolve(StudioLanguage.en), 'Schedule');
-      expect(text.resolve(StudioLanguage.ru), 'Расписание');
-    });
-
-    test('json round-trip', () {
-      const text = StudioText('a', 'б');
-      final decoded = StudioText.fromJson(text.toJson());
-      expect(decoded.en, 'a');
-      expect(decoded.ru, 'б');
-    });
-
-    test('fromJson tolerates missing fields', () {
-      final decoded = StudioText.fromJson(const {});
-      expect(decoded.en, '');
-      expect(decoded.ru, '');
-    });
-  });
-
   group('StudioScreenSpec', () {
     const spec = StudioScreenSpec(
       path: '/schedule/profile',
       parentPath: '/schedule',
-      title: StudioText('Profile', 'Профиль'),
-      purpose: StudioText('why', 'зачем'),
-      featureSpec: [StudioText('f1', 'ф1')],
-      discussionQuestions: [StudioText('q1', 'в1')],
+      title: 'Profile',
+      purpose: 'why',
+      featureSpec: ['f1'],
+      discussionQuestions: ['q1'],
     );
 
     test('json round-trip preserves all fields', () {
       final decoded = StudioScreenSpec.fromJson(spec.toJson());
       expect(decoded.path, '/schedule/profile');
       expect(decoded.parentPath, '/schedule');
-      expect(decoded.title.en, 'Profile');
-      expect(decoded.featureSpec.single.ru, 'ф1');
-      expect(decoded.discussionQuestions.single.en, 'q1');
+      expect(decoded.title, 'Profile');
+      expect(decoded.featureSpec.single, 'f1');
+      expect(decoded.discussionQuestions.single, 'q1');
     });
 
     test('omits parentPath when null', () {
       const root = StudioScreenSpec(
         path: '/schedule',
-        title: StudioText('Schedule', 'Расписание'),
-        purpose: StudioText('', ''),
+        title: 'Schedule',
+        purpose: '',
       );
       expect(root.toJson().containsKey('parentPath'), isFalse);
       expect(StudioScreenSpec.fromJson(root.toJson()).parentPath, isNull);
+    });
+
+    test('fromJson tolerates missing and non-string list items', () {
+      final decoded = StudioScreenSpec.fromJson(const {
+        'path': '/x',
+        'featureSpec': ['ok', 1, null],
+      });
+      expect(decoded.title, '');
+      expect(decoded.featureSpec, ['ok']);
+      expect(decoded.discussionQuestions, isEmpty);
     });
   });
 
   group('StudioZoneSpec', () {
     test('access enum round-trips and defaults to any', () {
       const zone = StudioZoneSpec(
-        label: StudioText('Auth', 'Авторизация'),
+        label: 'Auth',
         rootPath: '/auth',
         access: StudioZoneAccess.signedOut,
         screens: [],
@@ -66,6 +55,21 @@ void main() {
       expect(
         StudioZoneSpec.fromJson(const {'rootPath': '/x'}).access,
         StudioZoneAccess.any,
+      );
+    });
+
+    test('allowedPersonaIds round-trips and defaults to empty', () {
+      const zone = StudioZoneSpec(
+        label: 'Admin',
+        rootPath: '/admin',
+        allowedPersonaIds: ['admin-alex'],
+        screens: [],
+      );
+      expect(StudioZoneSpec.fromJson(zone.toJson()).allowedPersonaIds,
+          ['admin-alex']);
+      expect(
+        StudioZoneSpec.fromJson(const {'rootPath': '/x'}).allowedPersonaIds,
+        isEmpty,
       );
     });
   });
@@ -92,19 +96,19 @@ void main() {
   });
 
   group('StudioProjectManifest', () {
-    test('json round-trip with zones and personas', () {
+    test('json round-trip with zones, personas and locales', () {
       const manifest = StudioProjectManifest(
         projectName: 'Demo',
         zones: [
           StudioZoneSpec(
-            label: StudioText('Club', 'Клуб'),
+            label: 'Club',
             rootPath: '/schedule',
             access: StudioZoneAccess.signedIn,
             screens: [
               StudioScreenSpec(
                 path: '/schedule',
-                title: StudioText('Schedule', 'Расписание'),
-                purpose: StudioText('', ''),
+                title: 'Schedule',
+                purpose: '',
               ),
             ],
           ),
@@ -116,12 +120,19 @@ void main() {
             identifier: '79990000003',
           ),
         ],
+        supportedLocales: ['en', 'ru'],
       );
       final decoded = StudioProjectManifest.fromJson(manifest.toJson());
       expect(decoded.projectName, 'Demo');
       expect(decoded.zones.single.access, StudioZoneAccess.signedIn);
       expect(decoded.zones.single.screens.single.path, '/schedule');
       expect(decoded.personas.single.identifier, '79990000003');
+      expect(decoded.supportedLocales, ['en', 'ru']);
+    });
+
+    test('supportedLocales defaults to empty', () {
+      final decoded = StudioProjectManifest.fromJson(const {'projectName': 'x'});
+      expect(decoded.supportedLocales, isEmpty);
     });
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
@@ -16,13 +17,10 @@ class ChatMessageComposer extends HookConsumerWidget implements DwFeature {
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
         id: 'chat-message-composer',
-        title: StudioText('Message composer', 'Отправка сообщений'),
-        description: StudioText(
-          'Sending is a single DwRepository.saveModel(ChatMessage) — the list '
-              'above updates in realtime, no extra wiring.',
-          'Отправка — один DwRepository.saveModel(ChatMessage); список выше '
-              'обновляется в realtime, без лишней обвязки.',
-        ),
+        title: 'Message composer',
+        description:
+            'Sending is a single DwRepository.saveModel(ChatMessage) — the '
+            'list above updates in realtime, no extra wiring.',
       );
 
   @override
@@ -51,7 +49,7 @@ class ChatMessageComposer extends HookConsumerWidget implements DwFeature {
           child: AppTextFormField(
             value: draftText.value,
             onChanged: (value) => draftText.value = value,
-            hintText: 'Message the team...',
+            hintText: context.l10n.messageTheTeam,
             maxLines: 3,
             minLines: 1,
           ),

@@ -1,6 +1,7 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/core/user_profile_roles.dart';
@@ -87,17 +88,18 @@ class _AppBottomNavigationBar extends ConsumerWidget {
         for (final tab in tabs)
           BottomNavigationBarItem(
             icon: Icon(tab.icon),
-            label: _tabLabel(tab.route),
+            label: _tabLabel(context.l10n, tab.route),
           ),
       ],
     );
   }
 
-  String _tabLabel(AppNavigationZone route) => switch (route) {
-        AppNavigationZone.schedule => 'Schedule',
-        AppNavigationZone.bookings => 'My bookings',
-        AppNavigationZone.news => 'News',
-        AppNavigationZone.chat => 'Team chat',
-        _ => 'Profile',
+  String _tabLabel(AppLocalizations l10n, AppNavigationZone route) =>
+      switch (route) {
+        AppNavigationZone.schedule => l10n.tabSchedule,
+        AppNavigationZone.bookings => l10n.tabBookings,
+        AppNavigationZone.news => l10n.tabNews,
+        AppNavigationZone.chat => l10n.tabChat,
+        _ => l10n.tabProfile,
       };
 }

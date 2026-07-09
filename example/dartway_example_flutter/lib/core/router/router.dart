@@ -1,7 +1,9 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../app/admin/admin_page.dart';
+import '../../app/admin/dashboard/admin_dashboard_page.dart';
+import '../../app/admin/settings/admin_settings_page.dart';
+import '../../app/admin/users/admin_users_page.dart';
 import '../../app/bookings/my_bookings_page.dart';
 import '../../app/chat/staff_chat_page.dart';
 import '../../app/news/news_page.dart';

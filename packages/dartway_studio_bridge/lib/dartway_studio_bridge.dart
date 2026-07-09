@@ -11,7 +11,6 @@ export 'src/models/studio_persona_spec.dart';
 export 'src/models/studio_project_manifest.dart';
 export 'src/models/studio_screen_spec.dart';
 export 'src/models/studio_session_state.dart';
-export 'src/models/studio_text.dart';
 export 'src/models/studio_zone_spec.dart';
 
 // Runtime protocol.

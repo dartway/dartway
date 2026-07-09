@@ -1,0 +1,159 @@
+{
+  "@@locale": "en",
+
+  "tabSchedule": "Schedule",
+  "tabBookings": "My bookings",
+  "tabNews": "News",
+  "tabChat": "Team chat",
+  "tabProfile": "Profile",
+
+  "helloUser": "Hello, {name}",
+  "@helloUser": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "noUpcomingSessions": "No upcoming sessions yet",
+  "sessionFallbackTitle": "Session",
+  "minutesShort": "{minutes} min",
+  "@minutesShort": {
+    "placeholders": {
+      "minutes": {"type": "int"}
+    }
+  },
+  "withCoach": "with {name}",
+  "@withCoach": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "upToPeople": "up to {count} people",
+  "@upToPeople": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "book": "Book",
+  "cancel": "Cancel",
+  "youAreBooked": "You are booked!",
+  "bookingCancelled": "Booking cancelled",
+
+  "noBookingsYet": "No bookings yet — pick a session!",
+  "bookingStatus": "{status, select, booked{Booked} cancelled{Cancelled} attended{Attended} other{—}}",
+  "@bookingStatus": {
+    "placeholders": {
+      "status": {"type": "String"}
+    }
+  },
+  "cancelBooking": "Cancel booking",
+  "leaveReview": "Leave a review",
+  "thanksForReview": "Thanks for your review!",
+  "reviewSheetTitle": "How was your session?",
+  "reviewLabel": "Review",
+  "reviewHint": "Tell us what you liked (optional)",
+  "submitReview": "Submit review",
+  "thanksForFeedback": "Thanks for your feedback!",
+
+  "clubNews": "Club news",
+  "noNewsYet": "No news yet — stay tuned!",
+  "newClubPost": "New club post",
+  "postTitleLabel": "Title",
+  "postTitleHint": "What is happening?",
+  "postContentLabel": "Content",
+  "postContentHint": "Tell the members...",
+  "publish": "Publish",
+  "postPublished": "Post published!",
+
+  "staffOnlyArea": "This area is for the club team",
+  "noChatChannels": "No chat channels yet",
+  "sayHiToTeam": "Say hi to the team!",
+  "messageTheTeam": "Message the team...",
+
+  "ourServices": "Our services",
+  "priceListComingSoon": "The price list is coming soon",
+  "serviceDurationPrice": "{minutes} min · {price} ₽",
+  "@serviceDurationPrice": {
+    "placeholders": {
+      "minutes": {"type": "int"},
+      "price": {"type": "int"}
+    }
+  },
+
+  "profileTitle": "Profile",
+  "adminPanel": "Admin panel",
+  "signOutAction": "Sign out",
+  "firstNameLabel": "First Name",
+  "firstNameHint": "Enter your first name",
+  "firstNameRequired": "First name is required",
+  "genderLabel": "Gender",
+  "genderNotSpecified": "Not specified",
+  "genderValue": "{gender, select, male{Male} female{Female} other{—}}",
+  "@genderValue": {
+    "placeholders": {
+      "gender": {"type": "String"}
+    }
+  },
+  "saveChanges": "Save Changes",
+  "profileUpdated": "Profile updated successfully!",
+
+  "authStepTitle": "{step, select, greeting{Welcome!} registration{Step 1 of 3} login{Step 1 of 2} registrationConfirmation{Step 2 of 3} loginConfirmation{Step 2 of 2} other{}}",
+  "@authStepTitle": {
+    "placeholders": {
+      "step": {"type": "String"}
+    }
+  },
+  "completeLoginToContinue": "Complete login or registration to continue",
+  "registrationAction": "Registration",
+  "loginAction": "Login",
+  "fillRegistrationData": "Fill registration data",
+  "nameLabel": "Name",
+  "requiredField": "Required field",
+  "youMustAgree": "You must agree",
+  "agreeTermsPrefix": "I am familiar with and agree to the terms of the",
+  "offerLink": "offer,",
+  "userAgreementLink": "user agreement,",
+  "acceptTermsPrefix": "I accept the terms of the",
+  "dataPolicyLinkComma": "data processing policy,",
+  "iGive": "I give",
+  "consentLink": "consent",
+  "marketingConsentText": "on receiving informational and promotional mailings, therefore I give",
+  "dataProcessingConsentText": "on processing personal data in accordance with the",
+  "dataPolicyLink": "data processing policy",
+  "continueAction": "Continue",
+  "alreadyHaveAccount": "Already have an account? ",
+  "stillNoAccount": "Still no account? ",
+  "enterSmsCode": "Enter the code from SMS",
+  "sentCodeToNumber": "Sent 6-digit code to number\n{phone}",
+  "@sentCodeToNumber": {
+    "placeholders": {
+      "phone": {"type": "String"}
+    }
+  },
+
+  "adminDashboard": "Dashboard",
+  "adminUsers": "Users",
+  "adminSettings": "Settings",
+  "backToApp": "Back to the app",
+  "countersLiveHint": "Counters are live: they update in realtime as members book sessions and staff publishes news.",
+  "countMembers": "Members",
+  "countSessions": "Sessions",
+  "countNews": "News",
+  "searchLabel": "Search",
+  "searchHint": "Name or phone",
+  "allRoles": "All roles",
+  "roleName": "{role, select, client{Client} staff{Staff} admin{Admin} other{—}}",
+  "@roleName": {
+    "placeholders": {
+      "role": {"type": "String"}
+    }
+  },
+  "noMembersYet": "No members yet.",
+  "noMembersMatch": "No members match.",
+  "clubSettings": "Club settings",
+  "clubNameLabel": "Club name",
+  "saveAction": "Save",
+  "settingsSaved": "Settings saved",
+  "noSettingsConfigured": "No settings configured.",
+
+  "networkErrorTryAgain": "Network error. Please try again."
+}

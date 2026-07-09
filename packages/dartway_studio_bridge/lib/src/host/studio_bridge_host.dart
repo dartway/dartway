@@ -15,6 +15,10 @@ abstract interface class StudioBridgeHostDelegate {
   Future<void> onPersonaRequest(String personaId);
 
   Future<void> onSignOutRequest();
+
+  /// Switch the app UI to [locale] (a tag from the manifest's
+  /// `supportedLocales`). No-op for apps that declared none.
+  void onLocaleRequest(String locale);
 }
 
 /// The app-side end of the Studio bridge: announces the app, answers the
@@ -28,6 +32,7 @@ class StudioBridgeHost {
     this._currentPath,
     this._currentSession,
     this._currentFeatures,
+    this._currentLocale,
   ) {
     _subscription = _channel.messages.listen(_onMessage);
     _channel.send(const AppReadyMessage());
@@ -46,6 +51,7 @@ class StudioBridgeHost {
     required String Function() currentPath,
     required StudioSessionState Function() currentSession,
     List<DwFeatureSpec> Function()? currentFeatures,
+    String Function()? currentLocale,
     List<String> allowedStudioOrigins = const [],
   }) {
     final channel =
@@ -58,6 +64,7 @@ class StudioBridgeHost {
       currentPath,
       currentSession,
       currentFeatures ?? () => const [],
+      currentLocale ?? () => '',
     );
   }
 
@@ -67,6 +74,7 @@ class StudioBridgeHost {
   final String Function() _currentPath;
   final StudioSessionState Function() _currentSession;
   final List<DwFeatureSpec> Function() _currentFeatures;
+  final String Function() _currentLocale;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
   void _onMessage(StudioBridgeMessage message) {
@@ -77,6 +85,7 @@ class StudioBridgeHost {
           currentPath: _currentPath(),
           session: _currentSession(),
           features: _currentFeatures(),
+          currentLocale: _currentLocale(),
         ));
       case NavigateRequestMessage(:final path):
         _delegate.onNavigateRequest(path);
@@ -84,6 +93,8 @@ class StudioBridgeHost {
         unawaited(_delegate.onPersonaRequest(personaId));
       case SignOutRequestMessage():
         unawaited(_delegate.onSignOutRequest());
+      case LocaleRequestMessage(:final locale):
+        _delegate.onLocaleRequest(locale);
       default:
         break; // App → Studio messages echoed back are ignored.
     }
@@ -96,6 +107,8 @@ class StudioBridgeHost {
 
   void reportFeatures(String path, List<DwFeatureSpec> features) =>
       _channel.send(FeaturesChangedMessage(path: path, features: features));
+
+  void reportLocale(String locale) => _channel.send(LocaleChangedMessage(locale));
 
   void detach() {
     _subscription.cancel();

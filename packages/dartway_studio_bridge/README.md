@@ -11,28 +11,42 @@ the bridge — persona sign-in runs entirely inside the app.
 
 ## Declaring specs (app side)
 
+Passport texts are plain strings — write them in whatever language your team
+works in; Studio shows them as is.
+
 ```dart
 final scheduleSpec = StudioScreenSpec(
   path: '/schedule',
-  title: StudioText('Schedule', 'Расписание'),
-  purpose: StudioText('Weekly class timetable...', 'Расписание занятий...'),
-  featureSpec: [StudioText('Realtime list via DwRepository', '...')],
-  discussionQuestions: [StudioText('Should slots be bookable here?', '...')],
+  title: 'Schedule',
+  purpose: 'Weekly class timetable...',
+  featureSpec: ['Realtime list via DwRepository'],
+  discussionQuestions: ['Should slots be bookable here?'],
 );
 
 final manifest = StudioProjectManifest(
   projectName: 'My App',
   zones: [
     StudioZoneSpec(
-      label: StudioText('Client app', 'Приложение клиента'),
+      label: 'Client app',
       rootPath: '/schedule',
       access: StudioZoneAccess.signedIn,
       screens: [scheduleSpec /* ... */],
+    ),
+    StudioZoneSpec(
+      label: 'Admin',
+      rootPath: '/admin',
+      access: StudioZoneAccess.signedIn,
+      // Role-gated zone: Studio switches to a listed persona before entering.
+      allowedPersonaIds: ['admin'],
+      screens: [/* ... */],
     ),
   ],
   personas: [
     StudioPersonaSpec(id: 'client', label: 'Client · Ivan', identifier: '7999...'),
   ],
+  // Declare two or more locales to get a locale switcher in Studio; the app
+  // executes the switch itself via StudioBridgeHostDelegate.onLocaleRequest.
+  supportedLocales: ['en', 'ru'],
 );
 ```
 
@@ -41,12 +55,14 @@ final manifest = StudioProjectManifest(
 ```dart
 final host = StudioBridgeHost.attach(
   manifest: manifest,
-  delegate: myDelegate, // navigate / persona sign-in / sign-out executors
+  delegate: myDelegate, // navigate / persona sign-in / sign-out / locale executors
   currentPath: () => router.currentPath,
   currentSession: () => mySessionState,
+  currentLocale: () => myLocale.languageCode, // omit if not localized
 );
 host?.reportRoute(newPath);     // on router changes
 host?.reportSession(newState);  // on auth changes
+host?.reportLocale(newLocale);  // on locale changes
 ```
 
 `attach` returns null when the app is not running on web inside an iframe, or
@@ -56,11 +72,12 @@ fully functional and the bridge dormant (secure by default).
 ## Connecting (Studio side)
 
 ```dart
-final controller = createStudioFrameController(appUrl: 'http://localhost:8090/');
+final controller = createStudioFrameController(appUrl: 'http://localhost:8091/');
 final client = StudioBridgeClient(channel: controller.channel)..start();
 // render: HtmlElementView(viewType: controller.viewType)
-client.events.listen(...); // connected / route changed / session changed
+client.events.listen(...); // connected / route / session / locale changed
 client.requestNavigation('/schedule');
+client.requestLocale('ru');
 ```
 
 The handshake is dual-initiated and survives reloads and hot restarts of either

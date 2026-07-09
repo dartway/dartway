@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
@@ -44,6 +45,8 @@ class ProfileSettingsWidget extends HookConsumerWidget {
       };
     }, []);
 
+    final l10n = context.l10n;
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -53,11 +56,11 @@ class ProfileSettingsWidget extends HookConsumerWidget {
           AppTextFormField(
             value: firstNameController.text,
             onChanged: (value) => firstNameController.text = value,
-            labelText: 'First Name',
-            hintText: 'Enter your first name',
+            labelText: l10n.firstNameLabel,
+            hintText: l10n.firstNameHint,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'First name is required';
+                return l10n.firstNameRequired;
               }
               return null;
             },
@@ -66,27 +69,26 @@ class ProfileSettingsWidget extends HookConsumerWidget {
           const Gap(16),
 
           // Gender Selector
-          const DwText('Gender', textStyle: AppText.body),
+          DwText(l10n.genderLabel, textStyle: AppText.body),
           const Gap(8),
           DropdownButtonFormField<UserGender>(
-            value: selectedGender.value,
+            initialValue: selectedGender.value,
             onChanged: (UserGender? newValue) {
               selectedGender.value = newValue;
             },
             decoration: const InputDecoration(
-              hintText: 'Select your gender',
               border: OutlineInputBorder(),
             ),
             items: [
-              const DropdownMenuItem<UserGender>(
+              DropdownMenuItem<UserGender>(
                 value: null,
-                child: Text('Not specified'),
+                child: Text(l10n.genderNotSpecified),
               ),
               ...UserGender.values
                   .map<DropdownMenuItem<UserGender>>((UserGender gender) {
                 return DropdownMenuItem<UserGender>(
                   value: gender,
-                  child: Text(gender.name.toUpperCase()),
+                  child: Text(l10n.genderValue(gender.name)),
                 );
               }),
             ],
@@ -97,7 +99,7 @@ class ProfileSettingsWidget extends HookConsumerWidget {
           // Save Button (only shows when there are changes)
           if (hasChanges.value) ...[
             DwButton.primary(
-              'Save Changes',
+              l10n.saveChanges,
               dwCallback: DwUiAction.create(
                 (context) async {
                   await DwRepository.saveModel(
@@ -108,7 +110,7 @@ class ProfileSettingsWidget extends HookConsumerWidget {
                   );
                   hasChanges.value = false;
                 },
-                onSuccessNotification: 'Profile updated successfully!',
+                onSuccessNotification: l10n.profileUpdated,
               ),
             ),
             const Gap(16),

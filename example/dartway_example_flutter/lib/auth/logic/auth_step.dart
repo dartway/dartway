@@ -1,32 +1,15 @@
+/// Steps of the auth flow. Titles live in the localizations
+/// (`authStepTitle`), keyed by the step name.
 enum AuthStep {
-  greeting(
-    title: 'Welcome!',
-    previousStep: null,
-  ),
-  registration(
-    title: 'Step 1 of 3',
-    previousStep: greeting,
-  ),
-  login(
-    title: 'Step 1 of 2',
-    previousStep: greeting,
-  ),
-  registrationConfirmation(
-    title: 'Step 2 of 3',
-    previousStep: registration,
-  ),
-  loginConfirmation(
-    title: 'Step 2 of 2',
-    previousStep: login,
-  );
+  greeting(previousStep: null),
+  registration(previousStep: greeting),
+  login(previousStep: greeting),
+  registrationConfirmation(previousStep: registration),
+  loginConfirmation(previousStep: login);
 
-  final String? title;
   final AuthStep? previousStep;
 
-  const AuthStep({
-    required this.title,
-    required this.previousStep,
-  });
+  const AuthStep({required this.previousStep});
 
   AuthStep get requestOtpNextStep => switch (this) {
         AuthStep.registration => AuthStep.registrationConfirmation,

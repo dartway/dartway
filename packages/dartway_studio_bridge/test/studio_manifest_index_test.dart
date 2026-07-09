@@ -5,8 +5,8 @@ StudioScreenSpec _screen(String path, String? parent, String title) =>
     StudioScreenSpec(
       path: path,
       parentPath: parent,
-      title: StudioText(title, title),
-      purpose: const StudioText('', ''),
+      title: title,
+      purpose: '',
     );
 
 void main() {
@@ -14,7 +14,7 @@ void main() {
     projectName: 'Demo',
     zones: [
       StudioZoneSpec(
-        label: const StudioText('Club', 'Клуб'),
+        label: 'Club',
         rootPath: '/schedule',
         access: StudioZoneAccess.signedIn,
         screens: [
@@ -24,7 +24,7 @@ void main() {
         ],
       ),
       StudioZoneSpec(
-        label: const StudioText('Auth', 'Авторизация'),
+        label: 'Auth',
         rootPath: '/auth',
         access: StudioZoneAccess.signedOut,
         screens: [_screen('/auth', null, 'Sign in')],
@@ -35,7 +35,7 @@ void main() {
 
   group('specForPath', () {
     test('exact match', () {
-      expect(index.specForPath('/schedule/profile')!.title.en, 'Profile');
+      expect(index.specForPath('/schedule/profile')!.title, 'Profile');
     });
 
     test('deepest non-root prefix for nested location', () {
@@ -61,18 +61,17 @@ void main() {
   group('crumbLabel', () {
     test('builds the parent chain but drops the zone root', () {
       final services = index.specForPath('/schedule/profile/services')!;
-      expect(index.crumbLabel(services, StudioLanguage.en),
-          'Profile › Services');
+      expect(index.crumbLabel(services), 'Profile › Services');
     });
 
     test('a direct child of the zone root keeps only its own title', () {
       final profile = index.specForPath('/schedule/profile')!;
-      expect(index.crumbLabel(profile, StudioLanguage.en), 'Profile');
+      expect(index.crumbLabel(profile), 'Profile');
     });
 
     test('the zone root keeps its own title', () {
       final schedule = index.specForPath('/schedule')!;
-      expect(index.crumbLabel(schedule, StudioLanguage.en), 'Schedule');
+      expect(index.crumbLabel(schedule), 'Schedule');
     });
   });
 }

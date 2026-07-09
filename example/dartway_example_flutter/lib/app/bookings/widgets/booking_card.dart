@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/bookings/widgets/review_bottom_sheet.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class BookingCard extends StatelessWidget {
@@ -17,6 +18,7 @@ class BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final clubSession = booking.clubSession;
     final startsAt = clubSession?.startsAt;
 
@@ -31,12 +33,12 @@ class BookingCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: AppText.body(
-                    clubSession?.service?.title ?? 'Session',
+                    clubSession?.service?.title ?? l10n.sessionFallbackTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                AppText.caption(booking.status.name),
+                AppText.caption(l10n.bookingStatus(booking.status.name)),
               ],
             ),
             if (startsAt != null)
@@ -44,17 +46,17 @@ class BookingCard extends StatelessWidget {
             const Gap(12),
             if (_canCancel(startsAt))
               DwButton.secondary(
-                'Cancel booking',
+                l10n.cancelBooking,
                 dwCallback: DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     booking.copyWith(status: BookingStatus.cancelled),
                   ),
-                  onSuccessNotification: 'Booking cancelled',
+                  onSuccessNotification: l10n.bookingCancelled,
                 ),
               ),
             if (booking.status == BookingStatus.attended && !isReviewed)
               DwButton.primary(
-                'Leave a review',
+                l10n.leaveReview,
                 dwCallback: DwUiAction.create(
                   (context) => context.showAppBottomSheet(
                     child: ReviewBottomSheet(booking: booking),
@@ -62,7 +64,7 @@ class BookingCard extends StatelessWidget {
                 ),
               ),
             if (booking.status == BookingStatus.attended && isReviewed)
-              AppText.caption('Thanks for your review!'),
+              AppText.caption(l10n.thanksForReview),
           ],
         ),
       ),

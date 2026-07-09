@@ -7,12 +7,13 @@ screen map, screen passports and a demo-persona switcher.
 The open `dartway_studio_bridge` package is the only integration surface:
 
 - **Spec models** — declare navigation zones, screen passports
-  (`StudioScreenSpec` with bilingual `StudioText`) and demo personas in your
-  app's code. Screens are identified by route path strings, so any router
-  works.
+  (`StudioScreenSpec`, plain single-language strings — written in whatever
+  language your team works in) and demo personas in your app's code. Screens
+  are identified by route path strings, so any router works.
 - **Runtime protocol** — a versioned `postMessage` protocol between Studio and
-  the app's web build running in an iframe: Studio navigates the live app,
-  the app reports route and session changes, persona sign-in runs entirely
+  the app's web build running in an iframe: Studio navigates the live app and
+  switches its UI locale (when the manifest declares `supportedLocales`), the
+  app reports route, session and locale changes, persona sign-in runs entirely
   inside the app (credentials never cross the bridge).
 - **`StudioBridgeHost.attach`** — call it once in your app shell (see
   `lib/studio/studio_bridge_binding.dart` in the example). The host is inert

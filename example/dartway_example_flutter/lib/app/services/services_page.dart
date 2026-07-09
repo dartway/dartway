@@ -4,6 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/services/widgets/service_card.dart';
 import 'package:dartway_example_flutter/common/app_scaffold.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class ServicesPage extends ConsumerWidget {
@@ -12,13 +13,13 @@ class ServicesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return AppScaffold.inner(
-      appBar: AppBar(title: AppText.title('Our services')),
+      appBar: AppBar(title: AppText.title(context.l10n.ourServices)),
       body: ref.watchModelList<ClubService>().dwBuildListAsync(
             loadingItemsCount: 4,
             childBuilder: (services) {
               if (services.isEmpty) {
                 return Center(
-                  child: AppText.body('The price list is coming soon'),
+                  child: AppText.body(context.l10n.priceListComingSoon),
                 );
               }
 

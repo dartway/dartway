@@ -1,11 +1,12 @@
-import 'studio_text.dart';
-
 /// The screen passport declared in the app's code: functional specification
 /// plus product context, keyed by the screen's route path.
 ///
 /// Screens are identified by plain path strings so the bridge stays
 /// independent of any router package — the app converts its typed routes to
 /// paths when declaring specs.
+///
+/// Passport texts are plain single-language strings: whatever language the
+/// project team writes its specs in is what Studio shows.
 class StudioScreenSpec {
   const StudioScreenSpec({
     required this.path,
@@ -22,39 +23,39 @@ class StudioScreenSpec {
   /// Full path of the parent screen (breadcrumb chain), null for roots.
   final String? parentPath;
 
-  final StudioText title;
+  final String title;
 
   /// CJM / business context: why this screen exists.
-  final StudioText purpose;
+  final String purpose;
 
   /// Which framework capability each feature of the screen demonstrates.
-  final List<StudioText> featureSpec;
+  final List<String> featureSpec;
 
-  final List<StudioText> discussionQuestions;
+  final List<String> discussionQuestions;
 
   Map<String, dynamic> toJson() => {
         'path': path,
         if (parentPath != null) 'parentPath': parentPath,
-        'title': title.toJson(),
-        'purpose': purpose.toJson(),
-        'featureSpec': [for (final text in featureSpec) text.toJson()],
-        'discussionQuestions': [
-          for (final text in discussionQuestions) text.toJson(),
-        ],
+        'title': title,
+        'purpose': purpose,
+        'featureSpec': featureSpec,
+        'discussionQuestions': discussionQuestions,
       };
 
   factory StudioScreenSpec.fromJson(Map<String, dynamic> json) =>
       StudioScreenSpec(
         path: json['path'] as String? ?? '',
         parentPath: json['parentPath'] as String?,
-        title: StudioText.fromJson(
-          json['title'] as Map<String, dynamic>? ?? const {},
-        ),
-        purpose: StudioText.fromJson(
-          json['purpose'] as Map<String, dynamic>? ?? const {},
-        ),
-        featureSpec: StudioText.listFromJson(json['featureSpec']),
-        discussionQuestions:
-            StudioText.listFromJson(json['discussionQuestions']),
+        title: json['title'] as String? ?? '',
+        purpose: json['purpose'] as String? ?? '',
+        featureSpec: stringListFromJson(json['featureSpec']),
+        discussionQuestions: stringListFromJson(json['discussionQuestions']),
       );
+
+  /// Lenient string-list parsing shared by the spec models.
+  static List<String> stringListFromJson(Object? json) => [
+        if (json is List)
+          for (final item in json)
+            if (item is String) item,
+      ];
 }

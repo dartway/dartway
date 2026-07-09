@@ -1,5 +1,3 @@
-import 'studio_text.dart';
-
 /// A product feature present on a screen, discovered at runtime from the
 /// widgets that declare it (see `DwFeature`). Reported live to Studio and
 /// shown on the Technical passport tab.
@@ -13,23 +11,19 @@ class DwFeatureSpec {
   /// Stable id — deduplicates a feature declared by multiple widget instances.
   final String id;
 
-  final StudioText title;
-  final StudioText description;
+  final String title;
+  final String description;
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'title': title.toJson(),
-        'description': description.toJson(),
+        'title': title,
+        'description': description,
       };
 
   factory DwFeatureSpec.fromJson(Map<String, dynamic> json) => DwFeatureSpec(
         id: json['id'] as String? ?? '',
-        title: StudioText.fromJson(
-          json['title'] as Map<String, dynamic>? ?? const {},
-        ),
-        description: StudioText.fromJson(
-          json['description'] as Map<String, dynamic>? ?? const {},
-        ),
+        title: json['title'] as String? ?? '',
+        description: json['description'] as String? ?? '',
       );
 
   static List<DwFeatureSpec> listFromJson(Object? json) => [

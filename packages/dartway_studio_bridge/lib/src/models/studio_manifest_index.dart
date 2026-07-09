@@ -1,6 +1,5 @@
 import 'studio_project_manifest.dart';
 import 'studio_screen_spec.dart';
-import 'studio_text.dart';
 import 'studio_zone_spec.dart';
 
 /// Lookup helpers over a [StudioProjectManifest]: resolve the spec for a
@@ -41,13 +40,13 @@ class StudioManifestIndex {
 
   /// Breadcrumb-style label built from the parent chain, e.g.
   /// `Profile › Services`. Zone roots keep their own title.
-  String crumbLabel(StudioScreenSpec spec, StudioLanguage language) {
-    final labels = <String>[spec.title.resolve(language)];
+  String crumbLabel(StudioScreenSpec spec) {
+    final labels = <String>[spec.title];
     var parentPath = spec.parentPath;
     while (parentPath != null) {
       final parentSpec = _byPath[parentPath];
       if (parentSpec == null || parentSpec.parentPath == null) break;
-      labels.insert(0, parentSpec.title.resolve(language));
+      labels.insert(0, parentSpec.title);
       parentPath = parentSpec.parentPath;
     }
     return labels.join(' › ');

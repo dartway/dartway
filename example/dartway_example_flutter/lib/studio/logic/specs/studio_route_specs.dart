@@ -7,10 +7,10 @@ import '../../../core/router/router.dart';
 /// the only place where the router types and Studio declarations meet.
 StudioScreenSpec studioSpecForRoute(
   DwNavigationRoute<AppRouterState> route, {
-  required StudioText title,
-  required StudioText purpose,
-  List<StudioText> featureSpec = const [],
-  List<StudioText> discussionQuestions = const [],
+  required String title,
+  required String purpose,
+  List<String> featureSpec = const [],
+  List<String> discussionQuestions = const [],
 }) =>
     StudioScreenSpec(
       path: route.fullPath,

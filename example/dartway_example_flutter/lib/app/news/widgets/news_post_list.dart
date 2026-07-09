@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/news/widgets/news_post_card.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class NewsPostList extends ConsumerWidget {
@@ -15,7 +16,7 @@ class NewsPostList extends ConsumerWidget {
           childBuilder: (posts) {
             if (posts.isEmpty) {
               return Center(
-                child: AppText.body('No news yet — stay tuned!'),
+                child: AppText.body(context.l10n.noNewsYet),
               );
             }
 

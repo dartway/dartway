@@ -51,8 +51,8 @@ void main() {
           features: [
             DwFeatureSpec(
               id: 'schedule-list',
-              title: StudioText('List', 'Список'),
-              description: StudioText('desc', 'опис'),
+              title: 'List',
+              description: 'desc',
             ),
           ],
         ),
@@ -61,7 +61,17 @@ void main() {
       final msg = decoded as FeaturesChangedMessage;
       expect(msg.path, '/schedule');
       expect(msg.features.single.id, 'schedule-list');
-      expect(msg.features.single.title.ru, 'Список');
+      expect(msg.features.single.title, 'List');
+    });
+
+    test('localeRequest carries the locale', () {
+      final decoded = _roundTrip(const LocaleRequestMessage('ru'));
+      expect((decoded as LocaleRequestMessage).locale, 'ru');
+    });
+
+    test('localeChanged carries the locale', () {
+      final decoded = _roundTrip(const LocaleChangedMessage('en'));
+      expect((decoded as LocaleChangedMessage).locale, 'en');
     });
 
     test('sessionChanged carries the session', () {
@@ -73,12 +83,13 @@ void main() {
       expect((decoded as SessionChangedMessage).session.activePersonaId, 'a');
     });
 
-    test('manifest carries manifest, path and session', () {
+    test('manifest carries manifest, path, session and locale', () {
       final decoded = _roundTrip(
         const ManifestMessage(
           manifest: manifest,
           currentPath: '/schedule',
           session: StudioSessionState.signedOut,
+          currentLocale: 'en',
         ),
       );
       expect(decoded, isA<ManifestMessage>());
@@ -87,6 +98,7 @@ void main() {
       expect(msg.manifest.personas.single.id, 'a');
       expect(msg.currentPath, '/schedule');
       expect(msg.session.isSignedIn, isFalse);
+      expect(msg.currentLocale, 'en');
     });
   });
 
@@ -113,12 +125,19 @@ void main() {
             '{"dartwayStudioBridge":999,"type":"appReady"}'),
         isNull,
       );
+      // v1 (bilingual passports) is a different schema — must be ignored.
+      expect(
+        StudioBridgeMessage.tryDecode(
+            '{"dartwayStudioBridge":1,"type":"appReady"}'),
+        isNull,
+      );
     });
 
     test('unknown message type', () {
       expect(
         StudioBridgeMessage.tryDecode(
-            '{"dartwayStudioBridge":1,"type":"bogus","payload":{}}'),
+            '{"dartwayStudioBridge":${StudioBridgeProtocol.version},'
+            '"type":"bogus","payload":{}}'),
         isNull,
       );
     });

@@ -1,5 +1,4 @@
 import 'studio_screen_spec.dart';
-import 'studio_text.dart';
 
 /// Who can enter a navigation zone — lets Studio render zone tabs without
 /// app-specific knowledge (e.g. which zone is "the auth one").
@@ -22,32 +21,40 @@ class StudioZoneSpec {
     required this.label,
     required this.rootPath,
     this.access = StudioZoneAccess.any,
+    this.allowedPersonaIds = const [],
     required this.screens,
   });
 
-  final StudioText label;
+  final String label;
 
   /// Full path of the zone's root screen.
   final String rootPath;
 
   final StudioZoneAccess access;
 
+  /// Ids of the demo personas that can enter this zone (e.g. a role-gated
+  /// admin zone lists its admin persona). Empty means any persona. Studio
+  /// uses this to switch the session to a capable persona before navigating —
+  /// the app's guards stay the real protection.
+  final List<String> allowedPersonaIds;
+
   final List<StudioScreenSpec> screens;
 
   Map<String, dynamic> toJson() => {
-        'label': label.toJson(),
+        'label': label,
         'rootPath': rootPath,
         'access': access.name,
+        'allowedPersonaIds': allowedPersonaIds,
         'screens': [for (final screen in screens) screen.toJson()],
       };
 
   factory StudioZoneSpec.fromJson(Map<String, dynamic> json) => StudioZoneSpec(
-        label: StudioText.fromJson(
-          json['label'] as Map<String, dynamic>? ?? const {},
-        ),
+        label: json['label'] as String? ?? '',
         rootPath: json['rootPath'] as String? ?? '/',
         access: StudioZoneAccess.values.asNameMap()[json['access']] ??
             StudioZoneAccess.any,
+        allowedPersonaIds:
+            StudioScreenSpec.stringListFromJson(json['allowedPersonaIds']),
         screens: [
           if (json['screens'] is List)
             for (final item in json['screens'] as List)

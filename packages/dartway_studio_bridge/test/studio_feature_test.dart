@@ -15,15 +15,15 @@ class _FeatureBox extends StatelessWidget implements DwFeature {
 }
 
 DwFeatureSpec _spec(String id) =>
-    DwFeatureSpec(id: id, title: StudioText(id, id), description: const StudioText('d', 'д'));
+    DwFeatureSpec(id: id, title: id, description: 'd');
 
 void main() {
   group('DwFeatureSpec', () {
     test('json round-trip', () {
       final decoded = DwFeatureSpec.fromJson(_spec('x').toJson());
       expect(decoded.id, 'x');
-      expect(decoded.title.en, 'x');
-      expect(decoded.description.ru, 'д');
+      expect(decoded.title, 'x');
+      expect(decoded.description, 'd');
     });
 
     test('listFromJson tolerates non-list', () {

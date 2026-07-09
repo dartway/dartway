@@ -50,12 +50,16 @@ sealed class StudioBridgeMessage {
         SessionChangedMessage.fromPayload(payload),
       StudioBridgeProtocol.featuresChanged =>
         FeaturesChangedMessage.fromPayload(payload),
+      StudioBridgeProtocol.localeChanged =>
+        LocaleChangedMessage.fromPayload(payload),
       StudioBridgeProtocol.studioConnect => const StudioConnectMessage(),
       StudioBridgeProtocol.navigateRequest =>
         NavigateRequestMessage.fromPayload(payload),
       StudioBridgeProtocol.personaRequest =>
         PersonaRequestMessage.fromPayload(payload),
       StudioBridgeProtocol.signOutRequest => const SignOutRequestMessage(),
+      StudioBridgeProtocol.localeRequest =>
+        LocaleRequestMessage.fromPayload(payload),
       _ => null,
     };
   }

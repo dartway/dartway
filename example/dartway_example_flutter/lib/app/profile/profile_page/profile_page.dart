@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/app/profile/profile_page/widgets/profile_settings_widget.dart';
 import 'package:dartway_example_flutter/common/app_scaffold.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
@@ -15,9 +16,11 @@ class ProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+
     return AppScaffold.main(
       appBar: AppBar(
-        title: AppText.title('Profile'),
+        title: AppText.title(l10n.profileTitle),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -26,7 +29,7 @@ class ProfilePage extends ConsumerWidget {
             const Gap(24),
             if (ref.watchUserProfile.isClubAdmin) ...[
               DwButton.secondary(
-                'Admin panel',
+                l10n.adminPanel,
                 dwCallback: DwUiAction.create(
                   (context) => GoRouter.of(context)
                       .goNamed(AdminNavigationZone.admin.name),
@@ -35,7 +38,7 @@ class ProfilePage extends ConsumerWidget {
               const Gap(24),
             ],
             DwButton.secondary(
-              'Our services',
+              l10n.ourServices,
               dwCallback: DwUiAction.create(
                 (context) => GoRouter.of(context)
                     .goNamed(AppNavigationZone.services.name),
@@ -43,7 +46,7 @@ class ProfilePage extends ConsumerWidget {
             ),
             const Gap(24),
             DwButton.text(
-              'Sign out',
+              l10n.signOutAction,
               dwCallback: DwUiAction.create(
                 (context) => ref.read(dw.sessionProvider!.notifier).signOut(),
               ),

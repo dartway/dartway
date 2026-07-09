@@ -44,6 +44,7 @@ class StudioBridgeClient {
           :final currentPath,
           :final session,
           :final features,
+          :final currentLocale,
         ):
         _connected = true;
         _events.add(StudioProjectConnected(
@@ -51,6 +52,7 @@ class StudioBridgeClient {
           currentPath: currentPath,
           session: session,
           features: features,
+          currentLocale: currentLocale,
         ));
       case RouteChangedMessage(:final path):
         _events.add(StudioProjectRouteChanged(path));
@@ -60,6 +62,8 @@ class StudioBridgeClient {
         _events.add(
           StudioProjectFeaturesChanged(path: path, features: features),
         );
+      case LocaleChangedMessage(:final locale):
+        _events.add(StudioProjectLocaleChanged(locale));
       default:
         break; // Studio → app messages echoed back are ignored.
     }
@@ -72,6 +76,9 @@ class StudioBridgeClient {
       _channel.send(PersonaRequestMessage(personaId));
 
   void requestSignOut() => _channel.send(const SignOutRequestMessage());
+
+  void requestLocale(String locale) =>
+      _channel.send(LocaleRequestMessage(locale));
 
   void dispose() {
     _retryTimer?.cancel();

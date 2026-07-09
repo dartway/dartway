@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 import '../logic/auth_state.dart';
@@ -27,22 +28,22 @@ class PhoneEntryBlock extends HookConsumerWidget {
       _ => throw UnimplementedError(),
     };
 
-    // print('isRegistration: $isRegistration');
+    final l10n = context.l10n;
 
     return Column(
       children: [
-        const DwText('Fill registration data', textStyle: AppText.title),
+        DwText(l10n.fillRegistrationData, textStyle: AppText.title),
         const Gap(36),
         if (isRegistration)
           Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: AppTextFormField(
-              labelText: 'Name',
+              labelText: l10n.nameLabel,
               value: state.firstName,
               onChanged: (value) =>
                   ref.read(authStateProvider.notifier).update(firstName: value),
               validator: (p0) => p0 == null || p0.isEmpty || p0.length < 3
-                  ? 'Required field'
+                  ? l10n.requiredField
                   : null,
             ),
           ),
@@ -59,23 +60,23 @@ class PhoneEntryBlock extends HookConsumerWidget {
               onChanged: (value) => ref
                   .read(authStateProvider.notifier)
                   .update(allDocumentsAccepted: value),
-              validator: (value) => value != true ? 'You must agree' : null,
+              validator: (value) => value != true ? l10n.youMustAgree : null,
               titleWidget: MultiLinkText.multi(
                 textAlign: TextAlign.start,
                 parts: [
                   MultiLinkTextPart(
-                    'I am familiar with and agree to the terms of the',
-                    'offer,',
+                    l10n.agreeTermsPrefix,
+                    l10n.offerLink,
                     wipProgressNotificationCallback,
                   ),
                   MultiLinkTextPart(
                     null,
-                    'user agreement,',
+                    l10n.userAgreementLink,
                     wipProgressNotificationCallback,
                   ),
                   MultiLinkTextPart(
-                    'I accept the terms of the',
-                    'data processing policy,',
+                    l10n.acceptTermsPrefix,
+                    l10n.dataPolicyLinkComma,
                     wipProgressNotificationCallback,
                   ),
                 ],
@@ -94,18 +95,18 @@ class PhoneEntryBlock extends HookConsumerWidget {
                 textAlign: TextAlign.start,
                 parts: [
                   MultiLinkTextPart(
-                    'I give',
-                    'consent',
+                    l10n.iGive,
+                    l10n.consentLink,
                     wipProgressNotificationCallback,
                   ),
                   MultiLinkTextPart(
-                    'on receiving informational and promotional mailings, therefore I give',
-                    'consent',
+                    l10n.marketingConsentText,
+                    l10n.consentLink,
                     wipProgressNotificationCallback,
                   ),
                   MultiLinkTextPart(
-                    'on processing personal data in accordance with the',
-                    'data processing policy',
+                    l10n.dataProcessingConsentText,
+                    l10n.dataPolicyLink,
                     wipProgressNotificationCallback,
                   ),
                 ],
@@ -115,7 +116,7 @@ class PhoneEntryBlock extends HookConsumerWidget {
         const Spacer(),
         const SizedBox(height: 20),
         DwButton.primary(
-          'Continue',
+          l10n.continueAction,
           requireValidation: true,
           dwCallback: DwUiAction.create((_) async {
             await ref.read(authStateProvider.notifier).requestOtp();
@@ -124,16 +125,16 @@ class PhoneEntryBlock extends HookConsumerWidget {
         const Gap(24),
         isRegistration
             ? MultiLinkText.single(
-                text: 'Already have an account? ',
-                linkText: 'Login',
+                text: l10n.alreadyHaveAccount,
+                linkText: l10n.loginAction,
                 onLinkTap: DwUiAction.create(
                   (_) =>
                       ref.read(authStateProvider.notifier).goTo(AuthStep.login),
                 ),
               )
             : MultiLinkText.single(
-                text: 'Still no account? ',
-                linkText: 'Registration',
+                text: l10n.stillNoAccount,
+                linkText: l10n.registrationAction,
                 onLinkTap: DwUiAction.create(
                   (_) => ref
                       .read(authStateProvider.notifier)

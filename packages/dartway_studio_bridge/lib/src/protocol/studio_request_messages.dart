@@ -50,3 +50,20 @@ class SignOutRequestMessage extends StudioBridgeMessage {
   @override
   String get type => StudioBridgeProtocol.signOutRequest;
 }
+
+/// Studio → app: switch the app UI to the given locale (a language tag from
+/// the manifest's `supportedLocales`).
+class LocaleRequestMessage extends StudioBridgeMessage {
+  const LocaleRequestMessage(this.locale);
+
+  final String locale;
+
+  @override
+  String get type => StudioBridgeProtocol.localeRequest;
+
+  @override
+  Map<String, dynamic> payloadToJson() => {'locale': locale};
+
+  factory LocaleRequestMessage.fromPayload(Map<String, dynamic> payload) =>
+      LocaleRequestMessage(payload['locale'] as String? ?? '');
+}

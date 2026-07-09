@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 import '../logic/auth_state.dart';
@@ -18,10 +19,10 @@ class VerifyOtpBlock extends HookConsumerWidget {
       padding: const EdgeInsets.only(top: 16),
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: DwText(
-              'Enter the code from SMS',
+              context.l10n.enterSmsCode,
               textStyle: AppText.title,
             ),
           ),
@@ -29,7 +30,7 @@ class VerifyOtpBlock extends HookConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: AppText.body(
-              'Sent 6-digit code to number\n${state.phoneRaw}',
+              context.l10n.sentCodeToNumber(state.phoneRaw),
               textAlign: TextAlign.center,
             ),
           ),
@@ -59,7 +60,7 @@ class VerifyOtpBlock extends HookConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: DwButton.primary(
-              'Continue',
+              context.l10n.continueAction,
               requireValidation: true,
               dwCallback: DwUiAction.create(
                 (_) => ref.read(authStateProvider.notifier).verifyOtp(),

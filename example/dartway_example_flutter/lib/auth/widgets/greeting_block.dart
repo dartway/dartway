@@ -3,6 +3,7 @@ import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_state.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class GreetingBlock extends ConsumerWidget {
@@ -18,13 +19,12 @@ class GreetingBlock extends ConsumerWidget {
         ),
         const DwText('DartWay.dev', textStyle: AppText.title),
         const Gap(12),
-        const DwText('Complete login or registration to continue',
-            textStyle: AppText.body),
+        DwText(context.l10n.completeLoginToContinue, textStyle: AppText.body),
         const Spacer(
           flex: 1,
         ),
         DwButton.primary(
-          'Registration',
+          context.l10n.registrationAction,
           height: 40,
           width: 250,
           dwCallback: DwUiAction.create(
@@ -35,7 +35,7 @@ class GreetingBlock extends ConsumerWidget {
         ),
         const Gap(20),
         DwButton.secondary(
-          'Login',
+          context.l10n.loginAction,
           height: 40,
           width: 250,
           dwCallback: DwUiAction.create(

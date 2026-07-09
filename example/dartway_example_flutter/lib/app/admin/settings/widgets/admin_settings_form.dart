@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// Club settings form over AppSetting (clubName). Reads the setting and saves
@@ -24,7 +25,7 @@ class AdminSettingsForm extends ConsumerWidget {
               }
             }
             if (clubName == null) {
-              return AppText.body('No settings configured.');
+              return AppText.body(context.l10n.noSettingsConfigured);
             }
             return _ClubNameField(setting: clubName);
           },
@@ -43,6 +44,8 @@ class _ClubNameField extends HookWidget {
     final canSave =
         value.value.trim().isNotEmpty && value.value != setting.settingValue;
 
+    final l10n = context.l10n;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -50,18 +53,18 @@ class _ClubNameField extends HookWidget {
           child: AppTextFormField(
             value: value.value,
             onChanged: (v) => value.value = v,
-            labelText: 'Club name',
+            labelText: l10n.clubNameLabel,
           ),
         ),
         const Gap(12),
         DwButton.primary(
-          'Save',
+          l10n.saveAction,
           dwCallback: canSave
               ? DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     setting.copyWith(settingValue: value.value.trim()),
                   ),
-                  onSuccessNotification: 'Settings saved',
+                  onSuccessNotification: l10n.settingsSaved,
                 )
               : null,
         ),

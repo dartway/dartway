@@ -2,6 +2,7 @@ import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../core/app_l10n.dart';
 import '../core/router/router.dart';
 import 'logic/studio_persona_switcher.dart';
 import 'logic/studio_personas.dart';
@@ -48,6 +49,7 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       // The connect snapshot carries the current screen's features so a
       // freshly connected Studio sees them without waiting for navigation.
       currentFeatures: scanMountedFeatures,
+      currentLocale: () => ref.read(appLocaleProvider).languageCode,
     );
     if (_host == null) return;
 
@@ -82,6 +84,11 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
         reportFeaturesSoon();
       },
     );
+
+    ref.listenManual(
+      appLocaleProvider,
+      (previous, next) => _host?.reportLocale(next.languageCode),
+    );
   }
 
   @override
@@ -105,6 +112,10 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
   @override
   Future<void> onSignOutRequest() =>
       ref.read(studioPersonaSwitcherProvider.notifier).signOutCurrentUser();
+
+  @override
+  void onLocaleRequest(String locale) =>
+      ref.read(appLocaleProvider.notifier).selectLanguageCode(locale);
 
   @override
   Widget build(BuildContext context) => widget.child;

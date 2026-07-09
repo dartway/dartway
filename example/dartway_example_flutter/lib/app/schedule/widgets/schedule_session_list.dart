@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
@@ -16,13 +17,10 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
         id: 'schedule-session-list',
-        title: StudioText('Realtime session list', 'Живой список занятий'),
-        description: StudioText(
-          'ref.watchModelList<ClubSession>() with a backend filter — realtime '
-              'sync, pagination and loading states out of the box.',
-          'ref.watchModelList<ClubSession>() с backend-фильтром — realtime-'
-              'синк, пагинация и лоадеры из коробки.',
-        ),
+        title: 'Realtime session list',
+        description:
+            'ref.watchModelList<ClubSession>() with a backend filter — '
+            'realtime sync, pagination and loading states out of the box.',
       );
 
   @override
@@ -45,7 +43,7 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
           childBuilder: (sessions) {
             if (sessions.isEmpty) {
               return Center(
-                child: AppText.body('No upcoming sessions yet'),
+                child: AppText.body(context.l10n.noUpcomingSessions),
               );
             }
 

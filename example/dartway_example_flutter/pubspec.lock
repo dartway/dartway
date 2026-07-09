@@ -361,7 +361,7 @@ packages:
       path: "../../packages/dartway_studio_bridge"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   dartx:
     dependency: transitive
     description:
@@ -495,6 +495,11 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.0"
+  flutter_localizations:
+    dependency: "direct main"
+    description: flutter
+    source: sdk
+    version: "0.0.0"
   flutter_multi_formatter:
     dependency: "direct main"
     description:
@@ -738,7 +743,7 @@ packages:
     source: hosted
     version: "2.4.1"
   intl:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: intl
       sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"

@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_bubble.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// Live message list: new messages arrive through the framework's realtime
@@ -17,13 +18,10 @@ class ChatMessageList extends ConsumerWidget implements DwFeature {
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
         id: 'chat-message-list',
-        title: StudioText('Realtime staff chat', 'Живой чат команды'),
-        description: StudioText(
-          'A realtime chat is ~40 lines of DwCrudConfig, secure-by-default: '
-              'the staff-only access filter means clients never receive it.',
-          'Realtime-чат — ~40 строк DwCrudConfig, secure-by-default: '
-              'staff-фильтр не отдаёт данные чата клиенту вообще.',
-        ),
+        title: 'Realtime staff chat',
+        description:
+            'A realtime chat is ~40 lines of DwCrudConfig, secure-by-default: '
+            'the staff-only access filter means clients never receive it.',
       );
 
   @override
@@ -37,7 +35,7 @@ class ChatMessageList extends ConsumerWidget implements DwFeature {
           childBuilder: (messages) {
             if (messages.isEmpty) {
               return Center(
-                child: AppText.body('Say hi to the team!'),
+                child: AppText.body(context.l10n.sayHiToTeam),
               );
             }
 

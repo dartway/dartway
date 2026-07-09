@@ -5,6 +5,7 @@ import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_composer.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_list.dart';
 import 'package:dartway_example_flutter/common/app_scaffold.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/core/user_profile_roles.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -18,7 +19,7 @@ class StaffChatPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (!ref.watchUserProfile.isStaffMember) {
       return AppScaffold.main(
-        body: Center(child: AppText.body('This area is for the club team')),
+        body: Center(child: AppText.body(context.l10n.staffOnlyArea)),
       );
     }
 
@@ -27,7 +28,7 @@ class StaffChatPage extends ConsumerWidget {
           childBuilder: (channels) {
             if (channels.isEmpty) {
               return AppScaffold.main(
-                body: Center(child: AppText.body('No chat channels yet')),
+                body: Center(child: AppText.body(context.l10n.noChatChannels)),
               );
             }
 

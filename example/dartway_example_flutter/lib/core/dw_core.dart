@@ -3,6 +3,8 @@ import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:flutter/foundation.dart';
 import 'package:serverpod_flutter/serverpod_flutter.dart';
 
+import 'app_l10n.dart';
+
 /// Telegram/email/etc. alerts sink. Configure with a [DwTelegramAlertsConfig]
 /// when you want runtime error reports; the default no-op is fine for a fresh
 /// project.
@@ -32,7 +34,7 @@ void initExampleDwCore({required String backendUrl}) {
       // helper, so no classifier duplication.
       onFailedCall: dwConnectionAwareOnFailedCall(
         onConnectionError: (_, _) =>
-            dw.notify.error('Ошибка сети. Попробуйте снова.'),
+            dw.notify.error(appL10n.networkErrorTryAgain),
         onUnexpectedError: (ctx, error, _) =>
             debugPrint('[FAILED] ${ctx.endpointName}.${ctx.methodName}: $error'),
       ),

@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
 import 'package:dartway_example_flutter/auth/widgets/phone_entry_block.dart';
 import 'package:dartway_example_flutter/auth/widgets/verify_otp_block.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 import '../common/app_scaffold.dart';
@@ -27,9 +28,9 @@ class AuthPage extends ConsumerWidget {
               )
             : null,
         centerTitle: true,
-        title: state.currentStep.title != null
-            ? AppText.title(state.currentStep.title!)
-            : null,
+        title: AppText.title(
+          context.l10n.authStepTitle(state.currentStep.name),
+        ),
       ),
       body: SizedBox.expand(
         child: Padding(

@@ -24,6 +24,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
   serverpod_flutter: ^3.4.8
   dartway_example_client:
     path: ../dartway_example_client
@@ -119,6 +122,7 @@ flutter_gen:
 
 # The following section is specific to Flutter.
 flutter:
+  generate: true # gen-l10n (see l10n.yaml); output is checked in under lib/l10n/gen
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
