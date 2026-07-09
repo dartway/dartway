@@ -17,6 +17,8 @@ class DwUiAction<T> {
 
   factory DwUiAction.create(
     FutureOr<T> Function(BuildContext context) action, {
+    String? label,
+    DwUiConfirmation? confirmation,
     String? onSuccessNotification,
     String? onErrorNotification,
     FutureOr<DwUiNotification?> Function(T value)? customNotificationBuilder,
@@ -25,6 +27,13 @@ class DwUiAction<T> {
     void Function(Object error, StackTrace stackTrace)? onError,
   }) {
     return DwUiAction._((context) async {
+      if (confirmation != null) {
+        final confirmed = await dw.confirm(context, confirmation);
+        // Declined (or the dialog was dismissed): no action, no notifications,
+        // no follow-up.
+        if (confirmed != true || !context.mounted) return null;
+      }
+
       try {
         final value = await action(context);
 
@@ -49,7 +58,14 @@ class DwUiAction<T> {
           dw.notify.error(onErrorNotification);
         }
         onError?.call(error, stackTrace);
-        dw.handleError(error, stackTrace);
+        dw.handleError(
+          error,
+          stackTrace,
+          source: DwErrorSource.uiAction,
+          // Actions rarely get explicit labels — the notification texts make
+          // a meaningful fallback name in error reports.
+          actionLabel: label ?? onErrorNotification ?? onSuccessNotification,
+        );
         return null;
       }
     });

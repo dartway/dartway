@@ -1,5 +1,4 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
-import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';

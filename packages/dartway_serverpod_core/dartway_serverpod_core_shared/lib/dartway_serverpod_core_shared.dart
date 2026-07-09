@@ -4,6 +4,8 @@
 library;
 
 export 'src/alerts/configs/dw_telegram_alerts_config.dart';
+export 'src/alerts/dw_alert_context.dart';
+export 'src/alerts/dw_alert_formatter.dart';
 export 'src/alerts/dw_alerts.dart';
 export 'src/services/dw_telegram_service.dart';
 export 'src/static/dw_configuration_keys.dart';

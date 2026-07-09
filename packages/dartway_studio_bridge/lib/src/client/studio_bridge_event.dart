@@ -1,4 +1,4 @@
-import '../models/dw_feature_spec.dart';
+import '../models/studio_feature_info.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
 
@@ -21,7 +21,7 @@ class StudioProjectConnected extends StudioProjectEvent {
   final StudioProjectManifest manifest;
   final String currentPath;
   final StudioSessionState session;
-  final List<DwFeatureSpec> features;
+  final List<StudioFeatureInfo> features;
 
   /// Active UI locale, empty when the app is not localized.
   final String currentLocale;
@@ -49,7 +49,7 @@ class StudioProjectFeaturesChanged extends StudioProjectEvent {
   });
 
   final String path;
-  final List<DwFeatureSpec> features;
+  final List<StudioFeatureInfo> features;
 }
 
 /// The app's UI locale changed.

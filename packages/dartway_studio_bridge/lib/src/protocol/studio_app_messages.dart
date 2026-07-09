@@ -24,7 +24,7 @@ class ManifestMessage extends StudioBridgeMessage {
   final StudioSessionState session;
 
   /// Features mounted on the current screen at connect time.
-  final List<DwFeatureSpec> features;
+  final List<StudioFeatureInfo> features;
 
   /// Active UI locale, empty when the app is not localized.
   final String currentLocale;
@@ -50,7 +50,7 @@ class ManifestMessage extends StudioBridgeMessage {
         session: StudioSessionState.fromJson(
           payload['session'] as Map<String, dynamic>? ?? const {},
         ),
-        features: DwFeatureSpec.listFromJson(payload['features']),
+        features: StudioFeatureInfo.listFromJson(payload['features']),
         currentLocale: payload['currentLocale'] as String? ?? '',
       );
 }
@@ -77,7 +77,7 @@ class FeaturesChangedMessage extends StudioBridgeMessage {
   const FeaturesChangedMessage({required this.path, required this.features});
 
   final String path;
-  final List<DwFeatureSpec> features;
+  final List<StudioFeatureInfo> features;
 
   @override
   String get type => StudioBridgeProtocol.featuresChanged;
@@ -91,7 +91,7 @@ class FeaturesChangedMessage extends StudioBridgeMessage {
   factory FeaturesChangedMessage.fromPayload(Map<String, dynamic> payload) =>
       FeaturesChangedMessage(
         path: payload['path'] as String? ?? '/',
-        features: DwFeatureSpec.listFromJson(payload['features']),
+        features: StudioFeatureInfo.listFromJson(payload['features']),
       );
 }
 

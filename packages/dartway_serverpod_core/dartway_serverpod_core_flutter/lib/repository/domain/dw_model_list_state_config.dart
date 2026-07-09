@@ -1,4 +1,3 @@
-import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

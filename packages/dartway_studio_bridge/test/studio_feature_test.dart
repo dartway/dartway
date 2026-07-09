@@ -1,57 +1,33 @@
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _FeatureBox extends StatelessWidget implements DwFeature {
-  const _FeatureBox(this.spec);
-
-  final DwFeatureSpec spec;
-
-  @override
-  DwFeatureSpec get dwFeature => spec;
-
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-DwFeatureSpec _spec(String id) =>
-    DwFeatureSpec(id: id, title: id, description: 'd');
-
 void main() {
-  group('DwFeatureSpec', () {
+  group('StudioFeatureInfo', () {
     test('json round-trip', () {
-      final decoded = DwFeatureSpec.fromJson(_spec('x').toJson());
+      const info = StudioFeatureInfo(id: 'x', title: 'X', description: 'd');
+      final decoded = StudioFeatureInfo.fromJson(info.toJson());
       expect(decoded.id, 'x');
-      expect(decoded.title, 'x');
+      expect(decoded.title, 'X');
       expect(decoded.description, 'd');
     });
 
-    test('listFromJson tolerates non-list', () {
-      expect(DwFeatureSpec.listFromJson(null), isEmpty);
-      expect(DwFeatureSpec.listFromJson('nope'), isEmpty);
+    test('fromJson tolerates missing fields', () {
+      final decoded = StudioFeatureInfo.fromJson(const {});
+      expect(decoded.id, '');
+      expect(decoded.title, '');
+      expect(decoded.description, '');
     });
-  });
 
-  testWidgets('scanMountedFeatures collects mounted features, deduped by id',
-      (tester) async {
-    await tester.pumpWidget(
-      Column(
-        children: [
-          _FeatureBox(_spec('a')),
-          _FeatureBox(_spec('b')),
-          _FeatureBox(_spec('a')), // duplicate id — collapses to one
-        ],
-      ),
-    );
-
-    final ids = scanMountedFeatures().map((f) => f.id).toList();
-    expect(ids.toSet(), {'a', 'b'});
-    expect(ids.length, 2);
-  });
-
-  testWidgets('scanMountedFeatures is empty with no DwFeature widgets',
-      (tester) async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    expect(scanMountedFeatures(), isEmpty);
+    test('listFromJson tolerates non-list and foreign items', () {
+      expect(StudioFeatureInfo.listFromJson(null), isEmpty);
+      expect(StudioFeatureInfo.listFromJson('nope'), isEmpty);
+      expect(
+        StudioFeatureInfo.listFromJson([
+          {'id': 'a', 'title': 'A', 'description': ''},
+          42,
+        ]).single.id,
+        'a',
+      );
+    });
   });
 }

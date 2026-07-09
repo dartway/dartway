@@ -64,27 +64,33 @@ class DwAlerts {
     _sendAlert(message, logMessage: _logErrors);
   }
 
+  /// Reports an error as a formatted alert. [context] renders the app state
+  /// (route, features, action, platform...) into the message — on web builds
+  /// it is the informative part, the minified stack is not. The stack is
+  /// trimmed to [stackTraceMaxLines] (null = full).
   void reportError(
     String errorMessage, {
     Object? exception,
     StackTrace? stackTrace,
+    DwAlertContext? context,
+    int? stackTraceMaxLines = DwAlertFormatter.defaultStackTraceMaxLines,
   }) {
-    // Формируем тело сообщения с ограничением длины
-    final stack = stackTrace?.toString().trim() ?? '';
+    final fullMessage = DwAlertFormatter.formatErrorReport(
+      errorMessage: errorMessage,
+      exception: exception,
+      stackTrace: stackTrace,
+      context: context,
+      stackTraceMaxLines: stackTraceMaxLines,
+    );
 
-    final fullMessage =
-        '❌ *Error:*\n${errorMessage.toString()}\n\n'
-        '📌 *Exception:*\n${exception?.toString()}\n\n'
-        '📜 *StackTrace:*\n'
-        '$stack';
-
-    _sendAlert(fullMessage, logMessage: _logErrors);
+    _sendAlert(fullMessage, logMessage: _logErrors, isPreformatted: true);
   }
 
   _sendAlert(
     String message, {
     required bool logMessage,
     bool suppressErrors = false,
+    bool isPreformatted = false,
   }) {
     if (_telegramConfig != null) {
       DwTelegramService.sendMessage(
@@ -92,6 +98,9 @@ class DwAlerts {
         chatId: _telegramConfig.alertsChatId,
         messageThreadId: _telegramConfig.alertsMessageThreadId,
         token: _telegramConfig.alertsToken,
+        // Preformatted messages are already valid MarkdownV2 (values escaped,
+        // template markup alive) — escaping them again would kill the markup.
+        escapeMessage: !isPreformatted,
         reportErrorFunction: suppressErrors ? (_) {} : _sendAlertingError,
       );
     }

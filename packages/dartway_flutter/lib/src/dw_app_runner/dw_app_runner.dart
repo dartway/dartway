@@ -5,13 +5,22 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import '../error_reporting/dw_error_report.dart';
+import '../private/dw_singleton.dart';
 import 'logic/dw_app_loading_options.dart';
 import 'widgets/dw_app_bootstrapper.dart';
 
-// Default fallback if user does not provide an error handler.
-void _defaultErrorHandler(Object error, StackTrace stackTrace) {
-  debugPrint('[DwAppRunner ERROR] $error');
-  debugPrint(stackTrace.toString());
+/// Default zone handler: routes uncaught errors into the dw error pipeline
+/// (context capture + configured handlers / out-of-the-box alerting). Falls
+/// back to debugPrint while dw is not created yet (early bootstrap).
+void _routeErrorToDw(Object error, StackTrace stackTrace) {
+  final instance = dwOrNull;
+  if (instance != null) {
+    instance.handleError(error, stackTrace, source: DwErrorSource.zone);
+  } else {
+    debugPrint('[DwAppRunner ERROR] $error');
+    debugPrint(stackTrace.toString());
+  }
 }
 
 /// A universal application bootstrapper for Flutter + Riverpod apps.
@@ -38,15 +47,17 @@ class DwAppRunner {
   /// Also useful for MaterialApp.supportedLocales.
   final List<Locale> supportedLocales;
 
-  /// Optional custom global error handler.
-  final void Function(Object error, StackTrace stackTrace) onError;
+  /// Optional custom global error handler. When omitted, uncaught errors go
+  /// through the dw error pipeline (`dw.handleError` with zone source) — with
+  /// DwCore that means out-of-the-box alerting with app context.
+  final void Function(Object error, StackTrace stackTrace)? onError;
 
   /// The actual app widget.
   final Widget child;
 
   const DwAppRunner({
     required this.child,
-    this.onError = _defaultErrorHandler,
+    this.onError,
     this.appInitializers,
     this.appLoadingOptions = const DwAppLoadingOptions.withNativeSplash(),
     this.supportedLocales = const [],
@@ -68,6 +79,8 @@ class DwAppRunner {
   void run() {
     final binding = _preInit();
 
+    final effectiveOnError = onError ?? _routeErrorToDw;
+
     // Global error pipeline WITHOUT a custom error zone. A guarded zone makes
     // `runApp` run in a different zone than the binding was initialized in
     // (notably on web), triggering Flutter's "Zone mismatch" warning.
@@ -75,10 +88,10 @@ class DwAppRunner {
     // catches uncaught async errors that reach the root zone — the modern,
     // zone-safe equivalent of runZonedGuarded.
     FlutterError.onError = (FlutterErrorDetails details) {
-      onError(details.exception, details.stack ?? StackTrace.empty);
+      effectiveOnError(details.exception, details.stack ?? StackTrace.empty);
     };
     binding.platformDispatcher.onError = (error, stack) {
-      onError(error, stack);
+      effectiveOnError(error, stack);
       return true;
     };
 
@@ -97,7 +110,7 @@ class DwAppRunner {
         child: DwAppBootstrapper(
           appInitializers: initializers,
           useNativeSplash: appLoadingOptions.useNativeSplash,
-          onError: onError,
+          onError: effectiveOnError,
           errorScreen: appLoadingOptions.errorScreen,
           loadingScreen: appLoadingOptions.loadingScreen,
           child: child,

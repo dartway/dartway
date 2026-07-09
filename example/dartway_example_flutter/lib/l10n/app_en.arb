@@ -149,6 +149,13 @@
   },
   "noMembersYet": "No members yet.",
   "noMembersMatch": "No members match.",
+  "confirmChangeRole": "Change the role of {name} to {role}?",
+  "@confirmChangeRole": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "role": {"type": "String"}
+    }
+  },
   "clubSettings": "Club settings",
   "clubNameLabel": "Club name",
   "saveAction": "Save",

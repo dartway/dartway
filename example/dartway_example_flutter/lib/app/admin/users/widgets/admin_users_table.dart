@@ -56,16 +56,28 @@ class _UserRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = '${user.firstName} ${user.lastName ?? ''}'.trim();
+    final displayName = name.isEmpty ? user.phone : name;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: AppText.body(name.isEmpty ? user.phone : name),
+      title: AppText.body(displayName),
       subtitle: AppText.body(user.phone),
       trailing: DropdownButton<UserRole>(
         value: user.role,
         underline: const SizedBox.shrink(),
         onChanged: (role) {
           if (role == null || role == user.role) return;
-          DwRepository.saveModel(user.copyWith(role: role));
+          // Changing someone's role is a rights change — confirm it. The
+          // confirmation + label ride on the standard DwUiAction.
+          DwUiAction<void>.create(
+            (_) => DwRepository.saveModel(user.copyWith(role: role)),
+            label: 'changeUserRole',
+            confirmation: DwUiConfirmation(
+              context.l10n.confirmChangeRole(
+                displayName,
+                context.l10n.roleName(role.name),
+              ),
+            ),
+          )(context);
         },
         items: [
           for (final role in UserRole.values)

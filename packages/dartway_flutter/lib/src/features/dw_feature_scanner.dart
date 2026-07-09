@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-import '../models/dw_feature_spec.dart';
 import 'dw_feature.dart';
+import 'dw_feature_spec.dart';
 
 /// Collects the [DwFeatureSpec]s of every mounted [DwFeature] widget, keyed by
 /// id (so a feature declared by many instances appears once). Only the active

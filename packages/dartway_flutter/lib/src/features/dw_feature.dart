@@ -1,8 +1,9 @@
-import '../models/dw_feature_spec.dart';
+import 'dw_feature_spec.dart';
 
-/// Implemented by a widget that *is* a product feature on a screen. Studio
-/// discovers the mounted `DwFeature` widgets of the current screen to build
-/// the technical spec — so the spec stays tied to the real code.
+/// Implemented by a widget that *is* a product feature on a screen. The
+/// mounted `DwFeature` widgets of the current screen can be discovered at
+/// runtime (see `scanMountedFeatures`) — so the feature set stays tied to the
+/// real code.
 ///
 /// A contract, not behavior: the widget only declares its descriptor.
 /// ```dart

@@ -326,6 +326,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noMembersMatch => 'No members match.';
 
   @override
+  String confirmChangeRole(String name, String role) {
+    return 'Change the role of $name to $role?';
+  }
+
+  @override
   String get clubSettings => 'Club settings';
 
   @override

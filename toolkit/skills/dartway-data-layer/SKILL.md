@@ -73,23 +73,29 @@ final lessonsAsync = ref.watchModelList<LearningLesson>(
 
 ## 4. Действия из UI — `DwUiAction.create`
 
-**Зачем:** единая обёртка для действий пользователя (нажатия, сабмиты): автоматический loading-стейт и обработка ошибок. Колбэк получает `BuildContext`. Не оборачивай в сырой `() async {}`/`onPressed`.
+**Зачем:** единая обёртка для действий пользователя (нажатия, сабмиты): автоматический loading-стейт, обработка ошибок (с репортом в алертинг — см. `label`), подтверждения. Колбэк получает `BuildContext`. Не оборачивай в сырой `() async {}`/`onPressed`.
 
 ```dart
 // ❌ сырой обработчик: ошибки и loading руками в каждом виджете
 onPressed: () async { await doSomething(); }
 
-// ✅ DwUiAction.create — колбэк получает context; есть типизированный результат
-final deleteAction = DwUiAction<bool>.create((context) async {
-  final confirm = await showConfirmDialog(context);
-  if (confirm != true) return false;
-  await ref.deleteModel(post);
-  return true;
-});
+// ❌ ручной confirm-диалог внутри действия (боль легаси-проектов)
+final confirm = await showDialog<bool>(...); if (confirm != true) return;
+
+// ✅ DwUiAction.create — context, типизированный результат, встроенный confirm
+final deleteAction = DwUiAction<bool>.create(
+  (context) async {
+    await ref.deleteModel(post);
+    return true;
+  },
+  label: 'deletePost', // имя действия в error-репортах/алертах
+  confirmation: DwUiConfirmation('Delete this post?', isDestructive: true),
+);
 // в виджете: dwCallback: deleteAction   (или DwUiAction.create((_) async {...}) если context не нужен)
 ```
 
 > Реальное имя — **`DwUiAction`** (46+ использований). `DwCallback` в проекте нет.
+> Отказ в confirm-диалоге отменяет действие целиком (без нотификаций и follow-up). Кастомный диалог — `DwConfig.confirmDialogBuilder`. Ошибки действий автоматически попадают в алертинг с контекстом (роут, фичи экрана, `label`) — см. доку error-reporting фреймворка.
 
 ## 5. Уведомления — `dw.notify.*` (не `SnackBar`)
 

@@ -24,23 +24,26 @@ late final DwCore<Client, UserProfile> dw;
 /// from `DartwayExampleApp.run` before any widget reads `dw`.
 void initExampleDwCore({required String backendUrl}) {
   dw = DwCore<Client, UserProfile>(
-    config: const DwConfig(
+    config: DwConfig(
       defaultModelGetter: DwRepository.getDefault,
+      // Shown in error reports next to the platform and user.
+      appVersion: exampleAppVersion,
     ),
     client: Client(
       backendUrl,
       // Connection-level failures (timeout/offline) → a toast, not an alert;
-      // everything else → the app's report sink. Built from the framework's
-      // helper, so no classifier duplication.
-      onFailedCall: dwConnectionAwareOnFailedCall(
+      // everything else enters the dw error pipeline with `endpoint.method`
+      // attached and is alerted out of the box with the app context.
+      onFailedCall: dwReportingOnFailedCall(
         onConnectionError: (_, _) =>
             dw.notify.error(appL10n.networkErrorTryAgain),
-        onUnexpectedError: (ctx, error, _) =>
-            debugPrint('[FAILED] ${ctx.endpointName}.${ctx.methodName}: $error'),
       ),
     )
       ..connectivityMonitor = FlutterConnectivityMonitor()
       ..authKeyProvider = DwAuthenticationKeyManager(),
+    // No telegram config here: locally the alerts degrade to logging. To see
+    // the full formatted alert in the console use
+    // `DwAlerts.init(logErrors: true, logFunction: debugPrint)`.
     dwAlerts: dwAlerts,
     getUserId: (userProfile) => userProfile?.id,
     onStreamingStatusChanged: (status) =>

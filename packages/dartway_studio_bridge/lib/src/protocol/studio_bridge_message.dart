@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import '../models/dw_feature_spec.dart';
+import '../models/studio_feature_info.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
 import 'studio_bridge_protocol.dart';

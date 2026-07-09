@@ -325,6 +325,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noMembersMatch => 'Никто не подходит под фильтр.';
 
   @override
+  String confirmChangeRole(String name, String role) {
+    return 'Сменить роль $name на «$role»?';
+  }
+
+  @override
   String get clubSettings => 'Настройки клуба';
 
   @override

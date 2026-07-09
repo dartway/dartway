@@ -19,6 +19,10 @@
   personas that can enter it (empty = any), so Studio can switch the session
   to a capable persona before navigating. The app's guards stay the real
   protection.
+- **Breaking:** feature declarations (`DwFeature`, `DwFeatureSpec`,
+  `scanMountedFeatures`) moved to `dartway_flutter` — they are app semantics,
+  not transport. The bridge keeps a wire model `StudioFeatureInfo`
+  (id/title/description); the app's binding maps discovered features onto it.
 
 ## 0.1.0
 

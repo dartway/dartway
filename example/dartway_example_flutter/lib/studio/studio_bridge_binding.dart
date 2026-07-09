@@ -1,3 +1,4 @@
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -8,6 +9,18 @@ import 'logic/studio_persona_switcher.dart';
 import 'logic/studio_personas.dart';
 import 'logic/studio_project_manifest.dart';
 import 'logic/studio_session_state_provider.dart';
+
+/// The project wiring point between the app's semantic layer and the bridge:
+/// features are discovered from mounted [DwFeature] widgets and mapped onto
+/// the bridge wire model.
+List<StudioFeatureInfo> _mountedFeatureInfos() => [
+      for (final feature in scanMountedFeatures())
+        StudioFeatureInfo(
+          id: feature.id,
+          title: feature.title,
+          description: feature.description,
+        ),
+    ];
 
 /// Connects the app to DartWay Studio when it runs embedded in the Studio
 /// preview frame: attaches the bridge host, reports route/session changes and
@@ -48,7 +61,7 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       currentSession: () => ref.read(studioSessionStateProvider),
       // The connect snapshot carries the current screen's features so a
       // freshly connected Studio sees them without waiting for navigation.
-      currentFeatures: scanMountedFeatures,
+      currentFeatures: _mountedFeatureInfos,
       currentLocale: () => ref.read(appLocaleProvider).languageCode,
     );
     if (_host == null) return;
@@ -64,7 +77,7 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       ]) {
         Future<void>.delayed(delay, () {
           if (!mounted) return;
-          _host?.reportFeatures(currentPath(), scanMountedFeatures());
+          _host?.reportFeatures(currentPath(), _mountedFeatureInfos());
         });
       }
     }

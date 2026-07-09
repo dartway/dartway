@@ -632,6 +632,12 @@ abstract class AppLocalizations {
   /// **'No members match.'**
   String get noMembersMatch;
 
+  /// No description provided for @confirmChangeRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the role of {name} to {role}?'**
+  String confirmChangeRole(String name, String role);
+
   /// No description provided for @clubSettings.
   ///
   /// In en, this message translates to:

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import '../models/dw_feature_spec.dart';
+import '../models/studio_feature_info.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
 import '../protocol/studio_bridge_message.dart';
@@ -50,7 +50,7 @@ class StudioBridgeHost {
     required StudioBridgeHostDelegate delegate,
     required String Function() currentPath,
     required StudioSessionState Function() currentSession,
-    List<DwFeatureSpec> Function()? currentFeatures,
+    List<StudioFeatureInfo> Function()? currentFeatures,
     String Function()? currentLocale,
     List<String> allowedStudioOrigins = const [],
   }) {
@@ -73,7 +73,7 @@ class StudioBridgeHost {
   final StudioBridgeHostDelegate _delegate;
   final String Function() _currentPath;
   final StudioSessionState Function() _currentSession;
-  final List<DwFeatureSpec> Function() _currentFeatures;
+  final List<StudioFeatureInfo> Function() _currentFeatures;
   final String Function() _currentLocale;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
@@ -105,7 +105,7 @@ class StudioBridgeHost {
   void reportSession(StudioSessionState session) =>
       _channel.send(SessionChangedMessage(session));
 
-  void reportFeatures(String path, List<DwFeatureSpec> features) =>
+  void reportFeatures(String path, List<StudioFeatureInfo> features) =>
       _channel.send(FeaturesChangedMessage(path: path, features: features));
 
   void reportLocale(String locale) => _channel.send(LocaleChangedMessage(locale));

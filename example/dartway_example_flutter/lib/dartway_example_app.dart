@@ -29,14 +29,9 @@ class DartwayExampleApp {
     initExampleDwCore(backendUrl: backendUrl);
 
     DwAppRunner(
-      // Zone-level connection errors (e.g. the streaming retry) are swallowed;
-      // real errors still reach the report sink. Real apps route the latter to
-      // their alert sink instead of debugPrint.
-      onError: dwConnectionAwareErrorHandler(
-        onConnectionError: (error) =>
-            debugPrint('[zone] swallowed connection error: $error'),
-        onUnexpectedError: (error, st) => debugPrint('[zone] $error\n$st'),
-      ),
+      // No onError: uncaught errors flow into the dw pipeline, where DwCore
+      // filters connection blips and alerts everything else with app context
+      // (route, mounted features, action, user) — zero-config alerting.
       appInitializers: [
         () => dw.initDwCore(
           initRepositoryFunction: DefaultModels.initRepository,

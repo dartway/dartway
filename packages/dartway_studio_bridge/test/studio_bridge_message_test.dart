@@ -49,7 +49,7 @@ void main() {
         const FeaturesChangedMessage(
           path: '/schedule',
           features: [
-            DwFeatureSpec(
+            StudioFeatureInfo(
               id: 'schedule-list',
               title: 'List',
               description: 'desc',

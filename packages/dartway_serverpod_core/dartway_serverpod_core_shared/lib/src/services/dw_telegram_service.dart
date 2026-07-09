@@ -6,17 +6,21 @@ import 'package:http/http.dart' as http;
 class DwTelegramService {
   static const _telegramLimit = 4096;
 
-  /// Отправка сообщения в Telegram с автоматическим экранированием и обрезкой.
+  /// Sends a message to Telegram (MarkdownV2). With [escapeMessage] the whole
+  /// text is escaped and truncated (plain-text callers); pass `false` for
+  /// messages that are already valid MarkdownV2 (e.g. built by
+  /// [DwAlertFormatter]) — they only get the safety truncation.
   static Future<void> sendMessage({
     required String message,
     required String chatId,
     required String token,
     String? messageThreadId,
+    bool escapeMessage = true,
     Function(String message)? reportErrorFunction,
   }) async {
     try {
-      // 🧩 Подготовка текста
-      final safeMessage = _prepareMessage(message);
+      final safeMessage =
+          escapeMessage ? _prepareMessage(message) : _truncate(message);
 
       final url = Uri.parse("https://api.telegram.org/bot$token/sendMessage");
 
@@ -45,14 +49,16 @@ class DwTelegramService {
     }
   }
 
-  /// Экранирует спецсимволы MarkdownV2 и обрезает до безопасной длины.
-  static String _prepareMessage(String message) {
-    final escaped = message.replaceAllMapped(
-      RegExp(r'([_*\[\]()~`>#+\-=|{}.!])'),
-      (m) => '\\${m.group(1)}',
-    );
+  /// Escapes MarkdownV2 specials and truncates to the safe length.
+  static String _prepareMessage(String message) =>
+      _truncate(DwAlertFormatter.escapeMarkdownV2(message));
 
-    if (escaped.length <= _telegramLimit) return escaped;
-    return '${escaped.substring(0, _telegramLimit - 20)}\\n…';
+  /// Safety net: fits [message] into the Telegram limit without leaving a
+  /// dangling escape backslash at the cut point.
+  static String _truncate(String message) {
+    if (message.length <= _telegramLimit) return message;
+    var cut = message.substring(0, _telegramLimit - 20);
+    if (cut.endsWith('\\')) cut = cut.substring(0, cut.length - 1);
+    return '$cut\n…';
   }
 }

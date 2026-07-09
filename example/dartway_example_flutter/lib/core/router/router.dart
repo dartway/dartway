@@ -1,6 +1,7 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../dw_core.dart';
 import '../../app/admin/dashboard/admin_dashboard_page.dart';
 import '../../app/admin/settings/admin_settings_page.dart';
 import '../../app/admin/users/admin_users_page.dart';
@@ -27,7 +28,7 @@ final appRouterStateProvider = Provider<AppRouterState>(
 /// users are redirected to the auth zone; signed-in users are kept out of it.
 final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
   final routerState = ref.watch(appRouterStateProvider);
-  return DwRouter<AppRouterState>(
+  final router = DwRouter<AppRouterState>(
     routerState: routerState,
     navigationZones: [
       AppNavigationZone.values,
@@ -40,4 +41,13 @@ final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
       debugLogDiagnostics: false,
     ),
   );
+
+  // Error reports carry the current route — the framework has no access to
+  // the app's router, so the app registers a lazy source once.
+  dw.errorContext.registerRouteSource(() {
+    final configuration = router.router.routerDelegate.currentConfiguration;
+    return configuration.isEmpty ? '/' : configuration.uri.path;
+  });
+
+  return router;
 });

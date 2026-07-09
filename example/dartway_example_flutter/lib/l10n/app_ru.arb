@@ -98,6 +98,7 @@
   "roleName": "{role, select, client{Клиент} staff{Команда} admin{Админ} other{—}}",
   "noMembersYet": "Участников пока нет.",
   "noMembersMatch": "Никто не подходит под фильтр.",
+  "confirmChangeRole": "Сменить роль {name} на «{role}»?",
   "clubSettings": "Настройки клуба",
   "clubNameLabel": "Название клуба",
   "saveAction": "Сохранить",

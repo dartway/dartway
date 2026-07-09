@@ -1,3 +1,4 @@
+import 'package:dartway_flutter/src/error_reporting/dw_error_report.dart';
 import 'package:dartway_flutter/src/private/dw_singleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +18,7 @@ extension DwAsyncValueX<T> on AsyncValue<T> {
       skipLoadingOnRefresh: skipLoadingOnRefresh,
       data: (data) => childBuilder(data),
       error: (error, stackTrace) {
-        dw.handleError(error, stackTrace);
+        dw.handleError(error, stackTrace, source: DwErrorSource.asyncBuild);
         return errorWidget;
       },
       loading: () {
