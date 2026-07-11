@@ -4,6 +4,9 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 class DwUploadEndpoint extends Endpoint {
+  @override
+  bool get requireLogin => true;
+
   Future<String?> getUploadDescription(
     Session session, {
     required String path,
