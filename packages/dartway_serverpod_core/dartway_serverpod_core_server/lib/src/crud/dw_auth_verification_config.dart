@@ -29,7 +29,9 @@ final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
           authRequest.status != DwAuthRequestStatus.pendingVerification) {
         verification.setFailed(
           session,
-          DwAuthFailReason.invalidVerificationCode,
+          authRequest?.status == DwAuthRequestStatus.failed
+              ? DwAuthFailReason.tooManyAttempts
+              : DwAuthFailReason.invalidVerificationCode,
         );
         return;
       }
