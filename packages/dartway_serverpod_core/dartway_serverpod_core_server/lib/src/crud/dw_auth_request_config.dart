@@ -61,7 +61,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
                 authConfig.maxAuthRequestsPerIdentifier) {
               saveContext.currentModel.setFailed(
                 session,
-                DwAuthFailReason.invalidVerificationCode,
+                DwAuthFailReason.rateLimited,
               );
               return;
             }

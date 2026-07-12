@@ -8,3 +8,6 @@ values:
   - invalidAccessToken
   - invalidVerificationCode
   - userBlocked
+  - tooManyAttempts
+  - codeExpired
+  - rateLimited

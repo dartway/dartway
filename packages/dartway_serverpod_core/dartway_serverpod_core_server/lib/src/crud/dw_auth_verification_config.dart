@@ -38,19 +38,21 @@ final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
           DateTime.now().difference(authRequest.createdAt) >
           authConfig.verificationCodeLifetime;
 
+      if (isExpired) {
+        await _burnAuthRequest(session, authRequest, saveContext.transaction);
+        verification.setFailed(session, DwAuthFailReason.codeExpired);
+        return;
+      }
+
       final previousAttempts = await DwAuthVerification.db.count(
         session,
         where: (t) => t.dwAuthRequestId.equals(authRequest.id!),
         transaction: saveContext.transaction,
       );
 
-      if (isExpired ||
-          previousAttempts >= authConfig.maxVerificationAttempts) {
+      if (previousAttempts >= authConfig.maxVerificationAttempts) {
         await _burnAuthRequest(session, authRequest, saveContext.transaction);
-        verification.setFailed(
-          session,
-          DwAuthFailReason.invalidVerificationCode,
-        );
+        verification.setFailed(session, DwAuthFailReason.tooManyAttempts);
         return;
       }
 
@@ -60,12 +62,16 @@ final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
               DwAuthUtils.hashVerificationCode(verification.verificationCode!);
 
       if (!isCodeValid) {
-        if (previousAttempts + 1 >= authConfig.maxVerificationAttempts) {
+        final isLastAttempt =
+            previousAttempts + 1 >= authConfig.maxVerificationAttempts;
+        if (isLastAttempt) {
           await _burnAuthRequest(session, authRequest, saveContext.transaction);
         }
         verification.setFailed(
           session,
-          DwAuthFailReason.invalidVerificationCode,
+          isLastAttempt
+              ? DwAuthFailReason.tooManyAttempts
+              : DwAuthFailReason.invalidVerificationCode,
         );
         return;
       }
