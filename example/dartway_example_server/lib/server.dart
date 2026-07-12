@@ -29,7 +29,7 @@ void run(List<String> args) async {
   // Serve all files in the /web/static directory.
   pod.webServer.addRoute(StaticRoute.directory(Directory('web/static')), '/');
 
-  initDartwayCore(pod);
+  initDartwayCore(passwords: pod.server.passwords);
 
   await pod.start();
 }

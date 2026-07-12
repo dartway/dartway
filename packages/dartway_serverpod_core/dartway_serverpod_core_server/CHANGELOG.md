@@ -20,19 +20,29 @@
   `DwAuthFailReason` in app code must handle them**.
 - Every auth limit is now enforced **at the database level**, not by
   read-then-write in Dart. Under Postgres' default READ COMMITTED isolation the
-  latter is racy: parallel guesses each read the same attempt count, all pass
-  the check and all get to try — which would have left the brute-force limit
-  bypassable by simply firing the attempts concurrently. Verification attempts
-  now take a row lock on the auth request, request rate limiting takes a
-  transaction-scoped advisory lock on the identifier, and the access token is
-  claimed with a conditional `UPDATE` so a second redemption of the same token
+  latter is racy, and not academically so — the integration tests measure it:
+  twenty parallel guesses bought **ten** evaluated attempts against a limit of
+  five, and a "single-use" access token signed the caller in **twice**. Firing
+  the requests concurrently simply took the brute-force protection off.
+  Verification attempts and per-identifier rate limiting now take
+  transaction-scoped advisory locks, and the access token is claimed with a
+  conditional `UPDATE ... WHERE status = 'verified'`, so a second redemption
   matches no rows. See `DwAuthConcurrency`.
+- The locks are **non-blocking on purpose**. A lock that waits holds a pooled
+  database connection while it queues, so an attacker hammering one identifier
+  could exhaust the connection pool — trading a race for a denial of service.
+  Failing to take the lock means a request for that identifier is already in
+  flight, which for a rate limit is not an error but the answer, and the caller
+  gets `rateLimited`.
 - Access tokens are single-use: redeeming one moves its auth request to
   `completed`, and the write now commits with the sign-in it authorizes rather
   than outside the enclosing transaction.
 - `DwAuthConfig.verifyExternalCredential`: validate an external provider's
-  credential (Apple identity token, …) on a non-email `DwAuthRequest`; DartWay
-  then registers on first sign-in or logs the user in. Leaving it unset rejects
-  every non-email provider — an unconfigured provider is a closed door.
+  credential (Apple identity token, …) and let DartWay register on first sign-in
+  or log the user in. External means a credential issued by a third party —
+  Google, Apple, Telegram — while `email` and `phone` remain DartWay's own
+  identifier + verification-code flows and never take that path. Leaving the
+  callback unset rejects every external provider: an unconfigured provider is a
+  closed door, not an open one.
 - `DwCloudStorage` honours `useSSL` and `port` from its config instead of
   hardcoding HTTPS and ignoring the port.

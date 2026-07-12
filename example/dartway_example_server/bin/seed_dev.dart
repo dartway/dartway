@@ -28,7 +28,7 @@ Future<void> main(List<String> args) async {
     Endpoints(),
     authenticationHandler: dwAuthenticationHandler,
   );
-  initDartwayCore(pod);
+  initDartwayCore(passwords: pod.server.passwords);
 
   final session = await pod.createSession(enableLogging: false);
   try {

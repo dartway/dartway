@@ -13,12 +13,23 @@ import 'package:dartway_example_server/src/crud/user_profile_crud_config.dart';
 import 'package:dartway_example_server/src/generated/protocol.dart';
 import 'package:serverpod/serverpod.dart';
 
-late final DwCore<UserProfile> dw;
+late DwCore<UserProfile> dw;
+bool _initialized = false;
 
 String _randomVerificationCode() =>
     List.generate(6, (_) => Random.secure().nextInt(10)).join();
 
-void initDartwayCore(Serverpod serverpod) {
+/// Boots DartWay for this app.
+///
+/// Takes the passwords map rather than the whole [Serverpod] — that is the only
+/// thing the core needs from it, and passing it explicitly is what lets the
+/// integration tests bring DartWay up without a running server (`withServerpod`
+/// builds its own Serverpod and never calls `run`).
+void initDartwayCore({required Map<String, String> passwords}) {
+  // Tests call this from `setUpAll` in every group; booting once is enough.
+  if (_initialized) return;
+  _initialized = true;
+
   dw = DwCore.init<UserProfile>(
     userProfileTable: UserProfile.t,
     userProfileInclude: UserProfile.include(),
@@ -37,7 +48,7 @@ void initDartwayCore(Serverpod serverpod) {
     userProfileConstructor: _buildUserProfile,
     dwAlerts: DwAlerts.init(),
     dwAuthConfig: DwAuthConfig(
-      passwords: serverpod.server.passwords,
+      passwords: passwords,
       // Test/reviewer accounts carry a fixed, admin-rotated code
       // (UserProfile.testVerificationCode, serverOnly — never sent to clients);
       // everyone else gets a fresh random code. Works in any run mode, so store

@@ -5,6 +5,23 @@ import 'dw_auth_concurrency.dart';
 import 'dw_auth_utils.dart';
 
 extension DwAuthRequestVerification on DwAuthRequest {
+  /// Whether the request carries a credential issued by a third party, which
+  /// only the app can validate (see [DwAuthConfig.verifyExternalCredential]).
+  ///
+  /// Email and phone are DartWay's own identifier + verification-code flows and
+  /// must never take that path: an app doing phone OTP configures no external
+  /// verifier, and treating phone as external would reject every login.
+  ///
+  /// The switch is exhaustive on purpose — a new provider has to be classified,
+  /// not silently inherit a default.
+  bool get isExternalProvider => switch (authProvider) {
+    DwAuthProvider.email || DwAuthProvider.phone => false,
+    DwAuthProvider.google ||
+    DwAuthProvider.apple ||
+    DwAuthProvider.telegram ||
+    DwAuthProvider.other => true,
+  };
+
   void setFailed(Session session, DwAuthFailReason reason) {
     // TODO: setup alerting
     session.log('Auth failed: $reason', level: LogLevel.warning);
@@ -36,7 +53,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
   }) async {
     // External providers (Apple, …): validate the provider credential, then
     // register on first sign-in or log in when the user already exists.
-    if (authProvider != DwAuthProvider.email) {
+    if (isExternalProvider) {
       final verifyExternal =
           DwCore.instance.auth!.config.verifyExternalCredential;
 

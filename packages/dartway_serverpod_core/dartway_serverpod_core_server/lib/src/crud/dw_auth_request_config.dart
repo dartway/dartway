@@ -47,15 +47,25 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
               DwAuthRequestStatus.pendingVerification) {
             final authConfig = DwCore.instance.auth!.config;
 
-            // Serialize requests for this identifier before counting them:
-            // parallel requests would otherwise each count the same recent
-            // rows, all pass the limit and all send a code. See
-            // [DwAuthConcurrency].
-            await DwAuthConcurrency.lockIdentifier(
+            // Only one request per identifier may be counted at a time:
+            // parallel ones would otherwise each see the same recent rows, all
+            // pass the limit and all send a code. Refuse rather than queue —
+            // a request already in flight for this identifier *is* the answer
+            // "too fast", and a waiting lock would pin a pooled connection per
+            // attacker request. See [DwAuthConcurrency].
+            final locked = await DwAuthConcurrency.tryLockIdentifier(
               session,
               saveContext.currentModel.userIdentifier,
               transaction: saveContext.transaction,
             );
+
+            if (!locked) {
+              saveContext.currentModel.setFailed(
+                session,
+                DwAuthFailReason.rateLimited,
+              );
+              return;
+            }
 
             final recentRequestCount = await DwAuthRequest.db.count(
               session,

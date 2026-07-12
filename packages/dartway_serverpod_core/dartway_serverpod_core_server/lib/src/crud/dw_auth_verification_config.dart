@@ -21,15 +21,22 @@ final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
       final authConfig = DwCore.instance.auth!.config;
       final verification = saveContext.currentModel;
 
-      // Serialize concurrent attempts against the same request before reading
-      // anything: the attempt limit below is a read-then-write decision, and
-      // without this lock parallel guesses all see the same attempt count, all
-      // pass the check and all get to try. See [DwAuthConcurrency].
-      await DwAuthConcurrency.lockAuthRequest(
+      // The attempt limit below is a read-then-write decision, so only one
+      // attempt per request may be in flight. Refuse rather than queue: a
+      // waiting lock holds a pooled connection, and an attacker firing guesses
+      // in parallel would drain the pool. Refusing costs a real user nothing —
+      // they never verify the same request twice at once. See
+      // [DwAuthConcurrency].
+      final locked = await DwAuthConcurrency.tryLockAuthRequest(
         session,
         verification.dwAuthRequestId,
         transaction: saveContext.transaction,
       );
+
+      if (!locked) {
+        verification.setFailed(session, DwAuthFailReason.rateLimited);
+        return;
+      }
 
       final authRequest = await DwAuthRequest.db.findById(
         session,

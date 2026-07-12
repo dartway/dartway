@@ -13,5 +13,19 @@ services:
     volumes:
       - dartway_example_data:/var/lib/postgresql/data
 
+  # Test database. Matches config/test.yaml (localhost:9090, database
+  # "dartway_example_test"). Kept separate from development on purpose: the
+  # integration tests commit real transactions (concurrency cannot be observed
+  # inside a rolled-back one) and truncate tables between cases.
+  postgres_test:
+    image: postgres:16
+    ports:
+      - '9090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dartway_example_test
+      POSTGRES_PASSWORD: 'dartway_test_pw'
+    # No volume: a test database that survives a restart is a liability.
+
 volumes:
   dartway_example_data:
