@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
+import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_concurrency.dart';
 import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_utils.dart';
 import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_verification_extension.dart';
 import 'package:serverpod/serverpod.dart';
@@ -20,9 +21,20 @@ final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
       final authConfig = DwCore.instance.auth!.config;
       final verification = saveContext.currentModel;
 
+      // Serialize concurrent attempts against the same request before reading
+      // anything: the attempt limit below is a read-then-write decision, and
+      // without this lock parallel guesses all see the same attempt count, all
+      // pass the check and all get to try. See [DwAuthConcurrency].
+      await DwAuthConcurrency.lockAuthRequest(
+        session,
+        verification.dwAuthRequestId,
+        transaction: saveContext.transaction,
+      );
+
       final authRequest = await DwAuthRequest.db.findById(
         session,
         verification.dwAuthRequestId,
+        transaction: saveContext.transaction,
       );
 
       if (authRequest == null ||

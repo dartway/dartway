@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
+import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_concurrency.dart';
 import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_request_extension.dart';
 import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_utils.dart';
 import 'package:serverpod/serverpod.dart';
@@ -39,11 +40,23 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
           await saveContext.currentModel.tryVerify(
             session,
             userProfile: userProfile,
+            transaction: saveContext.transaction,
           );
 
           if (saveContext.currentModel.status ==
               DwAuthRequestStatus.pendingVerification) {
             final authConfig = DwCore.instance.auth!.config;
+
+            // Serialize requests for this identifier before counting them:
+            // parallel requests would otherwise each count the same recent
+            // rows, all pass the limit and all send a code. See
+            // [DwAuthConcurrency].
+            await DwAuthConcurrency.lockIdentifier(
+              session,
+              saveContext.currentModel.userIdentifier,
+              transaction: saveContext.transaction,
+            );
+
             final recentRequestCount = await DwAuthRequest.db.count(
               session,
               where: (t) =>

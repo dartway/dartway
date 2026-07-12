@@ -43,14 +43,22 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.sendVerificationCodeMethod,
     this.onSignInTrigger,
     this.preAuthValidation,
+    this.verifyExternalCredential,
     this.maxVerificationAttempts = 5,
     this.verificationCodeLifetime = const Duration(minutes: 10),
     this.maxAuthRequestsPerIdentifier = 5,
     this.authRequestRateLimitWindow = const Duration(minutes: 10),
   });
 
+  /// How many verification codes may be guessed for one auth request before it
+  /// is burned.
   final int maxVerificationAttempts;
+
+  /// How long a verification code stays valid after the request was created.
   final Duration verificationCodeLifetime;
+
+  /// How many auth requests one identifier may open within
+  /// [authRequestRateLimitWindow] before further ones are rate-limited.
   final int maxAuthRequestsPerIdentifier;
   final Duration authRequestRateLimitWindow;
 
@@ -62,6 +70,18 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     required DwAuthRequest authRequest,
     required UserProfileClass? userProfile,
   })? preAuthValidation;
+
+  /// Validates an external auth provider's credential (e.g. an Apple identity
+  /// token) carried on a non-email [DwAuthRequest]. Return `null` when the
+  /// credential is valid — DartWay then logs the user in, or registers them on
+  /// first sign-in — or a [DwAuthFailReason] to reject the attempt.
+  ///
+  /// Leaving this unset rejects every non-email provider: an unconfigured
+  /// provider must not be an open door.
+  final Future<DwAuthFailReason?> Function(
+    Session session, {
+    required DwAuthRequest authRequest,
+  })? verifyExternalCredential;
 
   /// Callback for triggering actions when a user signs in.
   final Future<void> Function(
