@@ -25,7 +25,8 @@ class DwCloudStorageConfig {
       endPoint: env[DwConfigurationKeys.dwCloudStorageEndpoint]!,
       port: int.parse(env[DwConfigurationKeys.dwCloudStoragePort] ?? '443'),
       useSSL:
-          env[DwConfigurationKeys.dwCloudStorageUseSSL]?.toLowerCase() ==
+          (env[DwConfigurationKeys.dwCloudStorageUseSSL] ?? 'true')
+              .toLowerCase() ==
           'true',
       accessKey: env[DwConfigurationKeys.dwCloudStorageAccessKey]!,
       secretKey: env[DwConfigurationKeys.dwCloudStorageSecretKey]!,

@@ -70,8 +70,14 @@ extension DwAuthRequestVerification on DwAuthRequest {
         ),
       );
 
-      if (verification != null &&
-          verification.dwAuthRequest?.userIdentifier == userIdentifier) {
+      final originalRequest = verification?.dwAuthRequest;
+
+      if (originalRequest != null &&
+          originalRequest.userIdentifier == userIdentifier &&
+          originalRequest.status == DwAuthRequestStatus.verified) {
+        originalRequest.status = DwAuthRequestStatus.completed;
+        await DwAuthRequest.db.updateRow(session, originalRequest);
+
         status = DwAuthRequestStatus.verified;
         session.log(
           'Auth verified for userId=$userId ($userIdentifier) with accessToken',

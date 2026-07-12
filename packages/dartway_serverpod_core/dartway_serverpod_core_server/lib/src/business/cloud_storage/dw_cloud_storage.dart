@@ -26,14 +26,21 @@ class DwCloudStorage {
     _client = Minio(
       region: config.region,
       endPoint: config.endPoint,
-      // port: config.port,
-      useSSL: true,
+      port: config.port,
+      useSSL: config.useSSL,
       accessKey: config.accessKey,
       secretKey: config.secretKey,
     );
   }
 
-  String get uploadUrl => 'https://${config.endPoint}/${config.bucket}';
+  String get _scheme => config.useSSL ? 'https' : 'http';
+
+  String get uploadUrl => Uri(
+    scheme: _scheme,
+    host: config.endPoint,
+    port: config.port,
+    pathSegments: [config.bucket],
+  ).toString();
 
   Future<bool> bucketExists() async {
     return await _client.bucketExists(config.bucket);
@@ -138,8 +145,9 @@ class DwCloudStorage {
 
   String _getPublicUrl(String objectPath) {
     return Uri(
-      scheme: 'https',
+      scheme: _scheme,
       host: config.endPoint,
+      port: config.port,
       path: '${config.bucket}/$objectPath',
     ).toString();
   }
