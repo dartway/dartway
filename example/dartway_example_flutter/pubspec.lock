@@ -9,14 +9,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "91.0.0"
-  adaptive_breakpoints:
-    dependency: transitive
-    description:
-      name: adaptive_breakpoints
-      sha256: "56dd5f1016f4d5732b80628d1b63a29d8c9cabe4d66a8a5fe63fdbec7b3af5cd"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.7"
   analyzer:
     dependency: transitive
     description:
@@ -209,14 +201,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
-  conditional_parent_widget:
-    dependency: transitive
-    description:
-      name: conditional_parent_widget
-      sha256: "04c7e5e42616557d964e139bdefc21e5479e5faee4fac538b7313401553eb7e7"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.0.2"
   connectivity_plus:
     dependency: transitive
     description:
@@ -325,7 +309,7 @@ packages:
       path: "../../packages/dartway_flutter"
       relative: true
     source: path
-    version: "0.9.0"
+    version: "0.1.0"
   dartway_router:
     dependency: "direct main"
     description:
@@ -340,28 +324,28 @@ packages:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_client"
       relative: true
     source: path
-    version: "0.0.0"
+    version: "0.1.0"
   dartway_serverpod_core_flutter:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_flutter"
       relative: true
     source: path
-    version: "0.0.1"
+    version: "0.1.0"
   dartway_serverpod_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_shared"
       relative: true
     source: path
-    version: "1.0.0"
+    version: "0.1.0"
   dartway_studio_bridge:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_studio_bridge"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.1.0"
   dartx:
     dependency: transitive
     description:
@@ -379,7 +363,7 @@ packages:
     source: hosted
     version: "0.7.14"
   device_frame:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: device_frame
       sha256: "7b2ebb2a09d6cc0f086b51bd1412d7be83e0170056a7290349169be41164c86a"

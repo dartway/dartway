@@ -28,26 +28,26 @@ class ProfilePage extends ConsumerWidget {
             const ProfileSettingsWidget(),
             const Gap(24),
             if (ref.watchUserProfile.isClubAdmin) ...[
-              DwButton.secondary(
+              AppButton.secondary(
                 l10n.adminPanel,
-                dwCallback: DwUiAction.create(
+                onTap: DwUiAction.create(
                   (context) => GoRouter.of(context)
                       .goNamed(AdminNavigationZone.admin.name),
                 ),
               ),
               const Gap(24),
             ],
-            DwButton.secondary(
+            AppButton.secondary(
               l10n.ourServices,
-              dwCallback: DwUiAction.create(
+              onTap: DwUiAction.create(
                 (context) => GoRouter.of(context)
                     .goNamed(AppNavigationZone.services.name),
               ),
             ),
             const Gap(24),
-            DwButton.text(
+            AppButton.text(
               l10n.signOutAction,
-              dwCallback: DwUiAction.create(
+              onTap: DwUiAction.create(
                 (context) => ref.read(dw.sessionProvider!.notifier).signOut(),
               ),
             ),

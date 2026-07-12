@@ -33,7 +33,8 @@ extension DwAsyncValueX<T> on AsyncValue<T> {
 
         final built = childBuilder(fakeData);
 
-        // 🧠 если дочерний виджет — sliver, используем SliverSkeletonizer
+        // A sliver child needs the sliver-flavoured skeletonizer: the box one
+        // would be an invalid child for the enclosing CustomScrollView.
         if (built is SliverList ||
             built is SliverGrid ||
             built is SliverToBoxAdapter ||
@@ -41,7 +42,6 @@ extension DwAsyncValueX<T> on AsyncValue<T> {
           return SliverSkeletonizer(enabled: true, child: built);
         }
 
-        // 🧩 иначе обычный box-режим
         return Skeletonizer(child: built);
       },
     );

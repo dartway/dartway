@@ -21,9 +21,8 @@ class VerifyOtpBlock extends HookConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: DwText(
+            child: AppText.title(
               context.l10n.enterSmsCode,
-              textStyle: AppText.title,
             ),
           ),
           const Gap(12),
@@ -59,10 +58,10 @@ class VerifyOtpBlock extends HookConsumerWidget {
           const Spacer(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: DwButton.primary(
+            child: AppButton.primary(
               context.l10n.continueAction,
               requireValidation: true,
-              dwCallback: DwUiAction.create(
+              onTap: DwUiAction.create(
                 (_) => ref.read(authStateProvider.notifier).verifyOtp(),
               ),
             ),

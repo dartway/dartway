@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../error_reporting/dw_error_report.dart';
-import '../../ui_kit/dialogs/dw_ui_confirmation.dart';
+import '../../dialogs/dw_ui_confirmation.dart';
 import 'dw_telegram_web_app_config.dart';
 
 class DwConfig {

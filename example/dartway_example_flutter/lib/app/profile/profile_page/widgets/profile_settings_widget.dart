@@ -69,7 +69,7 @@ class ProfileSettingsWidget extends HookConsumerWidget {
           const Gap(16),
 
           // Gender Selector
-          DwText(l10n.genderLabel, textStyle: AppText.body),
+          AppText.body(l10n.genderLabel),
           const Gap(8),
           DropdownButtonFormField<UserGender>(
             initialValue: selectedGender.value,
@@ -98,9 +98,9 @@ class ProfileSettingsWidget extends HookConsumerWidget {
 
           // Save Button (only shows when there are changes)
           if (hasChanges.value) ...[
-            DwButton.primary(
+            AppButton.primary(
               l10n.saveChanges,
-              dwCallback: DwUiAction.create(
+              onTap: DwUiAction.create(
                 (context) async {
                   await DwRepository.saveModel(
                     userProfile.copyWith(

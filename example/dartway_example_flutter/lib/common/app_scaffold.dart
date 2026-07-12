@@ -35,7 +35,7 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DwDeviceFrame(
+    return DeviceFrameShell(
       body: Scaffold(
         appBar: appBar,
         body: Stack(

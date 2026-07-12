@@ -56,9 +56,9 @@ class SessionCard extends ConsumerWidget {
             ),
             const Gap(12),
             if (activeBooking == null)
-              DwButton.primary(
+              AppButton.primary(
                 l10n.book,
-                dwCallback: DwUiAction.create(
+                onTap: DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     SessionBooking(
                       clubSessionId: session.id!,
@@ -71,9 +71,9 @@ class SessionCard extends ConsumerWidget {
                 ),
               )
             else
-              DwButton.secondary(
+              AppButton.secondary(
                 l10n.cancel,
-                dwCallback: DwUiAction.create(
+                onTap: DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     activeBooking!.copyWith(status: BookingStatus.cancelled),
                   ),

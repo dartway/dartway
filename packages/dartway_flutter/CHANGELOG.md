@@ -4,9 +4,30 @@
 
 - First public release: `DwAppRunner` bootstrap, `dw` app core (navigation,
   notifications, services, shared preferences, Telegram web-app support),
-  overlay notifications pipeline, base UI kit (`DwButton`, `DwText`,
-  `MultiLinkText`, `DwDeviceFrame`, `DwInfiniteListView`, `DwFlutterTheme`)
-  and AsyncValue utilities (`dwBuildListAsync`, `DwUiAction`).
+  overlay notifications pipeline, `DwInfiniteListView`, and AsyncValue
+  utilities (`dwBuildListAsync`, `DwUiAction`).
+- **The package ships no design system.** `DwButton`, `DwText`,
+  `DwFlutterTheme`, `DwColorPreset`, `DwTextStylePreset`,
+  `DwButtonStylePreset`, `DwDeviceFrame`, `MultiLinkText` and
+  `context.isMobile` are gone. A design system is the one thing every app ends
+  up owning; shipping it as a dependency only starts an argument about the
+  corner radius of a button — and it forced an entire indirection apparatus
+  (`ThemeExtension` + fallback presets) whose only job was to let framework
+  widgets look up app styles. The UI kit now lives as source in the app's
+  `lib/ui_kit/`, scaffolded by `dartway create` (see `example/`).
+- **New: `DwActionBuilder`** — the mechanism that used to be trapped inside
+  `DwButton`. It binds a `DwUiAction` to *any* tappable widget (a list tile, an
+  icon, a card), holding the in-flight flag, blocking re-entrant taps and
+  optionally validating the enclosing `Form`. The builder receives a ready
+  `onPressed` (null while the action runs) and a `busy` flag.
+  `DwUiAction` says *what* an action does; `DwActionBuilder` says what the UI
+  does while it runs.
+- Dropped three dependencies: `adaptive_breakpoints` (**discontinued upstream**;
+  it existed solely for `context.isMobile`, whose breakpoint was
+  platform-dependent and surprising enough that app code bypassed it),
+  `conditional_parent_widget` (unmaintained since 2023 and re-exported from the
+  public barrel) and `device_frame`. All three now belong to the app's kit,
+  where they are the app's business.
 - Feature declarations moved in from the Studio bridge: `DwFeature`,
   `DwFeatureSpec` and `scanMountedFeatures` are app semantics and now live
   here — feature catalogs, error-report context, analytics; a Studio binding

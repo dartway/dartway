@@ -57,9 +57,9 @@ class _ClubNameField extends HookWidget {
           ),
         ),
         const Gap(12),
-        DwButton.primary(
+        AppButton.primary(
           l10n.saveAction,
-          dwCallback: canSave
+          onTap: canSave
               ? DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     setting.copyWith(settingValue: value.value.trim()),

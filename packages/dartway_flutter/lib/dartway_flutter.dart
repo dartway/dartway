@@ -1,8 +1,14 @@
 // lib/dartway_flutter.dart
-// Core app functionality
-
-// Recommended UI packages
-export 'package:conditional_parent_widget/conditional_parent_widget.dart';
+//
+// The Flutter skeleton of a DartWay app: bootstrap, ambient app core, the
+// async-UI contract, actions, notifications, error reporting and features.
+//
+// It deliberately ships no design — no button, no text widget, no theme, no
+// style presets. Those belong to the app's own `ui_kit/`, which `dartway create`
+// scaffolds and the app then owns outright. What the framework does ship is the
+// mechanism an app should not have to reinvent: `DwActionBuilder` guards a
+// `DwUiAction` behind any tappable widget, and `dwBuildAsync` renders
+// loading/error/data uniformly.
 
 // Feature declarations: mark a widget as a product feature (DwFeature) and
 // discover the mounted ones at runtime — feature catalogs, error-report
@@ -25,22 +31,16 @@ export 'src/dw_app_runner/logic/dw_app_loading_options.dart';
 export 'src/notifications/domain/dw_ui_notification.dart';
 export 'src/notifications/ui/dw_notifications_listener.dart';
 export 'src/notifications/ui/dw_ui_notification_handler.dart';
-export 'src/ui_kit/base_widgets/dw_button/dw_button.dart';
-export 'src/ui_kit/base_widgets/dw_button/dw_button_style_preset.dart';
-export 'src/ui_kit/base_widgets/dw_button/dw_button_style_preset_extension.dart';
-export 'src/ui_kit/base_widgets/dw_text.dart';
-export 'src/ui_kit/base_widgets/multi_link_text.dart';
-export 'src/ui_kit/dialogs/dw_ui_confirmation.dart';
-export 'src/ui_kit/layout_widgets/dw_device_frame.dart';
-export 'src/ui_kit/layout_widgets/infinite_list_view/domain/dw_infinite_list_view_config.dart';
-export 'src/ui_kit/layout_widgets/infinite_list_view/domain/dw_infinite_list_view_grouped_item.dart';
-// UI Components
-export 'src/ui_kit/layout_widgets/infinite_list_view/infinite_list_view.dart';
-export 'src/ui_kit/theme/dw_color_preset.dart';
-export 'src/ui_kit/theme/dw_flutter_theme.dart';
-export 'src/ui_kit/theme/dw_text_style_preset.dart';
+// Confirmation: the declarative request, plus the built-in dialog used when the
+// app has not supplied `DwConfig.confirmDialogBuilder`.
+export 'src/dialogs/dw_ui_confirmation.dart';
+// Lists
+export 'src/lists/infinite_list_view/domain/dw_infinite_list_view_config.dart';
+export 'src/lists/infinite_list_view/domain/dw_infinite_list_view_grouped_item.dart';
+export 'src/lists/infinite_list_view/infinite_list_view.dart';
+// Actions: the policy (DwUiAction) and the widget-agnostic guard that runs it.
+export 'src/utils/dw_action_builder.dart';
+export 'src/utils/dw_ui_action.dart';
+// AsyncValue utilities
 export 'src/utils/dw_async_value_extension.dart';
 export 'src/utils/dw_build_async_list_value_extension.dart';
-export 'src/utils/dw_build_context_extension.dart';
-// Utilities
-export 'src/utils/dw_ui_action.dart';

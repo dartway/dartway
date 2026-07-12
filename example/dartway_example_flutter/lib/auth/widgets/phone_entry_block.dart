@@ -32,7 +32,7 @@ class PhoneEntryBlock extends HookConsumerWidget {
 
     return Column(
       children: [
-        DwText(l10n.fillRegistrationData, textStyle: AppText.title),
+        AppText.title(l10n.fillRegistrationData),
         const Gap(36),
         if (isRegistration)
           Padding(
@@ -115,10 +115,10 @@ class PhoneEntryBlock extends HookConsumerWidget {
           ),
         const Spacer(),
         const SizedBox(height: 20),
-        DwButton.primary(
+        AppButton.primary(
           l10n.continueAction,
           requireValidation: true,
-          dwCallback: DwUiAction.create((_) async {
+          onTap: DwUiAction.create((_) async {
             await ref.read(authStateProvider.notifier).requestOtp();
           }),
         ),

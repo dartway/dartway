@@ -45,9 +45,9 @@ class BookingCard extends StatelessWidget {
               AppText.caption('${startsAt.dayLabel} · ${startsAt.timeLabel}'),
             const Gap(12),
             if (_canCancel(startsAt))
-              DwButton.secondary(
+              AppButton.secondary(
                 l10n.cancelBooking,
-                dwCallback: DwUiAction.create(
+                onTap: DwUiAction.create(
                   (context) => DwRepository.saveModel(
                     booking.copyWith(status: BookingStatus.cancelled),
                   ),
@@ -55,9 +55,9 @@ class BookingCard extends StatelessWidget {
                 ),
               ),
             if (booking.status == BookingStatus.attended && !isReviewed)
-              DwButton.primary(
+              AppButton.primary(
                 l10n.leaveReview,
-                dwCallback: DwUiAction.create(
+                onTap: DwUiAction.create(
                   (context) => context.showAppBottomSheet(
                     child: ReviewBottomSheet(booking: booking),
                   ),

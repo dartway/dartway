@@ -17,28 +17,28 @@ class GreetingBlock extends ConsumerWidget {
         const Spacer(
           flex: 2,
         ),
-        const DwText('DartWay.dev', textStyle: AppText.title),
+        AppText.title('DartWay.dev'),
         const Gap(12),
-        DwText(context.l10n.completeLoginToContinue, textStyle: AppText.body),
+        AppText.body(context.l10n.completeLoginToContinue),
         const Spacer(
           flex: 1,
         ),
-        DwButton.primary(
+        AppButton.primary(
           context.l10n.registrationAction,
           height: 40,
           width: 250,
-          dwCallback: DwUiAction.create(
+          onTap: DwUiAction.create(
             (_) => ref
                 .read(authStateProvider.notifier)
                 .goTo(AuthStep.registration),
           ),
         ),
         const Gap(20),
-        DwButton.secondary(
+        AppButton.secondary(
           context.l10n.loginAction,
           height: 40,
           width: 250,
-          dwCallback: DwUiAction.create(
+          onTap: DwUiAction.create(
             (_) => ref.read(authStateProvider.notifier).goTo(AuthStep.login),
           ),
         ),

@@ -8,7 +8,6 @@ import 'core/default_models.dart';
 import 'core/dw_core.dart';
 import 'core/router/router.dart';
 import 'studio/studio_bridge_binding.dart';
-import 'ui_kit/ui_kit.dart';
 
 /// The DartWay example application. All app wiring lives here; `main` only
 /// supplies concrete development parameters (backend URL, version) and runs it.
@@ -59,15 +58,6 @@ class _ExampleMaterialApp extends ConsumerWidget {
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color.fromARGB(255, 4, 49, 57),
         ),
-        extensions: const [
-          DwFlutterTheme(
-            multiLinkText: AppText.body,
-            multiLinkTextLink: AppText.link,
-            primaryButton: AppButton.primary,
-            secondaryButton: AppButton.secondary,
-            textButton: AppButton.text,
-          ),
-        ],
       ),
       builder: (context, child) {
         // The Studio bridge is inert unless the app runs embedded in the

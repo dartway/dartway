@@ -41,9 +41,9 @@ class CreateNewsPostSheet extends HookConsumerWidget {
           maxLength: 5000,
         ),
         const Gap(24),
-        DwButton.primary(
+        AppButton.primary(
           l10n.publish,
-          dwCallback: isFormValid
+          onTap: isFormValid
               ? DwUiAction.create(
                   (context) async {
                     await DwRepository.saveModel(

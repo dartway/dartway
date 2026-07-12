@@ -1,7 +1,4 @@
-import 'package:collection/collection.dart';
-import 'package:dartway_flutter/dartway_flutter.dart';
-import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+part of '../ui_kit.dart';
 
 class MultiLinkTextPart {
   MultiLinkTextPart(this.text, this.linkText, this.onLinkTap);
@@ -11,6 +8,7 @@ class MultiLinkTextPart {
   final DwUiAction? onLinkTap;
 }
 
+/// Rich text with tappable links, each running a [DwUiAction].
 class MultiLinkText extends StatefulWidget {
   MultiLinkText.single({
     super.key,
@@ -18,26 +16,22 @@ class MultiLinkText extends StatefulWidget {
     String? linkText,
     DwUiAction? onLinkTap,
     this.textAlign,
-    this.textStyle,
-    this.linkStyle,
+    this.textStyle = AppText.body,
+    this.linkStyle = AppText.link,
   }) : parts = [MultiLinkTextPart(text, linkText, onLinkTap)];
 
   const MultiLinkText.multi({
-    super.key,
     required this.parts,
+    super.key,
     this.textAlign,
-    this.textStyle,
-    this.linkStyle,
+    this.textStyle = AppText.body,
+    this.linkStyle = AppText.link,
   });
 
   final TextAlign? textAlign;
   final List<MultiLinkTextPart> parts;
-
-  /// Preset for normal text
-  final DwTextStylePreset? textStyle;
-
-  /// Preset for link text
-  final DwTextStylePreset? linkStyle;
+  final AppText textStyle;
+  final AppText linkStyle;
 
   @override
   State<MultiLinkText> createState() => _MultiLinkTextState();
@@ -62,16 +56,12 @@ class _MultiLinkTextState extends State<MultiLinkText> {
   }
 
   void _initRecognizers() {
-    _recognizers =
-        widget.parts.map((e) {
-          if (e.linkText != null && e.onLinkTap != null) {
-            final recognizer =
-                TapGestureRecognizer()
-                  ..onTap = () => e.onLinkTap!.call(context);
-            return recognizer;
-          }
-          return null;
-        }).toList();
+    _recognizers = widget.parts.map((e) {
+      if (e.linkText != null && e.onLinkTap != null) {
+        return TapGestureRecognizer()..onTap = () => e.onLinkTap!.call(context);
+      }
+      return null;
+    }).toList();
   }
 
   void _disposeRecognizers() {
@@ -88,15 +78,8 @@ class _MultiLinkTextState extends State<MultiLinkText> {
 
   @override
   Widget build(BuildContext context) {
-    final themeExt =
-        Theme.of(context).extension<DwFlutterTheme>() ??
-        DwFlutterTheme.fallback;
-
-    final baseStyle = (widget.textStyle ?? themeExt.multiLinkText).resolveStyle(
-      context,
-    );
-    final linkStyle = (widget.linkStyle ?? themeExt.multiLinkTextLink)
-        .resolveStyle(context);
+    final baseStyle = widget.textStyle.resolve(context);
+    final linkStyle = widget.linkStyle.resolve(context);
 
     return RichText(
       textAlign: widget.textAlign ?? TextAlign.center,

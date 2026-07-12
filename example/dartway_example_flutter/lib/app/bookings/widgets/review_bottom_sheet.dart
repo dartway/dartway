@@ -47,9 +47,9 @@ class ReviewBottomSheet extends HookConsumerWidget {
           maxLines: 3,
         ),
         const Gap(24),
-        DwButton.primary(
+        AppButton.primary(
           l10n.submitReview,
-          dwCallback: DwUiAction.create(
+          onTap: DwUiAction.create(
             (context) async {
               await DwRepository.saveModel(
                 SessionReview(

@@ -1,12 +1,12 @@
-import 'package:conditional_parent_widget/conditional_parent_widget.dart';
-import 'package:dartway_flutter/src/utils/dw_build_context_extension.dart';
-import 'package:device_frame/device_frame.dart';
-import 'package:flutter/material.dart';
+part of '../ui_kit.dart';
 
-class DwDeviceFrame extends StatelessWidget {
-  const DwDeviceFrame({
-    super.key,
+/// Desktop shell for a mobile-first app: on a wide screen the app is rendered
+/// inside a phone frame flanked by optional side panels; on mobile it is shown
+/// as-is.
+class DeviceFrameShell extends StatelessWidget {
+  const DeviceFrameShell({
     required this.body,
+    super.key,
     this.customWrapCondition,
     this.leftSidePanel = const SizedBox.shrink(),
     this.leftSidePanelFlex = 1,
@@ -23,16 +23,14 @@ class DwDeviceFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConditionalParentWidget(
-      condition: customWrapCondition != null
-          ? customWrapCondition!(context)
-          : !context.isMobile,
+    return ConditionalParent(
+      condition: customWrapCondition?.call(context) ?? !context.isMobile,
       parentBuilder: (child) => Scaffold(
         body: Row(
           children: [
             Expanded(flex: leftSidePanelFlex, child: leftSidePanel),
             Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24),
               child: DeviceFrame(
                 device: Devices.ios.iPhone13ProMax,
                 isFrameVisible: true,

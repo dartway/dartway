@@ -91,7 +91,7 @@ final deleteAction = DwUiAction<bool>.create(
   label: 'deletePost', // имя действия в error-репортах/алертах
   confirmation: DwUiConfirmation('Delete this post?', isDestructive: true),
 );
-// в виджете: dwCallback: deleteAction   (или DwUiAction.create((_) async {...}) если context не нужен)
+// в виджете: onTap: deleteAction   (или DwUiAction.create((_) async {...}) если context не нужен)
 ```
 
 > Реальное имя — **`DwUiAction`** (46+ использований). `DwCallback` в проекте нет.

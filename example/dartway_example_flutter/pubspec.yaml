@@ -36,6 +36,10 @@ dependencies:
   freezed_annotation: ^3.0.0
   riverpod_annotation: ^3.0.0
 
+  # UI-kit dependencies: the kit lives in this app's `lib/ui_kit/`, so its
+  # packages belong to the app, not to the framework.
+  device_frame: ^1.4.0
+
   dartway_flutter:
     git:
       url: https://github.com/dartway/dartway.git
