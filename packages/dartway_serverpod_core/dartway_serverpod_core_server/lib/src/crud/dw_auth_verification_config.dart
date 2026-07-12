@@ -13,29 +13,83 @@ final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
           Session session,
           DwSaveContext<DwAuthVerification> saveContext,
         ) async => true,
-    // TODO: implement attempts limit and reset period
     beforeSaveTransaction: (
       Session session,
       DwSaveContext<DwAuthVerification> saveContext,
     ) async {
+      final authConfig = DwCore.instance.auth!.config;
+      final verification = saveContext.currentModel;
+
       final authRequest = await DwAuthRequest.db.findById(
         session,
-        saveContext.currentModel.dwAuthRequestId,
+        verification.dwAuthRequestId,
       );
 
-      if (saveContext.currentModel.verificationCode == null ||
-          authRequest?.verificationHash !=
-              DwAuthUtils.hashVerificationCode(
-                saveContext.currentModel.verificationCode!,
-              )) {
-        saveContext.currentModel.setFailed(
+      if (authRequest == null ||
+          authRequest.status != DwAuthRequestStatus.pendingVerification) {
+        verification.setFailed(
           session,
           DwAuthFailReason.invalidVerificationCode,
         );
-      } else {
-        saveContext.currentModel.accessToken =
-            DwAuthUtils.generateSecureToken();
+        return;
       }
+
+      final isExpired =
+          DateTime.now().difference(authRequest.createdAt) >
+          authConfig.verificationCodeLifetime;
+
+      final previousAttempts = await DwAuthVerification.db.count(
+        session,
+        where: (t) => t.dwAuthRequestId.equals(authRequest.id!),
+        transaction: saveContext.transaction,
+      );
+
+      if (isExpired ||
+          previousAttempts >= authConfig.maxVerificationAttempts) {
+        await _burnAuthRequest(session, authRequest, saveContext.transaction);
+        verification.setFailed(
+          session,
+          DwAuthFailReason.invalidVerificationCode,
+        );
+        return;
+      }
+
+      final isCodeValid =
+          verification.verificationCode != null &&
+          authRequest.verificationHash ==
+              DwAuthUtils.hashVerificationCode(verification.verificationCode!);
+
+      if (!isCodeValid) {
+        if (previousAttempts + 1 >= authConfig.maxVerificationAttempts) {
+          await _burnAuthRequest(session, authRequest, saveContext.transaction);
+        }
+        verification.setFailed(
+          session,
+          DwAuthFailReason.invalidVerificationCode,
+        );
+        return;
+      }
+
+      verification.accessToken = DwAuthUtils.generateSecureToken();
+      authRequest.status = DwAuthRequestStatus.verified;
+      await DwAuthRequest.db.updateRow(
+        session,
+        authRequest,
+        transaction: saveContext.transaction,
+      );
     },
   ),
 );
+
+Future<void> _burnAuthRequest(
+  Session session,
+  DwAuthRequest authRequest,
+  Transaction? transaction,
+) async {
+  authRequest.status = DwAuthRequestStatus.failed;
+  await DwAuthRequest.db.updateRow(
+    session,
+    authRequest,
+    transaction: transaction,
+  );
+}

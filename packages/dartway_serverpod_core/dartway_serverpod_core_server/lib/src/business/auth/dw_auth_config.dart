@@ -43,7 +43,16 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.sendVerificationCodeMethod,
     this.onSignInTrigger,
     this.preAuthValidation,
+    this.maxVerificationAttempts = 5,
+    this.verificationCodeLifetime = const Duration(minutes: 10),
+    this.maxAuthRequestsPerIdentifier = 5,
+    this.authRequestRateLimitWindow = const Duration(minutes: 10),
   });
+
+  final int maxVerificationAttempts;
+  final Duration verificationCodeLifetime;
+  final int maxAuthRequestsPerIdentifier;
+  final Duration authRequestRateLimitWindow;
 
   /// Callback invoked BEFORE verification code is sent or auth key is created.
   /// Return a [DwAuthFailReason] to reject the request, or `null` to proceed.

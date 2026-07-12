@@ -43,6 +43,29 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
 
           if (saveContext.currentModel.status ==
               DwAuthRequestStatus.pendingVerification) {
+            final authConfig = DwCore.instance.auth!.config;
+            final recentRequestCount = await DwAuthRequest.db.count(
+              session,
+              where: (t) =>
+                  t.userIdentifier.equals(
+                    saveContext.currentModel.userIdentifier,
+                  ) &
+                  (t.createdAt >
+                      DateTime.now().subtract(
+                        authConfig.authRequestRateLimitWindow,
+                      )),
+              transaction: saveContext.transaction,
+            );
+
+            if (recentRequestCount >=
+                authConfig.maxAuthRequestsPerIdentifier) {
+              saveContext.currentModel.setFailed(
+                session,
+                DwAuthFailReason.invalidVerificationCode,
+              );
+              return;
+            }
+
             final verificationCode = await DwCore
                 .instance
                 .auth!
