@@ -2,7 +2,6 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 import 'dw_auth_concurrency.dart';
-import 'dw_auth_utils.dart';
 
 extension DwAuthRequestVerification on DwAuthRequest {
   /// Whether the request carries a credential issued by a third party, which
@@ -94,9 +93,13 @@ extension DwAuthRequestVerification on DwAuthRequest {
         return setFailed(session, DwAuthFailReason.passwordNotSet);
       }
 
-      final isValid = DwAuthUtils.verifyPassword(
-        password!,
-        userPassword.passwordHash,
+      // Reads whichever format the hash is in — and quietly upgrades a legacy
+      // one to the active hasher, so a migrated user pays that path only once.
+      final isValid = await DwCore.instance.auth!.verifyPassword(
+        session,
+        userId: userId!,
+        password: password!,
+        storedHash: userPassword.passwordHash,
       );
 
       if (!isValid) {

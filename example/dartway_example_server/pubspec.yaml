@@ -23,6 +23,9 @@ dev_dependencies:
   lints: ^6.0.0
   test: '^1.24.2'
   serverpod_test: ^3.4.8
+  # Only the integration suite needs it: the fake "old backend" whose hashes the
+  # legacy-verifier test migrates away from.
+  crypto: ^3.0.0
 
 # Внутри монорепо темплейт собирается против ЛОКАЛЬНЫХ пакетов фреймворка.
 # При копировании в самостоятельный проект — удалить весь блок dependency_overrides

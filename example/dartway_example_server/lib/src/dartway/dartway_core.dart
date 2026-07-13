@@ -25,7 +25,13 @@ String _randomVerificationCode() =>
 /// thing the core needs from it, and passing it explicitly is what lets the
 /// integration tests bring DartWay up without a running server (`withServerpod`
 /// builds its own Serverpod and never calls `run`).
-void initDartwayCore({required Map<String, String> passwords}) {
+void initDartwayCore({
+  required Map<String, String> passwords,
+  // This app has no legacy passwords — it was born on DartWay. The seam is here
+  // because an app migrating off another backend registers its old hash format
+  // through it, and because the integration suite proves the upgrade with it.
+  List<DwPasswordVerifier> legacyPasswordVerifiers = const [],
+}) {
   // Tests call this from `setUpAll` in every group; booting once is enough.
   if (_initialized) return;
   _initialized = true;
@@ -49,6 +55,7 @@ void initDartwayCore({required Map<String, String> passwords}) {
     dwAlerts: DwAlerts.init(),
     dwAuthConfig: DwAuthConfig(
       passwords: passwords,
+      legacyPasswordVerifiers: legacyPasswordVerifiers,
       // Test/reviewer accounts carry a fixed, admin-rotated code
       // (UserProfile.testVerificationCode, serverOnly — never sent to clients);
       // everyone else gets a fresh random code. Works in any run mode, so store

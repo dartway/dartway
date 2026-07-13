@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:bcrypt/bcrypt.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
@@ -25,12 +24,6 @@ class DwAuthUtils {
   static String hashAuthKey(String key) {
     return hashString(DwCore.instance.auth!.config.authKeySalt, key);
   }
-
-  static String hashPassword(String password) =>
-      BCrypt.hashpw(password, BCrypt.gensalt());
-
-  static bool verifyPassword(String password, String hash) =>
-      BCrypt.checkpw(password, hash);
 
   static String hashVerificationCode(String verificationCode) {
     return hashString(

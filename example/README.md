@@ -29,18 +29,21 @@ See [DartWay Quickstart Guide](https://dartway.dev/docs/quick-start) for full de
 
 ## Tests
 
-The server carries the integration suite for DartWay's auth limits — attempt
-caps, code expiry, request rate limiting and single-use access tokens. They run
-against a real database, because that is the only place the guarantees hold:
-the limits are enforced with database locks, and a race cannot be observed in a
-rolled-back transaction.
+The server carries DartWay's integration suites: the auth limits — attempt caps,
+code expiry, request rate limiting, single-use access tokens — and password
+hashing, including the migration of a legacy hash on the user's next sign-in.
+They run against a real database, because that is the only place the guarantees
+hold: the limits are enforced with database locks, a race cannot be observed in
+a rolled-back transaction, and neither can a hash that must actually be written.
 
 ```bash
 cd dartway_example_server
 docker compose up -d          # dev database on 8090, test database on 9090
-dart test --concurrency=1
+dart test
 ```
 
-`--concurrency=1` keeps test files from sharing the database. The suite commits
-real transactions (see `RollbackDatabase.disabled`) and wipes the auth tables
-between cases.
+The suites commit real transactions (`RollbackDatabase.disabled`) and wipe the
+auth tables around themselves, which makes them stateful neighbours rather than
+isolated units: run in parallel they wipe each other's rows mid-test. Files
+therefore run one at a time — pinned in `dart_test.yaml`, not left to whoever
+remembers a flag.

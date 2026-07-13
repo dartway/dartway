@@ -2,6 +2,7 @@ export 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart
 
 export 'src/business/auth/dw_auth_config.dart';
 export 'src/business/auth/dw_authentification_handler.dart';
+export 'src/business/auth/dw_password_hashing.dart';
 export 'src/business/cloud_storage/dw_cloud_storage_config.dart';
 export 'src/business/dw_session_extension.dart';
 export 'src/core/dw_core.dart';

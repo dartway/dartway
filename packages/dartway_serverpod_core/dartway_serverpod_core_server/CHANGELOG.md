@@ -44,5 +44,25 @@
   identifier + verification-code flows and never take that path. Leaving the
   callback unset rejects every external provider: an unconfigured provider is a
   closed door, not an open one.
+- **Password hashing is pluggable.** `DwPasswordVerifier` reads one stored hash
+  format; `DwPasswordHasher` also writes one. `DwAuthConfig.passwordHasher` is
+  the single format DartWay writes (default: `DwBcryptPasswordHasher`, unchanged
+  behaviour), while `DwAuthConfig.legacyPasswordVerifiers` lists formats it can
+  only *read* — the hashes of a system the app is migrating off.
+  A password hash is one-way, so users cannot be copied over with their
+  passwords intact: without their old algorithm they simply cannot log in.
+  Register it, and DartWay lets them in with the password they have always used
+  and **rewrites the hash in the active format on the spot** — the plaintext
+  exists only during that sign-in, which is why an offline migration script
+  cannot do this and a lazy upgrade must. Every migrated user pays the legacy
+  path exactly once.
+  `DwAuthUtils.hashPassword` / `verifyPassword` are gone; hashing lives on the
+  hasher, and verification on `DwAuth.verifyPassword`, which knows about the
+  upgrade.
+- A hash in an unknown format now fails the login instead of crashing it.
+  `BCrypt.checkpw` throws `ArgumentError` on anything that is not bcrypt (an
+  empty string included), so a single foreign row in `dw_user_password` turned a
+  sign-in into a 500. It is now rejected as `invalidPassword`, and the server
+  logs the misconfiguration it really is.
 - `DwCloudStorage` honours `useSSL` and `port` from its config instead of
   hardcoding HTTPS and ignoring the port.

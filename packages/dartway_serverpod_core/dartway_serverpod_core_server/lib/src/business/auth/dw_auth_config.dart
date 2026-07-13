@@ -48,7 +48,33 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.verificationCodeLifetime = const Duration(minutes: 10),
     this.maxAuthRequestsPerIdentifier = 5,
     this.authRequestRateLimitWindow = const Duration(minutes: 10),
+    this.passwordHasher = const DwBcryptPasswordHasher(),
+    this.legacyPasswordVerifiers = const [],
   });
+
+  /// The one hash format DartWay writes — on registration, on password change,
+  /// and when upgrading a legacy hash after a successful sign-in.
+  final DwPasswordHasher passwordHasher;
+
+  /// Formats DartWay can *read* but never writes: the hashes of a system the app
+  /// is migrating off.
+  ///
+  /// A password hash is one-way, so users cannot be copied over with their
+  /// passwords intact — and without their old algorithm they simply cannot log
+  /// in. List the old algorithm here and DartWay lets them in with the password
+  /// they have always used, then **rewrites the hash in [passwordHasher]'s
+  /// format on the spot**. The plaintext exists only during that sign-in, which
+  /// is why an offline migration script cannot do this and a lazy one must.
+  ///
+  /// The list is empty by default: an app that never migrated anything has no
+  /// legacy formats, and DartWay refuses a hash nobody can read rather than
+  /// guessing.
+  ///
+  /// Note that a legacy algorithm is usually much faster than bcrypt, so a
+  /// not-yet-upgraded user answers measurably sooner. It leaks *who has not
+  /// logged in since the migration* — not their password. Empty the list once
+  /// the tail has migrated.
+  final List<DwPasswordVerifier> legacyPasswordVerifiers;
 
   /// How many verification codes may be guessed for one auth request before it
   /// is burned.
