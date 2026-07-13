@@ -22,12 +22,22 @@
   `onPressed` (null while the action runs) and a `busy` flag.
   `DwUiAction` says *what* an action does; `DwActionBuilder` says what the UI
   does while it runs.
-- Dropped three dependencies: `adaptive_breakpoints` (**discontinued upstream**;
+- **Telegram moved out to `dartway_telegram`.** `DwConfig.telegramWebAppConfig`
+  and `dw.services.telegramWebApp` are gone, and so is the `telegram_web_app`
+  dependency. The framework's config has no business knowing a vendor's name,
+  and an app that is not a Telegram Mini App should not download a Telegram SDK
+  to get a bootstrap runner. `DwAppRunner` already declares itself
+  "intentionally decoupled" — the Telegram field was the one place that wasn't.
+  An app that wants Telegram adds `dartway_telegram` and starts it through the
+  seam that already exists:
+  `DwAppRunner(appInitializers: [() => telegram.init(config)])`.
+- Dropped four dependencies: `adaptive_breakpoints` (**discontinued upstream**;
   it existed solely for `context.isMobile`, whose breakpoint was
   platform-dependent and surprising enough that app code bypassed it),
   `conditional_parent_widget` (unmaintained since 2023 and re-exported from the
-  public barrel) and `device_frame`. All three now belong to the app's kit,
-  where they are the app's business.
+  public barrel), `device_frame` and `telegram_web_app`. They now belong to the
+  app's kit or to `dartway_telegram`, where they are the app's business. Six
+  dependencies remain, down from ten.
 - Feature declarations moved in from the Studio bridge: `DwFeature`,
   `DwFeatureSpec` and `scanMountedFeatures` are app semantics and now live
   here — feature catalogs, error-report context, analytics; a Studio binding

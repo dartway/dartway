@@ -19,7 +19,6 @@ export 'src/features/dw_feature_spec.dart';
 
 // DwApp configuration
 export 'src/dw/configs/dw_config.dart';
-export 'src/dw/configs/dw_telegram_web_app_config.dart';
 export 'src/dw/dw.dart';
 // Error reporting: app-state context captured into every error report.
 export 'src/error_reporting/dw_error_context.dart';

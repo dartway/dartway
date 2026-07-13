@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../error_reporting/dw_error_report.dart';
 import '../../dialogs/dw_ui_confirmation.dart';
-import 'dw_telegram_web_app_config.dart';
 
 class DwConfig {
   const DwConfig({
@@ -12,10 +11,8 @@ class DwConfig {
     this.confirmDialogBuilder,
     this.defaultModelGetter,
     this.useSharedPreferences = true,
-    this.telegramWebAppConfig,
   });
   final bool useSharedPreferences;
-  final DwTelegramWebAppConfig? telegramWebAppConfig;
 
   /// Plain error hook, kept for compatibility. Prefer [onErrorReport] — it
   /// receives the full [DwErrorReport] with the app-state context snapshot.

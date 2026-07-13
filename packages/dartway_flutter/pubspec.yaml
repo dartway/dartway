@@ -19,7 +19,6 @@ dependencies:
   flutter_native_splash: ^2.3.0
   shared_preferences: ^2.3.0
   skeletonizer: ^2.1.0
-  telegram_web_app: ^0.3.3
 
 dev_dependencies:
   flutter_test:
