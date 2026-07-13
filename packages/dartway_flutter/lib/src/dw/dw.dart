@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_flutter/src/notifications/service/dw_notifications_controller.dart';
 import 'package:dartway_flutter/src/private/dw_singleton.dart';
@@ -13,11 +14,14 @@ part 'parts/dw_notifications.dart';
 part 'parts/dw_services.dart';
 
 class DwFlutter {
-  DwFlutter({required DwConfig config}) : _config = config {
+  DwFlutter({required DwConfig config, List<DwPlugin> plugins = const []})
+    : _config = config,
+      _plugins = plugins {
     setDwInstance(this);
   }
 
   final DwConfig _config;
+  final List<DwPlugin> _plugins;
 
   final notify = _DwNotifications._();
   final services = _DwServices._();
@@ -27,8 +31,30 @@ class DwFlutter {
   /// route source and custom entries (user, tenant, ...) at app start.
   final errorContext = DwErrorContext();
 
+  /// The registered plugin of type [T].
+  ///
+  /// Integration packages wrap this in their own accessor, so an app writes
+  /// `dw.telegram` rather than a lookup — see [DwPlugin]. The framework stays
+  /// ignorant of what any given plugin actually is.
+  T plugin<T extends DwPlugin>() {
+    final found = _plugins.whereType<T>().firstOrNull;
+
+    if (found == null) {
+      throw StateError(
+        'No $T is registered. Declare it at startup: '
+        'DwCore(plugins: [...], ...).',
+      );
+    }
+
+    return found;
+  }
+
   Future<void> init() async {
     await services._init(config: _config);
+
+    for (final plugin in _plugins) {
+      await plugin.init();
+    }
   }
 
   /// Reports an error through the framework pipeline: captures the app-state

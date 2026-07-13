@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:telegram_web_app/telegram_web_app.dart';
 
+import 'dw_telegram_platform.dart';
 import 'dw_telegram_web_app.dart';
 import 'dw_telegram_web_app_config.dart';
 
@@ -9,8 +10,10 @@ import 'dw_telegram_web_app_config.dart';
 /// Every access is guarded. On plain web — the same build, just opened in a
 /// browser rather than in Telegram — the bridge is absent and touching it
 /// throws instead of answering "no". An app should not have to know that.
-class DwTelegramWebAppImpl implements DwTelegramWebApp {
-  const DwTelegramWebAppImpl();
+class DwTelegramWebAppImpl extends DwTelegramWebApp {
+  const DwTelegramWebAppImpl({required this.config});
+
+  final DwTelegramWebAppConfig config;
 
   @override
   bool get isRunningInTelegram {
@@ -22,7 +25,18 @@ class DwTelegramWebAppImpl implements DwTelegramWebApp {
   }
 
   @override
-  Future<void> init(DwTelegramWebAppConfig config) async {
+  DwTelegramPlatform? get platform {
+    if (!isRunningInTelegram) return null;
+
+    try {
+      return DwTelegramPlatform.fromRaw(TelegramWebApp.instance.platform);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> init() async {
     if (!isRunningInTelegram) return;
 
     // The WebApp object can exist before Telegram has handed over the viewport,

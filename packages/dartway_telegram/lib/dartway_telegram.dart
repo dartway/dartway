@@ -5,5 +5,6 @@
 /// owns the bridge and starts it through the bootstrap seam it already has.
 library;
 
+export 'src/dw_telegram_platform.dart';
 export 'src/dw_telegram_web_app.dart';
 export 'src/dw_telegram_web_app_config.dart';

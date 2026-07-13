@@ -1,52 +1,65 @@
 # DartWay Telegram
 
 Telegram Mini App integration for [DartWay](https://dartway.dev) apps: announce
-the app to Telegram, apply the viewport options, and read the safe-area insets
-and the Telegram user id.
+the app to Telegram, apply the viewport options, and read the safe-area insets,
+the client platform and the Telegram user id.
 
-## Optional by construction
+## A plugin, not a framework feature
 
-`dartway_flutter` knows nothing about Telegram — the framework has no business
-carrying a vendor's name in its config, and an app that is not a Mini App should
-not download a Telegram SDK to get a bootstrap runner.
+`dartway_flutter` knows nothing about Telegram — it knows only what a `DwPlugin`
+is. The framework's config has no business carrying a vendor's name, and an app
+that is not a Mini App should not download a Telegram SDK to get a bootstrap
+runner.
 
-So this package stands alone: it does not even depend on `dartway_flutter`. The
-app owns the bridge and starts it through the bootstrap seam it already has.
-
-```dart
-final telegram = DwTelegramWebApp.create();
-
-void main() {
-  DwAppRunner(
-    appInitializers: [
-      () => telegram.init(const DwTelegramWebAppConfig()),
-    ],
-    child: const MyApp(),
-  ).run();
-}
-```
-
-Expose it to the widget tree the same way you expose anything else — a Riverpod
-provider:
+Declare the plugin at startup:
 
 ```dart
-final telegramProvider = Provider((ref) => telegram);
+DwCore(
+  config: DwConfig(...),
+  plugins: [
+    DwTelegramWebApp.create(
+      config: const DwTelegramWebAppConfig(requestFullScreen: true),
+    ),
+  ],
+  ...
+);
 ```
+
+…and reach it anywhere as `dw.telegram`:
+
+```dart
+final insets = dw.telegram.safeAreaInset;
+
+if (dw.telegram.isRunningInTelegram) { ... }
+```
+
+That accessor is an extension declared **in this package**, not in the
+framework. So you get the ergonomics of an ambient service with none of the
+coupling: `dw.telegram` exists only for apps that chose Telegram.
 
 ## Everywhere else it is inert
 
 `DwTelegramWebApp.create()` returns the real bridge on web and a stub on mobile
-and desktop, so you wire Telegram once and still ship every platform.
+and desktop, so you declare Telegram once and still ship every platform.
 
 And on plain web — the same build, just opened in a browser instead of in
 Telegram — every getter answers as if Telegram were absent rather than throwing.
-`isRunningInTelegram` tells you which world you are in:
+`isRunningInTelegram` tells you which world you are in.
+
+## Do not ask Telegram about the device
+
+`platform` is *Telegram's* client, not the user's device. Outside Telegram there
+is no Telegram to ask, and the answer is `null` — even on an iPhone. Ask Flutter
+for the device and Telegram only for Telegram:
 
 ```dart
-final padding = telegram.isRunningInTelegram
-    ? telegram.safeAreaInset
-    : EdgeInsets.zero;   // the getter already returns zero, but say what you mean
+bool get isIOS => dw.telegram.isRunningInTelegram
+    ? dw.telegram.platform == DwTelegramPlatform.ios
+    : defaultTargetPlatform == TargetPlatform.iOS;
 ```
+
+Getting this backwards is a classic: an app asks Telegram for the platform on
+web, gets `false` in Safari on an iPhone, and quietly serves the wrong controls.
 
 ## `telegramUserId` is a hint, not a proof
 

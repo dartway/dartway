@@ -20,6 +20,9 @@ export 'src/features/dw_feature_spec.dart';
 // DwApp configuration
 export 'src/dw/configs/dw_config.dart';
 export 'src/dw/dw.dart';
+// Plugins: integrations the framework must not know about (Telegram, analytics,
+// …). Declared at startup, reached anywhere via `dw.plugin<T>()`.
+export 'src/dw/dw_plugin.dart';
 // Error reporting: app-state context captured into every error report.
 export 'src/error_reporting/dw_error_context.dart';
 export 'src/error_reporting/dw_error_report.dart';

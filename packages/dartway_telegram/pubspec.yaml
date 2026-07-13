@@ -13,6 +13,7 @@ dependencies:
   flutter:
     sdk: flutter
 
+  dartway_flutter: ^0.1.0
   telegram_web_app: ^0.3.3
 
 dev_dependencies:

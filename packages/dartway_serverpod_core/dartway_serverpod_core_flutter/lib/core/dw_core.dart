@@ -43,6 +43,7 @@ class DwCore<
     required this.client,
     required this.dwAlerts,
     required this.getUserId,
+    super.plugins,
     this.onStreamingStatusChanged,
   }) {
     setDwInstance(this);

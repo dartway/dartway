@@ -22,15 +22,18 @@
   `onPressed` (null while the action runs) and a `busy` flag.
   `DwUiAction` says *what* an action does; `DwActionBuilder` says what the UI
   does while it runs.
+- **New: `DwPlugin`** — the seam for integrations the framework must not know
+  about. Declared at startup (`DwCore(plugins: [...])`), initialized with the app
+  core, and reached anywhere via `dw.plugin<T>()`. An integration package builds
+  its own accessor on top, so the app writes `dw.telegram` — the ergonomics of an
+  ambient service with none of the coupling, because the extension is declared in
+  the integration package, not here.
 - **Telegram moved out to `dartway_telegram`.** `DwConfig.telegramWebAppConfig`
   and `dw.services.telegramWebApp` are gone, and so is the `telegram_web_app`
   dependency. The framework's config has no business knowing a vendor's name,
   and an app that is not a Telegram Mini App should not download a Telegram SDK
   to get a bootstrap runner. `DwAppRunner` already declares itself
   "intentionally decoupled" — the Telegram field was the one place that wasn't.
-  An app that wants Telegram adds `dartway_telegram` and starts it through the
-  seam that already exists:
-  `DwAppRunner(appInitializers: [() => telegram.init(config)])`.
 - Dropped four dependencies: `adaptive_breakpoints` (**discontinued upstream**;
   it existed solely for `context.isMobile`, whose breakpoint was
   platform-dependent and surprising enough that app code bypassed it),
