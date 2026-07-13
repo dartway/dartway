@@ -81,8 +81,8 @@ class _AppBottomNavigationBar extends ConsumerWidget {
       currentIndex: currentIndex < 0 ? 0 : currentIndex,
       onTap: (index) => GoRouter.of(context).goNamed(tabs[index].route.name),
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: Theme.of(context).colorScheme.primary,
-      unselectedItemColor: Theme.of(context).colorScheme.outline,
+      // Colours come from AppTheme.light — set once for the whole app, not
+      // re-picked by every widget that happens to need them.
       showUnselectedLabels: true,
       items: [
         for (final tab in tabs)

@@ -1,7 +1,7 @@
 part of '../ui_kit.dart';
 
 extension ShowAppBottomSheetExtension on BuildContext {
-  static showAppBottomSheetStatic(
+  static Future<void> showAppBottomSheetStatic(
     BuildContext context,
     Widget child,
   ) =>

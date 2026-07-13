@@ -25,18 +25,9 @@ class ReviewBottomSheet extends HookConsumerWidget {
       children: [
         AppText.title(l10n.reviewSheetTitle),
         const Gap(16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            5,
-            (index) => IconButton(
-              onPressed: () => rating.value = index + 1,
-              icon: Icon(
-                index < rating.value ? Icons.star : Icons.star_border,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
+        AppRatingStars(
+          rating: rating.value,
+          onRatingChanged: (value) => rating.value = value,
         ),
         const Gap(16),
         AppTextFormField(

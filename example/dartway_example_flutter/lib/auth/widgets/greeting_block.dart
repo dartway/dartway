@@ -17,7 +17,7 @@ class GreetingBlock extends ConsumerWidget {
         const Spacer(
           flex: 2,
         ),
-        AppText.title('DartWay.dev'),
+        const AppText.title('DartWay.dev'),
         const Gap(12),
         AppText.body(context.l10n.completeLoginToContinue),
         const Spacer(

@@ -50,7 +50,7 @@ class AppTextFormField extends StatefulWidget {
   @override
   State<AppTextFormField> createState() => _AppTextFormFieldState();
 
-  /// Convenient adapter if there is still ValueNotifier<String> somewhere.
+  /// Convenient adapter if there is still a `ValueNotifier<String>` somewhere.
   factory AppTextFormField.fromStringNotifier({
     Key? key,
     required ValueNotifier<String> valueNotifier,

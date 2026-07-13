@@ -24,7 +24,12 @@ class DeviceFrameShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConditionalParent(
-      condition: customWrapCondition?.call(context) ?? !context.isMobile,
+      // Its own threshold, not `!context.isMobile`: framing a phone needs room
+      // for the phone *and* the desk it sits on.
+      condition:
+          customWrapCondition?.call(context) ??
+          MediaQuery.sizeOf(context).width >=
+              AppBreakpoints.deviceFrameMinWidth,
       parentBuilder: (child) => Scaffold(
         body: Row(
           children: [

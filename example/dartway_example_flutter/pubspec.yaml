@@ -85,6 +85,17 @@ dev_dependencies:
       ref: master
       path: packages/dartway_cli
 
+  # The UI-kit law is enforced here, not just written down: raw Color/TextStyle/
+  # BorderRadius and direct theme access outside `ui_kit/` are lints. Needs
+  # `analyzer: plugins: [custom_lint]` in analysis_options.yaml, and runs in the
+  # IDE and via `dart run custom_lint`.
+  custom_lint: ^0.8.0
+  dartway_lints:
+    git:
+      url: https://github.com/dartway/dartway.git
+      ref: master
+      path: packages/dartway_lints
+
 # Внутри монорепо темплейт собирается против ЛОКАЛЬНЫХ пакетов фреймворка.
 # При копировании в самостоятельный проект — удалить весь блок dependency_overrides.
 dependency_overrides:
@@ -100,6 +111,8 @@ dependency_overrides:
     path: ../../packages/dartway_studio_bridge
   dartway_cli:
     path: ../../packages/dartway_cli
+  dartway_lints:
+    path: ../../packages/dartway_lints
 
 
 # For information on the generic Dart part of this file, see the

@@ -16,22 +16,22 @@ class MultiLinkText extends StatefulWidget {
     String? linkText,
     DwUiAction? onLinkTap,
     this.textAlign,
-    this.textStyle = AppText.body,
-    this.linkStyle = AppText.link,
+    this.textStyle = AppTextStyle.body,
+    this.linkStyle = AppTextStyle.link,
   }) : parts = [MultiLinkTextPart(text, linkText, onLinkTap)];
 
   const MultiLinkText.multi({
     required this.parts,
     super.key,
     this.textAlign,
-    this.textStyle = AppText.body,
-    this.linkStyle = AppText.link,
+    this.textStyle = AppTextStyle.body,
+    this.linkStyle = AppTextStyle.link,
   });
 
   final TextAlign? textAlign;
   final List<MultiLinkTextPart> parts;
-  final AppText textStyle;
-  final AppText linkStyle;
+  final AppTextStyle textStyle;
+  final AppTextStyle linkStyle;
 
   @override
   State<MultiLinkText> createState() => _MultiLinkTextState();
