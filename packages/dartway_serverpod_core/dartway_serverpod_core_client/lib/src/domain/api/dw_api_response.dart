@@ -1,11 +1,31 @@
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 
-// Code to be pasted into Protocol after serverpod generate
-// if (data is Map<String, dynamic>) {
-//   final manualDeserialization =
-//       _i10.DwApiResponse.manualDeserialization<T>(data);
-//   if (manualDeserialization != null) return manualDeserialization;
-// }
+// `serverpod generate` overwrites the generated protocol and drops this hook —
+// re-paste it into `Protocol.deserialize<T>` (protocol.dart), right after
+// `t ??= T;`:
+//
+//   if (data is Map<String, dynamic>) {
+//     final manualDeserialization =
+//         _iNN.DwApiResponse.manualDeserialization<T>(data);
+//     if (manualDeserialization != null) {
+//       return manualDeserialization;
+//     }
+//   }
+//
+// `_iNN` is whatever alias the regenerated file gives this library — the number
+// moves between generations, so read it off the imports instead of copying one.
+//
+// Why it is needed at all: `extraClasses` does not understand generics. The
+// generator emits a check against the *raw* type (`t == DwApiResponse`, i.e.
+// `DwApiResponse<dynamic>`), while the wire carries `DwApiResponse<DwModelWrapper>`,
+// `DwApiResponse<List<DwModelWrapper>>`, `<int>`, `<bool>`… As `Type` objects
+// those never equal the raw one, so the generated branch is dead and every CRUD
+// response fails to deserialize. [manualDeserialization] resolves the concrete
+// instantiations by hand.
+//
+// The code still compiles without the hook — it breaks at runtime. Verify after
+// every generate:
+//   grep -n 'manualDeserialization' lib/src/protocol/protocol.dart
 class DwApiResponse<T> implements SerializableModel {
   const DwApiResponse({
     required this.isOk,

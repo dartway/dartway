@@ -40,6 +40,36 @@
 - **Архивы:** папки `zarchive/`/`zarchiv/` — легаси на выпил; ничего нового туда не добавлять, при рефакторинге — удалять, а не пополнять.
 - **Секьюрити-принцип (цель):** generic CRUD должен быть secure-by-default — не сконфигурирован доступ ⇒ запрещено. Новый код не должен вводить «открыто всем» как умолчание.
 
+## Ловушка: `serverpod generate` в ядре стирает ручной патч протокола
+
+**Это для Claude — Евгений генерацию не запускает.** Прогнал `serverpod generate` в `packages/dartway_serverpod_core/dartway_serverpod_core_server` — обязан проверить и восстановить патч в сгенерированном `dartway_serverpod_core_client/lib/src/protocol/protocol.dart`.
+
+**Что за патч.** В `Protocol.deserialize<T>`, сразу после `t ??= T;`, должен стоять блок:
+
+```dart
+if (data is Map<String, dynamic>) {
+  final manualDeserialization =
+      _iNN.DwApiResponse.manualDeserialization<T>(data);
+  if (manualDeserialization != null) {
+    return manualDeserialization;
+  }
+}
+```
+
+`_iNN` — **алиас импорта `dw_api_response.dart` в заново сгенерированном файле**, а не константа: номер меняется от генерации к генерации (сейчас `_i19`). Возьми его из шапки файла, не копируй вслепую.
+
+**Почему без него всё разваливается.** `extraClasses` в Serverpod не понимает дженерики: для `DwApiResponse<T>` генератор пишет проверку по **сырому** типу — `if (t == _i19.DwApiResponse)`, то есть `DwApiResponse<dynamic>`. А на проводе приезжают `DwApiResponse<DwModelWrapper>`, `<List<DwModelWrapper>>`, `<int>`, `<bool>` — как `Type` они сырому не равны, ветка не срабатывает **никогда**, и любой CRUD-ответ падает на десериализации. Патч подставляет `DwApiResponse.manualDeserialization<K>`, которая разбирает конкретные инстанциации руками.
+
+**Проверка после генерации:**
+
+```bash
+grep -n 'manualDeserialization' packages/dartway_serverpod_core/dartway_serverpod_core_client/lib/src/protocol/protocol.dart
+```
+
+Пусто → патч потерян, приложение сломано в рантайме (компиляция при этом проходит — в этом и коварство). Восстановить и убедиться, что example поднимается и грузит списки.
+
+Разовое лечение мины (в очереди, не сделано): идемпотентный скрипт-патчер + регрессионный тест в `core_client`, который краснеет, если патч не на месте. Радикальное — убрать дженерики с провода, но это переделка CRUD-эндпоинтов, а Serverpod после v1 всё равно выпиливается.
+
 ## Рабочий процесс
 
 Вход в рабочую сессию — команда **`/next`**: брифинг по `project/` (где мы, что сделано, напоминания о личных действиях Евгения), выбор задачи, работа, обновление `project/NEXT.md` в конце. Ключевые решения фиксируются строкой в `project/DECISIONS.md`.
