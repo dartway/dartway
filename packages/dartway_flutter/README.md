@@ -20,6 +20,11 @@ needs before and around its data layer:
   widgets as product features and discover the mounted ones at runtime — for
   feature catalogs, analytics and [DartWay Studio](https://dartway.dev)
   passports.
+- 🔌 **Plugins** — `DwPlugin`: the seam for integrations the framework must not
+  know about. Declare one at startup (`DwCore(plugins: [...])`) and reach it
+  anywhere via `dw.plugin<T>()`. Telegram Mini App support lives outside this
+  package, in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) —
+  an app that is not a Mini App never downloads a Telegram SDK.
 
 ## Riverpod-native by design
 

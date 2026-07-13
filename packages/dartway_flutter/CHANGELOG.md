@@ -3,9 +3,9 @@
 ## 0.1.0
 
 - First public release: `DwAppRunner` bootstrap, `dw` app core (navigation,
-  notifications, services, shared preferences, Telegram web-app support),
-  overlay notifications pipeline, `DwInfiniteListView`, and AsyncValue
-  utilities (`dwBuildListAsync`, `DwUiAction`).
+  notifications, services, shared preferences, plugins), overlay notifications
+  pipeline, `DwInfiniteListView`, and AsyncValue utilities (`dwBuildListAsync`,
+  `DwUiAction`).
 - **The package ships no design system.** `DwButton`, `DwText`,
   `DwFlutterTheme`, `DwColorPreset`, `DwTextStylePreset`,
   `DwButtonStylePreset`, `DwDeviceFrame`, `MultiLinkText` and
