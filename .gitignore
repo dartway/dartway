@@ -20,3 +20,6 @@ website/
 
 # DartWay Studio platform — private nested repo (dartway/dartway_studio)
 platform/
+
+# custom_lint run artifact
+custom_lint.log
