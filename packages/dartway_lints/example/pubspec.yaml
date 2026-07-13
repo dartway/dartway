@@ -1,0 +1,27 @@
+name: dartway_lints_example
+description: >-
+  The fixture dartway_lints is tested against: files that must trigger
+  forbidden_ui_style_usage and files that must not. `dart run custom_lint` here
+  is the package's test suite — the rule's bugs live in how it matches AST
+  nodes, which only the analyzer can prove.
+publish_to: none
+version: 0.1.0
+
+# Deliberately not a workspace member: workspace members share one
+# `.dart_tool/package_config.json` at the root, and custom_lint looks for its
+# plugins in the analyzed package's own — inside the workspace it silently loads
+# none and finds no issues in a file written entirely out of violations.
+
+environment:
+  sdk: ^3.11.0
+  flutter: ^3.41.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  custom_lint: ^0.8.0
+  flutter_lints: ^6.0.0
+  dartway_lints:
+    path: ../

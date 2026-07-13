@@ -6,3 +6,9 @@ environment:
 workspace:
   - packages/*
   - packages/dartway_serverpod_core/*
+
+# `packages/dartway_lints/example` is deliberately NOT a workspace member: a
+# member has no `.dart_tool/package_config.json` of its own (the workspace root
+# holds the only one), and that is exactly where custom_lint looks for its
+# plugins — inside the workspace it loads none and reports "No issues found" on
+# a file full of violations. It resolves standalone instead.

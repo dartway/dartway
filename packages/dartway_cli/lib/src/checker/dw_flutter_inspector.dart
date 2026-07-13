@@ -95,8 +95,16 @@ class DwFlutterInspector {
     final uiKitDir = Directory(_resolve('lib/ui_kit'));
     if (!uiKitDir.existsSync()) return;
 
+    // Generated files are nobody's code: a `part of` directive added to
+    // `assets.gen.dart` survives exactly until the next `flutter_gen` run, so
+    // demanding one is demanding a chore that undoes itself.
     final files = uiKitDir.listSync(recursive: true).whereType<File>().where(
-          (f) => f.path.endsWith('.dart') && !f.path.endsWith('ui_kit.dart'),
+          (f) =>
+              f.path.endsWith('.dart') &&
+              !f.path.endsWith('ui_kit.dart') &&
+              !f.path.endsWith('.gen.dart') &&
+              !f.path.endsWith('.g.dart') &&
+              !f.path.endsWith('.freezed.dart'),
         );
 
     for (final file in files) {
@@ -123,8 +131,14 @@ class DwFlutterInspector {
   void _checkUiKitTextConstants(String filePath, String content) {
     final lines = content.split('\n');
     for (var i = 0; i < lines.length; i++) {
-      final match =
-          RegExp('''["']([^"']{3,})["']''').firstMatch(lines[i].trim());
+      final line = lines[i].trim();
+
+      // A string inside a comment is prose, not a text constant — usage examples
+      // in doc comments are the most useful thing a kit widget can carry, and
+      // flagging them taught authors to write worse documentation.
+      if (line.startsWith('//') || line.startsWith('*')) continue;
+
+      final match = RegExp('''["']([^"']{3,})["']''').firstMatch(line);
       if (match == null) continue;
 
       final value = match.group(1);

@@ -5,10 +5,30 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
 ## Rules
 
 - **forbidden_ui_style_usage** (warning) — the UI kit is the single source of
-  styles: raw `Color(...)`, `TextStyle(...)`, `BorderRadius(...)`,
-  `Colors.*` and `context.textTheme` / `context.colorScheme` access are
-  flagged everywhere outside `ui_kit/`. Feature code composes UI-kit widgets
-  and presets instead.
+  styles. Flagged everywhere outside `ui_kit/`: raw `Color(...)`,
+  `TextStyle(...)`, `BorderRadius(...)`, `Colors.*`, `Theme.of(context)`, and
+  the kit's own theme shortcuts (`context.theme`, `context.textTheme`,
+  `context.colorScheme` — recognised by the *type* of the target, so `ctx` is
+  caught as readily as `context`). Generated files are left alone.
+
+  Feature code composes kit widgets and tokens instead. When Flutter insists on
+  a style rather than a widget — `InputDecoration.labelStyle`, a `TextSpan`, an
+  `Icon`'s colour — that widget belongs in the kit, and the feature composes it.
+
+## Testing
+
+`example/` is the rule's test suite: files under `lib/app/` carry
+`// expect_lint: forbidden_ui_style_usage` above every line that must be
+reported, and `lib/ui_kit/` writes the same styles freely and must stay silent.
+
+```bash
+cd example && dart run custom_lint   # fails on a missed or an unexpected lint
+```
+
+It runs the real analyzer, which is the point: this rule's one historical bug
+was a visitor registered for the wrong AST node (`context.textTheme` is a
+`PrefixedIdentifier`, not a `PropertyAccess`), so it matched nothing while every
+unit test of its logic would still have passed.
 
 ## Setup
 
