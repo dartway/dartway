@@ -22,6 +22,13 @@
   `onPressed` (null while the action runs) and a `busy` flag.
   `DwUiAction` says *what* an action does; `DwActionBuilder` says what the UI
   does while it runs.
+
+  `requireValidation` with no enclosing `Form` now runs the action (there is
+  nothing to validate) and asserts in debug, instead of silently cancelling
+  every tap. The old `?? false` meant a guard placed outside a form produced a
+  button that did nothing at all — no exception, no log, nothing to see. Freeing
+  the guard from `DwButton` is exactly what made that mistake easy to make, so
+  it has to be loud, and loud before the first dead tap.
 - **New: `DwPlugin`** — the seam for integrations the framework must not know
   about. Declared at startup (`DwCore(plugins: [...])`), initialized with the app
   core, and reached anywhere via `dw.plugin<T>()`. An integration package builds

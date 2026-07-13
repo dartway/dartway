@@ -49,6 +49,11 @@ class DwActionBuilder extends StatefulWidget {
   final DwActionWidgetBuilder builder;
 
   /// Validates the enclosing [Form] before running; cancels when it fails.
+  ///
+  /// With no enclosing [Form] there is nothing to validate and the action runs
+  /// — asserting in debug, because a `requireValidation` that finds no form is
+  /// almost always a mistake, and a button that silently does nothing is the
+  /// worst way to learn about it.
   final bool requireValidation;
 
   /// Drops keyboard focus before the action runs.
@@ -69,8 +74,12 @@ class _DwActionBuilderState extends State<DwActionBuilder> {
       FocusScope.of(context).unfocus();
     }
 
+    // No enclosing form means nothing to validate, so the action runs. The
+    // opposite (`?? false`) is what a guard must never do: it would swallow
+    // every tap in silence and leave the developer staring at a dead button.
+    // The mistake itself is caught in build, before the first tap.
     if (widget.requireValidation &&
-        !(Form.maybeOf(context)?.validate() ?? false)) {
+        !(Form.maybeOf(context)?.validate() ?? true)) {
       return;
     }
 
@@ -83,9 +92,22 @@ class _DwActionBuilderState extends State<DwActionBuilder> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(
-    context,
-    widget.action == null || _busy ? null : _run,
-    _busy,
-  );
+  Widget build(BuildContext context) {
+    // Complain where the mistake was made, not on the first tap that quietly
+    // does nothing. This guard used to live inside `DwButton`, always within
+    // the form its author had in mind; it now sits under any tappable widget,
+    // so drifting out of the `Form` is easy — and a validation with nothing to
+    // validate is not a thing anyone means to write.
+    assert(
+      !widget.requireValidation || Form.maybeOf(context) != null,
+      'DwActionBuilder(requireValidation: true) found no enclosing Form. '
+      'Wrap it in one, or drop requireValidation.',
+    );
+
+    return widget.builder(
+      context,
+      widget.action == null || _busy ? null : _run,
+      _busy,
+    );
+  }
 }
