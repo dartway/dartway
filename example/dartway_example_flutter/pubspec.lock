@@ -314,10 +314,10 @@ packages:
     dependency: "direct main"
     description:
       name: dartway_router
-      sha256: "8165a04e82df213f8a4c4fb83ef219392473b88da3bc43ff1093688810ba6937"
+      sha256: "18a9b68defecb662954c666eae8ab3e845a90999b9ada9184f673fac8253b865"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.0"
+    version: "1.1.1"
   dartway_serverpod_core_client:
     dependency: "direct overridden"
     description:
@@ -1243,14 +1243,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-  telegram_web_app:
-    dependency: transitive
-    description:
-      name: telegram_web_app
-      sha256: "5c33aaa07d776552ce55b49b401d0e835115fbeb136877c6d19b3b1491000535"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.3.3"
   term_glyph:
     dependency: transitive
     description:

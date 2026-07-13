@@ -46,7 +46,7 @@ dependencies:
       ref: master
       path: packages/dartway_flutter
 
-  dartway_router: ^1.1.0
+  dartway_router: ^1.1.1
 
   dartway_serverpod_core_flutter:
     git:
