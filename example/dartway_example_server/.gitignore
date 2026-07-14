@@ -15,5 +15,8 @@ doc/api/
 # Firebase service account key for Firebase auth
 config/firebase_service_account_key.json
 
-# DartWay: we suggest to generate migration on each machine separately
-migrations/
+# Migrations ARE tracked. They are the versioned history of the schema: the same
+# migrations must exist on every machine and in every deployment, and `dartway
+# create` hands a runnable project to a stranger only because they are here.
+# (They used to be ignored, with a note suggesting each machine generate its own.
+# That produced divergent migration ids and a template that could not boot.)
