@@ -1,7 +1,10 @@
 name: dartway_flutter
-description: "The Flutter skeleton of a DartWay app: bootstrap runner, guarded UI actions, the AsyncValue rendering contract, notifications and error reporting. Riverpod-native; ships no design system."
+description: "The Flutter skeleton of a DartWay app: bootstrap runner, guarded UI actions, the AsyncValue rendering contract, notifications and error reporting. Riverpod-native."
 version: 0.1.0
 repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, flutter, riverpod, fullstack]
 
 resolution: workspace
 

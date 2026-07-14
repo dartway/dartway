@@ -2,6 +2,9 @@ name: dartway_lints
 description: "Custom lint rules enforcing DartWay conventions: the UI kit is the single source of styles — raw Color/TextStyle/BorderRadius and direct theme access are flagged outside ui_kit/."
 version: 0.1.0
 repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, lints, linter, flutter]
 
 resolution: workspace
 

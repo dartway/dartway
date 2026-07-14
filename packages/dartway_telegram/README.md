@@ -37,6 +37,9 @@ That accessor is an extension declared **in this package**, not in the
 framework. So you get the ergonomics of an ambient service with none of the
 coupling: `dw.telegram` exists only for apps that chose Telegram.
 
+(`dw` itself is the core instance your app declares once at startup — no DartWay package
+exports it as a global.)
+
 ## Everywhere else it is inert
 
 `DwTelegramWebApp.create()` returns the real bridge on web and a stub on mobile

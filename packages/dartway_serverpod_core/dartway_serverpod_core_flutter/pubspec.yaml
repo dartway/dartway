@@ -1,7 +1,10 @@
 name: dartway_serverpod_core_flutter
-description: "Flutter side of the DartWay core: typed realtime data layer over the Serverpod module (watchModelList/saveModel), session management, connection-aware error handling and out-of-the-box context-rich alerting."
+description: "Flutter side of the DartWay core: a typed realtime data layer over the Serverpod module, session management, connection-aware error handling and context-rich alerting."
 version: 0.1.0
 repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, serverpod, flutter, riverpod, realtime]
 
 resolution: workspace
 

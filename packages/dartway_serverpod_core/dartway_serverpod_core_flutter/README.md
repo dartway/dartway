@@ -7,8 +7,9 @@ context-rich error alerting.
 - **Data layer in one line** —
   `ref.watchModelList<NewsPost>()` gives a typed live list: realtime sync,
   pagination, filters and skeleton loading states out of the box.
-  `watchModel` / `readModel` / `saveModel` / `deleteModel` cover the rest —
-  no service wrappers, no manual sockets.
+  `ref.watchModel` / `ref.readModel` read a single one; writes go through
+  `DwRepository.saveModel` / `DwRepository.deleteModel` — no service wrappers,
+  no manual sockets.
 - **Sessions** — passwordless auth flow on the app's own user model,
   session survives restarts via the authentication key manager.
 - **Out-of-the-box alerting** — errors are reported with app context
@@ -21,18 +22,31 @@ context-rich error alerting.
 
 ## Quick start
 
+Your app declares the core once, typed with its own Serverpod `Client` and user
+model, and reaches it anywhere as `dw`:
+
 ```dart
-final dw = DwCore<Client, UserProfile>(
-  config: DwConfig(defaultModelGetter: DwRepository.getDefault, appVersion: '1.0.0'),
-  client: Client(
-    backendUrl,
-    onFailedCall: dwReportingOnFailedCall(
-      onConnectionError: (_, _) => dw.notify.error('Network error'),
+/// Declared by the app — the framework does not export a `dw` singleton for you.
+late final DwCore<Client, UserProfile> dw;
+
+void initDwCore({required String backendUrl}) {
+  dw = DwCore<Client, UserProfile>(
+    config: DwConfig(
+      defaultModelGetter: DwRepository.getDefault,
+      appVersion: '1.0.0',
     ),
-  )..authKeyProvider = DwAuthenticationKeyManager(),
-  dwAlerts: DwAlerts.init(telegramConfig: myAlertsConfig),
-  getUserId: (userProfile) => userProfile?.id,
-);
+    client: Client(
+      backendUrl,
+      // Connection blips become a toast; everything else enters the error
+      // pipeline with `endpoint.method` attached.
+      onFailedCall: dwReportingOnFailedCall(
+        onConnectionError: (_, _) => dw.notify.error('Network error'),
+      ),
+    )..authKeyProvider = DwAuthenticationKeyManager(),
+    dwAlerts: DwAlerts.init(telegramConfig: myAlertsConfig),
+    getUserId: (userProfile) => userProfile?.id,
+  );
+}
 ```
 
 ```dart
@@ -44,8 +58,8 @@ ref.watchModelList<NewsPost>().dwBuildListAsync(
 ```
 
 This package re-exports [`dartway_flutter`](https://pub.dev/packages/dartway_flutter)
-(app shell, notifications, UI kit) — one import covers the standard app
-surface. The backend counterpart is
+(app bootstrap, guarded actions, notifications — no design system) — one import
+covers the standard app surface. The backend counterpart is
 [`dartway_serverpod_core_server`](https://pub.dev/packages/dartway_serverpod_core_server).
 
 See the canonical example app in the

@@ -1,7 +1,10 @@
 name: dartway_telegram
-description: "Telegram Mini App integration for DartWay apps: initialize the Telegram WebApp, read its safe-area insets and the Telegram user id. Optional — an app that is not a Mini App never depends on it."
+description: "Telegram Mini App integration for DartWay apps: initialize the Telegram WebApp, read its safe-area insets and the Telegram user id. Optional by design."
 version: 0.1.0
 repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, telegram, flutter, web]
 
 resolution: workspace
 

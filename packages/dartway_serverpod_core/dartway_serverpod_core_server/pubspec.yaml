@@ -1,7 +1,10 @@
 name: dartway_serverpod_core_server
-description: "Server side of the DartWay core — a Serverpod module: generic model-driven CRUD with realtime subscriptions, declarative access/validation configs, phone auth, cloud storage (S3/MinIO) and Telegram alerts."
+description: "Server side of the DartWay core, a Serverpod module: model-driven CRUD with realtime, declarative access and validation configs, phone auth, cloud storage and Telegram alerts."
 version: 0.1.0
 repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, serverpod, backend, crud, realtime]
 
 resolution: workspace
 

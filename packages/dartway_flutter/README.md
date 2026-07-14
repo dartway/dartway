@@ -21,10 +21,14 @@ needs before and around its data layer:
   feature catalogs, analytics and [DartWay Studio](https://dartway.dev)
   passports.
 - 🔌 **Plugins** — `DwPlugin`: the seam for integrations the framework must not
-  know about. Declare one at startup (`DwCore(plugins: [...])`) and reach it
-  anywhere via `dw.plugin<T>()`. Telegram Mini App support lives outside this
+  know about. Declare one at startup (`DwFlutter(plugins: [...])`, or `DwCore`
+  when you use the data layer) and reach it anywhere via `dw.plugin<T>()`. Telegram Mini App support lives outside this
   package, in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) —
   an app that is not a Mini App never downloads a Telegram SDK.
+
+> **About `dw`.** It is not a global this package hands you — the app declares it once
+> (`late final DwCore<Client, UserProfile> dw;` with the DartWay data layer, or `DwFlutter`
+> when this package is used standalone) and reaches it from anywhere afterwards.
 
 ## Riverpod-native by design
 
@@ -50,7 +54,9 @@ you should not have to reinvent — the action guard and the async contract abov
 AppButton.primary(
   'Save',
   onTap: DwUiAction.create(
-    (context) => ref.saveModel(model),
+    // any Future — with the DartWay data layer this is
+    // `DwRepository.saveModel(model)`, but the guard works over any call
+    (context) => saveProfile(model),
     onSuccessNotification: 'Saved',
   ),
 )

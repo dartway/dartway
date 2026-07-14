@@ -7,8 +7,11 @@ production-ready backend:
 - **Generic model-driven CRUD** — `getOne` / `getList` / `save` / `delete` /
   realtime `subscribe` for any model, no hand-written endpoints. One
   `DwCrudConfig<T>` per model declares the whole behavior:
-  `allowSave` → `validateSave` → `beforeSave` → write → `afterSave`
-  (all inside a transaction), access filters for reads, ordering, includes.
+  `allowSave` → `validateSave`, then `beforeSaveTransaction` → write →
+  `afterSaveTransaction` inside one transaction, then `afterSaveTransform` and
+  `afterSaveSideEffects` outside it; access filters for reads, ordering,
+  includes. (Guards run before the transaction opens — a check that must not
+  race belongs in `beforeSaveTransaction`.)
 - **Secure by design** — reads go through explicit `accessFilter`s, writes
   through `allowSave`/`validateSave`; a model without a config is not exposed.
 - **Phone auth** — passwordless flow (phone + one-time code) built on the
@@ -51,6 +54,9 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
     defaultOrderByList: [Order(column: NewsPost.t.createdAt, orderDescending: true)],
   ),
   saveConfig: DwSaveConfig<NewsPost>(
+    // `isStaffMember` is a one-line extension on Session in *your* app: the
+    // framework ships `session.currentUserProfileId` and `session.isUser(id)`,
+    // and never owns your roles.
     allowSave: (session, ctx) async => await session.isStaffMember,
     validateSave: (session, ctx) async =>
         ctx.currentModel.title.trim().isEmpty ? 'Title is required' : null,
@@ -66,7 +72,7 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
 | [`dartway_serverpod_core_client`](https://pub.dev/packages/dartway_serverpod_core_client) | generated protocol client |
 | [`dartway_serverpod_core_flutter`](https://pub.dev/packages/dartway_serverpod_core_flutter) | Flutter data layer (`watchModelList`, sessions, alerts) |
 | [`dartway_serverpod_core_shared`](https://pub.dev/packages/dartway_serverpod_core_shared) | pure-Dart shared layer |
-| [`dartway_flutter`](https://pub.dev/packages/dartway_flutter) | Flutter app shell & UI kit |
+| [`dartway_flutter`](https://pub.dev/packages/dartway_flutter) | Flutter app shell: bootstrap, guarded actions, notifications |
 
 See the canonical example app in the
 [DartWay monorepo](https://github.com/dartway/dartway) (`example/`) — a full

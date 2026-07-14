@@ -2,6 +2,9 @@ name: dartway_serverpod_core_shared
 description: "Pure-Dart shared layer of the DartWay core: alert formatting, Telegram alerts, configuration keys and cross-stack utilities used by both the server and the Flutter app."
 version: 0.1.0
 repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, serverpod, telegram, logging]
 
 resolution: workspace
 

@@ -2,6 +2,9 @@ name: dartway_serverpod_core_client
 description: "Generated Serverpod client of the DartWay core module: protocol models and endpoint callers consumed by dartway_serverpod_core_flutter. Not edited by hand."
 version: 0.1.0
 repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, serverpod, client]
 
 resolution: workspace
 

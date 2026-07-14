@@ -4,7 +4,7 @@
 
 - First public release: `DwAppRunner` bootstrap, `dw` app core (navigation,
   notifications, services, shared preferences, plugins), overlay notifications
-  pipeline, `DwInfiniteListView`, and AsyncValue utilities (`dwBuildListAsync`,
+  pipeline, `InfiniteListView`, and AsyncValue utilities (`dwBuildListAsync`,
   `DwUiAction`).
 - **The package ships no design system.** `DwButton`, `DwText`,
   `DwFlutterTheme`, `DwColorPreset`, `DwTextStylePreset`,
