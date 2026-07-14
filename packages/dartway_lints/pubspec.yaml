@@ -12,5 +12,9 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
-  analyzer: '>=7.4.0 <9.0.0'
-  custom_lint_builder: ^0.8.0
+  # analyzer is capped at <9 by custom_lint_builder itself (0.8.1, the latest,
+  # requires ^8.0.0), so the newest analyzer is out of reach for every
+  # custom_lint plugin — not just this one. The lower bound must be >=8.0.0 for
+  # the same reason: with 7.4.0 the package does not resolve at all.
+  analyzer: '>=8.0.0 <9.0.0'
+  custom_lint_builder: ^0.8.1

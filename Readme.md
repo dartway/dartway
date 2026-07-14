@@ -1,81 +1,111 @@
-# 🛠️ DartWay
+# DartWay
 
-**DartWay** — open-source fullstack Dart framework for ultra-fast MVP delivery with Flutter + Serverpod.  
-Build production-ready apps **3–4× faster**, with a unified data layer, modular architecture, and AI-first workflow.
+**An open-source fullstack Dart framework: Flutter on the client, Serverpod on the server, and one
+declarative data layer between them.**
 
----
+A feature — from the table in the database to the live screen — is a config and a widget. There are
+no endpoints to write.
 
-## 🚀 Key Features
+```dart
+// Server: the whole backend of a feature. Who reads, who writes, what is valid,
+// what runs inside the transaction.
+final bookingCrudConfig = DwCrudConfig<Booking>(
+  table: Booking.t,
+  getListConfig: DwGetModelListConfig(accessFilter: _onlyOwnBookings),
+  saveConfig: DwSaveConfig<Booking>(
+    allowSave: (session, ctx) async => await session.isStaffMember ||
+        await session.isUser(ctx.currentModel.clientProfileId),
+    validateSave: (session, ctx) async =>
+        await _spotsLeft(session, ctx) ? null : 'No spots left',
+  ),
+);
+```
 
-- ⚡ **MVP in 2–3 weeks** — minimal boilerplate, full-stack Dart from client to server  
-- 🧱 **Unified architecture** — one language, one toolchain, one mindset  
-- 🔗 **Flutter + Serverpod** — beautiful UIs + scalable backend  
-- 📦 **Modular ecosystem** — reusable packages, real-time sync, integrations  
-- 🤖 **AI-First Design** — built for Cursor & Copilot workflows  
+```dart
+// Client: the same model, typed and live. Realtime sync, pagination, filters and
+// skeleton loading states out of the box.
+ref.watchModelList<Booking>().dwBuildListAsync(
+      loadingItemsCount: 4,
+      childBuilder: (bookings) => ListView(children: [...]),
+    );
+```
 
----
+Serverpod gives you a backend. **DartWay removes the need to write one.**
 
-## 🧭 Quickstart
+## Start
 
-Use our quickstart guide to create your app in minutes:
-📘 [**dartway.dev/docs/quick-start**](https://dartway.dev/docs/quick-start)
+```bash
+dart pub global activate dartway_cli
+dartway create my_app
 
-Project template referenced in the guide is here:
-👉 [**DartWay Project Template**](https://github.com/dartway/dartway_project_template)
+cd my_app/my_app_server
+docker compose up -d                       # Postgres
+dart bin/main.dart --apply-migrations      # schema
+dart bin/seed_dev.dart --mode development  # one user per role
 
----
+# in another terminal
+cd ../my_app_flutter
+flutter run
+```
 
-## 🧩 Core Modules
+You get a running app: passwordless phone auth, roles, navigation, an admin panel and a UI kit you
+own — and **no domain models**, because your domain is yours to write. Sign in with `79990000003`;
+the one-time code is printed by the server.
 
-| Package | Description |
-|----------|-------------|
-| [**dartway_serverpod_core**](https://github.com/dartway/dartway_serverpod_core) | Core module: generic API, ORM, auth, filters, pagination, and real-time sync. |
-| [**dartway_flutter**](https://github.com/dartway/dartway_flutter) | Flutter helpers and toolbox for ultra-fast development. No backend dependencies included. |
-| [**dartway_router**](https://github.com/dartway/dartway_router) | Our wrapper for GoRouter - enables easier route configuration and some helper tools. |
-| [**dartway_studio_bridge**](packages/dartway_studio_bridge) | Open bridge between a DartWay app and DartWay Studio: in-code screen spec registry and the runtime postMessage protocol. |
+Full walkthrough: [dartway.dev/docs/quick-start](https://dartway.dev/docs/quick-start).
 
+## What is in this repository
 
----
+| Path | What it is |
+|---|---|
+| [`packages/`](packages/) | The framework — nine packages (see below) |
+| [`template/`](template/) | The skeleton `dartway create` hands you. No domain models |
+| [`example/`](example/) | A complete application built on DartWay — a fitness club with a schedule, bookings, a staff-only chat, news and an admin panel. **Read it; do not inherit it** |
+| [`docs/`](docs/) | Documentation source |
+| [`toolkit/`](toolkit/) | The AI toolkit installed into your project: skills and conventions that let an agent write features without tearing the project apart |
 
-## 💼 Integrations
+## The packages
 
-| Package | Description |
-|----------|-------------|
-| [**dartway_serverpod_tinkoff**](https://github.com/dartway-dev/dartway_serverpod_tinkoff) | Integration with Tinkoff acquiring — payment creation, signature, webhooks, and status handling. |
+**The core** — versioned in lockstep:
 
----
+| Package | Role |
+|---|---|
+| [`dartway_serverpod_core_server`](packages/dartway_serverpod_core/dartway_serverpod_core_server) | A Serverpod module: generic model-driven CRUD with realtime subscriptions, declarative access and validation configs, phone auth, cloud storage, alerts |
+| [`dartway_serverpod_core_flutter`](packages/dartway_serverpod_core/dartway_serverpod_core_flutter) | The typed realtime data layer: `watchModelList`, sessions, connection-aware error handling |
+| [`dartway_serverpod_core_client`](packages/dartway_serverpod_core/dartway_serverpod_core_client) | The generated protocol client |
+| [`dartway_serverpod_core_shared`](packages/dartway_serverpod_core/dartway_serverpod_core_shared) | The pure-Dart layer shared by both sides |
 
-## 🌐 Ecosystem
+**Everything else** — independent:
 
-- 📚 **Documentation:** [dartway.dev](https://dartway.dev)
-- ⚠️ **Project updates:** [@dartway_dev on Telegram](https://t.me/dartway_dev)
-- 💬 **Community:** [@dartway_dev_community on Telegram](https://t.me/dartway_dev_community)
-- 🧠 **YouTube Crash Course:** coming soon — learn to build a full MVP with DartWay
+| Package | Role |
+|---|---|
+| [`dartway_flutter`](packages/dartway_flutter) | The app skeleton: bootstrap, guarded actions, the async-UI contract, notifications, error reporting. Ships no design system |
+| [`dartway_cli`](packages/dartway_cli) | `dartway create` / `setup-ai` / `check` / `stats` |
+| [`dartway_lints`](packages/dartway_lints) | The conventions, enforced by machine |
+| [`dartway_telegram`](packages/dartway_telegram) | Telegram Mini App integration. Optional — an app that is not a Mini App never downloads it |
+| [`dartway_studio_bridge`](packages/dartway_studio_bridge) | The open bridge between an app and DartWay Studio: screen specs in code + the runtime protocol |
 
----
+## Three principles
 
-## 🤝 Contribute
+**The framework does not own your models.** A user is your `UserProfile`, in your database, with
+your fields and your roles. Not "extend our `UserInfo`", not "fork the module" — that is the wall
+every batteries-included kit runs into, and a fork follows you through every upgrade, forever.
 
-We’re building DartWay as a global movement for full-stack Dart developers.  
-You can help by:
+**Secure by default.** A model with no access config is served to nobody. Not "open until you close
+it" — closed until you open it. For generic CRUD it is the only honest default: forgetting to close
+something is easy, forgetting to open it is impossible to miss.
 
-- ⭐ Starring this repo  
-- 🐛 Reporting issues and suggesting features  
-- 🧩 Contributing to packages  
-- 🔥 Sharing DartWay with your community
+**An architecture a machine can verify.** Conventions, lints, a checker and skills for AI agents.
+Not decoration: an agent writing code in a project with machine-checkable rules does not tear it
+apart by the third feature.
 
-Join us on Telegram → [**Dart Way Dev Community**](https://t.me/dartway_dev_community)
+## Links
 
----
+- **Docs:** [dartway.dev](https://dartway.dev)
+- **Updates:** [@dartway_dev](https://t.me/dartway_dev) on Telegram
+- **Community:** [@dartway_dev_community](https://t.me/dartway_dev_community)
 
-## 🧭 Vision
+Contributions welcome — issues, features, packages. If DartWay saves you a week, a star costs
+nothing.
 
-DartWay isn’t just a framework — it’s a **new way to build and deliver software**.  
-Our goal: make full-stack Dart the fastest, cleanest, and most enjoyable path to launch your next product.
-
-> _“Ship faster. Build cleaner. Stay in flow.”_
-
----
-
-© 2025 DartWay.dev — licensed under the [Apache 2.0 License](./LICENSE)
-Made with 💙 by the [Dart Way](https://dartway.dev) team
+© 2026 DartWay — [Apache 2.0](./LICENSE)
