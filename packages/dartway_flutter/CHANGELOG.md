@@ -2,65 +2,43 @@
 
 ## 0.1.0
 
-- First public release: `DwAppRunner` bootstrap, `dw` app core (navigation,
-  notifications, services, shared preferences, plugins), overlay notifications
-  pipeline, `InfiniteListView`, and AsyncValue utilities (`dwBuildListAsync`,
-  `DwUiAction`).
-- **The package ships no design system.** `DwButton`, `DwText`,
-  `DwFlutterTheme`, `DwColorPreset`, `DwTextStylePreset`,
-  `DwButtonStylePreset`, `DwDeviceFrame`, `MultiLinkText` and
-  `context.isMobile` are gone. A design system is the one thing every app ends
-  up owning; shipping it as a dependency only starts an argument about the
-  corner radius of a button — and it forced an entire indirection apparatus
-  (`ThemeExtension` + fallback presets) whose only job was to let framework
-  widgets look up app styles. The UI kit now lives as source in the app's
-  `lib/ui_kit/`, scaffolded by `dartway create` (see `example/`).
-- **New: `DwActionBuilder`** — the mechanism that used to be trapped inside
-  `DwButton`. It binds a `DwUiAction` to *any* tappable widget (a list tile, an
-  icon, a card), holding the in-flight flag, blocking re-entrant taps and
-  optionally validating the enclosing `Form`. The builder receives a ready
-  `onPressed` (null while the action runs) and a `busy` flag.
-  `DwUiAction` says *what* an action does; `DwActionBuilder` says what the UI
-  does while it runs.
+First public release — the Flutter skeleton of a DartWay app: everything an app needs before and
+around its data layer.
 
-  `requireValidation` with no enclosing `Form` now runs the action (there is
-  nothing to validate) and asserts in debug, instead of silently cancelling
-  every tap. The old `?? false` meant a guard placed outside a form produced a
-  button that did nothing at all — no exception, no log, nothing to see. Freeing
-  the guard from `DwButton` is exactly what made that mistake easy to make, so
-  it has to be loud, and loud before the first dead tap.
-- **New: `DwPlugin`** — the seam for integrations the framework must not know
-  about. Declared at startup (`DwCore(plugins: [...])`), initialized with the app
-  core, and reached anywhere via `dw.plugin<T>()`. An integration package builds
-  its own accessor on top, so the app writes `dw.telegram` — the ergonomics of an
-  ambient service with none of the coupling, because the extension is declared in
-  the integration package, not here.
-- **Telegram moved out to `dartway_telegram`.** `DwConfig.telegramWebAppConfig`
-  and `dw.services.telegramWebApp` are gone, and so is the `telegram_web_app`
-  dependency. The framework's config has no business knowing a vendor's name,
-  and an app that is not a Telegram Mini App should not download a Telegram SDK
-  to get a bootstrap runner. `DwAppRunner` already declares itself
-  "intentionally decoupled" — the Telegram field was the one place that wasn't.
-- Dropped four dependencies: `adaptive_breakpoints` (**discontinued upstream**;
-  it existed solely for `context.isMobile`, whose breakpoint was
-  platform-dependent and surprising enough that app code bypassed it),
-  `conditional_parent_widget` (unmaintained since 2023 and re-exported from the
-  public barrel), `device_frame` and `telegram_web_app`. They now belong to the
-  app's kit or to `dartway_telegram`, where they are the app's business. Six
-  dependencies remain, down from ten.
-- Feature declarations moved in from the Studio bridge: `DwFeature`,
-  `DwFeatureSpec` and `scanMountedFeatures` are app semantics and now live
-  here — feature catalogs, error-report context, analytics; a Studio binding
-  maps them onto the bridge wire model.
-- Error reporting pipeline: `dw.errorContext` (route source + custom lazy
-  entries), `DwErrorReport`/`DwErrorSource`, `dw.handleError` captures an
-  app-state snapshot (route, mounted features, action label, platform,
-  version) and dispatches through the overridable `reportError`;
-  `DwConfig.onErrorReport` and `DwConfig.appVersion` added. `DwAppRunner`
-  routes uncaught zone errors into the pipeline by default.
-- `DwUiAction.create`: new optional `label` (names the action in error
-  reports; falls back to the notification texts) and `confirmation`
-  (`DwUiConfirmation` + built-in `DwConfirmDialog`, customizable via
-  `DwConfig.confirmDialogBuilder`) — declining skips the action entirely.
-- Removed the legacy `zarchive` material-app wrapper and the unused
-  `DwButtonNew` draft from the public surface.
+**App bootstrap.** `DwAppRunner` owns what every app sets up and no app enjoys setting up: the
+`ProviderScope`, the native splash, async initializers, and a zone that routes uncaught errors into
+the error pipeline instead of losing them.
+
+**The async-UI contract.** `dwBuildAsync` / `dwBuildListAsync` render loading, error and data
+uniformly — and the loading state is a skeleton derived from your real widget, not a spinner.
+
+**Guarded actions.** `DwUiAction` describes *what* an action does — confirmation
+(`DwUiConfirmation`), success notification, follow-up, error reporting — and `DwActionBuilder` binds
+it to *any* tappable widget and handles the rest: no re-entrant taps (a double tap does not book
+twice), an in-flight flag, optional `Form` validation. The guard is not welded to a button, so a
+list tile or an icon gets it too.
+
+**Notifications.** A global overlay pipeline: post a `DwUiNotification` from anywhere
+(`dw.notify.success(...)`), render it with your own handler.
+
+**Error reporting with context.** Every error carries an app-state snapshot — route, mounted
+features, the action label, platform, version — through an overridable `reportError`. A minified web
+stack trace tells you nothing; this tells you what the user was doing.
+
+**Feature declarations.** `DwFeature` / `scanMountedFeatures`: mark widgets as product features and
+discover the mounted ones at runtime — for feature catalogs, analytics, error context and
+[DartWay Studio](https://dartway.dev) passports.
+
+**Plugins.** `DwPlugin` is the seam for integrations the framework must not know about: declare one
+at startup and reach it anywhere via `dw.plugin<T>()`. Telegram Mini App support lives outside this
+package, in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) — an app that is not a
+Mini App never downloads a Telegram SDK.
+
+**It ships no design system.** There is no `DwButton`, no `DwText`, no theme and no style presets —
+on purpose. A design system is the one thing every serious app ends up owning, and shipping it as a
+dependency only starts an argument about the corner radius of your button. `dartway create`
+scaffolds a UI kit **into your app** as source you own. What this package keeps is the mechanism you
+should not have to reinvent.
+
+Riverpod-native by design: `AsyncValue` is the type the whole async-UI contract is built on. That is
+not an implementation detail you can swap — it is the framework.

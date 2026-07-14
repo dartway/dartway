@@ -2,9 +2,9 @@
 
 ## 0.1.0
 
-- First public release: generated Serverpod protocol of the DartWay core
-  module (`DwModelWrapper`, `DwApiResponse`, `DwBackendFilter`, endpoint
-  callers).
-- `DwAuthFailReason` gains `tooManyAttempts`, `codeExpired` and `rateLimited`,
-  so the client can tell the user which auth limit it hit. **Exhaustive
-  switches over `DwAuthFailReason` must handle the new values.**
+First public release — the generated Serverpod protocol client of the DartWay core module:
+`DwModelWrapper`, `DwApiResponse`, `DwBackendFilter`, `DwAuthFailReason` and the endpoint callers.
+
+You do not write against this package directly. It is a dependency of
+[`dartway_serverpod_core_flutter`](https://pub.dev/packages/dartway_serverpod_core_flutter) — that is
+the package your app uses.
