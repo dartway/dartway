@@ -10,19 +10,19 @@ part of 'studio_persona_switcher.dart';
 // ignore_for_file: type=lint, type=warning
 /// Programmatic sign-in as a seeded persona: the regular OTP flow with the
 /// fixed dev code. No manual navigation — the router guards move the app
-/// between /auth and the club zone on session changes. State = busy flag.
+/// between /auth and the app zone on session changes. State = busy flag.
 
 @ProviderFor(StudioPersonaSwitcher)
 const studioPersonaSwitcherProvider = StudioPersonaSwitcherProvider._();
 
 /// Programmatic sign-in as a seeded persona: the regular OTP flow with the
 /// fixed dev code. No manual navigation — the router guards move the app
-/// between /auth and the club zone on session changes. State = busy flag.
+/// between /auth and the app zone on session changes. State = busy flag.
 final class StudioPersonaSwitcherProvider
     extends $NotifierProvider<StudioPersonaSwitcher, bool> {
   /// Programmatic sign-in as a seeded persona: the regular OTP flow with the
   /// fixed dev code. No manual navigation — the router guards move the app
-  /// between /auth and the club zone on session changes. State = busy flag.
+  /// between /auth and the app zone on session changes. State = busy flag.
   const StudioPersonaSwitcherProvider._()
     : super(
         from: null,
@@ -55,7 +55,7 @@ String _$studioPersonaSwitcherHash() =>
 
 /// Programmatic sign-in as a seeded persona: the regular OTP flow with the
 /// fixed dev code. No manual navigation — the router guards move the app
-/// between /auth and the club zone on session changes. State = busy flag.
+/// between /auth and the app zone on session changes. State = busy flag.
 
 abstract class _$StudioPersonaSwitcher extends $Notifier<bool> {
   bool build();

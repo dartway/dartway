@@ -10,7 +10,7 @@ part 'studio_persona_switcher.g.dart';
 
 /// Programmatic sign-in as a seeded persona: the regular OTP flow with the
 /// fixed dev code. No manual navigation — the router guards move the app
-/// between /auth and the club zone on session changes. State = busy flag.
+/// between /auth and the app zone on session changes. State = busy flag.
 @Riverpod(keepAlive: true)
 class StudioPersonaSwitcher extends _$StudioPersonaSwitcher {
   @override

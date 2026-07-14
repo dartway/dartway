@@ -9,7 +9,7 @@ final isSignedInProvider = Provider<bool>((ref) {
   return ref.watch(userProfileProvider) != null;
 });
 
-/// True when the signed-in user is a club admin — gates the `/admin` zone.
+/// True when the signed-in user is an admin — gates the `/admin` zone.
 final isAdminProvider = Provider<bool>((ref) {
   return ref.watch(userProfileProvider)?.isAdmin ?? false;
 });

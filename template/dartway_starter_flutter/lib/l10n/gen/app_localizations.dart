@@ -341,7 +341,7 @@ abstract class AppLocalizations {
   /// No description provided for @countersLiveHint.
   ///
   /// In en, this message translates to:
-  /// **'Counters are live: they update in realtime as members book sessions and staff publishes news.'**
+  /// **'Counters are live: they update in realtime as the data changes.'**
   String get countersLiveHint;
 
   /// No description provided for @countMembers.

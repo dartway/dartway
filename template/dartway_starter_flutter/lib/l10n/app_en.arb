@@ -61,7 +61,7 @@
   "adminUsers": "Users",
   "adminSettings": "Settings",
   "backToApp": "Back to the app",
-  "countersLiveHint": "Counters are live: they update in realtime as members book sessions and staff publishes news.",
+  "countersLiveHint": "Counters are live: they update in realtime as the data changes.",
   "countMembers": "Members",
   "searchLabel": "Search",
   "searchHint": "Name or phone",

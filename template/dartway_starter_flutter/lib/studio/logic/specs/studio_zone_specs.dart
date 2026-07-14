@@ -38,7 +38,7 @@ final adminZoneStudioSpec = StudioZoneSpec(
             'phones — try switching the preview frame.',
       ],
       discussionQuestions: const [
-        'Which three numbers does a club owner check every morning?',
+        'Which three numbers does the owner of your product check every morning?',
       ],
     ),
     studioSpecForRoute(
@@ -63,13 +63,13 @@ final adminZoneStudioSpec = StudioZoneSpec(
       AdminNavigationZone.settings,
       title: 'Settings',
       purpose: 'Application settings stored in the AppSetting model — the '
-          'club changes its own texts without redeploys.',
+          'business changes its own texts without a redeploy.',
       featureSpec: const [
         'AppSetting is a regular CRUD model: admin-only writes, public '
             'reads — the app picks up changes in realtime.',
       ],
       discussionQuestions: const [
-        'Which other settings belong here: working hours, booking limits?',
+        'Which other settings belong here?',
       ],
     ),
   ],

@@ -24,7 +24,6 @@ part '2_frequent/phone_text_field.dart';
 part '2_frequent/show_app_bottom_sheet_extension.dart';
 part '3_special/auth/checkbox_form_field.dart';
 part '3_special/auth/pin_code_text_field.dart';
-part '3_special/chat/chat_bubble_container.dart';
 part '3_special/common/connection_status_indicator.dart';
 part 'layout/device_frame_shell.dart';
 part 'theme/app_button.dart';
