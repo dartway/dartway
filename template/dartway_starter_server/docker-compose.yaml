@@ -1,0 +1,31 @@
+services:
+  # Development database. Matches config/development.yaml (localhost:8090,
+  # database "dartway_starter", user "postgres"). Redis is disabled in the
+  # development config, so only Postgres is started here.
+  postgres:
+    image: postgres:16
+    ports:
+      - '8090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dartway_starter
+      POSTGRES_PASSWORD: 'dartway_dev_pw'
+    volumes:
+      - dartway_starter_data:/var/lib/postgresql/data
+
+  # Test database. Matches config/test.yaml (localhost:9090, database
+  # "dartway_starter_test"). Kept separate from development on purpose: the
+  # integration tests commit real transactions (concurrency cannot be observed
+  # inside a rolled-back one) and truncate tables between cases.
+  postgres_test:
+    image: postgres:16
+    ports:
+      - '9090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dartway_starter_test
+      POSTGRES_PASSWORD: 'dartway_test_pw'
+    # No volume: a test database that survives a restart is a liability.
+
+volumes:
+  dartway_starter_data:

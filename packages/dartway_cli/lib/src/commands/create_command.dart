@@ -7,9 +7,14 @@ import '../monorepo_source.dart';
 import '../project_layout.dart';
 import '../toolkit_installer.dart';
 
-/// Creates a new DartWay project from the canonical `example/` app of the
-/// monorepo: copies it, renames `dartway_example` to the project name,
-/// strips monorepo-only `dependency_overrides` and installs the AI toolkit.
+/// Creates a new DartWay project from the `template/` skeleton of the monorepo:
+/// copies it, renames `dartway_starter` to the project name, strips
+/// monorepo-only `dependency_overrides` and installs the AI toolkit.
+///
+/// The skeleton is deliberately domain-free — auth, roles, navigation, the
+/// admin panel and the UI kit, and no models of anyone else's business. The
+/// full application built on it lives in `example/` of the monorepo, and is a
+/// reference to read, not a project to inherit.
 class CreateCommand extends Command<int> {
   CreateCommand() {
     argParser
@@ -33,8 +38,9 @@ class CreateCommand extends Command<int> {
       );
   }
 
-  static const _sourceProjectName = 'dartway_example';
-  static const _sourceProjectPascalName = 'DartwayExample';
+  static const _sourceDirectory = 'template';
+  static const _sourceProjectName = 'dartway_starter';
+  static const _sourceProjectPascalName = 'DartwayStarter';
 
   static const _skippedDirectories = {
     '.dart_tool',
@@ -72,13 +78,17 @@ class CreateCommand extends Command<int> {
           branch: argResults!['channel'] as String,
           localDir: argResults!['local-repo'] as String?,
         ).resolve();
-    final exampleDir = Directory(p.join(monorepoDir.path, 'example'));
-    if (!exampleDir.existsSync()) {
-      throw StateError('No example/ found in monorepo at ${monorepoDir.path}');
+    final templateDir = Directory(
+      p.join(monorepoDir.path, _sourceDirectory),
+    );
+    if (!templateDir.existsSync()) {
+      throw StateError(
+        'No $_sourceDirectory/ found in monorepo at ${monorepoDir.path}',
+      );
     }
 
     stdout.writeln('Creating $projectName from the DartWay template...');
-    _copyProject(exampleDir, targetDir, projectName);
+    _copyProject(templateDir, targetDir, projectName);
     _rewritePubspecs(targetDir);
 
     final layout = ProjectLayout.detect(targetDir);
@@ -96,11 +106,14 @@ class CreateCommand extends Command<int> {
       ..writeln('')
       ..writeln('Project $projectName is ready. Next steps:')
       ..writeln('  cd $projectName/${layout.serverPackage}')
-      ..writeln('  docker compose up -d')
-      ..writeln('  dart bin/main.dart --apply-migrations')
+      ..writeln('  docker compose up -d                      # Postgres')
+      ..writeln('  dart bin/main.dart --apply-migrations     # schema')
+      ..writeln('  dart bin/seed_dev.dart --mode development # a user per role')
       ..writeln('then in another terminal:')
       ..writeln('  cd $projectName/${layout.flutterPackage}')
-      ..writeln('  flutter pub get && flutter run');
+      ..writeln('  flutter pub get && flutter run')
+      ..writeln('')
+      ..writeln('Sign in with 79990000003 — the code is printed by the server.');
     return 0;
   }
 

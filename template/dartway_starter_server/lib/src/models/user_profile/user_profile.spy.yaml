@@ -1,0 +1,25 @@
+class: UserProfile
+table: user_profile
+fields:
+  # Login identifier required by DartWay auth (see DwCore on the server). Holds
+  # the phone number for this example.
+  userIdentifier: String
+  phone: String
+  
+  agreedForMarketingCommunications: bool
+  conditionsAcceptedAt: DateTime
+
+  firstName: String
+  lastName: String?
+  imageUrl: String?
+  gender: UserGender?
+
+  # Access role: client (default), staff (club employees, see staff chat),
+  # admin (full access). Enforced by CRUD config access filters.
+  role: UserRole, default=client
+
+  # Rotatable test/reviewer OTP code. serverOnly: NEVER serialized to the client,
+  # so a regular client cannot read test codes. Real users leave it null and get
+  # a random code (secure-by-default); the admin sets/rotates it via a dedicated
+  # admin endpoint, and the users that have it set are the Studio demo personas.
+  testVerificationCode: String?, scope=serverOnly

@@ -1,0 +1,19 @@
+name: dartway_starter_client
+description: Starting point for a Serverpod client.
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+
+dependencies:
+  serverpod_client: ^3.4.8
+
+  dartway_serverpod_core_client:
+    git:
+      url: https://github.com/dartway/dartway.git
+      ref: master
+      path: packages/dartway_serverpod_core/dartway_serverpod_core_client
+
+# Внутри монорепо — локальная сборка. В самостоятельном проекте удалить блок.
+dependency_overrides:
+  dartway_serverpod_core_client:
+    path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_client

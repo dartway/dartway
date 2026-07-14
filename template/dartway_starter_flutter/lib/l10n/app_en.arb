@@ -1,0 +1,118 @@
+{
+  "@@locale": "en",
+  "tabProfile": "Profile",
+  "ourServices": "Our services",
+  "profileTitle": "Profile",
+  "adminPanel": "Admin panel",
+  "signOutAction": "Sign out",
+  "firstNameLabel": "First Name",
+  "firstNameHint": "Enter your first name",
+  "firstNameRequired": "First name is required",
+  "genderLabel": "Gender",
+  "genderNotSpecified": "Not specified",
+  "genderValue": "{gender, select, male{Male} female{Female} other{—}}",
+  "@genderValue": {
+    "placeholders": {
+      "gender": {
+        "type": "String"
+      }
+    }
+  },
+  "saveChanges": "Save Changes",
+  "profileUpdated": "Profile updated successfully!",
+  "authStepTitle": "{step, select, greeting{Welcome!} registration{Step 1 of 3} login{Step 1 of 2} registrationConfirmation{Step 2 of 3} loginConfirmation{Step 2 of 2} other{}}",
+  "@authStepTitle": {
+    "placeholders": {
+      "step": {
+        "type": "String"
+      }
+    }
+  },
+  "completeLoginToContinue": "Complete login or registration to continue",
+  "registrationAction": "Registration",
+  "loginAction": "Login",
+  "fillRegistrationData": "Fill registration data",
+  "nameLabel": "Name",
+  "requiredField": "Required field",
+  "youMustAgree": "You must agree",
+  "agreeTermsPrefix": "I am familiar with and agree to the terms of the",
+  "offerLink": "offer,",
+  "userAgreementLink": "user agreement,",
+  "acceptTermsPrefix": "I accept the terms of the",
+  "dataPolicyLinkComma": "data processing policy,",
+  "iGive": "I give",
+  "consentLink": "consent",
+  "marketingConsentText": "on receiving informational and promotional mailings, therefore I give",
+  "dataProcessingConsentText": "on processing personal data in accordance with the",
+  "dataPolicyLink": "data processing policy",
+  "continueAction": "Continue",
+  "alreadyHaveAccount": "Already have an account? ",
+  "stillNoAccount": "Still no account? ",
+  "enterSmsCode": "Enter the code from SMS",
+  "sentCodeToNumber": "Sent 6-digit code to number\n{phone}",
+  "@sentCodeToNumber": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "adminDashboard": "Dashboard",
+  "adminUsers": "Users",
+  "adminSettings": "Settings",
+  "backToApp": "Back to the app",
+  "countersLiveHint": "Counters are live: they update in realtime as members book sessions and staff publishes news.",
+  "countMembers": "Members",
+  "searchLabel": "Search",
+  "searchHint": "Name or phone",
+  "allRoles": "All roles",
+  "roleName": "{role, select, client{Client} staff{Staff} admin{Admin} other{—}}",
+  "@roleName": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "noMembersYet": "No members yet.",
+  "noMembersMatch": "No members match.",
+  "confirmChangeRole": "Change the role of {name} to {role}?",
+  "@confirmChangeRole": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "appSettings": "App settings",
+  "appNameLabel": "App name",
+  "saveAction": "Save",
+  "settingsSaved": "Settings saved",
+  "noSettingsConfigured": "No settings configured.",
+  "networkErrorTryAgain": "Network error. Please try again.",
+  "tabHome": "Home",
+  "homeTitle": "Home",
+  "homeGreeting": "Hello, {name}!",
+  "@homeGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeAppNameFromDatabase": "App name from the database: {appName}",
+  "@homeAppNameFromDatabase": {
+    "placeholders": {
+      "appName": {
+        "type": "String"
+      }
+    }
+  },
+  "homeNoAppName": "No app name configured yet — set it in the admin panel.",
+  "homeNextStepTitle": "Your first feature",
+  "homeNextStepBody": "Describe a model, give it a DwCrudConfig on the server, and read it with ref.watchModelList in a widget. No endpoints to write.",
+  "countSettings": "Settings"
+}

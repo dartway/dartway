@@ -1,0 +1,11 @@
+tags:
+  integration: {}
+
+# The integration suite runs against one real database with `RollbackDatabase.disabled` —
+# the only way to observe things that must actually commit: a race between two
+# concurrent sign-ins, or a password hash upgraded during a login.
+#
+# That makes the files stateful neighbours rather than isolated units: each wipes
+# the auth tables around itself, so run in parallel they wipe each other's rows
+# mid-test (reliably: three failures). One file at a time.
+concurrency: 1

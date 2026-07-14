@@ -1,0 +1,80 @@
+{
+  "@@locale": "ru",
+  "tabProfile": "Профиль",
+  "ourServices": "Наши услуги",
+  "profileTitle": "Профиль",
+  "adminPanel": "Админ-панель",
+  "signOutAction": "Выйти",
+  "firstNameLabel": "Имя",
+  "firstNameHint": "Введите имя",
+  "firstNameRequired": "Имя обязательно",
+  "genderLabel": "Пол",
+  "genderNotSpecified": "Не указан",
+  "genderValue": "{gender, select, male{Мужской} female{Женский} other{—}}",
+  "saveChanges": "Сохранить изменения",
+  "profileUpdated": "Профиль обновлён!",
+  "authStepTitle": "{step, select, greeting{Добро пожаловать!} registration{Шаг 1 из 3} login{Шаг 1 из 2} registrationConfirmation{Шаг 2 из 3} loginConfirmation{Шаг 2 из 2} other{}}",
+  "completeLoginToContinue": "Войдите или зарегистрируйтесь, чтобы продолжить",
+  "registrationAction": "Регистрация",
+  "loginAction": "Вход",
+  "fillRegistrationData": "Заполните данные регистрации",
+  "nameLabel": "Имя",
+  "requiredField": "Обязательное поле",
+  "youMustAgree": "Нужно согласие",
+  "agreeTermsPrefix": "Я ознакомлен и согласен с условиями",
+  "offerLink": "оферты,",
+  "userAgreementLink": "пользовательского соглашения,",
+  "acceptTermsPrefix": "принимаю условия",
+  "dataPolicyLinkComma": "политики обработки данных,",
+  "iGive": "Я даю",
+  "consentLink": "согласие",
+  "marketingConsentText": "на получение информационных и рекламных рассылок, а также даю",
+  "dataProcessingConsentText": "на обработку персональных данных в соответствии с",
+  "dataPolicyLink": "политикой обработки данных",
+  "continueAction": "Продолжить",
+  "alreadyHaveAccount": "Уже есть аккаунт? ",
+  "stillNoAccount": "Ещё нет аккаунта? ",
+  "enterSmsCode": "Введите код из СМС",
+  "sentCodeToNumber": "Отправили 6-значный код на номер\n{phone}",
+  "adminDashboard": "Дашборд",
+  "adminUsers": "Пользователи",
+  "adminSettings": "Настройки",
+  "backToApp": "Назад в приложение",
+  "countersLiveHint": "Счётчики живые: они обновляются в реальном времени, когда участники записываются на занятия, а команда публикует новости.",
+  "countMembers": "Участники",
+  "searchLabel": "Поиск",
+  "searchHint": "Имя или телефон",
+  "allRoles": "Все роли",
+  "roleName": "{role, select, client{Клиент} staff{Команда} admin{Админ} other{—}}",
+  "noMembersYet": "Участников пока нет.",
+  "noMembersMatch": "Никто не подходит под фильтр.",
+  "confirmChangeRole": "Сменить роль {name} на «{role}»?",
+  "appSettings": "Настройки приложения",
+  "appNameLabel": "Название приложения",
+  "saveAction": "Сохранить",
+  "settingsSaved": "Настройки сохранены",
+  "noSettingsConfigured": "Настройки не заданы.",
+  "networkErrorTryAgain": "Ошибка сети. Попробуйте снова.",
+  "tabHome": "Главная",
+  "homeTitle": "Главная",
+  "homeGreeting": "Привет, {name}!",
+  "@homeGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeAppNameFromDatabase": "Название приложения из базы: {appName}",
+  "@homeAppNameFromDatabase": {
+    "placeholders": {
+      "appName": {
+        "type": "String"
+      }
+    }
+  },
+  "homeNoAppName": "Название ещё не задано — задайте его в админке.",
+  "homeNextStepTitle": "Твоя первая фича",
+  "homeNextStepBody": "Опиши модель, дай ей DwCrudConfig на сервере и прочитай через ref.watchModelList в виджете. Эндпоинты писать не нужно.",
+  "countSettings": "Настройки"
+}

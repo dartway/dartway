@@ -1,0 +1,5 @@
+enum: UserGender
+serialized: byName
+values:
+  - female
+  - male

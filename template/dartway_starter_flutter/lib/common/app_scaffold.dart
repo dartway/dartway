@@ -1,0 +1,96 @@
+import 'package:dartway_router/dartway_router.dart';
+import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+
+/// App page scaffold. Pages live in the app navigation zone, which is only
+/// reachable when signed in (see the router redirect guards), so no per-page
+/// auth gating is needed here — the root [DwUserAsyncScope] loads the profile.
+class AppScaffold extends StatelessWidget {
+  const AppScaffold.main({
+    super.key,
+    required this.body,
+    this.appBar,
+    this.floatingActionButton,
+    this.bodyInsets = const EdgeInsets.all(16),
+  }) : showBottomNavigationBar = true;
+
+  const AppScaffold.inner({
+    super.key,
+    required this.body,
+    this.appBar,
+    this.floatingActionButton,
+    this.bodyInsets = const EdgeInsets.all(16),
+  }) : showBottomNavigationBar = false;
+
+  final PreferredSizeWidget? appBar;
+  final Widget body;
+  final Widget? floatingActionButton;
+  final EdgeInsets bodyInsets;
+  final bool showBottomNavigationBar;
+
+  @override
+  Widget build(BuildContext context) {
+    return DeviceFrameShell(
+      body: Scaffold(
+        appBar: appBar,
+        body: Stack(
+          children: [
+            Padding(
+              padding: bodyInsets,
+              child: SizedBox.expand(child: body),
+            ),
+            const Positioned(
+              right: 4,
+              bottom: 4,
+              child: AppVersionLabel(),
+            ),
+          ],
+        ),
+        floatingActionButton: floatingActionButton,
+        bottomNavigationBar:
+            showBottomNavigationBar ? const _AppBottomNavigationBar() : null,
+      ),
+    );
+  }
+}
+
+class _AppBottomNavigationBar extends ConsumerWidget {
+  const _AppBottomNavigationBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Add a tab per screen as the domain grows. Gate a tab on a role with an
+    // `if (ref.watchUserProfile.isStaffMember)` — but remember the tab is only
+    // the UI: the real protection is the access filter on the server.
+    final tabs = [
+      (route: AppNavigationZone.home, icon: Icons.home),
+      (route: AppNavigationZone.profile, icon: Icons.person),
+    ];
+    final currentIndex = tabs.indexWhere((tab) => tab.route.isActive(context));
+
+    return BottomNavigationBar(
+      currentIndex: currentIndex < 0 ? 0 : currentIndex,
+      onTap: (index) => GoRouter.of(context).goNamed(tabs[index].route.name),
+      type: BottomNavigationBarType.fixed,
+      // Colours come from AppTheme.light — set once for the whole app, not
+      // re-picked by every widget that happens to need them.
+      showUnselectedLabels: true,
+      items: [
+        for (final tab in tabs)
+          BottomNavigationBarItem(
+            icon: Icon(tab.icon),
+            label: _tabLabel(context.l10n, tab.route),
+          ),
+      ],
+    );
+  }
+
+  String _tabLabel(AppLocalizations l10n, AppNavigationZone route) =>
+      switch (route) {
+        AppNavigationZone.home => l10n.tabHome,
+        AppNavigationZone.profile => l10n.tabProfile,
+      };
+}

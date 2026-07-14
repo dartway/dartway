@@ -1,0 +1,171 @@
+---
+title: Feature Architecture
+description: Structure and rules for Flutter features in DartWay
+alwaysApply: true
+---
+
+# Feature Architecture
+
+DartWay features must be **small, isolated, and consistent**.  
+Every feature contains **UI + Logic**, and may additionally use **Domain Extensions** and **UI Kit**.  
+
+:::warning
+From outside the feature, you can only import the **root entry file** (page, widget, or context extension).  
+Never import internal files directly.
+:::
+
+---
+
+## 📦 Feature Structure
+
+Example folder structure:
+
+```
+lib/
+  todo/
+    todo_list_page.dart        // entry point (public)
+    widgets/
+      todo_list.dart
+      todo_item.dart
+    logic/
+      todo_provider.dart
+      todo_filter.dart
+```
+
+* **Entry Point** — only public file (`TodoListPage`).  
+* **Widgets** — visual building blocks (layout, transitions, interactions).  
+* **Logic** — providers, enums, helpers for this feature only.  
+* **Domain Extensions** — shared business logic (on models & enums).  
+* **UI Kit** — isolated styling and common components.  
+
+---
+
+## 📝 Example: Todo Feature
+
+### 1. Flutter Entry Point
+
+```dart
+// todo_list_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
+import 'package:dartway_app/dartway_app.dart';
+
+import 'widgets/todo_item.dart';
+import 'logic/todo_provider.dart';
+
+class TodoListPage extends ConsumerWidget {
+  const TodoListPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final search = ref.watch(todoSearchStringProvider);
+    final todos = ref.watchModelList<Todo>(
+      frontendFilter: (list) => list
+          .where((t) => search == null || t.title.contains(search))
+          .toList(),
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Todos'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Search todos...',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (value) =>
+                  ref.read(todoSearchStringProvider.notifier).state = value,
+            ),
+          ),
+        ),
+      ),
+      body: todos.dwBuildListAsync(
+        loadingItemsCount: 5,
+        childBuilder: (list) => ListView(
+          children: list.map((todo) => TodoItem(todo: todo)).toList(),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await ref.saveModel(
+            Todo(title: 'New task', isCompleted: false, createdAt: DateTime.now()),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+```
+
+---
+
+### 2. Widget
+
+```dart
+// widgets/todo_item.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class TodoItem extends ConsumerWidget {
+  final Todo todo;
+  const TodoItem({required this.todo, super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListTile(
+      title: Text(todo.title),
+      trailing: Checkbox(
+        value: todo.isCompleted,
+        onChanged: (value) {
+          ref.saveModel(todo.copyWith(isCompleted: value ?? false));
+        },
+      ),
+    );
+  }
+}
+```
+
+---
+
+### 3. Provider
+
+```dart
+// logic/todo_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final todoSearchStringProvider = StateProvider<String?>((ref) => null);
+```
+
+---
+
+### 4. Tests (sketch)
+
+```dart
+// flutter/test/todo_list_page_test.dart
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  testWidgets('renders todo list page', (tester) async {
+    // pump widget
+    // verify app bar title and FAB
+  });
+}
+```
+
+---
+
+## ✅ Key Takeaways
+
+* Feature = small, isolated folder with entry point.  
+* All data flow = through DartWay data layer methods.  
+* UI = pure, styled via UI Kit.  
+* AsyncValue lists should be rendered via `dwBuildListAsync` extension (with `loadingItemsCount`).  
+* Use `frontendFilter` + providers for local search or filters inside a feature.  
+* Tests are mandatory for Flutter side.  
