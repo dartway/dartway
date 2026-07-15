@@ -13,7 +13,7 @@ import 'dw_telegram_web_app_stub.dart'
 /// on plain web, outside Telegram, every getter answers as if there were no
 /// Telegram rather than throwing.
 ///
-/// Declare it at startup and reach it anywhere as `dw.telegram`:
+/// Declare it at startup and reach it anywhere as `dw.plugins.telegram`:
 ///
 /// ```dart
 /// DwCore(
@@ -27,12 +27,12 @@ import 'dw_telegram_web_app_stub.dart'
 /// );
 ///
 /// // anywhere
-/// final insets = dw.telegram.safeAreaInset;
+/// final insets = dw.plugins.telegram.safeAreaInset;
 /// ```
 ///
 /// `dartway_flutter` knows nothing of Telegram: it knows only what a [DwPlugin]
-/// is. The `dw.telegram` accessor is an extension declared *here*, so it exists
-/// only for apps that chose this package.
+/// is. The `dw.plugins.telegram` accessor is an extension declared *here*, so it
+/// exists only for apps that chose this package.
 abstract class DwTelegramWebApp implements DwPlugin {
   const DwTelegramWebApp();
 
@@ -72,11 +72,11 @@ abstract class DwTelegramWebApp implements DwPlugin {
   int? get telegramUserId;
 }
 
-/// Reaches the bridge from anywhere: `dw.telegram.safeAreaInset`.
+/// Reaches the bridge from anywhere: `dw.plugins.telegram.safeAreaInset`.
 ///
 /// Declared in this package rather than in the framework — that is what keeps
 /// `DwConfig` free of vendor names while the app still gets an ambient
 /// accessor.
-extension DwTelegramAccess on DwFlutter {
-  DwTelegramWebApp get telegram => plugin<DwTelegramWebApp>();
+extension DwTelegramAccess on DwPlugins {
+  DwTelegramWebApp get telegram => of<DwTelegramWebApp>();
 }

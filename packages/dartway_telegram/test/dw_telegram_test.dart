@@ -46,15 +46,15 @@ void main() {
 
     // One DwFlutter per test process — the singleton forbids re-creation.
     final dwInstance = DwFlutter(
-      config: const DwConfig(useSharedPreferences: false),
+      config: const DwConfig(),
       plugins: [telegram],
     );
 
-    test('is reachable as dw.telegram', () {
+    test('is reachable as dw.plugins.telegram', () {
       // The bridge the app declares is an interface; the object it gets is a
-      // platform impl. `dw.telegram` has to resolve the former to the latter —
+      // platform impl. `dw.plugins.telegram` has to resolve the former to the latter —
       // this is the whole contract behind the extension.
-      expect(dwInstance.telegram, same(telegram));
+      expect(dwInstance.plugins.telegram, same(telegram));
     });
 
     test('the framework initializes it with the app core', () {

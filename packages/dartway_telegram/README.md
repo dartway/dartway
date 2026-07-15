@@ -25,17 +25,17 @@ DwCore(
 );
 ```
 
-…and reach it anywhere as `dw.telegram`:
+…and reach it anywhere as `dw.plugins.telegram`:
 
 ```dart
-final insets = dw.telegram.safeAreaInset;
+final insets = dw.plugins.telegram.safeAreaInset;
 
-if (dw.telegram.isRunningInTelegram) { ... }
+if (dw.plugins.telegram.isRunningInTelegram) { ... }
 ```
 
 That accessor is an extension declared **in this package**, not in the
 framework. So you get the ergonomics of an ambient service with none of the
-coupling: `dw.telegram` exists only for apps that chose Telegram.
+coupling: `dw.plugins.telegram` exists only for apps that chose Telegram.
 
 (`dw` itself is the core instance your app declares once at startup — no DartWay package
 exports it as a global.)
@@ -56,8 +56,8 @@ is no Telegram to ask, and the answer is `null` — even on an iPhone. Ask Flutt
 for the device and Telegram only for Telegram:
 
 ```dart
-bool get isIOS => dw.telegram.isRunningInTelegram
-    ? dw.telegram.platform == DwTelegramPlatform.ios
+bool get isIOS => dw.plugins.telegram.isRunningInTelegram
+    ? dw.plugins.telegram.platform == DwTelegramPlatform.ios
     : defaultTargetPlatform == TargetPlatform.iOS;
 ```
 
