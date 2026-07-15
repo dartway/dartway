@@ -14,7 +14,7 @@ import 'logic/studio_session_state_provider.dart';
 /// features are discovered from mounted [DwFeature] widgets and mapped onto
 /// the bridge wire model.
 List<StudioFeatureInfo> _mountedFeatureInfos() => [
-      for (final feature in scanMountedFeatures())
+      for (final feature in DwFeature.scanMounted())
         StudioFeatureInfo(
           id: feature.id,
           title: feature.title,

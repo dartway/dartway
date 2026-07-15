@@ -107,7 +107,7 @@ class AppText extends StatelessWidget {
 ```dart
 AppButton.primary(
   l10n.saveAction,
-  onTap: DwUiAction.create(
+  onTap: dw.action(
     (context) => ref.saveModel(model),
     onSuccessNotification: l10n.saved,
   ),

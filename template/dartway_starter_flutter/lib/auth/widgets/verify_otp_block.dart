@@ -1,3 +1,4 @@
+import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -61,7 +62,7 @@ class VerifyOtpBlock extends HookConsumerWidget {
             child: AppButton.primary(
               context.l10n.continueAction,
               requireValidation: true,
-              onTap: DwUiAction.create(
+              onTap: dw.action(
                 (_) => ref.read(authStateProvider.notifier).verifyOtp(),
               ),
             ),

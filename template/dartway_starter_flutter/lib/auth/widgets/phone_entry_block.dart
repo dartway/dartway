@@ -1,3 +1,4 @@
+import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -118,7 +119,7 @@ class PhoneEntryBlock extends HookConsumerWidget {
         AppButton.primary(
           l10n.continueAction,
           requireValidation: true,
-          onTap: DwUiAction.create((_) async {
+          onTap: dw.action((_) async {
             await ref.read(authStateProvider.notifier).requestOtp();
           }),
         ),
@@ -127,7 +128,7 @@ class PhoneEntryBlock extends HookConsumerWidget {
             ? MultiLinkText.single(
                 text: l10n.alreadyHaveAccount,
                 linkText: l10n.loginAction,
-                onLinkTap: DwUiAction.create(
+                onLinkTap: dw.action(
                   (_) =>
                       ref.read(authStateProvider.notifier).goTo(AuthStep.login),
                 ),
@@ -135,7 +136,7 @@ class PhoneEntryBlock extends HookConsumerWidget {
             : MultiLinkText.single(
                 text: l10n.stillNoAccount,
                 linkText: l10n.registrationAction,
-                onLinkTap: DwUiAction.create(
+                onLinkTap: dw.action(
                   (_) => ref
                       .read(authStateProvider.notifier)
                       .goTo(AuthStep.registration),

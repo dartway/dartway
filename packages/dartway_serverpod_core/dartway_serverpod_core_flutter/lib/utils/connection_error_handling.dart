@@ -44,8 +44,8 @@ void Function(MethodCallContext, Object, StackTrace) dwReportingOnFailedCall({
       ),
     );
 
-/// Builds a zone / `globalErrorHandler` handler with the same routing, but
-/// without a [MethodCallContext]: connection-level → [onConnectionError]
+/// Builds a zone-level error handler with the same routing, but without a
+/// [MethodCallContext]: connection-level → [onConnectionError]
 /// (default: ignored), otherwise → [onUnexpectedError].
 void Function(Object, StackTrace) dwConnectionAwareErrorHandler({
   void Function(Object error)? onConnectionError,

@@ -81,7 +81,7 @@ class TodoListPage extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: DwUiAction.create((_) async {
+        onPressed: dw.action((_) async {
           await ref.saveModel(
             Todo(title: 'New task', isCompleted: false, createdAt: DateTime.now()),
           );
@@ -93,4 +93,4 @@ class TodoListPage extends ConsumerWidget {
 }
 ```
 
-Ключевое: списки `AsyncValue` — через `dwBuildListAsync` (с `loadingItemsCount`); локальный поиск/фильтр — `frontendFilter` + провайдер; действия из UI — в `DwUiAction.create` (колбэк получает `context`; `(_)`, если не нужен — см. `dartway-data-layer` §4).
+Ключевое: списки `AsyncValue` — через `dwBuildListAsync` (с `loadingItemsCount`); локальный поиск/фильтр — `frontendFilter` + провайдер; действия из UI — в `dw.action` (колбэк получает `context`; `(_)`, если не нужен — см. `dartway-data-layer` §4).

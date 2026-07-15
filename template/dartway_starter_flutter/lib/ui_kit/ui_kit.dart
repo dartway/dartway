@@ -34,6 +34,6 @@ part 'utils/conditional_parent.dart';
 part 'utils/date_labels.dart';
 part 'utils/formatters.dart';
 
-DwUiAction wipProgressNotificationCallback = DwUiAction.create(
+DwUiAction wipProgressNotificationCallback = dw.action(
   (context) => dw.notify.success('Not implemented yet'),
 );

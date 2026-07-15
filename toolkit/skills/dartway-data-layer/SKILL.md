@@ -5,7 +5,7 @@ description: >-
   через watchModel/readModel/watchMaybeModel/readMaybeModel/saveModel/deleteModel/watchModelList
   (никаких репозиториев и ручной синхронизации), списки через dwBuildListAsync(loadingItemsCount:),
   локальный фильтр через frontendFilter (по-элементный предикат), действия из UI через
-  DwUiAction.create (единая обработка ошибок/loading), уведомления через dw.notify.* (не SnackBar),
+  dw.action (единая обработка ошибок/loading), уведомления через dw.notify.* (не SnackBar),
   профиль через ref.watchUserProfile/readUserProfile (геттеры, не CRUD), выход через
   sessionProvider.notifier.signOut(). Использовать при работе с данными, действиями, уведомлениями,
   загрузкой/сохранением моделей во Flutter-фичах.
@@ -71,7 +71,7 @@ final lessonsAsync = ref.watchModelList<LearningLesson>(
 
 Для поиска по строке: храни строку в Riverpod-провайдере и используй её внутри `frontendFilter`.
 
-## 4. Действия из UI — `DwUiAction.create`
+## 4. Действия из UI — `dw.action`
 
 **Зачем:** единая обёртка для действий пользователя (нажатия, сабмиты): автоматический loading-стейт, обработка ошибок (с репортом в алертинг — см. `label`), подтверждения. Колбэк получает `BuildContext`. Не оборачивай в сырой `() async {}`/`onPressed`.
 
@@ -82,8 +82,8 @@ onPressed: () async { await doSomething(); }
 // ❌ ручной confirm-диалог внутри действия (боль легаси-проектов)
 final confirm = await showDialog<bool>(...); if (confirm != true) return;
 
-// ✅ DwUiAction.create — context, типизированный результат, встроенный confirm
-final deleteAction = DwUiAction<bool>.create(
+// ✅ dw.action — context, типизированный результат, встроенный confirm
+final deleteAction = dw.action<bool>(
   (context) async {
     await ref.deleteModel(post);
     return true;
@@ -91,7 +91,7 @@ final deleteAction = DwUiAction<bool>.create(
   label: 'deletePost', // имя действия в error-репортах/алертах
   confirmation: DwUiConfirmation('Delete this post?', isDestructive: true),
 );
-// в виджете: onTap: deleteAction   (или DwUiAction.create((_) async {...}) если context не нужен)
+// в виджете: onTap: deleteAction   (или dw.action((_) async {...}) если context не нужен)
 ```
 
 > Реальное имя — **`DwUiAction`** (46+ использований). `DwCallback` в проекте нет.
@@ -142,7 +142,7 @@ ref.read(dw.sessionProvider!.notifier).signOut();
 - [ ] Create и Update — один `saveModel` (не два разных метода).
 - [ ] Списки `AsyncValue` — через `dwBuildListAsync(loadingItemsCount:)`, не россыпь `when`.
 - [ ] Локальный фильтр — `frontendFilter: (model) => bool` (по-элементный предикат), не пост-фильтрация списка.
-- [ ] Действия из UI — `DwUiAction.create((context) async {...})`, не сырой `onPressed`/`() async {}`.
+- [ ] Действия из UI — `dw.action((context) async {...})`, не сырой `onPressed`/`() async {}`.
 - [ ] Уведомления — `dw.notify.success/warning/error/info`, не `SnackBar`/`ScaffoldMessenger`.
 - [ ] Профиль — `ref.watchUserProfile`/`readUserProfile` (геттеры), не `watchModel<UserProfile>()`.
 - [ ] Выход — `ref.read(dw.sessionProvider!.notifier).signOut()`.

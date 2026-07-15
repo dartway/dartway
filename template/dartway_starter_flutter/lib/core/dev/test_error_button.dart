@@ -23,7 +23,7 @@ class TestErrorButton extends ConsumerWidget {
               () => throw StateError('Test async error (zone)'),
             );
           case 'action':
-            DwUiAction<void>.create(
+            dw.action(
               (_) => throw StateError('Test action error'),
               label: 'testErrorAction',
             )(context);

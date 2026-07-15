@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -58,7 +59,7 @@ class SessionCard extends ConsumerWidget {
             if (activeBooking == null)
               AppButton.primary(
                 l10n.book,
-                onTap: DwUiAction.create(
+                onTap: dw.action(
                   (context) => DwRepository.saveModel(
                     SessionBooking(
                       clubSessionId: session.id!,
@@ -73,7 +74,7 @@ class SessionCard extends ConsumerWidget {
             else
               AppButton.secondary(
                 l10n.cancel,
-                onTap: DwUiAction.create(
+                onTap: dw.action(
                   (context) => DwRepository.saveModel(
                     activeBooking!.copyWith(status: BookingStatus.cancelled),
                   ),

@@ -2,7 +2,7 @@
 /// reports it over the bridge (shown on the Technical passport tab).
 ///
 /// The bridge does not know *how* the app discovers its features — DartWay
-/// apps typically map `DwFeatureSpec`s collected by `scanMountedFeatures()`
+/// apps typically map `DwFeatureSpec`s collected by `DwFeature.scanMounted()`
 /// (package `dartway_flutter`) onto this model in their bridge binding, but
 /// any source works.
 class StudioFeatureInfo {

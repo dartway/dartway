@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
@@ -47,7 +48,7 @@ class BookingCard extends StatelessWidget {
             if (_canCancel(startsAt))
               AppButton.secondary(
                 l10n.cancelBooking,
-                onTap: DwUiAction.create(
+                onTap: dw.action(
                   (context) => DwRepository.saveModel(
                     booking.copyWith(status: BookingStatus.cancelled),
                   ),
@@ -57,7 +58,7 @@ class BookingCard extends StatelessWidget {
             if (booking.status == BookingStatus.attended && !isReviewed)
               AppButton.primary(
                 l10n.leaveReview,
-                onTap: DwUiAction.create(
+                onTap: dw.action(
                   (context) => context.showAppBottomSheet(
                     child: ReviewBottomSheet(booking: booking),
                   ),

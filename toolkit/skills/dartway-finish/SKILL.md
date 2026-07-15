@@ -40,7 +40,7 @@ description: >-
 - Внешние `padding`/`margin` на верхнем уровне `build` виджета.
 - Приватные виджет-классы (`class _Foo extends ...Widget`) в публичных файлах фич.
 - Нейминг < 2 слов; запрещённые `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
-- Specials (`dartway-data-layer`): `SnackBar`/`ScaffoldMessenger` вместо `dw.notify.*`; `watchModel<UserProfile>()` вместо `ref.watchUserProfile`; сырой `onPressed`/`() async {}` вместо `DwUiAction.create`; сырые `Color`/`TextStyle`/`BorderRadius`/`context.theme` в фичах вместо UI Kit; `router.go()`/строковые роуты вместо enum-роутов и context-extensions (`dartway-navigation`).
+- Specials (`dartway-data-layer`): `SnackBar`/`ScaffoldMessenger` вместо `dw.notify.*`; `watchModel<UserProfile>()` вместо `ref.watchUserProfile`; сырой `onPressed`/`() async {}` вместо `dw.action`; сырые `Color`/`TextStyle`/`BorderRadius`/`context.theme` в фичах вместо UI Kit; `router.go()`/строковые роуты вместо enum-роутов и context-extensions (`dartway-navigation`).
 - Изоляция фич: импорт не-entry-point чужой фичи.
 - Часть 2: SRP/God-объекты, DRY (копипаста виджетов/маппингов), KISS/YAGNI, Law of Demeter (`a.b.c.d`), SoC (логика в State/UI), tell-don't-ask, магические числа/строки, единый источник истины, проглоченные ошибки (`catch (_) {}`, `catch ... return null`).
 

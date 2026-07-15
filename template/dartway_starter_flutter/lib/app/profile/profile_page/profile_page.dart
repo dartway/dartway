@@ -30,7 +30,7 @@ class ProfilePage extends ConsumerWidget {
             if (ref.watchUserProfile.isAdmin) ...[
               AppButton.secondary(
                 l10n.adminPanel,
-                onTap: DwUiAction.create(
+                onTap: dw.action(
                   (context) => GoRouter.of(context)
                       .goNamed(AdminNavigationZone.admin.name),
                 ),
@@ -39,7 +39,7 @@ class ProfilePage extends ConsumerWidget {
             ],
             AppButton.text(
               l10n.signOutAction,
-              onTap: DwUiAction.create(
+              onTap: dw.action(
                 (context) => ref.read(dw.sessionProvider!.notifier).signOut(),
               ),
             ),

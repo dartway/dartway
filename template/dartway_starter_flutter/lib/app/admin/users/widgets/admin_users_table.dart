@@ -1,3 +1,4 @@
+import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -68,7 +69,7 @@ class _UserRow extends StatelessWidget {
           if (role == null || role == user.role) return;
           // Changing someone's role is a rights change — confirm it. The
           // confirmation + label ride on the standard DwUiAction.
-          DwUiAction<void>.create(
+          dw.action(
             (_) => DwRepository.saveModel(user.copyWith(role: role)),
             label: 'changeUserRole',
             confirmation: DwUiConfirmation(

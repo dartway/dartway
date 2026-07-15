@@ -111,8 +111,8 @@ class DwCore<
   /// app-state context (route, mounted features, action/call, user).
   /// Connection blips are UX, not alerts — they are filtered out here.
   @override
-  void reportError(DwErrorReport report) {
-    if (hasCustomErrorHandling) return super.reportError(report);
+  void dispatchReport(DwErrorReport report) {
+    if (hasCustomErrorHandling) return super.dispatchReport(report);
 
     if (isStreamingConnectionError(report.error)) return;
 
