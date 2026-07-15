@@ -49,7 +49,7 @@ void main() {
         ),
       );
 
-      final action = DwUiAction<void>.create(
+      final action = dwInstance.action<void>(
         (_) => throw StateError('boom'),
         label: 'testAction',
       );
@@ -71,7 +71,7 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
       final context = tester.element(find.byType(SizedBox));
 
-      final action = DwUiAction<void>.create(
+      final action = dwInstance.action<void>(
         (_) => throw StateError('boom'),
         onErrorNotification: 'Could not save',
       );
@@ -106,7 +106,7 @@ void main() {
         MaterialApp(
           home: Builder(
             builder: (context) => TextButton(
-              onPressed: () => DwUiAction<void>.create(
+              onPressed: () => dwInstance.action<void>(
                 (_) async => executed = true,
                 confirmation: const DwUiConfirmation('Sure?'),
               )(context),
@@ -133,7 +133,7 @@ void main() {
         MaterialApp(
           home: Builder(
             builder: (context) => TextButton(
-              onPressed: () => DwUiAction<void>.create(
+              onPressed: () => dwInstance.action<void>(
                 (_) async => executed = true,
                 confirmation: const DwUiConfirmation(
                   'Sure?',

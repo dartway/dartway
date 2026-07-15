@@ -18,7 +18,7 @@ DwFeatureSpec _spec(String id) =>
     DwFeatureSpec(id: id, title: id, description: 'd');
 
 void main() {
-  testWidgets('scanMountedFeatures collects mounted features, deduped by id',
+  testWidgets('DwFeature.scanMounted collects mounted features, deduped by id',
       (tester) async {
     await tester.pumpWidget(
       Column(
@@ -30,14 +30,14 @@ void main() {
       ),
     );
 
-    final ids = scanMountedFeatures().map((f) => f.id).toList();
+    final ids = DwFeature.scanMounted().map((f) => f.id).toList();
     expect(ids.toSet(), {'a', 'b'});
     expect(ids.length, 2);
   });
 
-  testWidgets('scanMountedFeatures is empty with no DwFeature widgets',
+  testWidgets('DwFeature.scanMounted is empty with no DwFeature widgets',
       (tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
-    expect(scanMountedFeatures(), isEmpty);
+    expect(DwFeature.scanMounted(), isEmpty);
   });
 }

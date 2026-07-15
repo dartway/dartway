@@ -30,22 +30,22 @@ void main() {
 
   // One DwFlutter per test process — the singleton forbids re-creation.
   final dwInstance = DwFlutter(
-    config: const DwConfig(useSharedPreferences: false),
+    config: const DwConfig(),
     plugins: [recording, bridge],
   );
 
   group('plugin registry', () {
     test('resolves a declared plugin', () {
-      expect(dwInstance.plugin<_RecordingPlugin>(), same(recording));
+      expect(dwInstance.plugins.of<_RecordingPlugin>(), same(recording));
     });
 
     test('resolves an implementation through the interface the app names', () {
-      expect(dwInstance.plugin<_Bridge>(), same(bridge));
+      expect(dwInstance.plugins.of<_Bridge>(), same(bridge));
     });
 
     test('an undeclared plugin fails with a message that says what to do', () {
       expect(
-        () => dwInstance.plugin<_UndeclaredPlugin>(),
+        () => dwInstance.plugins.of<_UndeclaredPlugin>(),
         throwsA(
           isA<StateError>().having(
             (error) => error.message,

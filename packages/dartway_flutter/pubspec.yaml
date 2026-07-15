@@ -16,11 +16,9 @@ dependencies:
   flutter:
     sdk: flutter
 
-  collection: ^1.19.1
   flutter_riverpod: ^3.0.0
   intl: ^0.20.2
   flutter_native_splash: ^2.3.0
-  shared_preferences: ^2.3.0
   skeletonizer: ^2.1.0
 
 dev_dependencies:

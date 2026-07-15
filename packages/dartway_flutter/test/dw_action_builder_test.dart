@@ -40,6 +40,10 @@ Widget _button(DwUiAction<void> action, {bool requireValidation = true}) =>
     );
 
 void main() {
+  // One DwFlutter per test process — the singleton forbids re-creation.
+  // Registers itself as the ambient `dw`, so `testDw.action(...)` works.
+  final testDw = DwFlutter(config: const DwConfig());
+
   group('DwActionBuilder with requireValidation', () {
     testWidgets('shouts at build time when there is no Form', (tester) async {
       // The regression this guards: `Form.maybeOf(context)?.validate() ?? false`
@@ -49,7 +53,7 @@ void main() {
       // and loud *before* the first tap that would have done nothing.
       await _pump(
         tester,
-        child: _button(DwUiAction.create((_) async {})),
+        child: _button(testDw.action((_) async {})),
       );
 
       expect(tester.takeException(), isAssertionError);
@@ -63,7 +67,7 @@ void main() {
         tester,
         withForm: true,
         validator: (_) => null,
-        child: _button(DwUiAction.create((_) async => ran = true)),
+        child: _button(testDw.action((_) async => ran = true)),
       );
 
       await tester.tap(find.byType(ElevatedButton));
@@ -80,7 +84,7 @@ void main() {
         tester,
         withForm: true,
         validator: (_) => 'required',
-        child: _button(DwUiAction.create((_) async => ran = true)),
+        child: _button(testDw.action((_) async => ran = true)),
       );
 
       await tester.tap(find.byType(ElevatedButton));
@@ -98,7 +102,7 @@ void main() {
       await _pump(
         tester,
         child: _button(
-          DwUiAction.create((_) async => ran = true),
+          testDw.action((_) async => ran = true),
           requireValidation: false,
         ),
       );
@@ -118,7 +122,7 @@ void main() {
       await _pump(
         tester,
         child: _button(
-          DwUiAction.create((_) async {
+          testDw.action((_) async {
             runs++;
             await gate.future;
           }),

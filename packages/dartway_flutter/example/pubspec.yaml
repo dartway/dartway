@@ -1,0 +1,22 @@
+name: dartway_flutter_example
+description: A runnable tour of dartway_flutter — copy, flutter run, read top to bottom.
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ^3.11.0
+  flutter: '>=3.41.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  dartway_flutter:
+    path: ../
+  flutter_riverpod: ^3.0.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
