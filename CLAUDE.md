@@ -7,7 +7,8 @@
 | Папка | Роль |
 |---|---|
 | `packages/dartway_serverpod_core/` | Ядро (4 пакета: server / client / flutter / shared) — generic CRUD, real-time, auth, фильтры |
-| `packages/dartway_flutter` | Flutter-тулбокс: DwAppRunner, UI kit, нотификации |
+| `packages/dartway_flutter` | Flutter-тулбокс (скелет приложения): DwAppRunner, guarded actions (`dw.action`), async-UI контракт, нотификации, error reporting, `DwPlugins`. Ships no design |
+| `packages/dartway_shared_preferences` | Плагин локального хранилища: reactive riverpod-провайдеры над SharedPreferences, доступ `dw.plugins.prefs`. Опционален — ядро его не тянет |
 | `packages/dartway_lints` | Enforcement конвенций (custom_lint-правила) |
 | `packages/dartway_cli` | CLI: `create` / `setup-ai` / `check` (встроенный чекер конвенций) / `stats` |
 | `template/` | **Скелет** — единственное, что копирует `dartway create`. Auth, роли, навигация, админка, UI-кит, ноль доменных моделей. Пакеты `dartway_starter_*` (CLI переименовывает их в имя проекта) |
@@ -43,6 +44,7 @@
 - **Тулкит-инвариант:** в `toolkit/` нет проектных литералов — только токены `__*__`. Проверка: `grep -rniE 'tvolkova|tvaity|kerla' toolkit/` → пусто.
 - **Архивы:** папки `zarchive/`/`zarchiv/` — легаси на выпил; ничего нового туда не добавлять, при рефакторинге — удалять, а не пополнять.
 - **Секьюрити-принцип (цель):** generic CRUD должен быть secure-by-default — не сконфигурирован доступ ⇒ запрещено. Новый код не должен вводить «открыто всем» как умолчание.
+- **Дизайн публичного API — `docs/DESIGN.md` (закон, не пожелание).** Прежде чем добавлять/менять публичный символ любого пакета, свериться: единый корень `dw.` (ядро) / `dw.plugins.<name>` (расширения); критерий «фабрика на `dw.` vs конструктор типа» (3 вопроса); один способ, не два; ядро — минимальный контракт (опциональное — в плагины); проверяй по бою (tvolkova/kerla3), а не по демо, и смотри происхождение символа. У пакета может быть свой `DESIGN.md` (напр. `packages/dartway_flutter/DESIGN.md`) — **не путать философию фреймворка с философией пакета**.
 
 ## Ловушка: `serverpod generate` в ядре стирает ручной патч протокола
 
