@@ -16,14 +16,13 @@ import 'dw_telegram_web_app_stub.dart'
 /// Declare it at startup and reach it anywhere as `dw.plugins.telegram`:
 ///
 /// ```dart
-/// DwCore(
-///   config: DwConfig(...),
+/// DwFlutter(
+///   config: DwConfig(/* ... */),
 ///   plugins: [
 ///     DwTelegramWebApp.create(
 ///       config: const DwTelegramWebAppConfig(requestFullScreen: true),
 ///     ),
 ///   ],
-///   ...
 /// );
 ///
 /// // anywhere

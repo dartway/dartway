@@ -14,14 +14,13 @@ runner.
 Declare the plugin at startup:
 
 ```dart
-DwCore(
-  config: DwConfig(...),
+DwFlutter(
+  config: DwConfig(/* ... */),
   plugins: [
     DwTelegramWebApp.create(
       config: const DwTelegramWebAppConfig(requestFullScreen: true),
     ),
   ],
-  ...
 );
 ```
 
