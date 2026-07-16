@@ -3,7 +3,10 @@
 Declare the plugin once:
 
 ```dart
-DwCore(plugins: [DwSharedPreferencesPlugin()]);
+DwFlutter(
+  config: DwConfig(/* ... */),
+  plugins: [DwSharedPreferences()],
+);
 ```
 
 Then a stored value is a provider the UI watches like any other:

@@ -10,10 +10,14 @@ doesn't never downloads `shared_preferences`.
 ## Use
 
 ```dart
-DwCore(plugins: [DwSharedPreferencesPlugin()]);
+DwFlutter(
+  config: DwConfig(/* ... */),
+  plugins: [DwSharedPreferences()],
+);
 ```
 
-The plugin loads `SharedPreferences` during `dw.init()`. After that:
+The plugin loads `SharedPreferences` during `dw.init()`. After that — **define each
+provider once, as a top-level `final`**, like any riverpod provider:
 
 ```dart
 // A reactive value — the UI watches a preference like any other provider.
@@ -38,6 +42,10 @@ Update through the notifier:
 ```dart
 ref.read(darkModeProvider.notifier).update(true);
 ```
+
+`provider` stores natively — `String`, `bool`, `int`, `double`, `List<String>`. Any other type
+compiles but throws `UnsupportedError` on the first write; reach for `mappedProvider` (enums, custom
+types) or `raw` instead.
 
 ## Why a plugin
 

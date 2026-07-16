@@ -6,4 +6,3 @@
 library;
 
 export 'src/dw_shared_preferences.dart';
-export 'src/dw_shared_preferences_plugin.dart';
