@@ -24,6 +24,10 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
     // TODO: !!! ensure password is not visible in logs or database
     beforeSaveTransaction:
         (Session session, DwSaveContext<DwAuthRequest> saveContext) async {
+          if (saveContext.isInsert) {
+            saveContext.currentModel.createdAt = DateTime.now();
+          }
+
           final failReason = await DwCore.instance.prevalidateAuthAttempt(
             session,
             saveContext.currentModel,
