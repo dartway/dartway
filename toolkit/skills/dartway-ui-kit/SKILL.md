@@ -64,6 +64,15 @@ AppText.body(post.description)
 AppText.caption('${date.dayLabel} · ${date.timeLabel}')
 ```
 
+**Весь пользовательский текст — из l10n, а не строковым литералом.** Скелет локализован (en/ru); `AppText.body('Book a spot')` захардкоженной строкой рассинхронит фичу с остальным приложением. Бери текст из `context.l10n`:
+
+```dart
+final l10n = context.l10n;
+AppText.body(l10n.bookSpot)
+```
+
+Новая строка = добавить ключ в **оба** ARB (`lib/l10n/app_en.arb` и `app_ru.arb`) и прогнать `flutter gen-l10n`. Литералом в UI остаются только не-текст (иконки, отладочные метки за `kDebugMode`).
+
 ```dart
 // ui_kit/theme/app_text.dart
 enum AppTextStyle {
@@ -108,7 +117,7 @@ class AppText extends StatelessWidget {
 AppButton.primary(
   l10n.saveAction,
   onTap: dw.action(
-    (context) => ref.saveModel(model),
+    (context) => DwRepository.saveModel(model),
     onSuccessNotification: l10n.saved,
   ),
 )

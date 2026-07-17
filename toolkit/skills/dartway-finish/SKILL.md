@@ -38,7 +38,7 @@ description: >-
 - `ref.invalidate(...)` для рефреша.
 - `GlobalKey().currentState/currentContext` для поиска в дереве.
 - Внешние `padding`/`margin` на верхнем уровне `build` виджета.
-- Приватные виджет-классы (`class _Foo extends ...Widget`) в публичных файлах фич.
+- Приватный виджет-класс (`class _Foo extends ...Widget`) **с ценностью для переиспользования/теста** в публичном файле фичи (тривиальный локальный хелпер на один экран — допустим, см. `dartway-clean-code` 1.8).
 - Нейминг < 2 слов; запрещённые `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
 - Specials (`dartway-data-layer`): `SnackBar`/`ScaffoldMessenger` вместо `dw.notify.*`; `watchModel<UserProfile>()` вместо `ref.watchUserProfile`; сырой `onPressed`/`() async {}` вместо `dw.action`; сырые `Color`/`TextStyle`/`BorderRadius`/`context.theme` в фичах вместо UI Kit; `router.go()`/строковые роуты вместо enum-роутов и context-extensions (`dartway-navigation`).
 - Изоляция фич: импорт не-entry-point чужой фичи.
@@ -57,6 +57,11 @@ description: >-
 
 ### A.4 Проверка тестов
 - Нетривиальная логика/деньги/откаты-«даунгрейд» или багфикс **без теста** → флаг (`dartway-clean-code` Часть 3). Косметику не требуем.
+
+### A.5 Автоматические проверки
+- `dart analyze` (сервер) и `flutter analyze` (флаттер) — должно быть чисто.
+- **`dart run custom_lint` во флаттер-пакете — обязательно.** `flutter analyze` его правила НЕ гоняет, а именно `dartway_lints` ловит запрет сырых `Color`/`TextStyle`/`BorderRadius` вне ui_kit и прочие конвенции. Зелёный `flutter analyze` при красном `custom_lint` — типичная ловушка.
+- Тесты затронутых пакетов зелёные.
 
 ---
 

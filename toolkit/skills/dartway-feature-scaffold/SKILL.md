@@ -80,13 +80,21 @@ class TodoListPage extends ConsumerWidget {
           children: [for (final todo in list) TodoItem(todo: todo)],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: dw.action((_) async {
-          await ref.saveModel(
+      // `dw.action(...)` возвращает DwUiAction, а не VoidCallback: напрямую в
+      // onPressed его не отдать. Под тапом его разворачивает DwActionBuilder —
+      // он же гасит повторные тапы и отдаёт busy.
+      floatingActionButton: DwActionBuilder(
+        action: dw.action((_) async {
+          await DwRepository.saveModel(
             Todo(title: 'New task', isCompleted: false, createdAt: DateTime.now()),
           );
         }),
-        child: const Icon(Icons.add),
+        builder: (context, onPressed, busy) => FloatingActionButton(
+          onPressed: onPressed, // null, пока действие бежит
+          child: busy
+              ? const CircularProgressIndicator()
+              : const Icon(Icons.add),
+        ),
       ),
     );
   }
