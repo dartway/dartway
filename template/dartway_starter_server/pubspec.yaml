@@ -9,11 +9,7 @@ environment:
 dependencies:
   serverpod: ^3.4.8
 
-  dartway_serverpod_core_server:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: master
-      path: packages/dartway_serverpod_core/dartway_serverpod_core_server
+  dartway_serverpod_core_server: ^0.1.0
 
   http: ^1.5.0
 

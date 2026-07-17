@@ -40,25 +40,13 @@ dependencies:
   # packages belong to the app, not to the framework.
   device_frame: ^1.4.0
 
-  dartway_flutter:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: master
-      path: packages/dartway_flutter
+  dartway_flutter: ^0.1.0
 
   dartway_router: ^1.1.1
 
-  dartway_serverpod_core_flutter:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: master
-      path: packages/dartway_serverpod_core/dartway_serverpod_core_flutter
+  dartway_serverpod_core_flutter: ^0.1.0
 
-  dartway_studio_bridge:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: master
-      path: packages/dartway_studio_bridge
+  dartway_studio_bridge: ^0.1.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -79,22 +67,14 @@ dev_dependencies:
   riverpod_generator: ^3.0.0
   flutter_gen_runner: ^5.10.0
 
-  dartway_cli:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: master
-      path: packages/dartway_cli
+  dartway_cli: ^0.1.0
 
   # The UI-kit law is enforced here, not just written down: raw Color/TextStyle/
   # BorderRadius and direct theme access outside `ui_kit/` are lints. Needs
   # `analyzer: plugins: [custom_lint]` in analysis_options.yaml, and runs in the
   # IDE and via `dart run custom_lint`.
   custom_lint: ^0.8.0
-  dartway_lints:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: master
-      path: packages/dartway_lints
+  dartway_lints: ^0.1.0
 
 # Внутри монорепо темплейт собирается против ЛОКАЛЬНЫХ пакетов фреймворка.
 # При копировании в самостоятельный проект — удалить весь блок dependency_overrides.
