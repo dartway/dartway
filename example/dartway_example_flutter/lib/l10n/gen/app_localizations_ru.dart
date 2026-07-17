@@ -287,7 +287,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get countersLiveHint =>
-      'Счётчики живые: они обновляются в реальном времени, когда участники записываются на занятия, а команда публикует новости.';
+      'Каждый счётчик — типизированный живой список: одна строка watchModelList, без кода загрузки. Обновляется, когда админ перезагружает данные.';
 
   @override
   String get countMembers => 'Участники';

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dartway_serverpod_core_flutter/app/socket/service/streaming_error_classifier.dart';
+import 'package:dartway_serverpod_core_flutter/src/app/socket/service/streaming_error_classifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

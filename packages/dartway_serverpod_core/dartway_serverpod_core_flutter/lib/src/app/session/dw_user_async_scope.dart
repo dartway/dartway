@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
-import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
+import 'package:dartway_serverpod_core_flutter/src/private/dw_singleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';

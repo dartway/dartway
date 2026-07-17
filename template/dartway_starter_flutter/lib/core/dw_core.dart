@@ -5,8 +5,8 @@ import 'package:serverpod_flutter/serverpod_flutter.dart';
 
 import 'app_l10n.dart';
 
-/// Telegram/email/etc. alerts sink. Configure with a [DwTelegramAlertsConfig]
-/// when you want runtime error reports; the default no-op is fine for a fresh
+/// Runtime error reports sink. Pass a [DwTelegramAlertsConfig] to send them to
+/// Telegram; without one they degrade to logging, which is fine for a fresh
 /// project.
 final dwAlerts = DwAlerts.init();
 

@@ -66,10 +66,10 @@ class DwBackendFilter<T> implements SerializableModel {
 
     if (type == DwBackendFilterType.and || type == DwBackendFilterType.or) {
       if (children == null || children!.isEmpty) {
-        return true; // или другая логика для пустых групп
+        return true; // an empty group matches everything
       }
 
-      // Собираем детей, если нужно - с отрицанием
+      // Collect the children, carrying the negation down
       final expressions = children!.map(
         (child) => child.filterUpdate(
           jsonSerialization,
@@ -77,7 +77,7 @@ class DwBackendFilter<T> implements SerializableModel {
         ),
       );
 
-      // Используем OR если фильтр такого типа или если это отрицание AND
+      // OR when the filter says so, or when a negated AND turns into one
       return expressions.reduce((a, b) =>
           shouldNegate != (type == DwBackendFilterType.or) ? a || b : a && b);
     }
@@ -96,11 +96,10 @@ class DwBackendFilter<T> implements SerializableModel {
     Map<String, dynamic> jsonSerialization, {
     bool negate = false,
   }) {
-    // print(T.toString());
     if (T == dynamic) {
       throw Exception(
-        'NitBackendFilter<$T>: тип не определён! '
-        'Создайте фильтр с явным generic, например NitBackendFilter<int>().',
+        'DwBackendFilter<$T>: the type is not set. Build the filter with an '
+        'explicit generic, e.g. DwBackendFilter<int>().',
       );
     }
     final modelValue = DwCoreServerpodClient.protocol
@@ -179,17 +178,17 @@ class DwBackendFilter<T> implements SerializableModel {
   }
 
   bool _ilikeMatch(String value, String pattern) {
-    // Экранируем спецсимволы в RegExp, кроме % и _
+    // Escape the RegExp specials, but keep SQL's % and _ as placeholders
     String escaped = RegExp.escape(pattern)
-        .replaceAll('%', '<<<PERCENT>>>') // временные метки
+        .replaceAll('%', '<<<PERCENT>>>')
         .replaceAll('_', '<<<UNDERSCORE>>>');
 
-    // Преобразуем % и _ в шаблоны RegExp
+    // Turn the SQL wildcards into RegExp ones
     String regexPattern = escaped
         .replaceAll('<<<PERCENT>>>', '.*') // % → .*
         .replaceAll('<<<UNDERSCORE>>>', '.'); // _ → .
 
-    // Добавляем начало и конец строки для точного совпадения
+    // Anchor both ends: ILIKE matches the whole value, not a substring
     RegExp regex =
         RegExp('^$regexPattern\$', caseSensitive: false, dotAll: true);
 

@@ -23,10 +23,11 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
 
   final DwAuthenticationKeyManager keyManager;
 
-  /// Абстракция для догрузки профиля
+  /// Loads the user profile. Injected rather than called directly — the
+  /// service must not reach for the `dw` singleton.
   final Future<void> Function(int userId) fetchUserProfile;
 
-  /// Абстракция для удаления authKey (чтобы не зависеть от dw singleton)
+  /// Deletes an auth key, injected for the same reason as [fetchUserProfile].
   final Future<void> Function(int authKeyId) deleteAuthKey;
 
   int? _currentUserId;

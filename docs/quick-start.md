@@ -100,11 +100,15 @@ final noteCrudConfig = DwCrudConfig<Note>(
     validateSave: (session, ctx) async =>
         ctx.currentModel.text.trim().isEmpty ? 'The note is empty' : null,
 
-    // Runs inside the same transaction as the write.
+    // Runs inside the same transaction as the write. It can reject too —
+    // return a string — which is where a rule about a shared count belongs:
+    // `validateSave` runs before the transaction opens, so two concurrent
+    // saves can both pass it. Nothing to reject here, hence `null`.
     beforeSaveTransaction: (session, ctx) async {
       if (ctx.isInsert) {
         ctx.currentModel = ctx.currentModel.copyWith(createdAt: DateTime.now());
       }
+      return null;
     },
   ),
 );

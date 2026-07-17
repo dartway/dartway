@@ -171,13 +171,9 @@ class DwRepository {
     T model, {
     String? apiGroupOverride,
   }) async {
-    // TODO: подумать, как сделать это получше, может апи поменять или засылать objectWrapper.deleted просто
-
     final modelId = model.toJson()['id'];
     if (modelId == null) {
-      // notifyUser(NitNotification.warning(
-      //   'Мое',
-      // ));
+      // Never persisted, so there is nothing on the server to delete.
       return true;
     }
     return await dw.endpointCaller.dwCrud

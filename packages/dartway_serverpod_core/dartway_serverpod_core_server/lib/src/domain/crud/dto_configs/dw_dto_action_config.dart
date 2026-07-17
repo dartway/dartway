@@ -20,7 +20,7 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
     List<DwModelWrapper> updatedModels,
   )? afterSaveSideEffects;
 
-  /// Универсальный метод сохранения модели.
+  /// Runs [actionProcessing] in a transaction, then fires the side effects.
   Future<DwApiResponse<DwModelWrapper>> save(Session session, DTO dto) async {
     // --- transaction block ---
     List<DwModelWrapper> updatedModels = [];
@@ -29,8 +29,12 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
       await session.db.transaction((transaction) async {
         updatedModels = await actionProcessing(session, transaction, dto);
       });
-    } on DatabaseException catch (e) {
-      // TODO: Добавить логирование ошибки и алертинг
+    } on DatabaseException catch (e, stackTrace) {
+      DwCore.instance.alerts.reportError(
+        'Database error while running the ${DTO.toString()} action',
+        exception: e,
+        stackTrace: stackTrace,
+      );
       return DwApiResponse(
         isOk: false,
         value: null,
@@ -38,7 +42,7 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
       );
     }
 
-    // --- afterSideEffects (вне транзакции, неблокирующе) ---
+    // --- afterSideEffects (outside the transaction, non-blocking) ---
     if (afterSaveSideEffects != null) {
       unawaited(afterSaveSideEffects!(session, dto, updatedModels));
     }

@@ -58,7 +58,8 @@ class DwAuthData implements SerializableModel, ProtocolSerialization {
     };
   }
 
-  /// Необходим для работы методов copyWith в ChatInitialData и DwAppNotification
+  /// Required by the generated `copyWith` of every model that carries a
+  /// [DwAuthData] field.
   DwAuthData copyWith({
     SerializableModel? userProfile,
     int? userId,

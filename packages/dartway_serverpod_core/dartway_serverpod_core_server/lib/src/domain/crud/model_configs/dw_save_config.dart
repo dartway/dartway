@@ -5,17 +5,35 @@ import 'dart:async';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-/// Конфигурация процесса сохранения модели.
-/// Позволяет полностью контролировать логику сохранения.
+/// How one model gets saved: who may do it, what makes it valid, and what
+/// happens around the write.
 ///
-/// Общий жизненный цикл:
-/// 1. [allowSave]        — проверка прав
-/// 2. [validateSave]     — валидация данных
-/// 3. [beforeSaveTransaction]       — подготовка модели (в транзакции)
-/// 4. insert/update      — само сохранение
-/// 5. [afterSaveTransaction]        — модификации в БД (в транзакции)
-/// 6. [afterSaveTransform]   — обогащение модели вне транзакции
-/// 7. [afterSaveSideEffects] — внешние задачи, уведомления и т.п.
+/// The lifecycle, in order:
+/// 1. [allowSave]             — permissions
+/// 2. [validateSave]          — validation
+/// 3. [beforeSaveTransaction] — prepare the model (inside the transaction)
+/// 4. insert/update           — the write itself
+/// 5. [afterSaveTransaction]  — further database work (inside the transaction)
+/// 6. [afterSaveTransform]    — enrich the model, outside the transaction
+/// 7. [afterSaveSideEffects]  — notifications, async tasks, outside as well
+///
+/// Carries a rejection out of the transaction callback: throwing is the only
+/// way to roll a Serverpod transaction back. Private on purpose — it never
+/// leaves [DwSaveConfig.save], which turns it into an error response.
+class _DwSaveRejection implements Exception {
+  const _DwSaveRejection(this.message);
+
+  final String message;
+}
+
+/// Note where the transaction starts: steps 1 and 2 run **before** it opens.
+/// They see the database as it was a moment ago, so a rule that guards a shared
+/// count — seats left, slots free, stock on hand — can be raced by a concurrent
+/// save even though [validateSave] said yes to both. Enforce that kind of rule
+/// in [beforeSaveTransaction], which runs inside the transaction and can reject
+/// the save the same way: return the error text instead of null. [validateSave]
+/// is where you check the model; [beforeSaveTransaction] is where you check the
+/// world around it.
 class DwSaveConfig<T extends TableRow> {
   const DwSaveConfig({
     required this.allowSave,
@@ -26,35 +44,43 @@ class DwSaveConfig<T extends TableRow> {
     this.afterSaveSideEffects,
   });
 
-  /// Проверка прав (insert & update).
+  /// Who may save this model, on both insert and update. Required: a model
+  /// with no rule is not saved by anyone.
   final Future<bool> Function(Session session, DwSaveContext<T> saveContext)
       allowSave;
 
-  /// Валидация модели. Возвращает текст ошибки или null.
+  /// Validates the model. Return the error text to reject the save, or null to
+  /// let it through. Runs before the transaction opens — see the note on
+  /// [DwSaveConfig].
   final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
       validateSave;
 
-  /// Подготовка модели перед сохранением.
-  /// Выполняется внутри транзакции.
-  final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
+  /// Prepares the model for the write, and is the place for any rule that must
+  /// be evaluated against live data. Runs inside the transaction.
+  ///
+  /// Return the error text to reject the save — the transaction rolls back and
+  /// the client gets that text, exactly as with [validateSave] — or null to let
+  /// it through.
+  final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
       beforeSaveTransaction;
 
-  /// Дополнительные модификации в БД.
-  /// Выполняется внутри транзакции.
-  final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
+  /// Further database work once the model is written. Runs inside the
+  /// transaction, so it rolls back with it — including on a rejection: return
+  /// the error text to undo the write, or null to keep it.
+  final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
       afterSaveTransaction;
 
-  /// Обогащение модели после сохранения.
-  /// Выполняется **вне транзакции**, может быть долгой или асинхронной.
+  /// Enriches the saved model before it is returned. Runs **outside** the
+  /// transaction and may be slow.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
       afterSaveTransform;
 
-  /// Побочные эффекты: уведомления, async-таски и пр.
-  /// Выполняется **вне транзакции**, неблокирующе.
+  /// Side effects: notifications, async tasks, anything the caller need not
+  /// wait for. Runs **outside** the transaction, non-blocking.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
       afterSaveSideEffects;
 
-  /// Универсальный метод сохранения модели.
+  /// Saves [model], running the lifecycle described on [DwSaveConfig].
   Future<DwApiResponse<DwModelWrapper>> save(Session session, T model) async {
     final isInsert = model.id == null;
     final initialModel =
@@ -93,12 +119,14 @@ class DwSaveConfig<T extends TableRow> {
       await session.db.transaction((transaction) async {
         saveContext.transaction = transaction;
 
-        // beforeSave — подготовка модели
+        // beforeSave — prepare the model, and check the rules that need live
+        // data. Rejecting throws: that is what rolls the transaction back.
         if (beforeSaveTransaction != null) {
-          await beforeSaveTransaction!(session, saveContext);
+          final error = await beforeSaveTransaction!(session, saveContext);
+          if (error != null) throw _DwSaveRejection(error);
         }
 
-        // основной insert / update
+        // the write itself
         saveContext.currentModel = saveContext.isInsert
             ? await session.db.insertRow<T>(
                 saveContext.currentModel,
@@ -109,13 +137,22 @@ class DwSaveConfig<T extends TableRow> {
                 transaction: transaction,
               );
 
-        // afterSave — дополнительные действия в БД
+        // afterSave — further database work
         if (afterSaveTransaction != null) {
-          await afterSaveTransaction!(session, saveContext);
+          final error = await afterSaveTransaction!(session, saveContext);
+          if (error != null) throw _DwSaveRejection(error);
         }
       });
-    } on DatabaseException catch (e) {
-      // TODO: Добавить логирование ошибки и алертинг
+    } on _DwSaveRejection catch (rejection) {
+      // A rule said no. The transaction is rolled back; this is an answer to
+      // the caller, not a failure — no alert.
+      return DwApiResponse(isOk: false, value: null, error: rejection.message);
+    } on DatabaseException catch (e, stackTrace) {
+      DwCore.instance.alerts.reportError(
+        'Database error while saving ${T.toString()}',
+        exception: e,
+        stackTrace: stackTrace,
+      );
       return DwApiResponse(
         isOk: false,
         value: null,
@@ -123,17 +160,17 @@ class DwSaveConfig<T extends TableRow> {
       );
     }
 
-    // --- afterTransform (вне транзакции) ---
+    // --- afterTransform (outside the transaction) ---
     if (afterSaveTransform != null) {
       await afterSaveTransform!(session, saveContext);
     }
 
-    // --- afterSideEffects (вне транзакции, неблокирующе) ---
+    // --- afterSideEffects (outside the transaction, non-blocking) ---
     if (afterSaveSideEffects != null) {
       unawaited(afterSaveSideEffects!(session, saveContext));
     }
 
-    // Собираем итоговые обновления.
+    // Collect everything the client should refresh.
     final updatedModels = [
       ...saveContext.beforeUpdates,
       DwModelWrapper(object: saveContext.currentModel),

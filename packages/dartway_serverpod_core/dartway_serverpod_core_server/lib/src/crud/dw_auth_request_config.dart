@@ -114,9 +114,11 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
               ),
             );
           }
+          return null;
         },
     afterSaveTransaction:
-        (Session session, DwSaveContext<DwAuthRequest> saveContext) async {},
+        (Session session, DwSaveContext<DwAuthRequest> saveContext) async =>
+            null,
     afterSaveSideEffects: (session, saveContext) async {
       if (saveContext.extras[verificationCodeKey] != null) {
         await DwCore.instance.auth!.config.sendVerificationCodeMethod?.call(

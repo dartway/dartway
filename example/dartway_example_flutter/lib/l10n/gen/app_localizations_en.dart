@@ -288,7 +288,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get countersLiveHint =>
-      'Counters are live: they update in realtime as members book sessions and staff publishes news.';
+      'Each counter is a typed live list — one line of watchModelList, no fetch code. It refreshes when this admin reloads the data.';
 
   @override
   String get countMembers => 'Members';

@@ -20,4 +20,5 @@ export 'src/domain/crud/model_configs/dw_get_model_list_config.dart';
 export 'src/domain/crud/model_configs/dw_save_config.dart';
 export 'src/generated/endpoints.dart';
 export 'src/generated/protocol.dart';
+export 'src/static/dw_configuration_keys.dart';
 export 'src/utils/web_logs/dw_web_server_logger.dart';

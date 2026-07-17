@@ -41,25 +41,9 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
         if (clubSession.startsAt.isBefore(DateTime.now())) {
           return 'This session has already started';
         }
-        final takenSpots = await SessionBooking.db.count(
-          session,
-          where: (t) =>
-              t.clubSessionId.equals(booking.clubSessionId) &
-              t.status.equals(BookingStatus.booked),
-        );
-        if (takenSpots >= clubSession.capacity) {
-          return 'No spots left for this session';
-        }
-        final ownActiveBookings = await SessionBooking.db.count(
-          session,
-          where: (t) =>
-              t.clubSessionId.equals(booking.clubSessionId) &
-              t.clientProfileId.equals(booking.clientProfileId) &
-              t.status.equals(BookingStatus.booked),
-        );
-        if (ownActiveBookings > 0) {
-          return 'You are already booked for this session';
-        }
+        // Spot capacity and double-booking are NOT checked here: both count
+        // rows that a concurrent save is busy adding, and this runs before the
+        // transaction opens. They live in beforeSaveTransaction.
         return null;
       }
 
@@ -77,12 +61,58 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
       return null;
     },
     beforeSaveTransaction: (session, saveContext) async {
-      if (saveContext.isInsert) {
-        saveContext.currentModel = saveContext.currentModel.copyWith(
-          status: BookingStatus.booked,
-          createdAt: DateTime.now(),
-        );
+      if (!saveContext.isInsert) return null;
+
+      final booking = saveContext.currentModel;
+
+      // Lock the session row for the rest of this transaction. Without it the
+      // two rules below are decorative: under READ COMMITTED two clients going
+      // for the last spot both count four of five and both get in. Blocking is
+      // right here — unlike the auth limits, real clients rarely contend for
+      // the same session, and the wait is measured in milliseconds.
+      await session.db.unsafeQuery(
+        'SELECT "id" FROM "club_session" WHERE "id" = @sessionId FOR UPDATE',
+        parameters: QueryParameters.named({
+          'sessionId': booking.clubSessionId,
+        }),
+        transaction: saveContext.transaction,
+      );
+
+      final clubSession = await ClubSession.db.findById(
+        session,
+        booking.clubSessionId,
+        transaction: saveContext.transaction,
+      );
+      if (clubSession == null) return 'Session not found';
+
+      final takenSpots = await SessionBooking.db.count(
+        session,
+        where: (t) =>
+            t.clubSessionId.equals(booking.clubSessionId) &
+            t.status.equals(BookingStatus.booked),
+        transaction: saveContext.transaction,
+      );
+      if (takenSpots >= clubSession.capacity) {
+        return 'No spots left for this session';
       }
+
+      final ownActiveBookings = await SessionBooking.db.count(
+        session,
+        where: (t) =>
+            t.clubSessionId.equals(booking.clubSessionId) &
+            t.clientProfileId.equals(booking.clientProfileId) &
+            t.status.equals(BookingStatus.booked),
+        transaction: saveContext.transaction,
+      );
+      if (ownActiveBookings > 0) {
+        return 'You are already booked for this session';
+      }
+
+      saveContext.currentModel = booking.copyWith(
+        status: BookingStatus.booked,
+        createdAt: DateTime.now(),
+      );
+      return null;
     },
   ),
 );

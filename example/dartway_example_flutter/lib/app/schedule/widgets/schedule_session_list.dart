@@ -8,8 +8,11 @@ import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-/// Upcoming sessions grouped by day. Both lists are live: a booking made on
-/// another device updates the cards without any refresh code.
+/// Upcoming sessions grouped by day. Each list is live to *your own* writes:
+/// book or cancel and the card updates with no refresh code. A change another
+/// user makes shows on the next fetch — pushing it live to everyone needs a
+/// named channel (`DwChannelSubscriptionWidget` + `postMessage`), which this
+/// screen does not set up.
 class ScheduleSessionList extends ConsumerWidget implements DwFeature {
   const ScheduleSessionList({super.key});
 

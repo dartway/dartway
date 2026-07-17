@@ -38,14 +38,14 @@ class DwApiResponse<T> implements SerializableModel {
   const DwApiResponse.notConfigured()
     : isOk = false,
       value = null,
-      error = 'Действие не поддерживается сервером',
+      error = 'This action is not supported by the server',
       warning = null,
       updatedModels = null;
 
   const DwApiResponse.forbidden()
     : isOk = false,
       value = null,
-      error = 'Недостаточно полномочий',
+      error = 'Not enough permissions',
       warning = null,
       updatedModels = null;
 

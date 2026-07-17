@@ -9,6 +9,7 @@ import '../business/cloud_storage/dw_cloud_storage.dart';
 import '../crud/dw_auth_key_config.dart';
 import '../crud/dw_auth_request_config.dart';
 import '../domain/crud/domain/dw_crud_entity.dart';
+import '../utils/iterable_extension.dart';
 
 // TODO: add documentation
 /// The core class for the DartWay framework.

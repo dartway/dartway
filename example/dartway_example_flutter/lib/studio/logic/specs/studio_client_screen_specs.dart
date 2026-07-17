@@ -28,7 +28,8 @@ final bookingsStudioSpec = studioSpecForRoute(
   featureSpec: const [
     'Server access filter: a client physically receives only own '
         'bookings; staff sees all — one function in the config.',
-    'Status changes arrive in realtime (booked → attended by staff).',
+    'Your own book/cancel updates the card instantly; a live push to other '
+        'viewers takes a named channel (not wired on this screen).',
     'Review rule in validateSave: own attended booking, one per visit.',
   ],
   discussionQuestions: const [

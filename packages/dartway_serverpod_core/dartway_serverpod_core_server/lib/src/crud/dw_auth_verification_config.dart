@@ -104,6 +104,7 @@ final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
         authRequest,
         transaction: saveContext.transaction,
       );
+      return null;
     },
   ),
 );

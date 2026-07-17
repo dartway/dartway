@@ -1,3 +1,7 @@
+/// Keys DartWay reads from the server's `passwords.yaml`.
+///
+/// The values are the literal key names an app writes in that file — renaming
+/// one breaks every deployment that already has it.
 class DwConfigurationKeys {
   static const dwCloudStorageRegion = 'dwCloudStorageRegion';
   static const dwCloudStorageEndpoint = 'dwCloudStorageEndpoint';
@@ -6,11 +10,6 @@ class DwConfigurationKeys {
   static const dwCloudStorageAccessKey = 'dwCloudStorageAccessKey';
   static const dwCloudStorageSecretKey = 'dwCloudStorageSecretKey';
   static const dwCloudStorageBucket = 'dwCloudStorageBucket';
-
-  static const dwTelegramAlertsChatIdKey = 'dwTelegramAlertsChatId';
-  static const dwTelegramAlertsTokenKey = 'dwTelegramAlertsToken';
-  static const dwTelegramAlertsMessageThreadIdKey =
-      'dwTelegramAlertsMessageThreadId';
 
   static const dwAuthKeySaltKey = 'dwAuthKeySalt';
   static const dwVerificationCodeSaltKey = 'dwVerificationCodeSalt';

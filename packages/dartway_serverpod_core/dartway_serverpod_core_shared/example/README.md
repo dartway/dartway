@@ -7,15 +7,34 @@ Flutter app
 pull it in. It exists so the two halves format an alert and name a config key *the same way*,
 instead of drifting apart.
 
-## Alerts that survive Telegram's formatter
+## One sink, both halves
 
-An error report is useless if the channel mangles it. `DwAlertFormatter` produces MarkdownV2-safe
-text with the stack trace trimmed to its top frames — the part that says where it broke, without the
-forty lines that say how the framework got there.
+Configure the sink once, and the server and the app report the same way:
 
 ```dart
-final message = DwAlertFormatter.formatErrorReport(
-  errorMessage: 'Booking failed',
+final alerts = DwAlerts.init(
+  telegramConfig: DwTelegramAlertsConfig(
+    alertsToken: token,
+    alertsChatId: chatId,
+  ),
+);
+
+alerts.sendMessage('Deploy finished');
+```
+
+With no `telegramConfig`, alerts degrade to logging: a fresh project stays quiet and runnable
+instead of crashing on a missing token.
+
+## Reporting an error with its context
+
+An error report is useless if the channel mangles it, and nearly as useless if it arrives without
+the app state around it. `reportError` renders both: every value is escaped for Telegram's
+MarkdownV2, and the stack is trimmed to its top frames — the part that says where it broke, without
+the forty lines that say how the framework got there.
+
+```dart
+alerts.reportError(
+  'Booking failed',
   exception: error,
   stackTrace: stackTrace,
   context: DwAlertContext(
@@ -27,24 +46,12 @@ final message = DwAlertFormatter.formatErrorReport(
 );
 ```
 
-Both sides send through the same sink:
-
-```dart
-final alerts = DwAlerts.init(
-  telegramConfig: DwTelegramAlertsConfig(
-    alertsToken: token,
-    alertsChatId: chatId,
-  ),
-);
-
-alerts.sendMessage('Deploy finished');
-alerts.sendError(message);
-```
-
-With no `telegramConfig`, alerts degrade to logging: a fresh project stays quiet and runnable
-instead of crashing on a missing token.
+In a DartWay app you rarely write this by hand — `DwCore` on the Flutter side already reports
+uncaught errors, failed `dw.action`s and failed server calls through this sink, filling
+`DwAlertContext` from the live app.
 
 ## Configuration keys
 
-`DwConfigurationKeys` names the keys the server reads out of `config/passwords.yaml`, so a typo is a
-compile error rather than a `null` discovered in production.
+`DwTelegramAlertsKeys` names the keys `DwTelegramAlertsConfig.fromEnv` reads out of the server's
+`config/passwords.yaml`, so a typo is a compile error rather than a `null` discovered in
+production.

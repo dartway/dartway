@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:dartway_serverpod_core_flutter/utils/connection_error_handling.dart';
+import 'package:dartway_serverpod_core_flutter/src/utils/connection_error_handling.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

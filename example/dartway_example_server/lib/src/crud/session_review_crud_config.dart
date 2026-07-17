@@ -44,6 +44,7 @@ final sessionReviewCrudConfig = DwCrudConfig<SessionReview>(
           createdAt: DateTime.now(),
         );
       }
+      return null;
     },
   ),
 );

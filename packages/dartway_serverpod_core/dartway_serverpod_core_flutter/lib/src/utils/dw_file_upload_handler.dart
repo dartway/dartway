@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
-import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
+import 'package:dartway_serverpod_core_flutter/src/private/dw_singleton.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:heif_converter/heif_converter.dart';
 import 'package:image/image.dart' as img;
@@ -16,7 +16,7 @@ class DwFileUploadHandler {
   static String Function(XFile file) defaultUploadNameTemplate =
       (XFile file) => DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now());
 
-  // 🆕 шаблон для PlatformFile (если нет поля name)
+  // The PlatformFile counterpart: it carries an extension but no usable name
   static String Function(PlatformFile file) defaultPlatformUploadNameTemplate =
       (PlatformFile file) =>
           '${DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now())}${file.extension != null ? '.${file.extension!.toLowerCase()}' : ''}';
@@ -90,7 +90,7 @@ class DwFileUploadHandler {
   }) async {
     // final fileExtension = extension(platformFile.name ?? '').toLowerCase();
 
-    // Чтение байтов
+    // Read the bytes
     final Uint8List bytes;
     if (platformFile.bytes != null) {
       bytes = platformFile.bytes!;
@@ -102,8 +102,6 @@ class DwFileUploadHandler {
       );
     }
 
-    // Если это изображение — конвертируем
-    // final convertedBytes = await _convertToJpeg(bytes, fileExtension);
     final bytesToUpload = bytes;
 
     final uploadPath =

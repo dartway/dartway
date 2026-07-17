@@ -1,4 +1,7 @@
-import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
+import '../services/dw_telegram_service.dart';
+import 'configs/dw_telegram_alerts_config.dart';
+import 'dw_alert_context.dart';
+import 'dw_alert_formatter.dart';
 
 class DwAlerts {
   final DwTelegramAlertsConfig? _telegramConfig;
@@ -41,21 +44,6 @@ class DwAlerts {
        _logMessages = logMessages,
        _logErrors = logErrors;
 
-  // DwAlerts.debug({
-  //   Function(String message)? logFunction = print,
-  //   bool logAlertMessages = true,
-  //   bool logErrors = true,
-  // }) : _telegramConfig = null,
-  //      _logFunction = logFunction,
-  //      _logAlertMessages = logAlertMessages,
-  //      _logErrors = logErrors;
-
-  // DwAlerts.none()
-  //   : _telegramConfig = null,
-  //     _logFunction = null,
-  //     _logAlertMessages = false,
-  //     _logErrors = false;
-
   void sendMessage(String message) {
     _sendAlert(message, logMessage: _logMessages);
   }
@@ -86,7 +74,7 @@ class DwAlerts {
     _sendAlert(fullMessage, logMessage: _logErrors, isPreformatted: true);
   }
 
-  _sendAlert(
+  void _sendAlert(
     String message, {
     required bool logMessage,
     bool suppressErrors = false,
@@ -116,15 +104,7 @@ class DwAlerts {
     }
   }
 
-  _sendAlertingError(String message) {
+  void _sendAlertingError(String message) {
     _sendAlert(message, logMessage: _logErrors, suppressErrors: true);
-
-    // try {
-    //   if (_logErrors) {
-    //     _logFunction?.call(message);
-    //   }
-    // } catch (e) {
-    //   _logError("Error logging error message: $e", fromAlerting: fromAlerting);
-    // }
   }
 }

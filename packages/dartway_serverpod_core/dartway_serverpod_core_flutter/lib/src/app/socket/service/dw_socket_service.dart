@@ -3,7 +3,7 @@
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
-import 'package:dartway_serverpod_core_flutter/private/dw_singleton.dart';
+import 'package:dartway_serverpod_core_flutter/src/private/dw_singleton.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../repository/dw_repository.dart';

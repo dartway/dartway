@@ -34,6 +34,7 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
           createdAt: DateTime.now(),
         );
       }
+      return null;
     },
   ),
   deleteConfig: DwDeleteConfig<NewsPost>(

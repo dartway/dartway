@@ -16,7 +16,7 @@ class DwNoPagination implements DwPaginationStrategy {
 
   @override
   void onPageLoaded(List<DwModelWrapper> data) {
-    // После первого успешного запроса считаем, что больше грузить нечего
+    // One request returns everything there is — nothing more to load after it
     _loaded = true;
   }
 

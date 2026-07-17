@@ -120,15 +120,15 @@ class DwBackendFilter implements SerializableModel {
 
     if (type == DwBackendFilterType.and || type == DwBackendFilterType.or) {
       if (children == null || children!.isEmpty) {
-        return Constant.bool(true); // или другая логика для пустых групп
+        return Constant.bool(true); // an empty group matches everything
       }
 
-      // Собираем детей, если нужно - с отрицанием
+      // Collect the children, carrying the negation down
       final expressions = children!.map(
         (child) => child.prepareWhere(table, outerNegate: shouldNegate),
       );
 
-      // Используем OR если фильтр такого типа или если это отрицание AND
+      // OR when the filter says so, or when a negated AND turns into one
       return expressions.reduce(
         (a, b) =>
             shouldNegate != (type == DwBackendFilterType.or) ? a | b : a & b,

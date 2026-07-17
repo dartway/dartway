@@ -10,6 +10,12 @@ behaviour: `accessFilter` for reads; `allowSave` → `validateSave` guards, then
 `beforeSaveTransaction` → write → `afterSaveTransaction` inside a single transaction, and
 `afterSaveTransform` / `afterSaveSideEffects` outside it; ordering, includes, pagination.
 
+**Rules that guard a shared count are enforced where they hold.** `allowSave` and `validateSave`
+run *before* the transaction opens, so a rule about seats left or stock on hand can be raced —
+fired together, two saves both read four-of-five and both get in. The two in-transaction hooks
+reject the same way a validation does: return the error text and the write rolls back with that
+message reaching the client, instead of the rule quietly buying nothing.
+
 **Secure by default.** A model with no config is not reachable. Access is something you grant, never
 something you forget to take away — and an AI agent cannot ship a feature with an open backend by
 omission.

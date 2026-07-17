@@ -2,18 +2,19 @@ import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart
 
 import 'dw_pagination_params.dart';
 
+/// How a list asks the backend for its next page and decides when to stop.
 abstract class DwPaginationStrategy {
   int? get limit;
 
-  /// параметры для backend-запроса
+  /// The parameters for the next backend request.
   DwPaginationParams buildParams();
 
-  /// вызывается после успешной загрузки
+  /// Called after a page loads successfully.
   void onPageLoaded(List<DwModelWrapper> data);
 
-  /// есть ли ещё данные
+  /// Whether there is more to load.
   bool get hasMore;
 
-  /// сброс состояния
+  /// Returns the strategy to its initial state.
   void reset();
 }

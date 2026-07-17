@@ -1,4 +1,7 @@
 import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
+// DwAlertFormatter is internal — it renders what DwAlerts sends, and is not
+// part of the package's public API. Tested through src/ on purpose.
+import 'package:dartway_serverpod_core_shared/src/alerts/dw_alert_formatter.dart';
 import 'package:test/test.dart';
 
 void main() {

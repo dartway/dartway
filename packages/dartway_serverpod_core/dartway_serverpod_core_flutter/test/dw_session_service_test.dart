@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
-import 'package:dartway_serverpod_core_flutter/app/session/service/dw_auth_storage_interface.dart';
-import 'package:dartway_serverpod_core_flutter/app/session/service/dw_authentification_key_manager.dart';
-import 'package:dartway_serverpod_core_flutter/app/session/service/dw_session_service.dart';
-import 'package:dartway_serverpod_core_flutter/repository/dw_repository.dart';
+import 'package:dartway_serverpod_core_flutter/src/app/session/service/dw_auth_storage_interface.dart';
+import 'package:dartway_serverpod_core_flutter/src/app/session/service/dw_authentification_key_manager.dart';
+import 'package:dartway_serverpod_core_flutter/src/app/session/service/dw_session_service.dart';
+import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

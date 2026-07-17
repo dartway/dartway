@@ -25,6 +25,7 @@ final chatMessageCrudConfig = DwCrudConfig<ChatMessage>(
           createdAt: DateTime.now(),
         );
       }
+      return null;
     },
   ),
 );

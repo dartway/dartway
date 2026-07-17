@@ -7,10 +7,12 @@ and the Flutter app format an alert and name a config key the same way instead o
 
 - `DwAlerts` — the alert sink, with Telegram delivery. Without a config it degrades to logging, so a
   fresh project stays runnable instead of crashing on a missing token.
-- `DwAlertFormatter` + `DwAlertContext` — MarkdownV2-safe messages with structured app context and a
-  stack trace trimmed to its top frames: the part that says where it broke, without the forty lines
-  that say how the framework got there.
-- Configuration keys and cross-stack utilities.
+- `DwAlertContext` — the app state around a failure (route, features, action, platform, user).
+  Messages arrive MarkdownV2-safe, with the stack trimmed to its top frames: the part that says
+  where it broke, without the forty lines that say how the framework got there.
+- `DwTelegramAlertsConfig` (and `DwTelegramAlertsKeys`, the `passwords.yaml` names it reads).
+- `DwCoreConst` — the wire contract: the API and column names the server and the client must spell
+  identically, in one place instead of two.
 
 You do not usually depend on this package directly — the server and Flutter core packages both pull
 it in.

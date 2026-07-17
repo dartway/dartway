@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
+import 'dw_telegram_alerts_keys.dart';
 
 class DwTelegramAlertsConfig {
   final String alertsChatId;
@@ -8,26 +8,36 @@ class DwTelegramAlertsConfig {
   DwTelegramAlertsConfig({
     required this.alertsChatId,
     required this.alertsToken,
-    required this.alertsMessageThreadId,
+    this.alertsMessageThreadId,
   });
 
-  static DwTelegramAlertsConfig? fromEnv({required Map<String, String> env}) {
-    if (env[DwConfigurationKeys.dwTelegramAlertsChatIdKey] == null ||
-        env[DwConfigurationKeys.dwTelegramAlertsChatIdKey]!.isEmpty ||
-        env[DwConfigurationKeys.dwTelegramAlertsTokenKey] == null ||
-        env[DwConfigurationKeys.dwTelegramAlertsTokenKey]!.isEmpty) {
-      // TODO: заменить на log function
-      print(
-        'DwTelegramAlertsConfig.fromEnv: env doesn\'t contain all required keys',
+  /// Builds the config from [env] (typically the app's `passwords.yaml`).
+  ///
+  /// Returns null when the chat id or the token is missing — alerts then
+  /// degrade to logging instead of failing the boot. Pass [logFunction] to hear
+  /// about it; the library never writes to stdout on its own.
+  static DwTelegramAlertsConfig? fromEnv({
+    required Map<String, String> env,
+    void Function(String message)? logFunction,
+  }) {
+    if (env[DwTelegramAlertsKeys.dwTelegramAlertsChatIdKey] == null ||
+        env[DwTelegramAlertsKeys.dwTelegramAlertsChatIdKey]!.isEmpty ||
+        env[DwTelegramAlertsKeys.dwTelegramAlertsTokenKey] == null ||
+        env[DwTelegramAlertsKeys.dwTelegramAlertsTokenKey]!.isEmpty) {
+      logFunction?.call(
+        'DwTelegramAlertsConfig.fromEnv: '
+        '${DwTelegramAlertsKeys.dwTelegramAlertsChatIdKey} and '
+        '${DwTelegramAlertsKeys.dwTelegramAlertsTokenKey} are required — '
+        'Telegram alerts stay off.',
       );
       return null;
     }
 
     return DwTelegramAlertsConfig(
-      alertsChatId: env[DwConfigurationKeys.dwTelegramAlertsChatIdKey]!,
-      alertsToken: env[DwConfigurationKeys.dwTelegramAlertsTokenKey]!,
+      alertsChatId: env[DwTelegramAlertsKeys.dwTelegramAlertsChatIdKey]!,
+      alertsToken: env[DwTelegramAlertsKeys.dwTelegramAlertsTokenKey]!,
       alertsMessageThreadId:
-          env[DwConfigurationKeys.dwTelegramAlertsMessageThreadIdKey],
+          env[DwTelegramAlertsKeys.dwTelegramAlertsMessageThreadIdKey],
     );
   }
 }

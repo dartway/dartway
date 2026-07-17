@@ -82,7 +82,8 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     };
   }
 
-  /// Необходим для работы методов copyWith в ChatInitialData и DwAppNotification
+  /// Required by the generated `copyWith` of every model that carries a
+  /// [DwModelWrapper] field.
   DwModelWrapper copyWith({SerializableModel? model}) {
     final newModel = model ?? this.model;
     return DwModelWrapper._(

@@ -25,7 +25,7 @@ class DwCrudEndpoint extends Endpoint {
     Session session, {
     required String channel,
   }) async* {
-    print("subscribeOnUpdates for $channel");
+    session.log('subscribeOnUpdates for $channel', level: LogLevel.debug);
     yield* session.messages.createStream<SerializableModel>(channel);
   }
 
@@ -38,12 +38,13 @@ class DwCrudEndpoint extends Endpoint {
     try {
       final caller = DwCore.instance.getCrudConfig(className, api: apiGroup);
 
-      print(
-        "Received getOneCustom request for $className with filter: ${filter.attributeMap}",
+      session.log(
+        'getOne for $className with filter: ${filter.attributeMap}',
+        level: LogLevel.debug,
       );
 
       if (caller?.getModelConfigs == null || caller!.getModelConfigs!.isEmpty) {
-        return DwApiResponse.notConfigured(source: 'получение $className');
+        return DwApiResponse.notConfigured(source: 'getOne for $className');
       }
 
       final config = caller.getModelConfigs!.firstWhereOrNull(
@@ -54,7 +55,7 @@ class DwCrudEndpoint extends Endpoint {
       );
 
       if (config == null) {
-        return DwApiResponse.notConfigured(source: 'получение $className');
+        return DwApiResponse.notConfigured(source: 'getOne for $className');
       }
 
       return await config.call(session, caller.table, filter);
@@ -67,8 +68,8 @@ class DwCrudEndpoint extends Endpoint {
       return DwApiResponse(
         isOk: false,
         value: null,
-        error:
-            'Непредвиденная ошибка при обработке запроса на получение $className',
+        error: 'Unexpected error while handling the getOne request '
+            'for $className',
       );
     }
   }
@@ -81,7 +82,10 @@ class DwCrudEndpoint extends Endpoint {
   }) async {
     final caller = DwCore.instance.getCrudConfig(className, api: apiGroup);
 
-    print("CRUD: getCount for $className with filter: $filter");
+    session.log(
+      'getCount for $className with filter: $filter',
+      level: LogLevel.debug,
+    );
 
     if (caller?.getListConfig == null) {
       return DwApiResponse.notConfigured(source: 'getCount for $className');
@@ -114,7 +118,7 @@ class DwCrudEndpoint extends Endpoint {
     }
 
     if (caller == null) {
-      return DwApiResponse.notConfigured(source: 'получение списка $className');
+      return DwApiResponse.notConfigured(source: 'getAll for $className');
     }
 
     final table =

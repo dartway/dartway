@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/core/dw_core.dart';
+import 'package:dartway_serverpod_core_flutter/src/core/dw_core.dart';
 
 DwCore? _instance;
 

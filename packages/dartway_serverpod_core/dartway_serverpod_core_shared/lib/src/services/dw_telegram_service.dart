@@ -1,7 +1,9 @@
 import 'dart:convert';
 
-import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 import 'package:http/http.dart' as http;
+
+import '../alerts/dw_alert_formatter.dart';
+import '../alerts/dw_alerts.dart';
 
 class DwTelegramService {
   static const _telegramLimit = 4096;

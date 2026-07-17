@@ -134,7 +134,7 @@
   "adminUsers": "Users",
   "adminSettings": "Settings",
   "backToApp": "Back to the app",
-  "countersLiveHint": "Counters are live: they update in realtime as members book sessions and staff publishes news.",
+  "countersLiveHint": "Each counter is a typed live list — one line of watchModelList, no fetch code. It refreshes when this admin reloads the data.",
   "countMembers": "Members",
   "countSessions": "Sessions",
   "countNews": "News",
