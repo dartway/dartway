@@ -1,31 +1,44 @@
-# DartWay Project Template
+# DartwayStarter
 
-Starter template for creating new projects with **DartWay** (Flutter + Serverpod).  
-This repository provides the base structure for:
-- `dartway_starter_flutter` — Flutter application
-- `dartway_starter_server` — Serverpod backend
-- `dartway_starter_client` — generated API client
+A fullstack app built with [DartWay](https://dartway.dev) (Flutter + Serverpod):
 
-## 🚀 Quickstart
+- `dartway_starter_server` — Serverpod backend (models, CRUD configs, logic)
+- `dartway_starter_flutter` — Flutter app (features, UI kit, navigation)
+- `dartway_starter_client` — generated API client (**do not edit by hand**)
 
-Follow the step-by-step guide to create a new project:  
-👉 [DartWay Quickstart Guide](https://dartway.dev/docs/quick-start)
+## Getting started
 
-## Features
+Open the project in VS Code and press **F5** — launch **Server**, then **Seed dev
+data**, then **Flutter (web)** (configured in `.vscode/launch.json`).
 
-- Pre-configured **DartWay rules** for Cursor/AI coding
-- Ready-to-use Flutter + Serverpod integration
-- Structured project layout (app, server, client)
-- Scripts for renaming and setting up your own project
+Or from the terminal:
 
-## How to use
+```bash
+# backend
+cd dartway_starter_server
+dart pub get
+docker compose up -d                               # Postgres
+dart bin/main.dart --apply-migrations --role maintenance   # apply the schema
+dart bin/seed_dev.dart --mode development           # seed an admin + a user
+dart bin/main.dart                                  # run the server
+```
 
-1. Clone this repo as your new project folder  
-2. Run the rename script to replace `dartway_starter` with your project’s name  
-3. Install dependencies and generate code  
-4. Start coding your app 🚀
+```bash
+# app — in another terminal
+cd dartway_starter_flutter
+flutter pub get
+flutter run
+```
 
-See [DartWay Quickstart Guide](https://dartway.dev/docs/quick-start) for full details.
+Sign in as the seeded user **79990000003** — the one-time code is printed in the
+server console. (The admin is **79990000001**.)
+
+## Build a feature
+
+Everything an app needs — auth, roles, an admin panel, a live list from the
+database — is already here. Add your domain on top: a model (`.spy.yaml`) →
+`serverpod generate` → a `DwCrudConfig` → a screen with `ref.watchModelList`.
+No endpoints to write. The `.claude/` toolkit guides an AI assistant through it.
 
 ## Tests
 
