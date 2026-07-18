@@ -104,16 +104,22 @@ class CreateCommand extends Command<int> {
 
     stdout
       ..writeln('')
-      ..writeln('Project $projectName is ready. Next steps:')
+      ..writeln('Project $projectName is ready.')
+      ..writeln('')
+      ..writeln('Open it in VS Code and press F5 (Server, then Seed dev data, '
+          'then Flutter), or run it from the terminal:')
       ..writeln('  cd $projectName/${layout.serverPackage}')
-      ..writeln('  docker compose up -d                      # Postgres')
-      ..writeln('  dart bin/main.dart --apply-migrations     # schema')
-      ..writeln('  dart bin/seed_dev.dart --mode development # a user per role')
+      ..writeln('  dart pub get')
+      ..writeln('  docker compose up -d')
+      ..writeln('  dart bin/main.dart --apply-migrations --role maintenance')
+      ..writeln('  dart bin/seed_dev.dart --mode development')
+      ..writeln('  dart bin/main.dart')
       ..writeln('then in another terminal:')
       ..writeln('  cd $projectName/${layout.flutterPackage}')
       ..writeln('  flutter pub get && flutter run')
       ..writeln('')
-      ..writeln('Sign in with 79990000003 — the code is printed by the server.');
+      ..writeln('Sign in as the seeded user 79990000003 (the OTP code is '
+          'printed in the server console).');
     return 0;
   }
 

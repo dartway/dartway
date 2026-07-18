@@ -63,8 +63,8 @@ class _AppBottomNavigationBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Add a tab per screen as the domain grows. Gate a tab on a role with an
-    // `if (ref.watchUserProfile.isStaffMember)` — but remember the tab is only
-    // the UI: the real protection is the access filter on the server.
+    // `if (ref.watchUserProfile.isAdmin)` — but remember the tab is only the
+    // UI: the real protection is the access filter on the server.
     final tabs = [
       (route: AppNavigationZone.home, icon: Icons.home),
       (route: AppNavigationZone.profile, icon: Icons.person),

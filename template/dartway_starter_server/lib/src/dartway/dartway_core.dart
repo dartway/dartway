@@ -78,8 +78,8 @@ void initDartwayCore({
 }
 
 /// Builds a new [UserProfile] when a user registers via the DartWay auth flow.
-/// New users always start as [UserRole.client]; staff and admin roles are
-/// assigned by the admin (see the role guard in the UserProfile CRUD config).
+/// New users always start as [UserRole.user]; the admin role is assigned by an
+/// admin (see the role guard in the UserProfile CRUD config).
 Future<UserProfile> _buildUserProfile(
   Session session, {
   required DwAuthRequest registrationRequest,

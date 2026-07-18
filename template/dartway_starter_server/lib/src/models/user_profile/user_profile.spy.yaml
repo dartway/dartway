@@ -14,9 +14,9 @@ fields:
   imageUrl: String?
   gender: UserGender?
 
-  # Access role: client (default), staff (club employees, see staff chat),
-  # admin (full access). Enforced by CRUD config access filters.
-  role: UserRole, default=client
+  # Access role: user (default) or admin (full access). Enforced by CRUD config
+  # access filters. Add your own roles as your domain needs them.
+  role: UserRole, default=user
 
   # Rotatable test/reviewer OTP code. serverOnly: NEVER serialized to the client,
   # so a regular client cannot read test codes. Real users leave it null and get

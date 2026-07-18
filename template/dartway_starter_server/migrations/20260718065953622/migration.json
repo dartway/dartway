@@ -147,7 +147,7 @@
             "name": "role",
             "columnType": 0,
             "isNullable": false,
-            "columnDefault": "'client'::text",
+            "columnDefault": "'user'::text",
             "dartType": "protocol:UserRole"
           },
           {

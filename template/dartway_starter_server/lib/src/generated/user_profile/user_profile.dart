@@ -28,7 +28,7 @@ abstract class UserProfile
     this.gender,
     _i2.UserRole? role,
     this.testVerificationCode,
-  }) : role = role ?? _i2.UserRole.client;
+  }) : role = role ?? _i2.UserRole.user;
 
   factory UserProfile({
     int? id,

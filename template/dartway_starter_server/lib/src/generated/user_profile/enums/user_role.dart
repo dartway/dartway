@@ -13,16 +13,13 @@
 import 'package:serverpod/serverpod.dart' as _i1;
 
 enum UserRole implements _i1.SerializableModel {
-  client,
-  staff,
+  user,
   admin;
 
   static UserRole fromJson(String name) {
     switch (name) {
-      case 'client':
-        return UserRole.client;
-      case 'staff':
-        return UserRole.staff;
+      case 'user':
+        return UserRole.user;
       case 'admin':
         return UserRole.admin;
       default:

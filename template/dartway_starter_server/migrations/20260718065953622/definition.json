@@ -141,7 +141,7 @@
           "name": "role",
           "columnType": 0,
           "isNullable": false,
-          "columnDefault": "'client'::text",
+          "columnDefault": "'user'::text",
           "dartType": "protocol:UserRole"
         },
         {
@@ -2122,7 +2122,7 @@
     {
       "__className__": "serverpod.DatabaseMigrationVersion",
       "module": "dartway_starter",
-      "version": "20260714113459228"
+      "version": "20260718065953622"
     },
     {
       "__className__": "serverpod.DatabaseMigrationVersion",

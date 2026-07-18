@@ -26,7 +26,7 @@ abstract class UserProfile implements _i1.SerializableModel {
     this.imageUrl,
     this.gender,
     _i2.UserRole? role,
-  }) : role = role ?? _i2.UserRole.client;
+  }) : role = role ?? _i2.UserRole.user;
 
   factory UserProfile({
     int? id,

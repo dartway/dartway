@@ -8,8 +8,7 @@ import 'package:dartway_starter_server/src/generated/endpoints.dart';
 import 'package:dartway_starter_server/src/generated/protocol.dart';
 
 const _adminPhone = '79990000001';
-const _staffPhone = '79990000002';
-const _clientPhone = '79990000003';
+const _userPhone = '79990000003';
 
 /// Dev-only seed: one user per role, so you can sign in the moment the server
 /// is up. Sign in with any seeded phone — the OTP code is logged to the console.
@@ -36,9 +35,8 @@ Future<void> main(List<String> args) async {
   try {
     await _seed(session);
     stdout.writeln('Dev seed completed. Sign in with (OTP code in console):');
-    stdout.writeln(' - admin:  $_adminPhone');
-    stdout.writeln(' - staff:  $_staffPhone');
-    stdout.writeln(' - client: $_clientPhone');
+    stdout.writeln(' - admin: $_adminPhone');
+    stdout.writeln(' - user:  $_userPhone');
   } finally {
     await session.close();
     await pod.shutdown(exitProcess: false);
@@ -47,8 +45,7 @@ Future<void> main(List<String> args) async {
 
 Future<void> _seed(Session session) async {
   await _ensureProfile(session, _adminPhone, 'Alex', role: UserRole.admin);
-  await _ensureProfile(session, _staffPhone, 'Maria', role: UserRole.staff);
-  await _ensureProfile(session, _clientPhone, 'Ivan', role: UserRole.client);
+  await _ensureProfile(session, _userPhone, 'John', role: UserRole.user);
 
   final settingCount = await AppSetting.db.count(
     session,
@@ -57,7 +54,7 @@ Future<void> _seed(Session session) async {
   if (settingCount == 0) {
     await AppSetting.db.insertRow(
       session,
-      AppSetting(settingKey: 'appName', settingValue: 'DartWay Starter'),
+      AppSetting(settingKey: 'appName', settingValue: 'DartwayStarter'),
     );
   }
 }

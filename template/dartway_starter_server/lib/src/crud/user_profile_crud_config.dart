@@ -6,20 +6,20 @@ import 'package:dartway_starter_server/src/generated/protocol.dart';
 final userProfileCrudConfig = DwCrudConfig<UserProfile>(
   table: UserProfile.t,
   // Only the admin lists all profiles (the admin users table). Everyone else
-  // sees nothing here — secure-by-default, mirroring staffOnlyAccessFilter.
+  // sees nothing here — secure-by-default via adminOnlyAccessFilter.
   getListConfig: DwGetModelListConfig(
     accessFilter: adminOnlyAccessFilter,
   ),
   saveConfig: DwSaveConfig<UserProfile>(
     // A signed-in user saves only their own profile; the admin saves anyone's.
     allowSave: (session, saveContext) async =>
-        await session.isClubAdmin ||
+        await session.isAdmin ||
         await session.isUser(saveContext.currentModel.id ?? -1),
     // Privilege escalation guard: only the admin can change roles.
     validateSave: (session, saveContext) async {
       final roleChanged =
           saveContext.initialModel?.role != saveContext.currentModel.role;
-      if (roleChanged && !await session.isClubAdmin) {
+      if (roleChanged && !await session.isAdmin) {
         return 'Only the admin can change user roles';
       }
       return null;

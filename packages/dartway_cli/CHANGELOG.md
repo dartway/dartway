@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- `create`: the printed next steps now actually run in order — `dart pub get`
+  before the server starts, `--role maintenance` so migrations apply and exit
+  (leaving the terminal free to seed), and a mention of the VS Code F5 flow.
+  The sign-in hint points at the seeded user.
+
 ## 0.1.0
 
 First public release — the DartWay command-line tool.

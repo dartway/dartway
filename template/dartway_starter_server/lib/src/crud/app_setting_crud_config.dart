@@ -10,7 +10,7 @@ final appSettingCrudConfig = DwCrudConfig<AppSetting>(
     accessFilter: (session) async => null,
   ),
   saveConfig: DwSaveConfig<AppSetting>(
-    allowSave: (session, saveContext) async => session.isClubAdmin,
+    allowSave: (session, saveContext) async => session.isAdmin,
     validateSave: (session, saveContext) async =>
         saveContext.currentModel.settingKey.trim().isEmpty
             ? 'Setting key is required'

@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Server",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "dartway_starter_server",
+      "program": "bin/main.dart",
+      "args": ["--apply-migrations"]
+    },
+    {
+      "name": "Seed dev data",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "dartway_starter_server",
+      "program": "bin/seed_dev.dart",
+      "args": ["--mode", "development"]
+    },
+    {
+      "name": "Flutter (web)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "dartway_starter_flutter",
+      "program": "lib/main.dart",
+      "args": ["-d", "chrome"]
+    }
+  ]
+}
