@@ -103,7 +103,31 @@ final clubSessionListConfig = DwGetModelListConfig<ClubSession>(
 
 **Оба хука в транзакции возвращают `String?` — как `validateSave`.** Вернул текст → save отклоняется, транзакция откатывается, текст доходит до клиента; вернул `null` → идём дальше. Это и есть способ отказать по правилу, которое видно только внутри транзакции.
 
-**Зачем это, а не `validateSave`:** шаги 1–2 идут ДО транзакции, поэтому правило, стерегущее общий счётчик (места, остатки, лимиты), там гоняется — два параллельных сохранения оба получат «да». Проверяй такое правило в `beforeSaveTransaction`, взяв в той же транзакции лок на строку (`SELECT ... FOR UPDATE` через `session.db.unsafeQuery`). `validateSave` проверяет модель, `beforeSaveTransaction` — мир вокруг неё.
+**Зачем это, а не `validateSave`:** шаги 1–2 идут ДО транзакции, поэтому правило, стерегущее общий счётчик (места, остатки, лимиты), там гоняется — два параллельных сохранения оба получат «да». Проверяй такое правило в `beforeSaveTransaction`, взяв в той же транзакции **лок на строку**: `findById(..., transaction:, lockMode: LockMode.forUpdate)` — один вызов и лочит строку (`SELECT ... FOR UPDATE`), и возвращает её. `validateSave` проверяет модель, `beforeSaveTransaction` — мир вокруг неё.
+
+```dart
+beforeSaveTransaction: (session, saveContext) async {
+  if (!saveContext.isInsert) return null;
+  // Лочим и читаем занятие одним вызовом — конкурентные брони
+  // сериализуются на этой строке, продать сверх мест нельзя.
+  final clubSession = await ClubSession.db.findById(
+    session,
+    saveContext.currentModel.clubSessionId,
+    transaction: saveContext.transaction,
+    lockMode: LockMode.forUpdate,
+  );
+  if (clubSession == null) return 'Session not found';
+
+  final taken = await SessionBooking.db.count(
+    session,
+    where: (t) => t.clubSessionId.equals(clubSession.id!) &
+        t.status.equals(BookingStatus.booked),
+    transaction: saveContext.transaction,
+  );
+  if (taken >= clubSession.capacity) return 'No spots left';
+  return null;
+},
+```
 
 ```dart
 final clubSessionSaveConfig = DwSaveConfig<ClubSession>(

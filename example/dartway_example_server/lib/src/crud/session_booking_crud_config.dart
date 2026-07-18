@@ -65,23 +65,17 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
 
       final booking = saveContext.currentModel;
 
-      // Lock the session row for the rest of this transaction. Without it the
-      // two rules below are decorative: under READ COMMITTED two clients going
-      // for the last spot both count four of five and both get in. Blocking is
-      // right here — unlike the auth limits, real clients rarely contend for
+      // Lock the session row for the rest of this transaction and read it in the
+      // same call (`lockMode: forUpdate` → SELECT ... FOR UPDATE). Without the
+      // lock the two rules below are decorative: under READ COMMITTED two clients
+      // going for the last spot both count four of five and both get in. Blocking
+      // is right here — unlike the auth limits, real clients rarely contend for
       // the same session, and the wait is measured in milliseconds.
-      await session.db.unsafeQuery(
-        'SELECT "id" FROM "club_session" WHERE "id" = @sessionId FOR UPDATE',
-        parameters: QueryParameters.named({
-          'sessionId': booking.clubSessionId,
-        }),
-        transaction: saveContext.transaction,
-      );
-
       final clubSession = await ClubSession.db.findById(
         session,
         booking.clubSessionId,
         transaction: saveContext.transaction,
+        lockMode: LockMode.forUpdate,
       );
       if (clubSession == null) return 'Session not found';
 
