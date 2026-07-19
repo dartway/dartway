@@ -4,10 +4,13 @@ The open bridge between a DartWay app and [DartWay Studio](https://dartway.dev):
 screen specs declared in the app's code plus a versioned `postMessage` protocol
 that lets Studio preview, navigate and drive a running web build of the app.
 
-The app is the single source of truth: Studio receives the manifest (navigation
-zones, screen passports, demo personas) over the runtime channel on connect, so
-it can never go stale relative to the running build. Credentials never cross
-the bridge — persona sign-in runs entirely inside the app.
+The app is the single source of truth for its structure: Studio receives the
+manifest (navigation zones, screen passports, supported locales) over the
+runtime channel on connect, so it can never go stale relative to the running
+build. Demo personas are the opposite — a platform concern: test users and
+their codes are configured in Studio and never ship inside the app's public
+web build. Studio signs in by sending the credentials to the app, which runs
+its regular auth flow with them.
 
 ## Declaring specs (app side)
 
@@ -36,13 +39,10 @@ final manifest = StudioProjectManifest(
       label: 'Admin',
       rootPath: '/admin',
       access: StudioZoneAccess.signedIn,
-      // Role-gated zone: Studio switches to a listed persona before entering.
-      allowedPersonaIds: ['admin'],
+      // Role-gating is the app's own job (router guards, server filters) —
+      // the zone spec only says a session is needed at all.
       screens: [/* ... */],
     ),
-  ],
-  personas: [
-    StudioPersonaSpec(id: 'client', label: 'Client · Ivan', identifier: '7999...'),
   ],
   // Declare two or more locales to get a locale switcher in Studio; the app
   // executes the switch itself via StudioBridgeHostDelegate.onLocaleRequest.
@@ -55,7 +55,7 @@ final manifest = StudioProjectManifest(
 ```dart
 final host = StudioBridgeHost.attach(
   manifest: manifest,
-  delegate: myDelegate, // navigate / persona sign-in / sign-out / locale executors
+  delegate: myDelegate, // navigate / sign-in with credentials / sign-out / locale
   currentPath: () => router.currentPath,
   currentSession: () => mySessionState,
   currentLocale: () => myLocale.languageCode, // omit if not localized
@@ -65,9 +65,10 @@ host?.reportSession(newState);  // on auth changes
 host?.reportLocale(newLocale);  // on locale changes
 ```
 
-`attach` returns null when the app is not running on web inside an iframe, or
-when a release build has no explicit `allowedStudioOrigins` — the app stays
-fully functional and the bridge dormant (secure by default).
+`attach` returns null when the app is not running on web inside an iframe —
+the app stays fully functional and the bridge dormant. The channel pins the
+origin of the first valid Studio message for its replies; there is no origin
+allowlist for now (zero-config local work first).
 
 ## Connecting (Studio side)
 

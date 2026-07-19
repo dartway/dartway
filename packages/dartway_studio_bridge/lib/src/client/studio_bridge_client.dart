@@ -72,8 +72,17 @@ class StudioBridgeClient {
   void requestNavigation(String path) =>
       _channel.send(NavigateRequestMessage(path));
 
-  void requestPersona(String personaId) =>
-      _channel.send(PersonaRequestMessage(personaId));
+  /// Ask the app to sign in with the given test credentials (from Studio's
+  /// project config) through its regular auth flow. [secret] is whatever the
+  /// app's auth expects: a test verification code, or a password.
+  void requestSignIn({
+    required String identifier,
+    required String secret,
+  }) =>
+      _channel.send(SignInRequestMessage(
+        identifier: identifier,
+        secret: secret,
+      ));
 
   void requestSignOut() => _channel.send(const SignOutRequestMessage());
 

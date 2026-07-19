@@ -8,11 +8,16 @@ import '../transport/host/studio_host_channel.dart';
 import '../transport/studio_message_channel.dart';
 
 /// What the app does when Studio asks — navigation and session actions run
-/// entirely inside the app (Studio never learns credentials or router types).
+/// inside the app through its regular flows (Studio never learns router
+/// types; the sign-in credentials come from Studio's own project config).
 abstract interface class StudioBridgeHostDelegate {
   void onNavigateRequest(String path);
 
-  Future<void> onPersonaRequest(String personaId);
+  /// Sign in with the given test credentials through the app's normal auth
+  /// flow — exactly as if the user typed them ([secret] is a test
+  /// verification code for OTP flows, a password for password flows). The
+  /// app ships no test users and no special sign-in path.
+  Future<void> onSignInRequest(String identifier, String secret);
 
   Future<void> onSignOutRequest();
 
@@ -43,8 +48,8 @@ class StudioBridgeHost {
   static bool get isEmbeddedWebContext => isEmbeddedInStudioFrame;
 
   /// Attaches the bridge, or returns null when there is nothing to attach to
-  /// (not web, not embedded, or not permitted — see the origin policy in the
-  /// transport). Callers keep the app fully functional on null.
+  /// (not web or not embedded in an iframe). Callers keep the app fully
+  /// functional on null.
   static StudioBridgeHost? attach({
     required StudioProjectManifest manifest,
     required StudioBridgeHostDelegate delegate,
@@ -52,10 +57,8 @@ class StudioBridgeHost {
     required StudioSessionState Function() currentSession,
     List<StudioFeatureInfo> Function()? currentFeatures,
     String Function()? currentLocale,
-    List<String> allowedStudioOrigins = const [],
   }) {
-    final channel =
-        createStudioHostChannel(allowedStudioOrigins: allowedStudioOrigins);
+    final channel = createStudioHostChannel();
     if (channel == null) return null;
     return StudioBridgeHost._(
       channel,
@@ -89,8 +92,8 @@ class StudioBridgeHost {
         ));
       case NavigateRequestMessage(:final path):
         _delegate.onNavigateRequest(path);
-      case PersonaRequestMessage(:final personaId):
-        unawaited(_delegate.onPersonaRequest(personaId));
+      case SignInRequestMessage(:final identifier, :final secret):
+        unawaited(_delegate.onSignInRequest(identifier, secret));
       case SignOutRequestMessage():
         unawaited(_delegate.onSignOutRequest());
       case LocaleRequestMessage(:final locale):

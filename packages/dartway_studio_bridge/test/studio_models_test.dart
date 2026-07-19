@@ -58,45 +58,31 @@ void main() {
       );
     });
 
-    test('allowedPersonaIds round-trips and defaults to empty', () {
-      const zone = StudioZoneSpec(
-        label: 'Admin',
-        rootPath: '/admin',
-        allowedPersonaIds: ['admin-alex'],
-        screens: [],
-      );
-      expect(StudioZoneSpec.fromJson(zone.toJson()).allowedPersonaIds,
-          ['admin-alex']);
-      expect(
-        StudioZoneSpec.fromJson(const {'rootPath': '/x'}).allowedPersonaIds,
-        isEmpty,
-      );
-    });
   });
 
   group('StudioSessionState', () {
-    test('json round-trip with a persona', () {
+    test('json round-trip with a signed-in user', () {
       const session = StudioSessionState(
         isSignedIn: true,
-        activePersonaId: 'coach-maria',
+        userIdentifier: '79990000002',
         displayLabel: 'Maria',
         isBusy: true,
       );
       final decoded = StudioSessionState.fromJson(session.toJson());
       expect(decoded.isSignedIn, isTrue);
-      expect(decoded.activePersonaId, 'coach-maria');
+      expect(decoded.userIdentifier, '79990000002');
       expect(decoded.displayLabel, 'Maria');
       expect(decoded.isBusy, isTrue);
     });
 
     test('signedOut constant is empty', () {
       expect(StudioSessionState.signedOut.isSignedIn, isFalse);
-      expect(StudioSessionState.signedOut.activePersonaId, isNull);
+      expect(StudioSessionState.signedOut.userIdentifier, isNull);
     });
   });
 
   group('StudioProjectManifest', () {
-    test('json round-trip with zones, personas and locales', () {
+    test('json round-trip with zones and locales', () {
       const manifest = StudioProjectManifest(
         projectName: 'Demo',
         zones: [
@@ -113,20 +99,12 @@ void main() {
             ],
           ),
         ],
-        personas: [
-          StudioPersonaSpec(
-            id: 'client-ivan',
-            label: 'Client · Ivan',
-            identifier: '79990000003',
-          ),
-        ],
         supportedLocales: ['en', 'ru'],
       );
       final decoded = StudioProjectManifest.fromJson(manifest.toJson());
       expect(decoded.projectName, 'Demo');
       expect(decoded.zones.single.access, StudioZoneAccess.signedIn);
       expect(decoded.zones.single.screens.single.path, '/schedule');
-      expect(decoded.personas.single.identifier, '79990000003');
       expect(decoded.supportedLocales, ['en', 'ru']);
     });
 

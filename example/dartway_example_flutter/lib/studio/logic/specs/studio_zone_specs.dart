@@ -2,7 +2,6 @@ import 'package:dartway_router/dartway_router.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 
 import '../../../core/router/router.dart';
-import '../studio_personas.dart';
 import 'studio_client_screen_specs.dart';
 import 'studio_club_screen_specs.dart';
 import 'studio_route_specs.dart';
@@ -25,9 +24,9 @@ final adminZoneStudioSpec = StudioZoneSpec(
   label: 'Admin',
   rootPath: AdminNavigationZone.admin.fullPath,
   access: StudioZoneAccess.signedIn,
-  // Role-gated: Studio switches to Alex before entering; the router guard
-  // and server filters remain the real protection.
-  allowedPersonaIds: [StudioPersonas.adminAlex.id],
+  // Role-gated by the app itself: the router guard and server filters are
+  // the protection. Studio only signs in with whatever persona is chosen —
+  // a non-admin lands wherever the guards send it.
   screens: [
     studioSpecForRoute(
       AdminNavigationZone.admin,

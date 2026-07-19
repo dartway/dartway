@@ -6,7 +6,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../core/app_l10n.dart';
 import '../core/router/router.dart';
 import 'logic/studio_persona_switcher.dart';
-import 'logic/studio_personas.dart';
 import 'logic/studio_project_manifest.dart';
 import 'logic/studio_session_state_provider.dart';
 
@@ -116,11 +115,11 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       ref.read(appRouterProvider).router.go(path);
 
   @override
-  Future<void> onPersonaRequest(String personaId) async {
-    final persona = StudioPersonas.byId(personaId);
-    if (persona == null) return;
-    await ref.read(studioPersonaSwitcherProvider.notifier).switchTo(persona);
-  }
+  Future<void> onSignInRequest(String identifier, String secret) =>
+      ref.read(studioPersonaSwitcherProvider.notifier).signInWith(
+            identifier: identifier,
+            verificationCode: secret,
+          );
 
   @override
   Future<void> onSignOutRequest() =>

@@ -21,7 +21,6 @@ class StudioZoneSpec {
     required this.label,
     required this.rootPath,
     this.access = StudioZoneAccess.any,
-    this.allowedPersonaIds = const [],
     required this.screens,
   });
 
@@ -32,19 +31,12 @@ class StudioZoneSpec {
 
   final StudioZoneAccess access;
 
-  /// Ids of the demo personas that can enter this zone (e.g. a role-gated
-  /// admin zone lists its admin persona). Empty means any persona. Studio
-  /// uses this to switch the session to a capable persona before navigating —
-  /// the app's guards stay the real protection.
-  final List<String> allowedPersonaIds;
-
   final List<StudioScreenSpec> screens;
 
   Map<String, dynamic> toJson() => {
         'label': label,
         'rootPath': rootPath,
         'access': access.name,
-        'allowedPersonaIds': allowedPersonaIds,
         'screens': [for (final screen in screens) screen.toJson()],
       };
 
@@ -53,8 +45,6 @@ class StudioZoneSpec {
         rootPath: json['rootPath'] as String? ?? '/',
         access: StudioZoneAccess.values.asNameMap()[json['access']] ??
             StudioZoneAccess.any,
-        allowedPersonaIds:
-            StudioScreenSpec.stringListFromJson(json['allowedPersonaIds']),
         screens: [
           if (json['screens'] is List)
             for (final item in json['screens'] as List)

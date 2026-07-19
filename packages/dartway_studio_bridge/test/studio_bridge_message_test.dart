@@ -9,9 +9,6 @@ void main() {
   const manifest = StudioProjectManifest(
     projectName: 'Demo',
     zones: [],
-    personas: [
-      StudioPersonaSpec(id: 'a', label: 'A', identifier: '1'),
-    ],
   );
 
   group('round-trip every message type', () {
@@ -34,9 +31,14 @@ void main() {
       expect((decoded as NavigateRequestMessage).path, '/schedule');
     });
 
-    test('personaRequest carries the id', () {
-      final decoded = _roundTrip(const PersonaRequestMessage('coach-maria'));
-      expect((decoded as PersonaRequestMessage).personaId, 'coach-maria');
+    test('signInRequest carries the credentials', () {
+      final decoded = _roundTrip(const SignInRequestMessage(
+        identifier: '79990000002',
+        secret: '123456',
+      ));
+      final msg = decoded as SignInRequestMessage;
+      expect(msg.identifier, '79990000002');
+      expect(msg.secret, '123456');
     });
 
     test('routeChanged carries the path', () {
@@ -77,10 +79,10 @@ void main() {
     test('sessionChanged carries the session', () {
       final decoded = _roundTrip(
         const SessionChangedMessage(
-          StudioSessionState(isSignedIn: true, activePersonaId: 'a'),
+          StudioSessionState(isSignedIn: true, userIdentifier: '1'),
         ),
       );
-      expect((decoded as SessionChangedMessage).session.activePersonaId, 'a');
+      expect((decoded as SessionChangedMessage).session.userIdentifier, '1');
     });
 
     test('manifest carries manifest, path, session and locale', () {
@@ -95,7 +97,6 @@ void main() {
       expect(decoded, isA<ManifestMessage>());
       final msg = decoded as ManifestMessage;
       expect(msg.manifest.projectName, 'Demo');
-      expect(msg.manifest.personas.single.id, 'a');
       expect(msg.currentPath, '/schedule');
       expect(msg.session.isSignedIn, isFalse);
       expect(msg.currentLocale, 'en');

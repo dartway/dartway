@@ -3,12 +3,13 @@
 /// reports "not embedded" on every other platform.
 ///
 /// Provides `isEmbeddedInStudioFrame` (web and inside an iframe) and
-/// `createStudioHostChannel` (null when not embedded or not permitted).
+/// `createStudioHostChannel` (null when not embedded).
 ///
-/// Origin policy: with a non-empty allowlist only those origins may talk (and
-/// are the only targets we post to). With an empty list, debug/profile builds
-/// accept the first valid Studio message and pin its origin — zero-config
-/// local development — while release builds stay dormant (secure by default).
+/// Origin note: the channel accepts the first valid bridge message from the
+/// embedding window and pins that origin for its replies. There is no origin
+/// allowlist for now — zero-config local work outweighs the ceremony; an
+/// embedding page can only drive what the bridge exposes (navigation, test
+/// sign-in), and an explicit opt-in policy can return later if needed.
 library;
 
 export 'studio_host_channel_stub.dart'

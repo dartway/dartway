@@ -3,12 +3,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../core/user_profile_provider.dart';
 import 'studio_persona_switcher.dart';
-import 'studio_personas.dart';
 
 part 'studio_session_state_provider.g.dart';
 
-/// The session as reported to Studio: signed-in state, the matching declared
-/// persona and whether a persona switch is in flight.
+/// The session as reported to Studio: signed-in state, who it is (by phone —
+/// Studio matches it against its configured personas) and whether a requested
+/// sign-in is in flight.
 @riverpod
 StudioSessionState studioSessionState(Ref ref) {
   final profile = ref.watch(userProfileProvider);
@@ -19,7 +19,7 @@ StudioSessionState studioSessionState(Ref ref) {
   }
   return StudioSessionState(
     isSignedIn: true,
-    activePersonaId: StudioPersonas.byIdentifier(profile.phone)?.id,
+    userIdentifier: profile.phone,
     displayLabel: profile.firstName,
     isBusy: isBusy,
   );

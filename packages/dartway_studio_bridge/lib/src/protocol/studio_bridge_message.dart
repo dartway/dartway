@@ -55,8 +55,8 @@ sealed class StudioBridgeMessage {
       StudioBridgeProtocol.studioConnect => const StudioConnectMessage(),
       StudioBridgeProtocol.navigateRequest =>
         NavigateRequestMessage.fromPayload(payload),
-      StudioBridgeProtocol.personaRequest =>
-        PersonaRequestMessage.fromPayload(payload),
+      StudioBridgeProtocol.signInRequest =>
+        SignInRequestMessage.fromPayload(payload),
       StudioBridgeProtocol.signOutRequest => const SignOutRequestMessage(),
       StudioBridgeProtocol.localeRequest =>
         LocaleRequestMessage.fromPayload(payload),

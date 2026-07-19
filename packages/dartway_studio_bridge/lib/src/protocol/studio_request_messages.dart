@@ -26,21 +26,37 @@ class NavigateRequestMessage extends StudioBridgeMessage {
       NavigateRequestMessage(payload['path'] as String? ?? '/');
 }
 
-/// Studio → app: sign in as the declared persona; the app runs its own auth
-/// flow (Studio never learns the credentials).
-class PersonaRequestMessage extends StudioBridgeMessage {
-  const PersonaRequestMessage(this.personaId);
+/// Studio → app: sign in with the given test credentials through the app's
+/// regular auth flow. The credentials belong to Studio's project config (demo
+/// personas are a platform concern) — the app itself ships no test users and
+/// no special sign-in path; it uses them exactly like user-typed ones.
+class SignInRequestMessage extends StudioBridgeMessage {
+  const SignInRequestMessage({
+    required this.identifier,
+    required this.secret,
+  });
 
-  final String personaId;
+  /// The user identifier in the form the app's auth expects (phone, email).
+  final String identifier;
+
+  /// Whatever the app's auth flow expects as the second factor: a test
+  /// verification code for OTP flows, a password for password flows.
+  final String secret;
 
   @override
-  String get type => StudioBridgeProtocol.personaRequest;
+  String get type => StudioBridgeProtocol.signInRequest;
 
   @override
-  Map<String, dynamic> payloadToJson() => {'personaId': personaId};
+  Map<String, dynamic> payloadToJson() => {
+        'identifier': identifier,
+        'secret': secret,
+      };
 
-  factory PersonaRequestMessage.fromPayload(Map<String, dynamic> payload) =>
-      PersonaRequestMessage(payload['personaId'] as String? ?? '');
+  factory SignInRequestMessage.fromPayload(Map<String, dynamic> payload) =>
+      SignInRequestMessage(
+        identifier: payload['identifier'] as String? ?? '',
+        secret: payload['secret'] as String? ?? '',
+      );
 }
 
 /// Studio → app: sign the current user out.

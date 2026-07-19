@@ -1,10 +1,10 @@
 /// The app's current session as far as Studio needs to know: whether someone
-/// is signed in, which declared persona it maps to, and whether a persona
-/// switch is in flight.
+/// is signed in, who it is (by the app's own identifier), and whether a
+/// requested sign-in is still in flight.
 class StudioSessionState {
   const StudioSessionState({
     required this.isSignedIn,
-    this.activePersonaId,
+    this.userIdentifier,
     this.displayLabel,
     this.isBusy = false,
   });
@@ -13,19 +13,20 @@ class StudioSessionState {
 
   final bool isSignedIn;
 
-  /// Id of the matching [StudioPersonaSpec], null when the signed-in user is
-  /// not one of the declared personas.
-  final String? activePersonaId;
+  /// The signed-in user's identifier in the form the app's auth uses (phone,
+  /// email). Studio matches it against its own configured demo personas — the
+  /// app knows nothing about personas.
+  final String? userIdentifier;
 
-  /// Label to show for the current user (persona label or profile name).
+  /// Label to show for the current user (e.g. profile name).
   final String? displayLabel;
 
-  /// True while the app is executing a persona switch.
+  /// True while the app is executing a requested sign-in or sign-out.
   final bool isBusy;
 
   Map<String, dynamic> toJson() => {
         'isSignedIn': isSignedIn,
-        if (activePersonaId != null) 'activePersonaId': activePersonaId,
+        if (userIdentifier != null) 'userIdentifier': userIdentifier,
         if (displayLabel != null) 'displayLabel': displayLabel,
         'isBusy': isBusy,
       };
@@ -33,7 +34,7 @@ class StudioSessionState {
   factory StudioSessionState.fromJson(Map<String, dynamic> json) =>
       StudioSessionState(
         isSignedIn: json['isSignedIn'] as bool? ?? false,
-        activePersonaId: json['activePersonaId'] as String?,
+        userIdentifier: json['userIdentifier'] as String?,
         displayLabel: json['displayLabel'] as String?,
         isBusy: json['isBusy'] as bool? ?? false,
       );

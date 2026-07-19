@@ -5,7 +5,6 @@ library;
 // Spec models (declared in the app's code, delivered to Studio on connect).
 export 'src/models/studio_feature_info.dart';
 export 'src/models/studio_manifest_index.dart';
-export 'src/models/studio_persona_spec.dart';
 export 'src/models/studio_project_manifest.dart';
 export 'src/models/studio_screen_spec.dart';
 export 'src/models/studio_session_state.dart';

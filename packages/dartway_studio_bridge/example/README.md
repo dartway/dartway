@@ -36,22 +36,18 @@ final manifest = StudioProjectManifest(
       label: 'Admin',
       rootPath: '/admin',
       access: StudioZoneAccess.signedIn,
-      // Studio switches to a listed persona before entering a gated zone. The
-      // router guard and the server filters remain the real protection.
-      allowedPersonaIds: ['admin-alex'],
+      // Role-gating is the app's own job — router guard and server filters.
+      // The spec only tells Studio a signed-in session is needed at all.
       screens: [dashboardSpec],
-    ),
-  ],
-  personas: [
-    StudioPersonaSpec(
-      id: 'admin-alex',
-      label: 'Admin · Alex',
-      identifier: '79990000001',
     ),
   ],
   supportedLocales: const ['en', 'ru'],
 );
 ```
+
+Note what is **not** declared: demo personas. Test users and their codes are a
+platform concern — they live in Studio's project config, so your public web
+build ships no test accounts.
 
 The host side connects the running web build to Studio. It returns `null` when there is nothing to
 attach to — not web, not embedded, or the origin is not permitted — and the app carries on exactly
@@ -60,24 +56,26 @@ as before:
 ```dart
 final host = StudioBridgeHost.attach(
   manifest: manifest,
-  delegate: this, // implements StudioBridgeHostDelegate: navigate, switch persona, set locale
+  delegate: this, // implements StudioBridgeHostDelegate: navigate, sign in, set locale
   currentPath: () => router.currentPath,
   currentSession: () => StudioSessionState(
     isSignedIn: session.isSignedIn,
-    activePersonaId: session.personaId,
+    userIdentifier: session.phone, // Studio matches it to its personas
   ),
   currentLocale: () => locale.languageCode,
-  allowedStudioOrigins: const ['https://dartway.studio'],
 );
 ```
 
-`allowedStudioOrigins` is the security model of the bridge. **In a release build an empty allowlist
-means no Studio may connect at all** — you opt in to a Studio origin, you never forget to opt out.
-In debug the channel stays permissive, so a local Studio works without ceremony.
+The channel pins the origin of the first valid Studio message and replies only there. An origin
+allowlist existed in 0.1.0 and was removed for now: zero-config local work first; an embedding page
+can only drive what the bridge exposes (navigation, test sign-in), and an explicit opt-in policy
+can return later.
 
 Studio receives the manifest over the runtime channel on connect, so it can never go stale against
-the build it is previewing. **Credentials never cross the bridge** — persona sign-in happens inside
-the app, through the app's own auth.
+the build it is previewing. Persona sign-in is `onSignInRequest(identifier, secret)`:
+Studio sends the credentials from its config, and the app runs its **regular** auth flow with them
+— exactly as if the user typed the code (DartWay server side: per-user rotatable
+`testVerificationCode`). No special sign-in path ships in the app.
 
 The canonical wiring is `example/dartway_example_flutter/lib/studio/` in the
 [DartWay monorepo](https://github.com/dartway/dartway).

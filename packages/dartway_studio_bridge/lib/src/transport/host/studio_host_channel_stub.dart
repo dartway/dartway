@@ -4,7 +4,4 @@ import '../studio_message_channel.dart';
 bool get isEmbeddedInStudioFrame => false;
 
 /// No transport exists outside the web; the bridge host stays dormant.
-StudioMessageChannel? createStudioHostChannel({
-  required List<String> allowedStudioOrigins,
-}) =>
-    null;
+StudioMessageChannel? createStudioHostChannel() => null;
