@@ -10,8 +10,10 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 
-# Claude Code local (machine-specific) settings
+# Claude Code — внутренняя кухня разработки фреймворка (не для публичного монорепо)
 .claude/settings.local.json
+.claude/skills/
+/CLAUDE.md
 # Project management — private nested repo (dartway_manager)
 project/
 
