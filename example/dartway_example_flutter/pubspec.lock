@@ -327,7 +327,7 @@ packages:
       path: "../../packages/dartway_cli"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   dartway_example_client:
     dependency: "direct main"
     description:
@@ -384,7 +384,7 @@ packages:
       path: "../../packages/dartway_studio_bridge"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   dartx:
     dependency: transitive
     description:

@@ -14,6 +14,9 @@ export 'src/models/studio_zone_spec.dart';
 export 'src/protocol/studio_bridge_message.dart';
 export 'src/protocol/studio_bridge_protocol.dart';
 
+// Access control (shared hashing + a ready-made validator).
+export 'src/access/studio_access_key.dart';
+
 // App side.
 export 'src/host/studio_bridge_host.dart';
 

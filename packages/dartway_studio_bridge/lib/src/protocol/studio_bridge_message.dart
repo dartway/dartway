@@ -52,7 +52,8 @@ sealed class StudioBridgeMessage {
         FeaturesChangedMessage.fromPayload(payload),
       StudioBridgeProtocol.localeChanged =>
         LocaleChangedMessage.fromPayload(payload),
-      StudioBridgeProtocol.studioConnect => const StudioConnectMessage(),
+      StudioBridgeProtocol.studioConnect =>
+        StudioConnectMessage.fromPayload(payload),
       StudioBridgeProtocol.navigateRequest =>
         NavigateRequestMessage.fromPayload(payload),
       StudioBridgeProtocol.signInRequest =>

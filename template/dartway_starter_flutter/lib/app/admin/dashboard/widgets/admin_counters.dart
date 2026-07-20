@@ -4,14 +4,18 @@ import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/studio/logic/app_features.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
 /// Headline counters — live model counts, one tile per model.
 ///
 /// Copy a tile per model you add: the count is a live list, so it updates by
 /// itself when anyone writes the model anywhere.
-class AdminCounters extends ConsumerWidget {
+class AdminCounters extends ConsumerWidget implements DwFeature {
   const AdminCounters({super.key});
+
+  @override
+  DwFeatureSpec get dwFeature => AppFeatures.adminCounters;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

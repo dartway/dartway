@@ -22,7 +22,6 @@ final scheduleSpec = StudioScreenSpec(
   path: '/schedule',
   title: 'Schedule',
   purpose: 'Weekly class timetable...',
-  featureSpec: ['Realtime list via DwRepository'],
   discussionQuestions: ['Should slots be bookable here?'],
 );
 
@@ -44,6 +43,9 @@ final manifest = StudioProjectManifest(
       screens: [/* ... */],
     ),
   ],
+  // The app's full feature catalog — Studio diffs it against its records on
+  // connect. DartWay apps map their feature-registry enum onto StudioFeatureInfo.
+  features: [/* StudioFeatureInfo(id: 'chats/list', title: ..., description: ...) */],
   // Declare two or more locales to get a locale switcher in Studio; the app
   // executes the switch itself via StudioBridgeHostDelegate.onLocaleRequest.
   supportedLocales: ['en', 'ru'],
@@ -59,22 +61,37 @@ final host = StudioBridgeHost.attach(
   currentPath: () => router.currentPath,
   currentSession: () => mySessionState,
   currentLocale: () => myLocale.languageCode, // omit if not localized
+  // Accept only a Studio that presents this project's secret. The build bakes
+  // only the secret's HASH; the secret itself stays in Studio.
+  validateAccessKey: studioHashAccessValidator(
+    const String.fromEnvironment('STUDIO_KEY_HASH'),
+  ),
 );
-host?.reportRoute(newPath);     // on router changes
+host?.reportRoute(newPath, routeName: 'scheduleList'); // on router changes
 host?.reportSession(newState);  // on auth changes
 host?.reportLocale(newLocale);  // on locale changes
 ```
 
 `attach` returns null when the app is not running on web inside an iframe —
 the app stays fully functional and the bridge dormant. The channel pins the
-origin of the first valid Studio message for its replies; there is no origin
-allowlist for now (zero-config local work first).
+origin of the first valid Studio message for its replies.
+
+**Access control.** The `studioConnect` handshake carries an `accessKey`; the
+host answers with its manifest only if `validateAccessKey` accepts it,
+otherwise it stays silent (Studio shows "not connected"). The bridge is
+agnostic to *how* you check — the shipped `studioHashAccessValidator(hash)`
+keeps the secret out of the public build: Studio holds a per-project random
+secret, the app bakes only its hash (`studioAccessKeyHash`, hex SHA-256) and
+compares. An empty expected hash accepts any key (zero-config local dev).
 
 ## Connecting (Studio side)
 
 ```dart
 final controller = createStudioFrameController(appUrl: 'http://localhost:8091/');
-final client = StudioBridgeClient(channel: controller.channel)..start();
+final client = StudioBridgeClient(
+  channel: controller.channel,
+  accessKey: project.accessSecret, // the raw secret; the app checks its hash
+)..start();
 // render: HtmlElementView(viewType: controller.viewType)
 client.events.listen(...); // connected / route / session / locale changed
 client.requestNavigation('/schedule');

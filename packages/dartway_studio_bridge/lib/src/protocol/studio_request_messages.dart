@@ -1,13 +1,27 @@
 part of 'studio_bridge_message.dart';
 
-/// Studio → app: connection request; the app answers with a manifest message.
-/// Sent on Studio start, retried while unconnected, and re-sent whenever an
-/// app-ready message arrives (covers reloads of either side).
+/// Studio → app: connection request; the app answers with a manifest message
+/// only if it accepts [accessKey]. Sent on Studio start, retried while
+/// unconnected, and re-sent whenever an app-ready message arrives (covers
+/// reloads of either side).
+///
+/// [accessKey] is the project's raw access secret, held by Studio. The app
+/// checks it however it likes (see `StudioBridgeHost.attach`); the typical
+/// check is `hash(accessKey) == <hash baked into the build>`, so the secret
+/// never lives in the app's public bundle — only its hash does.
 class StudioConnectMessage extends StudioBridgeMessage {
-  const StudioConnectMessage();
+  const StudioConnectMessage({this.accessKey = ''});
+
+  final String accessKey;
 
   @override
   String get type => StudioBridgeProtocol.studioConnect;
+
+  @override
+  Map<String, dynamic> payloadToJson() => {'accessKey': accessKey};
+
+  factory StudioConnectMessage.fromPayload(Map<String, dynamic> payload) =>
+      StudioConnectMessage(accessKey: payload['accessKey'] as String? ?? '');
 }
 
 /// Studio → app: navigate the live app to the given route path.

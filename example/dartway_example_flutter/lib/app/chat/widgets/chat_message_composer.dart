@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -14,13 +15,7 @@ class ChatMessageComposer extends HookConsumerWidget implements DwFeature {
   final ChatChannel channel;
 
   @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-        id: 'chat-message-composer',
-        title: 'Message composer',
-        description:
-            'Sending is a single DwRepository.saveModel(ChatMessage) — the '
-            'list above updates in realtime, no extra wiring.',
-      );
+  DwFeatureSpec get dwFeature => AppFeatures.chatMessageComposer;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

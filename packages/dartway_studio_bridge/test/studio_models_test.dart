@@ -8,7 +8,6 @@ void main() {
       parentPath: '/schedule',
       title: 'Profile',
       purpose: 'why',
-      featureSpec: ['f1'],
       discussionQuestions: ['q1'],
     );
 
@@ -17,7 +16,6 @@ void main() {
       expect(decoded.path, '/schedule/profile');
       expect(decoded.parentPath, '/schedule');
       expect(decoded.title, 'Profile');
-      expect(decoded.featureSpec.single, 'f1');
       expect(decoded.discussionQuestions.single, 'q1');
     });
 
@@ -34,11 +32,10 @@ void main() {
     test('fromJson tolerates missing and non-string list items', () {
       final decoded = StudioScreenSpec.fromJson(const {
         'path': '/x',
-        'featureSpec': ['ok', 1, null],
+        'discussionQuestions': ['ok', 1, null],
       });
       expect(decoded.title, '');
-      expect(decoded.featureSpec, ['ok']);
-      expect(decoded.discussionQuestions, isEmpty);
+      expect(decoded.discussionQuestions, ['ok']);
     });
   });
 
@@ -99,17 +96,26 @@ void main() {
             ],
           ),
         ],
+        features: [
+          StudioFeatureInfo(
+            id: 'schedule/session-list',
+            title: 'Session list',
+            description: 'Realtime list',
+          ),
+        ],
         supportedLocales: ['en', 'ru'],
       );
       final decoded = StudioProjectManifest.fromJson(manifest.toJson());
       expect(decoded.projectName, 'Demo');
       expect(decoded.zones.single.access, StudioZoneAccess.signedIn);
       expect(decoded.zones.single.screens.single.path, '/schedule');
+      expect(decoded.features.single.id, 'schedule/session-list');
       expect(decoded.supportedLocales, ['en', 'ru']);
     });
 
-    test('supportedLocales defaults to empty', () {
+    test('features and supportedLocales default to empty', () {
       final decoded = StudioProjectManifest.fromJson(const {'projectName': 'x'});
+      expect(decoded.features, isEmpty);
       expect(decoded.supportedLocales, isEmpty);
     });
   });

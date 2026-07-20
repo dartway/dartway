@@ -53,6 +53,14 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       return configuration.isEmpty ? '/' : configuration.uri.path;
     }
 
+    // The stable route identity: the route's declared name (our routes are
+    // enum values, so the name survives path refactors). Screen attribution
+    // binds to it; the path is the instance context.
+    String? currentRouteName() {
+      final configuration = delegate.currentConfiguration;
+      return configuration.isEmpty ? null : configuration.last.route.name;
+    }
+
     _host = StudioBridgeHost.attach(
       manifest: exampleStudioManifest,
       delegate: this,
@@ -62,6 +70,12 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       // freshly connected Studio sees them without waiting for navigation.
       currentFeatures: _mountedFeatureInfos,
       currentLocale: () => ref.read(appLocaleProvider).languageCode,
+      // Accept only a Studio that presents this project's secret. The build
+      // bakes only the secret's HASH (STUDIO_KEY_HASH); the secret stays in
+      // Studio. Empty define = local dev, no check.
+      validateAccessKey: studioHashAccessValidator(
+        const String.fromEnvironment('STUDIO_KEY_HASH'),
+      ),
     );
     if (_host == null) return;
 
@@ -82,7 +96,7 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
     }
 
     void onRouteChanged() {
-      _host?.reportRoute(currentPath());
+      _host?.reportRoute(currentPath(), routeName: currentRouteName());
       reportFeaturesSoon();
     }
 

@@ -6,6 +6,7 @@ import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// Upcoming sessions grouped by day. Each list is live to *your own* writes:
@@ -17,13 +18,7 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
   const ScheduleSessionList({super.key});
 
   @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-        id: 'schedule-session-list',
-        title: 'Realtime session list',
-        description:
-            'ref.watchModelList<ClubSession>() with a backend filter — '
-            'realtime sync, pagination and loading states out of the box.',
-      );
+  DwFeatureSpec get dwFeature => AppFeatures.scheduleSessionList;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

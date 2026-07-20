@@ -9,7 +9,6 @@ StudioScreenSpec studioSpecForRoute(
   DwNavigationRoute<AppRouterState> route, {
   required String title,
   required String purpose,
-  List<String> featureSpec = const [],
   List<String> discussionQuestions = const [],
 }) =>
     StudioScreenSpec(
@@ -17,6 +16,5 @@ StudioScreenSpec studioSpecForRoute(
       parentPath: route.descriptor.parent?.fullPath,
       title: title,
       purpose: purpose,
-      featureSpec: featureSpec,
       discussionQuestions: discussionQuestions,
     );

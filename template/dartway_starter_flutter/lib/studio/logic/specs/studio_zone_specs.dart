@@ -27,15 +27,7 @@ final adminZoneStudioSpec = StudioZoneSpec(
       AdminNavigationZone.admin,
       title: 'Dashboard',
       purpose: 'The admin home: headline counters over live data. The future '
-          'home of event analytics (visits, conversion, retention).',
-      featureSpec: const [
-        'Counters are plain watchModelList calls — the same realtime CRUD '
-            'the client app uses, no separate admin API.',
-        'The whole zone is guarded by role: non-admins are redirected by '
-            'the router guard, and the server filters the data anyway.',
-        'Adaptive shell: a navigation rail on desktop, a bottom bar on '
-            'phones — try switching the preview frame.',
-      ],
+          'home of event analytics (visits, conversion, retention).',
       discussionQuestions: const [
         'Which three numbers does the owner of your product check every morning?',
       ],
@@ -44,14 +36,7 @@ final adminZoneStudioSpec = StudioZoneSpec(
       AdminNavigationZone.users,
       title: 'Users',
       purpose: 'Member management: find a person, see their role, change it '
-          'in place.',
-      featureSpec: const [
-        'The users list is admin-only on the server — the same UserProfile '
-            'model the app uses, filtered by role.',
-        'Role editing is guarded by validateSave on the server: the UI '
-            'dropdown is a convenience, not the protection.',
-        'Search and role filter are client-side over the live list.',
-      ],
+          'in place.',
       discussionQuestions: const [
         'Deactivate a member instead of deleting?',
         'Per-user test verification codes for store reviewers — manage '
@@ -62,11 +47,7 @@ final adminZoneStudioSpec = StudioZoneSpec(
       AdminNavigationZone.settings,
       title: 'Settings',
       purpose: 'Application settings stored in the AppSetting model — the '
-          'business changes its own texts without a redeploy.',
-      featureSpec: const [
-        'AppSetting is a regular CRUD model: admin-only writes, public '
-            'reads — the app picks up changes in realtime.',
-      ],
+          'business changes its own texts without a redeploy.',
       discussionQuestions: const [
         'Which other settings belong here?',
       ],
@@ -83,15 +64,7 @@ final authZoneStudioSpec = StudioZoneSpec(
       AuthNavigationZone.auth,
       title: 'Sign in',
       purpose: 'Passwordless onboarding: phone number + one-time code. The '
-          'fewer steps, the more clients finish registration.',
-      featureSpec: const [
-        'Model-driven auth: the flow is saveModel of DwAuthRequest and '
-            'DwAuthVerification — no custom endpoints.',
-        'Session persists across restarts via the authentication key '
-            'manager.',
-        'Test personas sign in with a per-user test verification code — '
-            'that is how the persona switcher works.',
-      ],
+          'fewer steps, the more clients finish registration.',
       discussionQuestions: const [
         'Alternative code channels: Telegram, email?',
       ],

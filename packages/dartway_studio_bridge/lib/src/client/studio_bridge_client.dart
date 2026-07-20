@@ -10,10 +10,16 @@ import 'studio_bridge_event.dart';
 class StudioBridgeClient {
   StudioBridgeClient({
     required StudioMessageChannel channel,
+    this.accessKey = '',
     this.connectRetryInterval = const Duration(seconds: 2),
   }) : _channel = channel;
 
   final StudioMessageChannel _channel;
+
+  /// The project's access secret, sent with every connect attempt so the app
+  /// can decide whether to accept this Studio (see `StudioBridgeHost.attach`).
+  final String accessKey;
+
   final Duration connectRetryInterval;
 
   final _events = StreamController<StudioProjectEvent>.broadcast();
@@ -31,7 +37,8 @@ class StudioBridgeClient {
     });
   }
 
-  void _sendConnect() => _channel.send(const StudioConnectMessage());
+  void _sendConnect() =>
+      _channel.send(StudioConnectMessage(accessKey: accessKey));
 
   void _onMessage(StudioBridgeMessage message) {
     switch (message) {
@@ -54,8 +61,8 @@ class StudioBridgeClient {
           features: features,
           currentLocale: currentLocale,
         ));
-      case RouteChangedMessage(:final path):
-        _events.add(StudioProjectRouteChanged(path));
+      case RouteChangedMessage(:final path, :final routeName):
+        _events.add(StudioProjectRouteChanged(path, routeName: routeName));
       case SessionChangedMessage(:final session):
         _events.add(StudioProjectSessionChanged(session));
       case FeaturesChangedMessage(:final path, :final features):

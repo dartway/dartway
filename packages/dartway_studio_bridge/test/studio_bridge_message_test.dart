@@ -16,9 +16,17 @@ void main() {
       expect(_roundTrip(const AppReadyMessage()), isA<AppReadyMessage>());
     });
 
-    test('studioConnect', () {
+    test('studioConnect carries the access key', () {
+      final decoded = _roundTrip(const StudioConnectMessage(accessKey: 'abc'));
+      expect((decoded as StudioConnectMessage).accessKey, 'abc');
+      // A legacy connect with no accessKey decodes to an empty key.
       expect(
-          _roundTrip(const StudioConnectMessage()), isA<StudioConnectMessage>());
+        (StudioBridgeMessage.tryDecode(
+          '{"dartwayStudioBridge":3,"type":"studioConnect","payload":{}}',
+        ) as StudioConnectMessage)
+            .accessKey,
+        '',
+      );
     });
 
     test('signOutRequest', () {
@@ -41,9 +49,15 @@ void main() {
       expect(msg.secret, '123456');
     });
 
-    test('routeChanged carries the path', () {
+    test('routeChanged carries the path and optional route name', () {
       final decoded = _roundTrip(const RouteChangedMessage('/auth'));
       expect((decoded as RouteChangedMessage).path, '/auth');
+      expect(decoded.routeName, isNull);
+
+      final named = _roundTrip(
+        const RouteChangedMessage('/ad/123', routeName: 'adDetail'),
+      );
+      expect((named as RouteChangedMessage).routeName, 'adDetail');
     });
 
     test('featuresChanged carries path and features', () {

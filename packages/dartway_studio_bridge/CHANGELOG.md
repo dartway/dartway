@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0
+
+**Per-project access control.** The `studioConnect` handshake now carries an `accessKey`, and
+`StudioBridgeHost.attach` takes a `validateAccessKey` callback — the app answers with its manifest
+only if the key is accepted, otherwise it stays silent (still runs; Studio shows "not connected").
+
+The bridge is agnostic to *how* the key is checked. The shipped default keeps the secret out of the
+app's public build: Studio holds a per-project random secret, the app bakes only its **hash** and
+compares. `studioAccessKeyHash(secret)` (hex SHA-256) and `studioHashAccessValidator(expectedHash)`
+are provided; an empty expected hash accepts any key (zero-config local dev).
+
+```dart
+StudioBridgeHost.attach(
+  // …
+  validateAccessKey: studioHashAccessValidator(
+    const String.fromEnvironment('STUDIO_KEY_HASH'),
+  ),
+);
+```
+
+Adds a `crypto` dependency. `StudioBridgeClient` gains an `accessKey` parameter.
+
 ## 0.2.0
 
 **Demo personas move from the app to Studio** (protocol version 3 — breaking).
@@ -23,6 +45,14 @@ a worse hole than the one avoided. Inverted:
 - The origin allowlist (`allowedStudioOrigins`, release-dormant policy) is removed for now:
   zero-config local work first. The channel still pins the origin of the first valid Studio
   message for its replies; an explicit opt-in policy can return later.
+- `StudioProjectManifest.features`: the app's complete feature catalog (DartWay apps: the values
+  of their feature-registry enum). Studio diffs it on every connect — new features surface
+  immediately, a vanished feature with open work is flagged instead of silently unlinking. The
+  live per-screen subset still arrives via feature reports.
+- `RouteChangedMessage`/`reportRoute` carry an optional `routeName` — the stable route identity
+  (the app's route-enum name); the path is the instance context (`/ad/123`).
+- `StudioScreenSpec.featureSpec` is removed: the Technical view is fed by the live feature scan
+  and the catalog, not by hand-written strings on screen specs.
 
 ## 0.1.0
 

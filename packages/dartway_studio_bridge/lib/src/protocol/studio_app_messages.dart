@@ -56,19 +56,30 @@ class ManifestMessage extends StudioBridgeMessage {
 }
 
 /// App → Studio: the app's router moved to a new location.
+///
+/// [path] is the concrete location (`/ad/123`); [routeName] is the stable
+/// route identity (the app's route-enum name, e.g. `adDetail`) — screen-level
+/// attribution binds to the name, the path is the instance context.
 class RouteChangedMessage extends StudioBridgeMessage {
-  const RouteChangedMessage(this.path);
+  const RouteChangedMessage(this.path, {this.routeName});
 
   final String path;
+  final String? routeName;
 
   @override
   String get type => StudioBridgeProtocol.routeChanged;
 
   @override
-  Map<String, dynamic> payloadToJson() => {'path': path};
+  Map<String, dynamic> payloadToJson() => {
+        'path': path,
+        if (routeName != null) 'routeName': routeName,
+      };
 
   factory RouteChangedMessage.fromPayload(Map<String, dynamic> payload) =>
-      RouteChangedMessage(payload['path'] as String? ?? '/');
+      RouteChangedMessage(
+        payload['path'] as String? ?? '/',
+        routeName: payload['routeName'] as String?,
+      );
 }
 
 /// App → Studio: the features mounted on the current screen changed

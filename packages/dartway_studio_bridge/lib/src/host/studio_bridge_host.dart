@@ -38,6 +38,7 @@ class StudioBridgeHost {
     this._currentSession,
     this._currentFeatures,
     this._currentLocale,
+    this._validateAccessKey,
   ) {
     _subscription = _channel.messages.listen(_onMessage);
     _channel.send(const AppReadyMessage());
@@ -57,6 +58,13 @@ class StudioBridgeHost {
     required StudioSessionState Function() currentSession,
     List<StudioFeatureInfo> Function()? currentFeatures,
     String Function()? currentLocale,
+    // Decides whether a connecting Studio may drive this app, from the access
+    // key it presents. The bridge is agnostic to *how* — pass
+    // `studioHashAccessValidator(const String.fromEnvironment('STUDIO_KEY_HASH'))`
+    // for the baked-hash check, a server call, or your own scheme. Null (or a
+    // validator that always returns true) accepts any Studio — fine for local
+    // dev, wide open in production.
+    Future<bool> Function(String accessKey)? validateAccessKey,
   }) {
     final channel = createStudioHostChannel();
     if (channel == null) return null;
@@ -68,6 +76,7 @@ class StudioBridgeHost {
       currentSession,
       currentFeatures ?? () => const [],
       currentLocale ?? () => '',
+      validateAccessKey ?? (_) async => true,
     );
   }
 
@@ -78,18 +87,17 @@ class StudioBridgeHost {
   final StudioSessionState Function() _currentSession;
   final List<StudioFeatureInfo> Function() _currentFeatures;
   final String Function() _currentLocale;
+  final Future<bool> Function(String accessKey) _validateAccessKey;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
   void _onMessage(StudioBridgeMessage message) {
     switch (message) {
-      case StudioConnectMessage():
-        _channel.send(ManifestMessage(
-          manifest: _manifest,
-          currentPath: _currentPath(),
-          session: _currentSession(),
-          features: _currentFeatures(),
-          currentLocale: _currentLocale(),
-        ));
+      case StudioConnectMessage(:final accessKey):
+        // Answer the handshake only if the access key is accepted; on refusal
+        // stay silent — the app keeps running, Studio shows "not connected".
+        _validateAccessKey(accessKey).then((accepted) {
+          if (accepted) _sendManifest();
+        });
       case NavigateRequestMessage(:final path):
         _delegate.onNavigateRequest(path);
       case SignInRequestMessage(:final identifier, :final secret):
@@ -103,7 +111,16 @@ class StudioBridgeHost {
     }
   }
 
-  void reportRoute(String path) => _channel.send(RouteChangedMessage(path));
+  void _sendManifest() => _channel.send(ManifestMessage(
+        manifest: _manifest,
+        currentPath: _currentPath(),
+        session: _currentSession(),
+        features: _currentFeatures(),
+        currentLocale: _currentLocale(),
+      ));
+
+  void reportRoute(String path, {String? routeName}) =>
+      _channel.send(RouteChangedMessage(path, routeName: routeName));
 
   void reportSession(StudioSessionState session) =>
       _channel.send(SessionChangedMessage(session));

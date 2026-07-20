@@ -25,6 +25,15 @@ The open `dartway_studio_bridge` package is the only integration surface:
   `lib/studio/studio_bridge_binding.dart` in the example). The host is inert
   unless the app runs on web embedded in an iframe; the channel pins the
   origin of the first valid Studio message for its replies.
+- **Access control is per project.** Studio holds a random secret per project;
+  the app accepts a connection only if the presented key passes its
+  `validateAccessKey`. The shipped `studioHashAccessValidator` bakes only the
+  secret's hash into the build (`--dart-define=STUDIO_KEY_HASH=...`), so the
+  secret never lives in the app's public bundle — only its hash does. Grab the
+  hash from the project's settings in Studio.
+- **The feature catalog** (`manifest.features`) is the app's full feature list,
+  from its registry enum; Studio diffs it on connect. The live per-screen
+  subset arrives separately as the app navigates.
 
 See the package [README](../packages/dartway_studio_bridge/README.md) for the
 full API, and `example/dartway_example_flutter/lib/studio/` for the reference

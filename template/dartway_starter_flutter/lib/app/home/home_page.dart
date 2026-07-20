@@ -6,6 +6,7 @@ import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/common/app_scaffold.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/user_profile_provider.dart';
+import 'package:dartway_starter_flutter/studio/logic/app_features.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
 /// The starter home screen — delete it once your domain has its own.
@@ -15,8 +16,11 @@ import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 /// proves the whole path is alive — Postgres → server config → typed live list
 /// → widget. Change the value in the admin panel and watch it update here
 /// without a reload.
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerWidget implements DwFeature {
   const HomePage({super.key});
+
+  @override
+  DwFeatureSpec get dwFeature => AppFeatures.homeLiveSettings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -15,13 +16,7 @@ class ChatMessageList extends ConsumerWidget implements DwFeature {
   final ChatChannel channel;
 
   @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-        id: 'chat-message-list',
-        title: 'Realtime staff chat',
-        description:
-            'A realtime chat is ~40 lines of DwCrudConfig, secure-by-default: '
-            'the staff-only access filter means clients never receive it.',
-      );
+  DwFeatureSpec get dwFeature => AppFeatures.chatMessageList;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

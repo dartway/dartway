@@ -27,11 +27,13 @@ class StudioProjectConnected extends StudioProjectEvent {
   final String currentLocale;
 }
 
-/// The app's router moved to a new location.
+/// The app's router moved to a new location. [routeName] is the stable route
+/// identity (the app's route-enum name), null when the app does not report it.
 class StudioProjectRouteChanged extends StudioProjectEvent {
-  const StudioProjectRouteChanged(this.path);
+  const StudioProjectRouteChanged(this.path, {this.routeName});
 
   final String path;
+  final String? routeName;
 }
 
 /// The app's session changed (sign-in, sign-out, switch progress).

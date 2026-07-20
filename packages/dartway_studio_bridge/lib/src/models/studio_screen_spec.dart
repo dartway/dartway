@@ -13,7 +13,6 @@ class StudioScreenSpec {
     this.parentPath,
     required this.title,
     required this.purpose,
-    this.featureSpec = const [],
     this.discussionQuestions = const [],
   });
 
@@ -28,9 +27,6 @@ class StudioScreenSpec {
   /// CJM / business context: why this screen exists.
   final String purpose;
 
-  /// Which framework capability each feature of the screen demonstrates.
-  final List<String> featureSpec;
-
   final List<String> discussionQuestions;
 
   Map<String, dynamic> toJson() => {
@@ -38,7 +34,6 @@ class StudioScreenSpec {
         if (parentPath != null) 'parentPath': parentPath,
         'title': title,
         'purpose': purpose,
-        'featureSpec': featureSpec,
         'discussionQuestions': discussionQuestions,
       };
 
@@ -48,7 +43,6 @@ class StudioScreenSpec {
         parentPath: json['parentPath'] as String?,
         title: json['title'] as String? ?? '',
         purpose: json['purpose'] as String? ?? '',
-        featureSpec: stringListFromJson(json['featureSpec']),
         discussionQuestions: stringListFromJson(json['discussionQuestions']),
       );
 
