@@ -4,6 +4,7 @@ import 'package:serverpod/serverpod.dart';
 
 import '../domain/api/dw_order_by.dart';
 import '../domain/crud/domain/dw_get_list_interface.dart';
+import '../private/dw_singleton.dart';
 
 class DwCrudEndpoint extends Endpoint {
   final _deepEquality = const DeepCollectionEquality();
@@ -13,7 +14,7 @@ class DwCrudEndpoint extends Endpoint {
     Object? exception,
     StackTrace? stackTrace,
   }) {
-    DwCore.instance.alerts.reportError(
+    dw.alerts.reportError(
       errorMessage,
       exception: exception,
       stackTrace: StackTrace.current,
@@ -36,7 +37,7 @@ class DwCrudEndpoint extends Endpoint {
     String? apiGroup,
   }) async {
     try {
-      final caller = DwCore.instance.getCrudConfig(className, api: apiGroup);
+      final caller = dw.getCrudConfig(className, api: apiGroup);
 
       session.log(
         'getOne for $className with filter: ${filter.attributeMap}',
@@ -60,15 +61,13 @@ class DwCrudEndpoint extends Endpoint {
 
       return await config.call(session, caller.table, filter);
     } catch (ex) {
-      DwCore.instance.alerts.reportError(
-        ex.toString(),
-        stackTrace: StackTrace.current,
-      );
+      dw.alerts.reportError(ex.toString(), stackTrace: StackTrace.current);
 
       return DwApiResponse(
         isOk: false,
         value: null,
-        error: 'Unexpected error while handling the getOne request '
+        error:
+            'Unexpected error while handling the getOne request '
             'for $className',
       );
     }
@@ -80,7 +79,7 @@ class DwCrudEndpoint extends Endpoint {
     DwBackendFilter? filter,
     String? apiGroup,
   }) async {
-    final caller = DwCore.instance.getCrudConfig(className, api: apiGroup);
+    final caller = dw.getCrudConfig(className, api: apiGroup);
 
     session.log(
       'getCount for $className with filter: $filter',
@@ -106,12 +105,12 @@ class DwCrudEndpoint extends Endpoint {
     int? offset,
     String? apiGroup,
   }) async {
-    final crudConfig = DwCore.instance.getCrudConfig(className, api: apiGroup);
+    final crudConfig = dw.getCrudConfig(className, api: apiGroup);
 
     DwGetListInterface? caller = crudConfig?.getListConfig;
 
     if (caller == null) {
-      final dtoConfig = DwCore.instance.getDtoConfig(className, api: apiGroup);
+      final dtoConfig = dw.getDtoConfig(className, api: apiGroup);
       if (dtoConfig is DwDtoGetListConfig) {
         caller = dtoConfig;
       }
@@ -121,14 +120,13 @@ class DwCrudEndpoint extends Endpoint {
       return DwApiResponse.notConfigured(source: 'getAll for $className');
     }
 
-    final table =
-        caller is DwDtoGetListConfig ? caller.queryTable : crudConfig!.table;
+    final table = caller is DwDtoGetListConfig
+        ? caller.queryTable
+        : crudConfig!.table;
 
     return await caller.getModelList(
       session,
-      whereClause: filter?.prepareWhere(
-        table,
-      ),
+      whereClause: filter?.prepareWhere(table),
       orderByList: orderByList?.map((e) => e.prepareOrderBy(table)).toList(),
       limit: limit,
       offset: offset,
@@ -148,15 +146,14 @@ class DwCrudEndpoint extends Endpoint {
         // throw UnsupportedError(
         //   'Received item of unsupported type: ${model.runtimeType}. Only TableRow could be saved to database',
         // );
-        final caller = DwCore.instance.getDtoConfig(className, api: apiGroup);
+        final caller = dw.getDtoConfig(className, api: apiGroup);
 
         if (caller == null || caller is! DwDtoActionConfig) {
           return DwApiResponse.notConfigured(source: 'saveModel $className');
         }
         return await caller.save(session, model);
       } else {
-        final caller =
-            DwCore.instance.getCrudConfig(className, api: apiGroup)?.saveConfig;
+        final caller = dw.getCrudConfig(className, api: apiGroup)?.saveConfig;
 
         if (caller == null) {
           return DwApiResponse.notConfigured(source: 'saveModel $className');
@@ -187,8 +184,7 @@ class DwCrudEndpoint extends Endpoint {
       }
 
       final className = wrappedModel.dwMappingClassname;
-      final caller =
-          DwCore.instance.getCrudConfig(className, api: apiGroup)?.saveConfig;
+      final caller = dw.getCrudConfig(className, api: apiGroup)?.saveConfig;
 
       if (caller == null) {
         throw Exception('notConfigured(source: saveModelStream $className');
@@ -240,8 +236,7 @@ class DwCrudEndpoint extends Endpoint {
     String? apiGroup,
   }) async {
     try {
-      final caller =
-          DwCore.instance.getCrudConfig(className, api: apiGroup)?.deleteConfig;
+      final caller = dw.getCrudConfig(className, api: apiGroup)?.deleteConfig;
 
       if (caller == null) {
         return DwApiResponse.notConfigured(source: 'delete $className');

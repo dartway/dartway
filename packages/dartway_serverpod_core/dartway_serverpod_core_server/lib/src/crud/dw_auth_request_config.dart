@@ -3,6 +3,7 @@ import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_concurre
 import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_request_extension.dart';
 import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_utils.dart';
 import 'package:serverpod/serverpod.dart';
+import '../private/dw_singleton.dart';
 
 const verificationCodeKey = 'verificationCode';
 
@@ -29,7 +30,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
             saveContext.currentModel.createdAt = DateTime.now();
           }
 
-          final failReason = await DwCore.instance.prevalidateAuthAttempt(
+          final failReason = await dw.prevalidateAuthAttempt(
             session,
             saveContext.currentModel,
           );
@@ -49,7 +50,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
 
           if (saveContext.currentModel.status ==
               DwAuthRequestStatus.pendingVerification) {
-            final authConfig = DwCore.instance.auth!.config;
+            final authConfig = dw.auth!.config;
 
             // Only one request per identifier may be counted at a time:
             // parallel ones would otherwise each see the same recent rows, all
@@ -84,8 +85,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
               transaction: saveContext.transaction,
             );
 
-            if (recentRequestCount >=
-                authConfig.maxAuthRequestsPerIdentifier) {
+            if (recentRequestCount >= authConfig.maxAuthRequestsPerIdentifier) {
               saveContext.currentModel.setFailed(
                 session,
                 DwAuthFailReason.rateLimited,
@@ -93,8 +93,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
               return;
             }
 
-            final verificationCode = await DwCore
-                .instance
+            final verificationCode = await dw
                 .auth!
                 .config
                 .generateVerificationCodeMethod
@@ -121,7 +120,7 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
             null,
     afterSaveSideEffects: (session, saveContext) async {
       if (saveContext.extras[verificationCodeKey] != null) {
-        await DwCore.instance.auth!.config.sendVerificationCodeMethod?.call(
+        await dw.auth!.config.sendVerificationCodeMethod?.call(
           session,
           verificationRequest: saveContext.currentModel,
           verificationCode: saveContext.extras[verificationCodeKey] as String,

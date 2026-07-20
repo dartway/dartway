@@ -1,6 +1,8 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../../private/dw_singleton.dart';
+
 /// Database-level guards for the auth flow.
 ///
 /// Every auth limit — verification attempts, request rate, one-time access
@@ -18,10 +20,6 @@ import 'package:serverpod/serverpod.dart';
 /// already handling this identifier or request, which for a rate limit is not an
 /// error condition but the answer: too fast.
 abstract final class DwAuthConcurrency {
-  /// Advisory-lock namespaces, so the two guards cannot collide on a key.
-  static const _authRequestNamespace = 1;
-  static const _identifierNamespace = 2;
-
   /// Tries to take the verification lock for one auth request.
   ///
   /// Returns `false` when another verification of the same request is already
@@ -31,13 +29,11 @@ abstract final class DwAuthConcurrency {
     Session session,
     int authRequestId, {
     required Transaction? transaction,
-  }) => _tryAdvisoryLock(
+  }) => dw.advisoryLock.tryLock(
     session,
-    namespace: _authRequestNamespace,
-    keyExpression: '@key',
-    parameters: {'key': authRequestId},
+    namespace: DwAdvisoryLockNamespace.authRequest,
+    key: authRequestId,
     transaction: transaction,
-    what: 'tryLockAuthRequest',
   );
 
   /// Tries to take the request-rate lock for one user identifier.
@@ -50,13 +46,11 @@ abstract final class DwAuthConcurrency {
     Session session,
     String userIdentifier, {
     required Transaction? transaction,
-  }) => _tryAdvisoryLock(
+  }) => dw.advisoryLock.tryLock(
     session,
-    namespace: _identifierNamespace,
-    keyExpression: 'hashtext(@key)',
-    parameters: {'key': userIdentifier},
+    namespace: DwAdvisoryLockNamespace.authIdentifier,
+    key: userIdentifier,
     transaction: transaction,
-    what: 'tryLockIdentifier',
   );
 
   /// Atomically claims a verified auth request, moving it to
@@ -82,30 +76,5 @@ abstract final class DwAuthConcurrency {
     );
 
     return affectedRows == 1;
-  }
-
-  static Future<bool> _tryAdvisoryLock(
-    Session session, {
-    required int namespace,
-    required String keyExpression,
-    required Map<String, Object?> parameters,
-    required Transaction? transaction,
-    required String what,
-  }) async {
-    if (transaction == null) {
-      throw StateError(
-        '$what requires an active transaction: a transaction-scoped advisory '
-        'lock taken outside one is released immediately, so the guard would '
-        'quietly buy nothing.',
-      );
-    }
-
-    final result = await session.db.unsafeQuery(
-      'SELECT pg_try_advisory_xact_lock($namespace, $keyExpression)',
-      parameters: QueryParameters.named(parameters),
-      transaction: transaction,
-    );
-
-    return result.first.first as bool;
   }
 }

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
+import '../../private/dw_singleton.dart';
 
 class DwAuthUtils {
   static final Random _random = Random.secure();
@@ -22,14 +23,11 @@ class DwAuthUtils {
   }
 
   static String hashAuthKey(String key) {
-    return hashString(DwCore.instance.auth!.config.authKeySalt, key);
+    return hashString(dw.auth!.config.authKeySalt, key);
   }
 
   static String hashVerificationCode(String verificationCode) {
-    return hashString(
-      DwCore.instance.auth!.config.verificationCodeSalt,
-      verificationCode,
-    );
+    return hashString(dw.auth!.config.verificationCodeSalt, verificationCode);
   }
 
   static String generateSecureToken([int length = 32]) {

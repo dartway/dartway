@@ -2,6 +2,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 import 'dw_auth_utils.dart';
+import '../../private/dw_singleton.dart';
 
 class DwAuth<UserProfileClass extends TableRow> {
   final DwAuthConfig<UserProfileClass> config;
@@ -143,7 +144,7 @@ class DwAuth<UserProfileClass extends TableRow> {
       }
 
       // Check if user profile exists (without FK)
-      final userProfile = await DwCore.instance.getUserProfile(session, userId);
+      final userProfile = await dw.getUserProfile(session, userId);
       if (userProfile == null) {
         throw StateError('UserProfile with id=$userId not found.');
       }

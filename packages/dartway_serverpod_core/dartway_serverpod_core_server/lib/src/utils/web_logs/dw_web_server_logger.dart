@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
+import '../../private/dw_singleton.dart';
 
 /// Universal web request logger for Serverpod routes.
 /// Handles reading the body once, error handling, and DB logging.
@@ -86,11 +87,7 @@ class DwWebServerLogger {
       status = 'error';
       statusCode = HttpStatus.internalServerError;
 
-      DwCore.instance.alerts.reportError(
-        '❌ $handler failed',
-        exception: e,
-        stackTrace: st,
-      );
+      dw.alerts.reportError('❌ $handler failed', exception: e, stackTrace: st);
 
       request.response
         ..statusCode = HttpStatus.internalServerError
@@ -128,7 +125,7 @@ class DwWebServerLogger {
           ),
         );
       } catch (e, st) {
-        DwCore.instance.alerts.reportError(
+        dw.alerts.reportError(
           '⚠️ Failed to write DwWebServerLog',
           exception: e,
           stackTrace: st,
@@ -140,9 +137,7 @@ class DwWebServerLogger {
   static bool _isSensitiveKey(String key, List<String> keys) {
     final lower = key.toLowerCase();
 
-    return keys.any(
-      (k) => lower == k.toLowerCase(),
-    );
+    return keys.any((k) => lower == k.toLowerCase());
   }
 
   static Map<String, String> _sanitizeHeaders(
@@ -157,10 +152,7 @@ class DwWebServerLogger {
     });
   }
 
-  static String? _sanitizeBody(
-    String? body,
-    List<String> extraKeys,
-  ) {
+  static String? _sanitizeBody(String? body, List<String> extraKeys) {
     if (body == null) return null;
 
     try {

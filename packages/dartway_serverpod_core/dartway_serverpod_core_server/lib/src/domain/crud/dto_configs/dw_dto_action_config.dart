@@ -4,6 +4,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 import '../domain/dw_crud_entity.dart';
+import '../../../private/dw_singleton.dart';
 
 class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
   const DwDtoActionConfig({
@@ -12,13 +13,18 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
   });
 
   final Future<List<DwModelWrapper>> Function(
-      Session session, Transaction transaction, DTO dto) actionProcessing;
+    Session session,
+    Transaction transaction,
+    DTO dto,
+  )
+  actionProcessing;
 
   final Future<void> Function(
     Session session,
     DTO dto,
     List<DwModelWrapper> updatedModels,
-  )? afterSaveSideEffects;
+  )?
+  afterSaveSideEffects;
 
   /// Runs [actionProcessing] in a transaction, then fires the side effects.
   Future<DwApiResponse<DwModelWrapper>> save(Session session, DTO dto) async {
@@ -30,7 +36,7 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
         updatedModels = await actionProcessing(session, transaction, dto);
       });
     } on DatabaseException catch (e, stackTrace) {
-      DwCore.instance.alerts.reportError(
+      dw.alerts.reportError(
         'Database error while running the ${DTO.toString()} action',
         exception: e,
         stackTrace: stackTrace,

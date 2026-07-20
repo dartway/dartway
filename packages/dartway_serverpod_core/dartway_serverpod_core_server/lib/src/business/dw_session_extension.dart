@@ -2,10 +2,11 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 import '../endpoints/dw_real_time_endpoint.dart';
+import '../private/dw_singleton.dart';
 
 extension DwSessionExtension on Session {
   Future<int?> get currentUserProfileId async =>
-      await DwCore.instance.currentUserProfile(this).then((value) => value?.id);
+      await dw.currentUserProfile(this).then((value) => value?.id);
 
   Future<bool> isUser(int userProfileId) async =>
       userProfileId == await currentUserProfileId;

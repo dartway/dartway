@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
+import '../../../private/dw_singleton.dart';
 
 /// How one model gets saved: who may do it, what makes it valid, and what
 /// happens around the write.
@@ -47,13 +48,13 @@ class DwSaveConfig<T extends TableRow> {
   /// Who may save this model, on both insert and update. Required: a model
   /// with no rule is not saved by anyone.
   final Future<bool> Function(Session session, DwSaveContext<T> saveContext)
-      allowSave;
+  allowSave;
 
   /// Validates the model. Return the error text to reject the save, or null to
   /// let it through. Runs before the transaction opens — see the note on
   /// [DwSaveConfig].
   final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
-      validateSave;
+  validateSave;
 
   /// Prepares the model for the write, and is the place for any rule that must
   /// be evaluated against live data. Runs inside the transaction.
@@ -62,29 +63,30 @@ class DwSaveConfig<T extends TableRow> {
   /// the client gets that text, exactly as with [validateSave] — or null to let
   /// it through.
   final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
-      beforeSaveTransaction;
+  beforeSaveTransaction;
 
   /// Further database work once the model is written. Runs inside the
   /// transaction, so it rolls back with it — including on a rejection: return
   /// the error text to undo the write, or null to keep it.
   final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
-      afterSaveTransaction;
+  afterSaveTransaction;
 
   /// Enriches the saved model before it is returned. Runs **outside** the
   /// transaction and may be slow.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
-      afterSaveTransform;
+  afterSaveTransform;
 
   /// Side effects: notifications, async tasks, anything the caller need not
   /// wait for. Runs **outside** the transaction, non-blocking.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
-      afterSaveSideEffects;
+  afterSaveSideEffects;
 
   /// Saves [model], running the lifecycle described on [DwSaveConfig].
   Future<DwApiResponse<DwModelWrapper>> save(Session session, T model) async {
     final isInsert = model.id == null;
-    final initialModel =
-        isInsert ? null : await session.db.findById<T>(model.id!);
+    final initialModel = isInsert
+        ? null
+        : await session.db.findById<T>(model.id!);
 
     if (initialModel == null && !isInsert) {
       return DwApiResponse(
@@ -148,7 +150,7 @@ class DwSaveConfig<T extends TableRow> {
       // the caller, not a failure — no alert.
       return DwApiResponse(isOk: false, value: null, error: rejection.message);
     } on DatabaseException catch (e, stackTrace) {
-      DwCore.instance.alerts.reportError(
+      dw.alerts.reportError(
         'Database error while saving ${T.toString()}',
         exception: e,
         stackTrace: stackTrace,

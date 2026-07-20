@@ -9,6 +9,7 @@ import '../business/cloud_storage/dw_cloud_storage.dart';
 import '../crud/dw_auth_key_config.dart';
 import '../crud/dw_auth_request_config.dart';
 import '../domain/crud/domain/dw_crud_entity.dart';
+import '../private/dw_singleton.dart';
 import '../utils/iterable_extension.dart';
 
 // TODO: add documentation
@@ -53,15 +54,6 @@ class DwCore<UserProfileClass extends TableRow> {
 
   final DwCloudStorage? cloudStorage;
 
-  static DwCore? _instance;
-
-  static DwCore get instance {
-    if (_instance == null) {
-      throw Exception('DwCore not initialized. Call init() first.');
-    }
-    return _instance!;
-  }
-
   /// Initialize DartWay Core
   static DwCore<UserProfileClass> init<UserProfileClass extends TableRow>({
     required Table userProfileTable,
@@ -77,10 +69,6 @@ class DwCore<UserProfileClass extends TableRow> {
     DwAuthConfig<UserProfileClass>? dwAuthConfig,
     DwCloudStorageConfig? cloudStorageConfig,
   }) {
-    if (_instance != null) {
-      throw Exception('DwCore already initialized');
-    }
-
     final instance = DwCore<UserProfileClass>._(
       userProfileTable: userProfileTable,
       crudConfigurations: crudConfigurations,
@@ -96,7 +84,7 @@ class DwCore<UserProfileClass extends TableRow> {
           : null,
     );
 
-    _instance = instance;
+    setDwInstance(instance);
 
     return instance;
   }
@@ -143,9 +131,8 @@ class DwCore<UserProfileClass extends TableRow> {
           table: userProfileTable,
           getModelConfigs: [
             DwGetModelConfig<UserProfileClass>(
-              accessFilter: (session) async => _userInfoIdColumn.equals(
-                _authenticatedUserId(session) ?? 0,
-              ),
+              accessFilter: (session) async =>
+                  _userInfoIdColumn.equals(_authenticatedUserId(session) ?? 0),
               filterPrototype: DwBackendFilter.equalsPrototype(
                 fieldName: DwCoreConst.userProfileIdColumnName,
               ),
@@ -164,6 +151,9 @@ class DwCore<UserProfileClass extends TableRow> {
       crudConfigurations.map((config) => MapEntry(config.className, config)),
     );
   }
+
+  /// Non-blocking, transaction-scoped advisory locks — `dw.advisoryLock`.
+  DwAdvisoryLock get advisoryLock => const DwAdvisoryLock();
 
   DwCrudConfig<TableRow>? getCrudConfig(String className, {String? api}) =>
       _crudConfiguration[api ?? DwCoreConst.defaultApi]?[className];

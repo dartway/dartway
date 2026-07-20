@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+**One `dw` root on the server.** The initialized core is now reached through a single package-private
+`dw` object (mirroring the Flutter side), so framework code accesses every service the same way —
+`dw.advisoryLock`, `dw.alerts`, `dw.getCrudConfig(...)`. The static `DwCore.instance` accessor is gone;
+all internal call sites moved to `dw`. The framework does not export `dw` — the app declares its own
+typed `dw` (`DwCore<UserProfile>`), one access style across the whole stack.
+
+- **`dw.advisoryLock`** — `DwAdvisoryLock`, a non-blocking, transaction-scoped Postgres advisory-lock
+  primitive keyed on `(namespace, key)`, with framework-reserved namespaces in `DwAdvisoryLockNamespace`.
+  Generalises the guard previously inlined in the auth flow (`DwAuthConcurrency` now delegates to it),
+  so any subsystem — push delivery, account deletion, outbound jobs — reuses one primitive instead of
+  hand-rolling advisory-lock SQL.
+- **`DwRecurringFutureCall`** — base class for a recurring future call that owns its whole lifecycle:
+  registration, first run, re-arming after every run (including a failed one, reported via `dw.alerts`),
+  and cancelling a stale schedule on restart. A subclass declares only `name`, `interval` and `run`;
+  the app hands its jobs to `DwRecurringFutureCall.startAll(pod, [...])` once at startup and touches no
+  Serverpod future-call plumbing. The imperative scheduler Serverpod 3 deprecated is isolated to one
+  private method behind this seam.
+
 ## 0.1.0
 
 First public release — the server half of the DartWay core, a Serverpod module.

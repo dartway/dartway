@@ -2,6 +2,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 import 'dw_auth_concurrency.dart';
+import '../../private/dw_singleton.dart';
 
 extension DwAuthRequestVerification on DwAuthRequest {
   /// Whether the request carries a credential issued by a third party, which
@@ -31,7 +32,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
   }
 
   Future<TableRow?> findRelatedUserProfile(Session session) async {
-    final userProfile = await DwCore.instance.getUserProfileByIdentifier(
+    final userProfile = await dw.getUserProfileByIdentifier(
       session,
       userIdentifier,
     );
@@ -53,8 +54,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
     // External providers (Apple, …): validate the provider credential, then
     // register on first sign-in or log in when the user already exists.
     if (isExternalProvider) {
-      final verifyExternal =
-          DwCore.instance.auth!.config.verifyExternalCredential;
+      final verifyExternal = dw.auth!.config.verifyExternalCredential;
 
       // An unconfigured provider is a closed door, not an open one.
       if (verifyExternal == null) {
@@ -95,7 +95,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
 
       // Reads whichever format the hash is in — and quietly upgrades a legacy
       // one to the active hasher, so a migrated user pays that path only once.
-      final isValid = await DwCore.instance.auth!.verifyPassword(
+      final isValid = await dw.auth!.verifyPassword(
         session,
         userId: userId!,
         password: password!,
@@ -161,10 +161,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
   }) async {
     switch (requestType) {
       case DwAuthRequestType.login:
-        final authKey = await DwCore.instance.auth!.signInUser(
-          session,
-          userId!,
-        );
+        final authKey = await dw.auth!.signInUser(session, userId!);
         return [
           DwModelWrapper(
             object: DwAuthData(
@@ -179,7 +176,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
           throw Exception('New password is not provided');
         }
 
-        await DwCore.instance.auth!.setUserPassword(
+        await dw.auth!.setUserPassword(
           session,
           userId: userId!,
           newPassword: newPassword,
@@ -187,25 +184,19 @@ extension DwAuthRequestVerification on DwAuthRequest {
 
         return [];
       case DwAuthRequestType.register:
-        userId = await DwCore.instance.createUserProfile(
-          session,
-          registrationRequest: this,
-        );
+        userId = await dw.createUserProfile(session, registrationRequest: this);
 
-        userProfile = await DwCore.instance.getUserProfile(session, userId!);
+        userProfile = await dw.getUserProfile(session, userId!);
 
         if (newPassword != null) {
-          await DwCore.instance.auth!.setUserPassword(
+          await dw.auth!.setUserPassword(
             session,
             userId: userId!,
             newPassword: newPassword,
           );
         }
 
-        final authKey = await DwCore.instance.auth!.signInUser(
-          session,
-          userId!,
-        );
+        final authKey = await dw.auth!.signInUser(session, userId!);
 
         return [
           DwModelWrapper(

@@ -2,6 +2,7 @@
 
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
+import '../private/dw_singleton.dart';
 
 class DwUploadEndpoint extends Endpoint {
   @override
@@ -11,8 +12,9 @@ class DwUploadEndpoint extends Endpoint {
     Session session, {
     required String path,
   }) async {
-    final t = await DwCore.instance.cloudStorage!
-        .createMultipartUploadDescription(objectPath: path);
+    final t = await dw.cloudStorage!.createMultipartUploadDescription(
+      objectPath: path,
+    );
 
     // final t11 = jsonDecode(t);
 
@@ -30,7 +32,7 @@ class DwUploadEndpoint extends Endpoint {
   //   Session session, {
   //   required String path,
   // }) async {
-  //   return await DwCore.instance.cloudStorage!
+  //   return await dw.cloudStorage!
   //       .createMultipartUploadDescription(path: path);
   // }
 
@@ -38,12 +40,12 @@ class DwUploadEndpoint extends Endpoint {
     Session session, {
     required String path,
   }) async {
-    final info = await DwCore.instance.cloudStorage!.statObject(path);
+    final info = await dw.cloudStorage!.statObject(path);
 
     if (info.size == null || info.size! <= 0) return null;
 
     final file = await session.db.insertRow(
-      DwCore.instance.cloudStorage!.createCloudFile(
+      dw.cloudStorage!.createCloudFile(
         userId: await session.currentUserProfileId,
         objectPath: path,
         size: info.size!,
