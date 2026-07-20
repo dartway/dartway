@@ -1,0 +1,60 @@
+# Claude reviews every pull request and posts findings as inline comments.
+# Requires one repository secret: CLAUDE_CODE_OAUTH_TOKEN
+#   (GitHub → Settings → Secrets and variables → Actions → New repository secret).
+# Generate the token with `claude setup-token` (Claude Code CLI). Without it the
+# job fails; delete this file if you don't want automated PR review.
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ github.event.pull_request.head.repo.fork != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Сделай ревью изменений этого pull request (diff против базовой ветки PR).
+            Проект — монорепо на Serverpod + DartWay + Flutter (CRUD-конфиги, domain-first,
+            генерируемый клиент dartway_starter_client править нельзя).
+
+            Не комментируй сгенерированные и платформенные файлы: dartway_starter_client/**,
+            **/generated/**, *.g.dart, *.freezed.dart, *.mocks.dart, *.pb.dart; iOS/Android
+            проектные и конфиг-файлы (*.pbxproj, *.xcconfig, *.xcscheme, *.plist,
+            *.entitlements, Podfile.lock, Runner.xcodeproj/**); локфайлы и ассеты
+            (pubspec.lock, *.lock, *.png, *.jpg, *.svg, *.webp). Фокус — ручной Dart-код.
+
+            Ищи: баги и логические ошибки, потенциальные null/типовые проблемы, гонки и
+            сайд-эффекты, проблемы безопасности. Только уверенные находки.
+
+            Для построчных замечаний используй mcp__github_inline_comment__create_inline_comment
+            (с confirmed: true). Для итоговой сводки используй gh pr comment. Если всё чисто —
+            напиши это сводным комментарием. Публикуй только через GitHub-комментарии,
+            ревью текстом-сообщением не выводи.
+          claude_args: |
+            --model claude-opus-4-8
+            --max-turns 50
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

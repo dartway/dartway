@@ -60,3 +60,10 @@ auth tables around themselves, which makes them stateful neighbours rather than
 isolated units: run in parallel they wipe each other's rows mid-test. Files
 therefore run one at a time — pinned in `dart_test.yaml`, not left to whoever
 remembers a flag.
+
+## Continuous integration
+
+`.github/workflows/claude-review.yml` runs a Claude review on every pull request
+and posts findings as inline comments. It needs one repository secret,
+`CLAUDE_CODE_OAUTH_TOKEN` (generate it with `claude setup-token`); without it the
+job fails. Delete the file to turn PR review off.
