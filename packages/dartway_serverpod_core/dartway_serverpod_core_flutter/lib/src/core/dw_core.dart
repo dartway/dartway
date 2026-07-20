@@ -106,6 +106,10 @@ class DwCore<
     }
   }
 
+  /// The single client-side data-access point — reads (providers), writes and
+  /// realtime — reached as `dw.repo`.
+  DwRepo get repo => const DwRepo();
+
   /// Out-of-the-box alerting: unless the app installed its own error policy
   /// in [DwConfig], every reported error goes to [dwAlerts] enriched with the
   /// app-state context (route, mounted features, action/call, user).

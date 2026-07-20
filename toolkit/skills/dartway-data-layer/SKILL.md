@@ -2,10 +2,11 @@
 name: dartway-data-layer
 description: >-
   DartWay Flutter data-layer и specials (проекты DartWay): доступ к данным только
-  через watchModel/readModel/watchMaybeModel/readMaybeModel/saveModel/deleteModel/watchModelList
+  через dw.repo — чтение как провайдеры под родной ref.watch/read/refresh
+  (dw.repo.model/maybeModel/modelList), запись dw.repo.saveModel/deleteModel
   (никаких репозиториев и ручной синхронизации), списки через dwBuildListAsync(loadingItemsCount:),
-  локальный фильтр через frontendFilter (по-элементный предикат), действия из UI через
-  dw.action (единая обработка ошибок/loading), уведомления через dw.notify.* (не SnackBar),
+  сужение запросом через backendFilter, локальную фильтрацию делай сам .where в виджете,
+  действия из UI через dw.action (единая обработка ошибок/loading), уведомления через dw.notify.* (не SnackBar),
   профиль через ref.watchUserProfile/readUserProfile (геттеры, не CRUD), выход через
   sessionProvider.notifier.signOut(). Использовать при работе с данными, действиями, уведомлениями,
   загрузкой/сохранением моделей во Flutter-фичах.
@@ -15,30 +16,29 @@ description: >-
 
 Во Flutter DartWay **доступ к данным и побочные действия идут через готовый data-layer**, а не через репозитории, ручные `Future`/`setState` и сырые попапы. Это даёт единообразную обработку ошибок, loading и реактивность. Источник правил чистоты — `dartway-clean-code`; карта слоёв — `__FLUTTER_PKG__/CLAUDE.md`.
 
-> ⚠️ API ниже сверен с кодовой базой. `DwCallback` **не существует** — это `DwUiAction`. `watchUserProfile` — **геттер** (без скобок).
+> ⚠️ API ниже сверен с кодовой базой. Чтение — провайдеры под `ref.watch(dw.repo.…)`, **не** `ref.watchModel`. `DwCallback` **не существует** — это `DwUiAction`. `watchUserProfile` — **геттер** (без скобок).
 
 ---
 
-## 1. Доступ к данным — только методы data-layer
+## 1. Доступ к данным — только через `dw.repo`
 
-**Зачем:** один контракт чтения/записи на все фичи. `watch` — реактивная подписка (UI перестраивается), `read` — разовое чтение. Конфиг чтения/записи задаётся на сервере (`DwCrudConfig`), фронту репозитории не нужны.
+**Зачем:** одна точка данных на все фичи. Чтение — риверпод-провайдеры, которые ты потребляешь **родным** `ref`: `ref.watch` — реактивная подписка (UI перестраивается), `ref.read(...future)` — разовое чтение, `ref.refresh(...future)` — принудительный свежий фетч. Запись — методы. Конфиг чтения/записи задаётся на сервере (`DwCrudConfig`), фронту репозитории не нужны.
 
 ```dart
 // ❌ свой репозиторий / ручной фьючер / прямой клиент
 final repo = ChatRepository();
 final posts = await repo.fetchPosts();
 
-// ✅ data-layer методы
-final coursesAsync = ref.watchModelList<LearningCourse>();        // реактивный список
-final course      = ref.readModel<LearningCourse>(filter: ...);   // разовое чтение
-final maybe       = ref.watchMaybeModel<UserCourse>(filter: ...); // null вместо ошибки
-await DwRepository.saveModel(updatedCourse);                       // create+update (один save)
-await DwRepository.deleteModel(post);
+// ✅ dw.repo — единая точка данных
+final coursesAsync = ref.watch(dw.repo.modelList<LearningCourse>());         // реактивный список
+final course       = ref.watch(dw.repo.model<LearningCourse>(filter: ...));  // AsyncValue<T>, нет → StateError
+final maybe        = ref.watch(dw.repo.maybeModel<UserCourse>(filter: ...)); // AsyncValue<T?>, null вместо ошибки
+final once         = await ref.read(dw.repo.model<LearningCourse>(id: 1).future); // разовое чтение
+await dw.repo.saveModel(updatedCourse);                                      // create+update (один save)
+await dw.repo.deleteModel(post);
 ```
 
-**Чтение — через `ref`, запись — через `DwRepository`.** `ref.saveModel` не существует: запись не зависит от жизненного цикла виджета, поэтому это статические методы `DwRepository.saveModel` / `DwRepository.deleteModel` — их можно звать откуда угодно, в том числе не из билда.
-
-Методы чтения: `watchModel` / `readModel` / `watchMaybeModel` / `readMaybeModel`, `watchModelList` / `readModelList` — все на `ref`. `...Maybe...` возвращают `null` вместо ошибки. **Create и Update — это один `saveModel`** (закон CRUD).
+**Чтение — провайдеры `dw.repo.model/maybeModel/modelList` под родным `ref`; запись — методы `dw.repo.saveModel/deleteModel`.** Никаких `ref.watchModel` и `DwRepository.` — единственная точка доступа к данным это `dw.repo`. `model` бросает `StateError`, если модели нет; `maybeModel` возвращает `null`. Принудительный фетч — `ref.refresh(dw.repo.maybeModel(...).future)` (фетчащий провайдер). **Create и Update — это один `saveModel`** (закон CRUD).
 
 ## 2. Списки — через `dwBuildListAsync`
 
@@ -60,30 +60,18 @@ coursesAsync.dwBuildListAsync(
 **Заводя новую модель, зарегистрируй её default-инстанс** в `__FLUTTER_PKG__/lib/core/default_models.dart` — по вызову на модель:
 
 ```dart
-DwRepository.setupRepository(
-  defaultModel: ClubSession(id: DwRepository.mockModelId, capacity: 10, ...),
+dw.repo.setupRepository(
+  defaultModel: ClubSession(id: dw.repo.mockModelId, capacity: 10, ...),
 );
 ```
 
 Скелетон рисуется из твоего же виджета, построенного на этом инстансе, — поэтому он похож на будущий контент, а не на generic-шиммер. Без регистрации первый же `dwBuildListAsync` падает в рантайме: `Default Objects Repository doesn't contain a model of type X`.
 
-## 3. Локальный фильтр/поиск — `frontendFilter` (по-элементный предикат)
+## 3. Фильтрация — `backendFilter` (сервер) + `.where` (клиент)
 
-**Зачем:** фильтрация на клиенте без второго провайдера-обёртки. `frontendFilter` — это **предикат над одной моделью** `(model) => bool`, а не трансформация всего списка.
+**Зачем:** сузить список запросом к БД — через `backendFilter`. Локальную фильтрацию уже загруженного фреймворк специально **не держит**: это тривиальный `.where`, делай его сам в виджете, не ищи «фреймворочный» способ.
 
-```dart
-// ❌ фильтрация списком после загрузки / своя логика в виджете
-final visible = all.where((l) => !l.isHidden).toList();
-
-// ✅ предикат на элемент прямо в запросе
-final lessonsAsync = ref.watchModelList<LearningLesson>(
-  frontendFilter: (lesson) => !lesson.isHidden && lesson.moduleId == null,
-);
-```
-
-Для поиска по строке: храни строку в Riverpod-провайдере и используй её внутри `frontendFilter`.
-
-**Фильтр на сервере (не на клиенте) — `backendFilter:`.** Когда список надо сузить запросом к БД (свои записи, сообщения одного чата, предстоящие занятия), а не отфильтровать уже загруженное, передавай `backendFilter`. Фильтры описываются enum'ом с `DwBackendFiltersMixin` и его `.equals()`/`.greaterThan()`:
+**Фильтр на сервере — `backendFilter:`.** Когда список надо сузить запросом (свои записи, сообщения одного чата, предстоящие занятия). Фильтры — enum с `DwBackendFiltersMixin` и его `.equals()`/`.greaterThan()`:
 
 ```dart
 enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
@@ -95,12 +83,24 @@ enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
 }
 
 // в фиче:
-ref.watchModelList<SessionBooking>(
+ref.watch(dw.repo.modelList<SessionBooking>(
   backendFilter: AppBackendFilters.clientBookings(ref.watchUserProfile.id!),
-);
+));
 ```
 
-`DwGetModelListConfig` на сервере **не требует** `filterPrototype` (в отличие от `DwGetModelConfig` для одной модели) — списочные backend-фильтры работают без регистрации прототипа. `backendFilter` сужает запрос; `frontendFilter` фильтрует уже загруженное. Секьюрити — не на `backendFilter`, а на `accessFilter` конфига (сервер), клиентский фильтр только сужает.
+`DwGetModelListConfig` на сервере **не требует** `filterPrototype` (в отличие от `DwGetModelConfig` для одной модели) — списочные backend-фильтры работают без регистрации прототипа. Секьюрити — на `accessFilter` конфига (сервер), не на клиентском сужении.
+
+**Локальный фильтр/поиск — сам `.where` в виджете.** Строку поиска держи в Riverpod-провайдере, фильтруй уже загруженный список прямо в билдере:
+
+```dart
+final query = ref.watch(searchQueryProvider);
+coursesAsync.dwBuildListAsync(
+  childBuilder: (list) {
+    final visible = list.where((c) => c.title.contains(query)).toList();
+    return ListView(children: [for (final c in visible) CourseCard(course: c)]);
+  },
+);
+```
 
 ## 4. Действия из UI — `dw.action`
 
@@ -116,7 +116,7 @@ final confirm = await showDialog<bool>(...); if (confirm != true) return;
 // ✅ dw.action — context, типизированный результат, встроенный confirm
 final deleteAction = dw.action<bool>(
   (context) async {
-    await DwRepository.deleteModel(post);
+    await dw.repo.deleteModel(post);
     return true;
   },
   label: 'deletePost', // имя действия в error-репортах/алертах
@@ -209,10 +209,10 @@ DwChannelSubscriptionWidget(
 
 ## Чек-лист data-layer
 
-- [ ] Данные — только `watchModel`/`readModel`/`saveModel`/`deleteModel`/`watchModelList` (нет репозиториев, ручных `Future`, прямого клиента).
+- [ ] Данные — только `dw.repo`: чтение — провайдеры `dw.repo.model/maybeModel/modelList` под `ref.watch/read/refresh`; запись — `dw.repo.saveModel/deleteModel`. Нет `ref.watchModel`, `DwRepository.`, репозиториев, ручных `Future`, прямого клиента.
 - [ ] Create и Update — один `saveModel` (не два разных метода).
 - [ ] Списки `AsyncValue` — через `dwBuildListAsync(loadingItemsCount:)`, не россыпь `when`.
-- [ ] Локальный фильтр — `frontendFilter: (model) => bool` (по-элементный предикат), не пост-фильтрация списка.
+- [ ] Сужение запросом — `backendFilter`; локальную фильтрацию делаешь сам `.where` в виджете (фреймворк её не держит).
 - [ ] Действия из UI — `dw.action((context) async {...})`, не сырой `onPressed`/`() async {}`.
 - [ ] Уведомления — `dw.notify.success/warning/error/info`, не `SnackBar`/`ScaffoldMessenger`.
 - [ ] Профиль — `ref.watchUserProfile`/`readUserProfile` (геттеры), не `watchModel<UserProfile>()`.

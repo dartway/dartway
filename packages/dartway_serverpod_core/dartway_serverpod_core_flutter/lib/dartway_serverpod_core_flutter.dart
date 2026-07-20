@@ -24,6 +24,7 @@ export 'src/widgets/infinite_list_view.dart';
 export 'src/repository/domain/dw_offset_pagination.dart';
 export 'src/repository/domain/dw_single_model_state_config.dart';
 export 'src/repository/dw_global_refresh_state_provider.dart';
+export 'src/repository/dw_repo.dart';
 export 'src/repository/dw_repository.dart';
 export 'src/repository/states/dw_model_list_state.dart';
 export 'src/repository/states/dw_single_model_state.dart';

@@ -154,6 +154,29 @@ class DwRepository {
         >;
   }
 
+  // A throwing view over [singleModelProvider]: same fetch and live updates,
+  // but resolves to a non-null `T` and surfaces a `StateError` when the model
+  // is absent. Derived (not its own fetch) so it always tracks the raw
+  // provider; force a refetch by refreshing the raw `maybeModel`, not this.
+  static final Map<Type, Object> _throwingSingleModelProviders = {};
+
+  static FutureProviderFamily<T, DwSingleModelStateConfig<T>>
+  throwingSingleModelProvider<T extends SerializableModel>() {
+    if (_throwingSingleModelProviders[T] == null) {
+      _throwingSingleModelProviders[T] =
+          FutureProvider.family<T, DwSingleModelStateConfig<T>>((ref, cfg) async {
+            final model = await ref.watch(singleModelProvider<T>()(cfg).future);
+            if (model == null) {
+              throw StateError('dw.repo.model<$T>: model not found ($cfg)');
+            }
+            return model;
+          });
+    }
+
+    return _throwingSingleModelProviders[T]
+        as FutureProviderFamily<T, DwSingleModelStateConfig<T>>;
+  }
+
   static Future<Model> saveModel<Model extends SerializableModel>(
     Model model, {
     String? apiGroupOverride,
