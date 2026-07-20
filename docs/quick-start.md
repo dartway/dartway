@@ -143,7 +143,7 @@ class NotesList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watchModelList<Note>().dwBuildListAsync(
+    return ref.watch(dw.repo.modelList<Note>()).dwBuildListAsync(
           loadingItemsCount: 5,
           childBuilder: (notes) => ListView(
             children: [for (final note in notes) NoteCard(note: note)],
@@ -156,13 +156,13 @@ class NotesList extends ConsumerWidget {
 No repository, no service, no provider, no API client. The list is typed, paginated, and rebuilds by
 itself when anyone writes a `Note` anywhere — open the app in two windows and watch.
 
-Writing goes through the repository, guarded by the action:
+Writing goes through `dw.repo`, guarded by the action:
 
 ```dart
 AppButton.primary(
   'Save',
   onTap: DwUiAction.create(
-    (context) => DwRepository.saveModel(
+    (context) => dw.repo.saveModel(
       Note(authorProfileId: myProfileId, text: text, createdAt: DateTime.now()),
     ),
     onSuccessNotification: 'Saved',

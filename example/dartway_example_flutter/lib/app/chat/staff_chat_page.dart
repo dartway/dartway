@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -23,7 +23,9 @@ class StaffChatPage extends ConsumerWidget {
       );
     }
 
-    return ref.watchModelList<ChatChannel>().dwBuildListAsync(
+    return ref
+        .watch(dw.repo.modelList<ChatChannel>())
+        .dwBuildListAsync(
           loadingItemsCount: 1,
           childBuilder: (channels) {
             if (channels.isEmpty) {

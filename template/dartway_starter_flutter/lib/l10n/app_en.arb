@@ -113,6 +113,6 @@
   },
   "homeNoAppName": "No app name configured yet — set it in the admin panel.",
   "homeNextStepTitle": "Your first feature",
-  "homeNextStepBody": "Describe a model, give it a DwCrudConfig on the server, and read it with ref.watchModelList in a widget. No endpoints to write.",
+  "homeNextStepBody": "Describe a model, give it a DwCrudConfig on the server, and read it with dw.repo.modelList in a widget. No endpoints to write.",
   "countSettings": "Settings"
 }

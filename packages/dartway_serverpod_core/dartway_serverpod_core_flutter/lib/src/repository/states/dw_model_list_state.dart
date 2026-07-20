@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/dw_no_pagination.dart';
 import '../domain/dw_pagination_strategy.dart';
+import '../dw_repository.dart';
 
 class DwModelListState<Model extends SerializableModel>
     extends AsyncNotifier<List<Model>> {

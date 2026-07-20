@@ -164,7 +164,10 @@ class DwRepository {
   throwingSingleModelProvider<T extends SerializableModel>() {
     if (_throwingSingleModelProviders[T] == null) {
       _throwingSingleModelProviders[T] =
-          FutureProvider.family<T, DwSingleModelStateConfig<T>>((ref, cfg) async {
+          FutureProvider.family<T, DwSingleModelStateConfig<T>>((
+            ref,
+            cfg,
+          ) async {
             final model = await ref.watch(singleModelProvider<T>()(cfg).future);
             if (model == null) {
               throw StateError('dw.repo.model<$T>: model not found ($cfg)');

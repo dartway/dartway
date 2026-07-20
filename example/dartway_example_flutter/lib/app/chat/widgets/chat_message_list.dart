@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -21,16 +21,16 @@ class ChatMessageList extends ConsumerWidget implements DwFeature {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ref
-        .watchModelList<ChatMessage>(
-          backendFilter: AppBackendFilters.channelMessages(channel.id!),
+        .watch(
+          dw.repo.modelList<ChatMessage>(
+            backendFilter: AppBackendFilters.channelMessages(channel.id!),
+          ),
         )
         .dwBuildListAsync(
           loadingItemsCount: 5,
           childBuilder: (messages) {
             if (messages.isEmpty) {
-              return Center(
-                child: AppText.body(context.l10n.sayHiToTeam),
-              );
+              return Center(child: AppText.body(context.l10n.sayHiToTeam));
             }
 
             final sorted = [...messages]
@@ -40,9 +40,8 @@ class ChatMessageList extends ConsumerWidget implements DwFeature {
               reverse: true,
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: sorted.length,
-              itemBuilder: (context, index) => ChatMessageBubble(
-                message: sorted[index],
-              ),
+              itemBuilder: (context, index) =>
+                  ChatMessageBubble(message: sorted[index]),
             );
           },
         );

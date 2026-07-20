@@ -14,20 +14,23 @@ enum AppFeatures implements DwFeatureSpec {
   scheduleSessionList(
     id: 'schedule/session-list',
     title: 'Realtime session list',
-    description: 'ref.watchModelList<ClubSession>() with a backend filter — '
+    description:
+        'ref.watch(dw.repo.modelList<ClubSession>()) with a backend filter — '
         'realtime sync, pagination and loading states out of the box.',
   ),
   chatMessageList(
     id: 'chat/message-list',
     title: 'Realtime staff chat',
-    description: 'A realtime chat is ~40 lines of DwCrudConfig, '
+    description:
+        'A realtime chat is ~40 lines of DwCrudConfig, '
         'secure-by-default: the staff-only access filter means clients '
         'never receive it.',
   ),
   chatMessageComposer(
     id: 'chat/message-composer',
     title: 'Message composer',
-    description: 'Sending is a single DwRepository.saveModel(ChatMessage) — '
+    description:
+        'Sending is a single dw.repo.saveModel(ChatMessage) — '
         'the list above updates in realtime, no extra wiring.',
   );
 

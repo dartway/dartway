@@ -1,5 +1,4 @@
 import 'package:dartway_starter_flutter/core/dw_core.dart';
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -15,7 +14,9 @@ class AdminSettingsForm extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watchModelList<AppSetting>().dwBuildListAsync(
+    return ref
+        .watch(dw.repo.modelList<AppSetting>())
+        .dwBuildListAsync(
           loadingItemsCount: 1,
           childBuilder: (settings) {
             AppSetting? appName;
@@ -62,7 +63,7 @@ class _AppNameField extends HookWidget {
           l10n.saveAction,
           onTap: canSave
               ? dw.action(
-                  (context) => DwRepository.saveModel(
+                  (context) => dw.repo.saveModel(
                     setting.copyWith(settingValue: value.value.trim()),
                   ),
                   onSuccessNotification: l10n.settingsSaved,

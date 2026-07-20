@@ -230,7 +230,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get homeNextStepBody =>
-      'Опиши модель, дай ей DwCrudConfig на сервере и прочитай через ref.watchModelList в виджете. Эндпоинты писать не нужно.';
+      'Опиши модель, дай ей DwCrudConfig на сервере и прочитай через dw.repo.modelList в виджете. Эндпоинты писать не нужно.';
 
   @override
   String get countSettings => 'Настройки';

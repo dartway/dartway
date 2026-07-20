@@ -75,6 +75,6 @@
   },
   "homeNoAppName": "Название ещё не задано — задайте его в админке.",
   "homeNextStepTitle": "Твоя первая фича",
-  "homeNextStepBody": "Опиши модель, дай ей DwCrudConfig на сервере и прочитай через ref.watchModelList в виджете. Эндпоинты писать не нужно.",
+  "homeNextStepBody": "Опиши модель, дай ей DwCrudConfig на сервере и прочитай через dw.repo.modelList в виджете. Эндпоинты писать не нужно.",
   "countSettings": "Настройки"
 }

@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -41,7 +41,7 @@ class HomePage extends ConsumerWidget implements DwFeature {
                   const Gap(8),
                   // A live list from the server: one line, realtime, typed.
                   ref
-                      .watchModelList<AppSetting>()
+                      .watch(dw.repo.modelList<AppSetting>())
                       .dwBuildListAsync(
                         loadingItemsCount: 1,
                         childBuilder: (settings) {

@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -25,7 +25,7 @@ class ChatMessageComposer extends HookConsumerWidget implements DwFeature {
       final text = draftText.value.trim();
       if (text.isEmpty) return;
 
-      await DwRepository.saveModel(
+      await dw.repo.saveModel(
         ChatMessage(
           channelId: channel.id!,
           authorProfileId: ref.readUserProfile.id!,

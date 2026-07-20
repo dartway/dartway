@@ -1,5 +1,4 @@
 import 'package:dartway_starter_flutter/core/dw_core.dart';
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -18,8 +17,9 @@ class ProfileSettingsWidget extends HookConsumerWidget {
     final userProfile = ref.watchUserProfile;
 
     // Initialize form fields with default values
-    final firstNameController =
-        useTextEditingController(text: userProfile.firstName);
+    final firstNameController = useTextEditingController(
+      text: userProfile.firstName,
+    );
     final selectedGender = useState<UserGender?>(userProfile.gender);
 
     // Track if any changes have been made
@@ -77,16 +77,15 @@ class ProfileSettingsWidget extends HookConsumerWidget {
             onChanged: (UserGender? newValue) {
               selectedGender.value = newValue;
             },
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
             items: [
               DropdownMenuItem<UserGender>(
                 value: null,
                 child: Text(l10n.genderNotSpecified),
               ),
-              ...UserGender.values
-                  .map<DropdownMenuItem<UserGender>>((UserGender gender) {
+              ...UserGender.values.map<DropdownMenuItem<UserGender>>((
+                UserGender gender,
+              ) {
                 return DropdownMenuItem<UserGender>(
                   value: gender,
                   child: Text(l10n.genderValue(gender.name)),
@@ -101,18 +100,15 @@ class ProfileSettingsWidget extends HookConsumerWidget {
           if (hasChanges.value) ...[
             AppButton.primary(
               l10n.saveChanges,
-              onTap: dw.action(
-                (context) async {
-                  await DwRepository.saveModel(
-                    userProfile.copyWith(
-                      firstName: firstNameController.text.trim(),
-                      gender: selectedGender.value,
-                    ),
-                  );
-                  hasChanges.value = false;
-                },
-                onSuccessNotification: l10n.profileUpdated,
-              ),
+              onTap: dw.action((context) async {
+                await dw.repo.saveModel(
+                  userProfile.copyWith(
+                    firstName: firstNameController.text.trim(),
+                    gender: selectedGender.value,
+                  ),
+                );
+                hasChanges.value = false;
+              }, onSuccessNotification: l10n.profileUpdated),
             ),
             const Gap(16),
           ],

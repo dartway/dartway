@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
 
 /// Default (mock) instances the repository renders skeleton loading states
@@ -9,9 +9,9 @@ import 'package:dartway_starter_client/dartway_starter_client.dart';
 /// that is about to arrive instead of a generic shimmer.
 class DefaultModels {
   static void initRepository() {
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: UserProfile(
-        id: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
         userIdentifier: '79999999999',
         firstName: 'Dartway',
         phone: '79999999999',
@@ -20,9 +20,9 @@ class DefaultModels {
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: AppSetting(
-        id: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
         settingKey: 'appName',
         settingValue: 'DartWay Starter',
       ),

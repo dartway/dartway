@@ -1,5 +1,4 @@
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -20,14 +19,17 @@ class AdminUsersTable extends ConsumerWidget {
     if (roleFilter != null && user.role != roleFilter) return false;
     final query = searchQuery.trim().toLowerCase();
     if (query.isEmpty) return true;
-    final name =
-        '${user.firstName} ${user.lastName ?? ''}'.trim().toLowerCase();
+    final name = '${user.firstName} ${user.lastName ?? ''}'
+        .trim()
+        .toLowerCase();
     return name.contains(query) || user.phone.contains(query);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watchModelList<UserProfile>().dwBuildListAsync(
+    return ref
+        .watch(dw.repo.modelList<UserProfile>())
+        .dwBuildListAsync(
           loadingItemsCount: 4,
           childBuilder: (users) {
             final visible = [
@@ -70,7 +72,7 @@ class _UserRow extends StatelessWidget {
           // Changing someone's role is a rights change — confirm it. The
           // confirmation + label ride on the standard DwUiAction.
           dw.action(
-            (_) => DwRepository.saveModel(user.copyWith(role: role)),
+            (_) => dw.repo.saveModel(user.copyWith(role: role)),
             label: 'changeUserRole',
             confirmation: DwUiConfirmation(
               context.l10n.confirmChangeRole(

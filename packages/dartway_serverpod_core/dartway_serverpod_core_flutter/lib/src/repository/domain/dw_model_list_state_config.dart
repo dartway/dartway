@@ -1,12 +1,15 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../dw_repository.dart';
 import 'dw_pagination_strategy.dart';
 
-class DwRelationUpdatesConfig<Model extends SerializableModel,
-    RelationModel extends SerializableModel> {
+class DwRelationUpdatesConfig<
+  Model extends SerializableModel,
+  RelationModel extends SerializableModel
+> {
   final Model Function(Model parentModel, List<DwModelWrapper> relatedModels)
-      copyWithRelatedModels;
+  copyWithRelatedModels;
   final String relationKey;
   final Set<int> Function(Model model)? parentIdsGetter;
 
@@ -26,9 +29,10 @@ class DwRelationUpdatesConfig<Model extends SerializableModel,
       List<DwModelWrapper> wrappedModelUpdates,
       String relationKey,
       Model Function(Model parentModel, List<DwModelWrapper> relatedModels)
-          copyWithRelatedModels,
+      copyWithRelatedModels,
       Set<int>? Function(Model model)? parentIdsGetter,
-    ) relationUpdatesListener,
+    )
+    relationUpdatesListener,
   ) {
     _wrappedListener = (updates) => relationUpdatesListener(
       updates,
@@ -55,7 +59,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
   final String? apiGroupOverride;
   final Function(List<DwModelWrapper>)? customUpdatesListener;
   final List<DwRelationUpdatesConfig<Model, SerializableModel>>?
-      relationUpdatesConfigs;
+  relationUpdatesConfigs;
   final int Function(Model a, Model b)? updatesSortingMethod;
   final DwPaginationStrategy? paginationStrategy;
 
@@ -79,7 +83,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
 
   @override
   AsyncValue<List<Model>> watchAsyncValue(WidgetRef ref) {
-    return ref.watchModelList<Model>(customConfig: this);
+    return ref.watch(DwRepository.modelListStateProvider<Model>()(this));
   }
 
   @override

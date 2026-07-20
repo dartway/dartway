@@ -111,3 +111,11 @@ class DwRepo {
   /// Returns the registered default instance for [T].
   T getDefault<T>() => DwRepository.getDefault<T>();
 }
+
+/// Default-model getter as a static tear-off, for `DwConfig.defaultModelGetter`.
+///
+/// The config is built while the global `dw` is still being constructed, so it
+/// cannot reach `dw.repo` yet (that would be a `LateInitializationError`); and
+/// Dart has no generic lambda literal, so a plain tear-off is the only option.
+/// After startup, prefer `dw.repo.getDefault`.
+T dwGetDefault<T>() => DwRepository.getDefault<T>();

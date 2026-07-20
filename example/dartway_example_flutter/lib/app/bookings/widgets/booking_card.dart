@@ -1,5 +1,4 @@
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -49,7 +48,7 @@ class BookingCard extends StatelessWidget {
               AppButton.secondary(
                 l10n.cancelBooking,
                 onTap: dw.action(
-                  (context) => DwRepository.saveModel(
+                  (context) => dw.repo.saveModel(
                     booking.copyWith(status: BookingStatus.cancelled),
                   ),
                   onSuccessNotification: l10n.bookingCancelled,

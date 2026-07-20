@@ -27,7 +27,7 @@ class StudioPersonaSwitcher extends _$StudioPersonaSwitcher {
         await ref.read(dw.sessionProvider!.notifier).signOut();
       }
 
-      final request = await DwRepository.saveModel(
+      final request = await dw.repo.saveModel(
         DwAuthRequest(
           requestType: DwAuthRequestType.login,
           userIdentifier: identifier,
@@ -40,7 +40,7 @@ class StudioPersonaSwitcher extends _$StudioPersonaSwitcher {
         return;
       }
 
-      final verification = await DwRepository.saveModel(
+      final verification = await dw.repo.saveModel(
         DwAuthVerification(
           dwAuthRequestId: request.id!,
           verificationCode: verificationCode,
@@ -55,7 +55,7 @@ class StudioPersonaSwitcher extends _$StudioPersonaSwitcher {
         return;
       }
 
-      final completed = await DwRepository.saveModel(
+      final completed = await dw.repo.saveModel(
         request.copyWith(accessToken: accessToken),
         apiGroupOverride: DwCoreConst.dartwayInternalApi,
       );

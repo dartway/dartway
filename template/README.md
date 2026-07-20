@@ -37,7 +37,7 @@ server console. (The admin is **79990000001**.)
 
 Everything an app needs — auth, roles, an admin panel, a live list from the
 database — is already here. Add your domain on top: a model (`.spy.yaml`) →
-`serverpod generate` → a `DwCrudConfig` → a screen with `ref.watchModelList`.
+`serverpod generate` → a `DwCrudConfig` → a screen with `ref.watch(dw.repo.modelList())`.
 No endpoints to write. The `.claude/` toolkit guides an AI assistant through it.
 
 ## Tests

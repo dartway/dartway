@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -14,7 +14,9 @@ class ServicesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return AppScaffold.inner(
       appBar: AppBar(title: AppText.title(context.l10n.ourServices)),
-      body: ref.watchModelList<ClubService>().dwBuildListAsync(
+      body: ref
+          .watch(dw.repo.modelList<ClubService>())
+          .dwBuildListAsync(
             loadingItemsCount: 4,
             childBuilder: (services) {
               if (services.isEmpty) {
@@ -27,9 +29,8 @@ class ServicesPage extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: services.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) => ServiceCard(
-                  service: services[index],
-                ),
+                itemBuilder: (context, index) =>
+                    ServiceCard(service: services[index]),
               );
             },
           ),

@@ -134,7 +134,7 @@
   "adminUsers": "Users",
   "adminSettings": "Settings",
   "backToApp": "Back to the app",
-  "countersLiveHint": "Each counter is a typed live list — one line of watchModelList, no fetch code. It refreshes when this admin reloads the data.",
+  "countersLiveHint": "Each counter is a typed live list — one line of dw.repo.modelList, no fetch code. It refreshes when this admin reloads the data.",
   "countMembers": "Members",
   "countSessions": "Sessions",
   "countNews": "News",

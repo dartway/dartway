@@ -11,6 +11,7 @@ import '../app/session/state/dw_session_state_notifier.dart';
 import '../app/socket/service/dw_socket_service.dart';
 import '../private/dw_singleton.dart';
 import '../utils/dw_error_report_alert_mapping.dart';
+import '../repository/dw_repository.dart';
 
 class DwCore<
   ServerpodClientClass extends ServerpodClientShared,
@@ -157,16 +158,18 @@ class DwCore<
   }
 
   static String _alertTitle(DwErrorReport report) => switch (report.source) {
-        DwErrorSource.zone => 'Unhandled error',
-        DwErrorSource.uiAction => report.actionLabel == null
-            ? 'UI action failed'
-            : 'Action failed: ${report.actionLabel}',
-        DwErrorSource.asyncBuild => 'Async build error',
-        DwErrorSource.failedCall => report.failedCall == null
-            ? 'Server call failed'
-            : 'Failed call: ${report.failedCall}',
-        DwErrorSource.manual => 'Reported error',
-      };
+    DwErrorSource.zone => 'Unhandled error',
+    DwErrorSource.uiAction =>
+      report.actionLabel == null
+          ? 'UI action failed'
+          : 'Action failed: ${report.actionLabel}',
+    DwErrorSource.asyncBuild => 'Async build error',
+    DwErrorSource.failedCall =>
+      report.failedCall == null
+          ? 'Server call failed'
+          : 'Failed call: ${report.failedCall}',
+    DwErrorSource.manual => 'Reported error',
+  };
 
   Future<void> initDwCore({
     // TODO: remove initRepositoryFunction

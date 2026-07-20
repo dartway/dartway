@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -22,18 +22,23 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final myBookings = ref
-            .watchModelList<SessionBooking>(
-              backendFilter: AppBackendFilters.clientBookings(
-                ref.watchUserProfile.id!,
+    final myBookings =
+        ref
+            .watch(
+              dw.repo.modelList<SessionBooking>(
+                backendFilter: AppBackendFilters.clientBookings(
+                  ref.watchUserProfile.id!,
+                ),
               ),
             )
             .value ??
         [];
 
     return ref
-        .watchModelList<ClubSession>(
-          backendFilter: AppBackendFilters.upcomingSessions(),
+        .watch(
+          dw.repo.modelList<ClubSession>(
+            backendFilter: AppBackendFilters.upcomingSessions(),
+          ),
         )
         .dwBuildListAsync(
           loadingItemsCount: 5,

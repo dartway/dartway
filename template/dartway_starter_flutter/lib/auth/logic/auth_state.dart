@@ -52,7 +52,7 @@ class AuthState extends _$AuthState {
   Future<void> requestOtp() async {
     final isRegistration = state.currentStep == AuthStep.registration;
 
-    final result = await DwRepository.saveModel(
+    final result = await dw.repo.saveModel(
       DwAuthRequest(
         requestType: isRegistration
             ? DwAuthRequestType.register
@@ -62,8 +62,8 @@ class AuthState extends _$AuthState {
         extraData: isRegistration
             ? {
                 'firstName': state.firstName,
-                'agreedForMarketingCommunications':
-                    state.marketingAgreed.toString(),
+                'agreedForMarketingCommunications': state.marketingAgreed
+                    .toString(),
               }
             : null,
       ),
@@ -87,7 +87,7 @@ class AuthState extends _$AuthState {
       return false;
     }
 
-    final verification = await DwRepository.saveModel(
+    final verification = await dw.repo.saveModel(
       DwAuthVerification(
         dwAuthRequestId: pending.id!,
         verificationCode: state.otpDigits,
@@ -101,12 +101,13 @@ class AuthState extends _$AuthState {
       return false;
     }
 
-    final result = await DwRepository.saveModel(
+    final result = await dw.repo.saveModel(
       pending.copyWith(accessToken: accessToken),
       apiGroupOverride: DwCoreConst.dartwayInternalApi,
     );
 
-    final success = result.status == DwAuthRequestStatus.completed ||
+    final success =
+        result.status == DwAuthRequestStatus.completed ||
         result.status == DwAuthRequestStatus.verified;
     if (!success) {
       dw.notify.error('Could not complete sign-in. Please try again.');

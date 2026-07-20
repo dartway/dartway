@@ -25,22 +25,23 @@ late final DwCore<Client, UserProfile> dw;
 void initExampleDwCore({required String backendUrl}) {
   dw = DwCore<Client, UserProfile>(
     config: DwConfig(
-      defaultModelGetter: DwRepository.getDefault,
+      defaultModelGetter: dwGetDefault,
       // Shown in error reports next to the platform and user.
       appVersion: exampleAppVersion,
     ),
-    client: Client(
-      backendUrl,
-      // Connection-level failures (timeout/offline) → a toast, not an alert;
-      // everything else enters the dw error pipeline with `endpoint.method`
-      // attached and is alerted out of the box with the app context.
-      onFailedCall: dwReportingOnFailedCall(
-        onConnectionError: (_, _) =>
-            dw.notify.error(appL10n.networkErrorTryAgain),
-      ),
-    )
-      ..connectivityMonitor = FlutterConnectivityMonitor()
-      ..authKeyProvider = DwAuthenticationKeyManager(),
+    client:
+        Client(
+            backendUrl,
+            // Connection-level failures (timeout/offline) → a toast, not an alert;
+            // everything else enters the dw error pipeline with `endpoint.method`
+            // attached and is alerted out of the box with the app context.
+            onFailedCall: dwReportingOnFailedCall(
+              onConnectionError: (_, _) =>
+                  dw.notify.error(appL10n.networkErrorTryAgain),
+            ),
+          )
+          ..connectivityMonitor = FlutterConnectivityMonitor()
+          ..authKeyProvider = DwAuthenticationKeyManager(),
     // No telegram config here: locally the alerts degrade to logging. To see
     // the full formatted alert in the console use
     // `DwAlerts.init(logErrors: true, logFunction: debugPrint)`.

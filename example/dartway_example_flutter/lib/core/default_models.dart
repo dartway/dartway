@@ -1,11 +1,11 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 
 class DefaultModels {
   static void initRepository() {
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: UserProfile(
-        id: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
         userIdentifier: '79999999999',
         firstName: 'Dartway',
         phone: '79999999999',
@@ -14,9 +14,9 @@ class DefaultModels {
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: ClubService(
-        id: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
         title: 'Group workout',
         description: 'One hour group workout',
         durationMinutes: 60,
@@ -24,66 +24,66 @@ class DefaultModels {
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: ClubSession(
-        id: DwRepository.mockModelId,
-        serviceId: DwRepository.mockModelId,
-        coachProfileId: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
+        serviceId: dw.repo.mockModelId,
+        coachProfileId: dw.repo.mockModelId,
         startsAt: DateTime.now(),
         capacity: 10,
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: SessionBooking(
-        id: DwRepository.mockModelId,
-        clubSessionId: DwRepository.mockModelId,
-        clientProfileId: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
+        clubSessionId: dw.repo.mockModelId,
+        clientProfileId: dw.repo.mockModelId,
         status: BookingStatus.booked,
         createdAt: DateTime.now(),
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: SessionReview(
-        id: DwRepository.mockModelId,
-        bookingId: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
+        bookingId: dw.repo.mockModelId,
         rating: 5,
         createdAt: DateTime.now(),
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: ChatChannel(
-        id: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
         title: 'General',
         createdAt: DateTime.now(),
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: ChatMessage(
-        id: DwRepository.mockModelId,
-        channelId: DwRepository.mockModelId,
-        authorProfileId: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
+        channelId: dw.repo.mockModelId,
+        authorProfileId: dw.repo.mockModelId,
         messageText: 'Message',
         createdAt: DateTime.now(),
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: NewsPost(
-        id: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
         title: 'News',
         text: 'News content',
         createdAt: DateTime.now(),
-        authorProfileId: DwRepository.mockModelId,
+        authorProfileId: dw.repo.mockModelId,
       ),
     );
 
-    DwRepository.setupRepository(
+    dw.repo.setupRepository(
       defaultModel: AppSetting(
-        id: DwRepository.mockModelId,
+        id: dw.repo.mockModelId,
         settingKey: 'clubName',
         settingValue: 'DartWay Fitness',
       ),

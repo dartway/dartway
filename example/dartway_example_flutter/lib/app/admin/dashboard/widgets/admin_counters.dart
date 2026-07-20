@@ -1,4 +1,4 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -20,7 +20,9 @@ class AdminCounters extends ConsumerWidget {
         Expanded(
           child: _CounterTile(
             label: l10n.countMembers,
-            child: ref.watchModelList<UserProfile>().dwBuildListAsync(
+            child: ref
+                .watch(dw.repo.modelList<UserProfile>())
+                .dwBuildListAsync(
                   loadingItemsCount: 1,
                   childBuilder: (items) => _CountText(items.length),
                 ),
@@ -30,7 +32,9 @@ class AdminCounters extends ConsumerWidget {
         Expanded(
           child: _CounterTile(
             label: l10n.countSessions,
-            child: ref.watchModelList<ClubSession>().dwBuildListAsync(
+            child: ref
+                .watch(dw.repo.modelList<ClubSession>())
+                .dwBuildListAsync(
                   loadingItemsCount: 1,
                   childBuilder: (items) => _CountText(items.length),
                 ),
@@ -40,7 +44,9 @@ class AdminCounters extends ConsumerWidget {
         Expanded(
           child: _CounterTile(
             label: l10n.countNews,
-            child: ref.watchModelList<NewsPost>().dwBuildListAsync(
+            child: ref
+                .watch(dw.repo.modelList<NewsPost>())
+                .dwBuildListAsync(
                   loadingItemsCount: 1,
                   childBuilder: (items) => _CountText(items.length),
                 ),
@@ -62,11 +68,7 @@ class _CounterTile extends StatelessWidget {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          child,
-          const Gap(4),
-          AppText.body(label),
-        ],
+        children: [child, const Gap(4), AppText.body(label)],
       ),
     );
   }

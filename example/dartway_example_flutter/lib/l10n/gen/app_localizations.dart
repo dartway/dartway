@@ -575,7 +575,7 @@ abstract class AppLocalizations {
   /// No description provided for @countersLiveHint.
   ///
   /// In en, this message translates to:
-  /// **'Each counter is a typed live list — one line of watchModelList, no fetch code. It refreshes when this admin reloads the data.'**
+  /// **'Each counter is a typed live list — one line of dw.repo.modelList, no fetch code. It refreshes when this admin reloads the data.'**
   String get countersLiveHint;
 
   /// No description provided for @countMembers.

@@ -467,7 +467,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeNextStepBody.
   ///
   /// In en, this message translates to:
-  /// **'Describe a model, give it a DwCrudConfig on the server, and read it with ref.watchModelList in a widget. No endpoints to write.'**
+  /// **'Describe a model, give it a DwCrudConfig on the server, and read it with dw.repo.modelList in a widget. No endpoints to write.'**
   String get homeNextStepBody;
 
   /// No description provided for @countSettings.

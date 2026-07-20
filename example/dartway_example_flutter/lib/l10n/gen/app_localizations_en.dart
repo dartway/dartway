@@ -288,7 +288,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get countersLiveHint =>
-      'Each counter is a typed live list — one line of watchModelList, no fetch code. It refreshes when this admin reloads the data.';
+      'Each counter is a typed live list — one line of dw.repo.modelList, no fetch code. It refreshes when this admin reloads the data.';
 
   @override
   String get countMembers => 'Members';

@@ -68,7 +68,7 @@ notification texts are the fallback) and a `confirmation`:
 
 ```dart
 DwUiAction.create(
-  (_) => DwRepository.saveModel(user.copyWith(role: role)),
+  (_) => dw.repo.saveModel(user.copyWith(role: role)),
   label: 'changeUserRole',
   confirmation: DwUiConfirmation('Change the role of $name?'),
 )
