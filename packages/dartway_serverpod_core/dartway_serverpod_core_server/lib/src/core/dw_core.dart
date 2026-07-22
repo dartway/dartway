@@ -23,6 +23,7 @@ import '../domain/crud/domain/dw_crud_entity.dart';
 /// - [alerts]: The alerts for the framework.
 /// - [auth]: The auth module for the framework.
 /// - [cloudStorage]: The cloud storage module for the framework.
+/// - [push]: The optional compact push delivery engine.
 ///
 /// It also contains the main methods for the framework:
 /// - [init]: Initializes the framework.
@@ -52,6 +53,9 @@ class DwCore<UserProfileClass extends TableRow> {
 
   final DwCloudStorage? cloudStorage;
 
+  /// Compact push queue and worker (optional).
+  final DwPush? push;
+
   static DwCore? _instance;
 
   static DwCore get instance {
@@ -75,6 +79,7 @@ class DwCore<UserProfileClass extends TableRow> {
     required DwAlerts dwAlerts,
     DwAuthConfig<UserProfileClass>? dwAuthConfig,
     DwCloudStorageConfig? cloudStorageConfig,
+    DwPushConfig? pushConfig,
   }) {
     if (_instance != null) {
       throw Exception('DwCore already initialized');
@@ -93,6 +98,7 @@ class DwCore<UserProfileClass extends TableRow> {
       cloudStorage: cloudStorageConfig != null
           ? DwCloudStorage(config: cloudStorageConfig)
           : null,
+      push: pushConfig != null ? DwPush(config: pushConfig) : null,
     );
 
     _instance = instance;
@@ -113,6 +119,7 @@ class DwCore<UserProfileClass extends TableRow> {
     required this.alerts,
     required this.auth,
     required this.cloudStorage,
+    required this.push,
   }) : _userProfileInclude = userProfileInclude,
        _userProfileConstructor = userProfileConstructor {
     _userInfoIdColumn =
@@ -142,9 +149,8 @@ class DwCore<UserProfileClass extends TableRow> {
           table: userProfileTable,
           getModelConfigs: [
             DwGetModelConfig<UserProfileClass>(
-              accessFilter: (session) async => _userInfoIdColumn.equals(
-                _authenticatedUserId(session) ?? 0,
-              ),
+              accessFilter: (session) async =>
+                  _userInfoIdColumn.equals(_authenticatedUserId(session) ?? 0),
               filterPrototype: DwBackendFilter.equalsPrototype(
                 fieldName: DwCoreConst.userProfileIdColumnName,
               ),

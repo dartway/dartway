@@ -127,14 +127,14 @@ packages:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_server"
       relative: true
     source: path
-    version: "0.0.0"
+    version: "0.1.0"
   dartway_serverpod_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_shared"
       relative: true
     source: path
-    version: "1.0.0"
+    version: "0.1.0"
   ffi:
     dependency: transitive
     description:
@@ -183,6 +183,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.3"
+  google_cloud:
+    dependency: transitive
+    description:
+      name: google_cloud
+      sha256: b385e20726ef5315d302c5933bfb728103116c5be2d3d17094b01a82da538c1f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.0"
+  google_identity_services_web:
+    dependency: transitive
+    description:
+      name: google_identity_services_web
+      sha256: "5d187c46dc59e02646e10fe82665fc3884a9b71bc1c90c2b8b749316d33ee454"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.3+1"
+  googleapis_auth:
+    dependency: transitive
+    description:
+      name: googleapis_auth
+      sha256: ea53b290aaf1fdff615c8d79091b02c9150ff81c48f7f3b7460598c444f3c50a
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.3"
   http:
     dependency: "direct main"
     description:

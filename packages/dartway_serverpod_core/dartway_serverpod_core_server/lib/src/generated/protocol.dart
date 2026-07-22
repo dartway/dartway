@@ -26,15 +26,21 @@ import 'dw_app_notification.dart' as _i13;
 import 'dw_backend_filter_type.dart' as _i14;
 import 'dw_updates_transport.dart' as _i15;
 import 'dw_webhook_log.dart' as _i16;
-import '/src/domain/api/dw_model_wrapper.dart' as _i17;
+import 'push/dw_push_delivery.dart' as _i17;
+import 'push/dw_push_message.dart' as _i18;
+import 'push/dw_push_message_recipient.dart' as _i19;
+import 'push/dw_push_metric_bucket.dart' as _i20;
+import 'push/dw_push_recipient_state.dart' as _i21;
+import 'push/dw_push_runtime_state.dart' as _i22;
+import '/src/domain/api/dw_model_wrapper.dart' as _i23;
 import 'package:dartway_serverpod_core_server/src/domain/api/dw_model_wrapper.dart'
-    as _i18;
+    as _i24;
 import 'package:dartway_serverpod_core_server/src/domain/api/dw_order_by.dart'
-    as _i19;
-import '/src/domain/api/dw_api_response.dart' as _i20;
-import '/src/domain/api/dw_auth_data.dart' as _i21;
-import '/src/domain/api/dw_backend_filter.dart' as _i22;
-import '/src/domain/api/dw_order_by.dart' as _i23;
+    as _i25;
+import '/src/domain/api/dw_api_response.dart' as _i26;
+import '/src/domain/api/dw_auth_data.dart' as _i27;
+import '/src/domain/api/dw_backend_filter.dart' as _i28;
+import '/src/domain/api/dw_order_by.dart' as _i29;
 export 'auth/auth_request/dw_auth_provider.dart';
 export 'auth/auth_request/dw_auth_request.dart';
 export 'auth/auth_request/dw_auth_request_status.dart';
@@ -49,6 +55,12 @@ export 'dw_app_notification.dart';
 export 'dw_backend_filter_type.dart';
 export 'dw_updates_transport.dart';
 export 'dw_webhook_log.dart';
+export 'push/dw_push_delivery.dart';
+export 'push/dw_push_message.dart';
+export 'push/dw_push_message_recipient.dart';
+export 'push/dw_push_metric_bucket.dart';
+export 'push/dw_push_recipient_state.dart';
+export 'push/dw_push_runtime_state.dart';
 
 class Protocol extends _i1.SerializationManagerServer {
   Protocol._();
@@ -434,6 +446,645 @@ class Protocol extends _i1.SerializationManagerServer {
       managed: true,
     ),
     _i2.TableDefinition(
+      name: 'dw_push_delivery',
+      dartName: 'DwPushDelivery',
+      schema: 'public',
+      module: 'dartway_serverpod_core',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'dw_push_delivery_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'messageId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'recipientId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'availableAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _i2.ColumnDefinition(
+          name: 'attemptCount',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+          columnDefault: '0',
+        ),
+        _i2.ColumnDefinition(
+          name: 'leaseId',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'leaseExpiresAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'lastError',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+      ],
+      foreignKeys: [
+        _i2.ForeignKeyDefinition(
+          constraintName: 'dw_push_delivery_fk_0',
+          columns: ['messageId'],
+          referenceTable: 'dw_push_message',
+          referenceTableSchema: 'public',
+          referenceColumns: ['id'],
+          onUpdate: _i2.ForeignKeyAction.noAction,
+          onDelete: _i2.ForeignKeyAction.cascade,
+          matchType: null,
+        ),
+      ],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_push_delivery_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_delivery_message_recipient_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'messageId',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'recipientId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_delivery_claim_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'availableAt',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'leaseExpiresAt',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_delivery_recipient_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'recipientId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
+      name: 'dw_push_message',
+      dartName: 'DwPushMessage',
+      schema: 'public',
+      module: 'dartway_serverpod_core',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'dw_push_message_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'deduplicationKey',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'category',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'title',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'body',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'imageUrl',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'data',
+          columnType: _i2.ColumnType.json,
+          isNullable: true,
+          dartType: 'Map<String,String>?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+        _i2.ColumnDefinition(
+          name: 'audienceClosedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'scheduledAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _i2.ColumnDefinition(
+          name: 'expiresAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_push_message_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_message_deduplication_key_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'deduplicationKey',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_message_expires_at_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'expiresAt',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
+      name: 'dw_push_message_recipient',
+      dartName: 'DwPushMessageRecipient',
+      schema: 'public',
+      module: 'dartway_serverpod_core',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault:
+              'nextval(\'dw_push_message_recipient_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'messageId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'recipientId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+      ],
+      foreignKeys: [
+        _i2.ForeignKeyDefinition(
+          constraintName: 'dw_push_message_recipient_fk_0',
+          columns: ['messageId'],
+          referenceTable: 'dw_push_message',
+          referenceTableSchema: 'public',
+          referenceColumns: ['id'],
+          onUpdate: _i2.ForeignKeyAction.noAction,
+          onDelete: _i2.ForeignKeyAction.cascade,
+          matchType: null,
+        ),
+      ],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_push_message_recipient_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_message_recipient_unique_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'messageId',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'recipientId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_message_recipient_recipient_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'recipientId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
+      name: 'dw_push_metric_bucket',
+      dartName: 'DwPushMetricBucket',
+      schema: 'public',
+      module: 'dartway_serverpod_core',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'dw_push_metric_bucket_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'bucketStart',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _i2.ColumnDefinition(
+          name: 'category',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'outcome',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'eventCount',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+          columnDefault: '0',
+        ),
+        _i2.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_push_metric_bucket_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_metric_bucket_identity_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'bucketStart',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'category',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'outcome',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_metric_bucket_start_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'bucketStart',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
+      name: 'dw_push_recipient_state',
+      dartName: 'DwPushRecipientState',
+      schema: 'public',
+      module: 'dartway_serverpod_core',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault:
+              'nextval(\'dw_push_recipient_state_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'recipientId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'stateKey',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'nextAllowedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _i2.ColumnDefinition(
+          name: 'metadata',
+          columnType: _i2.ColumnType.json,
+          isNullable: true,
+          dartType: 'Map<String,String>?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_push_recipient_state_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_recipient_state_identity_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'recipientId',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'stateKey',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_recipient_state_next_allowed_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'nextAllowedAt',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
+      name: 'dw_push_runtime_state',
+      dartName: 'DwPushRuntimeState',
+      schema: 'public',
+      module: 'dartway_serverpod_core',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'dw_push_runtime_state_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'workerName',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'isPaused',
+          columnType: _i2.ColumnType.boolean,
+          isNullable: false,
+          dartType: 'bool',
+          columnDefault: 'false',
+        ),
+        _i2.ColumnDefinition(
+          name: 'pausedUntil',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'lastClaimedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'lastCompletedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'lastErrorAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'lastError',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_push_runtime_state_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_runtime_state_worker_name_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'workerName',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
       name: 'dw_user_password',
       dartName: 'DwUserPassword',
       schema: 'public',
@@ -673,6 +1324,24 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i16.DwWebServerLog) {
       return _i16.DwWebServerLog.fromJson(data) as T;
     }
+    if (t == _i17.DwPushDelivery) {
+      return _i17.DwPushDelivery.fromJson(data) as T;
+    }
+    if (t == _i18.DwPushMessage) {
+      return _i18.DwPushMessage.fromJson(data) as T;
+    }
+    if (t == _i19.DwPushMessageRecipient) {
+      return _i19.DwPushMessageRecipient.fromJson(data) as T;
+    }
+    if (t == _i20.DwPushMetricBucket) {
+      return _i20.DwPushMetricBucket.fromJson(data) as T;
+    }
+    if (t == _i21.DwPushRecipientState) {
+      return _i21.DwPushRecipientState.fromJson(data) as T;
+    }
+    if (t == _i22.DwPushRuntimeState) {
+      return _i22.DwPushRuntimeState.fromJson(data) as T;
+    }
     if (t == _i1.getType<_i3.DwAuthProvider?>()) {
       return (data != null ? _i3.DwAuthProvider.fromJson(data) : null) as T;
     }
@@ -719,6 +1388,28 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i1.getType<_i16.DwWebServerLog?>()) {
       return (data != null ? _i16.DwWebServerLog.fromJson(data) : null) as T;
     }
+    if (t == _i1.getType<_i17.DwPushDelivery?>()) {
+      return (data != null ? _i17.DwPushDelivery.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i18.DwPushMessage?>()) {
+      return (data != null ? _i18.DwPushMessage.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i19.DwPushMessageRecipient?>()) {
+      return (data != null ? _i19.DwPushMessageRecipient.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i20.DwPushMetricBucket?>()) {
+      return (data != null ? _i20.DwPushMetricBucket.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i21.DwPushRecipientState?>()) {
+      return (data != null ? _i21.DwPushRecipientState.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i22.DwPushRuntimeState?>()) {
+      return (data != null ? _i22.DwPushRuntimeState.fromJson(data) : null)
+          as T;
+    }
     if (t == Map<String, String>) {
       return (data as Map).map(
             (k, v) => MapEntry(deserialize<String>(k), deserialize<String>(v)),
@@ -734,59 +1425,59 @@ class Protocol extends _i1.SerializationManagerServer {
               : null)
           as T;
     }
-    if (t == List<_i17.DwModelWrapper>) {
+    if (t == List<_i23.DwModelWrapper>) {
       return (data as List)
-              .map((e) => deserialize<_i17.DwModelWrapper>(e))
+              .map((e) => deserialize<_i23.DwModelWrapper>(e))
               .toList()
           as T;
     }
-    if (t == _i17.DwModelWrapper) {
-      return _i17.DwModelWrapper.fromJson(data) as T;
+    if (t == _i23.DwModelWrapper) {
+      return _i23.DwModelWrapper.fromJson(data) as T;
     }
-    if (t == List<_i18.DwModelWrapper>) {
+    if (t == List<_i24.DwModelWrapper>) {
       return (data as List)
-              .map((e) => deserialize<_i18.DwModelWrapper>(e))
+              .map((e) => deserialize<_i24.DwModelWrapper>(e))
               .toList()
           as T;
     }
-    if (t == List<_i19.DwOrderBy>) {
-      return (data as List).map((e) => deserialize<_i19.DwOrderBy>(e)).toList()
+    if (t == List<_i25.DwOrderBy>) {
+      return (data as List).map((e) => deserialize<_i25.DwOrderBy>(e)).toList()
           as T;
     }
-    if (t == _i1.getType<List<_i19.DwOrderBy>?>()) {
+    if (t == _i1.getType<List<_i25.DwOrderBy>?>()) {
       return (data != null
               ? (data as List)
-                    .map((e) => deserialize<_i19.DwOrderBy>(e))
+                    .map((e) => deserialize<_i25.DwOrderBy>(e))
                     .toList()
               : null)
           as T;
     }
-    if (t == _i20.DwApiResponse) {
-      return _i20.DwApiResponse.fromJson(data) as T;
+    if (t == _i26.DwApiResponse) {
+      return _i26.DwApiResponse.fromJson(data) as T;
     }
-    if (t == _i21.DwAuthData) {
-      return _i21.DwAuthData.fromJson(data) as T;
+    if (t == _i27.DwAuthData) {
+      return _i27.DwAuthData.fromJson(data) as T;
     }
-    if (t == _i22.DwBackendFilter) {
-      return _i22.DwBackendFilter.fromJson(data) as T;
+    if (t == _i28.DwBackendFilter) {
+      return _i28.DwBackendFilter.fromJson(data) as T;
     }
-    if (t == _i23.DwOrderBy) {
-      return _i23.DwOrderBy.fromJson(data) as T;
+    if (t == _i29.DwOrderBy) {
+      return _i29.DwOrderBy.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i17.DwModelWrapper?>()) {
-      return (data != null ? _i17.DwModelWrapper.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i23.DwModelWrapper?>()) {
+      return (data != null ? _i23.DwModelWrapper.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i20.DwApiResponse?>()) {
-      return (data != null ? _i20.DwApiResponse.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i26.DwApiResponse?>()) {
+      return (data != null ? _i26.DwApiResponse.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i21.DwAuthData?>()) {
-      return (data != null ? _i21.DwAuthData.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i27.DwAuthData?>()) {
+      return (data != null ? _i27.DwAuthData.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i22.DwBackendFilter?>()) {
-      return (data != null ? _i22.DwBackendFilter.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i28.DwBackendFilter?>()) {
+      return (data != null ? _i28.DwBackendFilter.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i23.DwOrderBy?>()) {
-      return (data != null ? _i23.DwOrderBy.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i29.DwOrderBy?>()) {
+      return (data != null ? _i29.DwOrderBy.fromJson(data) : null) as T;
     }
     try {
       return _i2.Protocol().deserialize<T>(data, t);
@@ -796,11 +1487,11 @@ class Protocol extends _i1.SerializationManagerServer {
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i17.DwModelWrapper => 'DwModelWrapper',
-      _i20.DwApiResponse => 'DwApiResponse',
-      _i21.DwAuthData => 'DwAuthData',
-      _i22.DwBackendFilter => 'DwBackendFilter',
-      _i23.DwOrderBy => 'DwOrderBy',
+      _i23.DwModelWrapper => 'DwModelWrapper',
+      _i26.DwApiResponse => 'DwApiResponse',
+      _i27.DwAuthData => 'DwAuthData',
+      _i28.DwBackendFilter => 'DwBackendFilter',
+      _i29.DwOrderBy => 'DwOrderBy',
       _i3.DwAuthProvider => 'DwAuthProvider',
       _i4.DwAuthRequest => 'DwAuthRequest',
       _i5.DwAuthRequestStatus => 'DwAuthRequestStatus',
@@ -815,6 +1506,12 @@ class Protocol extends _i1.SerializationManagerServer {
       _i14.DwBackendFilterType => 'DwBackendFilterType',
       _i15.DwUpdatesTransport => 'DwUpdatesTransport',
       _i16.DwWebServerLog => 'DwWebServerLog',
+      _i17.DwPushDelivery => 'DwPushDelivery',
+      _i18.DwPushMessage => 'DwPushMessage',
+      _i19.DwPushMessageRecipient => 'DwPushMessageRecipient',
+      _i20.DwPushMetricBucket => 'DwPushMetricBucket',
+      _i21.DwPushRecipientState => 'DwPushRecipientState',
+      _i22.DwPushRuntimeState => 'DwPushRuntimeState',
       _ => null,
     };
   }
@@ -832,15 +1529,15 @@ class Protocol extends _i1.SerializationManagerServer {
     }
 
     switch (data) {
-      case _i17.DwModelWrapper():
+      case _i23.DwModelWrapper():
         return 'DwModelWrapper';
-      case _i20.DwApiResponse():
+      case _i26.DwApiResponse():
         return 'DwApiResponse';
-      case _i21.DwAuthData():
+      case _i27.DwAuthData():
         return 'DwAuthData';
-      case _i22.DwBackendFilter():
+      case _i28.DwBackendFilter():
         return 'DwBackendFilter';
-      case _i23.DwOrderBy():
+      case _i29.DwOrderBy():
         return 'DwOrderBy';
       case _i3.DwAuthProvider():
         return 'DwAuthProvider';
@@ -870,6 +1567,18 @@ class Protocol extends _i1.SerializationManagerServer {
         return 'DwUpdatesTransport';
       case _i16.DwWebServerLog():
         return 'DwWebServerLog';
+      case _i17.DwPushDelivery():
+        return 'DwPushDelivery';
+      case _i18.DwPushMessage():
+        return 'DwPushMessage';
+      case _i19.DwPushMessageRecipient():
+        return 'DwPushMessageRecipient';
+      case _i20.DwPushMetricBucket():
+        return 'DwPushMetricBucket';
+      case _i21.DwPushRecipientState():
+        return 'DwPushRecipientState';
+      case _i22.DwPushRuntimeState():
+        return 'DwPushRuntimeState';
     }
     className = _i2.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -885,19 +1594,19 @@ class Protocol extends _i1.SerializationManagerServer {
       return super.deserializeByClassName(data);
     }
     if (dataClassName == 'DwModelWrapper') {
-      return deserialize<_i17.DwModelWrapper>(data['data']);
+      return deserialize<_i23.DwModelWrapper>(data['data']);
     }
     if (dataClassName == 'DwApiResponse') {
-      return deserialize<_i20.DwApiResponse>(data['data']);
+      return deserialize<_i26.DwApiResponse>(data['data']);
     }
     if (dataClassName == 'DwAuthData') {
-      return deserialize<_i21.DwAuthData>(data['data']);
+      return deserialize<_i27.DwAuthData>(data['data']);
     }
     if (dataClassName == 'DwBackendFilter') {
-      return deserialize<_i22.DwBackendFilter>(data['data']);
+      return deserialize<_i28.DwBackendFilter>(data['data']);
     }
     if (dataClassName == 'DwOrderBy') {
-      return deserialize<_i23.DwOrderBy>(data['data']);
+      return deserialize<_i29.DwOrderBy>(data['data']);
     }
     if (dataClassName == 'DwAuthProvider') {
       return deserialize<_i3.DwAuthProvider>(data['data']);
@@ -941,6 +1650,24 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName == 'DwWebServerLog') {
       return deserialize<_i16.DwWebServerLog>(data['data']);
     }
+    if (dataClassName == 'DwPushDelivery') {
+      return deserialize<_i17.DwPushDelivery>(data['data']);
+    }
+    if (dataClassName == 'DwPushMessage') {
+      return deserialize<_i18.DwPushMessage>(data['data']);
+    }
+    if (dataClassName == 'DwPushMessageRecipient') {
+      return deserialize<_i19.DwPushMessageRecipient>(data['data']);
+    }
+    if (dataClassName == 'DwPushMetricBucket') {
+      return deserialize<_i20.DwPushMetricBucket>(data['data']);
+    }
+    if (dataClassName == 'DwPushRecipientState') {
+      return deserialize<_i21.DwPushRecipientState>(data['data']);
+    }
+    if (dataClassName == 'DwPushRuntimeState') {
+      return deserialize<_i22.DwPushRuntimeState>(data['data']);
+    }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
       return _i2.Protocol().deserializeByClassName(data);
@@ -971,6 +1698,18 @@ class Protocol extends _i1.SerializationManagerServer {
         return _i13.DwAppNotification.t;
       case _i16.DwWebServerLog:
         return _i16.DwWebServerLog.t;
+      case _i17.DwPushDelivery:
+        return _i17.DwPushDelivery.t;
+      case _i18.DwPushMessage:
+        return _i18.DwPushMessage.t;
+      case _i19.DwPushMessageRecipient:
+        return _i19.DwPushMessageRecipient.t;
+      case _i20.DwPushMetricBucket:
+        return _i20.DwPushMetricBucket.t;
+      case _i21.DwPushRecipientState:
+        return _i21.DwPushRecipientState.t;
+      case _i22.DwPushRuntimeState:
+        return _i22.DwPushRuntimeState.t;
     }
     return null;
   }

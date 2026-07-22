@@ -19,6 +19,7 @@ String _randomVerificationCode() =>
     List.generate(6, (_) => Random.secure().nextInt(10)).join();
 
 void initDartwayCore(Serverpod serverpod) {
+  final pushConfig = _buildPushConfig(serverpod.server.passwords);
   dw = DwCore.init<UserProfile>(
     userProfileTable: UserProfile.t,
     userProfileInclude: UserProfile.include(),
@@ -42,31 +43,69 @@ void initDartwayCore(Serverpod serverpod) {
       // (UserProfile.testVerificationCode, serverOnly — never sent to clients);
       // everyone else gets a fresh random code. Works in any run mode, so store
       // reviewers can sign in, while real users are never handed a fixed code.
-      generateVerificationCodeMethod: (
-        session, {
-        required DwAuthRequest verificationRequest,
-      }) async {
-        final profile = await UserProfile.db.findFirstRow(
-          session,
-          where: (t) =>
-              t.userIdentifier.equals(verificationRequest.userIdentifier),
-        );
-        return profile?.testVerificationCode ?? _randomVerificationCode();
-      },
+      generateVerificationCodeMethod:
+          (session, {required DwAuthRequest verificationRequest}) async {
+            final profile = await UserProfile.db.findFirstRow(
+              session,
+              where: (t) =>
+                  t.userIdentifier.equals(verificationRequest.userIdentifier),
+            );
+            return profile?.testVerificationCode ?? _randomVerificationCode();
+          },
       // Dev: log the code to the server console instead of sending an SMS.
       // Wire a real SMS/email sender here for production.
-      sendVerificationCodeMethod: (
-        session, {
-        required DwAuthRequest verificationRequest,
-        required String verificationCode,
-      }) async {
-        session.log(
-          'Verification code for ${verificationRequest.userIdentifier}: '
-          '$verificationCode',
-        );
-      },
+      sendVerificationCodeMethod:
+          (
+            session, {
+            required DwAuthRequest verificationRequest,
+            required String verificationCode,
+          }) async {
+            session.log(
+              'Verification code for ${verificationRequest.userIdentifier}: '
+              '$verificationCode',
+            );
+          },
+    ),
+    // Push stays disabled when the example has no provider credentials. A real
+    // application keeps tokens and eligibility rules in its resolver, while
+    // DartWay owns the provider transport implementation.
+    pushConfig: pushConfig,
+  );
+}
+
+DwPushConfig? _buildPushConfig(Map<String, String> passwords) {
+  final fcmConfig = DwFcmPushProviderConfig.fromPasswords(passwords);
+  final ruStoreConfig = DwRuStorePushProviderConfig.fromPasswords(passwords);
+  final fcm = fcmConfig.isConfigured
+      ? DwFcmPushProvider(config: fcmConfig)
+      : null;
+  final ruStore = ruStoreConfig.isConfigured
+      ? DwRuStorePushProvider(config: ruStoreConfig)
+      : null;
+  if (fcm == null && ruStore == null) return null;
+
+  return DwPushConfig(
+    recipientResolver: const _ExamplePushRecipientResolver(),
+    transport: DwPushProviderTransport(
+      provider: fcm ?? ruStore!,
+      fallbackProvider: fcm == null ? null : ruStore,
     ),
   );
+}
+
+final class _ExamplePushRecipientResolver extends DwPushRecipientResolver {
+  const _ExamplePushRecipientResolver();
+
+  @override
+  Future<DwPushRecipient> resolve(
+    Session session, {
+    required int recipientId,
+    required DwPushPayload payload,
+    required Transaction transaction,
+  }) async {
+    // Replace with a lookup of active app-owned device tokens and preferences.
+    return DwPushRecipient(const []);
+  }
 }
 
 /// Builds a new [UserProfile] when a user registers via the DartWay auth flow.

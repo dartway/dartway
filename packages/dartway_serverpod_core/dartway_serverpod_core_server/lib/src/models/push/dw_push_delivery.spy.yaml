@@ -1,0 +1,22 @@
+### Short-lived queue row. Terminal rows are deleted, never archived here.
+class: DwPushDelivery
+serverOnly: true
+table: dw_push_delivery
+fields:
+  messageId: int
+  message: DwPushMessage?, relation(field=messageId, onDelete=Cascade)
+  recipientId: int
+  availableAt: DateTime
+  attemptCount: int, default=0
+  leaseId: String?
+  leaseExpiresAt: DateTime?
+  lastError: String?
+  createdAt: DateTime, default=now
+indexes:
+  dw_push_delivery_message_recipient_idx:
+    fields: messageId, recipientId
+    unique: true
+  dw_push_delivery_claim_idx:
+    fields: availableAt, leaseExpiresAt
+  dw_push_delivery_recipient_idx:
+    fields: recipientId

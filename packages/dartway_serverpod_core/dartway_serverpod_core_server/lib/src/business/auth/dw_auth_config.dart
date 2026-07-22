@@ -3,6 +3,20 @@ import 'package:serverpod/serverpod.dart';
 
 import 'dw_auth_utils.dart';
 
+/// Raised when the application rejects creation of a new authentication key.
+///
+/// The rejection reason is intentionally typed so callers can return a safe
+/// authorization response without exposing database or application details.
+final class DwAuthKeyIssuanceRejectedException implements Exception {
+  const DwAuthKeyIssuanceRejectedException(this.reason);
+
+  final DwAuthFailReason reason;
+
+  @override
+  String toString() =>
+      'DwAuthKeyIssuanceRejectedException(reason: ${reason.name})';
+}
+
 // typedef InitVerificationCallback = Future<bool> Function(
 //   Session session,
 //   String userIdentifier,
@@ -43,6 +57,7 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.sendVerificationCodeMethod,
     this.onSignInTrigger,
     this.preAuthValidation,
+    this.preAuthKeyIssuance,
     this.maxVerificationAttempts = 5,
     this.verificationCodeLifetime = const Duration(minutes: 10),
     this.maxAuthRequestsPerIdentifier = 5,
@@ -61,27 +76,44 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     Session session, {
     required DwAuthRequest authRequest,
     required UserProfileClass? userProfile,
-  })? preAuthValidation;
+  })?
+  preAuthValidation;
+
+  /// Final application-owned authorization check immediately before an auth
+  /// key is inserted.
+  ///
+  /// This callback runs in the same short transaction as the key insert. Apps
+  /// should lock and re-read their user row through [transaction] before
+  /// deciding, so account deletion and key issuance cannot pass each other.
+  final Future<DwAuthFailReason?> Function(
+    Session session, {
+    required int userId,
+    required Transaction transaction,
+  })?
+  preAuthKeyIssuance;
 
   /// Callback for triggering actions when a user signs in.
   final Future<void> Function(
     Session session, {
     required int userId,
     required bool isFirstSignIn,
-  })? onSignInTrigger;
+  })?
+  onSignInTrigger;
 
   /// Callback for generating a verification code.
   final Future<String> Function(
     Session session, {
     required DwAuthRequest verificationRequest,
-  })? generateVerificationCodeMethod;
+  })?
+  generateVerificationCodeMethod;
 
   /// Callback for sending validation message.
   final Future<void> Function(
     Session session, {
     required DwAuthRequest verificationRequest,
     required String verificationCode,
-  })? sendVerificationCodeMethod;
+  })?
+  sendVerificationCodeMethod;
 
   // static DwAuthConfig _config = DwAuthConfig(
   //   secretHashKey: 'DwHashSecret',

@@ -1,0 +1,16 @@
+### Generic bounded state for per-recipient throttling and aggregation leases.
+class: DwPushRecipientState
+serverOnly: true
+table: dw_push_recipient_state
+fields:
+  recipientId: int
+  stateKey: String
+  nextAllowedAt: DateTime
+  metadata: Map<String, String>?
+  updatedAt: DateTime, default=now
+indexes:
+  dw_push_recipient_state_identity_idx:
+    fields: recipientId, stateKey
+    unique: true
+  dw_push_recipient_state_next_allowed_idx:
+    fields: nextAllowedAt
