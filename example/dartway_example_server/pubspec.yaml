@@ -15,6 +15,14 @@ dependencies:
       ref: master
       path: packages/dartway_serverpod_core/dartway_serverpod_core_server
 
+  # Optional push delivery module. An app that does not need push simply omits
+  # this dependency and gets none of the dw_push_* tables.
+  dartway_push_server:
+    git:
+      url: https://github.com/dartway/dartway.git
+      ref: master
+      path: packages/dartway_push/dartway_push_server
+
   http: ^1.5.0
 
 
@@ -35,3 +43,5 @@ dependency_overrides:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_server
   dartway_serverpod_core_shared:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_shared
+  dartway_push_server:
+    path: ../../packages/dartway_push/dartway_push_server

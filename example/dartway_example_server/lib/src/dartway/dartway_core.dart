@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
+import 'package:dartway_push_server/dartway_push_server.dart';
 import 'package:dartway_example_server/src/crud/app_setting_crud_config.dart';
 import 'package:dartway_example_server/src/crud/chat_channel_crud_config.dart';
 import 'package:dartway_example_server/src/crud/chat_message_crud_config.dart';
@@ -14,6 +15,14 @@ import 'package:dartway_example_server/src/generated/protocol.dart';
 import 'package:serverpod/serverpod.dart';
 
 late DwCore<UserProfile> dw;
+
+/// The optional push delivery engine, owned by the app (not by [DwCore]).
+///
+/// Push is a separate Serverpod module (`dartway_push_server`): an app that
+/// needs it constructs its own [DwPush] and schedules the worker itself. Stays
+/// `null` when no push provider is configured.
+DwPush? dwPush;
+
 bool _initialized = false;
 
 String _randomVerificationCode() =>
@@ -85,6 +94,54 @@ void initDartwayCore({
       },
     ),
   );
+
+  // Push lives in a separate module, not in DwCore: the app owns the engine and
+  // schedules its worker. Stays null without provider credentials. Authorising
+  // who may send marketing or pause the worker is the app's job — it owns the
+  // endpoints; the module ships no gating.
+  dwPush = _buildDwPush(passwords);
+}
+
+/// Builds the optional push delivery engine from provider credentials.
+///
+/// Returns `null` — no engine, no worker — when the example has no FCM or
+/// RuStore credentials, which is the default. Because push is a separate module,
+/// an app that omits the dependency gets none of the `dw_push_*` tables at all.
+DwPush? _buildDwPush(Map<String, String> passwords) {
+  final fcmConfig = DwFcmPushProviderConfig.fromPasswords(passwords);
+  final ruStoreConfig = DwRuStorePushProviderConfig.fromPasswords(passwords);
+  final fcm = fcmConfig.isConfigured ? DwFcmPushProvider(config: fcmConfig) : null;
+  final ruStore = ruStoreConfig.isConfigured
+      ? DwRuStorePushProvider(config: ruStoreConfig)
+      : null;
+  if (fcm == null && ruStore == null) return null;
+
+  return DwPush(
+    config: DwPushConfig(
+      recipientResolver: const _ExamplePushRecipientResolver(),
+      transport: DwPushProviderTransport(
+        provider: fcm ?? ruStore!,
+        fallbackProvider: fcm == null ? null : ruStore,
+      ),
+    ),
+  );
+}
+
+/// Minimal resolver that shows the seam. A real app looks up active app-owned
+/// device tokens and per-recipient preferences here and returns only the
+/// targets that are eligible to receive [payload].
+final class _ExamplePushRecipientResolver extends DwPushRecipientResolver {
+  const _ExamplePushRecipientResolver();
+
+  @override
+  Future<DwPushRecipient> resolve(
+    Session session, {
+    required int recipientId,
+    required DwPushPayload payload,
+    required Transaction transaction,
+  }) async {
+    return DwPushRecipient(const []);
+  }
 }
 
 /// Builds a new [UserProfile] when a user registers via the DartWay auth flow.

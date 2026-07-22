@@ -25,6 +25,7 @@ import 'user_profile/user_gender.dart' as _i12;
 import 'user_profile/user_profile.dart' as _i13;
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart'
     as _i14;
+import 'package:dartway_push_client/dartway_push_client.dart' as _i15;
 export 'booking/enums/booking_status.dart';
 export 'booking/session_booking.dart';
 export 'booking/session_review.dart';
@@ -148,6 +149,9 @@ class Protocol extends _i1.SerializationManager {
     try {
       return _i14.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
+    try {
+      return _i15.Protocol().deserialize<T>(data, t);
+    } on _i1.DeserializationTypeNotFoundException catch (_) {}
     return super.deserialize<T>(data, t);
   }
 
@@ -211,6 +215,10 @@ class Protocol extends _i1.SerializationManager {
     if (className != null) {
       return 'dartway_serverpod_core.$className';
     }
+    className = _i15.Protocol().getClassNameForObject(data);
+    if (className != null) {
+      return 'dartway_push.$className';
+    }
     return null;
   }
 
@@ -260,6 +268,10 @@ class Protocol extends _i1.SerializationManager {
       data['className'] = dataClassName.substring(23);
       return _i14.Protocol().deserializeByClassName(data);
     }
+    if (dataClassName.startsWith('dartway_push.')) {
+      data['className'] = dataClassName.substring(13);
+      return _i15.Protocol().deserializeByClassName(data);
+    }
     return super.deserializeByClassName(data);
   }
 
@@ -274,6 +286,9 @@ class Protocol extends _i1.SerializationManager {
     }
     try {
       return _i14.Protocol().mapRecordToJson(record);
+    } catch (_) {}
+    try {
+      return _i15.Protocol().mapRecordToJson(record);
     } catch (_) {}
     throw Exception('Unsupported record type ${record.runtimeType}');
   }

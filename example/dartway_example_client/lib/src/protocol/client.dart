@@ -14,7 +14,8 @@ import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'dart:async' as _i2;
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart'
     as _i3;
-import 'protocol.dart' as _i4;
+import 'package:dartway_push_client/dartway_push_client.dart' as _i4;
+import 'protocol.dart' as _i5;
 
 /// {@category Endpoint}
 class EndpointDevelopment extends _i1.EndpointRef {
@@ -34,9 +35,12 @@ class EndpointDevelopment extends _i1.EndpointRef {
 class Modules {
   Modules(Client client) {
     dartway_serverpod_core = _i3.Caller(client);
+    dartway_push = _i4.Caller(client);
   }
 
   late final _i3.Caller dartway_serverpod_core;
+
+  late final _i4.Caller dartway_push;
 }
 
 class Client extends _i1.ServerpodClientShared {
@@ -59,7 +63,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i4.Protocol(),
+         _i5.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
@@ -84,5 +88,6 @@ class Client extends _i1.ServerpodClientShared {
   @override
   Map<String, _i1.ModuleEndpointCaller> get moduleLookup => {
     'dartway_serverpod_core': modules.dartway_serverpod_core,
+    'dartway_push': modules.dartway_push,
   };
 }

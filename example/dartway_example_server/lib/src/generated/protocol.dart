@@ -14,18 +14,19 @@ import 'package:serverpod/serverpod.dart' as _i1;
 import 'package:serverpod/protocol.dart' as _i2;
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart'
     as _i3;
-import 'booking/enums/booking_status.dart' as _i4;
-import 'booking/session_booking.dart' as _i5;
-import 'booking/session_review.dart' as _i6;
-import 'chat/chat_channel.dart' as _i7;
-import 'chat/chat_message.dart' as _i8;
-import 'news/news_post.dart' as _i9;
-import 'schedule/club_service.dart' as _i10;
-import 'schedule/club_session.dart' as _i11;
-import 'settings/app_setting.dart' as _i12;
-import 'user_profile/enums/user_role.dart' as _i13;
-import 'user_profile/user_gender.dart' as _i14;
-import 'user_profile/user_profile.dart' as _i15;
+import 'package:dartway_push_server/dartway_push_server.dart' as _i4;
+import 'booking/enums/booking_status.dart' as _i5;
+import 'booking/session_booking.dart' as _i6;
+import 'booking/session_review.dart' as _i7;
+import 'chat/chat_channel.dart' as _i8;
+import 'chat/chat_message.dart' as _i9;
+import 'news/news_post.dart' as _i10;
+import 'schedule/club_service.dart' as _i11;
+import 'schedule/club_session.dart' as _i12;
+import 'settings/app_setting.dart' as _i13;
+import 'user_profile/enums/user_role.dart' as _i14;
+import 'user_profile/user_gender.dart' as _i15;
+import 'user_profile/user_profile.dart' as _i16;
 export 'booking/enums/booking_status.dart';
 export 'booking/session_booking.dart';
 export 'booking/session_review.dart';
@@ -669,6 +670,7 @@ class Protocol extends _i1.SerializationManagerServer {
       managed: true,
     ),
     ..._i3.Protocol.targetTableDefinitions,
+    ..._i4.Protocol.targetTableDefinitions,
     ..._i2.Protocol.targetTableDefinitions,
   ];
 
@@ -699,80 +701,83 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
 
-    if (t == _i4.BookingStatus) {
-      return _i4.BookingStatus.fromJson(data) as T;
+    if (t == _i5.BookingStatus) {
+      return _i5.BookingStatus.fromJson(data) as T;
     }
-    if (t == _i5.SessionBooking) {
-      return _i5.SessionBooking.fromJson(data) as T;
+    if (t == _i6.SessionBooking) {
+      return _i6.SessionBooking.fromJson(data) as T;
     }
-    if (t == _i6.SessionReview) {
-      return _i6.SessionReview.fromJson(data) as T;
+    if (t == _i7.SessionReview) {
+      return _i7.SessionReview.fromJson(data) as T;
     }
-    if (t == _i7.ChatChannel) {
-      return _i7.ChatChannel.fromJson(data) as T;
+    if (t == _i8.ChatChannel) {
+      return _i8.ChatChannel.fromJson(data) as T;
     }
-    if (t == _i8.ChatMessage) {
-      return _i8.ChatMessage.fromJson(data) as T;
+    if (t == _i9.ChatMessage) {
+      return _i9.ChatMessage.fromJson(data) as T;
     }
-    if (t == _i9.NewsPost) {
-      return _i9.NewsPost.fromJson(data) as T;
+    if (t == _i10.NewsPost) {
+      return _i10.NewsPost.fromJson(data) as T;
     }
-    if (t == _i10.ClubService) {
-      return _i10.ClubService.fromJson(data) as T;
+    if (t == _i11.ClubService) {
+      return _i11.ClubService.fromJson(data) as T;
     }
-    if (t == _i11.ClubSession) {
-      return _i11.ClubSession.fromJson(data) as T;
+    if (t == _i12.ClubSession) {
+      return _i12.ClubSession.fromJson(data) as T;
     }
-    if (t == _i12.AppSetting) {
-      return _i12.AppSetting.fromJson(data) as T;
+    if (t == _i13.AppSetting) {
+      return _i13.AppSetting.fromJson(data) as T;
     }
-    if (t == _i13.UserRole) {
-      return _i13.UserRole.fromJson(data) as T;
+    if (t == _i14.UserRole) {
+      return _i14.UserRole.fromJson(data) as T;
     }
-    if (t == _i14.UserGender) {
-      return _i14.UserGender.fromJson(data) as T;
+    if (t == _i15.UserGender) {
+      return _i15.UserGender.fromJson(data) as T;
     }
-    if (t == _i15.UserProfile) {
-      return _i15.UserProfile.fromJson(data) as T;
+    if (t == _i16.UserProfile) {
+      return _i16.UserProfile.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i4.BookingStatus?>()) {
-      return (data != null ? _i4.BookingStatus.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i5.BookingStatus?>()) {
+      return (data != null ? _i5.BookingStatus.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i5.SessionBooking?>()) {
-      return (data != null ? _i5.SessionBooking.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i6.SessionBooking?>()) {
+      return (data != null ? _i6.SessionBooking.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i6.SessionReview?>()) {
-      return (data != null ? _i6.SessionReview.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i7.SessionReview?>()) {
+      return (data != null ? _i7.SessionReview.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i7.ChatChannel?>()) {
-      return (data != null ? _i7.ChatChannel.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i8.ChatChannel?>()) {
+      return (data != null ? _i8.ChatChannel.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i8.ChatMessage?>()) {
-      return (data != null ? _i8.ChatMessage.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i9.ChatMessage?>()) {
+      return (data != null ? _i9.ChatMessage.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i9.NewsPost?>()) {
-      return (data != null ? _i9.NewsPost.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i10.NewsPost?>()) {
+      return (data != null ? _i10.NewsPost.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i10.ClubService?>()) {
-      return (data != null ? _i10.ClubService.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i11.ClubService?>()) {
+      return (data != null ? _i11.ClubService.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i11.ClubSession?>()) {
-      return (data != null ? _i11.ClubSession.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i12.ClubSession?>()) {
+      return (data != null ? _i12.ClubSession.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i12.AppSetting?>()) {
-      return (data != null ? _i12.AppSetting.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i13.AppSetting?>()) {
+      return (data != null ? _i13.AppSetting.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i13.UserRole?>()) {
-      return (data != null ? _i13.UserRole.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i14.UserRole?>()) {
+      return (data != null ? _i14.UserRole.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i14.UserGender?>()) {
-      return (data != null ? _i14.UserGender.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i15.UserGender?>()) {
+      return (data != null ? _i15.UserGender.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i15.UserProfile?>()) {
-      return (data != null ? _i15.UserProfile.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i16.UserProfile?>()) {
+      return (data != null ? _i16.UserProfile.fromJson(data) : null) as T;
     }
     try {
       return _i3.Protocol().deserialize<T>(data, t);
+    } on _i1.DeserializationTypeNotFoundException catch (_) {}
+    try {
+      return _i4.Protocol().deserialize<T>(data, t);
     } on _i1.DeserializationTypeNotFoundException catch (_) {}
     try {
       return _i2.Protocol().deserialize<T>(data, t);
@@ -782,18 +787,18 @@ class Protocol extends _i1.SerializationManagerServer {
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i4.BookingStatus => 'BookingStatus',
-      _i5.SessionBooking => 'SessionBooking',
-      _i6.SessionReview => 'SessionReview',
-      _i7.ChatChannel => 'ChatChannel',
-      _i8.ChatMessage => 'ChatMessage',
-      _i9.NewsPost => 'NewsPost',
-      _i10.ClubService => 'ClubService',
-      _i11.ClubSession => 'ClubSession',
-      _i12.AppSetting => 'AppSetting',
-      _i13.UserRole => 'UserRole',
-      _i14.UserGender => 'UserGender',
-      _i15.UserProfile => 'UserProfile',
+      _i5.BookingStatus => 'BookingStatus',
+      _i6.SessionBooking => 'SessionBooking',
+      _i7.SessionReview => 'SessionReview',
+      _i8.ChatChannel => 'ChatChannel',
+      _i9.ChatMessage => 'ChatMessage',
+      _i10.NewsPost => 'NewsPost',
+      _i11.ClubService => 'ClubService',
+      _i12.ClubSession => 'ClubSession',
+      _i13.AppSetting => 'AppSetting',
+      _i14.UserRole => 'UserRole',
+      _i15.UserGender => 'UserGender',
+      _i16.UserProfile => 'UserProfile',
       _ => null,
     };
   }
@@ -811,29 +816,29 @@ class Protocol extends _i1.SerializationManagerServer {
     }
 
     switch (data) {
-      case _i4.BookingStatus():
+      case _i5.BookingStatus():
         return 'BookingStatus';
-      case _i5.SessionBooking():
+      case _i6.SessionBooking():
         return 'SessionBooking';
-      case _i6.SessionReview():
+      case _i7.SessionReview():
         return 'SessionReview';
-      case _i7.ChatChannel():
+      case _i8.ChatChannel():
         return 'ChatChannel';
-      case _i8.ChatMessage():
+      case _i9.ChatMessage():
         return 'ChatMessage';
-      case _i9.NewsPost():
+      case _i10.NewsPost():
         return 'NewsPost';
-      case _i10.ClubService():
+      case _i11.ClubService():
         return 'ClubService';
-      case _i11.ClubSession():
+      case _i12.ClubSession():
         return 'ClubSession';
-      case _i12.AppSetting():
+      case _i13.AppSetting():
         return 'AppSetting';
-      case _i13.UserRole():
+      case _i14.UserRole():
         return 'UserRole';
-      case _i14.UserGender():
+      case _i15.UserGender():
         return 'UserGender';
-      case _i15.UserProfile():
+      case _i16.UserProfile():
         return 'UserProfile';
     }
     className = _i2.Protocol().getClassNameForObject(data);
@@ -843,6 +848,10 @@ class Protocol extends _i1.SerializationManagerServer {
     className = _i3.Protocol().getClassNameForObject(data);
     if (className != null) {
       return 'dartway_serverpod_core.$className';
+    }
+    className = _i4.Protocol().getClassNameForObject(data);
+    if (className != null) {
+      return 'dartway_push.$className';
     }
     return null;
   }
@@ -854,40 +863,40 @@ class Protocol extends _i1.SerializationManagerServer {
       return super.deserializeByClassName(data);
     }
     if (dataClassName == 'BookingStatus') {
-      return deserialize<_i4.BookingStatus>(data['data']);
+      return deserialize<_i5.BookingStatus>(data['data']);
     }
     if (dataClassName == 'SessionBooking') {
-      return deserialize<_i5.SessionBooking>(data['data']);
+      return deserialize<_i6.SessionBooking>(data['data']);
     }
     if (dataClassName == 'SessionReview') {
-      return deserialize<_i6.SessionReview>(data['data']);
+      return deserialize<_i7.SessionReview>(data['data']);
     }
     if (dataClassName == 'ChatChannel') {
-      return deserialize<_i7.ChatChannel>(data['data']);
+      return deserialize<_i8.ChatChannel>(data['data']);
     }
     if (dataClassName == 'ChatMessage') {
-      return deserialize<_i8.ChatMessage>(data['data']);
+      return deserialize<_i9.ChatMessage>(data['data']);
     }
     if (dataClassName == 'NewsPost') {
-      return deserialize<_i9.NewsPost>(data['data']);
+      return deserialize<_i10.NewsPost>(data['data']);
     }
     if (dataClassName == 'ClubService') {
-      return deserialize<_i10.ClubService>(data['data']);
+      return deserialize<_i11.ClubService>(data['data']);
     }
     if (dataClassName == 'ClubSession') {
-      return deserialize<_i11.ClubSession>(data['data']);
+      return deserialize<_i12.ClubSession>(data['data']);
     }
     if (dataClassName == 'AppSetting') {
-      return deserialize<_i12.AppSetting>(data['data']);
+      return deserialize<_i13.AppSetting>(data['data']);
     }
     if (dataClassName == 'UserRole') {
-      return deserialize<_i13.UserRole>(data['data']);
+      return deserialize<_i14.UserRole>(data['data']);
     }
     if (dataClassName == 'UserGender') {
-      return deserialize<_i14.UserGender>(data['data']);
+      return deserialize<_i15.UserGender>(data['data']);
     }
     if (dataClassName == 'UserProfile') {
-      return deserialize<_i15.UserProfile>(data['data']);
+      return deserialize<_i16.UserProfile>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
@@ -896,6 +905,10 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName.startsWith('dartway_serverpod_core.')) {
       data['className'] = dataClassName.substring(23);
       return _i3.Protocol().deserializeByClassName(data);
+    }
+    if (dataClassName.startsWith('dartway_push.')) {
+      data['className'] = dataClassName.substring(13);
+      return _i4.Protocol().deserializeByClassName(data);
     }
     return super.deserializeByClassName(data);
   }
@@ -909,30 +922,36 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
     {
+      var table = _i4.Protocol().getTableForType(t);
+      if (table != null) {
+        return table;
+      }
+    }
+    {
       var table = _i2.Protocol().getTableForType(t);
       if (table != null) {
         return table;
       }
     }
     switch (t) {
-      case _i5.SessionBooking:
-        return _i5.SessionBooking.t;
-      case _i6.SessionReview:
-        return _i6.SessionReview.t;
-      case _i7.ChatChannel:
-        return _i7.ChatChannel.t;
-      case _i8.ChatMessage:
-        return _i8.ChatMessage.t;
-      case _i9.NewsPost:
-        return _i9.NewsPost.t;
-      case _i10.ClubService:
-        return _i10.ClubService.t;
-      case _i11.ClubSession:
-        return _i11.ClubSession.t;
-      case _i12.AppSetting:
-        return _i12.AppSetting.t;
-      case _i15.UserProfile:
-        return _i15.UserProfile.t;
+      case _i6.SessionBooking:
+        return _i6.SessionBooking.t;
+      case _i7.SessionReview:
+        return _i7.SessionReview.t;
+      case _i8.ChatChannel:
+        return _i8.ChatChannel.t;
+      case _i9.ChatMessage:
+        return _i9.ChatMessage.t;
+      case _i10.NewsPost:
+        return _i10.NewsPost.t;
+      case _i11.ClubService:
+        return _i11.ClubService.t;
+      case _i12.ClubSession:
+        return _i12.ClubSession.t;
+      case _i13.AppSetting:
+        return _i13.AppSetting.t;
+      case _i16.UserProfile:
+        return _i16.UserProfile.t;
     }
     return null;
   }
@@ -955,6 +974,9 @@ class Protocol extends _i1.SerializationManagerServer {
     }
     try {
       return _i3.Protocol().mapRecordToJson(record);
+    } catch (_) {}
+    try {
+      return _i4.Protocol().mapRecordToJson(record);
     } catch (_) {}
     throw Exception('Unsupported record type ${record.runtimeType}');
   }
