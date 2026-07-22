@@ -83,25 +83,56 @@ class DwAuth<UserProfileClass extends TableRow> {
     bool updateSession = true,
     bool skipTriggers = false,
   }) async {
-    var key = DwAuthUtils.generateRandomString();
-    var hash = DwAuthUtils.hashAuthKey(key);
+    final key = DwAuthUtils.generateRandomString();
+    final hash = DwAuthUtils.hashAuthKey(key);
+    final shouldRunTrigger = !skipTriggers && config.onSignInTrigger != null;
 
-    if (config.onSignInTrigger != null) {
-      final existingAuthKeys = await DwAuthKey.db.find(
-        session,
-        where: (t) => t.userId.equals(userId),
-      );
-
-      await config.onSignInTrigger!(
+    final (:insertedAuthKey, :isFirstSignIn) = await session.db.transaction((
+      transaction,
+    ) async {
+      final rejectionReason = await config.preAuthKeyIssuance?.call(
         session,
         userId: userId,
-        isFirstSignIn: existingAuthKeys.isEmpty,
+        transaction: transaction,
       );
+      if (rejectionReason != null) {
+        throw DwAuthKeyIssuanceRejectedException(rejectionReason);
+      }
+
+      final hasExistingAuthKey = shouldRunTrigger
+          ? await DwAuthKey.db.findFirstRow(
+                  session,
+                  where: (t) => t.userId.equals(userId),
+                  transaction: transaction,
+                ) !=
+                null
+          : false;
+      final insertedAuthKey = await DwAuthKey.db.insertRow(
+        session,
+        DwAuthKey(userId: userId, hash: hash, key: key),
+        transaction: transaction,
+      );
+
+      return (
+        insertedAuthKey: insertedAuthKey,
+        isFirstSignIn: !hasExistingAuthKey,
+      );
+    });
+
+    if (shouldRunTrigger) {
+      try {
+        await config.onSignInTrigger!(
+          session,
+          userId: userId,
+          isFirstSignIn: isFirstSignIn,
+        );
+      } catch (error) {
+        session.log(
+          'Post-sign-in trigger failed (type: ${error.runtimeType})',
+          level: LogLevel.error,
+        );
+      }
     }
-
-    var authKey = DwAuthKey(userId: userId, hash: hash, key: key);
-
-    var insertedAuthKey = await DwAuthKey.db.insertRow(session, authKey);
 
     if (updateSession) {
       session.updateAuthenticated(

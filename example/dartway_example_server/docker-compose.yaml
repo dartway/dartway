@@ -13,5 +13,18 @@ services:
     volumes:
       - dartway_example_data:/var/lib/postgresql/data
 
+  # Isolated database for `dart test --tags integration`.
+  postgres_test:
+    image: postgres:16
+    ports:
+      - '9090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dartway_example_test
+      POSTGRES_PASSWORD: 'dartway_test_pw'
+    volumes:
+      - dartway_example_test_data:/var/lib/postgresql/data
+
 volumes:
   dartway_example_data:
+  dartway_example_test_data:

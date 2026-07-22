@@ -14,6 +14,3 @@ doc/api/
 
 # Firebase service account key for Firebase auth
 config/firebase_service_account_key.json
-
-# DartWay: we suggest to generate migration on each machine separately
-migrations/

@@ -1,0 +1,21 @@
+### Immutable content stored once for all recipient deliveries.
+class: DwPushMessage
+serverOnly: true
+table: dw_push_message
+fields:
+  deduplicationKey: String
+  category: String
+  title: String
+  body: String?
+  imageUrl: String?
+  data: Map<String, String>?
+  createdAt: DateTime, default=now
+  audienceClosedAt: DateTime?
+  scheduledAt: DateTime
+  expiresAt: DateTime
+indexes:
+  dw_push_message_deduplication_key_idx:
+    fields: deduplicationKey
+    unique: true
+  dw_push_message_expires_at_idx:
+    fields: expiresAt

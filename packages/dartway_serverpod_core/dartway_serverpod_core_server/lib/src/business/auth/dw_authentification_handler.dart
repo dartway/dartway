@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:dartway_serverpod_core_server/src/business/auth/dw_auth_utils.dart';
 import 'package:serverpod/serverpod.dart';
@@ -10,6 +8,7 @@ Future<AuthenticationInfo?> dwAuthenticationHandler(
   Session session,
   String key,
 ) async {
+  Session? tempSession;
   try {
     // Get the secret and user id
     var parts = key.split(':');
@@ -20,12 +19,9 @@ Future<AuthenticationInfo?> dwAuthenticationHandler(
     var secret = parts[1];
 
     // Get the authentication key from the database
-    var tempSession = await session.serverpod.createSession(
-      enableLogging: false,
-    );
+    tempSession = await session.serverpod.createSession(enableLogging: false);
 
     var authKey = await DwAuthKey.db.findById(tempSession, keyId);
-    await tempSession.close();
 
     if (authKey == null) return null;
 
@@ -38,9 +34,23 @@ Future<AuthenticationInfo?> dwAuthenticationHandler(
       const <Scope>{},
       authId: keyIdStr,
     );
-  } catch (exception, stackTrace) {
-    stderr.writeln('Failed authentication: $exception');
-    stderr.writeln('$stackTrace');
+  } catch (exception) {
+    session.log(
+      'Authentication failed (type: ${exception.runtimeType})',
+      level: LogLevel.warning,
+    );
     return null;
+  } finally {
+    if (tempSession != null) {
+      try {
+        await tempSession.close();
+      } catch (exception) {
+        session.log(
+          'Authentication session cleanup failed '
+          '(type: ${exception.runtimeType})',
+          level: LogLevel.warning,
+        );
+      }
+    }
   }
 }

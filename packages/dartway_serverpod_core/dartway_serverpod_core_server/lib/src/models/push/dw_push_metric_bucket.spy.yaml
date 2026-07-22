@@ -1,0 +1,16 @@
+### Bounded hourly counters used instead of permanent delivery history.
+class: DwPushMetricBucket
+serverOnly: true
+table: dw_push_metric_bucket
+fields:
+  bucketStart: DateTime
+  category: String
+  outcome: String
+  eventCount: int, default=0
+  updatedAt: DateTime, default=now
+indexes:
+  dw_push_metric_bucket_identity_idx:
+    fields: bucketStart, category, outcome
+    unique: true
+  dw_push_metric_bucket_start_idx:
+    fields: bucketStart

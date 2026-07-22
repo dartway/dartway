@@ -10,7 +10,7 @@
 CLAUDE.md                     # generic-методология (always-in-context «мозг»): законы, нейминг,
                               #   слои server/flutter/shared/client, каталог скиллов; ставится как .claude/CLAUDE.md
 skills/dartway-*/SKILL.md     # методология DartWay (clean-code, models, crud-config, data-layer,
-                              #   navigation, ui-kit, feature-scaffold, finish)
+                              #   push-delivery, navigation, ui-kit, feature-scaffold, finish)
 commands/{commit,dartway-audit}.md
 setup-claude.sh / .ps1        # установщик (копия для новых клиентских репо)
 ```

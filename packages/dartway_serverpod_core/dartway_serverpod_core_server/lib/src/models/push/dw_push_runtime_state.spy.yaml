@@ -1,0 +1,17 @@
+### Operational state for pausing and monitoring one logical worker.
+class: DwPushRuntimeState
+serverOnly: true
+table: dw_push_runtime_state
+fields:
+  workerName: String
+  isPaused: bool, default=false
+  pausedUntil: DateTime?
+  lastClaimedAt: DateTime?
+  lastCompletedAt: DateTime?
+  lastErrorAt: DateTime?
+  lastError: String?
+  updatedAt: DateTime, default=now
+indexes:
+  dw_push_runtime_state_worker_name_idx:
+    fields: workerName
+    unique: true

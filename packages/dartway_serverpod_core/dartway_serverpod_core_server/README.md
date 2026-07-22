@@ -16,6 +16,10 @@ production-ready backend:
 - **Cloud storage** — S3/MinIO-compatible file storage helpers.
 - **Alerts** — error reports to Telegram with structured context (see
   `dartway_serverpod_core_shared`).
+- **Compact push delivery** — optional server-only queue with one stored
+  payload per logical message, recipient deliveries, multi-worker leases,
+  retries, bounded metrics, provider-neutral adapters and built-in FCM/RuStore
+  providers.
 
 ## Installing the module
 
@@ -71,3 +75,7 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
 See the canonical example app in the
 [DartWay monorepo](https://github.com/dartway/dartway) (`example/`) — a full
 fitness-club product built on this stack.
+
+For queue setup, built-in provider configuration, adapter contracts, worker
+scheduling, retention and safe account deletion, see
+[Push delivery](../../../docs/push-delivery.md).

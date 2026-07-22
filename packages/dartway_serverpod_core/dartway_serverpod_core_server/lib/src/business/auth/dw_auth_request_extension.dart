@@ -97,66 +97,71 @@ extension DwAuthRequestVerification on DwAuthRequest {
     Session session, {
     required TableRow? userProfile,
   }) async {
-    switch (requestType) {
-      case DwAuthRequestType.login:
-        final authKey = await DwCore.instance.auth!.signInUser(
-          session,
-          userId!,
-        );
-        return [
-          DwModelWrapper(
-            object: DwAuthData(
-              key: authKey.key!,
-              keyId: authKey.id!,
-              userProfile: userProfile!,
+    try {
+      switch (requestType) {
+        case DwAuthRequestType.login:
+          final authKey = await DwCore.instance.auth!.signInUser(
+            session,
+            userId!,
+          );
+          return [
+            DwModelWrapper(
+              object: DwAuthData(
+                key: authKey.key!,
+                keyId: authKey.id!,
+                userProfile: userProfile!,
+              ),
             ),
-          ),
-        ];
-      case DwAuthRequestType.changePassword:
-        if (newPassword == null) {
-          throw Exception('New password is not provided');
-        }
+          ];
+        case DwAuthRequestType.changePassword:
+          if (newPassword == null) {
+            throw Exception('New password is not provided');
+          }
 
-        await DwCore.instance.auth!.setUserPassword(
-          session,
-          userId: userId!,
-          newPassword: newPassword,
-        );
-
-        return [];
-      case DwAuthRequestType.register:
-        userId = await DwCore.instance.createUserProfile(
-          session,
-          registrationRequest: this,
-        );
-
-        userProfile = await DwCore.instance.getUserProfile(session, userId!);
-
-        if (newPassword != null) {
           await DwCore.instance.auth!.setUserPassword(
             session,
             userId: userId!,
             newPassword: newPassword,
           );
-        }
 
-        final authKey = await DwCore.instance.auth!.signInUser(
-          session,
-          userId!,
-        );
+          return [];
+        case DwAuthRequestType.register:
+          userId = await DwCore.instance.createUserProfile(
+            session,
+            registrationRequest: this,
+          );
 
-        return [
-          DwModelWrapper(
-            // TODO: try to replace with DwAuthKey
-            object: DwAuthData(
-              key: authKey.key!,
-              keyId: authKey.id!,
-              userProfile: userProfile!,
+          userProfile = await DwCore.instance.getUserProfile(session, userId!);
+
+          if (newPassword != null) {
+            await DwCore.instance.auth!.setUserPassword(
+              session,
+              userId: userId!,
+              newPassword: newPassword,
+            );
+          }
+
+          final authKey = await DwCore.instance.auth!.signInUser(
+            session,
+            userId!,
+          );
+
+          return [
+            DwModelWrapper(
+              // TODO: try to replace with DwAuthKey
+              object: DwAuthData(
+                key: authKey.key!,
+                keyId: authKey.id!,
+                userProfile: userProfile!,
+              ),
             ),
-          ),
-        ];
-      default:
-        throw UnimplementedError('Unknown request type: $requestType');
+          ];
+        default:
+          throw UnimplementedError('Unknown request type: $requestType');
+      }
+    } on DwAuthKeyIssuanceRejectedException catch (rejection) {
+      setFailed(session, rejection.reason);
+      return [];
     }
   }
 }
