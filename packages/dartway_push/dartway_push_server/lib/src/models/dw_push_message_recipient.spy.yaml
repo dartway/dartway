@@ -1,0 +1,16 @@
+### Compact recipient membership retained after terminal delivery until the
+### message expires or its whole audience is cancelled and no deliveries remain.
+class: DwPushMessageRecipient
+serverOnly: true
+table: dw_push_message_recipient
+fields:
+  messageId: int
+  message: DwPushMessage?, relation(field=messageId, onDelete=Cascade)
+  recipientId: int
+  createdAt: DateTime, default=now
+indexes:
+  dw_push_message_recipient_unique_idx:
+    fields: messageId, recipientId
+    unique: true
+  dw_push_message_recipient_recipient_idx:
+    fields: recipientId

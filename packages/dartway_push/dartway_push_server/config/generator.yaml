@@ -1,0 +1,5 @@
+type: module
+nickname: dartway_push
+
+client_package_path: ../dartway_push_client
+server_test_tools_path: test/integration/test_tools

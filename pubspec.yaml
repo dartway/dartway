@@ -6,6 +6,7 @@ environment:
 workspace:
   - packages/*
   - packages/dartway_serverpod_core/*
+  - packages/dartway_push/*
 
 # `packages/dartway_lints/example` is deliberately NOT a workspace member: a
 # member has no `.dart_tool/package_config.json` of its own (the workspace root

@@ -1,0 +1,12 @@
+name: dartway_push_client
+description: "Client side of the DartWay push module. Push models are server-only, so this package is intentionally thin — it exists because a Serverpod module needs a client package."
+version: 0.1.0
+repository: https://github.com/dartway/dartway
+
+environment:
+  sdk: ^3.11.0
+
+resolution: workspace
+
+dependencies:
+  serverpod_client: 3.4.8
