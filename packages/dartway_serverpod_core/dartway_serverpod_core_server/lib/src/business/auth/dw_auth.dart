@@ -196,7 +196,26 @@ class DwAuth<UserProfileClass extends TableRow> {
 
     var authKey = DwAuthKey(userId: userId, hash: hash, key: key);
 
-    var insertedAuthKey = await DwAuthKey.db.insertRow(session, authKey);
+    // The final authorization check and the key insert share one short
+    // transaction. An app that locks and re-reads its user row inside
+    // [DwAuthConfig.preAuthKeyIssuance] therefore cannot be raced by an account
+    // deletion committing between the check and the insert — the two serialise.
+    final insertedAuthKey = await session.db.transaction((transaction) async {
+      final preAuthKeyIssuance = config.preAuthKeyIssuance;
+      if (preAuthKeyIssuance != null) {
+        final failReason = await preAuthKeyIssuance(
+          session,
+          userId: userId,
+          transaction: transaction,
+        );
+        if (failReason != null) {
+          // Throwing is what rolls the insert back.
+          throw DwAuthKeyIssuanceRejectedException(failReason);
+        }
+      }
+
+      return DwAuthKey.db.insertRow(session, authKey, transaction: transaction);
+    });
 
     if (updateSession) {
       session.updateAuthenticated(

@@ -21,6 +21,21 @@ import 'dw_auth_utils.dart';
 //   DwAuthRequest verificationRequest,
 // );
 
+/// Raised when the application rejects creation of a new authentication key
+/// from [DwAuthConfig.preAuthKeyIssuance].
+///
+/// The reason is typed so the caller can answer with a safe authorization
+/// response without leaking database or application detail.
+final class DwAuthKeyIssuanceRejectedException implements Exception {
+  const DwAuthKeyIssuanceRejectedException(this.reason);
+
+  final DwAuthFailReason reason;
+
+  @override
+  String toString() =>
+      'DwAuthKeyIssuanceRejectedException(reason: ${reason.name})';
+}
+
 class DwAuthConfig<UserProfileClass extends TableRow> {
   final Map<String, String> passwords;
 
@@ -43,6 +58,7 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.sendVerificationCodeMethod,
     this.onSignInTrigger,
     this.preAuthValidation,
+    this.preAuthKeyIssuance,
     this.verifyExternalCredential,
     this.maxVerificationAttempts = 5,
     this.verificationCodeLifetime = const Duration(minutes: 10),
@@ -96,6 +112,21 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     required DwAuthRequest authRequest,
     required UserProfileClass? userProfile,
   })? preAuthValidation;
+
+  /// Final application-owned authorization check immediately before an auth key
+  /// is inserted.
+  ///
+  /// Runs in the same short transaction as the key insert, so an app that locks
+  /// and re-reads its user row through [transaction] here cannot be raced by a
+  /// concurrent account deletion: the two serialise instead of passing each
+  /// other. Returning a reason rejects issuance and rolls the insert back
+  /// (surfaced as [DwAuthKeyIssuanceRejectedException]); returning `null`
+  /// allows it.
+  final Future<DwAuthFailReason?> Function(
+    Session session, {
+    required int userId,
+    required Transaction transaction,
+  })? preAuthKeyIssuance;
 
   /// Validates an external auth provider's credential (e.g. an Apple identity
   /// token) carried on a non-email [DwAuthRequest]. Return `null` when the

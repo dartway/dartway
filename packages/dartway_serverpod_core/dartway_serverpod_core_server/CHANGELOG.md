@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **`DwSaveConfig.lockInitialModelForUpdate`** — opt-in row-lock serialisation for
+  updates. By default the save lifecycle reads the initial model and runs `allowSave`
+  / `validateSave` *outside* the transaction and only writes inside it, so two
+  concurrent saves of the same row can both read the same pre-state, both pass their
+  checks and both write — a lost update, or a rule quietly bypassed. With the flag on,
+  the initial model is re-read under `FOR UPDATE` inside the transaction and the rules
+  run against it, so a concurrent save waits and then re-validates against what was
+  actually committed. Off by default (lifecycle unchanged) and a no-op for inserts,
+  which have no row to lock yet. Worth enabling for rows whose rules depend on their
+  own current state — roles, consent flags, balances, a deletion marker.
+- **`DwAuthConfig.preAuthKeyIssuance`** — a final application-owned authorization
+  check immediately before an auth key is inserted, running in the *same* short
+  transaction as the insert. An app that locks and re-reads its user row through the
+  supplied `transaction` can no longer be raced by an account deletion committing
+  between the check and the key insert; the two serialise. Returning a
+  `DwAuthFailReason` rejects issuance and rolls the insert back, surfaced as the new
+  typed `DwAuthKeyIssuanceRejectedException`.
+
 **One `dw` root on the server.** The initialized core is now reached through a single package-private
 `dw` object (mirroring the Flutter side), so framework code accesses every service the same way —
 `dw.advisoryLock`, `dw.alerts`, `dw.getCrudConfig(...)`. The static `DwCore.instance` accessor is gone;
