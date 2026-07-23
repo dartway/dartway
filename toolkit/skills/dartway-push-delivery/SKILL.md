@@ -185,6 +185,24 @@ audience selection must forever exclude the deleted user from enqueue.
 admin dashboard, never contends with the worker. It is a snapshot, not a live
 per-millisecond gauge (the engine keeps no hot per-message counter by design).
 
+## Reusable helpers (device tokens, source cancellation)
+
+The module ships the generic plumbing so the app does not hand-roll it:
+
+- **Device tokens** — `DwDevicePushToken` (keyed on `recipientId`) plus
+  `DwDevicePushTokenPolicy` (normalize/validate/cap/refresh rules) and
+  `DwDevicePushTokenStore` (`findByNormalizedValue`, `evictExcessForRecipient`,
+  `recipientHasToken`, `filterRecipientsWithTokens`). The resolver returns
+  tokens from this store; drop no-token recipients before enqueue with
+  `filterRecipientsWithTokens`. Writing/registering tokens (an endpoint) stays
+  in the app; keep them canonical via the policy and bounded via eviction.
+- **Cancel-on-source-removal** — `dwPush.linkMessageSources(session,
+  sourceType:, sourceIds:, messageId:, transaction:)` records that a message was
+  enqueued "about" some business sources; `dwPush.cancelMessagesBySources(...)`
+  cancels those messages when a source disappears (a post deleted before its
+  push is sent), so an immutable payload never goes out stale. `sourceType`/
+  `sourceId` are opaque app strings.
+
 ## Authorization
 
 The module ships no endpoints and no gating. Marketing sends, `pause`/`resume`

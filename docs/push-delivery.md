@@ -130,6 +130,18 @@ enough to poll from an admin dashboard and never contends with the worker,
 because the engine keeps no hot per-message counter. It is a few-seconds-fresh
 snapshot, not a live millisecond gauge — the right tradeoff for a progress view.
 
+## Device tokens and stale cancellation
+
+Two pieces of plumbing every push app needs ship with the module, so you don't
+rebuild them. `DwDevicePushToken` plus `DwDevicePushTokenStore` and
+`DwDevicePushTokenPolicy` keep device tokens canonical (whitespace-normalized,
+deduped), bounded (a per-recipient cap with newest-first eviction) and usable
+(filter out recipients with no valid token before you enqueue). And when a
+message is queued "about" something that can vanish — a post deleted before its
+notification goes out — `dwPush.linkMessageSources(...)` records the link and
+`dwPush.cancelMessagesBySources(...)` cancels the message when the source is
+gone, so an immutable payload never ships stale.
+
 ## See also
 
 - [Advisory locks](advisory-locks.md) — the non-blocking primitive the delivery
