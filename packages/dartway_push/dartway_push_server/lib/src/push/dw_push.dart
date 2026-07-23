@@ -1,5 +1,6 @@
 // ignore_for_file: invalid_use_of_internal_member
 
+import 'package:dartway_push_server/src/generated/protocol.dart';
 import 'package:serverpod/serverpod.dart';
 
 import 'dw_push_contracts.dart';
@@ -185,6 +186,86 @@ SELECT
       total: row[0] as int,
       remaining: row[1] as int,
     );
+  }
+
+  /// Records that [messageId] was enqueued "about" each of [sourceIds] under
+  /// [sourceType], so the message can later be cancelled when a source is
+  /// removed. Idempotent; blank source ids are ignored.
+  Future<void> linkMessageSources(
+    Session session, {
+    required String sourceType,
+    required Iterable<String> sourceIds,
+    required int messageId,
+    required Transaction transaction,
+  }) async {
+    final normalizedSourceType = sourceType.trim();
+    final normalizedSourceIds = sourceIds
+        .map((sourceId) => sourceId.trim())
+        .where((sourceId) => sourceId.isNotEmpty)
+        .toSet();
+    if (normalizedSourceType.isEmpty || normalizedSourceIds.isEmpty) return;
+
+    await DwPushSourceLink.db.insert(
+      session,
+      [
+        for (final sourceId in normalizedSourceIds)
+          DwPushSourceLink(
+            sourceType: normalizedSourceType,
+            sourceId: sourceId,
+            messageId: messageId,
+          ),
+      ],
+      transaction: transaction,
+      ignoreConflicts: true,
+    );
+  }
+
+  /// Cancels every message linked to any of [sourceIds] under [sourceType] and
+  /// drops the links. A message payload is immutable and may aggregate several
+  /// sources, so keeping it after one source disappears would send a stale
+  /// title/body; cancelling is the safe choice. Returns removed delivery count.
+  Future<int> cancelMessagesBySources(
+    Session session, {
+    required String sourceType,
+    required Iterable<String> sourceIds,
+    required Transaction transaction,
+  }) async {
+    final normalizedSourceType = sourceType.trim();
+    final normalizedSourceIds = sourceIds
+        .map((sourceId) => sourceId.trim())
+        .where((sourceId) => sourceId.isNotEmpty)
+        .toSet();
+    if (normalizedSourceType.isEmpty || normalizedSourceIds.isEmpty) return 0;
+
+    final links = await DwPushSourceLink.db.find(
+      session,
+      where: (table) =>
+          table.sourceType.equals(normalizedSourceType) &
+          table.sourceId.inSet(normalizedSourceIds),
+      transaction: transaction,
+    );
+    final messageIds = links.map((link) => link.messageId).toSet().toList()
+      ..sort();
+    var removedDeliveries = 0;
+    for (final messageId in messageIds) {
+      await DwPushSourceLink.db.find(
+        session,
+        where: (table) => table.messageId.equals(messageId),
+        transaction: transaction,
+        lockMode: LockMode.forUpdate,
+      );
+      await DwPushSourceLink.db.deleteWhere(
+        session,
+        where: (table) => table.messageId.equals(messageId),
+        transaction: transaction,
+      );
+      removedDeliveries += await queue.cancelMessage(
+        session,
+        messageId,
+        transaction: transaction,
+      );
+    }
+    return removedDeliveries;
   }
 
   /// Removes expired queue work and bounded operational data.

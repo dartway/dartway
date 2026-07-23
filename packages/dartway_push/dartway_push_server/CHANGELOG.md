@@ -19,6 +19,17 @@ push pipeline instead of hand-rolling the same queue, retries and races.
   device tokens, consent and eligibility) and a `DwPushTransport`
   (`DwPushProviderTransport` by default). The engine knows nothing about the
   app's domain.
+- **Device-token store** (`DwDevicePushToken` + `DwDevicePushTokenPolicy` +
+  `DwDevicePushTokenStore`) — the generic token plumbing every push app needs:
+  canonical-whitespace normalization, byte-length validation, a per-recipient
+  cap with newest-N eviction, refresh windows, canonical-token dedup lookup, and
+  "has a usable token" filtering to skip enqueue for no-token recipients. Keyed
+  on an opaque `recipientId`, no app types.
+- **Source-linked cancellation** (`DwPushSourceLink` +
+  `linkMessageSources(...)` / `cancelMessagesBySources(...)`) — map arbitrary
+  business `(sourceType, sourceId)` values to a queued message, then cancel the
+  message when a source disappears (e.g. a post deleted before its notification
+  is sent), so an immutable payload never goes out stale.
 - **Small public surface.** `DwPushConfig(recipientResolver, transport)` is all
   most apps write; every tuning knob lives on an optional `DwPushFineTuning`
   with per-field documentation of what it affects.

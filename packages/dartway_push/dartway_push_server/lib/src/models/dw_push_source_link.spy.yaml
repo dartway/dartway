@@ -1,0 +1,19 @@
+### Maps an arbitrary business source (sourceType, sourceId) to a queued
+### DwPushMessage, so the app can cancel the message when its source disappears
+### (e.g. a post is deleted before its notification is sent). A message payload
+### is immutable and may aggregate several sources. Server-only.
+class: DwPushSourceLink
+table: dw_push_source_link
+serverOnly: true
+fields:
+  sourceType: String
+  sourceId: String
+  messageId: int
+  message: DwPushMessage?, relation(field=messageId, onDelete=Cascade)
+  createdAt: DateTime, default=now
+indexes:
+  dw_push_source_link_unique_idx:
+    fields: sourceType, sourceId, messageId
+    unique: true
+  dw_push_source_link_message_id_idx:
+    fields: messageId

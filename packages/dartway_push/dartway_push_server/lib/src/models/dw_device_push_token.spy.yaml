@@ -1,0 +1,20 @@
+### A device push token owned by the push module, keyed on an opaque recipient
+### id (the app's user id). Tokens are stored only after
+### DwDevicePushTokenPolicy normalization, so the UNIQUE(token) index is the
+### authoritative canonical-token key. Server-only: never sent to clients.
+class: DwDevicePushToken
+table: dw_device_push_token
+serverOnly: true
+fields:
+  recipientId: int
+  token: String
+  createdAt: DateTime, default=now
+  updatedAt: DateTime
+indexes:
+  dw_device_push_token_token_unique_idx:
+    fields: token
+    unique: true
+  dw_device_push_token_recipient_id_idx:
+    fields: recipientId
+  dw_device_push_token_recipient_updated_id_idx:
+    fields: recipientId, updatedAt, id

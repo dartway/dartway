@@ -14,18 +14,22 @@ import 'package:serverpod/serverpod.dart' as _i1;
 import 'package:serverpod/protocol.dart' as _i2;
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart'
     as _i3;
-import 'dw_push_delivery.dart' as _i4;
-import 'dw_push_message.dart' as _i5;
-import 'dw_push_message_recipient.dart' as _i6;
-import 'dw_push_metric_bucket.dart' as _i7;
-import 'dw_push_recipient_state.dart' as _i8;
-import 'dw_push_runtime_state.dart' as _i9;
+import 'dw_device_push_token.dart' as _i4;
+import 'dw_push_delivery.dart' as _i5;
+import 'dw_push_message.dart' as _i6;
+import 'dw_push_message_recipient.dart' as _i7;
+import 'dw_push_metric_bucket.dart' as _i8;
+import 'dw_push_recipient_state.dart' as _i9;
+import 'dw_push_runtime_state.dart' as _i10;
+import 'dw_push_source_link.dart' as _i11;
+export 'dw_device_push_token.dart';
 export 'dw_push_delivery.dart';
 export 'dw_push_message.dart';
 export 'dw_push_message_recipient.dart';
 export 'dw_push_metric_bucket.dart';
 export 'dw_push_recipient_state.dart';
 export 'dw_push_runtime_state.dart';
+export 'dw_push_source_link.dart';
 
 class Protocol extends _i1.SerializationManagerServer {
   Protocol._();
@@ -35,6 +39,110 @@ class Protocol extends _i1.SerializationManagerServer {
   static final Protocol _instance = Protocol._();
 
   static final List<_i2.TableDefinition> targetTableDefinitions = [
+    _i2.TableDefinition(
+      name: 'dw_device_push_token',
+      dartName: 'DwDevicePushToken',
+      schema: 'public',
+      module: 'dartway_push',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'dw_device_push_token_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'recipientId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'token',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+        _i2.ColumnDefinition(
+          name: 'updatedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_device_push_token_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_device_push_token_token_unique_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'token',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_device_push_token_recipient_id_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'recipientId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_device_push_token_recipient_updated_id_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'recipientId',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'updatedAt',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
     _i2.TableDefinition(
       name: 'dw_push_delivery',
       dartName: 'DwPushDelivery',
@@ -674,6 +782,108 @@ class Protocol extends _i1.SerializationManagerServer {
       ],
       managed: true,
     ),
+    _i2.TableDefinition(
+      name: 'dw_push_source_link',
+      dartName: 'DwPushSourceLink',
+      schema: 'public',
+      module: 'dartway_push',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'dw_push_source_link_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'sourceType',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'sourceId',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'messageId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+          columnDefault: 'CURRENT_TIMESTAMP',
+        ),
+      ],
+      foreignKeys: [
+        _i2.ForeignKeyDefinition(
+          constraintName: 'dw_push_source_link_fk_0',
+          columns: ['messageId'],
+          referenceTable: 'dw_push_message',
+          referenceTableSchema: 'public',
+          referenceColumns: ['id'],
+          onUpdate: _i2.ForeignKeyAction.noAction,
+          onDelete: _i2.ForeignKeyAction.cascade,
+          matchType: null,
+        ),
+      ],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'dw_push_source_link_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_source_link_unique_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'sourceType',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'sourceId',
+            ),
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'messageId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'dw_push_source_link_message_id_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'messageId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
     ..._i3.Protocol.targetTableDefinitions,
   ];
 
@@ -706,43 +916,56 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
 
-    if (t == _i4.DwPushDelivery) {
-      return _i4.DwPushDelivery.fromJson(data) as T;
+    if (t == _i4.DwDevicePushToken) {
+      return _i4.DwDevicePushToken.fromJson(data) as T;
     }
-    if (t == _i5.DwPushMessage) {
-      return _i5.DwPushMessage.fromJson(data) as T;
+    if (t == _i5.DwPushDelivery) {
+      return _i5.DwPushDelivery.fromJson(data) as T;
     }
-    if (t == _i6.DwPushMessageRecipient) {
-      return _i6.DwPushMessageRecipient.fromJson(data) as T;
+    if (t == _i6.DwPushMessage) {
+      return _i6.DwPushMessage.fromJson(data) as T;
     }
-    if (t == _i7.DwPushMetricBucket) {
-      return _i7.DwPushMetricBucket.fromJson(data) as T;
+    if (t == _i7.DwPushMessageRecipient) {
+      return _i7.DwPushMessageRecipient.fromJson(data) as T;
     }
-    if (t == _i8.DwPushRecipientState) {
-      return _i8.DwPushRecipientState.fromJson(data) as T;
+    if (t == _i8.DwPushMetricBucket) {
+      return _i8.DwPushMetricBucket.fromJson(data) as T;
     }
-    if (t == _i9.DwPushRuntimeState) {
-      return _i9.DwPushRuntimeState.fromJson(data) as T;
+    if (t == _i9.DwPushRecipientState) {
+      return _i9.DwPushRecipientState.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i4.DwPushDelivery?>()) {
-      return (data != null ? _i4.DwPushDelivery.fromJson(data) : null) as T;
+    if (t == _i10.DwPushRuntimeState) {
+      return _i10.DwPushRuntimeState.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i5.DwPushMessage?>()) {
-      return (data != null ? _i5.DwPushMessage.fromJson(data) : null) as T;
+    if (t == _i11.DwPushSourceLink) {
+      return _i11.DwPushSourceLink.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i6.DwPushMessageRecipient?>()) {
-      return (data != null ? _i6.DwPushMessageRecipient.fromJson(data) : null)
+    if (t == _i1.getType<_i4.DwDevicePushToken?>()) {
+      return (data != null ? _i4.DwDevicePushToken.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i5.DwPushDelivery?>()) {
+      return (data != null ? _i5.DwPushDelivery.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i6.DwPushMessage?>()) {
+      return (data != null ? _i6.DwPushMessage.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i7.DwPushMessageRecipient?>()) {
+      return (data != null ? _i7.DwPushMessageRecipient.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i7.DwPushMetricBucket?>()) {
-      return (data != null ? _i7.DwPushMetricBucket.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i8.DwPushMetricBucket?>()) {
+      return (data != null ? _i8.DwPushMetricBucket.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i8.DwPushRecipientState?>()) {
-      return (data != null ? _i8.DwPushRecipientState.fromJson(data) : null)
+    if (t == _i1.getType<_i9.DwPushRecipientState?>()) {
+      return (data != null ? _i9.DwPushRecipientState.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i9.DwPushRuntimeState?>()) {
-      return (data != null ? _i9.DwPushRuntimeState.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i10.DwPushRuntimeState?>()) {
+      return (data != null ? _i10.DwPushRuntimeState.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i11.DwPushSourceLink?>()) {
+      return (data != null ? _i11.DwPushSourceLink.fromJson(data) : null) as T;
     }
     if (t == Map<String, String>) {
       return (data as Map).map(
@@ -770,12 +993,14 @@ class Protocol extends _i1.SerializationManagerServer {
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i4.DwPushDelivery => 'DwPushDelivery',
-      _i5.DwPushMessage => 'DwPushMessage',
-      _i6.DwPushMessageRecipient => 'DwPushMessageRecipient',
-      _i7.DwPushMetricBucket => 'DwPushMetricBucket',
-      _i8.DwPushRecipientState => 'DwPushRecipientState',
-      _i9.DwPushRuntimeState => 'DwPushRuntimeState',
+      _i4.DwDevicePushToken => 'DwDevicePushToken',
+      _i5.DwPushDelivery => 'DwPushDelivery',
+      _i6.DwPushMessage => 'DwPushMessage',
+      _i7.DwPushMessageRecipient => 'DwPushMessageRecipient',
+      _i8.DwPushMetricBucket => 'DwPushMetricBucket',
+      _i9.DwPushRecipientState => 'DwPushRecipientState',
+      _i10.DwPushRuntimeState => 'DwPushRuntimeState',
+      _i11.DwPushSourceLink => 'DwPushSourceLink',
       _ => null,
     };
   }
@@ -793,18 +1018,22 @@ class Protocol extends _i1.SerializationManagerServer {
     }
 
     switch (data) {
-      case _i4.DwPushDelivery():
+      case _i4.DwDevicePushToken():
+        return 'DwDevicePushToken';
+      case _i5.DwPushDelivery():
         return 'DwPushDelivery';
-      case _i5.DwPushMessage():
+      case _i6.DwPushMessage():
         return 'DwPushMessage';
-      case _i6.DwPushMessageRecipient():
+      case _i7.DwPushMessageRecipient():
         return 'DwPushMessageRecipient';
-      case _i7.DwPushMetricBucket():
+      case _i8.DwPushMetricBucket():
         return 'DwPushMetricBucket';
-      case _i8.DwPushRecipientState():
+      case _i9.DwPushRecipientState():
         return 'DwPushRecipientState';
-      case _i9.DwPushRuntimeState():
+      case _i10.DwPushRuntimeState():
         return 'DwPushRuntimeState';
+      case _i11.DwPushSourceLink():
+        return 'DwPushSourceLink';
     }
     className = _i2.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -823,23 +1052,29 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName is! String) {
       return super.deserializeByClassName(data);
     }
+    if (dataClassName == 'DwDevicePushToken') {
+      return deserialize<_i4.DwDevicePushToken>(data['data']);
+    }
     if (dataClassName == 'DwPushDelivery') {
-      return deserialize<_i4.DwPushDelivery>(data['data']);
+      return deserialize<_i5.DwPushDelivery>(data['data']);
     }
     if (dataClassName == 'DwPushMessage') {
-      return deserialize<_i5.DwPushMessage>(data['data']);
+      return deserialize<_i6.DwPushMessage>(data['data']);
     }
     if (dataClassName == 'DwPushMessageRecipient') {
-      return deserialize<_i6.DwPushMessageRecipient>(data['data']);
+      return deserialize<_i7.DwPushMessageRecipient>(data['data']);
     }
     if (dataClassName == 'DwPushMetricBucket') {
-      return deserialize<_i7.DwPushMetricBucket>(data['data']);
+      return deserialize<_i8.DwPushMetricBucket>(data['data']);
     }
     if (dataClassName == 'DwPushRecipientState') {
-      return deserialize<_i8.DwPushRecipientState>(data['data']);
+      return deserialize<_i9.DwPushRecipientState>(data['data']);
     }
     if (dataClassName == 'DwPushRuntimeState') {
-      return deserialize<_i9.DwPushRuntimeState>(data['data']);
+      return deserialize<_i10.DwPushRuntimeState>(data['data']);
+    }
+    if (dataClassName == 'DwPushSourceLink') {
+      return deserialize<_i11.DwPushSourceLink>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
@@ -867,18 +1102,22 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
     switch (t) {
-      case _i4.DwPushDelivery:
-        return _i4.DwPushDelivery.t;
-      case _i5.DwPushMessage:
-        return _i5.DwPushMessage.t;
-      case _i6.DwPushMessageRecipient:
-        return _i6.DwPushMessageRecipient.t;
-      case _i7.DwPushMetricBucket:
-        return _i7.DwPushMetricBucket.t;
-      case _i8.DwPushRecipientState:
-        return _i8.DwPushRecipientState.t;
-      case _i9.DwPushRuntimeState:
-        return _i9.DwPushRuntimeState.t;
+      case _i4.DwDevicePushToken:
+        return _i4.DwDevicePushToken.t;
+      case _i5.DwPushDelivery:
+        return _i5.DwPushDelivery.t;
+      case _i6.DwPushMessage:
+        return _i6.DwPushMessage.t;
+      case _i7.DwPushMessageRecipient:
+        return _i7.DwPushMessageRecipient.t;
+      case _i8.DwPushMetricBucket:
+        return _i8.DwPushMetricBucket.t;
+      case _i9.DwPushRecipientState:
+        return _i9.DwPushRecipientState.t;
+      case _i10.DwPushRuntimeState:
+        return _i10.DwPushRuntimeState.t;
+      case _i11.DwPushSourceLink:
+        return _i11.DwPushSourceLink.t;
     }
     return null;
   }

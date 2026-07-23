@@ -3,6 +3,8 @@ export 'src/generated/protocol.dart';
 
 export 'src/push/dw_push.dart';
 export 'src/push/dw_push_contracts.dart';
+export 'src/push/dw_device_push_token_policy.dart';
+export 'src/push/dw_device_push_token_store.dart';
 export 'src/push/dw_fcm_push_provider.dart';
 export 'src/push/dw_push_http.dart';
 export 'src/push/dw_push_provider.dart';
