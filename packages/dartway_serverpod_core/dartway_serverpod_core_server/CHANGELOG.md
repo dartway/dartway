@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- **A closed streaming connection no longer stays in memory.** Two references outlived
+  every connection, so a client that reconnects — routinely, on an unstable network —
+  stranded a whole connection graph each time: the websocket, the request and the
+  buffered session log. Under production load that was one leaked graph every few
+  seconds. Both endpoints keep their signatures and their behaviour; only teardown
+  moved. Measured against serverpod 3.4.10 and 3.4.11.
+  - `DwRealTimeEndpoint` no longer calls the deprecated `setUserObject`. Serverpod
+    never releases what that puts in `Endpoint._userObjects`, and the endpoint is a
+    singleton living as long as the process, so every authenticated connection stayed
+    reachable from it forever. The channel listener is now dropped from a will-close
+    listener on the session itself, which makes the endpoint stateless and closes a
+    second hole — a `streamClosed` that Serverpod skips when authorization for the
+    endpoint has been revoked mid-connection. **Teardown now runs when the session
+    closes rather than in `streamClosed`, a few milliseconds later in the same
+    shutdown.**
+  - `DwCrudEndpoint.subscribeOnUpdates` and `.saveModelStream` no longer use
+    `session.messages.createStream`. It registers a cleanup callback in a map keyed by
+    the session, and on the teardown path *every* websocket takes — the stream is
+    cancelled before the session is closed, so `removeListenersForSession` finds
+    nothing left and returns before reaching that map — the entry outlives the
+    session. They subscribe to the channel directly instead, releasing the listener
+    both on stream cancellation and on session close.
+
 - **Serverpod 3.4.11.** Bumped from 3.4.8 and regenerated everywhere (core, the push
   module, example, template). All three intervening releases are bugfixes — notably
   correct column mapping for joins with long names and deeply nested relations, and

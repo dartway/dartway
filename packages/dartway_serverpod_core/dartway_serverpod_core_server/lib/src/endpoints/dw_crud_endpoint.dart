@@ -4,6 +4,7 @@ import 'package:serverpod/serverpod.dart';
 
 import '../domain/api/dw_order_by.dart';
 import '../domain/crud/domain/dw_get_list_interface.dart';
+import '../private/dw_channel_stream.dart';
 import '../private/dw_singleton.dart';
 
 class DwCrudEndpoint extends Endpoint {
@@ -25,9 +26,9 @@ class DwCrudEndpoint extends Endpoint {
   Stream<SerializableModel> subscribeOnUpdates(
     Session session, {
     required String channel,
-  }) async* {
+  }) {
     session.log('subscribeOnUpdates for $channel', level: LogLevel.debug);
-    yield* session.messages.createStream<SerializableModel>(channel);
+    return openChannelStream<SerializableModel>(session, channel);
   }
 
   Future<DwApiResponse<DwModelWrapper>> getOne(
@@ -190,9 +191,7 @@ class DwCrudEndpoint extends Endpoint {
         throw Exception('notConfigured(source: saveModelStream $className');
       }
 
-      final stream = session.messages.createStream<SerializableModel>(
-        channelName,
-      );
+      final stream = openChannelStream<SerializableModel>(session, channelName);
 
       () async {
         try {

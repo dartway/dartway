@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:serverpod_client/serverpod_client.dart';
 
 import '../../private/dw_singleton.dart';
 import 'service/dw_socket_service.dart';
@@ -23,12 +22,6 @@ class _DwChannelSubscriptionWidgetState
     extends State<DwChannelSubscriptionWidget> {
   late final DwSocketService _socket;
 
-  void _handleStatusChange() {
-    if (_socket.statusNotifier.value == StreamingConnectionStatus.connected) {
-      _socket.subscribeToChannel(widget.channel);
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -45,16 +38,13 @@ class _DwChannelSubscriptionWidgetState
 
     _socket = socket;
 
-    _socket.statusNotifier.addListener(_handleStatusChange);
-
-    if (_socket.statusNotifier.value == StreamingConnectionStatus.connected) {
-      _socket.subscribeToChannel(widget.channel);
-    }
+    // Asked for once: the service holds on to the request and reopens the
+    // channel itself on every reconnect.
+    _socket.subscribeToChannel(widget.channel);
   }
 
   @override
   void dispose() {
-    _socket.statusNotifier.removeListener(_handleStatusChange);
     _socket.unsubscribeFromChannel(widget.channel);
     super.dispose();
   }

@@ -7,6 +7,7 @@ import 'package:dartway_serverpod_core_flutter/src/private/dw_singleton.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../repository/dw_repository.dart';
+import 'dw_channel_subscriptions.dart';
 import 'streaming_error_classifier.dart';
 
 // TODO(serverpod-legacy-streams): This service still relies on Serverpod's
@@ -25,7 +26,12 @@ class DwSocketService {
 
   StreamingConnectionHandler? _connectionHandler;
   StreamSubscription<SerializableModel>? _mainStreamSub;
-  final Map<String, StreamSubscription<SerializableModel>> _channelSubs = {};
+
+  late final _channelSubscriptions = DwChannelSubscriptions(
+    openChannelStream: (channel) =>
+        dw.endpointCaller.dwCrud.subscribeOnUpdates(channel: channel),
+    onUpdate: _processUpdate,
+  );
 
   final ValueNotifier<StreamingConnectionStatus> statusNotifier = ValueNotifier(
     StreamingConnectionStatus.disconnected,
@@ -35,9 +41,12 @@ class DwSocketService {
     // Run the handler (and its retry timer) inside a child zone so retry errors
     // inherit this zone instead of the app's root zone from DwAppRunner.
     runZonedGuarded(() {
+      // Reconnect delay is left at Serverpod's own default of 5 seconds. The
+      // handler retries on a fixed interval with no backoff, so a shorter one
+      // turns an unstable network into a reconnect storm: every attempt opens a
+      // fresh server-side session, with its own log buffer and websocket.
       _connectionHandler = StreamingConnectionHandler(
         client: dw.client,
-        retryEverySeconds: 1,
         listener: (_) => _refresh(),
       );
 
@@ -47,7 +56,9 @@ class DwSocketService {
 
   void _onConnectionZoneError(Object error, StackTrace stack) {
     if (isStreamingConnectionError(error)) {
-      debugPrint('[DwSocketService] swallowed streaming connection error: $error');
+      debugPrint(
+        '[DwSocketService] swallowed streaming connection error: $error',
+      );
       return; // connection-level noise → swallow, never surface it
     }
     // Real error → forward to the parent (app) zone so genuine bugs are not hidden.
@@ -76,6 +87,11 @@ class DwSocketService {
 
     if (status == StreamingConnectionStatus.connected) {
       _startMainStream();
+      // Channel streams do not survive the connection they were opened on, so
+      // every reconnect reopens the ones the app still follows.
+      _channelSubscriptions.handleConnected();
+    } else {
+      _channelSubscriptions.handleDisconnected();
     }
 
     statusNotifier.value = status;
@@ -106,37 +122,13 @@ class DwSocketService {
     _mainStreamSub = dw.endpointCaller.dwRealTime.stream.listen(_processUpdate);
   }
 
-  Future<void> subscribeToChannel(String channel) async {
-    if (_connectionHandler?.status.status !=
-        StreamingConnectionStatus.connected) {
-      return;
-    }
+  /// Follows [channel] until told otherwise. Asking while the connection is
+  /// down is fine: the channel is opened as soon as it comes back.
+  Future<void> subscribeToChannel(String channel) async =>
+      _channelSubscriptions.request(channel);
 
-    if (_channelSubs.containsKey(channel)) return;
+  Future<void> unsubscribeFromChannel(String channel) =>
+      _channelSubscriptions.release(channel);
 
-    final sub = dw.endpointCaller.dwCrud
-        .subscribeOnUpdates(channel: channel)
-        .listen(
-          _processUpdate,
-          onDone: () => _channelSubs.remove(channel),
-          onError: (_, __) => _channelSubs.remove(channel),
-          cancelOnError: true,
-        );
-
-    _channelSubs[channel] = sub;
-  }
-
-  Future<void> unsubscribeFromChannel(String channel) async {
-    final sub = _channelSubs.remove(channel);
-    await sub?.cancel();
-  }
-
-  Future<void> unsubscribeAllChannels() async {
-    final subs = _channelSubs.values.toList();
-    _channelSubs.clear();
-
-    for (final sub in subs) {
-      await sub.cancel();
-    }
-  }
+  Future<void> unsubscribeAllChannels() => _channelSubscriptions.releaseAll();
 }

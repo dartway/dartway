@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **Channel subscriptions survive a reconnect.** A channel stream dies with the
+  connection that carried it, and nothing reopened it: `subscribeToChannel` returned
+  early while the socket was down and the dead entry was simply dropped, so after a
+  network blip realtime went quiet for the rest of the session with nothing in the
+  logs to say so. `DwSocketService` now keeps what the app asked to follow apart from
+  the streams that carry it (`DwChannelSubscriptions`) and reopens every requested
+  channel on each connect. Same public methods; `subscribeToChannel` may now be called
+  while offline — the channel opens as soon as the connection is back.
+  `DwChannelSubscriptionWidget` no longer resubscribes on connection status itself,
+  which also removes a race where a reconnect could land on a not-yet-dropped dead
+  subscription and skip reopening it for good.
+- **The streaming reconnect delay is back to Serverpod's own default of 5 seconds**,
+  from the 1 second `DwSocketService` used to pass. The handler retries on a fixed
+  interval with no backoff, so on an unstable network a one-second delay turned every
+  outage into a reconnect storm — and each attempt opens a fresh server-side session
+  with its own socket and log buffer. Deliberately not exposed as a parameter: no app
+  has a reason to prefer one value over the other, and the retry loop belongs to the
+  deprecated streaming API that is on its way out.
+
 **`dw.repo` — one client-side data-access point.** Reads are Riverpod providers consumed natively —
 `ref.watch(dw.repo.model<T>(...))` (reactive), `ref.read(...future)` (one-shot),
 `ref.refresh(...future)` (force). Writes and realtime are plain methods: `dw.repo.saveModel/deleteModel`,
