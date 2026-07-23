@@ -110,6 +110,47 @@ class DwRepo {
 
   /// Returns the registered default instance for [T].
   T getDefault<T>() => DwRepository.getDefault<T>();
+
+  // --- Imperative one-shot fetches -------------------------------------------
+  //
+  // For flows that own their own state and can't be a reactive provider — e.g.
+  // anchor/offset pagination. These hide class-name resolution and response
+  // unwrapping; prefer the reactive reads above whenever a provider fits.
+
+  /// One-shot list fetch: returns a plain `List<T>`, no manual response
+  /// handling. For imperative pagination that manages its own state.
+  Future<List<T>> fetchList<T extends SerializableModel>({
+    DwBackendFilter? filter,
+    List<DwOrderBy>? orderByList,
+    int? limit,
+    int? offset,
+    String? apiGroupOverride,
+  }) => DwRepository.fetchList<T>(
+    filter: filter,
+    orderByList: orderByList,
+    limit: limit,
+    offset: offset,
+    apiGroupOverride: apiGroupOverride,
+  );
+
+  /// One-shot server-side count of [T] rows matching [filter].
+  Future<int> count<T extends SerializableModel>({
+    DwBackendFilter? filter,
+    String? apiGroupOverride,
+  }) => DwRepository.count<T>(filter: filter, apiGroupOverride: apiGroupOverride);
+
+  /// Applies a **custom** (non-CRUD) endpoint's [DwApiResponse] to the repo:
+  /// returns its value (throwing on error) and, unless [updateListeners] is
+  /// `false`, dispatches its `updatedModels` so open watchers stay in sync.
+  /// CRUD reads/writes go through the providers and [saveModel]/[deleteModel];
+  /// reach for this only when you call a bespoke endpoint yourself.
+  K? processApiResponse<K>(
+    DwApiResponse<K> response, {
+    bool updateListeners = true,
+  }) => DwRepository.processApiResponse<K>(
+    response,
+    updateListeners: updateListeners,
+  );
 }
 
 /// Default-model getter as a static tear-off, for `DwConfig.defaultModelGetter`.

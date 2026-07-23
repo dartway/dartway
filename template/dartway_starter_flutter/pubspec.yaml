@@ -27,7 +27,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
-  serverpod_flutter: ^3.4.8
+  serverpod_flutter: 3.4.11
   dartway_starter_client:
     path: ../dartway_starter_client
 

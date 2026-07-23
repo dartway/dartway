@@ -26,7 +26,7 @@ Then, once at server startup (after `pod.start()`), hand the jobs over. This
 registers each handler and arms its first run:
 
 ```dart
-await DwRecurringFutureCall.startAll(pod, [
+await DwRecurringJobs.startAll(pod, [
   SessionClosureFutureCall(),
   DatabaseRetentionFutureCall(),
 ]);

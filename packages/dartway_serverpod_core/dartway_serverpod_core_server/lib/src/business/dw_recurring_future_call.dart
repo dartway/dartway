@@ -26,7 +26,7 @@ import '../private/dw_singleton.dart';
 /// registers each handler and arms its first run:
 ///
 /// ```dart
-/// await DwRecurringFutureCall.startAll(pod, [
+/// await DwRecurringJobs.startAll(pod, [
 ///   SessionClosureFutureCall(),
 ///   DatabaseRetentionFutureCall(),
 /// ]);
@@ -50,18 +50,6 @@ abstract class DwRecurringFutureCall extends FutureCall {
   /// The work to do each run. Throwing is safe: the error is reported via
   /// [dw].alerts and the next run is still queued.
   Future<void> run(Session session);
-
-  /// Registers each call's handler on [pod] and arms its first run. Call once at
-  /// server startup, after `pod.start()`.
-  static Future<void> startAll(
-    Serverpod pod,
-    List<DwRecurringFutureCall> calls,
-  ) async {
-    for (final call in calls) {
-      pod.registerFutureCall(call, call.name);
-      await call._reschedule(pod, call.initialDelay);
-    }
-  }
 
   @override
   Future<void> invoke(Session session, SerializableModel? object) async {
@@ -92,5 +80,25 @@ abstract class DwRecurringFutureCall extends FutureCall {
     await pod.cancelFutureCall(name);
     // ignore: deprecated_member_use
     await pod.futureCallWithDelay(name, null, delay, identifier: name);
+  }
+}
+
+/// Startup entry point for [DwRecurringFutureCall]s.
+///
+/// Deliberately a separate class rather than a static on [DwRecurringFutureCall]
+/// itself: Serverpod validates every public method of a `FutureCall` subclass as
+/// a future-call handler and requires its first parameter to be a `Session`, so
+/// a starter taking the `Serverpod` instance cannot live on that class.
+abstract final class DwRecurringJobs {
+  /// Registers each call's handler on [pod] and arms its first run. Call once at
+  /// server startup, after `pod.start()`.
+  static Future<void> startAll(
+    Serverpod pod,
+    List<DwRecurringFutureCall> calls,
+  ) async {
+    for (final call in calls) {
+      pod.registerFutureCall(call, call.name);
+      await call._reschedule(pod, call.initialDelay);
+    }
   }
 }

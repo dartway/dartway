@@ -211,6 +211,47 @@ class DwRepository {
         .then((response) => processApiResponse<bool>(response) ?? false);
   }
 
+  /// One-shot list fetch for imperative flows that own their own state (e.g.
+  /// anchor/offset pagination that can't be expressed as a reactive provider).
+  /// Handles class-name resolution and response unwrapping — the caller gets a
+  /// plain `List<Model>`. Reactive reads should use the `dw.repo` providers.
+  static Future<List<Model>> fetchList<Model extends SerializableModel>({
+    DwBackendFilter? filter,
+    List<DwOrderBy>? orderByList,
+    int? limit,
+    int? offset,
+    String? apiGroupOverride,
+  }) async {
+    final response = await dw.endpointCaller.dwCrud.getAll(
+      className: typeName<Model>(),
+      filter: filter,
+      orderByList: orderByList,
+      limit: limit,
+      offset: offset,
+      apiGroup: apiGroupOverride,
+    );
+    final wrappers =
+        processApiResponse<List<DwModelWrapper>>(
+          response,
+          updateListeners: false,
+        ) ??
+        const <DwModelWrapper>[];
+    return wrappers.map((wrapper) => wrapper.model as Model).toList();
+  }
+
+  /// One-shot server-side count of [Model] rows matching [filter].
+  static Future<int> count<Model extends SerializableModel>({
+    DwBackendFilter? filter,
+    String? apiGroupOverride,
+  }) async {
+    final response = await dw.endpointCaller.dwCrud.getCount(
+      className: typeName<Model>(),
+      filter: filter,
+      apiGroup: apiGroupOverride,
+    );
+    return processApiResponse<int>(response, updateListeners: false) ?? 0;
+  }
+
   static K? processApiResponse<K>(
     DwApiResponse<K> response, {
     bool updateListeners = true,

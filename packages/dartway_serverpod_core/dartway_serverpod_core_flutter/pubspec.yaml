@@ -16,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  serverpod_client: ^3.4.8
+  serverpod_client: ^3.4.11
 
   dartway_flutter: ^0.1.0
   dartway_serverpod_core_client: ^0.1.0

@@ -892,50 +892,50 @@ packages:
     dependency: transitive
     description:
       name: serverpod
-      sha256: d96d89bcdd675c8b8cac61819d538666e3d1a0d271d00fcfdcf9660755ee4ff9
+      sha256: b8bc1110191ddecf4e58b0b97d84802e11eb82612acc6d2c7085636f65b8bb6d
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.8"
+    version: "3.4.11"
   serverpod_client:
     dependency: transitive
     description:
       name: serverpod_client
-      sha256: e3bd9dc071e81eca5c7d2647bd9220d2e1af5a3b8b551c1f701dd9b4bc6d6845
+      sha256: d79108bd64df3efea7cae0c6b9473049f308c40236039c0dd7397539062e5191
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.8"
+    version: "3.4.11"
   serverpod_lints:
     dependency: transitive
     description:
       name: serverpod_lints
-      sha256: f12f6e48ca9790ca45a7489abef02aaa7882906f5a57e7c38e427538eb07540b
+      sha256: bc4f763b57e9b82ce9c35c752c962726d593526af4aee5605ac63c50938e5b20
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.8"
+    version: "3.4.11"
   serverpod_serialization:
     dependency: transitive
     description:
       name: serverpod_serialization
-      sha256: ccccb6f1b1103322a079848dafd32fec4455bc9923047c76cca6d2dbdcf7ded9
+      sha256: e159f298e9b980bfea720fbb91d66d5ad00ff6510f2fcd851932e9942ca0673d
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.8"
+    version: "3.4.11"
   serverpod_shared:
     dependency: transitive
     description:
       name: serverpod_shared
-      sha256: dc499d84279affb35175c4d3427f199b0586c279a6d05a3c8d346836e11d20b6
+      sha256: "515f5cf12cd68dc0a3934ab8d6478cbf0f011c700764a8c4c5d3ae9e967c79d0"
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.8"
+    version: "3.4.11"
   serverpod_test:
     dependency: transitive
     description:
       name: serverpod_test
-      sha256: "4ea8c3a33ef1de6049d0107c6a08e0e231bc251e904876cba1c6246dbbed3adb"
+      sha256: "32d5432d30cb34eb19979790334f7c073a5626c3dbf89f69ae3db8c06e1b49f5"
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.8"
+    version: "3.4.11"
   shared_preferences:
     dependency: transitive
     description:

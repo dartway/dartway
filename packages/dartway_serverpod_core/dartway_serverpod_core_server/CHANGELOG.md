@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **Serverpod 3.4.11.** Bumped from 3.4.8 and regenerated everywhere (core, the push
+  module, example, template). All three intervening releases are bugfixes — notably
+  correct column mapping for joins with long names and deeply nested relations, and
+  migrations now being generated when an index's columns change. Framework packages
+  keep a caret range (`^3.4.11`) so they stay co-installable with whatever Serverpod
+  patch an app is on; `template/` pins exactly, so a new project starts on a
+  combination known to match the generator.
+- **`DwRecurringFutureCall.startAll` moved to `DwRecurringJobs.startAll`** (same
+  signature). Serverpod 3.4.11 validates *every* public method of a `FutureCall`
+  subclass as a future-call handler and requires its first parameter to be a
+  `Session`, which a starter taking the `Serverpod` instance can never satisfy — so
+  the starter now lives on its own class beside the base.
+
 - **`DwSaveConfig.lockInitialModelForUpdate`** — opt-in row-lock serialisation for
   updates. By default the save lifecycle reads the initial model and runs `allowSave`
   / `validateSave` *outside* the transaction and only writes inside it, so two
@@ -40,7 +53,7 @@ typed `dw` (`DwCore<UserProfile>`), one access style across the whole stack.
 - **`DwRecurringFutureCall`** — base class for a recurring future call that owns its whole lifecycle:
   registration, first run, re-arming after every run (including a failed one, reported via `dw.alerts`),
   and cancelling a stale schedule on restart. A subclass declares only `name`, `interval` and `run`;
-  the app hands its jobs to `DwRecurringFutureCall.startAll(pod, [...])` once at startup and touches no
+  the app hands its jobs to `DwRecurringJobs.startAll(pod, [...])` once at startup and touches no
   Serverpod future-call plumbing. The imperative scheduler Serverpod 3 deprecated is isolated to one
   private method behind this seam.
 
