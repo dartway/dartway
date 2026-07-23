@@ -161,7 +161,15 @@ extension DwAuthRequestVerification on DwAuthRequest {
   }) async {
     switch (requestType) {
       case DwAuthRequestType.login:
-        final authKey = await dw.auth!.signInUser(session, userId!);
+        final DwAuthKey authKey;
+        try {
+          authKey = await dw.auth!.signInUser(session, userId!);
+        } on DwAuthKeyIssuanceRejectedException catch (rejection) {
+          // A final key-issuance guard (e.g. the user was deleted mid-flow)
+          // rejected the sign-in; surface it as a typed auth failure.
+          setFailed(session, rejection.reason);
+          return [];
+        }
         return [
           DwModelWrapper(
             object: DwAuthData(

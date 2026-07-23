@@ -178,29 +178,19 @@ class DwAuth<UserProfileClass extends TableRow> {
     bool updateSession = true,
     bool skipTriggers = false,
   }) async {
-    var key = DwAuthUtils.generateRandomString();
-    var hash = DwAuthUtils.hashAuthKey(key);
+    final key = DwAuthUtils.generateRandomString();
+    final hash = DwAuthUtils.hashAuthKey(key);
+    final authKey = DwAuthKey(userId: userId, hash: hash, key: key);
 
-    if (config.onSignInTrigger != null) {
-      final existingAuthKeys = await DwAuthKey.db.find(
-        session,
-        where: (t) => t.userId.equals(userId),
-      );
-
-      await config.onSignInTrigger!(
-        session,
-        userId: userId,
-        isFirstSignIn: existingAuthKeys.isEmpty,
-      );
-    }
-
-    var authKey = DwAuthKey(userId: userId, hash: hash, key: key);
-
-    // The final authorization check and the key insert share one short
-    // transaction. An app that locks and re-reads its user row inside
-    // [DwAuthConfig.preAuthKeyIssuance] therefore cannot be raced by an account
-    // deletion committing between the check and the insert — the two serialise.
-    final insertedAuthKey = await session.db.transaction((transaction) async {
+    // The final authorization check, the first-sign-in detection and the key
+    // insert share one short transaction. An app that locks and re-reads its
+    // user row inside [DwAuthConfig.preAuthKeyIssuance] therefore cannot be
+    // raced by an account deletion committing between the check and the insert,
+    // and concurrent sign-ins serialise on that lock — so exactly one of them
+    // observes an empty key set and is reported as the first sign-in.
+    final (insertedAuthKey, isFirstSignIn) = await session.db.transaction((
+      transaction,
+    ) async {
       final preAuthKeyIssuance = config.preAuthKeyIssuance;
       if (preAuthKeyIssuance != null) {
         final failReason = await preAuthKeyIssuance(
@@ -214,8 +204,46 @@ class DwAuth<UserProfileClass extends TableRow> {
         }
       }
 
-      return DwAuthKey.db.insertRow(session, authKey, transaction: transaction);
+      // First-sign-in detection only matters for the trigger, and must live
+      // inside this transaction so it serialises with the key insert (and with
+      // any FOR UPDATE lock taken above): concurrent sign-ins then see each
+      // other's key, so exactly one is reported as the first.
+      final willRunTrigger = !skipTriggers && config.onSignInTrigger != null;
+      final isFirstSignIn = willRunTrigger
+          ? (await DwAuthKey.db.find(
+              session,
+              where: (t) => t.userId.equals(userId),
+              transaction: transaction,
+            )).isEmpty
+          : false;
+      final inserted = await DwAuthKey.db.insertRow(
+        session,
+        authKey,
+        transaction: transaction,
+      );
+      return (inserted, isFirstSignIn);
     });
+
+    // Sign-in side effects run only after the auth key is durably committed, so
+    // a failing trigger can never roll back an otherwise valid sign-in, and a
+    // rejected key issuance never reaches them. Skipped entirely when the caller
+    // opts out via [skipTriggers] (e.g. admin impersonation).
+    if (!skipTriggers && config.onSignInTrigger != null) {
+      try {
+        await config.onSignInTrigger!(
+          session,
+          userId: userId,
+          isFirstSignIn: isFirstSignIn,
+        );
+      } catch (error, stackTrace) {
+        session.log(
+          'onSignInTrigger failed after sign-in for user $userId',
+          level: LogLevel.error,
+          exception: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
 
     if (updateSession) {
       session.updateAuthenticated(
