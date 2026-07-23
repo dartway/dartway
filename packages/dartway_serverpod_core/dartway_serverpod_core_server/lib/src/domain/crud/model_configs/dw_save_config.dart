@@ -292,6 +292,11 @@ class DwSaveConfig<T extends TableRow> {
     DatabaseException exception,
     StackTrace stackTrace,
   ) {
+    // Operators get the full exception through alerts; the caller gets a
+    // stable, detail-free message. A raw DatabaseException carries table and
+    // constraint names and the offending key value — handing that to a client
+    // discloses the schema and, with a unique-constraint violation, whether a
+    // given value already exists.
     dw.alerts.reportError(
       'Database error while saving ${T.toString()}',
       exception: exception,
@@ -300,7 +305,7 @@ class DwSaveConfig<T extends TableRow> {
     return DwApiResponse(
       isOk: false,
       value: null,
-      error: 'Database error during save: $exception',
+      error: 'Database error during save',
     );
   }
 }

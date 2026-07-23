@@ -12,6 +12,12 @@
   actually committed. Off by default (lifecycle unchanged) and a no-op for inserts,
   which have no row to lock yet. Worth enabling for rows whose rules depend on their
   own current state — roles, consent flags, balances, a deletion marker.
+- **Save no longer returns raw database errors to the caller.** A `DatabaseException`
+  from a save used to be interpolated straight into the API error string, handing the
+  client table and constraint names and the offending key value — schema disclosure,
+  and with a unique-constraint violation an oracle for "does this value already
+  exist". The caller now gets a stable `Database error during save`; operators still
+  get the full exception and stack trace through `dw.alerts`.
 - **`DwAuthConfig.preAuthKeyIssuance`** — a final application-owned authorization
   check immediately before an auth key is inserted, running in the *same* short
   transaction as the insert. An app that locks and re-reads its user row through the
