@@ -23,4 +23,5 @@ export 'src/repository/dw_global_refresh_state_provider.dart';
 export 'src/repository/dw_repo.dart';
 export 'src/repository/states/dw_model_list_state.dart';
 export 'src/repository/states/dw_single_model_state.dart';
+export 'src/utils/dw_error_report_alert_mapping.dart';
 export 'src/utils/dw_file_upload_handler.dart';
