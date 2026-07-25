@@ -8,10 +8,15 @@ A fullstack app built with [DartWay](https://dartway.dev) (Flutter + Serverpod):
 
 ## Getting started
 
-Open the project in VS Code and press **F5** — launch **Server**, then **Seed dev
-data**, then **Flutter (web)** (configured in `.vscode/launch.json`).
+Open the project and run `claude` in it, then ask for it in your own words —
+*"bring the project up"*. The toolkit in `.claude/` knows this stack: it starts
+Postgres, applies the migrations, seeds a dev user, runs the server and the app,
+and tells you how to sign in.
 
-Or from the terminal:
+Or press **F5** in VS Code — launch **Server**, then **Seed dev data**, then
+**Flutter (web)** (configured in `.vscode/launch.json`).
+
+Or do it by hand, from the terminal:
 
 ```bash
 # backend

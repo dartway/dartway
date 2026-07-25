@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.2
+
+- **`create` stops printing a wall of commands and hands the project to the agent.**
+  The old output listed seven commands across two terminals — which is both the
+  first thing a newcomer sees and a contradiction: every new project ships an AI
+  toolkit in `.claude/`, and the tool that installed it was still telling people to
+  type `docker compose up -d` by hand. Now `create` says to open the project and run
+  `claude`, then ask for it in plain words. The manual sequence has not gone
+  anywhere — it lives in the project's `README.md`, for people without an agent at
+  hand and for anyone who wants to see what actually happens.
+- The toolkit gained the skill that makes this real: **`dartway-run`** knows the
+  order that matters (seeding before migrations fails; a started container is not yet
+  a database accepting connections), the ports (API 8080, dev database 8090, test
+  9090), where the one-time sign-in code is printed, and how to read the failures
+  people actually hit — Docker not running, port 8090 taken by another DartWay
+  project, a schema that drifted, a model changed without `serverpod generate`, a
+  `serverpod_cli` that no longer matches the project's pin.
+
 ## 0.1.1
 
 - `create`: the printed next steps now actually run in order — `dart pub get`

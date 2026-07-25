@@ -106,20 +106,18 @@ class CreateCommand extends Command<int> {
       ..writeln('')
       ..writeln('Project $projectName is ready.')
       ..writeln('')
-      ..writeln('Open it in VS Code and press F5 (Server, then Seed dev data, '
-          'then Flutter), or run it from the terminal:')
-      ..writeln('  cd $projectName/${layout.serverPackage}')
-      ..writeln('  dart pub get')
-      ..writeln('  docker compose up -d')
-      ..writeln('  dart bin/main.dart --apply-migrations --role maintenance')
-      ..writeln('  dart bin/seed_dev.dart --mode development')
-      ..writeln('  dart bin/main.dart')
-      ..writeln('then in another terminal:')
-      ..writeln('  cd $projectName/${layout.flutterPackage}')
-      ..writeln('  flutter pub get && flutter run')
+      ..writeln('  cd $projectName')
+      ..writeln('  claude')
       ..writeln('')
-      ..writeln('Sign in as the seeded user 79990000003 (the OTP code is '
-          'printed in the server console).');
+      ..writeln('Then ask for it in your own words — "bring the project up".')
+      ..writeln('The AI toolkit shipped in .claude/ knows this stack: it starts '
+          'Postgres, applies')
+      ..writeln('the migrations, seeds a dev user, runs the server and the app, '
+          'and tells you how')
+      ..writeln('to sign in.')
+      ..writeln('')
+      ..writeln('Prefer your own hands, or no agent at hand? Every command is in '
+          'README.md.');
     return 0;
   }
 

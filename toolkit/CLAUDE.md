@@ -39,10 +39,12 @@ Dart-пакеты (роль определяется суффиксом имен
 
 ## Скиллы и команды
 
-- Скиллы (`.claude/skills/`): `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — подгружаются по релевантности задачи.
+- Скиллы (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — подгружаются по релевантности задачи.
 - Команды (`.claude/commands/`): `/dartway-audit` — глубокий аудит модуля; `/commit` — коммит в формате CI проекта.
 
 **Жизненный цикл задачи:** `dartway-requirements` (анализ спеки → вопросы → варианты) → `dartway-plan` (пошаговый план + риски) → реализация (слоевые скиллы) → `dartway-finish` (аудит + docs-sync + тесты перед PR).
+
+**Поднять проект локально** (свежий клон, «не стартует», после смены модели) — `dartway-run`: БД, миграции, сид, сервер, приложение, плюс диагностика типовых отказов. Проверка живости обязательна — докладывать фактом (код ответа API, применённые миграции), а не предположением.
 
 ## Git
 
