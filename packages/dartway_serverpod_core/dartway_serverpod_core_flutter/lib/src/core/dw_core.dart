@@ -10,7 +10,6 @@ import '../app/session/service/dw_session_service.dart';
 import '../app/session/state/dw_session_state_notifier.dart';
 import '../app/socket/service/dw_socket_service.dart';
 import '../private/dw_singleton.dart';
-import '../utils/dw_error_report_alert_mapping.dart';
 import '../repository/dw_repository.dart';
 
 class DwCore<

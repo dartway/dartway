@@ -149,7 +149,7 @@ dw.notify.info('Загрузка началась');
 
 ```dart
 // ❌ профиль через обычный CRUD
-final me = ref.watchModel<UserProfile>(filter: ...);
+final me = ref.watch(dw.repo.model<UserProfile>(...));
 
 // ✅ специальные геттеры (без скобок!) — возвращают UserProfile напрямую
 final isMine = post.authorProfileId == ref.watchUserProfile.id;   // реактивно
@@ -167,7 +167,7 @@ ref.read(dw.sessionProvider!.notifier).signOut();
 
 ## 8. Real-time между пользователями — именованный канал (простой рецепт, но выбор канала важен)
 
-**Чего НЕТ из коробки:** `saveModel` возвращает обновление **только тому, кто сохранял**. Каждый клиент по умолчанию слушает лишь свой личный канал. Поэтому «клиент А записался — у клиента Б обновилось само» **не работает автоматически**: `watchModelList` реактивен к *своим* правкам, чужие не вещает.
+**Чего НЕТ из коробки:** `saveModel` возвращает обновление **только тому, кто сохранял**. Каждый клиент по умолчанию слушает лишь свой личный канал. Поэтому «клиент А записался — у клиента Б обновилось само» **не работает автоматически**: `dw.repo.modelList` реактивен к *своим* правкам, чужие не вещает.
 
 **Рецепт — именованный канал, обе стороны** (это всё, тут нечего долго изучать):
 
@@ -185,11 +185,11 @@ await session.messages.postMessage(
 // FLUTTER — оберни экран в подписку на тот же канал:
 DwChannelSubscriptionWidget(
   channel: scheduleAvailabilityChannel,
-  child: scheduleList,   // внутри — обычный ref.watchModelList<ClubSession>()
+  child: scheduleList,   // внутри — обычный ref.watch(dw.repo.modelList<ClubSession>())
 )
 ```
 
-Пришедшая в канал модель роутится по типу в **любой** `watchModelList<T>()` у подписчиков — список перерисовывается сам, без кода обновления. Имя канала держи **общей константой** (один файл, импортят и сервер, и Flutter), чтобы стороны не разъехались.
+Пришедшая в канал модель роутится по типу в **любой** `dw.repo.modelList<T>()` у подписчиков — список перерисовывается сам, без кода обновления. Имя канала держи **общей константой** (один файл, импортят и сервер, и Flutter), чтобы стороны не разъехались.
 
 ### Какой канал слушать и куда слать — это и есть решение
 
@@ -217,4 +217,4 @@ DwChannelSubscriptionWidget(
 - [ ] Уведомления — `dw.notify.success/warning/error/info`, не `SnackBar`/`ScaffoldMessenger`.
 - [ ] Профиль — `ref.watchUserProfile`/`readUserProfile` (геттеры), не `watchModel<UserProfile>()`.
 - [ ] Выход — `ref.read(dw.sessionProvider!.notifier).signOut()`.
-- [ ] Обновление должен увидеть **другой** пользователь? `watchModelList` сам этого не делает — именованный канал (`postMessage` + `DwChannelSubscriptionWidget`) для общего, `sendUpdatesToUser` для приватного.
+- [ ] Обновление должен увидеть **другой** пользователь? `dw.repo.modelList` сам этого не делает — именованный канал (`postMessage` + `DwChannelSubscriptionWidget`) для общего, `sendUpdatesToUser` для приватного.

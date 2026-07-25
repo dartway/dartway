@@ -211,8 +211,8 @@ Future<T> _save<T extends TableRow>(Session session, T model) async {
   // The auth models are registered under DartWay's internal API, not the app's
   // default one — the same lookup the CRUD endpoint performs.
   final saveConfig =
-      (DwCore.instance.getCrudConfig(className) ??
-              DwCore.instance.getCrudConfig(
+      (dw.getCrudConfig(className) ??
+              dw.getCrudConfig(
                 className,
                 api: DwCoreConst.dartwayInternalApi,
               ))

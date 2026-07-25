@@ -156,7 +156,7 @@ Future<DwApiResponse<DwModelWrapper>> _bookRaw(
   );
 
   final className = DwModelWrapper(object: booking).dwMappingClassname;
-  final saveConfig = DwCore.instance.getCrudConfig(className)?.saveConfig;
+  final saveConfig = dw.getCrudConfig(className)?.saveConfig;
 
   if (saveConfig == null) {
     throw StateError('No save config for $className');

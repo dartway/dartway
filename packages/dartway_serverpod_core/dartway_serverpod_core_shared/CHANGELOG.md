@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+No changes to this package. The four `dartway_serverpod_core_*` packages are released in lockstep —
+one version across all four — so that an app never has to reason about which combination of them is
+co-installable.
+
 ## 0.1.0
 
 First public release — the pure-Dart layer both halves of the DartWay core share, so that the server

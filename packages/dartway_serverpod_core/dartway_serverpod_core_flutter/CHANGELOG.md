@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - **Channel subscriptions survive a reconnect.** A channel stream dies with the
   connection that carried it, and nothing reopened it: `subscribeToChannel` returned

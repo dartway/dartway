@@ -117,7 +117,7 @@ class AppText extends StatelessWidget {
 AppButton.primary(
   l10n.saveAction,
   onTap: dw.action(
-    (context) => DwRepository.saveModel(model),
+    (context) => dw.repo.saveModel(model),
     onSuccessNotification: l10n.saved,
   ),
 )

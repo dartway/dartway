@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - **A closed streaming connection no longer stays in memory.** Two references outlived
   every connection, so a client that reconnects — routinely, on an unstable network —

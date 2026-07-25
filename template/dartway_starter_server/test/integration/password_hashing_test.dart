@@ -112,7 +112,7 @@ void main() {
       });
 
       test('a bcrypt password still works — the default path is untouched', () async {
-        await DwCore.instance.auth!.setUserPassword(
+        await dw.auth!.setUserPassword(
           session,
           userId: userId,
           newPassword: _password,
@@ -138,7 +138,7 @@ void main() {
 
 /// Seeds a hash the way a migration does: import what you cannot reverse.
 Future<void> _seedHash(Session session, int userId, String hash) =>
-    DwCore.instance.auth!.setUserPassword(
+    dw.auth!.setUserPassword(
       session,
       userId: userId,
       newPasswordHash: hash,
@@ -173,8 +173,8 @@ Future<T> _save<T extends TableRow>(Session session, T model) async {
   final className = wrapper.dwMappingClassname;
 
   final saveConfig =
-      (DwCore.instance.getCrudConfig(className) ??
-              DwCore.instance.getCrudConfig(
+      (dw.getCrudConfig(className) ??
+              dw.getCrudConfig(
                 className,
                 api: DwCoreConst.dartwayInternalApi,
               ))

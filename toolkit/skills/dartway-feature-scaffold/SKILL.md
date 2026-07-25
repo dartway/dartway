@@ -44,7 +44,7 @@ lib/app/<feature>/
 Создай entry point (Page/Widget/extension), набросай layout (кнопки, списки, поля). Стили — из UI Kit. Данные на этом шаге можно замокать/захардкодить.
 
 ### 3. State & Logic
-Определи, какие данные нужны UI. Доступ к данным — только методами data-layer: `watchModel`/`readModel`/`watchMaybeModel`/`readMaybeModel`, `saveModel`, `deleteModel`, `watchModelList`/`readModelList`. Для сложных сценариев/переиспользования внутри фичи — Riverpod-провайдер. Локальный стейт — Riverpod + StatefulWidget + flutter_hooks. Опиши все действия пользователя (create/edit/delete) до привязки к бэкенду.
+Определи, какие данные нужны UI. Доступ к данным — только через `dw.repo`: чтение — провайдеры `dw.repo.model`/`maybeModel`/`modelList` под родным `ref` (`ref.watch(...)` реактивно, `ref.read(....future)` разово), запись — методы `dw.repo.saveModel`/`deleteModel`. Для сложных сценариев/переиспользования внутри фичи — Riverpod-провайдер. Локальный стейт — Riverpod + StatefulWidget + flutter_hooks. Опиши все действия пользователя (create/edit/delete) до привязки к бэкенду.
 
 ### 4. Backend (CRUD-конфиги)
 Каждое действие пользователя маппится на CRUD-слой — никаких произвольных эндпоинтов. Используй `SaveConfig`/`DeleteConfig`/`GetModelConfig`/`GetListConfig`, ответы оборачивай в `DwModelWrapper`. В конфигах: права, валидации, pre/post-обработка, сайд-эффекты. Детали — скилл `dartway-crud-config`.
@@ -68,16 +68,20 @@ class TodoListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final search = ref.watch(todoSearchStringProvider);
-    final todos = ref.watchModelList<Todo>(
-      // frontendFilter — предикат на одну модель (не трансформ списка)
-      frontendFilter: (todo) => search == null || todo.title.contains(search),
-    );
+    final todos = ref.watch(dw.repo.modelList<Todo>());
 
     return Scaffold(
       body: todos.dwBuildListAsync(
         loadingItemsCount: 5,
+        // локальная фильтрация — обычный .where в виджете; «фреймворочного»
+        // способа нет специально (см. dartway-data-layer §3)
         childBuilder: (list) => ListView(
-          children: [for (final todo in list) TodoItem(todo: todo)],
+          children: [
+            for (final todo in list.where(
+              (t) => search == null || t.title.contains(search),
+            ))
+              TodoItem(todo: todo),
+          ],
         ),
       ),
       // `dw.action(...)` возвращает DwUiAction, а не VoidCallback: напрямую в
@@ -85,7 +89,7 @@ class TodoListPage extends ConsumerWidget {
       // он же гасит повторные тапы и отдаёт busy.
       floatingActionButton: DwActionBuilder(
         action: dw.action((_) async {
-          await DwRepository.saveModel(
+          await dw.repo.saveModel(
             Todo(title: 'New task', isCompleted: false, createdAt: DateTime.now()),
           );
         }),
@@ -101,4 +105,4 @@ class TodoListPage extends ConsumerWidget {
 }
 ```
 
-Ключевое: списки `AsyncValue` — через `dwBuildListAsync` (с `loadingItemsCount`); локальный поиск/фильтр — `frontendFilter` + провайдер; действия из UI — в `dw.action` (колбэк получает `context`; `(_)`, если не нужен — см. `dartway-data-layer` §4).
+Ключевое: списки `AsyncValue` — через `dwBuildListAsync` (с `loadingItemsCount`); локальный поиск/фильтр — `.where` в виджете (+ провайдер под строку поиска); действия из UI — в `dw.action` (колбэк получает `context`; `(_)`, если не нужен — см. `dartway-data-layer` §4).
