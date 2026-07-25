@@ -27,5 +27,34 @@ services:
       POSTGRES_PASSWORD: 'dartway_test_pw'
     # No volume: a test database that survives a restart is a liability.
 
+  # Object storage for uploads. DartWay's cloud storage speaks S3 through the
+  # minio client, so a local Minio is the same code path production runs.
+  # Matches the dwCloudStorage* keys in config/passwords.yaml.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9101"
+    ports:
+      - '9100:9000' # S3 API — what the server and the app talk to
+      - '9101:9101' # web console
+    environment:
+      MINIO_ROOT_USER: dartway_dev
+      MINIO_ROOT_PASSWORD: 'dartway_dev_storage_pw'
+    volumes:
+      - dartway_example_uploads:/data
+
+  # Creates the bucket on first start and opens it for reading, because the
+  # public URLs the server hands out have to resolve in a browser.
+  minio_init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 dartway_dev dartway_dev_storage_pw; do sleep 1; done;
+      mc mb --ignore-existing local/uploads;
+      mc anonymous set download local/uploads;
+      "
+
 volumes:
   dartway_example_data:
+  dartway_example_uploads:

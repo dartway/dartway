@@ -13,6 +13,8 @@
   "genderValue": "{gender, select, male{Мужской} female{Женский} other{—}}",
   "saveChanges": "Сохранить изменения",
   "profileUpdated": "Профиль обновлён!",
+  "profilePhotoUpdated": "Фото обновлено",
+  "profilePhotoHint": "Нажмите, чтобы изменить фото",
   "authStepTitle": "{step, select, greeting{Добро пожаловать!} registration{Шаг 1 из 3} login{Шаг 1 из 2} registrationConfirmation{Шаг 2 из 3} loginConfirmation{Шаг 2 из 2} other{}}",
   "completeLoginToContinue": "Войдите или зарегистрируйтесь, чтобы продолжить",
   "registrationAction": "Регистрация",

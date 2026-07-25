@@ -55,6 +55,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileUpdated => 'Профиль обновлён!';
 
   @override
+  String get profilePhotoUpdated => 'Фото обновлено';
+
+  @override
+  String get profilePhotoHint => 'Нажмите, чтобы изменить фото';
+
+  @override
   String authStepTitle(String step) {
     String _temp0 = intl.Intl.selectLogic(step, {
       'greeting': 'Добро пожаловать!',

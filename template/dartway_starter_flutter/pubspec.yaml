@@ -44,7 +44,7 @@ dependencies:
 
   dartway_router: ^1.1.1
 
-  dartway_serverpod_core_flutter: ^0.2.0
+  dartway_serverpod_core_flutter: ^0.2.1
 
   dartway_studio_bridge: ^0.3.0
 

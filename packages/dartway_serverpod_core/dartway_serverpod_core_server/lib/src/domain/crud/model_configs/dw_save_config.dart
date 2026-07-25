@@ -44,6 +44,7 @@ class DwSaveConfig<T extends TableRow> {
     this.afterSaveTransform,
     this.afterSaveSideEffects,
     this.lockInitialModelForUpdate = false,
+    this.broadcastTo,
   });
 
   /// Who may save this model, on both insert and update. Required: a model
@@ -98,6 +99,30 @@ class DwSaveConfig<T extends TableRow> {
   /// row to lock yet — which is why those still validate before their
   /// transaction.
   final bool lockInitialModelForUpdate;
+
+  /// The channels everything this save changed is broadcast to — so that one
+  /// user's change lands on the other users' screens without a refresh.
+  ///
+  /// Answered per save, with the context in hand, because the audience usually
+  /// depends on the row: a message goes to its chat, a booking to its session,
+  /// a catalogue item to everyone. Return an empty list to send nothing.
+  ///
+  /// ```dart
+  /// broadcastTo: (session, ctx) => [AppChannels.catalogue],
+  /// broadcastTo: (session, ctx) => ['chat:${ctx.currentModel.chatId}'],
+  /// ```
+  ///
+  /// Subscribers route each arriving model by type into any
+  /// `dw.repo.modelList<T>()` they hold, so a list already on screen redraws
+  /// itself — no listener to write on either side.
+  ///
+  /// **Null by default, and the default is the safe one.** A channel is an
+  /// audience the framework cannot check: what you send reaches every
+  /// subscriber, including users `accessFilter` would never have shown that row
+  /// to. Scope the channel to the audience that may see the data; for rows that
+  /// belong to one person, notify that person with `session.sendUpdatesToUser`.
+  final List<String> Function(Session session, DwSaveContext<T> saveContext)?
+  broadcastTo;
 
   /// Saves [model], running the lifecycle described on [DwSaveConfig].
   Future<DwApiResponse<DwModelWrapper>> save(Session session, T model) async {
@@ -274,6 +299,15 @@ class DwSaveConfig<T extends TableRow> {
       DwModelWrapper(object: saveContext.currentModel),
       ...saveContext.afterUpdates,
     ];
+
+    // The caller gets these back in the response either way; the channels get
+    // the same set. Non-blocking: nobody waits on a socket.
+    if (broadcastTo != null) {
+      final transport = DwUpdatesTransport(wrappedModelUpdates: updatedModels);
+      for (final channel in broadcastTo!(session, saveContext)) {
+        session.messages.postMessage(channel, transport);
+      }
+    }
 
     return DwApiResponse(
       isOk: true,

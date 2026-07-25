@@ -410,6 +410,18 @@ abstract class AppLocalizations {
   /// **'Profile updated successfully!'**
   String get profileUpdated;
 
+  /// No description provided for @profilePhotoUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo updated'**
+  String get profilePhotoUpdated;
+
+  /// No description provided for @profilePhotoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to change your photo'**
+  String get profilePhotoHint;
+
   /// No description provided for @authStepTitle.
   ///
   /// In en, this message translates to:

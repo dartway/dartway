@@ -63,7 +63,13 @@ class _ExampleMaterialApp extends ConsumerWidget {
           child: DwUserAsyncScope<UserProfile>(
             skipOnSignIn: false,
             whenProfileReadyCallback: (_) {},
-            child: child ?? const SizedBox.shrink(),
+            // Subscribed once, for the whole app: anything a CRUD config
+            // broadcasts to this channel (`broadcastTo:` on the server) is
+            // routed by type into every `dw.repo.modelList<T>()` on screen.
+            child: DwChannelSubscriptionWidget(
+              channel: DwCoreConst.publicUpdatesChannel,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
 

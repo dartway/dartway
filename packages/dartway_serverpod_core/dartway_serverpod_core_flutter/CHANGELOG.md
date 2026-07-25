@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is on
+the server side (`broadcastTo` on the CRUD configs, `session.sendUpdates`).
+No changes to this package: the app side already routes whatever arrives on a
+subscribed channel into `dw.repo` lists.
+
 ## 0.2.0
 
 - **Channel subscriptions survive a reconnect.** A channel stream dies with the

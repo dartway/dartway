@@ -20,6 +20,8 @@
   },
   "saveChanges": "Save Changes",
   "profileUpdated": "Profile updated successfully!",
+  "profilePhotoUpdated": "Photo updated",
+  "profilePhotoHint": "Tap to change your photo",
   "authStepTitle": "{step, select, greeting{Welcome!} registration{Step 1 of 3} login{Step 1 of 2} registrationConfirmation{Step 2 of 3} loginConfirmation{Step 2 of 2} other{}}",
   "@authStepTitle": {
     "placeholders": {

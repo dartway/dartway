@@ -63,7 +63,15 @@ class _ExampleMaterialApp extends ConsumerWidget {
           child: DwUserAsyncScope<UserProfile>(
             skipOnSignIn: false,
             whenProfileReadyCallback: (_) {},
-            child: child ?? const SizedBox.shrink(),
+            // Subscribed once, for the whole app: anything a CRUD config
+            // broadcasts to this channel (`broadcastTo:` on the server) is routed
+            // by type into every `dw.repo.modelList<T>()` on screen. That is what
+            // makes "one user changed it, everyone sees it" cost one line on the
+            // server and nothing here — a new feature inherits it.
+            child: DwChannelSubscriptionWidget(
+              channel: DwCoreConst.publicUpdatesChannel,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
 

@@ -43,6 +43,14 @@ void initDartwayCore({
     dtoConfigurations: [],
     userProfileConstructor: _buildUserProfile,
     dwAlerts: DwAlerts.init(),
+    // Uploads are optional: configured when this run mode carries the
+    // dwCloudStorage* keys (development points them at the `minio` service in
+    // docker-compose), and simply absent when it does not — rather than a boot
+    // that fails on a half-filled config.
+    cloudStorageConfig:
+        passwords.containsKey(DwConfigurationKeys.dwCloudStorageEndpoint)
+        ? DwCloudStorageConfig.fromEnv(passwords)
+        : null,
     dwAuthConfig: DwAuthConfig(
       passwords: passwords,
       legacyPasswordVerifiers: legacyPasswordVerifiers,

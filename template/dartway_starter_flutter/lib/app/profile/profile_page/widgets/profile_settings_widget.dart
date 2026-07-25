@@ -1,3 +1,4 @@
+import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -53,6 +54,47 @@ class ProfileSettingsWidget extends HookConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Photo: pick, upload, store the URL on the profile.
+          //
+          // `DwFileUploadHandler.pickAndUploadImageUrl` is the whole upload —
+          // it opens the picker, sends the bytes to the storage configured on
+          // the server (see cloudStorageConfig) and returns the public URL. What
+          // is left is an ordinary save, so the photo travels the same CRUD path
+          // as any other field.
+          Center(
+            child: DwActionBuilder(
+              action: dw.action((_) async {
+                final imageUrl =
+                    await DwFileUploadHandler.pickAndUploadImageUrl();
+                // Null means the picker was dismissed — not a failure.
+                if (imageUrl == null) return;
+                await dw.repo.saveModel(
+                  userProfile.copyWith(imageUrl: imageUrl),
+                );
+              }, onSuccessNotification: l10n.profilePhotoUpdated),
+              builder: (context, onPressed, busy) => InkResponse(
+                onTap: onPressed,
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 48,
+                      foregroundImage: userProfile.imageUrl == null
+                          ? null
+                          : NetworkImage(userProfile.imageUrl!),
+                      child: busy
+                          ? const CircularProgressIndicator()
+                          : const Icon(Icons.photo_camera_outlined, size: 32),
+                    ),
+                    const Gap(8),
+                    AppText.caption(l10n.profilePhotoHint),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const Gap(24),
+
           // First Name Field
           AppTextFormField(
             value: firstNameController.text,

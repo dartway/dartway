@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.2.1
+
+- **`broadcastTo` on `DwSaveConfig` and `DwDeleteConfig`** — a config answers, per
+  operation and with the context in hand, which channels the models it changed
+  travel to. That is cross-user realtime as a line of configuration: subscribers
+  route each arriving model by type into any `dw.repo.modelList<T>()` they hold,
+  so a list already on screen redraws itself with no listener written on either
+  side. Deletions are symmetric on purpose — without them the other clients keep
+  a row that is no longer there, which is noticed at the worst possible moment.
+  Null by default: a channel is an audience the framework cannot check, and what
+  you broadcast reaches every subscriber whether or not `accessFilter` would have
+  shown them that row.
+- **`session.sendUpdates(channels:, updatedModels:, deletedModels:)`** — the same
+  delivery, imperatively, for when the choice of *what* travels matters as much
+  as where: a save whose own row is private may still need to tell everyone that
+  a public counter moved. `sendUpdatesToUser` stays as the named shortcut for the
+  one audience that is always safe, and now delegates to it.
+- **`DwCoreConst.publicUpdatesChannel`** — a ready-made name for "everyone using
+  this app", so both halves can agree on one spelling without a shared package to
+  put it in. The core never posts there on its own.
+- **Uploads fail with a sentence instead of a null check.** `DwUploadEndpoint` is
+  mounted whether or not an app configured storage, and reaching it without
+  `cloudStorageConfig` used to die on `dw.cloudStorage!` — a crash that says
+  nothing about what is missing. It now states what to configure.
+
 ## 0.2.0
 
 - **A closed streaming connection no longer stays in memory.** Two references outlived

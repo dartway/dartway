@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is on
+the server side (`broadcastTo` on the CRUD configs, `session.sendUpdates`).
+This package gained `DwCoreConst.publicUpdatesChannel` — a name both halves
+can use for "everyone using this app" without a shared package of their own.
+
 ## 0.2.0
 
 No changes to this package. The four `dartway_serverpod_core_*` packages are released in lockstep —

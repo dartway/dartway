@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is on
+the server side (`broadcastTo` on the CRUD configs, `session.sendUpdates`).
+No changes to this package.
+
 ## 0.2.0
 
 Regenerated against Serverpod 3.4.11 (from 3.4.8). No hand-written change and no change to the

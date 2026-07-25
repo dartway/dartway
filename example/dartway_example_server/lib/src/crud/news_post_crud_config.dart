@@ -36,8 +36,21 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
       }
       return null;
     },
+    // The feed is the same for everyone, so a new post belongs on every screen
+    // the moment it is published — no pull-to-refresh, no listener written in
+    // the app. Whatever this save touched is routed by type into the
+    // `dw.repo.modelList<NewsPost>()` the feed already watches.
+    //
+    // Safe here precisely because the model is public: its accessFilter grants
+    // the whole audience. Broadcasting sends everything the save touched, so a
+    // config whose rows belong to one person must not do this — see
+    // sessionBookingCrudConfig, which picks what travels instead.
+    broadcastTo: (session, saveContext) => [DwCoreConst.publicUpdatesChannel],
   ),
   deleteConfig: DwDeleteConfig<NewsPost>(
     allowDelete: (session, model) => session.isStaffMember,
+    // A deleted post has to disappear everywhere too — without this the other
+    // clients keep showing a post that is no longer there.
+    broadcastTo: (session, model) => [DwCoreConst.publicUpdatesChannel],
   ),
 );

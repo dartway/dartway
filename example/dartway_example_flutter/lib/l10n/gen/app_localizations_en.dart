@@ -190,6 +190,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileUpdated => 'Profile updated successfully!';
 
   @override
+  String get profilePhotoUpdated => 'Photo updated';
+
+  @override
+  String get profilePhotoHint => 'Tap to change your photo';
+
+  @override
   String authStepTitle(String step) {
     String _temp0 = intl.Intl.selectLogic(step, {
       'greeting': 'Welcome!',
