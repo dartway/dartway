@@ -74,6 +74,9 @@ class DwCore<
           socketUserId = id;
           socketService!.onUserChanged(previousUserId, id);
         },
+        // Doubles as the session check on startup: the internal profile config
+        // filters by the authenticated user, so an empty answer means the
+        // stored key no longer identifies this user — see [DwSessionService].
         fetchUserProfile: (userId) async {
           final response = await endpointCaller.dwCrud.getOne(
             className: DwRepository.typeName<UserProfileClass>(),
@@ -85,7 +88,11 @@ class DwCore<
             apiGroup: DwCoreConst.dartwayInternalApi,
           );
 
-          DwRepository.processApiResponse<DwModelWrapper?>(response);
+          final wrapper = DwRepository.processApiResponse<DwModelWrapper?>(
+            response,
+          );
+
+          return wrapper?.model as UserProfileClass?;
         },
         deleteAuthKey: (authKeyId) async {
           await endpointCaller.dwCrud.delete(

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2
+
+Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is in
+the Flutter package. Nothing changed here, but the server side is what makes it
+work: the internal user-profile config filters by the authenticated user, so a
+request carrying a dead key matches no row — which the client now reads as "this
+session is over" instead of keeping its cached profile.
+
 ## 0.2.1
 
 - **`broadcastTo` on `DwSaveConfig` and `DwDeleteConfig`** — a config answers, per

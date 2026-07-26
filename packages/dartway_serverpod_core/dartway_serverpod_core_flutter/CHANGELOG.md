@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.2
+
+- **A cached profile no longer signs a user in on its own.** On startup the
+  session was restored from the local cache first and validated afterwards — and
+  the validation had no way to fail: the profile fetch returned `void` and its
+  result reached the session only through a repository update. When the stored
+  key had expired, or the user was gone from the database, the server answered
+  with an empty `DwApiResponse` rather than an error (the internal profile config
+  filters by the authenticated user, so an unauthenticated request simply matches
+  no row). Nothing arrived, nothing was cleared, and the app kept running as the
+  previous user — across databases, too.
+
+  `DwSessionService` now treats the cached profile as a claim and lets the server
+  decide: `fetchUserProfile` returns the confirmed profile (or `null`), and an
+  empty answer clears the stored key together with the cached profile, leaving
+  every listener signed out. The same request that loads the profile is the
+  session check — a profile comes back only while the key is valid *and* still
+  belongs to that user, so a key pointing at someone else is dropped as well.
+
+  Offline behaviour is unchanged: a connection-level failure is not an answer, so
+  a cached profile still starts the app and refreshes once connectivity returns.
+  Startup latency is unchanged too — `initDwCore` already awaited this request.
+
+  Sign-out stays silent by design: the framework drops the session and the app
+  routes to its auth screen. Telling the user *why* is a product decision and
+  belongs to the app, not to the core.
+
 ## 0.2.1
 
 Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is on

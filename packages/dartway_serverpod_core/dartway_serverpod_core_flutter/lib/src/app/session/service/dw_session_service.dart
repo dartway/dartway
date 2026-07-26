@@ -23,9 +23,10 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
 
   final DwAuthenticationKeyManager keyManager;
 
-  /// Loads the user profile. Injected rather than called directly — the
-  /// service must not reach for the `dw` singleton.
-  final Future<void> Function(int userId) fetchUserProfile;
+  /// Loads the user profile from the server, or `null` when the server has no
+  /// profile to give for the stored session. Injected rather than called
+  /// directly — the service must not reach for the `dw` singleton.
+  final Future<UserProfileClass?> Function(int userId) fetchUserProfile;
 
   /// Deletes an auth key, injected for the same reason as [fetchUserProfile].
   final Future<void> Function(int authKeyId) deleteAuthKey;
@@ -80,27 +81,58 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
   }
 
   Future<void> _doInitialize() async {
-    final (int? id, UserProfileClass? profile) = await keyManager
+    final (int? id, UserProfileClass? cachedProfile) = await keyManager
         .loadLocalUserProfile<UserProfileClass>();
-
-    if (profile != null) {
-      _setCurrentUser(profile, id);
-    }
 
     _addRepositoryUpdateListeners();
 
-    if (id != null) {
-      try {
-        await fetchUserProfile(id);
-      } catch (error) {
-        // A failed *refresh* is non-fatal when we already started from a cached
-        // profile and the failure is connection-level (timeout/offline): keep
-        // the cached profile — fresh data arrives once connectivity returns.
-        // Otherwise (no cache, or a non-connection error) propagate as before.
-        if (profile == null || !isStreamingConnectionError(error)) rethrow;
-        debugPrint('[DwSessionService] kept cached profile; refresh failed: $error');
-      }
+    if (id == null) {
+      // Nothing usable is stored: no key at all, or a key whose cached profile
+      // cannot be read back — and without a user id there is nothing to ask the
+      // server about. Clear both halves so a half-written session cannot linger,
+      // and start signed out.
+      await keyManager.remove();
+      return;
     }
+
+    // The cached profile is a *claim*, not a session — the server decides.
+    // The profile fetch is filtered server-side by the authenticated user, so a
+    // profile comes back only while the stored key is still valid and still
+    // belongs to this user; an expired key, a deleted user or a different
+    // database all answer with no profile instead of an error.
+    try {
+      final profile = await fetchUserProfile(id);
+
+      if (profile == null) {
+        // The server answered, and the answer is "no such session". Trusting
+        // the cache here is what used to keep a signed-out user signed in.
+        await _invalidateSession();
+        return;
+      }
+
+      await keyManager.storeUserProfile(profile);
+      _setCurrentUser(profile, id);
+    } catch (error) {
+      // A connection-level failure is not an answer: with a cached profile we
+      // start from it and keep working offline — fresh data arrives once
+      // connectivity returns. Without one there is nothing to fall back to, and
+      // any other error is a real bug; both propagate.
+      if (cachedProfile == null || !isStreamingConnectionError(error)) rethrow;
+
+      debugPrint(
+        '[DwSessionService] kept cached profile; validation failed: $error',
+      );
+      _setCurrentUser(cachedProfile, id);
+    }
+  }
+
+  /// Drops a session the server no longer recognizes: the stored key and the
+  /// cached profile go, and every listener sees a signed-out user. Unlike
+  /// [signOut] it makes no server call — there is no live session left to
+  /// delete a key with.
+  Future<void> _invalidateSession() async {
+    await keyManager.remove();
+    _setCurrentUser(null, null);
   }
 
   void dispose() {

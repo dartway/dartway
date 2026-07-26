@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is in
+the Flutter package (a stored session is validated against the server before it
+signs anyone in). No changes to this package.
+
 ## 0.2.1
 
 Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is on
