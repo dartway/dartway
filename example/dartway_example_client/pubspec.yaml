@@ -13,7 +13,19 @@ dependencies:
       ref: master
       path: packages/dartway_serverpod_core/dartway_serverpod_core_client
 
+  # The client half of the optional push module. Required because the generated
+  # protocol imports it — the server consumes the module, so its `Caller` shows
+  # up in this package's `client.dart`. Drop both together if an app does not
+  # need push.
+  dartway_push_client:
+    git:
+      url: https://github.com/dartway/dartway.git
+      ref: master
+      path: packages/dartway_push/dartway_push_client
+
 # Внутри монорепо — локальная сборка. В самостоятельном проекте удалить блок.
 dependency_overrides:
   dartway_serverpod_core_client:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_client
+  dartway_push_client:
+    path: ../../packages/dartway_push/dartway_push_client
