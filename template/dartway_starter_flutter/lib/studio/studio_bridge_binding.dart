@@ -83,14 +83,24 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
     // may mount the new screen a frame or two later (and its content can load
     // asynchronously), so re-scan over a short window until it settles.
     void reportFeaturesSoon() {
-      for (final delay in const [
+      const rescanDelays = [
         Duration(milliseconds: 50),
         Duration(milliseconds: 400),
         Duration(milliseconds: 1000),
-      ]) {
+      ];
+      for (final (index, delay) in rescanDelays.indexed) {
+        final isLastRescan = index == rescanDelays.length - 1;
         Future<void>.delayed(delay, () {
           if (!mounted) return;
-          _host?.reportFeatures(currentPath(), _mountedFeatureInfos());
+          final features = _mountedFeatureInfos();
+          // An early re-scan often lands between screens — the old one already
+          // parked under the new one, the new one not mounted yet — and finds
+          // nothing. That is "the screen is not ready", not "the screen has no
+          // features", and reporting it would flash an empty passport in
+          // Studio, which takes these reports at face value. Only the last
+          // re-scan is allowed to report emptiness, where it is real.
+          if (features.isEmpty && !isLastRescan) return;
+          _host?.reportFeatures(currentPath(), features);
         });
       }
     }
