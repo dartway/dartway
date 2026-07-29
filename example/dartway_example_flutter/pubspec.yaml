@@ -107,6 +107,11 @@ dependency_overrides:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_client
   dartway_serverpod_core_shared:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_shared
+  # Transitive, through dartway_example_client: the generated protocol imports
+  # the push module's client. Overridden here too, or the app builds this one
+  # package from git while everything around it is local.
+  dartway_push_client:
+    path: ../../packages/dartway_push/dartway_push_client
   dartway_studio_bridge:
     path: ../../packages/dartway_studio_bridge
   dartway_cli:

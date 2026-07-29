@@ -327,7 +327,7 @@ packages:
       path: "../../packages/dartway_cli"
       relative: true
     source: path
-    version: "0.1.1"
+    version: "0.1.2"
   dartway_example_client:
     dependency: "direct main"
     description:
@@ -341,11 +341,18 @@ packages:
       path: "../../packages/dartway_flutter"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   dartway_lints:
     dependency: "direct dev"
     description:
       path: "../../packages/dartway_lints"
+      relative: true
+    source: path
+    version: "0.1.0"
+  dartway_push_client:
+    dependency: "direct overridden"
+    description:
+      path: "../../packages/dartway_push/dartway_push_client"
       relative: true
     source: path
     version: "0.1.0"
@@ -363,28 +370,28 @@ packages:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_client"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.3"
   dartway_serverpod_core_flutter:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_flutter"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.3"
   dartway_serverpod_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_shared"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.3"
   dartway_studio_bridge:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_studio_bridge"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.4.0"
   dartx:
     dependency: transitive
     description:
@@ -1105,26 +1112,26 @@ packages:
     dependency: transitive
     description:
       name: serverpod_client
-      sha256: "068edf4ba9b7ad91518f5e28f09b386506db4bc9d3a76ee4cc26d982ac34da26"
+      sha256: d79108bd64df3efea7cae0c6b9473049f308c40236039c0dd7397539062e5191
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.10"
+    version: "3.4.11"
   serverpod_flutter:
     dependency: "direct main"
     description:
       name: serverpod_flutter
-      sha256: e8da7df9c01635dabd3cbbbdf455b6557d7e4c20d37df8510c179283cf4063ca
+      sha256: e6235cfb9706235ed9940350b8a9c6e4e3ae3a31484f2cdad5cd80b9605732d4
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.10"
+    version: "3.4.11"
   serverpod_serialization:
     dependency: transitive
     description:
       name: serverpod_serialization
-      sha256: cea9464a28adcdba861ba5bf481d6bde59b14b6d3bd6c9df2f18794065f37951
+      sha256: e159f298e9b980bfea720fbb91d66d5ad00ff6510f2fcd851932e9942ca0673d
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.10"
+    version: "3.4.11"
   shared_preferences:
     dependency: transitive
     description:
