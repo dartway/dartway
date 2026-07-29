@@ -4,7 +4,6 @@ import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/studio/logic/app_features.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
 /// Headline counters — live model counts, one tile per model.
@@ -15,7 +14,23 @@ class AdminCounters extends ConsumerWidget implements DwFeature {
   const AdminCounters({super.key});
 
   @override
-  DwFeatureSpec get dwFeature => AppFeatures.adminCounters;
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'admin/live-counters',
+    title: 'Live dashboard counters',
+    purpose: 'An admin sees the current size of the system at a glance.',
+    behaviors: [
+      'Counters follow the data live — a new record moves them with no '
+          'reload.',
+    ],
+    requirements: [
+      'Visible to admins only — the route guard and the access filters '
+          'enforce it, not this widget.',
+    ],
+    implementationNotes: [
+      'Plain watchModelList calls: the same realtime CRUD the client app '
+          'uses, with no separate admin API.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

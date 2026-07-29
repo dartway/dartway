@@ -8,8 +8,28 @@ import '../../../ui_kit/ui_kit.dart';
 /// Shell of the admin zone. Deliberately not wrapped in the device frame:
 /// the admin panel is a working surface, so it uses the full viewport and
 /// adapts — a navigation rail on wide screens, a bottom bar on narrow ones.
-class AdminScaffold extends StatelessWidget {
+class AdminScaffold extends StatelessWidget implements DwFeature {
   const AdminScaffold({super.key, required this.title, required this.body});
+
+  @override
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'admin/shell',
+    title: 'Admin shell',
+    // No purpose: the shell serves the admin zone, it does not carry a
+    // purpose of its own. Delete this spec if you delete the panel.
+    behaviors: [
+      'From 700 logical pixels wide the sections sit in a navigation rail; '
+          'below that, in a bottom bar.',
+      'The section the current route belongs to is the highlighted one.',
+      'The back arrow leaves the panel for the client app.',
+    ],
+    implementationNotes: [
+      'Not wrapped in the device frame: the panel is a working surface and '
+          'takes the whole viewport.',
+      'The zone root matches every admin location, so the *deepest* active '
+          'route wins — otherwise every section would look selected.',
+    ],
+  );
 
   static const _wideBreakpoint = 700.0;
 

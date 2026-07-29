@@ -6,7 +6,6 @@ import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/common/app_scaffold.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/user_profile_provider.dart';
-import 'package:dartway_starter_flutter/studio/logic/app_features.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
 /// The starter home screen — delete it once your domain has its own.
@@ -20,7 +19,21 @@ class HomePage extends ConsumerWidget implements DwFeature {
   const HomePage({super.key});
 
   @override
-  DwFeatureSpec get dwFeature => AppFeatures.homeLiveSettings;
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'home/live-settings',
+    title: 'Live app settings',
+    purpose:
+        'The first screen proves the whole path works: Postgres → CRUD config '
+        '→ typed live list → widget.',
+    behaviors: [
+      'The app name comes from the database, not from a constant.',
+      'Changing it in the admin panel updates this screen with no reload.',
+    ],
+    implementationNotes: [
+      'A watchModelList over AppSetting — the same realtime read any other '
+          'screen uses.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

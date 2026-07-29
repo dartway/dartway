@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3
+
+Moves to `dartway_flutter` 0.2.0, whose `DwFeatureSpec` dropped `description` for the
+fields that carry a feature's actual behaviour. Nothing in this package uses the spec —
+the bump is here so an app can hold both packages at once.
+
 ## 0.2.2
 
 - **A cached profile no longer signs a user in on its own.** On startup the

@@ -234,7 +234,7 @@ class _Section extends StatelessWidget implements DwFeature {
 
   @override
   DwFeatureSpec get dwFeature =>
-      DwFeatureSpec(id: title, title: title, description: '');
+      DwFeatureSpec(id: title, title: title);
 
   @override
   Widget build(BuildContext context) {

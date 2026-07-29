@@ -8,14 +8,47 @@ class DwFeatureSpec {
   const DwFeatureSpec({
     required this.id,
     required this.title,
-    required this.description,
+    this.purpose,
+    this.behaviors = const [],
+    this.requirements = const [],
+    this.implementationNotes = const [],
   });
 
-  /// Stable id — deduplicates a feature declared by multiple widget instances.
+  /// Stable id — deduplicates a feature declared by multiple widget instances,
+  /// and is the name everything outside the code refers the feature by: Studio
+  /// passports, feedback, tracker items. It is a contract, so it survives the
+  /// folder being moved or renamed: never rewrite an id in place — add a new
+  /// one and retire the old.
   final String id;
 
+  /// Short human name, as the team would say it out loud.
   final String title;
-  final String description;
+
+  /// Why the feature exists for the user. Optional on purpose: a card or a row
+  /// usually has no purpose of its own — it belongs to the screen it serves,
+  /// and repeating the screen's purpose on every part of it is noise.
+  final String? purpose;
+
+  /// What the feature observably does, one checkable statement per entry
+  /// ("tapping a card opens the details dialog", "with no subtitle the second
+  /// line is not rendered").
+  ///
+  /// The rule that keeps this field useful: every entry must be verifiable by
+  /// looking at the running app. The moment "works nicely with long titles"
+  /// appears here, the field has turned back into prose.
+  final List<String> behaviors;
+
+  /// What the feature must honour, imposed from outside it: signed-in users
+  /// only, no price before confirmation, works offline. Anything that can be
+  /// phrased as an observable action belongs in [behaviors] instead.
+  final List<String> requirements;
+
+  /// Decisions a reader would otherwise re-open: why the preview image in the
+  /// row and the full one in the list, why the height lives in the kit.
+  ///
+  /// Written for the team, not for the client — Studio shows it on the
+  /// technical side, away from the product panel.
+  final List<String> implementationNotes;
 }
 
 /// Implemented by a widget that *is* a product feature on a screen. A contract,
@@ -25,7 +58,11 @@ class DwFeatureSpec {
 /// ```dart
 /// class ScheduleSessionList extends ConsumerWidget implements DwFeature {
 ///   @override
-///   DwFeatureSpec get dwFeature => const DwFeatureSpec(id: 'schedule-list', ...);
+///   DwFeatureSpec get dwFeature => const DwFeatureSpec(
+///         id: 'schedule/session_list',
+///         title: 'Session list',
+///         behaviors: ['A session with no seats left is shown as full'],
+///       );
 /// }
 /// ```
 abstract interface class DwFeature {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+Lockstep release: no changes of its own.
+
 ## 0.2.2
 
 Released in lockstep with the rest of `dartway_serverpod_core_*`; the change is in

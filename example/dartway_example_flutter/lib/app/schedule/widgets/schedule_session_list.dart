@@ -6,7 +6,6 @@ import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
-import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// Upcoming sessions grouped by day. Each list is live to *your own* writes:
@@ -18,7 +17,31 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
   const ScheduleSessionList({super.key});
 
   @override
-  DwFeatureSpec get dwFeature => AppFeatures.scheduleSessionList;
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'schedule/session-list',
+    title: 'Realtime session list',
+    purpose:
+        'A club member sees what is on in the coming days and books a place '
+        'without leaving the list.',
+    behaviors: [
+      'Upcoming sessions are grouped by day, nearest day first.',
+      'Booking or cancelling updates the card without a manual refresh.',
+      'A session at capacity is shown as full and cannot be booked.',
+      'While the first page loads, five placeholder cards are shown.',
+    ],
+    requirements: [
+      'Only sessions in the future are listed — the backend filter decides, '
+          'not the widget.',
+      'A member sees only their own bookings on the cards.',
+    ],
+    implementationNotes: [
+      'ref.watch(dw.repo.modelList<ClubSession>()) with a backend filter: '
+          'realtime sync, pagination and loading states come with it.',
+      'Live to your own writes only. Another member booking the last seat '
+          'shows on the next fetch — pushing it to everyone needs a named '
+          'channel, which this screen deliberately does not set up.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -68,7 +68,7 @@ void main() {
             StudioFeatureInfo(
               id: 'schedule-list',
               title: 'List',
-              description: 'desc',
+              behaviors: ['does a thing'],
             ),
           ],
         ),

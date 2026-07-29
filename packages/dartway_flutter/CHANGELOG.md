@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.0
+
+**A feature now describes itself, and the description lives next to the code.** `DwFeatureSpec`
+used to carry a single `description`, which is why every project that wanted more grew a second
+description somewhere else — a doc page, a table in a tool — and then had two that disagreed. The
+spec now carries the whole thing:
+
+- `purpose` — why the feature exists for the user. Optional on purpose: a card or a row usually
+  has no purpose of its own, it belongs to the screen it serves, and repeating the screen's
+  purpose on each of its parts is noise.
+- `behaviors` — what it observably does, one checkable statement per entry. The rule that keeps
+  the field alive is in its doc comment: every entry must be verifiable by looking at the running
+  app. The moment "works nicely with long titles" appears, the field has turned back into prose.
+- `requirements` — what it must honour, imposed from outside it.
+- `implementationNotes` — decisions a reader would otherwise re-open; written for the team, not
+  for the client.
+
+**Breaking:** `description` is gone. It sat between `title` and `behaviors` with nothing left to
+say, and that is exactly what made feature descriptions shallow.
+
+The registry enum is gone with it. A spec belongs in the file of the feature it describes — a
+central catalog of every feature in the app is a file nobody reads that lives far from the code it
+claims to describe. What the enum did give was enumerability, and a running app cannot replace it:
+Dart has no reflection, so `DwFeature.scanMounted()` sees only what is on screen. A whole-project
+catalog is a job for static analysis of the sources.
+
 ## 0.1.0
 
 First public release — the Flutter skeleton of a DartWay app: everything an app needs before and

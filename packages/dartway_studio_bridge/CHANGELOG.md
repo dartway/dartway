@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0
+
+**A feature reports what it actually does, not one line about itself.** `StudioFeatureInfo` follows
+`DwFeatureSpec` (package `dartway_flutter` 0.2.0): `purpose`, `behaviors`, `requirements` and
+`implementationNotes` replace the single `description`. The fields split by audience — `title`,
+`purpose` and `behaviors` are what a client reads, the other two are written for the team — and
+Studio is expected to show them apart.
+
+All of it travels on every connect and nothing needs storing on the Studio side, which is the point:
+a description held in a database is a description that can drift away from the code it describes.
+
+Decoding stays lenient in both directions. An app built against 0.3.0 sends `description` and no
+lists — it decodes without error, just without the new fields; an app built against a newer bridge
+may send fields this one has never heard of, and those are ignored. Empty lists and a null `purpose`
+never reach the wire.
+
 ## 0.3.0
 
 **Per-project access control.** The `studioConnect` handshake now carries an `accessKey`, and

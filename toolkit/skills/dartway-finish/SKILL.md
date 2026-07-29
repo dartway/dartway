@@ -32,7 +32,7 @@ description: >-
 Прогони детекторы **только по изменённым файлам** (не по всему репо). Для каждой находки — `file:line`.
 
 **Flutter (`dartway-clean-code` Часть 1 + specials):**
-- Несколько ответственностей в файле (длина — мягкий сигнал: >120 строк — присмотреться, >200 — ворнинг; осмысленный файл на 220 строк лучше бессмысленного попила).
+- Несколько ответственностей в файле (длина — самый слабый сигнал: >200 строк — присмотреться, >350 — ворнинг; осмысленный файл на 300 строк лучше бессмысленного попила).
 - `BuildContext`/`WidgetRef` в параметрах сервисов/функций (не в `build`).
 - `_buildXxx()`, возвращающий `Widget` (вместо виджет-класса).
 - `ref.invalidate(...)` для рефреша.
@@ -42,6 +42,7 @@ description: >-
 - Нейминг < 2 слов; запрещённые `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
 - Specials (`dartway-data-layer`): `SnackBar`/`ScaffoldMessenger` вместо `dw.notify.*`; `watchModel<UserProfile>()` вместо `ref.watchUserProfile`; сырой `onPressed`/`() async {}` вместо `dw.action`; сырые `Color`/`TextStyle`/`BorderRadius`/`context.theme` в фичах вместо UI Kit; `router.go()`/строковые роуты вместо enum-роутов и context-extensions (`dartway-navigation`).
 - Изоляция фич: импорт не-entry-point чужой фичи.
+- Entry point-виджет фичи без `implements DwFeature` / `DwFeatureSpec` — фича есть в коде, но ничего о себе не говорит (её паспорт читают отчёты об ошибках, Studio и агент). Изменил поведение фичи — сверь `behaviors`: устаревший паспорт хуже отсутствующего. Как заполнять — `dartway-feature-scaffold`, «Паспорт фичи».
 - Часть 2: SRP/God-объекты, DRY (копипаста виджетов/маппингов), KISS/YAGNI, Law of Demeter (`a.b.c.d`), SoC (логика в State/UI), tell-don't-ask, магические числа/строки, единый источник истины, проглоченные ошибки (`catch (_) {}`, `catch ... return null`).
 
 **Server (`dartway-crud-config` / `dartway-models`):**

@@ -21,20 +21,27 @@ enum DwCheckType {
   /// `widgets/` and `logic/`.
   invalidFeatureStructure,
 
-  /// A file longer than 120 lines — undesirable, not critical. A meaningful
-  /// 220-line file beats a pointless split.
+  /// A file longer than 200 lines — a nudge, nothing more. A meaningful
+  /// 300-line file beats a pointless split.
   fileLong,
 
-  /// A file longer than 200 lines — worth restructuring.
+  /// A file longer than 350 lines — worth restructuring: at that size a file
+  /// has usually collected more than one responsibility.
   fileTooLong,
 
   /// Importing `widgets/` or `logic/` of another feature (only feature entry
   /// points are public).
-  forbiddenFeatureImport;
+  forbiddenFeatureImport,
+
+  /// A feature whose public widget does not declare a `DwFeatureSpec` — the
+  /// feature exists in the code but says nothing about itself, so error
+  /// reports, Studio and the agent see it as a blank.
+  featureSpecMissing;
 
   DwCheckSeverity get severity => switch (this) {
         DwCheckType.fileLong => DwCheckSeverity.info,
         DwCheckType.uiKitContainsText ||
+        DwCheckType.featureSpecMissing ||
         DwCheckType.fileTooLong =>
           DwCheckSeverity.warning,
         _ => DwCheckSeverity.error,

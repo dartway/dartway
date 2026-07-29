@@ -100,7 +100,7 @@ void main() {
           StudioFeatureInfo(
             id: 'schedule/session-list',
             title: 'Session list',
-            description: 'Realtime list',
+            behaviors: ['Updates without a refresh'],
           ),
         ],
         supportedLocales: ['en', 'ru'],

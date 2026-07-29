@@ -15,10 +15,12 @@ The Flutter skeleton of a [DartWay](https://dartway.dev) app — everything an a
   from anywhere (`dw.notify.success(...)`), render it with your own handler.
 - 🧯 **Error reporting** — every error carries an app-state snapshot: route,
   mounted features, action label, platform, version.
-- 🏷️ **Feature declarations** — `DwFeature` / `DwFeature.scanMounted`: mark
-  widgets as product features and discover the mounted ones at runtime — for
-  feature catalogs, analytics and [DartWay Studio](https://dartway.dev)
-  passports.
+- 🏷️ **Feature declarations** — `DwFeature` / `DwFeatureSpec`: a widget states
+  what it is next to its own code — `purpose`, `behaviors` (one checkable
+  statement per entry), `requirements`, `implementationNotes`. Not prose kept
+  somewhere else that drifts: `DwFeature.scanMounted()` reads it off the running
+  app, for error reports, analytics and
+  [DartWay Studio](https://dartway.dev) passports.
 - 🔌 **Plugins** — `DwPlugin`: the seam for integrations the framework must not know about. Declare one at startup (`DwFlutter(plugins: [...])`, or `DwCore` when you use the data layer) and reach it as `dw.plugins.<name>` — kept apart from the core's own services. Telegram lives in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) (`dw.plugins.telegram`), local storage in [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) (`dw.plugins.prefs`) — an app that needs neither never downloads them.
 
 > **About `dw`.** It is not a global this package hands you — the app declares it once

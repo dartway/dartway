@@ -2,6 +2,16 @@
 
 ## 0.1.2
 
+- **The file-length thresholds are relaxed: nothing below 200 lines, a nudge above it,
+  a warning above 350.** Length is the weakest signal the checker has, and a tight limit
+  makes it lie — it flagged files that were long because they were well described. That
+  is not hypothetical: a feature's `DwFeatureSpec` now lives in the file of the feature it
+  describes, and a good description costs twenty lines. A rule that goes off when someone
+  documents their feature properly teaches them to document less.
+- New check `featureSpecMissing` (warning): a feature whose public file is a widget is
+  expected to declare a `DwFeatureSpec` — the spec is what error reports, Studio and the
+  agent read. Features whose entry point is an extension or a plain function are left
+  alone: there is nothing there to hang a spec on.
 - **`create` stops printing a wall of commands and hands the project to the agent.**
   The old output listed seven commands across two terminals — which is both the
   first thing a newcomer sees and a contradiction: every new project ships an AI

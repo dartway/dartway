@@ -31,9 +31,17 @@ The open `dartway_studio_bridge` package is the only integration surface:
   secret's hash into the build (`--dart-define=STUDIO_KEY_HASH=...`), so the
   secret never lives in the app's public bundle — only its hash does. Grab the
   hash from the project's settings in Studio.
-- **The feature catalog** (`manifest.features`) is the app's full feature list,
-  from its registry enum; Studio diffs it on connect. The live per-screen
-  subset arrives separately as the app navigates.
+- **Features** arrive per screen, as the app navigates: every widget that
+  implements `DwFeature` declares its `DwFeatureSpec` next to itself, and the
+  binding reports the ones currently mounted. What a feature says about itself
+  — `purpose`, `behaviors`, `requirements`, `implementationNotes` — travels
+  over the bridge on every connect, so Studio renders it live and stores none
+  of it: there is nothing that can drift away from the code.
+
+  `manifest.features` stays in the protocol for the *whole-project* catalog,
+  but a running app cannot fill it: Dart has no reflection, so only mounted
+  widgets are observable. Enumerating every feature of a project is a job for
+  static analysis of the sources, not for the app.
 
 See the package [README](../packages/dartway_studio_bridge/README.md) for the
 full API, and `example/dartway_example_flutter/lib/studio/` for the reference

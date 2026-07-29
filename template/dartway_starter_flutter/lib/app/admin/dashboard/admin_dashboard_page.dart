@@ -9,8 +9,23 @@ import 'widgets/admin_counters.dart';
 /// Admin home: headline counters over live model lists. Event analytics
 /// (visits, conversion, retention) arrives with the analytics milestone —
 /// this screen is its future home.
-class AdminDashboardPage extends StatelessWidget {
+class AdminDashboardPage extends StatelessWidget implements DwFeature {
   const AdminDashboardPage({super.key});
+
+  @override
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'admin/dashboard',
+    title: 'Admin dashboard',
+    purpose:
+        'The landing screen of the panel: how big the system is right now.',
+    behaviors: [
+      'A line under the counters explains that they are live.',
+    ],
+    implementationNotes: [
+      'The counters themselves are admin/live-counters; this screen is their '
+          'frame, and the place to put analytics when you have any.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {

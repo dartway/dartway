@@ -7,8 +7,26 @@ import 'package:dartway_example_flutter/common/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-class ServicesPage extends ConsumerWidget {
+class ServicesPage extends ConsumerWidget implements DwFeature {
   const ServicesPage({super.key});
+
+  @override
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'services/price-list',
+    title: 'Services and prices',
+    purpose:
+        'A member sees what the club offers and what it costs without having '
+        'to ask at the desk.',
+    behaviors: [
+      'Services are listed as cards, in the order the backend returns them.',
+      'An empty price list shows a "coming soon" message, not a blank screen.',
+      'While the list loads, four placeholder cards are shown.',
+    ],
+    implementationNotes: [
+      'An unfiltered dw.repo.modelList<ClubService> — the price list is '
+          'readable by anyone signed in, so there is nothing to narrow.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

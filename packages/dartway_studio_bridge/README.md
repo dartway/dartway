@@ -43,9 +43,11 @@ final manifest = StudioProjectManifest(
       screens: [/* ... */],
     ),
   ],
-  // The app's full feature catalog — Studio diffs it against its records on
-  // connect. DartWay apps map their feature-registry enum onto StudioFeatureInfo.
-  features: [/* StudioFeatureInfo(id: 'chats/list', title: ..., description: ...) */],
+  // Left empty on purpose: a running app cannot enumerate its own features —
+  // Dart has no reflection, so only the mounted ones are observable, and those
+  // are reported per screen (see `reportFeatures` below). The whole-project
+  // catalog is a job for static analysis of the sources.
+  features: const [],
   // Declare two or more locales to get a locale switcher in Studio; the app
   // executes the switch itself via StudioBridgeHostDelegate.onLocaleRequest.
   supportedLocales: ['en', 'ru'],
@@ -60,6 +62,7 @@ final host = StudioBridgeHost.attach(
   delegate: myDelegate, // navigate / sign-in with credentials / sign-out / locale
   currentPath: () => router.currentPath,
   currentSession: () => mySessionState,
+  currentFeatures: mountedFeatureInfos, // the features on screen right now
   currentLocale: () => myLocale.languageCode, // omit if not localized
   // Accept only a Studio that presents this project's secret. The build bakes
   // only the secret's HASH; the secret itself stays in Studio.
@@ -70,7 +73,40 @@ final host = StudioBridgeHost.attach(
 host?.reportRoute(newPath, routeName: 'scheduleList'); // on router changes
 host?.reportSession(newState);  // on auth changes
 host?.reportLocale(newLocale);  // on locale changes
+host?.reportFeatures(newPath, mountedFeatureInfos()); // after the frame settles
 ```
+
+## Reporting features
+
+A feature says what it is next to its own code, and the app reports the ones
+currently on screen — so what Studio shows is what the running build actually
+does, with nothing stored on the Studio side that could drift away from it.
+
+The bridge does not care how the app finds its features. DartWay apps let each
+widget declare a `DwFeatureSpec` (package `dartway_flutter`) and collect the
+mounted ones:
+
+```dart
+List<StudioFeatureInfo> mountedFeatureInfos() => [
+      for (final feature in DwFeature.scanMounted())
+        StudioFeatureInfo(
+          id: feature.id,                 // 'schedule/session-list' — a contract; never renamed in place
+          title: feature.title,
+          purpose: feature.purpose,       // why it exists for the user; null for a part that serves a screen
+          behaviors: feature.behaviors,   // what it observably does, one checkable statement per entry
+          requirements: feature.requirements,
+          implementationNotes: feature.implementationNotes,
+        ),
+    ];
+```
+
+`title`, `purpose` and `behaviors` are what a client reads; `requirements` and
+`implementationNotes` are written for the team, and Studio shows them apart.
+
+Report after the new screen has built — a route change fires before its widgets
+mount, so reporting in the same turn describes the screen you just left. See
+`example/dartway_example_flutter/lib/studio/studio_bridge_binding.dart` for the
+reference binding.
 
 `attach` returns null when the app is not running on web inside an iframe —
 the app stays fully functional and the bridge dormant. The channel pins the

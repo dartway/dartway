@@ -1,6 +1,5 @@
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 
-import 'app_features.dart';
 import 'specs/studio_zone_specs.dart';
 
 /// Everything this app declares about itself for DartWay Studio: its zones
@@ -11,16 +10,10 @@ import 'specs/studio_zone_specs.dart';
 final appStudioManifest = StudioProjectManifest(
   projectName: 'DartWay Starter',
   zones: [appZoneStudioSpec, adminZoneStudioSpec, authZoneStudioSpec],
-  // The full feature catalog — the registry enum is enumerable by
-  // construction, so the manifest can never miss a feature.
-  features: [
-    for (final feature in AppFeatures.values)
-      StudioFeatureInfo(
-        id: feature.id,
-        title: feature.title,
-        description: feature.description,
-      ),
-  ],
+  // No full catalog here on purpose. A feature declares its spec inside its
+  // own file, next to the widget, and Dart cannot enumerate those at runtime —
+  // only the mounted ones are observable, and those the bridge binding reports
+  // per screen. The whole-project catalog is a job for static analysis.
   // Keep in sync with AppLocalizations.supportedLocales (lib/l10n) — drives
   // the locale switcher in Studio.
   supportedLocales: const ['en', 'ru'],

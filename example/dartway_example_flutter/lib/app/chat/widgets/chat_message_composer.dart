@@ -1,5 +1,4 @@
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -15,7 +14,18 @@ class ChatMessageComposer extends HookConsumerWidget implements DwFeature {
   final ChatChannel channel;
 
   @override
-  DwFeatureSpec get dwFeature => AppFeatures.chatMessageComposer;
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'chat/message-composer',
+    title: 'Message composer',
+    behaviors: [
+      'Sending clears the input.',
+      'An empty or whitespace-only message is not sent.',
+    ],
+    implementationNotes: [
+      'Sending is a single dw.repo.saveModel(ChatMessage) — the list above '
+          'updates in realtime, with no extra wiring.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

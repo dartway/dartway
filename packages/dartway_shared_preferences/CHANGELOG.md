@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+Moves to `dartway_flutter` 0.2.0 (breaking `DwFeatureSpec`), so the two resolve together.
+
 ## 0.1.0
 
 First public release — the shared-preferences plugin for DartWay.

@@ -15,7 +15,7 @@ class _FeatureBox extends StatelessWidget implements DwFeature {
 }
 
 DwFeatureSpec _spec(String id) =>
-    DwFeatureSpec(id: id, title: id, description: 'd');
+    DwFeatureSpec(id: id, title: id, behaviors: const ['does a thing']);
 
 void main() {
   testWidgets('DwFeature.scanMounted collects mounted features, deduped by id',

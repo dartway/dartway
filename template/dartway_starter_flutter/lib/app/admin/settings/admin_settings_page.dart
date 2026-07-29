@@ -8,8 +8,28 @@ import 'widgets/admin_settings_form.dart';
 
 /// Application settings backed by the AppSetting model — write access is
 /// admin-only on the server. New settings appear here as the model grows.
-class AdminSettingsPage extends StatelessWidget {
+class AdminSettingsPage extends StatelessWidget implements DwFeature {
   const AdminSettingsPage({super.key});
+
+  @override
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'admin/settings',
+    title: 'App settings',
+    purpose:
+        'An admin changes what the app says about itself without waiting for '
+        'a release.',
+    behaviors: [
+      'The app name is editable here and nothing else yet.',
+      'Saving is offered only once the value has actually changed and is not '
+          'blank.',
+      'With no settings row in the database the screen says so instead of '
+          'showing an empty form.',
+    ],
+    requirements: [
+      'Everyone signed in reads the settings; only an admin writes them, and '
+          'the server is what enforces it.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {

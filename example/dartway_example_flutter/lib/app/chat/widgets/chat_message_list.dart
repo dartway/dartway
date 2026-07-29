@@ -1,5 +1,4 @@
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/studio/logic/app_features.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
@@ -16,7 +15,24 @@ class ChatMessageList extends ConsumerWidget implements DwFeature {
   final ChatChannel channel;
 
   @override
-  DwFeatureSpec get dwFeature => AppFeatures.chatMessageList;
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'chat/message-list',
+    title: 'Realtime staff chat',
+    purpose:
+        'Coaches and admins keep one running conversation about the club day.',
+    behaviors: [
+      'Messages appear for every staff member without a refresh.',
+      'Each message shows its author and time.',
+    ],
+    requirements: [
+      'Clients never receive staff messages — the access filter is the '
+          'enforcement, not the UI.',
+    ],
+    implementationNotes: [
+      'A realtime chat is ~40 lines of DwCrudConfig, secure-by-default: '
+          'the staff-only access filter means the data never reaches a client.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

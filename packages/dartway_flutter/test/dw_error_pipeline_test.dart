@@ -9,7 +9,7 @@ class _FeatureBox extends StatelessWidget implements DwFeature {
 
   @override
   DwFeatureSpec get dwFeature =>
-      DwFeatureSpec(id: id, title: id, description: '');
+      DwFeatureSpec(id: id, title: id);
 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();

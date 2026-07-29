@@ -17,7 +17,10 @@ List<StudioFeatureInfo> _mountedFeatureInfos() => [
         StudioFeatureInfo(
           id: feature.id,
           title: feature.title,
-          description: feature.description,
+          purpose: feature.purpose,
+          behaviors: feature.behaviors,
+          requirements: feature.requirements,
+          implementationNotes: feature.implementationNotes,
         ),
     ];
 

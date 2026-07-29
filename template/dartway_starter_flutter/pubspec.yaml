@@ -40,13 +40,13 @@ dependencies:
   # packages belong to the app, not to the framework.
   device_frame: ^1.4.0
 
-  dartway_flutter: ^0.1.0
+  dartway_flutter: ^0.2.0
 
   dartway_router: ^1.1.1
 
-  dartway_serverpod_core_flutter: ^0.2.2
+  dartway_serverpod_core_flutter: ^0.2.3
 
-  dartway_studio_bridge: ^0.3.0
+  dartway_studio_bridge: ^0.4.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

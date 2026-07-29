@@ -67,7 +67,7 @@ PR и диффы — против ветки `__BASE_BRANCH__`. Первая с�
 
 Структура `lib/`: `admin/` · `app/` (основные фичи) · `auth/` · `common/` · `core/` (router, dw_core) · `data/` (data-layer) · `domain/` (кросс-фича extensions) · `ui_kit/`.
 
-- **Фичи:** фича = entry point (один публичный файл) + `widgets/` + `logic/`. Извне импортируй **только entry point**. Кросс-фичевая логика — в `lib/domain/`.
+- **Фичи:** фича = entry point (один публичный файл) + `widgets/` + `logic/`. Извне импортируй **только entry point**. Кросс-фичевая логика — в `lib/domain/`. Entry point-виджет объявляет паспорт фичи (`implements DwFeature` с `DwFeatureSpec`) прямо в своём файле — описание живёт рядом с кодом, а не в отдельном реестре; его читают отчёты об ошибках, Studio и агент. Скилл — `dartway-feature-scaffold`.
 - **Данные (data-layer):** доступ только через `dw.repo` — чтение как провайдеры под родным `ref.watch`/`read`/`refresh` (`dw.repo.model`/`maybeModel`/`modelList`), запись `dw.repo.saveModel`/`deleteModel`. Списки — `dwBuildListAsync(loadingItemsCount:)`; сужение запросом — `backendFilter`, локальную фильтрацию делаешь сам `.where` в виджете. Контракт — `dartway-data-layer`, создание фичи — `dartway-feature-scaffold`.
 - **UI Kit — единственный источник стилей:** в `app/`/`auth/`/`common/` запрещены прямые `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme`; импорт только `ui_kit.dart`. Скилл — `dartway-ui-kit`.
 - **Навигация:** DartWay Router — enum-роуты, enum-параметры, переходы через context-extensions (`context.goNamed`/`pushTo`/`replaceWith`, не `router.go()`), гварды централизованно. Скилл — `dartway-navigation`.

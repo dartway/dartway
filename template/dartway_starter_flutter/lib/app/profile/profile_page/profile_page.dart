@@ -11,8 +11,23 @@ import 'package:dartway_starter_flutter/core/user_profile_provider.dart';
 import 'package:dartway_starter_flutter/core/user_profile_roles.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
-class ProfilePage extends ConsumerWidget {
+class ProfilePage extends ConsumerWidget implements DwFeature {
   const ProfilePage({super.key});
+
+  @override
+  DwFeatureSpec get dwFeature => const DwFeatureSpec(
+    id: 'profile/my-profile',
+    title: 'My profile',
+    purpose: 'A user manages their own account and finds the way out of the app.',
+    behaviors: [
+      'The way into the admin panel is shown to admins only.',
+      'Signing out returns to the auth flow.',
+    ],
+    requirements: [
+      'The admin button is convenience, not access: the route guard and the '
+          'server access filters decide who actually gets in.',
+    ],
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

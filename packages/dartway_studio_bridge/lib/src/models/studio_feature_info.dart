@@ -1,39 +1,76 @@
 /// Wire model of a product feature present on the current screen, as the app
-/// reports it over the bridge (shown on the Technical passport tab).
+/// reports it over the bridge.
 ///
 /// The bridge does not know *how* the app discovers its features — DartWay
 /// apps typically map `DwFeatureSpec`s collected by `DwFeature.scanMounted()`
 /// (package `dartway_flutter`) onto this model in their bridge binding, but
 /// any source works.
+///
+/// The fields split by audience, and Studio shows them accordingly: [title],
+/// [purpose] and [behaviors] are what a client reads, while [requirements] and
+/// [implementationNotes] are written for the team.
 class StudioFeatureInfo {
   const StudioFeatureInfo({
     required this.id,
     required this.title,
-    required this.description,
+    this.purpose,
+    this.behaviors = const [],
+    this.requirements = const [],
+    this.implementationNotes = const [],
   });
 
-  /// Stable id — deduplicates a feature reported by multiple widget instances.
+  /// Stable id — deduplicates a feature reported by multiple widget instances,
+  /// and the name feedback and tracker items refer it by.
   final String id;
 
   final String title;
-  final String description;
+
+  /// Why the feature exists for the user; absent for parts that serve a screen
+  /// rather than carrying a purpose of their own.
+  final String? purpose;
+
+  /// What the feature observably does — one checkable statement per entry.
+  final List<String> behaviors;
+
+  /// What it must honour, imposed from outside the feature.
+  final List<String> requirements;
+
+  /// Decisions the team should not have to re-open. Technical side only.
+  final List<String> implementationNotes;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
-        'description': description,
+        if (purpose != null) 'purpose': purpose,
+        if (behaviors.isNotEmpty) 'behaviors': behaviors,
+        if (requirements.isNotEmpty) 'requirements': requirements,
+        if (implementationNotes.isNotEmpty)
+          'implementationNotes': implementationNotes,
       };
 
+  /// Parsing stays lenient: an app built against an older bridge sends neither
+  /// the new lists nor `purpose`, and an app built against a newer one may send
+  /// fields this Studio has never heard of. Both must keep working.
   factory StudioFeatureInfo.fromJson(Map<String, dynamic> json) =>
       StudioFeatureInfo(
         id: json['id'] as String? ?? '',
         title: json['title'] as String? ?? '',
-        description: json['description'] as String? ?? '',
+        purpose: json['purpose'] as String?,
+        behaviors: stringListFromJson(json['behaviors']),
+        requirements: stringListFromJson(json['requirements']),
+        implementationNotes: stringListFromJson(json['implementationNotes']),
       );
 
   static List<StudioFeatureInfo> listFromJson(Object? json) => [
         if (json is List)
           for (final item in json)
             if (item is Map<String, dynamic>) StudioFeatureInfo.fromJson(item),
+      ];
+
+  /// Lenient string-list parsing, shared with the other spec models.
+  static List<String> stringListFromJson(Object? json) => [
+        if (json is List)
+          for (final item in json)
+            if (item is String) item,
       ];
 }
