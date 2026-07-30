@@ -1,5 +1,15 @@
 # Changelog
 
+
+## 0.5.0
+
+`StudioFeatureInfo` follows `DwFeatureSpec` (package `dartway_flutter` 0.3.0) and carries
+`knownIssues`: what is wrong in the feature and worth taking into work. Studio flags a feature that
+has any, so open questions are visible from the catalog instead of one passport at a time.
+
+Additive and lenient in both directions, as before: an app built against 0.4.0 sends no
+`knownIssues` and decodes fine here, and a Studio on 0.4.0 ignores the new key.
+
 ## 0.4.0
 
 **A feature reports what it actually does, not one line about itself.** `StudioFeatureInfo` follows

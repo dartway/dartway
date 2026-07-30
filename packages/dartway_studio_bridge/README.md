@@ -96,12 +96,15 @@ List<StudioFeatureInfo> mountedFeatureInfos() => [
           behaviors: feature.behaviors,   // what it observably does, one checkable statement per entry
           requirements: feature.requirements,
           implementationNotes: feature.implementationNotes,
+          knownIssues: feature.knownIssues,   // what is wrong here and worth taking into work
         ),
     ];
 ```
 
-`title`, `purpose` and `behaviors` are what a client reads; `requirements` and
-`implementationNotes` are written for the team, and Studio shows them apart.
+`title`, `purpose` and `behaviors` are what a client reads; `requirements`,
+`implementationNotes` and `knownIssues` are written for the team, and Studio
+shows them apart. A feature with a non-empty `knownIssues` is flagged in the
+catalog, so open questions are visible without reading every passport.
 
 Report after the new screen has built — a route change fires before its widgets
 mount, so reporting in the same turn describes the screen you just left. See

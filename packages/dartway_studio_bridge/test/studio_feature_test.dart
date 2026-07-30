@@ -11,6 +11,7 @@ void main() {
         behaviors: ['tapping opens details'],
         requirements: ['signed-in users only'],
         implementationNotes: ['preview image in the row'],
+        knownIssues: ['the sort order is commented out in the list'],
       );
       final decoded = StudioFeatureInfo.fromJson(info.toJson());
       expect(decoded.id, 'x');
@@ -19,6 +20,10 @@ void main() {
       expect(decoded.behaviors, ['tapping opens details']);
       expect(decoded.requirements, ['signed-in users only']);
       expect(decoded.implementationNotes, ['preview image in the row']);
+      expect(decoded.knownIssues, [
+        'the sort order is commented out in the list',
+      ]);
+      expect(decoded.hasKnownIssues, isTrue);
     });
 
     test('an app built against an older bridge still decodes', () {
@@ -40,6 +45,8 @@ void main() {
       expect(decoded.behaviors, isEmpty);
       expect(decoded.requirements, isEmpty);
       expect(decoded.implementationNotes, isEmpty);
+      expect(decoded.knownIssues, isEmpty);
+      expect(decoded.hasKnownIssues, isFalse);
     });
 
     test('empty lists and a null purpose stay out of the wire payload', () {

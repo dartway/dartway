@@ -18,7 +18,7 @@ dependencies:
 
   serverpod_client: ^3.4.11
 
-  dartway_flutter: ^0.2.0
+  dartway_flutter: ^0.3.0
   dartway_serverpod_core_client: ^0.2.3
   dartway_serverpod_core_shared: ^0.2.3
 

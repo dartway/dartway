@@ -17,7 +17,8 @@ The Flutter skeleton of a [DartWay](https://dartway.dev) app — everything an a
   mounted features, action label, platform, version.
 - 🏷️ **Feature declarations** — `DwFeature` / `DwFeatureSpec`: a widget states
   what it is next to its own code — `purpose`, `behaviors` (one checkable
-  statement per entry), `requirements`, `implementationNotes`. Not prose kept
+  statement per entry), `requirements`, `implementationNotes`, `knownIssues`.
+  Not prose kept
   somewhere else that drifts: `DwFeature.scanMounted()` reads it off the running
   app, for error reports, analytics and
   [DartWay Studio](https://dartway.dev) passports.

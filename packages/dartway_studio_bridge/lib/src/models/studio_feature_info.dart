@@ -7,8 +7,8 @@
 /// any source works.
 ///
 /// The fields split by audience, and Studio shows them accordingly: [title],
-/// [purpose] and [behaviors] are what a client reads, while [requirements] and
-/// [implementationNotes] are written for the team.
+/// [purpose] and [behaviors] are what a client reads, while [requirements],
+/// [implementationNotes] and [knownIssues] are written for the team.
 class StudioFeatureInfo {
   const StudioFeatureInfo({
     required this.id,
@@ -17,6 +17,7 @@ class StudioFeatureInfo {
     this.behaviors = const [],
     this.requirements = const [],
     this.implementationNotes = const [],
+    this.knownIssues = const [],
   });
 
   /// Stable id — deduplicates a feature reported by multiple widget instances,
@@ -38,6 +39,13 @@ class StudioFeatureInfo {
   /// Decisions the team should not have to re-open. Technical side only.
   final List<String> implementationNotes;
 
+  /// What is wrong in the feature and worth taking into work. Studio filters
+  /// on this to show which features carry open questions.
+  final List<String> knownIssues;
+
+  /// Whether the feature carries anything worth taking into work.
+  bool get hasKnownIssues => knownIssues.isNotEmpty;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
@@ -46,6 +54,7 @@ class StudioFeatureInfo {
         if (requirements.isNotEmpty) 'requirements': requirements,
         if (implementationNotes.isNotEmpty)
           'implementationNotes': implementationNotes,
+        if (knownIssues.isNotEmpty) 'knownIssues': knownIssues,
       };
 
   /// Parsing stays lenient: an app built against an older bridge sends neither
@@ -59,6 +68,7 @@ class StudioFeatureInfo {
         behaviors: stringListFromJson(json['behaviors']),
         requirements: stringListFromJson(json['requirements']),
         implementationNotes: stringListFromJson(json['implementationNotes']),
+        knownIssues: stringListFromJson(json['knownIssues']),
       );
 
   static List<StudioFeatureInfo> listFromJson(Object? json) => [

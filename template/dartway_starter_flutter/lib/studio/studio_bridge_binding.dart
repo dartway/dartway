@@ -21,6 +21,7 @@ List<StudioFeatureInfo> _mountedFeatureInfos() => [
           behaviors: feature.behaviors,
           requirements: feature.requirements,
           implementationNotes: feature.implementationNotes,
+          knownIssues: feature.knownIssues,
         ),
     ];
 

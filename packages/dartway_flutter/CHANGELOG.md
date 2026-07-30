@@ -1,5 +1,20 @@
 # Changelog
 
+
+## 0.3.0
+
+**A feature can say what is wrong with it.** `DwFeatureSpec` gains `knownIssues` — a setting nothing
+reads, a screen still wired to mock data, a sort order commented out while the field feeding it
+stayed in the form. `hasKnownIssues` answers the catalog's question without every caller repeating
+`.isNotEmpty`.
+
+The line against `implementationNotes` is what the reader is meant to do about the entry: a note
+says "this is deliberate, leave it", an issue says "this is not right, fix it". An agent editing the
+feature has to tell them apart before it touches anything, and prose in one list could not. The
+test: if someone fixed it, would the entry disappear?
+
+Additive — the field defaults to empty, so existing specs compile unchanged.
+
 ## 0.2.0
 
 **A feature now describes itself, and the description lives next to the code.** `DwFeatureSpec`

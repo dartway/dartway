@@ -12,6 +12,7 @@ class DwFeatureSpec {
     this.behaviors = const [],
     this.requirements = const [],
     this.implementationNotes = const [],
+    this.knownIssues = const [],
   });
 
   /// Stable id — deduplicates a feature declared by multiple widget instances,
@@ -49,6 +50,26 @@ class DwFeatureSpec {
   /// Written for the team, not for the client — Studio shows it on the
   /// technical side, away from the product panel.
   final List<String> implementationNotes;
+
+  /// What is wrong here and worth taking into work: a setting nothing reads,
+  /// a screen still wired to mock data, a sort order that was commented out
+  /// while the field feeding it stayed in the form.
+  ///
+  /// The line between this and [implementationNotes] is what the reader is
+  /// meant to do about the entry. A note says "this is deliberate, leave it";
+  /// an issue says "this is not right, fix it" — and an agent editing the
+  /// feature must be able to tell them apart before it touches anything. The
+  /// test: *if someone fixed it, would the entry disappear?* If yes, it is an
+  /// issue; if it would survive as an explanation, it is a note.
+  ///
+  /// Keep entries to one sentence: what is wrong and what it costs. This is a
+  /// pointer for whoever picks the feature up, not a tracker — the tracker
+  /// item is written from it, and this entry is deleted once the fix lands.
+  final List<String> knownIssues;
+
+  /// Whether the feature carries anything worth taking into work. Studio
+  /// filters on this, so it lives here rather than in every caller.
+  bool get hasKnownIssues => knownIssues.isNotEmpty;
 }
 
 /// Implemented by a widget that *is* a product feature on a screen. A contract,

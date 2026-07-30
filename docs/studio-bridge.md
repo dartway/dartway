@@ -34,9 +34,11 @@ The open `dartway_studio_bridge` package is the only integration surface:
 - **Features** arrive per screen, as the app navigates: every widget that
   implements `DwFeature` declares its `DwFeatureSpec` next to itself, and the
   binding reports the ones currently mounted. What a feature says about itself
-  — `purpose`, `behaviors`, `requirements`, `implementationNotes` — travels
-  over the bridge on every connect, so Studio renders it live and stores none
-  of it: there is nothing that can drift away from the code.
+  — `purpose`, `behaviors`, `requirements`, `implementationNotes`,
+  `knownIssues` — travels over the bridge on every connect, so Studio renders
+  it live and stores none of it: there is nothing that can drift away from the
+  code. A feature with a non-empty `knownIssues` is flagged in the catalog, so
+  the open questions of a project are visible without opening every passport.
 
   `manifest.features` stays in the protocol for the *whole-project* catalog,
   but a running app cannot fill it: Dart has no reflection, so only mounted
