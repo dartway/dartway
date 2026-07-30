@@ -656,6 +656,12 @@ abstract class AppLocalizations {
   /// **'Club settings'**
   String get clubSettings;
 
+  /// No description provided for @signUpEnabledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-up enabled'**
+  String get signUpEnabledLabel;
+
   /// No description provided for @clubNameLabel.
   ///
   /// In en, this message translates to:

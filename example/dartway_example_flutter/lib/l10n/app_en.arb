@@ -159,6 +159,7 @@
     }
   },
   "clubSettings": "Club settings",
+  "signUpEnabledLabel": "Sign-up enabled",
   "clubNameLabel": "Club name",
   "saveAction": "Save",
   "settingsSaved": "Settings saved",

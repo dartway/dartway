@@ -5,6 +5,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/common/app_scaffold.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
+import 'package:dartway_starter_flutter/core/app_settings/app_settings_reader.dart';
 import 'package:dartway_starter_flutter/core/user_profile_provider.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
@@ -57,17 +59,14 @@ class HomePage extends ConsumerWidget implements DwFeature {
                       .watch(dw.repo.modelList<AppSetting>())
                       .dwBuildListAsync(
                         loadingItemsCount: 1,
-                        childBuilder: (settings) {
-                          final appName = settings
-                              .where((s) => s.settingKey == 'appName')
-                              .firstOrNull
-                              ?.settingValue;
-                          return AppText.caption(
-                            appName == null
-                                ? l10n.homeNoAppName
-                                : l10n.homeAppNameFromDatabase(appName),
-                          );
-                        },
+                        childBuilder: (settings) => AppText.caption(
+                          l10n.homeAppNameFromDatabase(
+                            // Typed read by catalogue entry, not by string
+                            // literal: a setting nobody has changed yet gives
+                            // its declared default instead of a blank.
+                            settings.valueOf(AppSettingKey.appName),
+                          ),
+                        ),
                       ),
                 ],
               ),

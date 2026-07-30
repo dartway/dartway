@@ -410,6 +410,12 @@ abstract class AppLocalizations {
   /// **'App settings'**
   String get appSettings;
 
+  /// No description provided for @signUpEnabledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-up enabled'**
+  String get signUpEnabledLabel;
+
   /// No description provided for @appNameLabel.
   ///
   /// In en, this message translates to:

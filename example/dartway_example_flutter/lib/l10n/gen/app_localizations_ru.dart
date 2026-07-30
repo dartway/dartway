@@ -339,6 +339,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get clubSettings => 'Настройки клуба';
 
   @override
+  String get signUpEnabledLabel => 'Регистрация разрешена';
+
+  @override
   String get clubNameLabel => 'Название клуба';
 
   @override

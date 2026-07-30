@@ -199,6 +199,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appSettings => 'App settings';
 
   @override
+  String get signUpEnabledLabel => 'Sign-up enabled';
+
+  @override
   String get appNameLabel => 'App name';
 
   @override

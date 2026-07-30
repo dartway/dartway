@@ -90,6 +90,7 @@
     }
   },
   "appSettings": "App settings",
+  "signUpEnabledLabel": "Sign-up enabled",
   "appNameLabel": "App name",
   "saveAction": "Save",
   "settingsSaved": "Settings saved",

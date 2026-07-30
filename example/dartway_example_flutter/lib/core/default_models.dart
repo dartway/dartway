@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 
@@ -84,7 +85,7 @@ class DefaultModels {
     dw.repo.setupRepository(
       defaultModel: AppSetting(
         id: dw.repo.mockModelId,
-        settingKey: 'clubName',
+        settingKey: AppSettingKey.clubName.key,
         settingValue: 'DartWay Fitness',
       ),
     );

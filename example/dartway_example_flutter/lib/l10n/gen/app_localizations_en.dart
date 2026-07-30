@@ -340,6 +340,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clubSettings => 'Club settings';
 
   @override
+  String get signUpEnabledLabel => 'Sign-up enabled';
+
+  @override
   String get clubNameLabel => 'Club name';
 
   @override

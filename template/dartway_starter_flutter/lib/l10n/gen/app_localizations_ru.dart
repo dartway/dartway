@@ -198,6 +198,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get appSettings => 'Настройки приложения';
 
   @override
+  String get signUpEnabledLabel => 'Регистрация разрешена';
+
+  @override
   String get appNameLabel => 'Название приложения';
 
   @override
