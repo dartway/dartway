@@ -41,11 +41,9 @@ class AuthPage extends ConsumerWidget {
               child: switch (state.currentStep) {
                 AuthStep.greeting => const GreetingBlock(),
                 AuthStep.registration ||
-                AuthStep.login =>
-                  const PhoneEntryBlock(),
+                AuthStep.login => const PhoneEntryBlock(),
                 AuthStep.registrationConfirmation ||
-                AuthStep.loginConfirmation =>
-                  const VerifyOtpBlock(),
+                AuthStep.loginConfirmation => const VerifyOtpBlock(),
               },
             ),
           ),

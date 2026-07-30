@@ -4,12 +4,11 @@ extension ShowAppBottomSheetExtension on BuildContext {
   static Future<void> showAppBottomSheetStatic(
     BuildContext context,
     Widget child,
-  ) =>
-      context.showAppBottomSheet(
-        child: child,
-        isWithDragHandle: true,
-        isDismissible: true,
-      );
+  ) => context.showAppBottomSheet(
+    child: child,
+    isWithDragHandle: true,
+    isDismissible: true,
+  );
 
   Future<T?> showAppBottomSheet<T>({
     required Widget child,
@@ -63,17 +62,12 @@ extension ShowAppBottomSheetExtension on BuildContext {
                       height: 4,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.all(
-                            Radius.circular(100),
-                          ),
+                          borderRadius: BorderRadius.all(Radius.circular(100)),
                         ),
                       ),
                     ),
                   const SizedBox(height: 16),
-                  Flexible(
-                    fit: FlexFit.loose,
-                    child: child,
-                  ),
+                  Flexible(fit: FlexFit.loose, child: child),
                 ],
               ),
             ),

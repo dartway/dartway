@@ -10,11 +10,10 @@ StudioScreenSpec studioSpecForRoute(
   required String title,
   required String purpose,
   List<String> discussionQuestions = const [],
-}) =>
-    StudioScreenSpec(
-      path: route.fullPath,
-      parentPath: route.descriptor.parent?.fullPath,
-      title: title,
-      purpose: purpose,
-      discussionQuestions: discussionQuestions,
-    );
+}) => StudioScreenSpec(
+  path: route.fullPath,
+  parentPath: route.descriptor.parent?.fullPath,
+  title: title,
+  purpose: purpose,
+  discussionQuestions: discussionQuestions,
+);

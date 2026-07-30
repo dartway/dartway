@@ -9,10 +9,7 @@ final appZoneStudioSpec = StudioZoneSpec(
   label: 'App',
   rootPath: AppNavigationZone.home.fullPath,
   access: StudioZoneAccess.signedIn,
-  screens: [
-    homeStudioSpec,
-    profileStudioSpec,
-  ],
+  screens: [homeStudioSpec, profileStudioSpec],
 );
 
 final adminZoneStudioSpec = StudioZoneSpec(
@@ -26,8 +23,9 @@ final adminZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AdminNavigationZone.admin,
       title: 'Dashboard',
-      purpose: 'The admin home: headline counters over live data. The future '
-          'home of event analytics (visits, conversion, retention).',
+      purpose:
+          'The admin home: headline counters over live data. The future '
+          'home of event analytics (visits, conversion, retention).',
       discussionQuestions: const [
         'Which three numbers does the owner of your product check every morning?',
       ],
@@ -35,8 +33,9 @@ final adminZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AdminNavigationZone.users,
       title: 'Users',
-      purpose: 'Member management: find a person, see their role, change it '
-          'in place.',
+      purpose:
+          'Member management: find a person, see their role, change it '
+          'in place.',
       discussionQuestions: const [
         'Deactivate a member instead of deleting?',
         'Per-user test verification codes for store reviewers — manage '
@@ -46,11 +45,10 @@ final adminZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AdminNavigationZone.settings,
       title: 'Settings',
-      purpose: 'Application settings stored in the AppSetting model — the '
-          'business changes its own texts without a redeploy.',
-      discussionQuestions: const [
-        'Which other settings belong here?',
-      ],
+      purpose:
+          'Application settings stored in the AppSetting model — the '
+          'business changes its own texts without a redeploy.',
+      discussionQuestions: const ['Which other settings belong here?'],
     ),
   ],
 );
@@ -63,8 +61,9 @@ final authZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AuthNavigationZone.auth,
       title: 'Sign in',
-      purpose: 'Passwordless onboarding: phone number + one-time code. The '
-          'fewer steps, the more clients finish registration.',
+      purpose:
+          'Passwordless onboarding: phone number + one-time code. The '
+          'fewer steps, the more clients finish registration.',
       discussionQuestions: const [
         'Alternative code channels: Telegram, email?',
       ],

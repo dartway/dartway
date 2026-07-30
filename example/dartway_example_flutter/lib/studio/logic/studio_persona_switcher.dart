@@ -80,4 +80,5 @@ class StudioPersonaSwitcher extends Notifier<bool> {
   }
 }
 
-final studioPersonaSwitcherProvider = NotifierProvider<StudioPersonaSwitcher, bool>(StudioPersonaSwitcher.new);
+final studioPersonaSwitcherProvider =
+    NotifierProvider<StudioPersonaSwitcher, bool>(StudioPersonaSwitcher.new);

@@ -8,9 +8,8 @@ class CreateNewsPostFab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton(
-      onPressed: () => context.showAppBottomSheet(
-        child: const CreateNewsPostSheet(),
-      ),
+      onPressed: () =>
+          context.showAppBottomSheet(child: const CreateNewsPostSheet()),
       child: const Icon(Icons.add),
     );
   }

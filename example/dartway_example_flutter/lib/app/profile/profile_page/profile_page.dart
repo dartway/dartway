@@ -35,9 +35,7 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
     final l10n = context.l10n;
 
     return AppScaffold.main(
-      appBar: AppBar(
-        title: AppText.title(l10n.profileTitle),
-      ),
+      appBar: AppBar(title: AppText.title(l10n.profileTitle)),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -47,8 +45,9 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
               AppButton.secondary(
                 l10n.adminPanel,
                 onTap: dw.action(
-                  (context) => GoRouter.of(context)
-                      .goNamed(AdminNavigationZone.admin.name),
+                  (context) => GoRouter.of(
+                    context,
+                  ).goNamed(AdminNavigationZone.admin.name),
                 ),
               ),
               const Gap(24),
@@ -56,8 +55,9 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
             AppButton.secondary(
               l10n.ourServices,
               onTap: dw.action(
-                (context) => GoRouter.of(context)
-                    .goNamed(AppNavigationZone.services.name),
+                (context) => GoRouter.of(
+                  context,
+                ).goNamed(AppNavigationZone.services.name),
               ),
             ),
             const Gap(24),

@@ -42,16 +42,13 @@ class AppScaffold extends StatelessWidget {
               padding: bodyInsets,
               child: SizedBox.expand(child: body),
             ),
-            const Positioned(
-              right: 4,
-              bottom: 4,
-              child: AppVersionLabel(),
-            ),
+            const Positioned(right: 4, bottom: 4, child: AppVersionLabel()),
           ],
         ),
         floatingActionButton: floatingActionButton,
-        bottomNavigationBar:
-            showBottomNavigationBar ? const _AppBottomNavigationBar() : null,
+        bottomNavigationBar: showBottomNavigationBar
+            ? const _AppBottomNavigationBar()
+            : null,
       ),
     );
   }

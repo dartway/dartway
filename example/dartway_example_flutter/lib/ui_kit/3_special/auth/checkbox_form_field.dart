@@ -76,8 +76,8 @@ class CheckboxFormField extends StatelessWidget {
                       child: Text(
                         fieldState.errorText!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     )
                   : const SizedBox(height: 0, key: ValueKey('no_error')),

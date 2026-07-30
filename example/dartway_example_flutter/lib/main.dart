@@ -9,8 +9,7 @@ void main() {
   //
   // `defaultTargetPlatform` works on every platform — unlike `dart:io`'s
   // `Platform`, which does not compile for Flutter web.
-  final backendUrl =
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+  final backendUrl = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
       ? 'http://192.168.0.100:8080/'
       : 'http://localhost:8080/';
 

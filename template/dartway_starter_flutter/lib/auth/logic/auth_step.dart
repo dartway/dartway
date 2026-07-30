@@ -12,9 +12,10 @@ enum AuthStep {
   const AuthStep({required this.previousStep});
 
   AuthStep get requestOtpNextStep => switch (this) {
-        AuthStep.registration => AuthStep.registrationConfirmation,
-        AuthStep.login => AuthStep.loginConfirmation,
-        _ => throw StateError(
-            'Incorrect AuthStep $this while requestOtp is called'),
-      };
+    AuthStep.registration => AuthStep.registrationConfirmation,
+    AuthStep.login => AuthStep.loginConfirmation,
+    _ => throw StateError(
+      'Incorrect AuthStep $this while requestOtp is called',
+    ),
+  };
 }

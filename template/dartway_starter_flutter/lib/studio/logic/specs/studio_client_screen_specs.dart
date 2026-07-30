@@ -11,7 +11,8 @@ import 'studio_route_specs.dart';
 final homeStudioSpec = studioSpecForRoute(
   AppNavigationZone.home,
   title: 'Home',
-  purpose: 'The starter screen. Replace it with the entry point of your '
+  purpose:
+      'The starter screen. Replace it with the entry point of your '
       'domain — the one screen that makes the product worth opening.',
   discussionQuestions: const [
     'What is the first thing a user should see after signing in?',
@@ -21,7 +22,8 @@ final homeStudioSpec = studioSpecForRoute(
 final profileStudioSpec = studioSpecForRoute(
   AppNavigationZone.profile,
   title: 'Profile',
-  purpose: 'The user manages their own data and signs out. Admins reach the '
+  purpose:
+      'The user manages their own data and signs out. Admins reach the '
       'admin panel from here.',
   discussionQuestions: const [
     'Which profile fields does your domain actually need?',

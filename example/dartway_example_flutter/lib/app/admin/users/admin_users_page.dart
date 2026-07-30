@@ -19,8 +19,7 @@ class AdminUsersPage extends HookConsumerWidget implements DwFeature {
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
     id: 'admin/users',
     title: 'Members',
-    purpose:
-        'An admin finds a person and changes what they are allowed to do.',
+    purpose: 'An admin finds a person and changes what they are allowed to do.',
     behaviors: [
       'Typing in the search field narrows the table as you type.',
       'The role chips narrow it further; "all roles" clears that filter.',

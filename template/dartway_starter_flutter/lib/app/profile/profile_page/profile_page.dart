@@ -18,7 +18,8 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
     id: 'profile/my-profile',
     title: 'My profile',
-    purpose: 'A user manages their own account and finds the way out of the app.',
+    purpose:
+        'A user manages their own account and finds the way out of the app.',
     behaviors: [
       'The way into the admin panel is shown to admins only.',
       'Signing out returns to the auth flow.',
@@ -34,9 +35,7 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
     final l10n = context.l10n;
 
     return AppScaffold.main(
-      appBar: AppBar(
-        title: AppText.title(l10n.profileTitle),
-      ),
+      appBar: AppBar(title: AppText.title(l10n.profileTitle)),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -46,8 +45,9 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
               AppButton.secondary(
                 l10n.adminPanel,
                 onTap: dw.action(
-                  (context) => GoRouter.of(context)
-                      .goNamed(AdminNavigationZone.admin.name),
+                  (context) => GoRouter.of(
+                    context,
+                  ).goNamed(AdminNavigationZone.admin.name),
                 ),
               ),
               const Gap(24),

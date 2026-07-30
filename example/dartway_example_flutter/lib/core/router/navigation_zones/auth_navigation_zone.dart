@@ -2,9 +2,7 @@ part of '../router.dart';
 
 /// Auth zone. Guard redirects already signed-in users back to the app zone.
 enum AuthNavigationZone implements DwNavigationRoute<AppRouterState> {
-  auth(
-    DwNavigationRouteDescriptor.simple(pageWidget: AuthPage()),
-  );
+  auth(DwNavigationRouteDescriptor.simple(pageWidget: AuthPage()));
 
   const AuthNavigationZone(this.descriptor);
 
@@ -22,7 +20,6 @@ enum AuthNavigationZone implements DwNavigationRoute<AppRouterState> {
 
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-        (state) =>
-            state.isSignedIn ? AppNavigationZone.schedule.fullPath : null,
-      ];
+    (state) => state.isSignedIn ? AppNavigationZone.schedule.fullPath : null,
+  ];
 }

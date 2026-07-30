@@ -28,16 +28,16 @@ class ConnectionStatusIndicator extends StatelessWidget {
   }
 
   Color _statusColor(StreamingConnectionStatus status) => switch (status) {
-        StreamingConnectionStatus.connected => Colors.green,
-        StreamingConnectionStatus.connecting => Colors.orange,
-        StreamingConnectionStatus.waitingToRetry => Colors.orange,
-        StreamingConnectionStatus.disconnected => Colors.red,
-      };
+    StreamingConnectionStatus.connected => Colors.green,
+    StreamingConnectionStatus.connecting => Colors.orange,
+    StreamingConnectionStatus.waitingToRetry => Colors.orange,
+    StreamingConnectionStatus.disconnected => Colors.red,
+  };
 
   String _statusLabel(StreamingConnectionStatus status) => switch (status) {
-        StreamingConnectionStatus.connected => 'online',
-        StreamingConnectionStatus.connecting => 'connecting',
-        StreamingConnectionStatus.waitingToRetry => 'reconnecting',
-        StreamingConnectionStatus.disconnected => 'offline',
-      };
+    StreamingConnectionStatus.connected => 'online',
+    StreamingConnectionStatus.connecting => 'connecting',
+    StreamingConnectionStatus.waitingToRetry => 'reconnecting',
+    StreamingConnectionStatus.disconnected => 'offline',
+  };
 }

@@ -4,9 +4,7 @@ part of '../router.dart';
 /// user management and application settings. Guards redirect signed-out users
 /// to auth and non-admins back to the app — the panel is admin-only.
 enum AdminNavigationZone implements DwNavigationRoute<AppRouterState> {
-  admin(
-    DwNavigationRouteDescriptor.zoneRoot(pageWidget: AdminDashboardPage()),
-  ),
+  admin(DwNavigationRouteDescriptor.zoneRoot(pageWidget: AdminDashboardPage())),
   users(
     DwNavigationRouteDescriptor.simple(
       pageWidget: AdminUsersPage(),
@@ -36,7 +34,7 @@ enum AdminNavigationZone implements DwNavigationRoute<AppRouterState> {
 
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-        (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
-        (state) => !state.isAdmin ? AppNavigationZone.home.fullPath : null,
-      ];
+    (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
+    (state) => !state.isAdmin ? AppNavigationZone.home.fullPath : null,
+  ];
 }

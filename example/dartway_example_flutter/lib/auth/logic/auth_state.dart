@@ -113,4 +113,6 @@ class AuthState extends Notifier<AuthStateModel> {
   }
 }
 
-final authStateProvider = NotifierProvider<AuthState, AuthStateModel>(AuthState.new);
+final authStateProvider = NotifierProvider<AuthState, AuthStateModel>(
+  AuthState.new,
+);

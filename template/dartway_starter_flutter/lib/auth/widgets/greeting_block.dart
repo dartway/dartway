@@ -15,9 +15,7 @@ class GreetingBlock extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Spacer(
-          flex: 2,
-        ),
+        const Spacer(flex: 2),
         // Your brand goes here — the mark and the name every new project
         // replaces first. The screen names an icon, not a file: swap the asset
         // and the path in `AppIcon`, and nothing here changes.
@@ -26,9 +24,7 @@ class GreetingBlock extends ConsumerWidget {
         const AppText.title('DartwayStarter'),
         const Gap(12),
         AppText.body(context.l10n.completeLoginToContinue),
-        const Spacer(
-          flex: 1,
-        ),
+        const Spacer(flex: 1),
         AppButton.primary(
           context.l10n.registrationAction,
           height: 40,
@@ -48,9 +44,7 @@ class GreetingBlock extends ConsumerWidget {
             (_) => ref.read(authStateProvider.notifier).goTo(AuthStep.login),
           ),
         ),
-        const Spacer(
-          flex: 3,
-        ),
+        const Spacer(flex: 3),
       ],
     );
   }

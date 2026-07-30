@@ -18,22 +18,14 @@ final isAdminProvider = Provider<bool>((ref) {
 /// notifies the router so zone guards re-run whenever either changes.
 class AppRouterState extends ChangeNotifier {
   AppRouterState(this.ref) {
-    ref.listen<bool>(
-      isSignedInProvider,
-      (_, next) {
-        isSignedIn = next;
-        notifyListeners();
-      },
-      fireImmediately: true,
-    );
-    ref.listen<bool>(
-      isAdminProvider,
-      (_, next) {
-        isAdmin = next;
-        notifyListeners();
-      },
-      fireImmediately: true,
-    );
+    ref.listen<bool>(isSignedInProvider, (_, next) {
+      isSignedIn = next;
+      notifyListeners();
+    }, fireImmediately: true);
+    ref.listen<bool>(isAdminProvider, (_, next) {
+      isAdmin = next;
+      notifyListeners();
+    }, fireImmediately: true);
   }
 
   final Ref ref;

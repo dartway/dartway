@@ -55,8 +55,9 @@ class AdminScaffold extends StatelessWidget implements DwFeature {
 
     // Deepest active route wins: the zone root matches every admin location,
     // so the last match is the specific section.
-    final lastActive =
-        _sections.lastIndexWhere((s) => s.route.isActive(context));
+    final lastActive = _sections.lastIndexWhere(
+      (s) => s.route.isActive(context),
+    );
     final activeIndex = lastActive < 0 ? 0 : lastActive;
 
     void goToSection(int index) =>
@@ -107,10 +108,7 @@ class AdminScaffold extends StatelessWidget implements DwFeature {
 
         return Scaffold(
           appBar: appBar,
-          body: Padding(
-            padding: const EdgeInsets.all(16),
-            child: body,
-          ),
+          body: Padding(padding: const EdgeInsets.all(16), child: body),
           bottomNavigationBar: NavigationBar(
             selectedIndex: activeIndex,
             onDestinationSelected: goToSection,

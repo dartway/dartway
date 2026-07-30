@@ -31,7 +31,8 @@ final adminZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AdminNavigationZone.admin,
       title: 'Dashboard',
-      purpose: 'The admin home: headline counters over live data. The future '
+      purpose:
+          'The admin home: headline counters over live data. The future '
           'home of event analytics (visits, conversion, retention).',
       discussionQuestions: const [
         'Which three numbers does a club owner check every morning?',
@@ -40,7 +41,8 @@ final adminZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AdminNavigationZone.users,
       title: 'Users',
-      purpose: 'Member management: find a person, see their role, change it '
+      purpose:
+          'Member management: find a person, see their role, change it '
           'in place.',
       discussionQuestions: const [
         'Deactivate a member instead of deleting?',
@@ -51,7 +53,8 @@ final adminZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AdminNavigationZone.settings,
       title: 'Settings',
-      purpose: 'Application settings stored in the AppSetting model — the '
+      purpose:
+          'Application settings stored in the AppSetting model — the '
           'club changes its own texts without redeploys.',
       discussionQuestions: const [
         'Which other settings belong here: working hours, booking limits?',
@@ -68,7 +71,8 @@ final authZoneStudioSpec = StudioZoneSpec(
     studioSpecForRoute(
       AuthNavigationZone.auth,
       title: 'Sign in',
-      purpose: 'Passwordless onboarding: phone number + one-time code. The '
+      purpose:
+          'Passwordless onboarding: phone number + one-time code. The '
           'fewer steps, the more clients finish registration.',
       discussionQuestions: const [
         'Alternative code channels: Telegram, email?',

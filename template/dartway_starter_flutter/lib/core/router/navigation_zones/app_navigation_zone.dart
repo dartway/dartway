@@ -7,14 +7,9 @@ part of '../router.dart';
 /// `DwNavigationRouteDescriptor.parameterized` + a [DwNavigationParamsMixin]
 /// enum for routes that carry parameters.
 enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
-  home(
-    DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage()),
-  ),
+  home(DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage())),
   profile(
-    DwNavigationRouteDescriptor.simple(
-      pageWidget: ProfilePage(),
-      parent: home,
-    ),
+    DwNavigationRouteDescriptor.simple(pageWidget: ProfilePage(), parent: home),
   );
 
   const AppNavigationZone(this.descriptor);
@@ -33,6 +28,6 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
 
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-        (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
-      ];
+    (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
+  ];
 }

@@ -8,9 +8,7 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import '../logic/auth_state.dart';
 
 class VerifyOtpBlock extends HookConsumerWidget {
-  const VerifyOtpBlock({
-    super.key,
-  });
+  const VerifyOtpBlock({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,9 +20,7 @@ class VerifyOtpBlock extends HookConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: AppText.title(
-              context.l10n.enterSmsCode,
-            ),
+            child: AppText.title(context.l10n.enterSmsCode),
           ),
           const Gap(12),
           Padding(

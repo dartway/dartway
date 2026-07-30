@@ -43,8 +43,9 @@ class AppLocaleController extends Notifier<Locale> {
   }
 }
 
-final appLocaleProvider =
-    NotifierProvider<AppLocaleController, Locale>(AppLocaleController.new);
+final appLocaleProvider = NotifierProvider<AppLocaleController, Locale>(
+  AppLocaleController.new,
+);
 
 extension AppL10nX on BuildContext {
   AppLocalizations get l10n => AppLocalizations.of(this);

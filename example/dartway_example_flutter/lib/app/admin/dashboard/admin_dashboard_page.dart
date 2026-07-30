@@ -17,9 +17,7 @@ class AdminDashboardPage extends StatelessWidget implements DwFeature {
     id: 'admin/dashboard',
     title: 'Admin dashboard',
     purpose: 'The landing screen of the panel: how big the club is right now.',
-    behaviors: [
-      'A line under the counters explains that they are live.',
-    ],
+    behaviors: ['A line under the counters explains that they are live.'],
     implementationNotes: [
       'The counters themselves are admin/live-counters. This screen is their '
           'frame, and the future home of event analytics — visits, conversion, '

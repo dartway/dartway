@@ -114,8 +114,10 @@ class _AppTextFormFieldState extends State<AppTextFormField> {
     if (widget.value != _lastExternalValue &&
         widget.value != _controller.text) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _syncControllerText(widget.value,
-            placeCursorAtEnd: widget.cursorToEndOnExternalUpdate);
+        _syncControllerText(
+          widget.value,
+          placeCursorAtEnd: widget.cursorToEndOnExternalUpdate,
+        );
         _lastExternalValue = widget.value;
       });
     }

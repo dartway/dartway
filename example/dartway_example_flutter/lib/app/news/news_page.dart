@@ -16,9 +16,7 @@ class NewsPage extends ConsumerWidget implements DwFeature {
     id: 'news/feed',
     title: 'Club news',
     purpose: 'Members find out what the club is announcing.',
-    behaviors: [
-      'The publish button is shown to staff and to nobody else.',
-    ],
+    behaviors: ['The publish button is shown to staff and to nobody else.'],
     requirements: [
       'Only staff publishes, and only under their own name — the server '
           'refuses the save regardless of what the UI shows.',

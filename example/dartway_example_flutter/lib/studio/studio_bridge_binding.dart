@@ -13,17 +13,17 @@ import 'logic/studio_session_state_provider.dart';
 /// features are discovered from mounted [DwFeature] widgets and mapped onto
 /// the bridge wire model.
 List<StudioFeatureInfo> _mountedFeatureInfos() => [
-      for (final feature in DwFeature.scanMounted())
-        StudioFeatureInfo(
-          id: feature.id,
-          title: feature.title,
-          purpose: feature.purpose,
-          behaviors: feature.behaviors,
-          requirements: feature.requirements,
-          implementationNotes: feature.implementationNotes,
-          knownIssues: feature.knownIssues,
-        ),
-    ];
+  for (final feature in DwFeature.scanMounted())
+    StudioFeatureInfo(
+      id: feature.id,
+      title: feature.title,
+      purpose: feature.purpose,
+      behaviors: feature.behaviors,
+      requirements: feature.requirements,
+      implementationNotes: feature.implementationNotes,
+      knownIssues: feature.knownIssues,
+    ),
+];
 
 /// Connects the app to DartWay Studio when it runs embedded in the Studio
 /// preview frame: attaches the bridge host, reports route/session changes and
@@ -107,13 +107,10 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
     delegate.addListener(onRouteChanged);
     _removeRouteListener = () => delegate.removeListener(onRouteChanged);
 
-    ref.listenManual(
-      studioSessionStateProvider,
-      (previous, next) {
-        _host?.reportSession(next);
-        reportFeaturesSoon();
-      },
-    );
+    ref.listenManual(studioSessionStateProvider, (previous, next) {
+      _host?.reportSession(next);
+      reportFeaturesSoon();
+    });
 
     ref.listenManual(
       appLocaleProvider,
@@ -133,11 +130,9 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       ref.read(appRouterProvider).router.go(path);
 
   @override
-  Future<void> onSignInRequest(String identifier, String secret) =>
-      ref.read(studioPersonaSwitcherProvider.notifier).signInWith(
-            identifier: identifier,
-            verificationCode: secret,
-          );
+  Future<void> onSignInRequest(String identifier, String secret) => ref
+      .read(studioPersonaSwitcherProvider.notifier)
+      .signInWith(identifier: identifier, verificationCode: secret);
 
   @override
   Future<void> onSignOutRequest() =>

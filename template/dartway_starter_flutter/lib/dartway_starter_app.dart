@@ -33,9 +33,8 @@ class DartwayStarterApp {
       // filters connection blips and alerts everything else with app context
       // (route, mounted features, action, user) — zero-config alerting.
       appInitializers: [
-        () => dw.initDwCore(
-          initRepositoryFunction: DefaultModels.initRepository,
-        ),
+        () =>
+            dw.initDwCore(initRepositoryFunction: DefaultModels.initRepository),
       ],
       child: const _ExampleMaterialApp(),
     ).run();

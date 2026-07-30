@@ -17,10 +17,7 @@ class PhoneEntryBlock extends HookConsumerWidget {
   // final bool isAdminShadowMode;
 
   @override
-  Widget build(
-    BuildContext context,
-    WidgetRef ref,
-  ) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(authStateProvider);
 
     final isRegistration = switch (state.currentStep) {

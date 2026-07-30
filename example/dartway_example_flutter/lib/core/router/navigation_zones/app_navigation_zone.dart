@@ -4,9 +4,7 @@ part of '../router.dart';
 /// users to the auth zone. Add parameterized routes with
 /// `DwNavigationRouteDescriptor.parameterized` + a [DwNavigationParamsMixin] enum.
 enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
-  schedule(
-    DwNavigationRouteDescriptor.zoneRoot(pageWidget: SchedulePage()),
-  ),
+  schedule(DwNavigationRouteDescriptor.zoneRoot(pageWidget: SchedulePage())),
   bookings(
     DwNavigationRouteDescriptor.simple(
       pageWidget: MyBookingsPage(),
@@ -54,6 +52,6 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
 
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-        (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
-      ];
+    (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
+  ];
 }
