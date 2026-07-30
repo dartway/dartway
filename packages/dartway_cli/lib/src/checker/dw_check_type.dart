@@ -36,20 +36,29 @@ enum DwCheckType {
   /// A feature whose public widget does not declare a `DwFeatureSpec` — the
   /// feature exists in the code but says nothing about itself, so error
   /// reports, Studio and the agent see it as a blank.
-  featureSpecMissing;
+  featureSpecMissing,
+
+  /// An `assets/...` path that points at no file. Nothing else catches this:
+  /// the code compiles and the screen renders a blank where the image was.
+  assetPathMissing,
+
+  /// A raw `assets/...` path outside `ui_kit/`. Asset paths live in one place
+  /// in the kit — a path spelled out in a screen survives a renamed file only
+  /// by accident, and cannot be found by search.
+  forbiddenAssetPath;
 
   DwCheckSeverity get severity => switch (this) {
-        DwCheckType.fileLong => DwCheckSeverity.info,
-        DwCheckType.uiKitContainsText ||
-        DwCheckType.featureSpecMissing ||
-        DwCheckType.fileTooLong =>
-          DwCheckSeverity.warning,
-        _ => DwCheckSeverity.error,
-      };
+    DwCheckType.fileLong => DwCheckSeverity.info,
+    DwCheckType.uiKitContainsText ||
+    DwCheckType.featureSpecMissing ||
+    DwCheckType.forbiddenAssetPath ||
+    DwCheckType.fileTooLong => DwCheckSeverity.warning,
+    _ => DwCheckSeverity.error,
+  };
 
   String get reportLabel => switch (severity) {
-        DwCheckSeverity.info => 'ℹ️ INFO',
-        DwCheckSeverity.warning => '⚠️ WARNING',
-        DwCheckSeverity.error => '❌ ERROR',
-      };
+    DwCheckSeverity.info => 'ℹ️ INFO',
+    DwCheckSeverity.warning => '⚠️ WARNING',
+    DwCheckSeverity.error => '❌ ERROR',
+  };
 }

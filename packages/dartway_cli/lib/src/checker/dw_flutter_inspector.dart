@@ -47,15 +47,13 @@ class DwFlutterInspector {
     DwCheckType? filterType,
     DwCheckSeverity? filterSeverity,
     this.targetDirPath,
-  }) : activeTypes = DwCheckType.values
-            .where((type) {
-              if (filterType != null) return type == filterType;
-              if (filterSeverity != null) {
-                return type.severity == filterSeverity;
-              }
-              return true;
-            })
-            .toSet();
+  }) : activeTypes = DwCheckType.values.where((type) {
+         if (filterType != null) return type == filterType;
+         if (filterSeverity != null) {
+           return type.severity == filterSeverity;
+         }
+         return true;
+       }).toSet();
 
   final Directory packageDir;
   final Set<DwCheckType> activeTypes;
@@ -83,10 +81,9 @@ class DwFlutterInspector {
 
     final scope = targetDirPath == null
         ? null
-        : p.relative(_resolve(targetDirPath!), from: _libPath).replaceAll(
-              r'\',
-              '/',
-            );
+        : p
+              .relative(_resolve(targetDirPath!), from: _libPath)
+              .replaceAll(r'\', '/');
     if (scope != null && !Directory(_resolve(targetDirPath!)).existsSync()) {
       print('❌ Selected folder not found: $targetDirPath');
       return 1;
@@ -94,13 +91,16 @@ class DwFlutterInspector {
 
     if (scope == null) await _checkUiKit();
 
-    final areas = libDir
-        .listSync()
-        .whereType<Directory>()
-        .map((d) => p.basename(d.path))
-        .where((name) => name != 'ui_kit' && !dwIgnoredFolders.contains(name))
-        .toList()
-      ..sort();
+    final areas =
+        libDir
+            .listSync()
+            .whereType<Directory>()
+            .map((d) => p.basename(d.path))
+            .where(
+              (name) => name != 'ui_kit' && !dwIgnoredFolders.contains(name),
+            )
+            .toList()
+          ..sort();
 
     final trees = <String, List<DwFeatureNode>>{};
     for (final area in areas) {
@@ -120,14 +120,16 @@ class DwFlutterInspector {
 
   String _resolve(String relative) =>
       relative.startsWith(RegExp(r'([A-Za-z]:)?[/\\]'))
-          ? relative
-          : p.join(packageDir.path, relative);
+      ? relative
+      : p.join(packageDir.path, relative);
 
   String _readPackageName() {
     final pubspec = File(p.join(packageDir.path, 'pubspec.yaml'));
     if (!pubspec.existsSync()) return '';
-    final match = RegExp(r'^name:\s*(\S+)', multiLine: true)
-        .firstMatch(pubspec.readAsStringSync());
+    final match = RegExp(
+      r'^name:\s*(\S+)',
+      multiLine: true,
+    ).firstMatch(pubspec.readAsStringSync());
     return match?.group(1) ?? '';
   }
 
@@ -242,6 +244,11 @@ class DwFlutterInspector {
       'context.textTheme': 'context.textTheme',
       'context.colorTheme': 'context.colorTheme',
       'context.colorScheme': 'context.colorScheme',
+      // The longhand of the three above. Without it the rule is trivially
+      // sidestepped: `Theme.of(context).textTheme.bodySmall` reads as ordinary
+      // Flutter and passed the checker while `context.textTheme` did not.
+      'Theme.of(': 'Theme.of(context)',
+      'context.theme': 'context.theme',
     };
     for (final entry in forbiddenPatterns.entries) {
       if (content.contains(entry.key)) {
@@ -254,6 +261,34 @@ class DwFlutterInspector {
     }
 
     _checkImports(rel, content, owner);
+    _checkAssetPaths(rel, content, owner);
+  }
+
+  /// Asset paths are checked against the file system — this is what replaces
+  /// the guarantee a code generator used to give: a generated constant could
+  /// not name a file that does not exist, a hand-written one can.
+  void _checkAssetPaths(String rel, String content, String owner) {
+    final assetLiteral = RegExp(r"'(assets/[^']+)'");
+    for (final match in assetLiteral.allMatches(content)) {
+      final assetPath = match.group(1)!;
+
+      if (!File(p.join(packageDir.path, assetPath)).existsSync()) {
+        _add(
+          DwCheckType.assetPathMissing,
+          '$rel points at $assetPath, which does not exist',
+          owner,
+        );
+      }
+
+      if (!rel.startsWith('ui_kit/')) {
+        _add(
+          DwCheckType.forbiddenAssetPath,
+          '$rel spells out $assetPath — asset paths belong to the kit, and '
+          'the screen should receive a widget, not a file name',
+          owner,
+        );
+      }
+    }
   }
 
   void _checkImports(String rel, String content, String owner) {
@@ -303,7 +338,10 @@ class DwFlutterInspector {
     // Generated files are nobody's code: a `part of` directive added to
     // `assets.gen.dart` survives exactly until the next `flutter_gen` run, so
     // demanding one is demanding a chore that undoes itself.
-    final files = uiKitDir.listSync(recursive: true).whereType<File>().where(
+    final files = uiKitDir
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where(
           (f) =>
               f.path.endsWith('.dart') &&
               !f.path.endsWith('ui_kit.dart') &&
@@ -326,6 +364,7 @@ class DwFlutterInspector {
       }
 
       _checkUiKitTextConstants(rel, content);
+      _checkAssetPaths(rel, content, 'ui_kit');
     }
   }
 
@@ -344,7 +383,8 @@ class DwFlutterInspector {
 
       final value = match.group(1);
       // Skip paths, translations, interpolations, date formats and the like.
-      final isException = value == null ||
+      final isException =
+          value == null ||
           value.contains(RegExp(r'\.svg$|\.png$|\.dart$|\.json$')) ||
           value.startsWith('../') ||
           value.startsWith(r'$') ||
@@ -391,8 +431,10 @@ class DwFlutterInspector {
       }
       final areaLevel = byOwner[area];
       if (areaLevel != null) {
-        print('  ${_grade(areaLevel).badge}  (files directly in $area/) '
-            '· ${_countsLabel(areaLevel)}');
+        print(
+          '  ${_grade(areaLevel).badge}  (files directly in $area/) '
+          '· ${_countsLabel(areaLevel)}',
+        );
       }
     }
 
@@ -463,8 +505,9 @@ class DwFlutterInspector {
     final warnings = findings
         .where((f) => f.type.severity == DwCheckSeverity.warning)
         .length;
-    final infos =
-        findings.where((f) => f.type.severity == DwCheckSeverity.info).length;
+    final infos = findings
+        .where((f) => f.type.severity == DwCheckSeverity.info)
+        .length;
     return [
       if (errors > 0) '$errors error${errors == 1 ? '' : 's'}',
       if (warnings > 0) '$warnings warning${warnings == 1 ? '' : 's'}',

@@ -2,6 +2,21 @@
 
 ## 0.1.2
 
+- **`forbiddenUiUsage` now catches `Theme.of(context)` and `context.theme`.** It already flagged
+  `context.textTheme` and `context.colorScheme`, so the rule was sidesteppable by writing the same
+  thing the long way: `Theme.of(context).textTheme.bodySmall` reads as ordinary Flutter and passed
+  the checker while the short form did not. Both spellings mean a screen is styling itself.
+
+- **Asset paths are checked against the file system.** `assetPathMissing` (error) fires when a
+  string like `assets/icons/lock.png` names a file that is not there — nothing else catches it: the
+  code compiles and the screen renders a blank. `forbiddenAssetPath` (warning) fires on a raw asset
+  path outside `ui_kit/`, because a path spelled out in a screen survives a renamed file only by
+  accident and cannot be found by search.
+
+  Together these replace what a code generator used to guarantee. A generated constant could not
+  name a missing file; a hand-written one can — and DartWay projects now write them by hand, since
+  `build_runner` in the edit loop costs minutes per change and punishes the one who forgets to run
+  it with errors about code that is perfectly fine.
 - **The file-length thresholds are relaxed: nothing below 200 lines, a nudge above it,
   a warning above 350.** Length is the weakest signal the checker has, and a tight limit
   makes it lie — it flagged files that were long because they were well described. That
