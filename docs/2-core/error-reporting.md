@@ -51,7 +51,7 @@ Custom entries join every report: `dw.errorContext.set('tenant', 'acme')` or
 `dw.errorContext.register('cart', () => cart.id)`.
 
 Features come for free: any widget implementing `DwFeature` (see the example
-app) is picked up by `scanMountedFeatures()` at the moment of the error — the
+app) is picked up by `DwFeature.scanMounted()` at the moment of the error — the
 alert names the features of the screen where it happened.
 
 ## Custom policy
@@ -63,11 +63,12 @@ alerting steps aside automatically. The legacy `globalErrorHandler`
 
 ## Action labels and confirmations
 
-`DwUiAction.create` now takes a `label` (names the action in reports;
-notification texts are the fallback) and a `confirmation`:
+`dw.action(...)` — the only way to build a `DwUiAction`; its constructor is
+private — takes a `label` (names the action in reports; notification texts are
+the fallback) and a `confirmation`:
 
 ```dart
-DwUiAction.create(
+dw.action(
   (_) => dw.repo.saveModel(user.copyWith(role: role)),
   label: 'changeUserRole',
   confirmation: DwUiConfirmation('Change the role of $name?'),
