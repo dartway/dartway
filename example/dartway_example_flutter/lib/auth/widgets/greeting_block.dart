@@ -18,6 +18,11 @@ class GreetingBlock extends ConsumerWidget {
         const Spacer(
           flex: 2,
         ),
+        // The mark and the name a new project replaces first. The screen
+        // names an icon, not a file: swap the asset and the path in `AppIcon`,
+        // and nothing here changes.
+        const AppIconView(AppIcon.brandMark, size: 64),
+        const Gap(16),
         const AppText.title('DartWay.dev'),
         const Gap(12),
         AppText.body(context.l10n.completeLoginToContinue),

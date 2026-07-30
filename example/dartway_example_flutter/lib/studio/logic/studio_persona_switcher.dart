@@ -1,18 +1,15 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../core/dw_core.dart';
 import '../../core/router/router.dart';
-
-part 'studio_persona_switcher.g.dart';
 
 /// Programmatic sign-in with credentials received from Studio: the regular
 /// OTP flow, with the verification code Studio sent (the server accepts it
 /// when it matches the user's testVerificationCode / dev-mode code). No
 /// manual navigation — the router guards move the app between /auth and the
 /// club zone on session changes. State = busy flag.
-@Riverpod(keepAlive: true)
-class StudioPersonaSwitcher extends _$StudioPersonaSwitcher {
+class StudioPersonaSwitcher extends Notifier<bool> {
   @override
   bool build() => false;
 
@@ -82,3 +79,5 @@ class StudioPersonaSwitcher extends _$StudioPersonaSwitcher {
     }
   }
 }
+
+final studioPersonaSwitcherProvider = NotifierProvider<StudioPersonaSwitcher, bool>(StudioPersonaSwitcher.new);

@@ -33,24 +33,23 @@ dependencies:
 
   flutter_hooks: ^0.21.2
   hooks_riverpod: ^3.0.0
-  freezed_annotation: ^3.0.0
-  riverpod_annotation: ^3.0.0
 
   # UI-kit dependencies: the kit lives in this app's `lib/ui_kit/`, so its
   # packages belong to the app, not to the framework.
   device_frame: ^1.4.0
 
-  dartway_flutter: ^0.2.0
+  dartway_flutter: ^0.3.0
 
   dartway_router: ^1.1.1
 
   dartway_serverpod_core_flutter: ^0.2.3
 
-  dartway_studio_bridge: ^0.4.0
+  dartway_studio_bridge: ^0.5.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.5
+  flutter_svg: ^2.0.10+1
   gap: ^3.0.1
   pin_code_fields: ^8.0.1
   flutter_multi_formatter: ^2.13.8
@@ -62,10 +61,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  build_runner: ^2.4.11
-  freezed: ^3.0.0
-  riverpod_generator: ^3.0.0
-  flutter_gen_runner: ^5.10.0
 
   dartway_cli: ^0.1.0
 
@@ -110,11 +105,6 @@ flutter_native_splash:
     image: assets/dartway_splash_logo.png
     icon_background_color: "#05060C"
 
-flutter_gen:
-  output: lib/ui_kit/gen/
-  integrations:
-    image: true
-    flutter_svg: true
 
 # The following section is specific to Flutter.
 flutter:

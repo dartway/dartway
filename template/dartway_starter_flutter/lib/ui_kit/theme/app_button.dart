@@ -8,6 +8,10 @@ part of '../ui_kit.dart';
 /// validation). Everything below the guard is the app's: which Material widget,
 /// what it looks like, how "busy" is rendered.
 ///
+/// The look is the kit's, not the caller's: no colors, text styles or paddings
+/// cross the constructor — a new look is a new named constructor here, so that
+/// "primary" keeps meaning one thing across the app.
+///
 /// There is no width mode here. A Material button already hugs its content, and
 /// making one fill the row is the parent's job in Flutter — wrap it in a
 /// `SizedBox(width: double.infinity)` or an `Expanded`. [width] and [height] are
@@ -22,11 +26,6 @@ class AppButton extends StatelessWidget {
     this.showProgress = true,
     this.requireValidation = false,
     this.unfocusOnTap = true,
-    this.backgroundColor,
-    this.foregroundColor,
-    this.borderColor,
-    this.labelStyle,
-    this.padding,
     this.width,
     this.height,
   }) : _variant = _AppButtonVariant.primary;
@@ -40,11 +39,6 @@ class AppButton extends StatelessWidget {
     this.showProgress = true,
     this.requireValidation = false,
     this.unfocusOnTap = true,
-    this.backgroundColor,
-    this.foregroundColor,
-    this.borderColor,
-    this.labelStyle,
-    this.padding,
     this.width,
     this.height,
   }) : _variant = _AppButtonVariant.secondary;
@@ -58,11 +52,6 @@ class AppButton extends StatelessWidget {
     this.showProgress = true,
     this.requireValidation = false,
     this.unfocusOnTap = true,
-    this.backgroundColor,
-    this.foregroundColor,
-    this.borderColor,
-    this.labelStyle,
-    this.padding,
     this.width,
     this.height,
   }) : _variant = _AppButtonVariant.text;
@@ -81,14 +70,6 @@ class AppButton extends StatelessWidget {
 
   /// Drops keyboard focus before the action runs.
   final bool unfocusOnTap;
-
-  /// Per-call overrides of the variant's colors — a brand has exceptions, and
-  /// making the app fork the whole variant for one of them is how kits rot.
-  final Color? backgroundColor;
-  final Color? foregroundColor;
-  final Color? borderColor;
-  final TextStyle? labelStyle;
-  final EdgeInsetsGeometry? padding;
 
   /// An exact size, when the design really calls for one. To fill the available
   /// width, wrap the button instead — that is Flutter's own answer.
@@ -153,25 +134,20 @@ class AppButton extends StatelessWidget {
 
     return switch (_variant) {
       _AppButtonVariant.primary => ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor ?? cs.primary,
-        foregroundColor: foregroundColor ?? cs.onPrimary,
-        textStyle: labelStyle,
-        padding: padding ?? defaultPadding,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
+        padding: defaultPadding,
         shape: shape,
       ),
       _AppButtonVariant.secondary => OutlinedButton.styleFrom(
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor ?? cs.primary,
-        side: BorderSide(color: borderColor ?? cs.primary),
-        textStyle: labelStyle,
-        padding: padding ?? defaultPadding,
+        foregroundColor: cs.primary,
+        side: BorderSide(color: cs.primary),
+        padding: defaultPadding,
         shape: shape,
       ),
       _AppButtonVariant.text => TextButton.styleFrom(
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor ?? cs.primary,
-        textStyle: labelStyle,
-        padding: padding ?? defaultPadding,
+        foregroundColor: cs.primary,
+        padding: defaultPadding,
       ),
     };
   }

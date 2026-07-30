@@ -11,9 +11,12 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:intl/intl.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 export 'package:dartway_flutter/dartway_flutter.dart';
 
+part 'assets/app_icon.dart';
+part 'assets/app_icon_view.dart';
 part '1_essentials/app_checkbox.dart';
 part '1_essentials/app_text_form_field.dart';
 part '1_essentials/app_version_label.dart';

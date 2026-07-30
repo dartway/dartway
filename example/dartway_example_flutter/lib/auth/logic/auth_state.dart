@@ -1,19 +1,16 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../core/dw_core.dart';
 import 'auth_state_model.dart';
 import 'auth_step.dart';
-
-part 'auth_state.g.dart';
 
 /// Drives the phone-based auth flow on top of the DartWay framework auth:
 /// a [DwAuthRequest] (login/register, phone provider) is sent, the server
 /// replies `pendingVerification`, the user enters the code, and a
 /// [DwAuthVerification] exchanges it for an access token that completes the
 /// request and signs the user in.
-@riverpod
-class AuthState extends _$AuthState {
+class AuthState extends Notifier<AuthStateModel> {
   DwAuthRequest? _pendingRequest;
 
   @override
@@ -115,3 +112,5 @@ class AuthState extends _$AuthState {
     return success;
   }
 }
+
+final authStateProvider = NotifierProvider<AuthState, AuthStateModel>(AuthState.new);
