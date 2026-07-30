@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 /// Resolves a checkout of the DartWay monorepo to read `toolkit/` and
-/// `example/` from.
+/// `template/` from.
 ///
 /// Source priority:
 /// 1. an explicit local checkout (`--local-repo` or `DARTWAY_MONOREPO_DIR`) —
@@ -11,10 +11,9 @@ import 'package:path/path.dart' as p;
 /// 2. a shallow clone of [branch] cached in `~/.dartway/monorepo`.
 class MonorepoSource {
   MonorepoSource({required this.branch, String? localDir})
-    : localDir =
-          (localDir != null && localDir.isNotEmpty)
-              ? localDir
-              : Platform.environment['DARTWAY_MONOREPO_DIR'];
+    : localDir = (localDir != null && localDir.isNotEmpty)
+          ? localDir
+          : Platform.environment['DARTWAY_MONOREPO_DIR'];
 
   static const defaultRepoUrl = 'https://github.com/dartway/dartway.git';
   static const defaultBranch = 'stable';
@@ -48,14 +47,19 @@ class MonorepoSource {
     final cacheDir = _cacheDir;
     if (Directory(p.join(cacheDir.path, '.git')).existsSync()) {
       stdout.writeln('Updating DartWay monorepo cache (branch: $branch)...');
-      await _runGit(
-        ['fetch', '--depth', '1', 'origin', branch],
-        workingDirectory: cacheDir.path,
-      );
-      await _runGit(
-        ['checkout', '-B', branch, 'FETCH_HEAD'],
-        workingDirectory: cacheDir.path,
-      );
+      await _runGit([
+        'fetch',
+        '--depth',
+        '1',
+        'origin',
+        branch,
+      ], workingDirectory: cacheDir.path);
+      await _runGit([
+        'checkout',
+        '-B',
+        branch,
+        'FETCH_HEAD',
+      ], workingDirectory: cacheDir.path);
     } else {
       stdout.writeln('Cloning $repoUrl (branch: $branch)...');
       if (cacheDir.existsSync()) {

@@ -17,8 +17,9 @@ enum DwCheckType {
   /// Importing `ui_kit/*` files directly instead of the `ui_kit.dart` barrel.
   forbiddenUiKitImport,
 
-  /// A feature folder with more than one root file, or folders other than
-  /// `widgets/` and `logic/`.
+  /// A feature folder with more than one root file. A subfolder other than
+  /// `widgets/`/`logic/` is *not* reported here — it simply becomes a nested
+  /// node of the tree, and is judged as a feature or a group on its own.
   invalidFeatureStructure,
 
   /// A file longer than 200 lines — a nudge, nothing more. A meaningful
@@ -45,7 +46,20 @@ enum DwCheckType {
   /// A raw `assets/...` path outside `ui_kit/`. Asset paths live in one place
   /// in the kit — a path spelled out in a screen survives a renamed file only
   /// by accident, and cannot be found by search.
-  forbiddenAssetPath;
+  forbiddenAssetPath,
+
+  /// A file that only re-exports other files. It reads as convenience and acts
+  /// as a hole in the feature boundary: importers name the barrel, so reaching
+  /// into another feature's internals through it looks legitimate and the
+  /// import checks see nothing. One such file laundered three features' guts
+  /// until it was deleted.
+  barrelFile,
+
+  /// `Expanded` or an infinite `SizedBox` as the root of `build` — the widget
+  /// deciding how much room it gets. It works until someone puts it in a
+  /// bottom sheet or a scroll view, and then it throws at runtime while the
+  /// analyzer stays silent. Space is the parent's call.
+  widgetSizesItself;
 
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,

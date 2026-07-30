@@ -2,6 +2,17 @@
 
 ## 0.1.2
 
+- **Two more conventions the analyzer cannot see.** `barrelFile` (error) fires on a file that only
+  re-exports: it reads as convenience and acts as a hole in the feature boundary, because importers
+  name the barrel and reaching into another feature's guts through it looks legitimate — one such
+  file laundered three features' internals until it was deleted. `widgetSizesItself` (error) fires
+  on `Expanded` or `SizedBox.expand` opening a `build` body: the widget claims the parent's space
+  and throws in the first parent that is not a flex, while the analyzer stays silent.
+
+  `SizedBox(width: double.infinity)` was tried in the second check and taken back out. Inside a
+  bounded parent it only means "as wide as allowed", so every hit was arguable — and a check whose
+  findings are arguable teaches people to skip the checker.
+
 - **`forbiddenUiUsage` now catches `Theme.of(context)` and `context.theme`.** It already flagged
   `context.textTheme` and `context.colorScheme`, so the rule was sidesteppable by writing the same
   thing the long way: `Theme.of(context).textTheme.bodySmall` reads as ordinary Flutter and passed

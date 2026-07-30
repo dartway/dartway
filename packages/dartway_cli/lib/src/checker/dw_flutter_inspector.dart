@@ -15,9 +15,13 @@ import 'dw_feature_tree.dart';
 const dwFileLongThreshold = 200;
 const dwFileTooLongThreshold = 350;
 
-/// Areas whose folders are expected to be shaped as features. The remaining
-/// areas (`core/`, `data/`, `domain/`) hold infrastructure with a shape of its
-/// own, so only the file-level and import rules apply there.
+/// Areas whose folders are expected to be shaped as features.
+///
+/// The checker looks at these areas **and nothing else**: `core/`, `data/` and
+/// `domain/` are skipped entirely, not merely exempted from the structure
+/// rules. That is worth knowing, because a raw `TextStyle` in `data/` is as
+/// wrong as one in `app/` and currently goes unseen — widening the scope is an
+/// open decision, not an oversight to fix in passing.
 bool _isStructuralArea(String name) =>
     name.startsWith('app') ||
     name.startsWith('auth') ||
@@ -242,7 +246,6 @@ class DwFlutterInspector {
       'BorderRadius.': 'BorderRadius',
       'BorderRadius(': 'BorderRadius',
       'context.textTheme': 'context.textTheme',
-      'context.colorTheme': 'context.colorTheme',
       'context.colorScheme': 'context.colorScheme',
       // The longhand of the three above. Without it the rule is trivially
       // sidestepped: `Theme.of(context).textTheme.bodySmall` reads as ordinary
@@ -262,6 +265,72 @@ class DwFlutterInspector {
 
     _checkImports(rel, content, owner);
     _checkAssetPaths(rel, content, owner);
+    _checkBarrelFile(rel, content, owner);
+    _checkWidgetSizesItself(rel, content, owner);
+  }
+
+  /// A file whose whole body is `export` directives.
+  ///
+  /// Detected by what is left after comments, blank lines and directives are
+  /// removed: nothing but exports means the file carries no code of its own.
+  /// A single-line re-export of one symbol counts too — that is the same hole,
+  /// just smaller.
+  void _checkBarrelFile(String rel, String content, String owner) {
+    var exportCount = 0;
+
+    for (final line in content.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty ||
+          trimmed.startsWith('//') ||
+          trimmed.startsWith('/*') ||
+          trimmed.startsWith('*')) {
+        continue;
+      }
+      if (trimmed.startsWith('export ')) {
+        exportCount++;
+        continue;
+      }
+      return; // real code — not a barrel
+    }
+
+    if (exportCount == 0) return;
+
+    _add(
+      DwCheckType.barrelFile,
+      '$rel only re-exports ($exportCount export'
+      '${exportCount == 1 ? '' : 's'}) — import the real files instead; a '
+      'barrel hides which feature an import actually reaches into',
+      owner,
+    );
+  }
+
+  /// `Expanded` or `SizedBox.expand` opening a `build` body.
+  ///
+  /// Matched on the return that follows a `build` signature, so a legitimate
+  /// `Expanded` deeper in the tree — inside a `Column` the widget itself
+  /// builds — is not touched.
+  ///
+  /// Deliberately narrow. A bare `SizedBox(width: double.infinity)` was tried
+  /// here and taken back out: inside a bounded parent it only means "as wide as
+  /// allowed", so every hit was arguable — and a check whose findings are
+  /// arguable teaches people to skip the checker. These two are not arguable:
+  /// both throw in the first parent that does not offer unbounded space.
+  void _checkWidgetSizesItself(String rel, String content, String owner) {
+    final rootReturn = RegExp(
+      r'Widget\s+build\s*\([^)]*\)\s*(?:\{\s*return\s+|=>\s*)'
+      r'(Expanded|SizedBox\.expand)\s*\(',
+      dotAll: true,
+    );
+
+    for (final match in rootReturn.allMatches(content)) {
+      _add(
+        DwCheckType.widgetSizesItself,
+        '$rel returns ${match.group(1)} from build — the widget decides how '
+        'much room it gets, and breaks in the first parent that is not a flex; '
+        'let the caller wrap it',
+        owner,
+      );
+    }
   }
 
   /// Asset paths are checked against the file system — this is what replaces
