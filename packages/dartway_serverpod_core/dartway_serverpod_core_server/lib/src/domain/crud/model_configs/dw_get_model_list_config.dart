@@ -10,6 +10,7 @@ class DwGetModelListConfig<Model extends TableRow>
     extends DwGetConfigInterface<Model> implements DwGetListInterface<Model> {
   const DwGetModelListConfig({
     required super.accessFilter,
+    super.allowAnonymous,
     super.include,
     // this.additionalModelsFetchFunction,
     super.defaultOrderByList,

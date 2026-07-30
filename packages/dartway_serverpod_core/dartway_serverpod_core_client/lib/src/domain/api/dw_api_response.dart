@@ -49,6 +49,17 @@ class DwApiResponse<T> implements SerializableModel {
       warning = null,
       updatedModels = null;
 
+  /// The caller is not signed in and the config did not opt into anonymous
+  /// access. Distinct from [DwApiResponse.forbidden]: there the caller is
+  /// known and lacks permission, here there is no caller at all — the client
+  /// can act on that by sending the user to the login screen.
+  const DwApiResponse.notAuthenticated({String? source})
+    : isOk = false,
+      value = null,
+      error = 'Authentication required${source != null ? ' ($source)' : ''}',
+      warning = null,
+      updatedModels = null;
+
   final bool isOk;
   final T? value;
   final String? warning;

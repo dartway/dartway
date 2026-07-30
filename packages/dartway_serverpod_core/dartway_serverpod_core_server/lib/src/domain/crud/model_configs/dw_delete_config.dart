@@ -4,7 +4,17 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 class DwDeleteConfig<T extends TableRow> {
-  const DwDeleteConfig({this.allowDelete, this.afterDelete, this.broadcastTo});
+  const DwDeleteConfig({
+    this.allowAnonymous = false,this.allowDelete, this.afterDelete, this.broadcastTo});
+
+
+  /// Whether a caller who is not signed in may reach this operation.
+  ///
+  /// Defaults to `false`: a CRUD endpoint is reachable without a session, so
+  /// without this gate the operation is open to the internet. Not configured
+  /// means not allowed. Set it to `true` deliberately, and only for data that
+  /// genuinely precedes the login screen.
+  final bool allowAnonymous;
 
   final Future<bool> Function(Session session, T model)? allowDelete;
   final Future<List<TableRow>> Function(Session session, T model)? afterDelete;
@@ -24,18 +34,30 @@ class DwDeleteConfig<T extends TableRow> {
   final List<String> Function(Session session, T model)? broadcastTo;
 
   Future<DwApiResponse<bool>> delete(Session session, int modelId) async {
+    // Answer "not configured" before touching the database: without a rule for
+    // who may delete, there is nothing to decide and nothing to reveal.
+    if (allowDelete == null) {
+      return DwApiResponse.notConfigured(source: 'delete $T');
+    }
+
     final T? model = await session.db.findById<T>(modelId);
 
     if (model == null) {
+      // Known gap, narrowed but not closed: a caller who may not delete still
+      // tells a missing id ("ok") from a present one ("forbidden"). Anonymous
+      // probing is gone — the endpoint now rejects unauthenticated callers
+      // before this runs — so what remains is a signed-in user learning
+      // whether a row exists.
+      //
+      // Closing it fully means answering `forbidden` here too, which would
+      // report an error for the ordinary case of deleting a row someone else
+      // already removed. That trade is a product decision, not a default the
+      // framework should pick silently.
       return DwApiResponse(
         isOk: true,
         value: true,
         warning: 'Model not found, possibly deleted earlier',
       );
-    }
-
-    if (allowDelete == null) {
-      return DwApiResponse.notConfigured(source: 'delete $T');
     }
 
     if (true != await allowDelete?.call(session, model)) {

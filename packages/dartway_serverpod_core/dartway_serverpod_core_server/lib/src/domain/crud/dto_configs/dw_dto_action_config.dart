@@ -8,9 +8,19 @@ import '../../../private/dw_singleton.dart';
 
 class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
   const DwDtoActionConfig({
+    this.allowAnonymous = false,
     required this.actionProcessing,
     this.afterSaveSideEffects,
   });
+
+
+  /// Whether a caller who is not signed in may reach this operation.
+  ///
+  /// Defaults to `false`: a CRUD endpoint is reachable without a session, so
+  /// without this gate the operation is open to the internet. Not configured
+  /// means not allowed. Set it to `true` deliberately, and only for data that
+  /// genuinely precedes the login screen.
+  final bool allowAnonymous;
 
   final Future<List<DwModelWrapper>> Function(
     Session session,

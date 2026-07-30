@@ -12,12 +12,22 @@ class DwDtoGetListConfig<DTO extends SerializableModel, Model extends TableRow>
     with DwCrudEntity<DTO>
     implements DwGetListInterface<DTO> {
   const DwDtoGetListConfig({
+    this.allowAnonymous = false,
     required this.queryTable,
     required super.accessFilter,
     super.include,
     super.defaultOrderByList,
     required this.transformModelFunction,
   });
+
+
+  /// Whether a caller who is not signed in may reach this operation.
+  ///
+  /// Defaults to `false`: a CRUD endpoint is reachable without a session, so
+  /// without this gate the operation is open to the internet. Not configured
+  /// means not allowed. Set it to `true` deliberately, and only for data that
+  /// genuinely precedes the login screen.
+  final bool allowAnonymous;
 
   final Table queryTable;
 

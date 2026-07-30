@@ -8,6 +8,7 @@ import '../domain/dw_get_interface.dart';
 class DwGetModelConfig<T extends TableRow> extends DwGetConfigInterface<T> {
   const DwGetModelConfig({
     required super.accessFilter,
+    super.allowAnonymous,
     required this.filterPrototype,
     this.createIfMissing,
     super.include,

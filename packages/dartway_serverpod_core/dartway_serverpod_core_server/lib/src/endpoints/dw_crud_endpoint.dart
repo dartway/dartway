@@ -31,6 +31,16 @@ class DwCrudEndpoint extends Endpoint {
     return openChannelStream<SerializableModel>(session, channel);
   }
 
+  /// Rejects an unauthenticated caller unless the resolved config opted in.
+  ///
+  /// The gate lives here, per config, rather than on the endpoint: Serverpod's
+  /// `requireLogin` is all-or-nothing for a whole endpoint, and this one CRUD
+  /// endpoint serves every model — a public catalog and a private order list
+  /// share it. Checked before the config runs, so an unauthenticated caller
+  /// never reaches the database.
+  Future<bool> _isCallerAllowed(Session session, bool allowAnonymous) async =>
+      allowAnonymous || await session.currentUserProfileId != null;
+
   Future<DwApiResponse<DwModelWrapper>> getOne(
     Session session, {
     required String className,
@@ -58,6 +68,10 @@ class DwCrudEndpoint extends Endpoint {
 
       if (config == null) {
         return DwApiResponse.notConfigured(source: 'getOne for $className');
+      }
+
+      if (!await _isCallerAllowed(session, config.allowAnonymous)) {
+        return DwApiResponse.notAuthenticated(source: 'getOne for $className');
       }
 
       return await config.call(session, caller.table, filter);
@@ -91,7 +105,14 @@ class DwCrudEndpoint extends Endpoint {
       return DwApiResponse.notConfigured(source: 'getCount for $className');
     }
 
-    return await caller!.getListConfig!.getCount(
+    if (!await _isCallerAllowed(
+      session,
+      caller!.getListConfig!.allowAnonymous,
+    )) {
+      return DwApiResponse.notAuthenticated(source: 'getCount for $className');
+    }
+
+    return await caller.getListConfig!.getCount(
       session,
       whereClause: filter?.prepareWhere(caller.table),
     );
@@ -119,6 +140,10 @@ class DwCrudEndpoint extends Endpoint {
 
     if (caller == null) {
       return DwApiResponse.notConfigured(source: 'getAll for $className');
+    }
+
+    if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
+      return DwApiResponse.notAuthenticated(source: 'getAll for $className');
     }
 
     final table = caller is DwDtoGetListConfig
@@ -152,12 +177,22 @@ class DwCrudEndpoint extends Endpoint {
         if (caller == null || caller is! DwDtoActionConfig) {
           return DwApiResponse.notConfigured(source: 'saveModel $className');
         }
+        if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
+          return DwApiResponse.notAuthenticated(
+            source: 'saveModel $className',
+          );
+        }
         return await caller.save(session, model);
       } else {
         final caller = dw.getCrudConfig(className, api: apiGroup)?.saveConfig;
 
         if (caller == null) {
           return DwApiResponse.notConfigured(source: 'saveModel $className');
+        }
+        if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
+          return DwApiResponse.notAuthenticated(
+            source: 'saveModel $className',
+          );
         }
         return await caller.save(session, model);
       }
@@ -239,6 +274,10 @@ class DwCrudEndpoint extends Endpoint {
 
       if (caller == null) {
         return DwApiResponse.notConfigured(source: 'delete $className');
+      }
+
+      if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
+        return DwApiResponse.notAuthenticated(source: 'delete $className');
       }
 
       return await caller.delete(session, modelId);

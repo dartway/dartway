@@ -37,6 +37,7 @@ class _DwSaveRejection implements Exception {
 /// world around it.
 class DwSaveConfig<T extends TableRow> {
   const DwSaveConfig({
+    this.allowAnonymous = false,
     required this.allowSave,
     this.validateSave,
     this.beforeSaveTransaction,
@@ -49,6 +50,15 @@ class DwSaveConfig<T extends TableRow> {
 
   /// Who may save this model, on both insert and update. Required: a model
   /// with no rule is not saved by anyone.
+
+  /// Whether a caller who is not signed in may reach this operation.
+  ///
+  /// Defaults to `false`: a CRUD endpoint is reachable without a session, so
+  /// without this gate the operation is open to the internet. Not configured
+  /// means not allowed. Set it to `true` deliberately, and only for data that
+  /// genuinely precedes the login screen.
+  final bool allowAnonymous;
+
   final Future<bool> Function(Session session, DwSaveContext<T> saveContext)
   allowSave;
 

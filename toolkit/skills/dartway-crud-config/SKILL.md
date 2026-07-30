@@ -1,61 +1,78 @@
 ---
 name: dartway-crud-config
 description: >-
-  Серверный playbook DartWay/Serverpod: как писать CRUD-конфиги — DwCrudConfig<T> (одна на
-  модель), DwGetModelConfig, DwGetModelListConfig (оба требуют accessFilter), DwSaveConfig
+  The DartWay/Serverpod server playbook: how to write CRUD configs — DwCrudConfig<T> (one per
+  model), DwGetModelConfig, DwGetModelListConfig (both require accessFilter), DwSaveConfig
   (allowSave/validateSave/beforeSaveTransaction/afterSaveTransaction/afterSaveTransform/
   afterSaveSideEffects), DwDeleteConfig (allowDelete/afterDelete), DwModelWrapper,
-  Event-модели, границы domain(чистое)/app(session-aware). Вся серверная логика идёт через
-  конфиги, не через эндпоинты. Использовать при добавлении/изменении серверной логики, прав,
-  валидаций, сайд-эффектов для модели.
+  Event models, the domain(pure)/app(session-aware) boundary. All server logic goes through
+  configs, not through endpoints. Use when adding or changing server logic, permissions,
+  validations, or side effects for a model.
 ---
 
-# DartWay — CRUD-конфиги (сервер)
+# DartWay — CRUD configs (server)
 
-В DartWay **вся серверная логика идёт через CRUD-конфиги**, не через произвольные эндпоинты. Это даёт консистентность и предсказуемость. Конфиги — обёртки (`DwSaveConfig`, `DwDeleteConfig`, `DwGetModelConfig`, `DwGetModelListConfig`) с колбэками для прав, валидации, обработки и сайд-эффектов. См. также `__SERVER_PKG__/CLAUDE.md`.
+In DartWay, **all server logic goes through CRUD configs**, not through arbitrary endpoints. That buys consistency and predictability. The configs are wrappers (`DwSaveConfig`, `DwDeleteConfig`, `DwGetModelConfig`, `DwGetModelListConfig`) with callbacks for permissions, validation, processing, and side effects. See also `__SERVER_PKG__/CLAUDE.md`.
 
-## DwCrudConfig<T> — точка входа на модель
+## DwCrudConfig<T> — the entry point per model
 
-Одна `DwCrudConfig<T>` на модель агрегирует все правила — это место, куда смотрят и разработчик, и AI.
+One `DwCrudConfig<T>` per model aggregates all the rules — it is the place both the developer and the AI look at.
 
 ```dart
 final userProfileCrudConfig = DwCrudConfig<UserProfile>(
   table: UserProfile.t,
-  getModelConfigs: [ ... ],   // можно несколько
+  getModelConfigs: [ ... ],   // several are allowed
   getListConfig: ...,
   saveConfig: ...,
   deleteConfig: ...,
 );
 ```
 
-Не забудь зарегистрировать конфиг в `crudConfigurations` при `DwCore.init`. Если конфиг отсутствует → API вернёт `DwApiResponse.notConfigured`.
+Don't forget to register the config in `crudConfigurations` at `DwCore.init`. If the config is missing → the API returns `DwApiResponse.notConfigured`.
 
-## accessFilter — сердце secure-by-default
+## accessFilter — the heart of secure-by-default
 
-У обоих read-конфигов `accessFilter` — **обязательный** параметр: `(Session session) => Future<Expression?>`. Он возвращает SQL-условие, сужающее выборку под текущего пользователя, или `null` — «ограничений нет».
+Two separate questions, and until 0.3.0 they were conflated into one:
 
-Именно поэтому доступ нельзя забыть закрыть: нет конфига → модель не отдаётся вообще; есть конфиг → фильтр написан явно. `null` — это осознанное «видно всем залогиненным», а не умолчание.
+- **who may call at all** — `allowAnonymous`, default `false`;
+- **which rows they see** — `accessFilter`.
+
+`accessFilter` is a **required** parameter: `(Session session) => Future<Expression?>`. It returns an SQL condition narrowing the selection, or `null` — "no row restriction".
+
+**`null` here does not mean "signed-in users only".** It means no filter at all. Authentication is a separate gate: without `allowAnonymous: true` an unauthenticated caller is rejected before the config runs, with `DwApiResponse.notAuthenticated` — which the client can turn into "go to the login screen", unlike `forbidden`.
+
+That is what makes access closed by accident impossible: no config → the model is not served; a config exists → the filter is written explicitly, and reaching it requires a session unless the config says otherwise **in a word you can grep for**:
 
 ```dart
-/// Клиенты видят только свои записи, персонал — все.
+// A public catalog: readable before the login screen, deliberately.
+final clubServiceListConfig = DwGetModelListConfig<ClubService>(
+  allowAnonymous: true,
+  accessFilter: (session) async => null,
+);
+```
+
+Before 0.3.0 there was no such word. A CRUD endpoint does not require a session (Serverpod's `requireLogin` defaults to `false` and `DwCrudEndpoint` never overrode it), so an `accessFilter` returning `null` published the whole table to the internet — and this skill used to call that "visible to every logged-in user". If you are upgrading, walk every config whose filter can return `null` and decide which ones are genuinely public.
+
+```dart
+/// Clients see only their own bookings, staff see all of them.
 Future<Expression<dynamic>?> _bookingAccessFilter(Session session) async {
   if (await session.isStaffMember) {
-    return null; // ограничений нет
+    return null; // no restrictions
   }
   final userProfileId = await session.currentUserProfileId;
   return SessionBooking.t.clientProfileId.equals(userProfileId ?? -1);
 }
 ```
 
-Id текущего пользователя — `await session.currentUserProfileId` (не `session.userId`).
+The current user's id is `await session.currentUserProfileId` (not `session.userId`).
 
-## DwGetModelConfig — одна сущность по фильтру
+## DwGetModelConfig — a single entity by filter
 
-Параметры: `accessFilter` (**required**), `filterPrototype` (**required** — под какие запросы применяется), `createIfMissing` `(session, filter) => model`, `include` (eager-загрузка связей), `defaultOrderByList`. Можно несколько конфигов на модель — разные фильтры или разные права.
+Parameters: `accessFilter` (**required**), `filterPrototype` (**required** — which requests it applies to), `createIfMissing` `(session, filter) => model`, `include` (eager loading of relations), `defaultOrderByList`. A model may have several configs — different filters or different permissions.
 
-На сервере прототип строится специальными конструкторами: `DwBackendFilter.equalsPrototype(fieldName: ...)`, `.andPrototype(children: [...])`, `.orPrototype(children: [...])`. Голого `DwBackendFilter(...)` нет — конструктор приватный.
+On the server the prototype is built with dedicated constructors: `DwBackendFilter.equalsPrototype(fieldName: ...)`, `.andPrototype(children: [...])`, `.orPrototype(children: [...])`. There is no bare `DwBackendFilter(...)` — the constructor is private.
 
-Прототип описывает **форму** запроса (по какому полю и как сравниваем), а не значение: под него матчатся конкретные фильтры с клиента. На клиентской стороне фильтры не конструируются руками — там enum с `DwBackendFiltersMixin` и его `.equals()` / `.greaterThan()` (контракт — `dartway-data-layer`):
+The prototype describes the **shape** of the request (which field and how it is compared), not the value: concrete filters from the client are matched against it. On the client side filters are not built by hand — there you have an enum with `DwBackendFiltersMixin` and its `.equals()` / `.greaterThan()` (the contract is in `dartway-data-layer`):
 
 ```dart
 enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
@@ -63,7 +80,7 @@ enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
   startsAt<DateTime>();
 }
 
-// в data-layer: AppBackendFilters.clientProfileId.equals(userProfileId)
+// in the data layer: AppBackendFilters.clientProfileId.equals(userProfileId)
 ```
 
 ```dart
@@ -74,9 +91,9 @@ final userProfileGetConfig = DwGetModelConfig<UserProfile>(
 );
 ```
 
-## DwGetModelListConfig — список
+## DwGetModelListConfig — a list
 
-Параметры: `accessFilter` (**required**), `include`, `defaultOrderByList`.
+Parameters: `accessFilter` (**required**), `include`, `defaultOrderByList`.
 
 ```dart
 final clubSessionListConfig = DwGetModelListConfig<ClubSession>(
@@ -88,39 +105,39 @@ final clubSessionListConfig = DwGetModelListConfig<ClubSession>(
 );
 ```
 
-## DwSaveConfig — create + update (унифицировано)
+## DwSaveConfig — create + update (unified)
 
-**Все хуки имеют одну сигнатуру:** `(Session session, DwSaveContext<T> saveContext)`. Никаких `(initial, updated)` — и то и другое лежит в контексте.
+**All hooks share one signature:** `(Session session, DwSaveContext<T> saveContext)`. No `(initial, updated)` — both of them live in the context.
 
-`DwSaveContext<T>`: `currentModel` (модель на текущем шаге — её и правь), `initialModel` (что было в БД, null при insert), `isInsert`, `currentUserId`, `transaction`, `beforeUpdates`/`afterUpdates` (списки `DwModelWrapper` для клиента), `extras` (протащить данные между шагами).
+`DwSaveContext<T>`: `currentModel` (the model at the current step — this is the one you edit), `initialModel` (what was in the DB, null on insert), `isInsert`, `currentUserId`, `transaction`, `beforeUpdates`/`afterUpdates` (lists of `DwModelWrapper` for the client), `extras` (to carry data between steps).
 
-Порядок выполнения и сигнатуры:
+Execution order and signatures:
 
-1. `allowSave` → `Future<bool>` — права, **обязателен**
-2. `validateSave` → `Future<String?>` — текст ошибки или null
-3. **открывается транзакция:** `beforeSaveTransaction` → `Future<String?>` → insert/update → `afterSaveTransaction` → `Future<String?>`
-4. вне транзакции: `afterSaveTransform` → `Future<void>` (обогащение), затем `afterSaveSideEffects` → `Future<void>` (неблокирующе)
+1. `allowSave` → `Future<bool>` — permissions, **required**
+2. `validateSave` → `Future<String?>` — the error text or null
+3. **the transaction opens:** `beforeSaveTransaction` → `Future<String?>` → insert/update → `afterSaveTransaction` → `Future<String?>`
+4. outside the transaction: `afterSaveTransform` → `Future<void>` (enrichment), then `afterSaveSideEffects` → `Future<void>` (non-blocking)
 
-**Оба хука в транзакции возвращают `String?` — как `validateSave`.** Вернул текст → save отклоняется, транзакция откатывается, текст доходит до клиента; вернул `null` → идём дальше. Это и есть способ отказать по правилу, которое видно только внутри транзакции.
+**Both in-transaction hooks return `String?` — just like `validateSave`.** Returned text → the save is rejected, the transaction is rolled back, the text reaches the client; returned `null` → we move on. This is precisely how you reject on a rule that is only visible inside the transaction.
 
-**Зачем это, а не `validateSave`:** шаги 1–2 идут ДО транзакции, поэтому правило, стерегущее общий счётчик (места, остатки, лимиты), там гоняется — два параллельных сохранения оба получат «да». Проверяй такое правило в `beforeSaveTransaction`, взяв в той же транзакции **лок на строку**: `findById(..., transaction:, lockMode: LockMode.forUpdate)` — один вызов и лочит строку (`SELECT ... FOR UPDATE`), и возвращает её. `validateSave` проверяет модель, `beforeSaveTransaction` — мир вокруг неё.
+**Why this and not `validateSave`:** steps 1–2 run BEFORE the transaction, so a rule guarding a shared counter (seats, stock, limits) is evaluated there — two parallel saves would both get a "yes". Check such a rule in `beforeSaveTransaction`, taking a **row lock** in the same transaction: `findById(..., transaction:, lockMode: LockMode.forUpdate)` — a single call both locks the row (`SELECT ... FOR UPDATE`) and returns it. `validateSave` checks the model, `beforeSaveTransaction` checks the world around it.
 
-**Если правило зависит от текущего состояния самой строки** (роли, флаги согласий, баланс, признак удаления) — включи `lockInitialModelForUpdate: true`. Тогда на **апдейте** исходная модель перечитывается под `FOR UPDATE` внутри транзакции, и шаги 1–2 гоняются уже против неё: параллельное сохранение той же строки ждёт и перевалидируется против того, что реально закоммитили, вместо того чтобы пройти по устаревшему до-состоянию. Флаг опционален (по умолчанию `false`, цикл не меняется) и на insert не влияет — там ещё нечего лочить.
+**If the rule depends on the current state of the row itself** (roles, consent flags, balance, a deleted marker) — turn on `lockInitialModelForUpdate: true`. Then on an **update** the initial model is re-read under `FOR UPDATE` inside the transaction, and steps 1–2 are evaluated against it: a parallel save of the same row waits and gets re-validated against what was actually committed, instead of passing on a stale pre-state. The flag is optional (defaults to `false`, the cycle is unchanged) and has no effect on insert — there is nothing to lock yet.
 
-**Чтобы изменение увидели другие пользователи** — `broadcastTo` в конфиге: колбэк от контекста, возвращает список каналов, в которые улетают все затронутые сохранением модели. У подписчиков они роутятся по типу в любой `dw.repo.modelList<T>()`, и список перерисовывается сам — писать во Flutter ничего не надо (приложение подписано на публичный канал в корне).
+**To make other users see the change** — `broadcastTo` in the config: a callback over the context that returns the list of channels all the models touched by the save fly into. On the subscribers' side they are routed by type into any `dw.repo.modelList<T>()`, and the list redraws itself — nothing has to be written in Flutter (the app is subscribed to the public channel at the root).
 
 ```dart
-broadcastTo: (session, ctx) => [DwCoreConst.publicUpdatesChannel],   // публичная модель
-broadcastTo: (session, ctx) => ['chat:${ctx.currentModel.chatId}'],  // аудитория поуже
+broadcastTo: (session, ctx) => [DwCoreConst.publicUpdatesChannel],   // public model
+broadcastTo: (session, ctx) => ['chat:${ctx.currentModel.chatId}'],  // a narrower audience
 ```
 
-**Канал — это аудитория, которую фреймворк проверить не может:** улетит всё, что затронуло сохранение, каждому подписчику, независимо от `accessFilter`. Поэтому по умолчанию `null`, публичный канал — только для моделей, которые и так вправе читать все. Если сохраняется приватная строка, а публично поменялось что-то другое (бронь приватна, счётчик мест публичен) — не вешай `broadcastTo`, а выбери в `afterSaveSideEffects`, что именно отправить: `session.sendUpdates(channels: [...], updatedModels: [публичнаяМодель])`.
+**A channel is an audience the framework cannot verify:** everything the save touched flies out to every subscriber, regardless of `accessFilter`. Hence the default of `null`, and the public channel is only for models everyone is entitled to read anyway. If a private row is being saved while something else changed publicly (the booking is private, the seat counter is public) — do not attach `broadcastTo`; instead pick in `afterSaveSideEffects` what exactly to send: `session.sendUpdates(channels: [...], updatedModels: [publicModel])`.
 
 ```dart
 beforeSaveTransaction: (session, saveContext) async {
   if (!saveContext.isInsert) return null;
-  // Лочим и читаем занятие одним вызовом — конкурентные брони
-  // сериализуются на этой строке, продать сверх мест нельзя.
+  // Lock and read the session in one call — concurrent bookings
+  // serialize on this row, overselling seats is impossible.
   final clubSession = await ClubSession.db.findById(
     session,
     saveContext.currentModel.clubSessionId,
@@ -151,13 +168,13 @@ final clubSessionSaveConfig = DwSaveConfig<ClubSession>(
     if (saveContext.isInsert && clubSession.startsAt.isBefore(DateTime.now())) {
       return 'Session cannot start in the past';
     }
-    return null; // модель в порядке — пускаем
+    return null; // the model is fine — let it through
   },
   beforeSaveTransaction: (session, saveContext) async {
     saveContext.currentModel = saveContext.currentModel.copyWith(
       capacity: saveContext.currentModel.capacity.clamp(1, 100),
     );
-    return null; // претензий нет — иначе вернули бы текст ошибки
+    return null; // no objections — otherwise we would return the error text
   },
   afterSaveSideEffects: (session, saveContext) async {
     await AppNotifications.sendSessionUpdated(session, saveContext.currentModel);
@@ -165,13 +182,13 @@ final clubSessionSaveConfig = DwSaveConfig<ClubSession>(
 );
 ```
 
-Модель правится через `saveContext.currentModel`; связанные обновления для клиента кладутся в `saveContext.beforeUpdates` / `saveContext.afterUpdates`. Транзакционные хуки обязаны завершиться `return null`, если не отклоняют, — иначе analyzer поймает `body_might_complete_normally_nullable`.
+The model is edited through `saveContext.currentModel`; related updates for the client go into `saveContext.beforeUpdates` / `saveContext.afterUpdates`. Transactional hooks must end with `return null` when they do not reject — otherwise the analyzer will catch `body_might_complete_normally_nullable`.
 
-## DwDeleteConfig — удаление
+## DwDeleteConfig — deletion
 
-Параметры: `allowDelete` `(session, model) => bool` (без него → `notConfigured`), `afterDelete` `(session, model) => [related]`, `broadcastTo` `(session, model) => [каналы]` — симметрично save-конфигу. **Если модель вещает свои сохранения, она почти всегда обязана вещать и удаления**: иначе у остальных клиентов останется висеть строка, которой больше нет, и обнаружится это в самый неудачный момент. Если модель не найдена → ok с предупреждением. `DatabaseException` (например, FK) → ошибка.
+Parameters: `allowDelete` `(session, model) => bool` (without it → `notConfigured`), `afterDelete` `(session, model) => [related]`, `broadcastTo` `(session, model) => [channels]` — symmetric to the save config. **If a model broadcasts its saves, it almost always has to broadcast its deletions too**: otherwise the other clients keep a row hanging around that no longer exists, and that gets discovered at the worst possible moment. If the model is not found → ok with a warning. A `DatabaseException` (an FK, for example) → an error.
 
-**Важное ограничение:** у `DwDeleteConfig` нет ни before-хука, ни транзакции — `afterDelete` бежит **после** того, как строка уже удалена, без хендла транзакции. Гоночно-чувствительный пересчёт (освободить место, вернуть остаток на склад) здесь сделать нельзя. Если удаление должно атомарно менять общий счётчик — не удаляй строку, а делай **мягкое удаление статусом** через `DwSaveConfig` (`status: cancelled`): там есть транзакция и `beforeSaveTransaction` с локом. Пример — отмена записи на занятие.
+**An important limitation:** `DwDeleteConfig` has neither a before hook nor a transaction — `afterDelete` runs **after** the row has already been deleted, without a transaction handle. A race-sensitive recomputation (free up a seat, return stock to the warehouse) cannot be done here. If the deletion has to change a shared counter atomically — do not delete the row, do a **soft delete via a status** through `DwSaveConfig` (`status: cancelled`): there you have a transaction and `beforeSaveTransaction` with a lock. Example — cancelling a booking for a session.
 
 ```dart
 final userProfileDeleteConfig = DwDeleteConfig<UserProfile>(
@@ -182,18 +199,18 @@ final userProfileDeleteConfig = DwDeleteConfig<UserProfile>(
 );
 ```
 
-## Где какая логика
+## Which logic goes where
 
-- **Конфиги держи маленькими** — только права, проверки, обработка, сайд-эффекты.
-- **Чистая логика** (вычисления из полей, без Session/IO) → `/domain` (extensions на моделях).
-- **Workflow** (session-aware: внешние API, оркестрация) → `/app`.
-- **Транзакционные/денежные потоки** → Event-модели (`BalanceEvent`) вместо прямого апдейта поля: безопасность от гонок, аудит, единое место правил.
-- Все апдейты в ответах оборачивай в `DwModelWrapper`.
+- **Keep configs small** — permissions, checks, processing, side effects only.
+- **Pure logic** (computations from fields, no Session/IO) → `/domain` (extensions on models).
+- **Workflow** (session-aware: external APIs, orchestration) → `/app`.
+- **Transactional/money flows** → Event models (`BalanceEvent`) instead of updating a field directly: safety from races, an audit trail, one place for the rules.
+- Wrap all updates in responses in `DwModelWrapper`.
 
-## Custom endpoint — крайний случай
+## A custom endpoint — the last resort
 
-Только когда не ложится в CRUD (file upload/download — часто всё равно как модель `FileUploadRequest`, webhooks, тяжёлая async-обработка). Документировать как исключение.
+Only when it does not fit into CRUD (file upload/download — often still shaped as a `FileUploadRequest` model, webhooks, heavy async processing). Document it as an exception.
 
-## Workflow и тесты
+## Workflow and tests
 
-Модель в `/models` → `serverpod generate` → `create-migration` → `DwCrudConfig` в `/crud` → логика в `/domain` или `/app` → тесты. Юнит-тесты на каждый конфиг (права, валидация, pre/post, sideEffects) и Event-модели. Багфикс — сначала падающий тест на причину.
+Model in `/models` → `serverpod generate` → `create-migration` → a `DwCrudConfig` in `/crud` → logic in `/domain` or `/app` → tests. Unit tests for every config (permissions, validation, pre/post, sideEffects) and for Event models. A bugfix starts with a failing test for the cause.
