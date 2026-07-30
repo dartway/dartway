@@ -128,6 +128,115 @@ final deleteAction = dw.action<bool>(
 > Реальное имя — **`DwUiAction`** (46+ использований). `DwCallback` в проекте нет.
 > Отказ в confirm-диалоге отменяет действие целиком (без нотификаций и follow-up). Кастомный диалог — `DwConfig.confirmDialogBuilder`. Ошибки действий автоматически попадают в алертинг с контекстом (роут, фичи экрана, `label`) — см. доку error-reporting фреймворка.
 
+## 4a. Производное состояние — провайдер, а не сборка в виджете
+
+Состояние, выведенное **из нескольких источников** или содержащее правило, живёт в провайдере
+(`@riverpod`), а не собирается в `build`.
+
+```dart
+// ❌ виджет вручную сшивает три watch и подаёт их в функцию — пересчёт на каждой сборке
+final state = resolveSomething(
+  a: ref.watch(providerA), b: ref.watchUserProfile.flag, c: ref.watch(providerC),
+);
+
+// ✅ провайдер знает, откуда данные; чистая функция — что из них следует
+final state = ref.watch(somethingProvider(id: id));
+```
+
+**Пишем провайдер руками, без `riverpod_generator`** (см. политику кодогена в `CLAUDE.md`):
+
+```dart
+final courseLockStateProvider =
+    Provider.family<CourseLockState, ({int? courseId, int accessCourseId})>(
+  (ref, args) => CourseLockState.resolve(
+    userCourse: ref.watchUserCourseById(args.accessCourseId),
+    hidePaidFeaturesInfo: ref.watchUserProfile.hidePaidFeaturesInfo,
+    now: DateTime.now(),
+  ),
+);
+```
+
+**Семейный нотифаер тоже пишется руками.** `NotifierProvider.family` объявлен как
+`NotifierT Function(ArgT arg)` — аргумент приходит в фабрику, нотифаер принимает его конструктором:
+
+```dart
+class AudioControllerNotifier extends Notifier<AsyncValue<AudioControllerState>> {
+  AudioControllerNotifier(this._args);
+  final AudioControllerArgs _args;
+  @override
+  AsyncValue<AudioControllerState> build() { /* ... _args.mediaId ... */ }
+}
+
+final audioControllerProvider = NotifierProvider.family<
+    AudioControllerNotifier, AsyncValue<AudioControllerState>, AudioControllerArgs>(
+  AudioControllerNotifier.new,
+);
+```
+
+Так устроен и сам фреймворк (`DwModelListState(this.config)`). Внутренний `ref.$arg`, которым
+пользуется кодоген, рукописному классу не нужен — и трогать его нельзя, он `@internal`.
+
+**Ключ семейства — значение со значимым равенством.** Модели Serverpod сравниваются по identity:
+семейство по модели создаёт новый провайдер на каждой сборке, с пересчётом и авто-диспозом впустую.
+Ключ — идентификаторы или **рекорд** из них: у рекорда равенство по значению из коробки, поэтому
+ручной вариант здесь не проигрывает генератору, а выигрывает — без ожидания `build_runner`.
+
+**Провайдер не лезет во внутренности чужой фичи.** Расширения доступа к данным обычно объявлены на
+`WidgetRef`, а внутри провайдера доступен `Ref` — соблазн импортировать `logic/` соседней фичи
+велик и ловится только чекером. Правильный ход: **публичный файл той фичи даёт расширение на `Ref`**.
+
+**Не заводи локальное состояние поверх серверного.** Запись через `dw.repo` обновляет списки сама:
+«уже отправленные заявки» не нужно копить в `Set<int>` — ответ уже есть в списке, который экран и так
+watch-ит. Локальная копия серверной правды — второй источник, который может только разъехаться с первым.
+
+**Не заводи шимы над API фреймворка.** `ref.saveModel(...)`, пробрасывающий вызов в
+`dw.repo.saveModel(...)`, ничего не добавляет, но прячет настоящий API: на боевом проекте на такой
+прослойке жили 82 вызова, и половина команды не знала, что вызывает.
+
+### Подмена провайдера в тесте
+
+У **ручного** `NotifierProvider` нет `overrideWithValue` — этот метод есть только у провайдеров
+значения. Подменяется фабрика: наследник, который переопределяет `build()` готовым значением.
+
+```dart
+// ❌ не компилируется: overrideWithValue не определён для NotifierProvider
+overrides: [userCoursesStateProvider.overrideWithValue(userCourses)],
+
+// ✅ фейк-нотифаер: тест проверяет расширение над состоянием, а не его загрузку
+class _FixedUserCoursesState extends UserCoursesState {
+  _FixedUserCoursesState(this.fixedCourses);
+  final List<UserCourse> fixedCourses;
+  @override
+  List<UserCourse> build() => fixedCourses;
+}
+
+overrides: [
+  userCoursesStateProvider.overrideWith(() => _FixedUserCoursesState(userCourses)),
+],
+```
+
+**У семейства `overrideWith` принимает беспараметрную фабрику** — `() => notifier`, а не
+`(arg) => notifier`, хотя сам `NotifierProvider.family` объявлен как `NotifierT Function(ArgT)`.
+Подменяется всё семейство сразу, поэтому аргумент фейку отдаёшь сам через конструктор:
+
+```dart
+final fake = FakeAudioControllerNotifier(
+  const AudioControllerArgs(246, 'https://example.com/podcast.mp3'),
+);
+overrides: [audioControllerProvider.overrideWith(() => fake)],
+```
+
+Наследник семейного нотифаера обязан **пробросить аргумент в `super`** и переопределить
+беспараметрный `build()` — тот, что принимал аргументы, остался в кодогенном мире:
+
+```dart
+class FakeAudioControllerNotifier extends AudioControllerNotifier {
+  FakeAudioControllerNotifier(AudioControllerArgs args) : super(args);
+  @override
+  AsyncValue<AudioControllerState> build() => const AsyncValue.loading();
+}
+```
+
 ## 5. Уведомления — `dw.notify.*` (не `SnackBar`)
 
 **Зачем:** единый стиль тостов/нотификаций по всему приложению. Не дёргай `ScaffoldMessenger`/`SnackBar`/кастомные попапы.
