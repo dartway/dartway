@@ -72,7 +72,7 @@ Future<int> runDeploy(Command<int> command, ArgResults results) async {
     ssh: ssh,
   );
   var blocking = 0;
-  for (final check in dwLocalDeployChecks) {
+  for (final check in dwLocalDeployChecks.where((c) => c.partOfDeploy)) {
     final verdict = await check.evaluate(context);
     if (verdict.passed || verdict.skipped) {
       continue;

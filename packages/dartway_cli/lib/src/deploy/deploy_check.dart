@@ -92,6 +92,7 @@ class DwDeployCheck {
     required this.severity,
     required this.evaluate,
     this.requiresSsh = false,
+    this.partOfDeploy = true,
   });
 
   /// Stable identifier, safe to reference from scripts and issues.
@@ -105,6 +106,14 @@ class DwDeployCheck {
 
   /// Skipped rather than failed when the server is unreachable.
   final bool requiresSsh;
+
+  /// Whether a deployment evaluates this check.
+  ///
+  /// Some checks describe the secret-management workflow rather than a
+  /// precondition for deploying. Running those before every deploy puts a
+  /// warning in every CI log — which is how people learn to stop reading
+  /// warnings. `dartway deploy check` still reports them.
+  final bool partOfDeploy;
 
   final Future<DwDeployVerdict> Function(DwDeployContext context) evaluate;
 }
@@ -172,6 +181,10 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     title: 'The local passwords file covers this environment',
     stage: DwDeployCheckStage.local,
     severity: DwCheckSeverity.warning,
+    // A deployment never reads the master file — the server already holds its
+    // own slice. On CI, where the file is absent by design, this would warn on
+    // every single run.
+    partOfDeploy: false,
     evaluate: _checkPasswordsCoverEnvironment,
   ),
   DwDeployCheck(
