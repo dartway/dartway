@@ -24,7 +24,7 @@ setup-claude.sh / .ps1        # установщик (копия для новы
 | `__SERVER_PKG__` / `__CLIENT_PKG__` / `__FLUTTER_PKG__` / `__SHARED_PKG__` | имена Dart-пакетов | авто-детект по `*_server`/`*_client`/`*_flutter`/`*_shared` |
 | `__BASE_BRANCH__` | базовая ветка | параметр запуска установщика |
 
-Пути docs (`docs/2_features`, `docs/1_general`, `docs/audits`) — конвенция DartWay, зашиты как есть. Тикет в `/commit` передаётся аргументом, формат проверяет CI проекта.
+Пути docs (`docs/1_general`, `docs/audits`) — конвенция DartWay, зашиты как есть; отдельных доков на фичу нет, описание живёт в `DwFeatureSpec` рядом с кодом. Тикет в `/commit` передаётся аргументом, формат проверяет CI проекта.
 
 ## Подключение к клиентскому репо
 

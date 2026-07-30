@@ -23,7 +23,7 @@ description: >-
 
 ## Фаза B — Повторный анализ под выбранный вариант
 
-Точно определи, что и где трогаем (Glob/Grep/Read): конкретные модели `.spy.yaml`, CRUD-конфиги, flutter-фичи, доки (`code-anchors`). Что **переиспользуем** (существующие модели/виджеты/extensions), какие паттерны слоёв применяем — опирайся на `dartway-models`, `dartway-crud-config`, `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`, `dartway-feature-scaffold`.
+Точно определи, что и где трогаем (Glob/Grep/Read): конкретные модели `.spy.yaml`, CRUD-конфиги, flutter-фичи и их `DwFeatureSpec`. Что **переиспользуем** (существующие модели/виджеты/extensions), какие паттерны слоёв применяем — опирайся на `dartway-models`, `dartway-crud-config`, `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`, `dartway-feature-scaffold`.
 
 ## Фаза C — Пошаговый план
 
@@ -35,7 +35,7 @@ description: >-
 4. **Серверная логика** — `domain` (чистая) / `app` (session-aware).
 5. **Flutter** — навигация (роут) → entry point фичи → data-layer (watch/save) → UI Kit → specials. `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit`.
 6. **Тесты** — нетривиальная логика / Event-модели / права; багфикс — сначала падающий тест.
-7. **Доки** — обнови/заведи `docs/2_features/<FEATURE>.md` (шапка `code-anchors`/`last-verified`).
+7. **Описание** — сверь `DwFeatureSpec` фичи с новым поведением, серверные правила — doc-комментарии над CRUD-конфигом. Отдельный док на фичу не заводится.
 
 ## Фаза D — Нюансы и риски
 
@@ -49,7 +49,7 @@ description: >-
 - **Тесты** — новые/обновлённые зелёные; багфикс покрыт регрессом.
 - **Миграции** — применяются на чистой БД и поверх существующей.
 - **Права/доступ** — ведут себя как задумано.
-- **Доки** — фича обновлена (`code-anchors`/`last-verified`).
+- **Описание** — `DwFeatureSpec` фичи сверен с новым поведением.
 - **Перед PR** — прогнать **`dartway-finish`** (аудит диффа против контракта + docs-sync + тесты).
 
 ## Формат вывода
