@@ -1,26 +1,26 @@
 ---
 name: dartway-models
 description: >-
-  Серверные YAML-модели Serverpod в DartWay: файлы .spy.yaml в lib/src/models/<domain>/,
-  enum'ы в enums/. Base vs Event-модели (текущее состояние vs изменения над базой — для денег/
-  транзакций), типы полей и дисциплина nullable (nullable только если значение реально отсутствует
-  в домене), связи 1-1/1-N/N-N через relation(name=...) (двунаправленные — одинаковый name с обеих
-  сторон), onDelete=Cascade, indexes/unique, default=, enum-модели (serialized: byName). Workflow:
-  правка YAML → serverpod generate → create-migration → DwCrudConfig + регистрация в crudConfigurations
-  → миграции на старте. Использовать при создании/изменении моделей, полей, связей, enum'ов и схемы БД.
+  Server-side Serverpod YAML models in DartWay: .spy.yaml files in lib/src/models/<domain>/,
+  enums in enums/. Base vs Event models (current state vs changes on top of the base — for money/
+  transactions), field types and nullable discipline (nullable only if the value is genuinely absent
+  in the domain), 1-1/1-N/N-N relations via relation(name=...) (bidirectional — the same name on both
+  sides), onDelete=Cascade, indexes/unique, default=, enum models (serialized: byName). Workflow:
+  edit YAML → serverpod generate → create-migration → DwCrudConfig + registration in crudConfigurations
+  → migrations at startup. Use when creating or changing models, fields, relations, enums and the DB schema.
 ---
 
-# DartWay — модели (Serverpod, сервер)
+# DartWay — models (Serverpod, server)
 
-**Domain-first:** любая фича начинается с модели(ей) (закон №2). Модель отражает доменную реальность, а не сиюминутные нужды UI. Схема — единый источник; Flutter-модели генерируются из неё, руками не дублируются. См. также `__SERVER_PKG__/CLAUDE.md`, `dartway-crud-config`, `docs/1_general/SERVER_ARCHITECTURE.md`.
+**Domain-first:** every feature starts with its model(s) (Law 2). A model reflects domain reality, not the momentary needs of the UI. The schema is the single source; Flutter models are generated from it, never duplicated by hand. See also `__SERVER_PKG__/CLAUDE.md`, `dartway-crud-config`, `docs/1_general/SERVER_ARCHITECTURE.md`.
 
-## Где живут модели
+## Where models live
 
-- Файлы — **`lib/src/models/<domain>/<model>.spy.yaml`** (расширение `.spy.yaml`, не просто `.yaml`).
-- Enum'ы домена — в подпапке `enums/` рядом (`.spy.yaml` с `enum:`).
-- Имя класса — минимум 2 слова (`UserProfile`, `AnalyticsEvent`), `table` — snake_case.
+- Files — **`lib/src/models/<domain>/<model>.spy.yaml`** (the extension is `.spy.yaml`, not just `.yaml`).
+- Domain enums — in an `enums/` subfolder next to them (`.spy.yaml` with `enum:`).
+- A class name is at least 2 words (`UserProfile`, `AnalyticsEvent`), `table` is snake_case.
 
-## Структура модели
+## Model structure
 
 ```yaml
 class: UserProfile
@@ -28,90 +28,90 @@ table: user_profile
 fields:
   createdAt: DateTime
   userIdentifier: String
-  telegramId: String?              # nullable — значение реально может отсутствовать
-  isAdmin: bool, default=false     # default для не-nullable с разумным значением
+  telegramId: String?              # nullable — the value genuinely may be absent
+  isAdmin: bool, default=false     # default for a non-nullable with a sensible value
   email: String?
-  quizFinancialGoal: FinancialGoal?    # ссылка на enum-модель
+  quizFinancialGoal: FinancialGoal?    # reference to an enum model
   courses: List<UserCourse>?, relation(name=user_profile_courses)   # 1-N
-  completedLessonsIds: List<int>?      # примитивный список — без relation
+  completedLessonsIds: List<int>?      # primitive list — no relation
 indexes:
   user_profile_email_index:
     fields: email
     unique: true
 ```
 
-## Дисциплина nullable (важно)
+## Nullable discipline (important)
 
-**Зачем:** nullable-поля заражают весь стек проверками `?`/`!`. Делай поле nullable, **только если значение реально может отсутствовать в домене**.
+**Why:** nullable fields infect the whole stack with `?`/`!` checks. Make a field nullable **only if the value genuinely may be absent in the domain**.
 
 ```yaml
-# ❌ nullable «ради удобства редактирования формы»
-title: String?      # хотя у сущности всегда есть title
-# ✅ для form-state на флаттере — отдельная form-модель; в доменной модели поле обязательное
+# ❌ nullable "for the convenience of editing a form"
+title: String?      # even though the entity always has a title
+# ✅ for form state on Flutter — a separate form model; in the domain model the field is required
 title: String
-# ✅ default вместо nullable, когда есть осмысленное значение по умолчанию
+# ✅ a default instead of nullable, when there is a meaningful default value
 isDeleted: bool, default=false
 ```
 
-**Исключение — объектные поля связей.** У них `?` означает не «в домене может не быть», а «объект может быть не подгружен» (без `include` он и не приезжает). Правило выше к ним не применяй: почти всегда пиши `?`.
+**Exception — relation object fields.** For them `?` means not "may be absent in the domain" but "the object may not be loaded" (without `include` it does not arrive at all). Do not apply the rule above to them: almost always write `?`.
 
 ```yaml
-service: ClubService?, relation      # ✅ так и надо, даже если услуга обязательна
+service: ClubService?, relation      # ✅ this is exactly right, even if the service is mandatory
 coachProfile: UserProfile?, relation
 ```
 
-Обязательность связи задаёт не `?`, а сгенерированный FK: из объявления выше генератор делает **required** `serviceId` / `coachProfileId`. То есть `ClubSession(serviceId: ..., coachProfileId: ...)` не собрать без них, а `clubSession.service` останется null, пока не запросишь с `include`. Два ортогональных понятия: `?` — про загрузку, FK — про домен.
+Whether a relation is mandatory is defined not by `?` but by the generated FK: from the declaration above the generator produces a **required** `serviceId` / `coachProfileId`. That is, `ClubSession(serviceId: ..., coachProfileId: ...)` cannot be constructed without them, while `clubSession.service` stays null until you query with `include`. Two orthogonal notions: `?` is about loading, the FK is about the domain.
 
-## Base vs Event-модели
+## Base vs Event models
 
-**Зачем:** для транзакционных/денежных потоков опасно менять поле базовой модели напрямую (гонки, нет аудита, правила размазаны). Event-модель фиксирует **изменение над базой**.
+**Why:** for transactional/money flows it is dangerous to change a base model's field directly (races, no audit trail, rules smeared around). An Event model records **a change on top of the base**.
 
-- **Base** — текущее состояние сущности (`UserProfile`).
-- **Event** — событие/изменение (`AnalyticsEvent`, `BalanceEvent`). Не меняй `UserProfile.balance` напрямую — создавай `BalanceEvent`: безопасность от гонок, аудит, единое место бизнес-правил (3 уровня усложнения логики — Event-модели идут первыми, до конфигурации CRUD и тем более custom-эндпоинтов).
+- **Base** — the entity's current state (`UserProfile`).
+- **Event** — an event/change (`AnalyticsEvent`, `BalanceEvent`). Do not change `UserProfile.balance` directly — create a `BalanceEvent`: safety from races, an audit trail, a single place for business rules (of the 3 levels of increasing logic complexity, Event models come first, before CRUD configuration and long before custom endpoints).
 
-## Связи (всегда явные)
+## Relations (always explicit)
 
-**Зачем:** связи описаны в схеме, а не выводятся из id руками. Двунаправленная связь — **одинаковый `relation(name=...)` с обеих сторон**.
+**Why:** relations are described in the schema, not derived from ids by hand. A bidirectional relation means **the same `relation(name=...)` on both sides**.
 
 ```yaml
-# UserProfile (одна сторона 1-N)
+# UserProfile (one side of 1-N)
 courses: List<UserCourse>?, relation(name=user_profile_courses)
 
-# UserCourse (другая сторона — тот же name)
+# UserCourse (the other side — the same name)
 userProfile: UserProfile?, relation(name=user_profile_courses, onDelete=Cascade)
-course: LearningCourse?, relation(onDelete=Cascade)   # односторонняя ссылка — name не обязателен
+course: LearningCourse?, relation(onDelete=Cascade)   # one-way reference — name is not required
 ```
 
-- 1-1 / 1-N / N-N — все явные. `onDelete=Cascade` — каскадное удаление зависимых.
-- Поля связей с пользователем — со словом **Profile** в имени (`userProfileId`, `authorProfileId`) — закон нейминга №5.
+- 1-1 / 1-N / N-N — all explicit. `onDelete=Cascade` — cascading deletion of dependents.
+- Fields relating to the user carry the word **Profile** in the name (`userProfileId`, `authorProfileId`) — naming law 5.
 
-## Enum-модели
+## Enum models
 
 ```yaml
 enum: AnalyticsAccessType
-serialized: byName        # byName — устойчиво к перестановке значений (предпочтительно)
+serialized: byName        # byName — resilient to reordering values (preferred)
 values:
   - free
   - paid
   - trial
 ```
 
-## Workflow изменения модели
+## Model change workflow
 
-1. Правишь/добавляешь `.spy.yaml` в `lib/src/models/<domain>/`.
-2. `dart run serverpod generate` — обновляет generated + `__CLIENT_PKG__`.
-3. `dart run serverpod create-migration` (`--force` только на раннем MVP, если старые миграции можно перезаписать).
-4. Настраиваешь `DwCrudConfig` в `/crud` (см. `dartway-crud-config`) и **регистрируешь в `crudConfigurations`** при `DwCore.init` — иначе API вернёт `notConfigured`.
-5. Логика: `/domain` (чистая) или `/app` (session-aware).
-6. Миграции применяются на старте (`--apply-migrations`) или `dart run serverpod migrate`.
-7. Тесты (юнит на конфиг и Event-модели).
+1. Edit/add a `.spy.yaml` in `lib/src/models/<domain>/`.
+2. `dart run serverpod generate` — updates the generated code + `__CLIENT_PKG__`.
+3. `dart run serverpod create-migration` (`--force` only in early MVP, if the old migrations can be overwritten).
+4. Set up `DwCrudConfig` in `/crud` (see `dartway-crud-config`) and **register it in `crudConfigurations`** at `DwCore.init` — otherwise the API returns `notConfigured`.
+5. Logic: `/domain` (pure) or `/app` (session-aware).
+6. Migrations are applied at startup (`--apply-migrations`) or via `dart run serverpod migrate`.
+7. Tests (unit tests for the config and Event models).
 
-## Чек-лист модели
+## Model checklist
 
-- [ ] Файл `.spy.yaml` в `lib/src/models/<domain>/`; enum'ы — в `enums/`.
-- [ ] Имя класса ≥2 слов; `table` snake_case.
-- [ ] Nullable — только если значение реально отсутствует в домене (не «ради формы»); где уместно — `default=`.
-- [ ] Связи явные; двунаправленные — одинаковый `relation(name=...)` с обеих сторон; поля связей с пользователем со словом `Profile`.
-- [ ] Транзакционная/денежная логика — через Event-модель, а не прямой апдейт поля.
-- [ ] После правки: `serverpod generate` → `create-migration`; новая модель добавлена в `crudConfigurations` с `DwCrudConfig`.
+- [ ] A `.spy.yaml` file in `lib/src/models/<domain>/`; enums in `enums/`.
+- [ ] Class name ≥2 words; `table` snake_case.
+- [ ] Nullable only if the value is genuinely absent in the domain (not "for the form's sake"); where appropriate — `default=`.
+- [ ] Relations are explicit; bidirectional ones use the same `relation(name=...)` on both sides; fields relating to the user carry the word `Profile`.
+- [ ] Transactional/money logic goes through an Event model, not a direct field update.
+- [ ] After editing: `serverpod generate` → `create-migration`; the new model is added to `crudConfigurations` with a `DwCrudConfig`.
 - [ ] Enum — `serialized: byName`.

@@ -1,28 +1,28 @@
 ---
-description: Закоммитить изменения текущей ветки в формате, который проверяет CI
-argument-hint: "<TICKET> (напр. PROJ-123)"
+description: Commit the current branch's changes in the format the CI checks
+argument-hint: "<TICKET> (e.g. PROJ-123)"
 ---
 
-Проанализируй все изменения в текущей ветке и сделай коммит с точным описанием того, что сделано, **на английском**, кратко.
+Analyze all the changes in the current branch and make a commit with a precise description of what was done, **in English**, briefly.
 
-## Тикет — обязательный аргумент
+## The ticket is a required argument
 
-Номер тикета передаётся **аргументом команды**: `$ARGUMENTS` (напр. `PROJ-123`). Из имени ветки тикет **не** вытягиваем. Если аргумент пуст — остановись и попроси номер тикета, не коммить.
+The ticket number is passed as a **command argument**: `$ARGUMENTS` (e.g. `PROJ-123`). We do **not** pull the ticket out of the branch name. If the argument is empty — stop and ask for the ticket number, do not commit.
 
-## Формат первой строки
+## The format of the first line
 
-`<type>: <краткое описание> #<TICKET>`
+`<type>: <short description> #<TICKET>`
 
-- `<type>` — `feat`, `fix` или `chore` (строчными), затем `: ` (двоеточие + один пробел). Определи по смыслу изменений.
-- `<краткое описание>` — на английском, лаконично, что сделано; латиница/цифры/пробелы/`-`/`.`/`_`.
-- `#<TICKET>` — `#` + переданный аргумент (напр. `#PROJ-123`).
+- `<type>` — `feat`, `fix` or `chore` (lowercase), then `: ` (a colon plus one space). Determine it from the meaning of the changes.
+- `<short description>` — in English, terse, what was done; latin letters/digits/spaces/`-`/`.`/`_`.
+- `#<TICKET>` — `#` + the argument passed in (e.g. `#PROJ-123`).
 
-Примеры:
+Examples:
 
 - `fix: stabilize quiz result option bar layout #PROJ-58`
 - `feat: add survey redirect condition #PROJ-149`
 - `chore: add local docker dev setup #PROJ-14`
 
-Точный формат тикета (префикс, регистр) задаёт CI проекта — финальную проверку делает он; см. `CLAUDE.md`/README проекта, если нужно подтвердить. Тело коммита (после пустой строки) — по желанию, сохраняй полезный контекст как принято в проекте.
+The exact ticket format (prefix, case) is set by the project's CI — it does the final check; see the project's `CLAUDE.md`/README if you need to confirm. The commit body (after a blank line) is optional; keep useful context the way the project does.
 
-Сначала определи тип (`feat`/`fix`/`chore`) по смыслу изменений, собери одну корректную первую строку с переданным тикетом и выполни коммит.
+First determine the type (`feat`/`fix`/`chore`) from the meaning of the changes, assemble one correct first line with the ticket passed in, and make the commit.

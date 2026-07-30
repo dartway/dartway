@@ -1,55 +1,57 @@
 # DartWay Claude Toolkit
 
-Обвязка Claude Code для приложений на DartWay: переиспользуемые скиллы и команды `dartway-*`. **Единый источник правды** — папка `toolkit/` монорепо `dartway`: скиллы версионируются и эволюционируют вместе с кодом фреймворка (изменение публичного API пакета обновляет затронутые скиллы в том же PR — см. корневой `CLAUDE.md` монорепо).
+The Claude Code harness for DartWay apps: reusable `dartway-*` skills and commands. **The single source of truth** is the `toolkit/` folder of the `dartway` monorepo: the skills are versioned and evolve together with the framework code (a change to a package's public API updates the affected skills in the same PR — see the monorepo's root `CLAUDE.md`).
 
-В клиентские репо обвязка ставится скриптом и **коммитится** (`.claude/` — генерируемый-но-коммитимый артефакт, как Serverpod-клиент): клонировал проект — скиллы уже на месте, история фиксирует, с какими скиллами писался код, обновление — осознанное действие с видимым диффом. Установщик перезаписывает **только управляемые файлы** (`CLAUDE.md`, скиллы `dartway-*`, команды `commit`/`dartway-audit`) — собственные скиллы и команды проекта живут рядом под своими именами и не трогаются. Хочешь кастомизировать dartway-скилл — скопируй под другим именем.
+In client repos the harness is installed by a script and **committed** (`.claude/` is a generated-but-committed artifact, like the Serverpod client): you clone the project and the skills are already there, the history records which skills the code was written with, and updating is a deliberate action with a visible diff. The installer overwrites **only the managed files** (`CLAUDE.md`, the `dartway-*` skills, the `commit`/`dartway-audit` commands) — the project's own skills and commands live alongside under their own names and are left alone. Want to customize a dartway skill — copy it under a different name.
 
-## Структура
+## Structure
 
 ```
-CLAUDE.md                     # generic-методология (always-in-context «мозг»): законы, нейминг,
-                              #   слои server/flutter/shared/client, каталог скиллов; ставится как .claude/CLAUDE.md
-skills/dartway-*/SKILL.md     # методология DartWay (clean-code, models, crud-config, data-layer,
-                              #   navigation, ui-kit, feature-scaffold, finish)
+CLAUDE.md                     # the generic methodology (the always-in-context "brain"): laws, naming,
+                              #   the server/flutter/shared/client layers, the skill catalog; installed as .claude/CLAUDE.md
+skills/dartway-*/SKILL.md     # the DartWay methodology — 12 skills: requirements, plan, run,
+                              #   feature-scaffold, models, crud-config, data-layer, navigation,
+                              #   ui-kit, clean-code, push-delivery, finish
 commands/{commit,dartway-audit}.md
-setup-claude.sh / .ps1        # установщик (копия для новых клиентских репо)
+setup-claude.sh / .ps1        # legacy installers, superseded by `dartway setup-ai` — nothing calls them
 ```
 
-`CLAUDE.md` ставится в `.claude/CLAUDE.md` (gitignored), который Claude Code автоматически держит в контексте — поэтому проектных `CLAUDE.md` в клиентском репо не нужно: методология едет из тулкита, а проектное знание живёт в `docs/`.
+`CLAUDE.md` is installed as `.claude/CLAUDE.md` and committed with the project, which Claude Code automatically keeps in context — which is why a client repo needs no project `CLAUDE.md` files: the methodology rides in from the toolkit, and project knowledge lives in `docs/`.
 
-Скиллы — **generic**: проектные значения вынесены в плейсхолдер-токены, которые установщик подставляет при инсталляции:
+The skills are **generic**: project-specific values are extracted into placeholder tokens that the installer substitutes at install time:
 
-| Токен | Значение | Откуда |
+| Token | Value | Where from |
 |---|---|---|
-| `__SERVER_PKG__` / `__CLIENT_PKG__` / `__FLUTTER_PKG__` / `__SHARED_PKG__` | имена Dart-пакетов | авто-детект по `*_server`/`*_client`/`*_flutter`/`*_shared` |
-| `__BASE_BRANCH__` | базовая ветка | параметр запуска установщика |
+| `__SERVER_PKG__` / `__CLIENT_PKG__` / `__FLUTTER_PKG__` / `__SHARED_PKG__` | the Dart package names | auto-detected by `*_server`/`*_client`/`*_flutter`/`*_shared` |
+| `__BASE_BRANCH__` | the base branch | a parameter of the installer run |
 
-Пути docs (`docs/1_general`, `docs/audits`) — конвенция DartWay, зашиты как есть; отдельных доков на фичу нет, описание живёт в `DwFeatureSpec` рядом с кодом. Тикет в `/commit` передаётся аргументом, формат проверяет CI проекта.
+The docs paths (`docs/1_general`, `docs/audits`) are a DartWay convention, hardcoded as-is; there are no separate per-feature docs, the description lives in `DwFeatureSpec` next to the code. The ticket for `/commit` is passed as an argument, and the project's CI checks the format.
 
-## Подключение к клиентскому репо
+## Wiring it into a client repo
 
-В клиентский репо кладётся `tools/dw_claude_setup/setup-claude.{sh,ps1}` (копия отсюда) + строка `tools/dw_claude_setup/.toolkit/` в `.gitignore` (кэш клона; сам `.claude/` — коммитится). Затем:
+Installed by the CLI — the shell scripts it replaced are gone:
 
 ```bash
-./tools/dw_claude_setup/setup-claude.sh <base-branch>      # напр. develop
+dart pub global activate dartway_cli
+dartway setup-ai                      # in the project root
 ```
 
-Установщик клонит/пуллит монорепо `dartway` (по умолчанию ветка **`stable`** — последнее проверенное состояние; канал можно сменить через `DARTWAY_BRANCH=master`), берёт из него `toolkit/`, детектит пакеты, подставляет токены и наполняет `.claude/`.
+It clones or pulls the `dartway` monorepo (the **`stable`** branch by default — the last verified
+state), takes `toolkit/` from it, detects the packages, substitutes the tokens and fills `.claude/`.
+Commit `.claude/` afterwards: it is a generated-but-committed artifact, like the Serverpod client.
 
-> Скрипты — временное решение: их заменит `dartway_cli` (`dartway create` / `dartway setup-ai`), который после выхода пакетов на pub.dev будет брать скиллы из `.pub-cache` точно под версию пакетов проекта.
+## Developing the toolkit
 
-## Разработка тулкита
-
-Правь скиллы **здесь** (в `toolkit/` монорепо) и пушь. Быстрый цикл правка→тест — ставить в реальный проект из локального чекаута:
+Edit the skills **here** (in the monorepo's `toolkit/`) and push. For a fast edit→test cycle, install into a real project from a local checkout:
 
 ```bash
-DARTWAY_TOOLKIT_DIR=../dartway/toolkit ./tools/dw_claude_setup/setup-claude.sh develop
+dartway setup-ai --local-repo ../dartway    # or DARTWAY_MONOREPO_DIR=../dartway
 ```
 
-Правка → re-run setup в проекте → тест → `git push`. Обратной синхронизации нет: источник правды всегда здесь.
+Edit → re-run `setup-ai` in the project → test → `git push`. There is no reverse sync: the source of truth is always here.
 
-Инвариант: в `CLAUDE.md`, `skills/` и `commands/` **не должно быть проектных литералов** — только токены `__*__`. Проверка:
+The invariant: `CLAUDE.md`, `skills/` and `commands/` **must contain no project literals** — only `__*__` tokens. The check:
 
 ```bash
-grep -rniE 'tvolkova|tvaity|kerla|RAZRABOTKA|BAGI|DEVOPS' CLAUDE.md skills commands   # должно быть пусто
+grep -rniE 'tvolkova|tvaity|kerla|RAZRABOTKA|BAGI|DEVOPS' CLAUDE.md skills commands   # must be empty
 ```

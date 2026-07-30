@@ -1,89 +1,89 @@
 ---
 name: dartway-requirements
 description: >-
-  Анализ требований ПЕРЕД началом dartway-задачи (DartWay-проекты): разработчик даёт спеку —
-  скилл глубоко изучает, что в проекте уже есть по теме (модели, CRUD-конфиги, фичи, доки),
-  выявляет возможности рефакторинга и улучшения качества кода в затрагиваемой фиче по контракту
-  dartway-clean-code (долг-блокеры vs смежный долг), формирует пул уточняющих вопросов и
-  предлагает 2–3 варианта реализации по 3-уровневой лестнице DartWay (Event-модели →
-  конфигурация CRUD → custom endpoint) с ограничениями, трейдоффами, рисками и грубой оценкой
-  времени. Read-only: ничего не пишет, только отчёт. Запускается как /dartway-requirements в
-  начале работы над фичей/задачей — до планирования и кода.
+  Requirements analysis BEFORE starting a DartWay task (DartWay projects): the developer gives a spec —
+  the skill studies in depth what the project already has on the topic (models, CRUD configs, features, docs),
+  identifies refactoring and code-quality opportunities in the affected feature per the
+  dartway-clean-code contract (blocking debt vs adjacent debt), assembles a pool of clarifying questions and
+  proposes 2–3 implementation options along the 3-level DartWay ladder (Event models →
+  CRUD configuration → custom endpoint) with constraints, tradeoffs, risks and a rough time
+  estimate. Read-only: writes nothing, only a report. Run as /dartway-requirements at the
+  start of work on a feature/task — before planning and code.
 ---
 
-# DartWay — анализ требований (`dartway-requirements`)
+# DartWay — requirements analysis (`dartway-requirements`)
 
-Первый шаг dartway-задачи: превратить сырую спеку в понятный, обоснованный набор решений. Скилл **read-only** — изучает проект и выдаёт отчёт (что есть + вопросы + варианты), **не трогает код** и не пишет план (это следующий шаг — `dartway-plan`).
+The first step of a DartWay task: turn a raw spec into a clear, justified set of decisions. The skill is **read-only** — it studies the project and produces a report (what exists + questions + options), **does not touch the code** and does not write a plan (that is the next step — `dartway-plan`).
 
-## ⛔ Принцип
+## ⛔ Principle
 
-Не предлагай решение, пока не понял, **что уже есть в проекте**. DartWay — domain-first и CRUD-first: почти всё делается через модели и CRUD-конфиги, а не новые эндпоинты (законы №1, №2, №4). Переиспользуй существующее, не плоди дубли. Решение должно отражать доменную реальность, а не сиюминутный UI.
+Do not propose a solution before you understand **what the project already has**. DartWay is domain-first and CRUD-first: almost everything is done through models and CRUD configs, not new endpoints (laws 1, 2, 4). Reuse what exists, do not breed duplicates. The solution must reflect domain reality, not the momentary UI.
 
-## Фаза A — Разбор спеки
+## Phase A — Parsing the spec
 
-Распарси требование: какая пользовательская/бизнес-цель, какой скоуп, какие сущности и действия упоминаются. Вычлени **неявные допущения и пробелы** — то, чего спека не говорит, но что придётся решить. Не достраивай молча — это материал для вопросов (Фаза D).
+Parse the requirement: what user/business goal, what scope, which entities and actions are mentioned. Extract the **implicit assumptions and gaps** — what the spec does not say but what will have to be decided. Do not fill them in silently — this is material for the questions (Phase D).
 
-## Фаза B — Анализ кодовой базы (read-only)
+## Phase B — Codebase analysis (read-only)
 
-Найди всё, что уже относится к теме (Glob/Grep/Read; для широкого охвата — Explore-субагенты):
+Find everything already related to the topic (Glob/Grep/Read; for broad coverage — Explore subagents):
 
-- **Модели** — есть ли подходящие `.spy.yaml` (поля, связи, enum'ы): что переиспользовать, что расширить, чего не хватает. Domain-first (`dartway-models`).
-- **CRUD/логика** — существующие `DwCrudConfig`, права (`allowSave`/`allowDelete`), валидации, сайд-эффекты (`dartway-crud-config`).
-- **Фичи** — близкие фичи во flutter (entry point, флоу), что переиспользуемо; помни про изоляцию фич.
-- **Текущее поведение** — читай `DwFeatureSpec` затронутых фич (в их публичных файлах) и `knownIssues` там же: что уже признано неправильным, скорее всего и есть предмет задачи. Архитектура и сквозные соглашения — `docs/1_general/*`.
+- **Models** — are there suitable `.spy.yaml` files (fields, relations, enums): what to reuse, what to extend, what is missing. Domain-first (`dartway-models`).
+- **CRUD/logic** — existing `DwCrudConfig`, permissions (`allowSave`/`allowDelete`), validations, side effects (`dartway-crud-config`).
+- **Features** — nearby features in Flutter (entry point, flow), what is reusable; remember feature isolation.
+- **Current behaviour** — read the `DwFeatureSpec` of the affected features (in their public files) and the `knownIssues` there: what is already acknowledged as wrong is most likely the subject of the task. Architecture and cross-cutting conventions — `docs/1_general/*`.
 
-Сведи в три списка: **что уже есть → чего не хватает → что мешает** (ограничения текущей схемы/прав/архитектуры).
+Reduce it to three lists: **what already exists → what is missing → what gets in the way** (constraints of the current schema/permissions/architecture).
 
-Попутно, читая код **всей затрагиваемой фичи целиком** (а не только строки будущего диффа), фиксируй сигналы качества — нарушения контракта `dartway-clean-code` и антипаттерны слоёв. Это материал для Фазы C; не достраивай выводы здесь.
+Along the way, while reading the code of **the entire affected feature** (not just the lines of the future diff), record quality signals — violations of the `dartway-clean-code` contract and layer antipatterns. This is material for Phase C; do not draw conclusions here.
 
-## Фаза C — Возможности рефакторинга и улучшения качества
+## Phase C — Refactoring and quality opportunities
 
-Раз уж область уже изучена в Фазе B — оцени, что в ней стоит улучшить по методологии проекта, пока работа ещё не началась.
+Since the area has already been studied in Phase B — assess what in it is worth improving per the project's methodology, while the work has not started yet.
 
-- **Охват** — вся затронутая фича/модуль целиком (включая части, которые задача напрямую не правит), а не только будущий дифф.
-- **Источник правил** — контракт `dartway-clean-code` (Часть 1 — жёсткие правила команды; Часть 2 — SOLID/KISS/DRY/YAGNI и пр.) и слоевые скиллы (`dartway-models`, `dartway-crud-config`, `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`). Детекторы **не дублируй** — сверяйся с контрактом.
+- **Coverage** — the whole affected feature/module (including the parts the task does not edit directly), not just the future diff.
+- **Source of rules** — the `dartway-clean-code` contract (Part 1 — the team's hard rules; Part 2 — SOLID/KISS/DRY/YAGNI and the rest) and the layer skills (`dartway-models`, `dartway-crud-config`, `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`). Do **not** duplicate the detectors — check against the contract.
 
-Раздели находки на две группы:
+Split the findings into two groups:
 
-- 🔧 **Долг-блокер** — существующий код, который **мешает или усложняет новую работу**: god-объект, который придётся расширять; прямой апдейт поля (напр. `balance`) вместо Event-модели в денежной логике, которую фича затронет; отсутствие нужной абстракции/extension; нарушение изоляции фич на пути интеграции. Такой долг **должен быть учтён** в скоупе, рисках и оценке соответствующего варианта (Фаза E).
-- 🧹 **Смежный долг** — нарушения контракта **рядом** с областью работы, которые можно прибрать попутно (boy-scout rule), но которые задачу не блокируют. Опционально, **на решение автора**.
+- 🔧 **Blocking debt** — existing code that **gets in the way of or complicates the new work**: a god object you will have to extend; a direct field update (e.g. `balance`) instead of an Event model in money logic the feature will touch; a missing abstraction/extension; a broken feature isolation on the integration path. Such debt **must be accounted for** in the scope, risks and estimate of the corresponding option (Phase E).
+- 🧹 **Adjacent debt** — contract violations **near** the work area, which can be tidied up along the way (boy-scout rule) but which do not block the task. Optional, **the author's call**.
 
-**Дисциплина:** read-only, без авто-правок; не раздувать в полный аудит репозитория (это работа `/dartway-audit`); каждая находка — с `file:line` и кратким «почему это долг».
+**Discipline:** read-only, no auto-fixes; do not inflate this into a full repository audit (that is the job of `/dartway-audit`); every finding comes with a `file:line` and a short "why this is debt".
 
-**Граница:** `dartway-finish` аудитит готовый **дифф** перед PR, `/dartway-audit` — **модуль по запросу**; здесь же — взгляд **вперёд** на область до начала работы, чтобы выбранный подход учёл существующий долг.
+**Boundary:** `dartway-finish` audits the finished **diff** before a PR, `/dartway-audit` audits a **module on request**; here it is a look **forward** at the area before the work starts, so that the chosen approach accounts for the existing debt.
 
-## Фаза D — Пул уточняющих вопросов
+## Phase D — Pool of clarifying questions
 
-Только **реально блокирующие** вопросы (не то, что выводится из кода или разумного дефолта). Сгруппируй:
+Only the **genuinely blocking** questions (not the ones derivable from the code or from a reasonable default). Group them:
 
-- **Домен/модель** — какие сущности, поля, связи, состояния.
-- **Права и роли** — кто что может (влияет на `allowSave`/`allowDelete`/фильтры доступа).
-- **Флоу/UX** — шаги, краевые и пустые/ошибочные состояния.
-- **Данные/миграции** — что с существующими данными, обратная совместимость.
-- **Нефункциональное** — объёмы, реалтайм, оффлайн, перф.
+- **Domain/model** — which entities, fields, relations, states.
+- **Permissions and roles** — who can do what (affects `allowSave`/`allowDelete`/access filters).
+- **Flow/UX** — the steps, the edge cases and the empty/error states.
+- **Data/migrations** — what happens to existing data, backward compatibility.
+- **Non-functional** — volumes, real-time, offline, performance.
 
-Для каждого вопроса предложи разумный **дефолт** (твою рекомендацию), чтобы согласование шло быстро.
+For each question propose a reasonable **default** (your recommendation), so that agreement goes fast.
 
-## Фаза E — Варианты реализации
+## Phase E — Implementation options
 
-Дай **2–3 варианта** по 3-уровневой лестнице усложнения (закон №4): Event-модели → конфигурация CRUD → custom endpoint (последний — только как исключение, с обоснованием). Для каждого:
+Give **2–3 options** along the 3-level ladder of increasing complexity (law 4): Event models → CRUD configuration → custom endpoint (the last one only as an exception, with justification). For each:
 
-- **Суть** — как устроено в терминах DartWay (какие модели, конфиги, фичи).
-- **Что затрагивает** — модели/миграции, CRUD-конфиги, flutter-фичи.
-- **Ограничения и трейдоффы** — что нельзя/неудобно, на что влияет.
-- **Риски** — миграции, права, гонки (деньги/счётчики → Event-модели), изоляция фич.
-- **Долг-блокеры** — какой рефакторинг из Фазы C вариант тянет за собой (если выбранный подход требует предварительной уборки — отрази это в скоупе).
-- **Оценка времени** — грубый диапазон (S/M/L или часы-дни) с учётом долга-блокера и оговоркой, что зависит от ответов на вопросы.
+- **Essence** — how it works in DartWay terms (which models, configs, features).
+- **What it touches** — models/migrations, CRUD configs, Flutter features.
+- **Constraints and tradeoffs** — what is impossible/awkward, what it affects.
+- **Risks** — migrations, permissions, races (money/counters → Event models), feature isolation.
+- **Blocking debt** — which refactoring from Phase C the option drags along (if the chosen approach requires cleaning up first — reflect that in the scope).
+- **Time estimate** — a rough range (S/M/L or hours-days) accounting for the blocking debt and with the caveat that it depends on the answers to the questions.
 
-Заверши **рекомендацией** — какой вариант и почему.
+Finish with a **recommendation** — which option and why.
 
-## Формат вывода
+## Output format
 
-Отчёт в чат (по-русски), ничего не меняя:
+A report in the chat, in the user's language, changing nothing:
 
-1. **Что уже есть в проекте** по теме и **чего не хватает / что мешает**.
-2. **Возможности рефакторинга** — 🔧 долг-блокеры (учесть в плане) и 🧹 смежный долг (на решение автора), с `file:line`.
-3. **Уточняющие вопросы** — сгруппированы, с дефолтами.
-4. **Варианты реализации** — с ограничениями/рисками/оценкой + рекомендация.
+1. **What the project already has** on the topic and **what is missing / what gets in the way**.
+2. **Refactoring opportunities** — 🔧 blocking debt (to be accounted for in the plan) and 🧹 adjacent debt (the author's call), with `file:line`.
+3. **Clarifying questions** — grouped, with defaults.
+4. **Implementation options** — with constraints/risks/estimate + a recommendation.
 
-Дальше, когда требования согласованы и вариант выбран → **`dartway-plan`** (детальный пошаговый план).
+Next, once the requirements are agreed and an option is chosen → **`dartway-plan`** (a detailed step-by-step plan).

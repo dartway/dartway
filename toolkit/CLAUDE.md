@@ -1,127 +1,127 @@
-# DartWay-монорепо — гайд проекта для Claude
+# The DartWay monorepo — project guide for Claude
 
-Монорепо на стеке **Serverpod + DartWay + Flutter + Riverpod**. DartWay — **highly opinionated** фреймворк: меньше свободы в том, *как* делать → больше консистентности и скорости. Не изобретай альтернативные подходы — следуй принятым паттернам.
+A monorepo on the **Serverpod + DartWay + Flutter + Riverpod** stack. DartWay is a **highly opinionated** framework: less freedom in *how* to do things → more consistency and speed. Don't invent alternative approaches — follow the established patterns.
 
-> Эта обвязка (методология + скиллы + команды) приезжает из монорепо DartWay (`toolkit/`, ветка `stable`) и ставится в `.claude/` этого репозитория (коммитится). Файлы `CLAUDE.md`, `skills/dartway-*` и команды `commit`/`dartway-audit` — управляемые: не редактируй их здесь, они перезаписываются при обновлении; кастомизация — копией под своим именем. Источник правды — тулкит в монорепо. Структура пакетов детектится автоматически; пути ниже подставлены при установке.
+> This harness (methodology + skills + commands) ships from the DartWay monorepo (`toolkit/`, branch `stable`) and is installed into this repository's `.claude/` (committed). The files `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-audit` commands are **managed**: don't edit them here, they get overwritten on update; customize by copying under your own name. The source of truth is the toolkit in the monorepo. The package structure is detected automatically; the paths below were substituted at install time.
 
-## Структура монорепо
+## Monorepo structure
 
-Dart-пакеты (роль определяется суффиксом имени):
+Dart packages (the role is determined by the name suffix):
 
-| Пакет | Роль | Что делает |
+| Package | Role | What it does |
 |---|---|---|
-| `__SERVER_PKG__` | server | Serverpod-бэкенд: YAML-модели, CRUD-конфиги, серверная логика и workflow |
-| `__CLIENT_PKG__` | client | Сгенерированный Serverpod protocol. **Руками не править** |
-| `__FLUTTER_PKG__` | flutter | Flutter-приложение: фичи, UI Kit, навигация, data-layer |
+| `__SERVER_PKG__` | server | The Serverpod backend: YAML models, CRUD configs, server logic and workflows |
+| `__CLIENT_PKG__` | client | The generated Serverpod protocol. **Never edit by hand** |
+| `__FLUTTER_PKG__` | flutter | The Flutter app: features, UI Kit, navigation, data layer |
 
-Проект может завести четвёртый, `*_shared` — чистый Dart для кода, который обязан вести себя одинаково на сервере и во флаттере (см. «Shared» ниже). В скелете его нет: пока такого кода не появилось, пакет не нужен.
+A project may add a fourth one, `*_shared` — pure Dart for code that has to behave identically on the server and in Flutter (see "Shared" below). The skeleton has none: until such code shows up, the package is not needed.
 
-## Кросс-стековые законы (действуют везде)
+## Cross-stack laws (they hold everywhere)
 
-1. **CRUD — основа всего.** Все взаимодействия Flutter ↔ Server идут через CRUD-операции над моделями. Никаких произвольных эндпоинтов без крайней необходимости. Create и Update объединены в один `save`.
-2. **Domain-first.** Любая фича начинается с модели(ей). Модель отражает доменную реальность, а не сиюминутные нужды UI. Данные живут в моделях — UI это только проекция.
-3. **Фича = end-to-end.** Фича — это сквозной поток через сервер (модели + CRUD-конфиги) и флаттер (entry point + widgets + logic). Извне фичи импортируется **только** её entry point — на любой глубине вложенности.
+1. **CRUD is the foundation of everything.** All Flutter ↔ Server interaction goes through CRUD operations on models. No arbitrary endpoints unless there is really no other way. Create and Update are merged into a single `save`.
+2. **Domain-first.** Every feature starts with its model(s). A model reflects domain reality, not the momentary needs of the UI. Data lives in models — the UI is only a projection.
+3. **A feature is end-to-end.** A feature is a flow running through the server (models + CRUD configs) and Flutter (entry point + widgets + logic). From outside the feature, **only** its entry point is imported — at any nesting depth.
 
-   **Что такое фича, решает содержимое папки — объявлять ничего не нужно:**
-   - **фича** — папка, в корне которой **ровно один** `.dart`. Этот файл — вся её публичная поверхность;
-   - **внутренности** — только `widgets/` и `logic/`; снаружи их не импортирует никто;
-   - **группа** — папка **без** корневых `.dart`. Она только группирует фичи, ничего не инкапсулирует и своих `widgets/`/`logic/` не имеет. Группировка **не влияет на видимость**: роутер имеет право импортировать `app/learning/lesson/lesson_page.dart`, потому что `lesson` — фича, а `learning` — группа;
-   - **общее для двух фич — это ещё одна фича**, а не папка `shared/`. Карточку, которую рисуют и блок на главной, и экран списка, кладём в свою папку с одним публичным файлом;
-   - у фичи **ровно одна публичная сущность**. Появилась вторая (страница и встраиваемый блок, флоу из трёх экранов) — это группа из нескольких фич.
+   **What a feature is gets decided by the folder's contents — nothing has to be declared:**
+   - a **feature** is a folder with **exactly one** `.dart` at its root. That file is its entire public surface;
+   - the **internals** are only `widgets/` and `logic/`; nobody imports them from outside;
+   - a **group** is a folder **without** root-level `.dart` files. It only groups features, encapsulates nothing, and has no `widgets/`/`logic/` of its own. Grouping **does not affect visibility**: the router is allowed to import `app/learning/lesson/lesson_page.dart`, because `lesson` is a feature and `learning` is a group;
+   - **what two features share is one more feature**, not a `shared/` folder. A card drawn both by the block on the home screen and by the list screen goes into its own folder with a single public file;
+   - a feature has **exactly one public entity**. A second one appeared (a page plus an embeddable block, a three-screen flow) — that is a group of several features.
 
-   Много мелких папок — нормально: атомарность важнее короткого дерева. Проверяется `dartway check` — он строит дерево «зона → группа → фича» и ставит каждой фиче оценку A–D.
+   Many small folders are fine: atomicity matters more than a short tree. Checked by `dartway check` — it builds a "zone → group → feature" tree and grades every feature A–D.
 
-   **Не фича:** общеприложенческие реестры и инфраструктура (каталог фич, аналитика, инициализаторы пушей) — это `lib/core/`; кросс-фичевая доменная логика — `lib/domain/`. Если такой файл лежит в `logic/` какой-нибудь фичи, все остальные начинают импортировать её внутренности.
-4. **3 уровня усложнения логики** (по возрастанию «крайности»): Event-модели → конфигурация CRUD (`SaveConfig`/`GetConfig`/...) → custom endpoint (только когда иначе никак, документировать как исключение).
-5. **Нейминг.** Классы — минимум 2 слова (`UserProfile`, не `User`). Переменные полностью описательны и совпадают с типом (`userProfile`, `userProfileId`). В полях связей с пользователем всегда слово Profile: `userProfileId`, `authorProfileId`, `updatedByProfileId`. Запрещены `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
-6. **Завершение = аудит + описание рядом с кодом.** Фича не закончена, пока не прогнан `dartway-finish`: аудит диффа против контракта чистоты и сверка описания фичи с новым поведением. **Описание живёт в коде, а не в отдельном доке:** поведение экрана — в `DwFeatureSpec` виджета-фичи, серверные договорённости — в doc-комментариях над CRUD-конфигом. Отдельных файлов «док на фичу» мы не заводим: описание вдали от кода расходится с ним на первой же правке, и расходится молча — код компилируется, а док врёт. Проверено на боевом проекте: док фичи описывал API, которого в коде уже год не было, и агент по нему писал неработающий код.
+   **Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; cross-feature domain logic — `lib/domain/`. If such a file sits in some feature's `logic/`, everyone else starts importing that feature's internals.
+4. **3 levels of escalating logic** (in order of "last resort"): Event models → CRUD configuration (`SaveConfig`/`GetConfig`/...) → a custom endpoint (only when there is no other way; document it as an exception).
+5. **Naming.** Classes — at least 2 words (`UserProfile`, not `User`). Variables are fully descriptive and match the type (`userProfile`, `userProfileId`). Fields relating to a user always carry the word Profile: `userProfileId`, `authorProfileId`, `updatedByProfileId`. Forbidden: `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
+6. **Done = audit + a description next to the code.** A feature is not finished until `dartway-finish` has been run: an audit of the diff against the cleanliness contract, and a reconciliation of the feature's description with the new behavior. **The description lives in the code, not in a separate doc:** a screen's behavior — in the `DwFeatureSpec` of the feature widget, the server-side agreements — in the doc comments above the CRUD config. We do not keep separate "a doc per feature" files: a description far from the code drifts from it on the very first edit, and it drifts silently — the code compiles while the doc lies. Verified on a production project: a feature's doc described an API that had not been in the code for a year, and the agent wrote non-working code from it.
 
-## Кодогенерация: по умолчанию не используем
+## Code generation: not used by default
 
-Единственный генератор в проекте — **`serverpod generate`** (модели и клиент). Это отдельный CLI, не `build_runner`, и он неизбежен.
+The only generator in the project is **`serverpod generate`** (models and client). It is a separate CLI, not `build_runner`, and it is unavoidable.
 
-Всё остальное пишем руками:
+Everything else is written by hand:
 
-- **провайдеры и стейт** — обычные `Provider` / `NotifierProvider`, без `riverpod_generator`. Ключ семейства — рекорд (`({int courseId, int? parentId})`): у него значимое равенство по построению, ровно то, ради чего и нужен генератор;
-- **дата-классы состояния** — обычный неизменяемый класс с `copyWith` и `==`, без `freezed`. Модели домена и так приезжают сгенерированными из Serverpod;
-- **ассеты** — константы в ките, без `flutter_gen`. Что путь ведёт к существующему файлу, проверяет `dartway check`.
+- **providers and state** — plain `Provider` / `NotifierProvider`, no `riverpod_generator`. A family key is a record (`({int courseId, int? parentId})`): it has meaningful equality by construction, which is exactly what the generator is wanted for;
+- **state data classes** — a plain immutable class with `copyWith` and `==`, no `freezed`. Domain models already arrive generated from Serverpod;
+- **assets** — constants in the kit, no `flutter_gen`. That a path leads to an existing file is checked by `dartway check`.
 
-**Почему против течения** (документация Riverpod написана про кодоген): `build_runner` встаёт в ежедневный цикл правки — на боевом проекте одна правка провайдера стоила больше четырёх минут ожидания. Хуже того, это ловушка для агента: забыл прогнать генератор — получил `undefined name` и начал «чинить» исправный код. Экономия на нескольких строках `Provider.family` этого не стоит.
+**Why against the current** (the Riverpod documentation is written around codegen): `build_runner` inserts itself into the daily edit cycle — on a production project a single provider edit cost more than four minutes of waiting. Worse, it is a trap for the agent: forgot to run the generator — got `undefined name` and started "fixing" working code. Saving a few lines of `Provider.family` is not worth it.
 
-**Семейства тоже пишутся руками** — включая семейный нотифаер с методами: `NotifierProvider.family` объявлен как `NotifierT Function(ArgT arg)`, то есть **аргумент приходит в фабрику**, а нотифаер принимает его конструктором. Внутренний `ref.$arg`, которым пользуется кодоген, рукописному классу не нужен. Так устроен и сам фреймворк: `DwModelListState(this.config)` + `AsyncNotifierProvider.family(...)`.
+**Families are written by hand too** — including a family notifier with methods: `NotifierProvider.family` is declared as `NotifierT Function(ArgT arg)`, that is, **the argument arrives in the factory**, and the notifier takes it through its constructor. The internal `ref.$arg` that codegen uses is not needed by a handwritten class. The framework itself is built that way: `DwModelListState(this.config)` + `AsyncNotifierProvider.family(...)`.
 
-Ключ семейства — значение со значимым равенством: рекорд, если хватает полей без умолчаний, иначе маленький класс с `==` и `hashCode`. По нему Riverpod решает, тот же это провайдер или новый.
+A family key is a value with meaningful equality: a record if fields without defaults are enough, otherwise a small class with `==` and `hashCode`. Riverpod uses it to decide whether this is the same provider or a new one.
 
-Проект вправе решить иначе (большая библиотека ассетов, union-типы, где `freezed` реально окупается) — но это осознанное исключение, а не умолчание.
+A project is free to decide otherwise (a large asset library, union types where `freezed` really pays off) — but that is a deliberate exception, not a default.
 
-## Документация: описание живёт в коде
+## Documentation: the description lives in the code
 
-**Отдельных доков «файл на фичу» в проекте нет.** Про фичу спрашивают её код:
+**There are no separate "a file per feature" docs in the project.** To learn about a feature, ask its code:
 
-| Что нужно узнать | Где смотреть |
+| What you need to know | Where to look |
 |---|---|
-| что фича делает, чего от неё ждать, где грабли | `DwFeatureSpec` в её публичном файле |
-| что в фиче не так и стоит взять в работу | `knownIssues` в той же спеке |
-| правила доступа, валидации, сайд-эффекты | doc-комментарии над `DwCrudConfig` модели |
-| инварианты и смысл поля | doc-комментарий над полем в YAML-модели |
+| what the feature does, what to expect from it, where the traps are | `DwFeatureSpec` in its public file |
+| what is wrong with the feature and worth picking up | `knownIssues` in that same spec |
+| access rules, validations, side effects | the doc comments above the model's `DwCrudConfig` |
+| a field's invariants and meaning | the doc comment above the field in the YAML model |
 
-**Почему так.** Док, лежащий отдельно от кода, расходится с ним молча: компилятор его не проверяет, чекер не видит, а агент читает и верит. На боевом проекте такой док описывал API, удалённый год назад, и по нему писался неработающий код. Спека в файле фичи и комментарий над конфигом переживают правку кода, потому что лежат в том же диффе — их невозможно не заметить.
+**Why so.** A doc sitting apart from the code drifts from it silently: the compiler does not check it, the checker does not see it, and the agent reads it and believes it. On a production project such a doc described an API deleted a year earlier, and non-working code was written from it. A spec in the feature's file and a comment above the config survive a code edit because they lie in the same diff — they are impossible to miss.
 
-Что в `docs/` остаётся:
+What stays in `docs/`:
 
-- **`docs/1_general/`** — архитектура и инфраструктура (`FLUTTER_ARCHITECTURE.md`, `SERVER_ARCHITECTURE.md`, релизные плейбуки) и **сквозные справочники**, у которых нет своей фичи: реестр событий аналитики, каталог ключей настроек, матрица ролей и доступа, payload внешней интеграции. Признак такого файла — он описывает не экран, а соглашение, действующее во всём приложении.
-- **`docs/audits/`** — отчёты `/dartway-audit`.
+- **`docs/1_general/`** — architecture and infrastructure (`FLUTTER_ARCHITECTURE.md`, `SERVER_ARCHITECTURE.md`, release playbooks) and the **cross-cutting references** that have no feature of their own: the analytics event registry, the settings key catalog, the roles and access matrix, an external integration's payload. The sign of such a file — it describes not a screen but a convention that holds across the whole app.
+- **`docs/audits/`** — `/dartway-audit` reports.
 
-Не заводи в `docs/` файл, который можно было бы назвать по имени фичи. Если тянет — значит описание не влезло в спеку, и вопрос не «куда положить док», а «почему спека не отвечает».
+Don't create a file in `docs/` that could be named after a feature. If you're tempted, it means the description did not fit into the spec, and the question is not "where to put the doc" but "why doesn't the spec answer it".
 
-## Чистота и завершение
+## Cleanliness and finishing
 
-Для **любого** Dart/Flutter кода действует контракт чистого кода: `.claude/skills/dartway-clean-code/SKILL.md` (8 жёстких правил команды + SOLID/KISS/DRY/YAGNI + тесты для сложного). Это контракт стиля — сверяйся при написании, рефакторинге и ревью.
+For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/dartway-clean-code/SKILL.md` (the team's hard rules + SOLID/KISS/DRY/YAGNI + tests for the complex stuff). This is a style contract — check against it while writing, refactoring and reviewing.
 
-**Завершение задачи (закон №6):** закончив фичу/задачу, прогоняй `dartway-finish` перед коммитом/PR. Он аудитит дифф против контракта, проверяет дрейф документации фичи и покрытие тестами, **показывает предложения и применяет только подтверждённое**.
+**Finishing a task (Law 6):** when a feature/task is done, run `dartway-finish` before the commit/PR. It audits the diff against the contract, checks the feature's documentation for drift and the test coverage, and **shows suggestions and applies only what was confirmed**.
 
-## Скиллы и команды
+## Skills and commands
 
-- Скиллы (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — подгружаются по релевантности задачи.
-- Команды (`.claude/commands/`): `/dartway-audit` — глубокий аудит модуля; `/commit` — коммит в формате CI проекта.
+- Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — loaded by relevance to the task.
+- Commands (`.claude/commands/`): `/dartway-audit` — a deep audit of a module; `/commit` — a commit in the project's CI format.
 
-**Жизненный цикл задачи:** `dartway-requirements` (анализ спеки → вопросы → варианты) → `dartway-plan` (пошаговый план + риски) → реализация (слоевые скиллы) → `dartway-finish` (аудит + docs-sync + тесты перед PR).
+**Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + docs sync + tests before the PR).
 
-**Поднять проект локально** (свежий клон, «не стартует», после смены модели) — `dartway-run`: БД, миграции, сид, сервер, приложение, плюс диагностика типовых отказов. Проверка живости обязательна — докладывать фактом (код ответа API, применённые миграции), а не предположением.
+**Bringing the project up locally** (a fresh clone, "it won't start", after a model change) — `dartway-run`: DB, migrations, seed, server, app, plus diagnostics for the typical failures. A liveness check is mandatory — report it as a fact (the API response code, the applied migrations), not as an assumption.
 
 ## Git
 
-PR и диффы — против ветки `__BASE_BRANCH__`. Первая строка коммита: `<type>: <описание на англ.> #<TICKET>` (`type` = `feat`/`fix`/`chore`); тикет передаётся аргументом `/commit`, точный формат проверяет CI проекта.
+PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commit: `<type>: <description in English> #<TICKET>` (`type` = `feat`/`fix`/`chore`); the ticket is passed as an argument to `/commit`, and the project's CI checks the exact format.
 
 ---
 
-## Сервер (`__SERVER_PKG__`)
+## Server (`__SERVER_PKG__`)
 
-**Главный закон:** вся логика — через **CRUD-конфиги**, не через произвольные эндпоинты. Domain-first.
+**The main law:** all logic goes through **CRUD configs**, not through arbitrary endpoints. Domain-first.
 
-Структура `lib/src/`: `app/` (session-aware workflow) · `crud/` (CRUD-конфиги — здесь вся логика) · `dartway/` (внутренние утилиты) · `domain/` (чистые extensions, без Session/IO/БД) · `endpoints/` (крайний случай: upload, webhooks) · `generated/` (**не редактировать**) · `models/` (YAML-схема) · `web/`. Граница: **domain** — чистые правила, **app** — session-aware сайд-эффекты.
+The `lib/src/` structure: `app/` (session-aware workflows) · `crud/` (CRUD configs — all the logic is here) · `dartway/` (internal utilities) · `domain/` (pure extensions, no Session/IO/DB) · `endpoints/` (last resort: upload, webhooks) · `generated/` (**do not edit**) · `models/` (the YAML schema) · `web/`. The boundary: **domain** — pure rules, **app** — session-aware side effects.
 
-- **Модели:** nullable только если значение реально может отсутствовать в домене. **Base vs Event:** Base — текущее состояние (`UserProfile`), Event — изменения над базой (`BalanceEvent`); для денег/транзакций используй Event (не меняй поле вроде `balance` напрямую). Связи явные в YAML, двунаправленные — одинаковый `relation(name=...)`. Playbook — `dartway-models`.
-- **CRUD:** одна `DwCrudConfig<T>` на модель (`allowSave` → `validateSave` → транзакция: `beforeSaveTransaction` → запись → `afterSaveTransaction` → вне транзакции: `afterSaveTransform` → `afterSaveSideEffects`; все хуки — `(session, saveContext)`; `getModelConfigs`/`getListConfig`/`deleteConfig`, у read-конфигов `accessFilter` обязателен); без конфига API вернёт `notConfigured`; ответы в `DwModelWrapper`. Playbook — `dartway-crud-config`.
-- **Workflow модели:** правка YAML → `serverpod generate` (обновляет `generated` + client-пакет) → `create-migration` → `DwCrudConfig` + регистрация в `crudConfigurations` → миграции на старте → тесты.
-- **Auth:** пользователь — **наша** модель `UserProfile`; `serverpod_auth` **не используем** (в свежих версиях у него свой `UserProfile` → конфликт имён). Аутентификация — через DartWay (`DwPhoneAuthConfig` и т.п.).
+- **Models:** nullable only if the value really can be absent in the domain. **Base vs Event:** Base is the current state (`UserProfile`), Event is a change on top of the base (`BalanceEvent`); for money/transactions use Event (don't change a field like `balance` directly). Relations are explicit in the YAML, bidirectional ones share the same `relation(name=...)`. Playbook — `dartway-models`.
+- **CRUD:** one `DwCrudConfig<T>` per model (`allowSave` → `validateSave` → transaction: `beforeSaveTransaction` → write → `afterSaveTransaction` → outside the transaction: `afterSaveTransform` → `afterSaveSideEffects`; all hooks take `(session, saveContext)`; `getModelConfigs`/`getListConfig`/`deleteConfig`, and read configs require `accessFilter`); without a config the API returns `notConfigured`; responses come in `DwModelWrapper`. Playbook — `dartway-crud-config`.
+- **Model workflow:** edit the YAML → `serverpod generate` (updates `generated` + the client package) → `create-migration` → `DwCrudConfig` + registration in `crudConfigurations` → migrations on startup → tests.
+- **Auth:** the user is **our own** `UserProfile` model; `serverpod_auth` is **not used** (recent versions ship their own `UserProfile` → a name clash). Authentication goes through DartWay (`DwPhoneAuthConfig` and the like).
 
 ## Flutter (`__FLUTTER_PKG__`)
 
-Структура `lib/`: `admin/` · `app/` (основные фичи) · `auth/` · `common/` · `core/` (router, dw_core) · `data/` (data-layer) · `domain/` (кросс-фича extensions) · `ui_kit/`.
+The `lib/` structure: `admin/` · `app/` (the main features) · `auth/` · `common/` · `core/` (router, dw_core) · `data/` (the data layer) · `domain/` (cross-feature extensions) · `ui_kit/`.
 
-- **Фичи:** фича = entry point (один публичный файл) + `widgets/` + `logic/`. Извне импортируй **только entry point**. Кросс-фичевая логика — в `lib/domain/`. Entry point-виджет объявляет паспорт фичи (`implements DwFeature` с `DwFeatureSpec`) прямо в своём файле — описание живёт рядом с кодом, а не в отдельном реестре; его читают отчёты об ошибках, Studio и агент. Скилл — `dartway-feature-scaffold`.
-- **Данные (data-layer):** доступ только через `dw.repo` — чтение как провайдеры под родным `ref.watch`/`read`/`refresh` (`dw.repo.model`/`maybeModel`/`modelList`), запись `dw.repo.saveModel`/`deleteModel`. Списки — `dwBuildListAsync(loadingItemsCount:)`; сужение запросом — `backendFilter`, локальную фильтрацию делаешь сам `.where` в виджете. Контракт — `dartway-data-layer`, создание фичи — `dartway-feature-scaffold`.
-- **UI Kit — единственный источник стилей:** в `app/`/`auth/`/`common/` запрещены прямые `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme`; импорт только `ui_kit.dart`. Скилл — `dartway-ui-kit`.
-- **Навигация:** DartWay Router — enum-роуты, enum-параметры, переходы через context-extensions (`context.goNamed`/`pushTo`/`replaceWith`, не `router.go()`), гварды централизованно. Скилл — `dartway-navigation`.
-- **Specials:** уведомления — `dw.notify.*` (не `SnackBar`); профиль — `ref.watchUserProfile`/`readUserProfile` (не `watchModel<UserProfile>`); действия из UI — `dw.action`; выход — `signOut()`.
+- **Features:** a feature = an entry point (one public file) + `widgets/` + `logic/`. From outside, import **only the entry point**. Cross-feature logic goes to `lib/domain/`. The entry-point widget declares the feature spec (`implements DwFeature` with a `DwFeatureSpec`) right in its own file — the description lives next to the code, not in a separate registry; it is read by error reports, Studio and the agent. Skill — `dartway-feature-scaffold`.
+- **Data (the data layer):** access only through `dw.repo` — reads are providers under the native `ref.watch`/`read`/`refresh` (`dw.repo.model`/`maybeModel`/`modelList`), writes are `dw.repo.saveModel`/`deleteModel`. Lists — `dwBuildListAsync(loadingItemsCount:)`; narrowing by query — `backendFilter`, local filtering you do yourself with `.where` in the widget. The contract — `dartway-data-layer`, creating a feature — `dartway-feature-scaffold`.
+- **The UI Kit is the only source of styles:** in `app/`/`auth/`/`common/` direct `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme` are forbidden; the only import is `ui_kit.dart`. Skill — `dartway-ui-kit`.
+- **Navigation:** the DartWay Router — enum routes, enum parameters, transitions through context extensions (`context.goNamed`/`pushTo`/`replaceWith`, not `router.go()`), guards centralized. Skill — `dartway-navigation`.
+- **Specials:** notifications — `dw.notify.*` (not `SnackBar`); the profile — `ref.watchUserProfile`/`readUserProfile` (not `watchModel<UserProfile>`); actions from the UI — `dw.action`; sign-out — `signOut()`.
 
-## Shared (опциональный `*_shared`)
+## Shared (the optional `*_shared`)
 
-**В скелете этого пакета нет** — заводи его, когда появился код, который обязан вести себя **одинаково** на бэке и фронте (валидация формата, общие enum'ы, расчёты из полей без IO). Пока такого кода нет, дублировать нечего и пакет не нужен.
+**The skeleton does not include this package** — create it once code appears that has to behave **identically** on the backend and the frontend (format validation, shared enums, computations over fields without IO). Until such code exists there is nothing to duplicate and the package is not needed.
 
-✅ Можно: чистый Dart, зависимость от client-пакета. ❌ Нельзя: Flutter, серверные API, `Session`, IO, БД. Публичный API — в `lib/<имя_пакета>.dart`, реализация — в `lib/src/`.
+✅ Allowed: pure Dart, a dependency on the client package. ❌ Not allowed: Flutter, server APIs, `Session`, IO, the DB. The public API goes in `lib/<package_name>.dart`, the implementation in `lib/src/`.
 
 ## Client (`__CLIENT_PKG__`)
 
-Сгенерированный Serverpod protocol (модели + клиент). **Руками не править** — пересоздаётся из YAML сервера через `serverpod generate`. Зависимость для shared / flutter / server.
+The generated Serverpod protocol (models + client). **Never edit by hand** — it is recreated from the server's YAML via `serverpod generate`. A dependency of shared / flutter / server.

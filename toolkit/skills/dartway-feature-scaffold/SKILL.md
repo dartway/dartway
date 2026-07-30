@@ -1,149 +1,150 @@
 ---
 name: dartway-feature-scaffold
 description: >-
-  Пошаговый playbook создания новой фичи в DartWay end-to-end (Flutter + Serverpod):
-  навигация → UI entry point → state/logic через data-layer и Riverpod → backend CRUD-конфиги
-  → модели/БД → тесты. Структура фичи (entry point + widgets + logic), изоляция (импорт только
-  entry point), границы domain/app/ui_kit, паспорт фичи `DwFeatureSpec` в её же файле.
-  Использовать при добавлении новой функциональности, экрана, флоу или модели.
+  Step-by-step playbook for building a new DartWay feature end-to-end (Flutter + Serverpod):
+  navigation → UI entry point → state/logic via the data layer and Riverpod → backend CRUD configs
+  → models/DB → tests. Feature structure (entry point + widgets + logic), isolation (import the
+  entry point only), domain/app/ui_kit boundaries, the `DwFeatureSpec` feature spec in the feature's
+  own file. Use when adding new functionality, a screen, a flow, or a model.
 ---
 
-# DartWay — создание фичи (end-to-end)
+# DartWay — building a feature (end-to-end)
 
-Playbook добавления новой фичи. Фича в DartWay **маленькая и самодостаточная** и проходит сквозь сервер и флаттер. По возможности выделяй каждый функциональный виджет в отдельную фичу, если они не делят действительно критичный стейт.
+The playbook for adding a new feature. A DartWay feature is **small and self-contained**, and it runs through both the server and Flutter. Whenever you can, split every functional widget into its own feature, unless they share genuinely critical state.
 
-См. также: `__FLUTTER_PKG__/CLAUDE.md`, `__SERVER_PKG__/CLAUDE.md`, скиллы `dartway-crud-config`, `dartway-data-layer`, `dartway-models`, `dartway-navigation`, `dartway-ui-kit`, `dartway-clean-code`, `dartway-finish`.
+See also: `__FLUTTER_PKG__/CLAUDE.md`, `__SERVER_PKG__/CLAUDE.md`, skills `dartway-crud-config`, `dartway-data-layer`, `dartway-models`, `dartway-navigation`, `dartway-ui-kit`, `dartway-clean-code`, `dartway-finish`.
 
-> Если фича уже существует — **сначала прочитай её публичный файл**: `DwFeatureSpec` там же и есть текущее описание поведения, а `knownIssues` скажет, что в ней уже признано неправильным. Серверные правила — в doc-комментариях над её `DwCrudConfig`. Меняешь поведение — правишь спеку в том же диффе (закон №6).
+> If the feature already exists — **read its public file first**: the `DwFeatureSpec` sitting right there *is* the current description of the behavior, and `knownIssues` tells you what has already been acknowledged as wrong in it. Server-side rules live in the doc comments above its `DwCrudConfig`. Change the behavior and you fix the spec in the same diff (Law 6).
 
-## Структура фичи (Flutter)
+## Feature structure (Flutter)
 
 ```
 lib/app/<feature>/
-  <feature>_page.dart        // entry point — единственный публичный файл
+  <feature>_page.dart        // entry point — the only public file
   widgets/
     <feature>_list.dart
     <feature>_item.dart
-  logic/                     // опционально
+  logic/                     // optional
     <feature>_provider.dart
     <feature>_filter.dart
 ```
 
-- **Entry Point** — единственный публичный файл (Page/Widget/context-extension вроде `context.showInviteDialog()`). Извне фичи импортируется только он — и это проверяется на любой глубине вложенности.
-- **widgets/** — визуальные блоки фичи.
-- **logic/** — провайдеры/enum'ы/хелперы только этой фичи.
-- Кросс-фичевая бизнес-логика → `lib/domain` (extensions на моделях), не внутри фичи.
-- Стили → только `ui_kit.dart`.
+- **Entry point** — the only public file (a Page/Widget/context extension such as `context.showInviteDialog()`). From outside the feature, only it is imported — and that is enforced at any nesting depth.
+- **widgets/** — the feature's visual blocks.
+- **logic/** — providers/enums/helpers belonging to this feature only.
+- Cross-feature business logic → `lib/domain` (extensions on models), not inside the feature.
+- Styles → `ui_kit.dart` only.
 
-### Группы: когда фича перестала быть одной фичей
+### Groups: when a feature stopped being one feature
 
-Папка **без** корневых `.dart` — это **группа**. Она только группирует фичи: ничего не инкапсулирует, своих `widgets/`/`logic/` не имеет и **не влияет на видимость** — роутер имеет право импортировать `app/learning/lesson/lesson_page.dart`, потому что `lesson` — фича, а `learning` — группа.
+A folder **without** root-level `.dart` files is a **group**. It only groups features: it encapsulates nothing, has no `widgets/`/`logic/` of its own, and **does not affect visibility** — the router is allowed to import `app/learning/lesson/lesson_page.dart`, because `lesson` is a feature and `learning` is a group.
 
-Как только у фичи появляется вторая публичная сущность (экран + встраиваемый блок, флоу из трёх экранов, переиспользуемая карточка) — она становится **группой из нескольких фич**, а не фичей с двумя корневыми файлами:
+The moment a feature gains a second public entity (a screen plus an embeddable block, a three-screen flow, a reusable card), it becomes a **group of several features**, not a feature with two root files:
 
 ```
-app/community_events/                  // группа
-  community_events_block/              // блок на главной
+app/community_events/                  // group
+  community_events_block/              // block on the home screen
     community_events_block.dart
-  community_events_page/               // экран «Все мероприятия»
+  community_events_page/               // the "All events" screen
     community_events_page.dart
     widgets/ community_events_filter_row.dart …
-  community_event_card/                // карточку рисуют и блок, и экран
+  community_event_card/                // both the block and the screen draw the card
     community_event_card.dart
     widgets/ community_event_detail_dialog.dart
     logic/   event_format_label_extension.dart
 ```
 
-**Общее для двух фич — это ещё одна фича, а не папка `shared/`.** Новой сущности не заводим: у карточки такой же один публичный файл, как у экрана. Много мелких папок — нормально, атомарность важнее короткого дерева.
+**What two features share is one more feature, not a `shared/` folder.** No new kind of entity is introduced: the card has exactly the same single public file as the screen. Many small folders are fine — atomicity matters more than a short tree.
 
-**Не фича:** общеприложенческие реестры и инфраструктура (каталог фич, аналитика, инициализаторы пушей) — это `lib/core/`; кросс-фичевая доменная логика — `lib/domain/`. Признак, что место выбрано неверно: файл лежит в `logic/` одной фичи, а импортируют его из других — тогда все они лезут в её внутренности.
+**Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; cross-feature domain logic — `lib/domain/`. The sign that the placement is wrong: the file sits in one feature's `logic/` and is imported from other features — then all of them are reaching into its internals.
 
-Проверка — `dartway check`: он строит дерево «зона → группа → фича» и ставит каждой фиче оценку A–D.
+The check is `dartway check`: it builds a "zone → group → feature" tree and grades every feature A–D.
 
-## Где живёт логика фичи: три варианта
+## Where a feature's logic lives: three options
 
-Выбирай **снизу вверх** — начинай с первого и поднимайся, только когда упёрся. Преждевременный провайдер стоит столько же, сколько преждевременная абстракция.
+Choose **bottom-up** — start with the first and move up only when you hit a wall. A premature provider costs exactly as much as a premature abstraction.
 
-### 1. Всё в виджете — по умолчанию
+### 1. Everything in the widget — the default
 
-Пара `watch`, немного разметки, локальный стейт через хуки. Ничего выносить не нужно.
+A couple of `watch` calls, a bit of layout, local state via hooks. Nothing needs to be extracted.
 
 ```dart
 final events = ref.watch(dw.repo.modelList<CommunityEvent>());
 final selectedTypeId = useState<int?>(null);
 ```
 
-**Когда хватает:** данные читаются из `dw.repo` и сразу рисуются; фильтр — `.where` по локальному стейту; никакой производной величины, которую пришлось бы объяснять.
+**When this is enough:** the data is read from `dw.repo` and drawn right away; the filter is a `.where` over local state; there is no derived value that would need explaining.
 
-### 2. Провайдер + чистая функция решения — когда состояние выводится
+### 2. A provider plus a pure decision function — when state is derived
 
-Как только состояние собирается **из нескольких источников** или содержит правило («доступ истёк, но пробный — это другой текст»), виджет перестаёт быть местом для этого. Заводится провайдер (`@riverpod`, семейство по параметрам), а решение выносится в чистую функцию рядом:
+As soon as state is assembled **from several sources** or carries a rule ("access expired, but it was a trial — that's a different message"), the widget stops being the place for it. You introduce a provider — written by hand, a family keyed by parameters — and the decision moves into a factory on the state type next to it:
 
 ```dart
-@riverpod
-CourseLockState courseLockState(Ref ref, {required int accessCourseId, ...}) =>
-    resolveCourseLockState(                       // ← что из данных следует
-      userCourse: ref.watchUserCourseById(accessCourseId),  // ← откуда данные
-      hidePaidFeaturesInfo: ref.watchUserProfile.hidePaidFeaturesInfo,
-      now: DateTime.now(),
-    );
+final courseLockStateProvider =
+    Provider.family<CourseLockState, CourseLockKey>(
+  (ref, key) => CourseLockState.resolve(              // ← what follows from the data
+        userCourse: ref.watchUserCourseById(key.accessCourseId), // ← where it comes from
+        hidePaidFeaturesInfo: ref.watchUserProfile.hidePaidFeaturesInfo,
+        now: DateTime.now(),
+      ),
+);
 ```
 
-**Зачем разделять две половины:** провайдер отвечает за то, *откуда* данные, фабрика — за то, *что из них следует*. Фабрика проверяется тестом без контейнера провайдеров, и время в неё передаётся параметром, чтобы истечение доступа можно было проверить, не переводя часы. Решение живёт **фабричным конструктором на самом типе состояния**, а не свободной функцией (`dartway-clean-code` §1.3a); `@riverpod`-точка входа остаётся функцией верхнего уровня — этого требует генератор.
+**Why split the two halves:** the provider is responsible for *where* the data comes from, the factory for *what follows* from it. The factory is testable without a provider container, and time is passed into it as a parameter so that access expiry can be tested without moving the clock. The decision lives in a **factory constructor on the state type itself**, not in a free function (`dartway-clean-code` §1.3a). The provider is written by hand: code generation is off by default here, see the policy in `CLAUDE.md`.
 
-**Антипаттерн, который выглядит похоже:** виджет вручную собирает три `watch` и подаёт их в функцию. Тогда производное состояние не кэшируется и пересчитывается на каждой сборке — это работа провайдера, а не виджета.
+**The anti-pattern that looks similar:** the widget manually collects three `watch` calls and feeds them into a function. Then the derived state is not cached and is recomputed on every build — that is a provider's job, not a widget's.
 
-### 3. Notifier — когда у фичи есть собственное изменяемое состояние
+### 3. A Notifier — when the feature owns mutable state
 
-Черновик формы, мультивыбор, пошаговый флоу, оптимистичные правки — то, чем **владеет** фича и что меняется её методами.
+A form draft, multi-select, a step-by-step flow, optimistic edits — things the feature **owns** and that change through its methods.
 
-**Проверь перед тем, как заводить:** не дублирует ли это то, что уже знает сервер. Запись через `dw.repo` обновляет списки сама — «уже отправленные заявки» не нужно копить в `Set<int>`, ответ уже есть в списке заявок. Локальное состояние поверх серверного — второй источник правды, который может только разъехаться с первым.
+**Check before you introduce one:** does this duplicate what the server already knows? A write through `dw.repo` refreshes the lists by itself — "requests already sent" does not need to be accumulated in a `Set<int>`, the answer is already in the list of requests. Local state on top of server state is a second source of truth, and it can only drift apart from the first.
 
-**Состояние, которым пользуются две фичи, — это фича, и её публичная поверхность — провайдер.**
-Не «класс состояния плюс нотифаер плюс провайдер в одном корневом файле»: наружу нужен только
-провайдер — и состояние, и методы нотифаера доступны через него, имена классов вызывающему
-писать не приходится, они выводятся. Значит в корне лежит провайдер, а класс состояния и нотифаер
-— в `logic/`, по файлу на каждого:
+**State used by two features is a feature, and its public surface is a provider.**
+Not "a state class plus a notifier plus a provider in one root file": the outside world only needs
+the provider — both the state and the notifier's methods are reachable through it, the caller never
+has to write the class names, they are inferred. So the root holds the provider, while the state
+class and the notifier go into `logic/`, one file each:
 
 ```
 admin_chats_filters/
-  admin_chats_filters.dart              ← только провайдер: вся публичная поверхность
+  admin_chats_filters.dart              ← the provider only: the entire public surface
   logic/
-    admin_chats_filters_model.dart      ← неизменяемый класс состояния + copyWith
-    admin_chats_filters_state.dart      ← Notifier с методами изменения
+    admin_chats_filters_model.dart      ← immutable state class + copyWith
+    admin_chats_filters_state.dart      ← Notifier with the mutation methods
 ```
 
-Обратный признак — состояние лежит в `logic/` какой-то одной фичи, а импортирует его соседняя:
-это нарушение границ, которое чекер поймает, и лечится оно ровно этим переездом.
+The inverse symptom — the state sits in one feature's `logic/` and a neighboring feature imports it:
+that is a boundary violation, the checker will catch it, and it is cured by exactly this move.
 
-## Порядок работы
+## Order of work
 
-### 1. Навигация
-Определи точку входа в фичу и точки выхода. Если нужен роут — добавь (enum-роут, см. скилл `dartway-navigation`).
+### 1. Navigation
+Decide the feature's entry point and its exit points. If a route is needed — add it (an enum route, see the `dartway-navigation` skill).
 
-### 2. Интерфейс (UI)
-Создай entry point (Page/Widget/extension), набросай layout (кнопки, списки, поля). Стили — из UI Kit. Данные на этом шаге можно замокать/захардкодить.
+### 2. Interface (UI)
+Create the entry point (Page/Widget/extension), sketch the layout (buttons, lists, fields). Styles come from the UI Kit. Data can be mocked/hardcoded at this step.
 
-Entry point-виджет **объявляет, что он за фича** — `implements DwFeature` с `DwFeatureSpec` прямо в своём файле (см. «Паспорт фичи» ниже). Без этого `dartway check` даёт ворнинг `featureSpecMissing`.
+The entry-point widget **declares what feature it is** — `implements DwFeature` with a `DwFeatureSpec` right in its own file (see "Feature spec" below). Without it, `dartway check` emits a `featureSpecMissing` warning.
 
 ### 3. State & Logic
-Определи, какие данные нужны UI. Доступ к данным — только через `dw.repo`: чтение — провайдеры `dw.repo.model`/`maybeModel`/`modelList` под родным `ref` (`ref.watch(...)` реактивно, `ref.read(....future)` разово), запись — методы `dw.repo.saveModel`/`deleteModel`. Для сложных сценариев/переиспользования внутри фичи — Riverpod-провайдер. Локальный стейт — Riverpod + StatefulWidget + flutter_hooks. Опиши все действия пользователя (create/edit/delete) до привязки к бэкенду.
+Decide what data the UI needs. Data access goes through `dw.repo` only: reads via the `dw.repo.model`/`maybeModel`/`modelList` providers under the native `ref` (`ref.watch(...)` reactively, `ref.read(....future)` one-off), writes via the `dw.repo.saveModel`/`deleteModel` methods. For complex scenarios or reuse inside the feature — a Riverpod provider. Local state — Riverpod + StatefulWidget + flutter_hooks. Describe every user action (create/edit/delete) before wiring it to the backend.
 
-### 4. Backend (CRUD-конфиги)
-Каждое действие пользователя маппится на CRUD-слой — никаких произвольных эндпоинтов. Используй `SaveConfig`/`DeleteConfig`/`GetModelConfig`/`GetListConfig`, ответы оборачивай в `DwModelWrapper`. В конфигах: права, валидации, pre/post-обработка, сайд-эффекты. Детали — скилл `dartway-crud-config`.
+### 4. Backend (CRUD configs)
+Every user action maps onto the CRUD layer — no arbitrary endpoints. Use `SaveConfig`/`DeleteConfig`/`GetModelConfig`/`GetListConfig`, wrap responses in `DwModelWrapper`. The configs hold permissions, validations, pre/post processing, side effects. Details — the `dartway-crud-config` skill.
 
-### 5. Модели & БД
-Уточни модели под реальные нужды фичи: поля и связи (1–1, 1–N, N–N). Поле nullable — только если значение реально может отсутствовать в домене, не ради удобства UI. Схема отражает доменную реальность. После правки YAML — `serverpod generate` + миграция.
+### 5. Models & DB
+Refine the models against the feature's real needs: fields and relations (1–1, 1–N, N–N). A field is nullable only if the value really can be absent in the domain, not for the UI's convenience. The schema reflects domain reality. After editing the YAML — `serverpod generate` + a migration.
 
-### 6. Тесты
-Сервер: юнит-тесты на каждый CRUD-конфиг (права, валидации, pre/post, sideEffects), тесты Event-моделей. Флаттер: widget-тест на entry point, provider-тесты на логику, integration — на навигацию и ключевые действия. Порог — по сложности (см. `dartway-clean-code`, Часть 3).
+### 6. Tests
+Server: unit tests for every CRUD config (permissions, validations, pre/post, sideEffects), tests for Event models. Flutter: a widget test for the entry point, provider tests for the logic, integration tests for navigation and the key actions. The threshold depends on complexity (see `dartway-clean-code`, Part 3).
 
-### 7. Завершение (закон №6)
-Прогони скилл `dartway-finish`: аудит диффа против контракта, сверка `DwFeatureSpec` с новым поведением и покрытия тестами. Отдельный док на фичу не заводится — описание уже в её файле. Скилл показывает предложения и применяет только подтверждённое.
+### 7. Finishing (Law 6)
+Run the `dartway-finish` skill: it audits the diff against the contract, reconciles `DwFeatureSpec` with the new behavior, and checks test coverage. No separate doc is created for the feature — the description already lives in its file. The skill shows suggestions and applies only what you confirm.
 
-## Паспорт фичи (`DwFeatureSpec`)
+## Feature spec (`DwFeatureSpec`)
 
-Фича описывает себя **в своём же файле**, рядом с кодом — и это единственное её описание. Ни реестра, ни отдельного дока: описание, живущее вдали от кода, расходится с ним на первой же правке, причём молча — компилятор его не проверяет, чекер не видит, а агент читает и верит. Это же описание читают отчёты об ошибках, DartWay Studio и агент.
+A feature describes itself **in its own file**, next to the code — and that is its only description. No registry, no separate doc: a description living away from the code drifts from it on the very first edit, and it does so silently — the compiler does not check it, the checker does not see it, and the agent reads it and believes it. That same description is read by error reports, DartWay Studio, and the agent.
 
 ```dart
 class BookingListPage extends ConsumerWidget implements DwFeature {
@@ -152,45 +153,47 @@ class BookingListPage extends ConsumerWidget implements DwFeature {
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
     id: 'bookings/list',
-    title: 'Мои записи',
-    purpose: 'Клиент видит, на что записан, и может отменить запись.',
+    title: 'My bookings',
+    purpose: 'The client sees what they are booked for and can cancel a booking.',
     behaviors: [
-      'Записи отсортированы по дате, ближайшая сверху.',
-      'Отмена убирает запись из списка без перезагрузки.',
-      'Прошедшую запись отменить нельзя — кнопки нет.',
+      'Bookings are sorted by date, the nearest one on top.',
+      'Cancelling removes the booking from the list without a reload.',
+      'A past booking cannot be cancelled — there is no button.',
     ],
     requirements: [
-      'Клиент видит только свои записи — решает accessFilter на бэке, не виджет.',
+      'A client sees only their own bookings — decided by accessFilter on the backend, not by the widget.',
     ],
     implementationNotes: [
-      'Один watch dw.repo.modelList<Booking> с backendFilter — realtime и пагинация идут в комплекте.',
+      'One watch on dw.repo.modelList<Booking> with a backendFilter — realtime and pagination come included.',
     ],
     knownIssues: [
-      'Сортировка по дате закомментирована в списке, хотя поле в форме осталось —'
-          ' порядок сейчас случайный.',
+      'Sorting by date is commented out in the list even though the field is still in the form —'
+          ' the order is currently random.',
     ],
   );
 ```
 
-Правила по полям:
+Rules per field:
 
-- **`id`** — `<папка-фичи>/<осмысленное-имя>`. Это **контракт**: по нему на фичу ссылаются Studio, фидбек и тикеты. Переехала папка — id остаётся. Нужно другое имя — заводи новый id и выводи старый из обращения, но **не переименовывай на месте**.
-- **`title`** — как фичу называют вслух.
-- **`purpose`** — зачем она пользователю. **Опционально и часто не нужно:** у карточки или строки списка своей цели нет, она служит экрану; повторять цель экрана на каждой его части — шум.
-- **`behaviors`** — что фича наблюдаемо делает, по одному проверяемому утверждению на пункт. **Критерий, который держит поле живым: каждый пункт можно проверить, посмотрев на работающее приложение.** Как только появляется «хорошо работает с длинными названиями» — поле снова превратилось в сочинение.
-- **`requirements`** — что фича обязана соблюдать, наложенное **извне** (только авторизованным, цена не показывается до подтверждения, работает офлайн). Если формулируется как наблюдаемое действие — это `behaviors`.
-- **`implementationNotes`** — решения, которые иначе будут переоткрывать («почему превью в строке, а полная картинка в списке»). Пишется для команды, не для клиента: Studio показывает их на технической стороне.
-- **`knownIssues`** — что в фиче **не так** и стоит взять в работу: настройка, которую никто не читает; экран, всё ещё сидящий на моках; сортировка, закомментированная при живом поле в форме.
+- **`id`** — `<feature-folder>/<meaningful-name>`. This is a **contract**: Studio, feedback, and tickets refer to the feature by it. The folder moved — the id stays. Need a different name — introduce a new id and retire the old one, but **do not rename it in place**.
+- **`title`** — what the feature is called out loud.
+- **`purpose`** — why the user needs it. **Optional and often unnecessary:** a card or a list row has no purpose of its own, it serves the screen; repeating the screen's purpose on every one of its parts is noise.
+- **`behaviors`** — what the feature observably does, one verifiable statement per item. **The criterion that keeps this field alive: every item can be verified by looking at the running app.** The moment "works well with long titles" shows up, the field has turned back into an essay.
+- **`requirements`** — what the feature is obliged to honor, imposed **from the outside** (authorized users only, the price is not shown before confirmation, works offline). If it is phrased as an observable action, it belongs in `behaviors`.
+- **`implementationNotes`** — decisions that would otherwise be rediscovered ("why the preview is in the row and the full image in the list"). Written for the team, not for the client: Studio shows them on the technical side.
+- **`knownIssues`** — what is **wrong** in the feature and worth picking up: a setting nobody reads; a screen still sitting on mocks; sorting commented out while the field is still live in the form.
 
-**Граница между `implementationNotes` и `knownIssues` — что читатель должен с этим сделать.** Заметка говорит «так задумано, не трогай», находка — «так неправильно, почини». Агенту это различие нужно **до** того, как он что-то поменяет: иначе он либо «чинит» намеренное решение, либо аккуратно сохраняет баг. Проверка одним вопросом: **если это исправят, запись исчезнет?** Исчезнет — `knownIssues`. Останется как объяснение — `implementationNotes`.
+**The line between `implementationNotes` and `knownIssues` is what the reader is supposed to do about it.** A note says "this is intentional, don't touch it", a finding says "this is wrong, fix it". The agent needs that distinction **before** it changes anything: otherwise it either "fixes" a deliberate decision or carefully preserves a bug. One question settles it: **if this gets fixed, does the entry disappear?** It disappears — `knownIssues`. It stays as an explanation — `implementationNotes`.
 
-Пиши по предложению на пункт: что не так и чем это грозит. Это указатель для того, кто возьмёт фичу в работу, а не трекер — тикет заводится по этой строке, а сама строка удаляется вместе с починкой. Studio показывает у таких фич счётчик и умеет по нему фильтровать.
+Write one sentence per item: what is wrong and what it costs. This is a pointer for whoever picks the feature up, not a tracker — a ticket is created from that line, and the line itself is deleted together with the fix. Studio shows a counter for such features and can filter by it.
 
-**Находку видно только при чтении кода — значит вносить её надо там же и сразу.** Заметил по дороге, что поле сохраняется и никем не читается, — строка в `knownIssues` той фичи, а не «надо будет посмотреть». Это единственный способ, которым такие вещи вообще доживают до разбора.
+**A finding is only visible while reading the code — so it must be recorded there and then.** You noticed along the way that a field is saved and read by nobody — that is a line in that feature's `knownIssues`, not a "should look into it later". This is the only way such things survive long enough to be dealt with.
 
-Паспорт нужен виджету-фиче. Если entry point — extension или функция (`context.showInviteDialog()`), вешать спеку не на что, и чекер такую фичу не трогает.
+**Write the spec from what the code does, not from what was intended.** While you phrase verifiable statements you find things nobody ever claimed — that is how it surfaced that the events block on the home screen does not sort them by date while the screen does.
 
-## Пример entry point
+The spec is for a widget-feature. If the entry point is an extension or a function (`context.showInviteDialog()`), there is nothing to attach the spec to, and the checker leaves such a feature alone.
+
+## Entry point example
 
 ```dart
 // todo_list_page.dart
@@ -205,8 +208,8 @@ class TodoListPage extends ConsumerWidget {
     return Scaffold(
       body: todos.dwBuildListAsync(
         loadingItemsCount: 5,
-        // локальная фильтрация — обычный .where в виджете; «фреймворочного»
-        // способа нет специально (см. dartway-data-layer §3)
+        // local filtering — a plain .where in the widget; there is deliberately
+        // no "framework" way to do it (see dartway-data-layer §3)
         childBuilder: (list) => ListView(
           children: [
             for (final todo in list.where(
@@ -216,9 +219,9 @@ class TodoListPage extends ConsumerWidget {
           ],
         ),
       ),
-      // `dw.action(...)` возвращает DwUiAction, а не VoidCallback: напрямую в
-      // onPressed его не отдать. Под тапом его разворачивает DwActionBuilder —
-      // он же гасит повторные тапы и отдаёт busy.
+      // `dw.action(...)` returns a DwUiAction, not a VoidCallback: you cannot hand
+      // it straight to onPressed. DwActionBuilder unwraps it under a tap — it also
+      // suppresses repeat taps and exposes busy.
       floatingActionButton: DwActionBuilder(
         action: dw.action((_) async {
           await dw.repo.saveModel(
@@ -226,7 +229,7 @@ class TodoListPage extends ConsumerWidget {
           );
         }),
         builder: (context, onPressed, busy) => FloatingActionButton(
-          onPressed: onPressed, // null, пока действие бежит
+          onPressed: onPressed, // null while the action is running
           child: busy
               ? const CircularProgressIndicator()
               : const Icon(Icons.add),
@@ -237,17 +240,4 @@ class TodoListPage extends ConsumerWidget {
 }
 ```
 
-## Паспорт фичи (`DwFeatureSpec`)
-
-Публичный виджет фичи объявляет `implements DwFeature` и отдаёт спек прямо в своём файле. Его читают отчёты об ошибках, Studio и агент — поэтому пустой спек хуже отсутствующего.
-
-- `id` — **контракт**: на него ссылаются задачи и записи Studio. Переносишь папку — id не трогаешь; устаревший id выводят из обращения явно, а не переписывают на месте;
-- `title` — как фичу называют вслух;
-- `purpose` — зачем она пользователю. **Необязателен**: у карточки или строки списка своего смысла нет, он у экрана, которому они служат, и повторять его на каждой части — шум;
-- `behaviors` — **проверяемые утверждения**, по одному на пункт: «пусто → блок не рисуется вовсе», «цена показывается, только если указана». Появилось «удобно работает с длинными названиями» — поле снова стало прозой;
-- `requirements` — что фича обязана соблюдать, наложенное **снаружи** (только авторизованным, не показывать цену до подтверждения);
-- `implementationNotes` — решения, которые иначе будут переоткрывать заново. Пишутся **для команды**: в Studio они лежат на технической стороне, не в продуктовой панели.
-
-**Пиши спек по факту кода, а не по замыслу.** Пока формулируешь проверяемые утверждения, находится то, чего никто не заявлял: так вскрылось, что блок мероприятий на главной не сортирует их по дате, хотя экран — сортирует.
-
-Ключевое: списки `AsyncValue` — через `dwBuildListAsync` (с `loadingItemsCount`); локальный поиск/фильтр — `.where` в виджете (+ провайдер под строку поиска); действия из UI — в `dw.action` (колбэк получает `context`; `(_)`, если не нужен — см. `dartway-data-layer` §4).
+The essentials: `AsyncValue` lists — through `dwBuildListAsync` (with `loadingItemsCount`); local search/filter — a `.where` in the widget (plus a provider for the search string); actions from the UI — inside `dw.action` (the callback receives `context`; use `(_)` if you don't need it — see `dartway-data-layer` §4).

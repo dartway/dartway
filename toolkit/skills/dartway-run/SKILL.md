@@ -1,106 +1,106 @@
 ---
 name: dartway-run
 description: >-
-  Поднять DartWay-проект локально и убедиться, что он живой (проекты DartWay):
-  зависимости, Postgres в docker, миграции, сид тестовых юзеров, сервер, приложение.
-  Знает порядок шагов (сид до миграций не работает), реальные порты (API 8080,
-  БД разработки 8090, тестовая 9090, объектное хранилище 8100 и его консоль 8101),
-  где взять код входа (печатается в консоли сервера) и как чинить типовые отказы:
-  docker не запущен, порт занят, схема разъехалась, модель поменяли без serverpod
-  generate, версия serverpod_cli не совпала с проектом, картинки не открываются
-  по ссылке, загрузка падает на ненастроенном хранилище.
-  Использовать, когда просят «подними проект», «запусти», «почему не стартует»,
-  «проверь, что работает», а также после смены модели или свежего git clone.
+  Bring a DartWay project up locally and confirm it is alive (DartWay projects):
+  dependencies, Postgres in docker, migrations, seeding test users, the server, the app.
+  Knows the order of the steps (seeding before migrations does not work), the real ports
+  (API 8080, development DB 8090, test DB 9090, object storage 8100 and its console 8101),
+  where to find the sign-in code (printed in the server console) and how to fix the typical
+  failures: docker not running, port already taken, schema drifted, model changed without
+  serverpod generate, serverpod_cli version not matching the project, images not opening
+  by link, upload failing on unconfigured storage.
+  Use when asked to "bring the project up", "run it", "why does it not start",
+  "check that it works", and also after a model change or a fresh git clone.
 ---
 
-# DartWay — поднять проект локально (`dartway-run`)
+# DartWay — bring the project up locally (`dartway-run`)
 
-Твоя задача — довести проект до состояния «сервер отвечает, приложение открылось,
-пользователь может войти» и **доложить фактом**, а не предположением: код ответа
-API, применённые миграции, имя юзера для входа.
+Your job is to get the project to the state "the server responds, the app opened,
+the user can sign in" and **report facts**, not assumptions: the API response code,
+the applied migrations, the user name to sign in with.
 
-Пакеты проекта: `__SERVER_PKG__` (бэкенд), `__FLUTTER_PKG__` (приложение),
-`__CLIENT_PKG__` (сгенерированный протокол — руками не трогать).
+Project packages: `__SERVER_PKG__` (backend), `__FLUTTER_PKG__` (app),
+`__CLIENT_PKG__` (generated protocol — do not touch by hand).
 
 ---
 
-## Порядок (он не произвольный)
+## The order (it is not arbitrary)
 
 ```bash
 cd __SERVER_PKG__
-dart pub get                                              # ~12 c
-docker compose up -d                                       # ~5 c
-# дождись готовности БД, не спи вслепую:
-#   docker exec <postgres-контейнер> pg_isready -U postgres
-dart bin/main.dart --apply-migrations --role maintenance    # ~18 c
-dart bin/seed_dev.dart --mode development                   # ~9 c
-dart bin/main.dart                                          # сервер, не завершается
+dart pub get                                              # ~12 s
+docker compose up -d                                       # ~5 s
+# wait until the DB is ready, do not sleep blindly:
+#   docker exec <postgres-container> pg_isready -U postgres
+dart bin/main.dart --apply-migrations --role maintenance    # ~18 s
+dart bin/seed_dev.dart --mode development                   # ~9 s
+dart bin/main.dart                                          # the server, does not exit
 ```
 
 ```bash
 cd __FLUTTER_PKG__
-flutter pub get     # ~18 c
+flutter pub get     # ~18 s
 flutter run
 ```
 
-**Почему именно так:**
+**Why exactly this way:**
 
-- **Сид после миграций.** Сид пишет в таблицы — до применения схемы их нет, он упадёт.
-- **Миграции после `docker compose up`** и **после готовности БД.** Контейнер «Started»
-  ≠ Postgres принимает соединения; между ними секунды, и миграция в этом окне падает
-  на connection refused. Дожидайся `pg_isready`, а не `sleep`.
-- **Хранилище поднимается тем же `docker compose up`.** Рядом с Postgres встаёт `minio` (S3 для загрузок) и одноразовый `minio_init`, который создаёт бакет и открывает его на чтение — без этого залитые картинки не откроются по ссылке.
-- **Сервер — долгоживущий процесс.** Запускай его фоново и не жди завершения:
-  ожидание «пока команда закончится» подвесит тебя навсегда.
+- **Seeding after migrations.** The seed writes into tables — before the schema is applied they do not exist and it will fail.
+- **Migrations after `docker compose up`** and **after the DB is ready.** A container that is "Started"
+  ≠ Postgres accepting connections; there are seconds between them, and a migration in that window fails
+  with connection refused. Wait for `pg_isready`, not for a `sleep`.
+- **Storage comes up with the same `docker compose up`.** Alongside Postgres it brings up `minio` (S3 for uploads) and a one-shot `minio_init`, which creates the bucket and opens it for reading — without that, uploaded images will not open by link.
+- **The server is a long-running process.** Start it in the background and do not wait for it to finish:
+  waiting "until the command completes" will hang you forever.
 
-## Проверка, что живой (обязательна — без неё не докладывай об успехе)
+## Liveness check (mandatory — do not report success without it)
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/     # ожидаем 200
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/     # expect 200
 ```
 
-Сервер печатает применённые миграции и результат сида. Сид сообщает, кем входить:
-телефон админа и телефон обычного юзера. **Одноразовый код входа печатается в консоли
-сервера** — найди его там и передай пользователю; не выдумывай код и не предлагай
-«введите любой».
+The server prints the applied migrations and the seeding result. The seed reports who to sign in as:
+the admin's phone and a regular user's phone. **The one-time sign-in code is printed in the server
+console** — find it there and pass it to the user; do not invent a code and do not suggest
+"enter anything".
 
-## Типовые отказы и что делать
+## Typical failures and what to do
 
-| Симптом | Причина | Действие |
+| Symptom | Cause | Action |
 |---|---|---|
-| `docker: command not found` / `cannot connect to the Docker daemon` | Docker Desktop не запущен | Попроси запустить Docker; не пытайся поднять Postgres иначе |
-| Первый `docker compose up` висит минуты | Тянется образ `postgres:16` | Это нормально, дождись; в следующий раз `docker pull postgres:16` заранее |
-| `connection refused` на миграциях | БД ещё не приняла соединения | Дождись `pg_isready`, повтори |
-| `port is already allocated` (8090/9090/8100) | Занят другой проект или прошлый контейнер | `docker ps` → останови конфликтующий контейнер. **8090 — частая коллизия** между DartWay-проектами |
-| Картинки не грузятся, ссылка отдаёт 404 | Бакет не создан или закрыт на чтение | Проверь логи `minio_init` (`docker compose logs minio_init`): должно быть «Bucket created» и «set to `download`». Публичная ссылка вида `http://localhost:8100/uploads/<файл>` обязана открываться в браузере |
-| Загрузка падает с «Cloud storage is not configured» | Нет ключей `dwCloudStorage*` для этого run mode | Добавь их в `config/passwords.yaml` (в разработке они указывают на сервис `minio`) |
-| `Address already in use` на 8080 | Сервер уже запущен в другом терминале | Не поднимай второй; проверь `curl localhost:8080` |
-| Миграция не применяется, жалоба на расхождение схемы | БД пережила смену модели | Для локальной разработки проще всего пересоздать: `docker compose down -v` (**удаляет данные**) → `up -d` → миграции → сид. Спроси подтверждение, прежде чем сносить том |
-| Клиент не видит новое поле модели | После правки `.spy.yaml` не прогнали генерацию | `serverpod generate`, затем `serverpod create-migration`, затем применить миграции |
-| Странные ошибки генерации/протокола | Версия `serverpod_cli` разъехалась с пином `serverpod` в pubspec проекта | Сверь `dart pub global list` с версией в `__SERVER_PKG__/pubspec.yaml`; генератор обязан совпадать с рантаймом |
-| `Default Objects Repository doesn't contain a model of type X` | Новая модель не зарегистрирована дефолт-инстансом | Добавь `dw.repo.setupRepository(defaultModel: X(...))` в `__FLUTTER_PKG__/lib/core/default_models.dart` |
-| API отвечает `notConfigured` | Для модели нет `DwCrudConfig` или он не зарегистрирован | Заведи конфиг и добавь его в `crudConfigurations` (скилл `dartway-crud-config`) |
+| `docker: command not found` / `cannot connect to the Docker daemon` | Docker Desktop is not running | Ask to start Docker; do not try to bring Postgres up another way |
+| The first `docker compose up` hangs for minutes | The `postgres:16` image is being pulled | This is normal, wait it out; next time `docker pull postgres:16` in advance |
+| `connection refused` during migrations | The DB is not accepting connections yet | Wait for `pg_isready`, retry |
+| `port is already allocated` (8090/9090/8100) | Taken by another project or a leftover container | `docker ps` → stop the conflicting container. **8090 is a frequent collision** between DartWay projects |
+| Images do not load, the link returns 404 | The bucket was not created or is closed for reading | Check the `minio_init` logs (`docker compose logs minio_init`): they must say "Bucket created" and "set to `download`". A public link of the form `http://localhost:8100/uploads/<file>` must open in a browser |
+| Upload fails with "Cloud storage is not configured" | No `dwCloudStorage*` keys for this run mode | Add them to `config/passwords.yaml` (in development they point at the `minio` service) |
+| `Address already in use` on 8080 | The server is already running in another terminal | Do not start a second one; check `curl localhost:8080` |
+| A migration does not apply, complaining about a schema mismatch | The DB survived a model change | For local development the simplest fix is to recreate it: `docker compose down -v` (**deletes the data**) → `up -d` → migrations → seed. Ask for confirmation before destroying the volume |
+| The client does not see a new model field | Generation was not run after editing `.spy.yaml` | `serverpod generate`, then `serverpod create-migration`, then apply the migrations |
+| Strange generation/protocol errors | The `serverpod_cli` version drifted from the `serverpod` pin in the project's pubspec | Compare `dart pub global list` with the version in `__SERVER_PKG__/pubspec.yaml`; the generator must match the runtime |
+| `Default Objects Repository doesn't contain a model of type X` | The new model has no registered default instance | Add `dw.repo.setupRepository(defaultModel: X(...))` in `__FLUTTER_PKG__/lib/core/default_models.dart` |
+| The API answers `notConfigured` | The model has no `DwCrudConfig`, or it is not registered | Create the config and add it to `crudConfigurations` (skill `dartway-crud-config`) |
 
-## Чего не делать
+## What not to do
 
-- **Не выводи в чат содержимое `config/passwords.yaml`** и других секретов — ни при
-  диагностике, ни «чтобы показать». Если нужен факт из него, скажи, какого ключа не хватает.
-- **Не чини «пустой список» ослаблением доступа.** Пустой ответ у read-конфига — это
-  чаще всего корректно работающий `accessFilter`, а не баг. Не сконфигурирован доступ ⇒
-  запрещено — это осознанное правило фреймворка.
-- **Не удаляй том с данными без подтверждения** (`docker compose down -v`).
-- Не предлагай «переустановить зависимости» как первый шаг — сначала прочитай ошибку.
+- **Do not print the contents of `config/passwords.yaml`** or other secrets into the chat — neither
+  while diagnosing, nor "just to show". If you need a fact from it, say which key is missing.
+- **Do not fix an "empty list" by loosening access.** An empty response from a read config is
+  most often a correctly working `accessFilter`, not a bug. Access not configured ⇒
+  forbidden — this is a deliberate rule of the framework.
+- **Do not delete the data volume without confirmation** (`docker compose down -v`).
+- Do not propose "reinstall the dependencies" as the first step — read the error first.
 
-## После смены модели
+## After a model change
 
-Полный цикл, если пользователь поменял `.spy.yaml`:
+The full cycle if the user changed a `.spy.yaml`:
 
 ```bash
 cd __SERVER_PKG__
-serverpod generate           # ~24 c — обновляет генерат сервера и __CLIENT_PKG__
-serverpod create-migration   # ~6 c  — новая миграция в migrations/
+serverpod generate           # ~24 s — updates the server's generated code and __CLIENT_PKG__
+serverpod create-migration   # ~6 s  — a new migration in migrations/
 dart bin/main.dart --apply-migrations --role maintenance
 ```
 
-Затем: `DwCrudConfig` для новой модели + регистрация в `crudConfigurations`,
-дефолт-инстанс в `default_models.dart`, и только потом экран.
+Then: a `DwCrudConfig` for the new model + registration in `crudConfigurations`,
+a default instance in `default_models.dart`, and only after that the screen.

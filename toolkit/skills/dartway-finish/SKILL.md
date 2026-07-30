@@ -1,146 +1,146 @@
 ---
 name: dartway-finish
 description: >-
-  Завершение dartway-задачи перед коммитом/PR (проекты DartWay): «definition of done».
-  Аудитит дифф против базовой ветки по контракту dartway-clean-code (Flutter + сервер), проверяет
-  дрейф описания затронутой фичи (DwFeatureSpec рядом с кодом, doc-комментарии над CRUD-конфигом) и
-  покрытие тестами, затем ПОКАЗЫВАЕТ предложения и применяет ТОЛЬКО подтверждённое — ничего
-  не меняет молча. Использовать, когда задача/фича закончена, перед коммитом или открытием PR
-  (закон №6); запускается как /dartway-finish.
+  Finishing a dartway task before a commit/PR (DartWay projects): the "definition of done".
+  Audits the diff against the base branch using the dartway-clean-code contract (Flutter + server),
+  checks the affected feature's description for drift (DwFeatureSpec next to the code, doc comments
+  above the CRUD config) and test coverage, then SHOWS suggestions and applies ONLY what was
+  confirmed — it never changes anything silently. Use when a task/feature is done, before committing
+  or opening a PR (Law 6); runs as /dartway-finish.
 ---
 
-# DartWay — завершение задачи (`dartway-finish`)
+# DartWay — finishing a task (`dartway-finish`)
 
-«Definition of done» для dartway-задачи. Запускается, когда работа над задачей/фичей закончена — **перед коммитом/PR** (закон №6). Аудитит изменения, проверяет документацию и тесты, и помогает довести задачу до контракта.
+The "definition of done" for a dartway task. Run it when the work on a task/feature is done — **before the commit/PR** (Law 6). It audits the changes, checks the documentation and the tests, and helps bring the task up to the contract.
 
-## ⛔ Принцип безопасности
+## ⛔ Safety principle
 
-Скилл работает в три фазы и **никогда не меняет код или доки без явного подтверждения автора**. Фазы A (аудит) и B (предложения) — read-only. Фаза C (применение) — только то, что автор подтвердил. Спорное и архитектурное скилл **не трогает** — оставляет автору с пометкой.
+The skill works in three phases and **never changes code or docs without the author's explicit confirmation**. Phases A (audit) and B (suggestions) are read-only. Phase C (application) covers only what the author confirmed. Anything debatable or architectural the skill **does not touch** — it leaves it to the author with a note.
 
-Источник правил — `dartway-clean-code` (контракт чистоты), плюс `dartway-data-layer`, `dartway-models`, `dartway-crud-config`, `dartway-navigation`, `dartway-ui-kit`. Это тот же свод, что и у команды `/dartway-audit`; отличие: `dartway-finish` смотрит **дифф одной задачи** и добавляет docs-sync + проверку тестов + цикл подтверждения.
+The rules come from `dartway-clean-code` (the cleanliness contract), plus `dartway-data-layer`, `dartway-models`, `dartway-crud-config`, `dartway-navigation`, `dartway-ui-kit`. It is the same body of rules the `/dartway-audit` command uses; the difference: `dartway-finish` looks at **the diff of a single task** and adds docs sync + a test check + a confirmation loop.
 
 ---
 
-## Фаза A — Аудит (read-only)
+## Phase A — Audit (read-only)
 
-### A.1 Скоуп диффа
-Определи изменения: `git diff --stat origin/__BASE_BRANCH__...HEAD` + незакоммиченное (`git status`, `git diff`). Собери список изменённых `.dart`/`.spy.yaml`/доков.
+### A.1 Diff scope
+Determine the changes: `git diff --stat origin/__BASE_BRANCH__...HEAD` + uncommitted work (`git status`, `git diff`). Collect the list of changed `.dart`/`.spy.yaml`/doc files.
 
-**Исключи из аудита генерёнку** (её не ревьюят): `**/generated/**`, `*.g.dart`, `*.freezed.dart`, весь пакет `__CLIENT_PKG__`, `*.spy.yaml`-генерёнку. Аудитируем только рукописное.
+**Exclude generated code from the audit** (it is not reviewed): `**/generated/**`, `*.g.dart`, `*.freezed.dart`, the whole `__CLIENT_PKG__` package, `*.spy.yaml` generated output. We audit handwritten code only.
 
-### A.2 Аудит кода против контракта
-Прогони детекторы **только по изменённым файлам** (не по всему репо). Для каждой находки — `file:line`.
+### A.2 Auditing the code against the contract
+Run the detectors **over the changed files only** (not over the whole repo). For every finding — `file:line`.
 
-**Flutter (`dartway-clean-code` Часть 1 + specials):**
-- Несколько ответственностей в файле (длина — самый слабый сигнал: >200 строк — присмотреться, >350 — ворнинг; осмысленный файл на 300 строк лучше бессмысленного попила).
-- `BuildContext`/`WidgetRef` в параметрах сервисов/функций (не в `build`).
-- `_buildXxx()`, возвращающий `Widget` (вместо виджет-класса).
-- `ref.invalidate(...)` для рефреша.
-- `GlobalKey().currentState/currentContext` для поиска в дереве.
-- Внешние `padding`/`margin` на верхнем уровне `build` виджета.
-- Приватный виджет-класс (`class _Foo extends ...Widget`) **с ценностью для переиспользования/теста** в публичном файле фичи (тривиальный локальный хелпер на один экран — допустим, см. `dartway-clean-code` 1.8).
-- Нейминг < 2 слов; запрещённые `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
-- Specials (`dartway-data-layer`): `SnackBar`/`ScaffoldMessenger` вместо `dw.notify.*`; `watchModel<UserProfile>()` вместо `ref.watchUserProfile`; сырой `onPressed`/`() async {}` вместо `dw.action`; сырые `Color`/`TextStyle`/`BorderRadius`/`context.theme` в фичах вместо UI Kit; `router.go()`/строковые роуты вместо enum-роутов и context-extensions (`dartway-navigation`).
-- Изоляция фич: импорт не-entry-point чужой фичи.
-- Entry point-виджет фичи без `implements DwFeature` / `DwFeatureSpec` — фича есть в коде, но ничего о себе не говорит (её паспорт читают отчёты об ошибках, Studio и агент). Изменил поведение фичи — сверь `behaviors`: устаревший паспорт хуже отсутствующего. Как заполнять — `dartway-feature-scaffold`, «Паспорт фичи».
-- **Наткнулся по ходу аудита на «здесь не так» — строка в `knownIssues` той фичи, а не в отчёт и не в голову.** Настройка, которую никто не читает; экран на моках; закомментированная сортировка при живом поле в форме. Аудит — единственный момент, когда это видно, а `knownIssues` — единственное место, где оно доживёт до разбора: Studio по нему фильтрует. Починил в этой же задаче — строку удаляешь.
-- Часть 2: SRP/God-объекты, DRY (копипаста виджетов/маппингов), KISS/YAGNI, Law of Demeter (`a.b.c.d`), SoC (логика в State/UI), tell-don't-ask, магические числа/строки, единый источник истины, проглоченные ошибки (`catch (_) {}`, `catch ... return null`).
+**Flutter (`dartway-clean-code` Part 1 + specials):**
+- Several responsibilities in one file (length is the weakest signal: >200 lines — take a look, >350 — a warning; a meaningful 300-line file beats a pointless split).
+- `BuildContext`/`WidgetRef` in the parameters of services/functions (outside `build`).
+- A `_buildXxx()` returning a `Widget` (instead of a widget class).
+- `ref.invalidate(...)` used for refreshing.
+- `GlobalKey().currentState/currentContext` used to look things up in the tree.
+- Outer `padding`/`margin` at the top level of a widget's `build`.
+- A private widget class (`class _Foo extends ...Widget`) **with value for reuse/testing** inside a feature's public file (a trivial local helper for a single screen is fine, see `dartway-clean-code` 1.8).
+- Naming shorter than 2 words; the forbidden `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
+- Specials (`dartway-data-layer`): `SnackBar`/`ScaffoldMessenger` instead of `dw.notify.*`; `watchModel<UserProfile>()` instead of `ref.watchUserProfile`; a raw `onPressed`/`() async {}` instead of `dw.action`; raw `Color`/`TextStyle`/`BorderRadius`/`context.theme` in features instead of the UI Kit; `router.go()`/string routes instead of enum routes and context extensions (`dartway-navigation`).
+- Feature isolation: importing a non-entry-point file of another feature.
+- A feature's entry-point widget without `implements DwFeature` / `DwFeatureSpec` — the feature exists in the code but says nothing about itself (its spec is read by error reports, Studio, and the agent). Changed the feature's behavior — reconcile `behaviors`: an outdated spec is worse than a missing one. How to fill it in — `dartway-feature-scaffold`, "Feature spec".
+- **Ran into a "this is wrong here" during the audit — that is a line in that feature's `knownIssues`, not in the report and not in your head.** A setting nobody reads; a screen on mocks; commented-out sorting while the field is still live in the form. The audit is the only moment when this is visible, and `knownIssues` is the only place where it will survive until it is dealt with: Studio filters by it. Fixed it within this same task — you delete the line.
+- Part 2: SRP/God objects, DRY (copy-pasted widgets/mappings), KISS/YAGNI, the Law of Demeter (`a.b.c.d`), SoC (logic in State/UI), tell-don't-ask, magic numbers/strings, a single source of truth, swallowed errors (`catch (_) {}`, `catch ... return null`).
 
 **Server (`dartway-crud-config` / `dartway-models`):**
-- Произвольный эндпоинт вместо CRUD-конфига (без документированного исключения).
-- Модель без `DwCrudConfig` или не зарегистрированная в `crudConfigurations`.
-- Прямой апдейт поля (напр. `balance`) вместо Event-модели в транзакционной/денежной логике.
-- Проглоченные ошибки в колбэках конфигов; nullable «ради UI» в `.spy.yaml`.
+- An arbitrary endpoint instead of a CRUD config (without a documented exception).
+- A model without a `DwCrudConfig`, or not registered in `crudConfigurations`.
+- A direct field update (e.g. `balance`) instead of an Event model in transactional/money logic.
+- Swallowed errors in config callbacks; nullable "for the UI's sake" in `.spy.yaml`.
 
-### A.3 Проверка описания (оно живёт в коде)
+### A.3 Checking the description (it lives in the code)
 
-Отдельных доков на фичу нет — описание лежит там же, где код, поэтому и искать его не нужно: оно **в том же диффе**.
+There are no separate docs per feature — the description sits where the code sits, so there is nothing to look for: it is **in the same diff**.
 
-- Изменился файл внутри фичи — открой её публичный файл и сверь `DwFeatureSpec` с новым поведением. Появилось наблюдаемое действие — пункт в `behaviors`; изменилось существующее — правь формулировку. **Устаревшая спека хуже отсутствующей:** её читают отчёты об ошибках, Studio и следующий агент.
-- Изменился CRUD-конфиг — сверь doc-комментарии над ним: права, валидации, сайд-эффекты. Появилось правило, которое из кода не читается («почему `accessFilter` именно такой») — комментарий над конфигом.
-- Новая фича без `DwFeatureSpec` — не закончена. Чекер даст `featureSpecMissing`.
-- Тянет завести файл в `docs/`, названный по имени фичи, — не заводи: значит описание не влезло в спеку, и вопрос в том, почему спека не отвечает. В `docs/1_general/` place только сквозным справочникам, у которых нет своей фичи (реестр событий аналитики, каталог настроек, матрица доступа).
-- Проверь, не разошлись ли утверждения `CLAUDE.md` (корневой/пакетные) или скиллов с изменённым кодом (двунаправленно — как мы нашли дрейф `DwCallback`→`DwUiAction`).
+- A file inside a feature changed — open the feature's public file and reconcile `DwFeatureSpec` with the new behavior. A new observable action appeared — an item in `behaviors`; an existing one changed — fix the wording. **An outdated spec is worse than a missing one:** it is read by error reports, Studio, and the next agent.
+- A CRUD config changed — reconcile the doc comments above it: permissions, validations, side effects. A rule appeared that cannot be read off the code ("why `accessFilter` is exactly like this") — a comment above the config.
+- A new feature without a `DwFeatureSpec` is not finished. The checker will emit `featureSpecMissing`.
+- Tempted to create a file in `docs/` named after the feature — don't: it means the description did not fit into the spec, and the question is why the spec does not answer it. `docs/1_general/` is only for cross-cutting references that have no feature of their own (the analytics event registry, the settings catalog, the access matrix).
+- Check whether the statements in `CLAUDE.md` (root or per-package) or in the skills have drifted apart from the changed code (in both directions — that is how we found the `DwCallback`→`DwUiAction` drift).
 
-### A.3a Правки, которые анализатор не ловит
+### A.3a Edits the analyzer does not catch
 
-Отдельно проверь глазами то, что падает только в рантайме:
+Check separately, by eye, the things that only break at runtime:
 
-- **Механика размеров.** Заменил `SizedBox`/`Padding` на `Expanded` (или наоборот) — пройди по
-  **всем вызывающим**: `Expanded` требует flex-родителя, а виджет могли вставить в боттом-шит,
-  `SingleChildScrollView` или диалог, где родителя-flex нет. `dart analyze` промолчит, упадёт
-  у пользователя.
-- **Явный цвет вместо цвета темы.** `WidgetStateProperty.all(color)` красит **все** состояния,
-  включая `disabled`: снимая или добавляя такой параметр, проверь, как виджет выглядит выключенным
-  и во время выполнения действия.
-- **Ключи семейств провайдеров.** Семейство по объекту, который сравнивается по identity, тихо
-  создаёт новый провайдер на каждой сборке.
+- **Sizing mechanics.** You replaced a `SizedBox`/`Padding` with an `Expanded` (or the other way round) — walk
+  **every caller**: `Expanded` requires a flex parent, and the widget may have been put into a bottom sheet,
+  a `SingleChildScrollView`, or a dialog, where there is no flex parent. `dart analyze` will stay quiet, it
+  will crash for the user.
+- **An explicit color instead of a theme color.** `WidgetStateProperty.all(color)` paints **all** states,
+  including `disabled`: when adding or removing such a parameter, check how the widget looks disabled
+  and while the action is running.
+- **Provider family keys.** A family keyed by an object compared by identity silently
+  creates a new provider on every build.
 
-### A.3b Тесты — часть площади рефакторинга
+### A.3b Tests are part of the refactoring surface
 
-Тесты ссылаются на код **по путям и по именам**, причём часто на внутренности (`logic/`, `widgets/`)
-— для юнит-теста это законно. Значит любая из этих правок ломает `test/`, и анализатор `lib` этого
-не покажет:
+Tests reference the code **by path and by name**, and often reference internals (`logic/`, `widgets/`)
+— which is legitimate for a unit test. So any of these edits breaks `test/`, and analyzing `lib` will
+not show it:
 
-- **перенёс или переименовал файл** — импорты в тестах ведут в никуда;
-- **свободная функция стала методом класса или extension'а** — вызов `doThing(x, ...)` больше не
-  компилируется, нужен `x.doThing(...)`;
-- **убрал параметр из публичного API виджета** (например визуальный параметр уехал в кит) — тест
-  передаёт то, чего нет, или не передаёт ставшее обязательным;
-- **выпилил кодогенерацию** — тесты продолжают звать `Assets.*` / `FontFamily.*`;
-- **перевёл `@riverpod` на ручной провайдер** — тестовые подмены перестают компилироваться (см.
-  `dartway-data-layer`, «Подмена провайдера в тесте»).
+- **you moved or renamed a file** — the imports in the tests lead nowhere;
+- **a free function became a method of a class or an extension** — the call `doThing(x, ...)` no longer
+  compiles, it has to be `x.doThing(...)`;
+- **you removed a parameter from a widget's public API** (e.g. a visual parameter moved into the kit) — the test
+  passes something that no longer exists, or fails to pass something that became required;
+- **you dropped code generation** — the tests keep calling `Assets.*` / `FontFamily.*`;
+- **you moved `@riverpod` to a manual provider** — the test overrides stop compiling (see
+  `dartway-data-layer`, "Overriding a provider in a test").
 
-**Правило:** массовую правку импортов делай по явной карте «старый путь → новый». Регулярка с
-фолбэком, которая «на всякий случай» подставляет что-то при непопадании, тихо перепишет пол-проекта
-— так один заход стоил 64 сломанных файла и восстановления из `git show`.
+**The rule:** do bulk import edits from an explicit "old path → new path" map. A regex with a
+fallback that "just in case" substitutes something when it does not match will silently rewrite half the project
+— one such run cost 64 broken files and a restore from `git show`.
 
-**Публичная сущность уехала в кит и стала приватной** — тест на неё не выбрасывай: то же поведение
-проверяется через публичный китовый виджет. Тест на приватную композицию → тест на её обёртку.
+**A public entity moved into the kit and became private** — do not throw its test away: the same behavior
+is verified through the public kit widget. A test of a private composition → a test of its wrapper.
 
-### A.4 Проверка тестов
-- Нетривиальная логика/деньги/откаты-«даунгрейд» или багфикс **без теста** → флаг (`dartway-clean-code` Часть 3). Косметику не требуем.
+### A.4 Checking the tests
+- Non-trivial logic/money/"downgrade" rollbacks or a bugfix **without a test** → flag it (`dartway-clean-code` Part 3). We do not demand tests for cosmetics.
 
-### A.5 Автоматические проверки
-- **`dartway check` во флаттер-пакете — обязательно.** Он проверяет то, чего не видят ни анализатор, ни линты: структуру фич и групп, границы (импорт внутренностей чужой фичи на любой глубине), стили мимо кита, отсутствующие паспорта фич, ссылки на несуществующие ассеты. Отчёт пофичевый, с оценкой A–D — смотри на фичи, которых коснулась задача, а не только на общий счётчик.
-- `dart analyze` (сервер) и `flutter analyze` (флаттер) — должно быть чисто.
-- **Анализируй пакет целиком, без пути-аргумента.** `dart analyze lib` выглядит быстрее и «достаточно», но `test/` в него не попадает — а тесты ссылаются на код по путям и именам, поэтому именно там и оседают последствия переносов и смены API. Зелёный `dart analyze lib` при 59 ошибках компиляции в `test/` — реально случившийся случай.
-- **`dart run custom_lint` во флаттер-пакете — обязательно.** `flutter analyze` его правила НЕ гоняет, а именно `dartway_lints` ловит запрет сырых `Color`/`TextStyle`/`BorderRadius` вне ui_kit и прочие конвенции. Зелёный `flutter analyze` при красном `custom_lint` — типичная ловушка.
-- **`flutter test` прогнан, а не «тесты вроде не трогали».** Анализатор доказывает, что код компилируется, и ничего не говорит о поведении: overflow в узкой раскладке, неинициализированный `dw`, слетевшая раскладка — всё это видно только в прогоне. Падение теста после рефакторинга — сначала гипотеза «я сломал», и только после проверки на HEAD — «тест был красным до меня».
-
----
-
-## Фаза B — Предложения (показать, не применять)
-
-Выдай структурированный отчёт в чат:
-
-1. **🔴 Critical** — нарушения контракта/архитектуры, прячущие баги (Часть 1, проглоченные ошибки, God-объекты, нарушение изоляции фич, эндпоинт вместо CRUD). `file:line` + как чинить.
-2. **🟡 Major** — серьёзные нарушения принципов (SRP, DRY, SoC, длинные файлы).
-3. **🟢 Minor** — нейминг, магические числа, мелочи.
-4. **📄 Docs** — какие feature-доки/`CLAUDE.md`/скиллы устарели, **с конкретным предложенным diff'ом** правки.
-5. **🧪 Tests** — что из нетривиального не покрыто.
-
-Для каждого пункта дай **конкретную предлагаемую правку**, готовую к применению. Спорное/архитектурное помечай «на решение автора» — не предлагай авто-правку.
+### A.5 Automated checks
+- **`dartway check` in the Flutter package is mandatory.** It checks what neither the analyzer nor the lints see: the structure of features and groups, the boundaries (importing another feature's internals at any depth), styles bypassing the kit, missing feature specs, references to non-existent assets. The report is per-feature, with an A–D grade — look at the features the task touched, not just at the overall counter.
+- `dart analyze` (server) and `flutter analyze` (Flutter) — must be clean.
+- **Analyze the whole package, without a path argument.** `dart analyze lib` looks faster and "good enough", but `test/` is not included in it — and tests reference the code by paths and names, which is exactly where the consequences of moves and API changes settle. A green `dart analyze lib` with 59 compilation errors in `test/` is a case that actually happened.
+- **`dart run custom_lint` in the Flutter package is mandatory.** `flutter analyze` does NOT run its rules, and it is `dartway_lints` that catches the ban on raw `Color`/`TextStyle`/`BorderRadius` outside ui_kit and the other conventions. A green `flutter analyze` with a red `custom_lint` is a classic trap.
+- **`flutter test` was actually run, not "the tests probably weren't touched".** The analyzer proves that the code compiles and says nothing about behavior: an overflow in a narrow layout, an uninitialized `dw`, a layout that fell apart — all of that is only visible in a run. A test failing after a refactoring starts with the hypothesis "I broke it", and only after checking against HEAD becomes "the test was red before me".
 
 ---
 
-## Фаза C — Применение (только по подтверждению)
+## Phase B — Suggestions (show, do not apply)
 
-- Спроси, что применить. Поддержи пакеты: «применить доки», «применить Minor», «применить всё кроме архитектурного», поштучно по номерам.
-- Примени **только подтверждённое**. Ничего молча.
-- После применения правок дока — обнови `last-verified` в его шапке на сегодняшнюю дату.
-- Спорное/архитектурное не трогай, даже если автор сказал «всё» — переспроси по таким пунктам отдельно.
-- В конце — короткое резюме: что применено, что осталось на авторе.
+Produce a structured report in the chat:
+
+1. **🔴 Critical** — contract/architecture violations that hide bugs (Part 1, swallowed errors, God objects, broken feature isolation, an endpoint instead of CRUD). `file:line` + how to fix.
+2. **🟡 Major** — serious violations of principles (SRP, DRY, SoC, long files).
+3. **🟢 Minor** — naming, magic numbers, small stuff.
+4. **📄 Docs** — which feature docs/`CLAUDE.md`/skills are outdated, **with a concrete proposed diff** for the fix.
+5. **🧪 Tests** — which non-trivial parts are uncovered.
+
+For every item give a **concrete proposed edit**, ready to apply. Mark anything debatable/architectural as "for the author to decide" — do not propose an automatic fix.
 
 ---
 
-## Чем отличается от `/dartway-audit`
+## Phase C — Application (only on confirmation)
 
-| | `dartway-finish` (скилл) | `/dartway-audit` (команда) |
+- Ask what to apply. Support batches: "apply the docs", "apply Minor", "apply everything except the architectural items", or item by item by number.
+- Apply **only what was confirmed**. Nothing silently.
+- After applying edits to a doc, update `last-verified` in its header to today's date.
+- Do not touch anything debatable/architectural, even if the author said "all of it" — ask again about such items separately.
+- At the end — a short summary: what was applied, what is left to the author.
+
+---
+
+## How this differs from `/dartway-audit`
+
+| | `dartway-finish` (skill) | `/dartway-audit` (command) |
 |---|---|---|
-| Скоуп | дифф одной задачи vs базовой ветки | целый модуль/папка по запросу |
-| Доп. проверки | docs-sync + тесты + применение | только аудит кода |
-| Вывод | отчёт + правки по подтверждению | отчёт в чат |
-| Когда | завершая задачу, перед PR | глубокая проверка области по требованию |
+| Scope | the diff of one task vs the base branch | a whole module/folder on request |
+| Extra checks | docs sync + tests + application | code audit only |
+| Output | report + edits on confirmation | report in the chat |
+| When | finishing a task, before a PR | a deep check of an area on demand |
 
-Детекторы общие (источник — `dartway-clean-code`). Не дублируй логику — ссылайся на контракт.
+The detectors are shared (their source is `dartway-clean-code`). Do not duplicate the logic — reference the contract.

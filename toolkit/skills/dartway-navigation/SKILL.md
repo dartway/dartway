@@ -1,46 +1,46 @@
 ---
 name: dartway-navigation
 description: >-
-  Правила навигации DartWay Router для Flutter (проекты DartWay): зоны как enum'ы,
-  реализующие DwNavigationRoute<AppRouterState>; дескрипторы
-  DwNavigationRouteDescriptor.zoneRoot/.simple/.parameterized; гварды зоны в
-  zoneGuards; типобезопасные параметры через enum с DwNavigationParamsMixin
-  (set/fromPath/fromQuery); роутер собирается DwRouter<T>(routerState:,
-  navigationZones:, pageBuilder:, options:). Использовать при создании/правке
-  роутов, экранов, редиректов и навигации между зонами.
+  DartWay Router navigation rules for Flutter (DartWay projects): zones as enums
+  implementing DwNavigationRoute<AppRouterState>; descriptors
+  DwNavigationRouteDescriptor.zoneRoot/.simple/.parameterized; zone guards in
+  zoneGuards; type-safe parameters via an enum with DwNavigationParamsMixin
+  (set/fromPath/fromQuery); the router is assembled with DwRouter<T>(routerState:,
+  navigationZones:, pageBuilder:, options:). Use when creating or editing routes,
+  screens, redirects and navigation between zones.
 ---
 
-# DartWay Router — навигация
+# DartWay Router — navigation
 
-Правила навигации в проектах DartWay. Роутер — обёртка над go_router: `dartway_router` **ре-экспортирует `go_router`**, поэтому `GoRouter`, `context.go` и прочее доступны из того же импорта. См. также `__FLUTTER_PKG__/CLAUDE.md`.
+Navigation rules for DartWay projects. The router is a wrapper over go_router: `dartway_router` **re-exports `go_router`**, so `GoRouter`, `context.go` and the rest are available from the same import. See also `__FLUTTER_PKG__/CLAUDE.md`.
 
-## Жёсткие правила
+## Hard rules
 
-- **Только enum-роуты** — никаких строковых имён маршрутов в вызовах.
-- **Зона = enum**, реализующий `DwNavigationRoute<AppRouterState>`; определения роутов живут в `core/router/`, не в виджетах.
-- **Гварды — в зоне** (`zoneGuards`), а не разбросаны по экранам.
-- **Параметры — только типобезопасные**, через enum с `DwNavigationParamsMixin`.
-- Навигационную логику не мешать с UI.
+- **Enum routes only** — no string route names in calls.
+- **A zone is an enum** implementing `DwNavigationRoute<AppRouterState>`; route definitions live in `core/router/`, not in widgets.
+- **Guards live in the zone** (`zoneGuards`), not scattered across screens.
+- **Parameters are type-safe only**, via an enum with `DwNavigationParamsMixin`.
+- Do not mix navigation logic with UI.
 
-## Структура
+## Structure
 
 ```
 lib/core/router/
-  router.dart                       // провайдеры + part-директивы
-  app_router_state.dart             // ChangeNotifier: на что реагируют гварды
+  router.dart                       // providers + part directives
+  app_router_state.dart             // ChangeNotifier: what the guards react to
   navigation_zones/
     app_navigation_zone.dart        // part of '../router.dart'
     admin_navigation_zone.dart
     auth_navigation_zone.dart
 ```
 
-Зоны — `part of '../router.dart'`: так они видят общие импорты и друг друга (гварду из app-зоны нужен `AuthNavigationZone.auth.fullPath`).
+Zones are `part of '../router.dart'`: that way they see the shared imports and each other (a guard in the app zone needs `AuthNavigationZone.auth.fullPath`).
 
-## Зона
+## A zone
 
-Каждый роут — значение enum'а с дескриптором. Обязательные члены: `descriptor`, `zoneRoot`, `shellRouteBuilder`, `statefulShellRouteBuilder`, `zoneGuards`.
+Every route is an enum value with a descriptor. Required members: `descriptor`, `zoneRoot`, `shellRouteBuilder`, `statefulShellRouteBuilder`, `zoneGuards`.
 
-Дескрипторы: `.zoneRoot(pageWidget:)` — корень зоны; `.simple(pageWidget:, parent:)` — обычная страница; `.parameterized(pageWidget:, parameter:, parent:)` — страница с path-параметром.
+Descriptors: `.zoneRoot(pageWidget:)` — the zone root; `.simple(pageWidget:, parent:)` — a regular page; `.parameterized(pageWidget:, parameter:, parent:)` — a page with a path parameter.
 
 ```dart
 part of '../router.dart';
@@ -62,7 +62,7 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
   final DwNavigationRouteDescriptor<AppRouterState> descriptor;
 
   @override
-  String get zoneRoot => ''; // '' — корень сайта; 'admin' → /admin/...
+  String get zoneRoot => ''; // '' — the site root; 'admin' → /admin/...
 
   @override
   DwShellRoutePageBuilder? get shellRouteBuilder => null;
@@ -70,8 +70,8 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
   @override
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
-  /// Гвард возвращает путь для редиректа или null, если пускаем. Так ни один
-  /// экран зоны не проверяет авторизацию сам.
+  /// A guard returns a redirect path, or null if access is allowed. That way no
+  /// screen in the zone checks authorization on its own.
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
         (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
@@ -79,7 +79,7 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
 }
 ```
 
-Зона под роль — те же гварды, по очереди:
+A role-specific zone — the same guards, one after another:
 
 ```dart
   @override
@@ -92,9 +92,9 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
       ];
 ```
 
-## Состояние роутера
+## Router state
 
-`AppRouterState` — `ChangeNotifier`, на который смотрят гварды: он слушает провайдеры и дёргает `notifyListeners()`, из-за чего гварды перепрогоняются. Никакой другой связи между авторизацией и навигацией нет.
+`AppRouterState` is a `ChangeNotifier` the guards watch: it listens to providers and calls `notifyListeners()`, which makes the guards re-run. There is no other link between authorization and navigation.
 
 ```dart
 class AppRouterState extends ChangeNotifier {
@@ -110,7 +110,7 @@ class AppRouterState extends ChangeNotifier {
 }
 ```
 
-## Сборка роутера
+## Assembling the router
 
 ```dart
 final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
@@ -131,19 +131,19 @@ final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
 });
 ```
 
-В приложении: `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)`.
+In the app: `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)`.
 
-## Переходы
+## Transitions
 
-Имя роута — `.name` (enum), полный путь — `.fullPath`. Переход:
+The route name is `.name` (the enum), the full path is `.fullPath`. A transition:
 
 ```dart
 GoRouter.of(context).goNamed(AdminNavigationZone.admin.name);
 ```
 
-`GoRouter` приезжает из `dartway_router` (ре-экспорт), отдельный импорт `go_router` не нужен. Типобезопасность даёт enum: строковых имён в вызове нет.
+`GoRouter` comes from `dartway_router` (the re-export), a separate `go_router` import is not needed. Type safety comes from the enum: there are no string names in the call.
 
-## Параметры
+## Parameters
 
 ```dart
 enum AppParams<T> with DwNavigationParamsMixin<T> {
@@ -151,7 +151,7 @@ enum AppParams<T> with DwNavigationParamsMixin<T> {
   searchQuery<String>(),
 }
 
-// роут:
+// route:
 userDetail(
   DwNavigationRouteDescriptor.parameterized(
     pageWidget: UserDetailPage(),
@@ -160,21 +160,21 @@ userDetail(
   ),
 ),
 
-// переход:
+// transition:
 GoRouter.of(context).goNamed(
   AppNavigationZone.userDetail.name,
   pathParameters: AppParams.userProfileId.set(42),
 );
 
-// чтение на странице — из BuildContext, не из ref:
+// reading it on the page — from BuildContext, not from ref:
 final userProfileId = AppParams.userProfileId.fromPath(context);
 ```
 
-Методы миксина: `set(value)` → мапа для перехода; `fromPath(context)` / `fromQuery(context)` — бросают, если параметра нет; `fromPathOrNull` / `fromQueryOrNull` — вернут null.
+Mixin methods: `set(value)` → the map for a transition; `fromPath(context)` / `fromQuery(context)` — throw if the parameter is missing; `fromPathOrNull` / `fromQueryOrNull` — return null.
 
-## Частые ошибки
+## Common mistakes
 
-- Строковые имена маршрутов и raw-мапы параметров вместо enum'ов.
-- Проверка авторизации внутри экрана вместо `zoneGuards`.
-- Забытый `parent` у `.simple`/`.parameterized` — роут не встанет в дерево зоны.
-- Изменение состояния без `notifyListeners()` — гварды не перепрогонятся.
+- String route names and raw parameter maps instead of enums.
+- Checking authorization inside a screen instead of `zoneGuards`.
+- A forgotten `parent` on `.simple`/`.parameterized` — the route will not take its place in the zone tree.
+- Changing state without `notifyListeners()` — the guards will not re-run.

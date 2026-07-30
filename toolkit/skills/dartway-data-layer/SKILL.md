@@ -1,51 +1,51 @@
 ---
 name: dartway-data-layer
 description: >-
-  DartWay Flutter data-layer и specials (проекты DartWay): доступ к данным только
-  через dw.repo — чтение как провайдеры под родной ref.watch/read/refresh
-  (dw.repo.model/maybeModel/modelList), запись dw.repo.saveModel/deleteModel
-  (никаких репозиториев и ручной синхронизации), списки через dwBuildListAsync(loadingItemsCount:),
-  сужение запросом через backendFilter, локальную фильтрацию делай сам .where в виджете,
-  действия из UI через dw.action (единая обработка ошибок/loading), уведомления через dw.notify.* (не SnackBar),
-  профиль через ref.watchUserProfile/readUserProfile (геттеры, не CRUD), выход через
-  sessionProvider.notifier.signOut(). Использовать при работе с данными, действиями, уведомлениями,
-  загрузкой/сохранением моделей во Flutter-фичах.
+  DartWay Flutter data layer and specials (DartWay projects): data access only
+  through dw.repo — reads are providers under the native ref.watch/read/refresh
+  (dw.repo.model/maybeModel/modelList), writes are dw.repo.saveModel/deleteModel
+  (no repositories, no manual syncing), lists via dwBuildListAsync(loadingItemsCount:),
+  narrowing by query via backendFilter, local filtering you do yourself with .where in the widget,
+  actions from the UI via dw.action (unified error/loading handling), notifications via dw.notify.* (not SnackBar),
+  the profile via ref.watchUserProfile/readUserProfile (getters, not CRUD), sign-out via
+  sessionProvider.notifier.signOut(). Use when working with data, actions, notifications,
+  loading/saving models in Flutter features.
 ---
 
-# DartWay — data-layer и specials (Flutter)
+# DartWay — data layer and specials (Flutter)
 
-Во Flutter DartWay **доступ к данным и побочные действия идут через готовый data-layer**, а не через репозитории, ручные `Future`/`setState` и сырые попапы. Это даёт единообразную обработку ошибок, loading и реактивность. Источник правил чистоты — `dartway-clean-code`; карта слоёв — `__FLUTTER_PKG__/CLAUDE.md`.
+In DartWay Flutter **data access and side effects go through a ready-made data layer**, not through repositories, manual `Future`/`setState` and raw popups. This gives uniform error handling, loading and reactivity. The source of cleanliness rules is `dartway-clean-code`; the layer map is `__FLUTTER_PKG__/CLAUDE.md`.
 
-> ⚠️ API ниже сверен с кодовой базой. Чтение — провайдеры под `ref.watch(dw.repo.…)`, **не** `ref.watchModel`. `DwCallback` **не существует** — это `DwUiAction`. `watchUserProfile` — **геттер** (без скобок).
+> ⚠️ The API below is verified against the codebase. Reads are providers under `ref.watch(dw.repo.…)`, **not** `ref.watchModel`. `DwCallback` **does not exist** — it is `DwUiAction`. `watchUserProfile` is a **getter** (no parentheses).
 
 ---
 
-## 1. Доступ к данным — только через `dw.repo`
+## 1. Data access — only through `dw.repo`
 
-**Зачем:** одна точка данных на все фичи. Чтение — риверпод-провайдеры, которые ты потребляешь **родным** `ref`: `ref.watch` — реактивная подписка (UI перестраивается), `ref.read(...future)` — разовое чтение, `ref.refresh(...future)` — принудительный свежий фетч. Запись — методы. Конфиг чтения/записи задаётся на сервере (`DwCrudConfig`), фронту репозитории не нужны.
+**Why:** one data entry point for all features. Reads are riverpod providers that you consume with the **native** `ref`: `ref.watch` — a reactive subscription (the UI rebuilds), `ref.read(...future)` — a one-off read, `ref.refresh(...future)` — a forced fresh fetch. Writes are methods. The read/write config is set on the server (`DwCrudConfig`), the frontend needs no repositories.
 
 ```dart
-// ❌ свой репозиторий / ручной фьючер / прямой клиент
+// ❌ your own repository / a manual future / a direct client
 final repo = ChatRepository();
 final posts = await repo.fetchPosts();
 
-// ✅ dw.repo — единая точка данных
-final coursesAsync = ref.watch(dw.repo.modelList<LearningCourse>());         // реактивный список
-final course       = ref.watch(dw.repo.model<LearningCourse>(filter: ...));  // AsyncValue<T>, нет → StateError
-final maybe        = ref.watch(dw.repo.maybeModel<UserCourse>(filter: ...)); // AsyncValue<T?>, null вместо ошибки
-final once         = await ref.read(dw.repo.model<LearningCourse>(id: 1).future); // разовое чтение
-await dw.repo.saveModel(updatedCourse);                                      // create+update (один save)
+// ✅ dw.repo — the single data entry point
+final coursesAsync = ref.watch(dw.repo.modelList<LearningCourse>());         // reactive list
+final course       = ref.watch(dw.repo.model<LearningCourse>(filter: ...));  // AsyncValue<T>, missing → StateError
+final maybe        = ref.watch(dw.repo.maybeModel<UserCourse>(filter: ...)); // AsyncValue<T?>, null instead of an error
+final once         = await ref.read(dw.repo.model<LearningCourse>(id: 1).future); // one-off read
+await dw.repo.saveModel(updatedCourse);                                      // create+update (one save)
 await dw.repo.deleteModel(post);
 ```
 
-**Чтение — провайдеры `dw.repo.model/maybeModel/modelList` под родным `ref`; запись — методы `dw.repo.saveModel/deleteModel`.** Никаких `ref.watchModel` и `DwRepository.` — единственная точка доступа к данным это `dw.repo`. `model` бросает `StateError`, если модели нет; `maybeModel` возвращает `null`. Принудительный фетч — `ref.refresh(dw.repo.maybeModel(...).future)` (фетчащий провайдер). **Create и Update — это один `saveModel`** (закон CRUD).
+**Reads are the `dw.repo.model/maybeModel/modelList` providers under the native `ref`; writes are the `dw.repo.saveModel/deleteModel` methods.** No `ref.watchModel` and no `DwRepository.` — the single data access point is `dw.repo`. `model` throws a `StateError` if the model is missing; `maybeModel` returns `null`. A forced fetch is `ref.refresh(dw.repo.maybeModel(...).future)` (the fetching provider). **Create and Update are one `saveModel`** (the CRUD law).
 
-## 2. Списки — через `dwBuildListAsync`
+## 2. Lists — through `dwBuildListAsync`
 
-**Зачем:** единый рендер `AsyncValue<List<T>>` со скелетонами на loading и обработкой ошибок — без россыпи `when(loading/error/data)`.
+**Why:** a single render of `AsyncValue<List<T>>` with skeletons on loading and error handling — without a scattering of `when(loading/error/data)`.
 
 ```dart
-// ❌ ручной when с копипастой loading/error в каждой фиче
+// ❌ a manual when with loading/error copy-pasted into every feature
 coursesAsync.when(loading: () => ..., error: (e, _) => ..., data: (list) => ...);
 
 // ✅
@@ -57,7 +57,7 @@ coursesAsync.dwBuildListAsync(
 );
 ```
 
-**Заводя новую модель, зарегистрируй её default-инстанс** в `__FLUTTER_PKG__/lib/core/default_models.dart` — по вызову на модель:
+**When you introduce a new model, register its default instance** in `__FLUTTER_PKG__/lib/core/default_models.dart` — one call per model:
 
 ```dart
 dw.repo.setupRepository(
@@ -65,13 +65,13 @@ dw.repo.setupRepository(
 );
 ```
 
-Скелетон рисуется из твоего же виджета, построенного на этом инстансе, — поэтому он похож на будущий контент, а не на generic-шиммер. Без регистрации первый же `dwBuildListAsync` падает в рантайме: `Default Objects Repository doesn't contain a model of type X`.
+The skeleton is drawn from your own widget built on that instance — that's why it resembles the future content rather than a generic shimmer. Without registration the very first `dwBuildListAsync` fails at runtime: `Default Objects Repository doesn't contain a model of type X`.
 
-## 3. Фильтрация — `backendFilter` (сервер) + `.where` (клиент)
+## 3. Filtering — `backendFilter` (server) + `.where` (client)
 
-**Зачем:** сузить список запросом к БД — через `backendFilter`. Локальную фильтрацию уже загруженного фреймворк специально **не держит**: это тривиальный `.where`, делай его сам в виджете, не ищи «фреймворочный» способ.
+**Why:** to narrow a list with a query to the DB — through `backendFilter`. Local filtering of already loaded data the framework deliberately **does not provide**: it is a trivial `.where`, do it yourself in the widget, don't look for a "framework" way.
 
-**Фильтр на сервере — `backendFilter:`.** Когда список надо сузить запросом (свои записи, сообщения одного чата, предстоящие занятия). Фильтры — enum с `DwBackendFiltersMixin` и его `.equals()`/`.greaterThan()`:
+**Server-side filter — `backendFilter:`.** When a list must be narrowed by a query (your own records, the messages of one chat, upcoming sessions). Filters are an enum with `DwBackendFiltersMixin` and its `.equals()`/`.greaterThan()`:
 
 ```dart
 enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
@@ -82,15 +82,15 @@ enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
       AppBackendFilters.clientProfileId.equals(id);
 }
 
-// в фиче:
+// in the feature:
 ref.watch(dw.repo.modelList<SessionBooking>(
   backendFilter: AppBackendFilters.clientBookings(ref.watchUserProfile.id!),
 ));
 ```
 
-`DwGetModelListConfig` на сервере **не требует** `filterPrototype` (в отличие от `DwGetModelConfig` для одной модели) — списочные backend-фильтры работают без регистрации прототипа. Секьюрити — на `accessFilter` конфига (сервер), не на клиентском сужении.
+`DwGetModelListConfig` on the server **does not require** a `filterPrototype` (unlike `DwGetModelConfig` for a single model) — list backend filters work without registering a prototype. Security is on the config's `accessFilter` (server), not on client-side narrowing.
 
-**Локальный фильтр/поиск — сам `.where` в виджете.** Строку поиска держи в Riverpod-провайдере, фильтруй уже загруженный список прямо в билдере:
+**Local filter/search — a plain `.where` in the widget.** Keep the search string in a Riverpod provider, filter the already loaded list right in the builder:
 
 ```dart
 final query = ref.watch(searchQueryProvider);
@@ -102,48 +102,48 @@ coursesAsync.dwBuildListAsync(
 );
 ```
 
-## 4. Действия из UI — `dw.action`
+## 4. Actions from the UI — `dw.action`
 
-**Зачем:** единая обёртка для действий пользователя (нажатия, сабмиты): автоматический loading-стейт, обработка ошибок (с репортом в алертинг — см. `label`), подтверждения. Колбэк получает `BuildContext`. Не оборачивай в сырой `() async {}`/`onPressed`.
+**Why:** a single wrapper for user actions (taps, submits): automatic loading state, error handling (with a report to alerting — see `label`), confirmations. The callback receives a `BuildContext`. Don't wrap things in a raw `() async {}`/`onPressed`.
 
 ```dart
-// ❌ сырой обработчик: ошибки и loading руками в каждом виджете
+// ❌ a raw handler: errors and loading by hand in every widget
 onPressed: () async { await doSomething(); }
 
-// ❌ ручной confirm-диалог внутри действия (боль легаси-проектов)
+// ❌ a manual confirm dialog inside the action (the pain of legacy projects)
 final confirm = await showDialog<bool>(...); if (confirm != true) return;
 
-// ✅ dw.action — context, типизированный результат, встроенный confirm
+// ✅ dw.action — context, a typed result, a built-in confirm
 final deleteAction = dw.action<bool>(
   (context) async {
     await dw.repo.deleteModel(post);
     return true;
   },
-  label: 'deletePost', // имя действия в error-репортах/алертах
+  label: 'deletePost', // the action name in error reports/alerts
   confirmation: DwUiConfirmation('Delete this post?', isDestructive: true),
 );
-// в виджете: onTap: deleteAction   (или dw.action((_) async {...}) если context не нужен)
+// in the widget: onTap: deleteAction   (or dw.action((_) async {...}) if context isn't needed)
 ```
 
-> Реальное имя — **`DwUiAction`** (46+ использований). `DwCallback` в проекте нет.
-> Отказ в confirm-диалоге отменяет действие целиком (без нотификаций и follow-up). Кастомный диалог — `DwConfig.confirmDialogBuilder`. Ошибки действий автоматически попадают в алертинг с контекстом (роут, фичи экрана, `label`) — см. доку error-reporting фреймворка.
+> The real name is **`DwUiAction`** (46+ usages). There is no `DwCallback` in the project.
+> Declining the confirm dialog cancels the action entirely (no notifications, no follow-up). A custom dialog is `DwConfig.confirmDialogBuilder`. Action errors automatically reach alerting with context (route, screen features, `label`) — see the framework's error-reporting doc.
 
-## 4a. Производное состояние — провайдер, а не сборка в виджете
+## 4a. Derived state — a provider, not assembly in the widget
 
-Состояние, выведенное **из нескольких источников** или содержащее правило, живёт в провайдере
-(`@riverpod`), а не собирается в `build`.
+State derived **from several sources** or containing a rule lives in a provider,
+it is not assembled in `build`.
 
 ```dart
-// ❌ виджет вручную сшивает три watch и подаёт их в функцию — пересчёт на каждой сборке
+// ❌ the widget stitches three watches by hand and feeds them to a function — recomputed on every build
 final state = resolveSomething(
   a: ref.watch(providerA), b: ref.watchUserProfile.flag, c: ref.watch(providerC),
 );
 
-// ✅ провайдер знает, откуда данные; чистая функция — что из них следует
+// ✅ the provider knows where the data comes from; a pure function — what follows from it
 final state = ref.watch(somethingProvider(id: id));
 ```
 
-**Пишем провайдер руками, без `riverpod_generator`** (см. политику кодогена в `CLAUDE.md`):
+**We write providers by hand, without `riverpod_generator`** (see the code generation policy in `CLAUDE.md`):
 
 ```dart
 final courseLockStateProvider =
@@ -156,8 +156,8 @@ final courseLockStateProvider =
 );
 ```
 
-**Семейный нотифаер тоже пишется руками.** `NotifierProvider.family` объявлен как
-`NotifierT Function(ArgT arg)` — аргумент приходит в фабрику, нотифаер принимает его конструктором:
+**A family notifier is also written by hand.** `NotifierProvider.family` is declared as
+`NotifierT Function(ArgT arg)` — the argument arrives in the factory, the notifier takes it through its constructor:
 
 ```dart
 class AudioControllerNotifier extends Notifier<AsyncValue<AudioControllerState>> {
@@ -173,36 +173,36 @@ final audioControllerProvider = NotifierProvider.family<
 );
 ```
 
-Так устроен и сам фреймворк (`DwModelListState(this.config)`). Внутренний `ref.$arg`, которым
-пользуется кодоген, рукописному классу не нужен — и трогать его нельзя, он `@internal`.
+The framework itself is built this way (`DwModelListState(this.config)`). The internal `ref.$arg` that
+code generation uses is not needed by a hand-written class — and must not be touched, it is `@internal`.
 
-**Ключ семейства — значение со значимым равенством.** Модели Serverpod сравниваются по identity:
-семейство по модели создаёт новый провайдер на каждой сборке, с пересчётом и авто-диспозом впустую.
-Ключ — идентификаторы или **рекорд** из них: у рекорда равенство по значению из коробки, поэтому
-ручной вариант здесь не проигрывает генератору, а выигрывает — без ожидания `build_runner`.
+**A family key is a value with meaningful equality.** Serverpod models compare by identity:
+a family keyed by a model creates a new provider on every build, recomputing and auto-disposing for nothing.
+The key is identifiers or a **record** of them: a record has value equality out of the box, so the hand-written
+option doesn't lose to the generator here, it wins — without waiting for `build_runner`.
 
-**Провайдер не лезет во внутренности чужой фичи.** Расширения доступа к данным обычно объявлены на
-`WidgetRef`, а внутри провайдера доступен `Ref` — соблазн импортировать `logic/` соседней фичи
-велик и ловится только чекером. Правильный ход: **публичный файл той фичи даёт расширение на `Ref`**.
+**A provider does not reach into another feature's internals.** Data access extensions are usually declared on
+`WidgetRef`, while inside a provider you have `Ref` — the temptation to import a neighbouring feature's `logic/`
+is strong and is caught only by the checker. The right move: **that feature's public file provides an extension on `Ref`**.
 
-**Не заводи локальное состояние поверх серверного.** Запись через `dw.repo` обновляет списки сама:
-«уже отправленные заявки» не нужно копить в `Set<int>` — ответ уже есть в списке, который экран и так
-watch-ит. Локальная копия серверной правды — второй источник, который может только разъехаться с первым.
+**Don't introduce local state on top of server state.** A write through `dw.repo` updates the lists itself:
+"requests already sent" do not need to be accumulated in a `Set<int>` — the response is already in the list the
+screen watches anyway. A local copy of server truth is a second source that can only drift from the first.
 
-**Не заводи шимы над API фреймворка.** `ref.saveModel(...)`, пробрасывающий вызов в
-`dw.repo.saveModel(...)`, ничего не добавляет, но прячет настоящий API: на боевом проекте на такой
-прослойке жили 82 вызова, и половина команды не знала, что вызывает.
+**Don't introduce shims over the framework API.** `ref.saveModel(...)` forwarding the call to
+`dw.repo.saveModel(...)` adds nothing but hides the real API: on a production project 82 calls lived on such a
+pass-through, and half the team didn't know what they were calling.
 
-### Подмена провайдера в тесте
+### Overriding a provider in a test
 
-У **ручного** `NotifierProvider` нет `overrideWithValue` — этот метод есть только у провайдеров
-значения. Подменяется фабрика: наследник, который переопределяет `build()` готовым значением.
+A **hand-written** `NotifierProvider` has no `overrideWithValue` — that method exists only on value
+providers. What gets overridden is the factory: a subclass that overrides `build()` with a ready value.
 
 ```dart
-// ❌ не компилируется: overrideWithValue не определён для NotifierProvider
+// ❌ doesn't compile: overrideWithValue is not defined for NotifierProvider
 overrides: [userCoursesStateProvider.overrideWithValue(userCourses)],
 
-// ✅ фейк-нотифаер: тест проверяет расширение над состоянием, а не его загрузку
+// ✅ a fake notifier: the test checks the extension over the state, not its loading
 class _FixedUserCoursesState extends UserCoursesState {
   _FixedUserCoursesState(this.fixedCourses);
   final List<UserCourse> fixedCourses;
@@ -215,9 +215,9 @@ overrides: [
 ],
 ```
 
-**У семейства `overrideWith` принимает беспараметрную фабрику** — `() => notifier`, а не
-`(arg) => notifier`, хотя сам `NotifierProvider.family` объявлен как `NotifierT Function(ArgT)`.
-Подменяется всё семейство сразу, поэтому аргумент фейку отдаёшь сам через конструктор:
+**For a family, `overrideWith` takes a parameterless factory** — `() => notifier`, not
+`(arg) => notifier`, even though `NotifierProvider.family` itself is declared as `NotifierT Function(ArgT)`.
+The whole family is overridden at once, so you hand the argument to the fake yourself through its constructor:
 
 ```dart
 final fake = FakeAudioControllerNotifier(
@@ -226,8 +226,8 @@ final fake = FakeAudioControllerNotifier(
 overrides: [audioControllerProvider.overrideWith(() => fake)],
 ```
 
-Наследник семейного нотифаера обязан **пробросить аргумент в `super`** и переопределить
-беспараметрный `build()` — тот, что принимал аргументы, остался в кодогенном мире:
+A subclass of a family notifier must **forward the argument to `super`** and override the
+parameterless `build()` — the one that took arguments stayed in the code generation world:
 
 ```dart
 class FakeAudioControllerNotifier extends AudioControllerNotifier {
@@ -237,133 +237,135 @@ class FakeAudioControllerNotifier extends AudioControllerNotifier {
 }
 ```
 
-## 5. Уведомления — `dw.notify.*` (не `SnackBar`)
+## 5. Notifications — `dw.notify.*` (not `SnackBar`)
 
-**Зачем:** единый стиль тостов/нотификаций по всему приложению. Не дёргай `ScaffoldMessenger`/`SnackBar`/кастомные попапы.
+**Why:** a single style of toasts/notifications across the whole app. Don't poke `ScaffoldMessenger`/`SnackBar`/custom popups.
 
 ```dart
 // ❌
-ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Готово')));
+ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Done')));
 
 // ✅
-dw.notify.success('Сохранено');
-dw.notify.error('Файл слишком большой');
-dw.notify.warning('Проверьте поля');
-dw.notify.info('Загрузка началась');
+dw.notify.success('Saved');
+dw.notify.error('The file is too large');
+dw.notify.warning('Check the fields');
+dw.notify.info('Upload started');
 ```
 
-## 6. Профиль пользователя — `ref.watchUserProfile` (геттер, не CRUD)
+## 6. User profile — `ref.watchUserProfile` (a getter, not CRUD)
 
-**Зачем:** текущий профиль — это специальный источник, не обычная модель. Не тяни его через `watchModel<UserProfile>()`.
+**Why:** the current profile is a special source, not an ordinary model. Don't pull it through `watchModel<UserProfile>()`.
+
+**These getters are the project's, not the framework's.** `dartway create` scaffolds them into `__FLUTTER_PKG__/lib/core/user_profile_provider.dart`, because the framework does not know your profile model — it only knows the signed-in id (`watchSignedInUserId` / `readSignedInUserId`). So don't look for `watchUserProfile` in the packages, and don't remove the file it lives in.
 
 ```dart
-// ❌ профиль через обычный CRUD
+// ❌ the profile through ordinary CRUD
 final me = ref.watch(dw.repo.model<UserProfile>(...));
 
-// ✅ специальные геттеры (без скобок!) — возвращают UserProfile напрямую
-final isMine = post.authorProfileId == ref.watchUserProfile.id;   // реактивно
-final myId   = ref.readUserProfile.id;                            // разово
+// ✅ special getters (no parentheses!) — they return UserProfile directly
+final isMine = post.authorProfileId == ref.watchUserProfile.id;   // reactive
+final myId   = ref.readUserProfile.id;                            // one-off
 ```
 
-## 7. Выход — через `sessionProvider`
+## 7. Sign-out — through `sessionProvider`
 
-**Зачем:** завершение сессии — централизованная операция dartway-сессии, не самописный сброс стейта.
+**Why:** ending a session is a centralized dartway-session operation, not a hand-written state reset.
 
 ```dart
-// ✅ как в кодовой базе
+// ✅ as in the codebase
 ref.read(dw.sessionProvider!.notifier).signOut();
 ```
 
-## 8. Real-time между пользователями — `broadcastTo` в конфиге
+## 8. Real-time between users — `broadcastTo` in the config
 
-**Чего НЕТ по умолчанию:** `saveModel` возвращает обновление **только тому, кто сохранял**. Поэтому «клиент А записался — у клиента Б обновилось само» само по себе не работает: `dw.repo.modelList` реактивен к *своим* правкам.
+**What is NOT there by default:** `saveModel` returns the update **only to whoever saved it**. So "client A signed up — it updated by itself for client B" does not work on its own: `dw.repo.modelList` is reactive to *its own* edits.
 
-**Включается одной строкой — на сервере, в CRUD-конфиге.** Ничего писать во Flutter не надо: приложение уже подписано на публичный канал в своём корне.
+**It is switched on by one line — on the server, in the CRUD config.** Nothing needs to be written in Flutter: the app is already subscribed to the public channel in its root.
 
 ```dart
-// СЕРВЕР — в конфиге модели:
+// SERVER — in the model config:
 saveConfig: DwSaveConfig<NewsPost>(
   allowSave: ...,
   broadcastTo: (session, ctx) => [DwCoreConst.publicUpdatesChannel],
 ),
 deleteConfig: DwDeleteConfig<NewsPost>(
   allowDelete: ...,
-  // без этого у остальных останется висеть удалённая строка
+  // without this, everybody else keeps a deleted row hanging around
   broadcastTo: (session, model) => [DwCoreConst.publicUpdatesChannel],
 ),
 ```
 
-Пришедшая в канал модель роутится по типу в **любой** `dw.repo.modelList<T>()` у подписчиков — список перерисовывается сам, без кода обновления на обеих сторонах.
+A model arriving in the channel is routed by type into **any** `dw.repo.modelList<T>()` of the subscribers — the list redraws itself, with no update code on either side.
 
-**Канал — это аудитория, и фреймворк не может проверить, кто в ней.** Улетает всё, что затронуло сохранение, каждому подписчику — независимо от того, показал бы ему эту строку `accessFilter` или нет. Отсюда два правила:
+**A channel is an audience, and the framework cannot check who is in it.** Everything the save touched flies out to every subscriber — regardless of whether `accessFilter` would have shown them that row or not. Hence two rules:
 
-- `broadcastTo` — **только для моделей, публичных целиком** (каталог, цены, остатки, опубликованные новости). Их `accessFilter` и так открыт всей аудитории;
-- для строк, принадлежащих одному человеку (заказы, сообщения, профили), — **не вещать**, а уведомлять владельца: `session.sendUpdatesToUser(id, updatedModels: [...])`.
+- `broadcastTo` — **only for models that are public in their entirety** (a catalog, prices, stock, published news). Their `accessFilter` is open to the whole audience anyway;
+- for rows belonging to one person (orders, messages, profiles) — **don't broadcast**, notify the owner: `session.sendUpdatesToUser(id, updatedModels: [...])`.
 
-**Когда надо выбрать, что именно улетит** (сохраняется приватная строка, а публично поменялся счётчик) — императивный вызов в `afterSaveSideEffects`:
+**When you need to choose what exactly flies out** (a private row is saved, but a public counter changed) — an imperative call in `afterSaveSideEffects`:
 
 ```dart
-// летит только публичное занятие, сама бронь остаётся приватной
+// only the public session flies out, the booking itself stays private
 session.sendUpdates(
   channels: [DwCoreConst.publicUpdatesChannel],
   updatedModels: [updatedSession],
 );
 ```
 
-Канал можно сузить до нужной аудитории и построить из контекста — `['chat:${ctx.currentModel.chatId}']`. Тогда экран подписывается на него точечно:
+A channel can be narrowed to the audience you need and built from the context — `['chat:${ctx.currentModel.chatId}']`. Then a screen subscribes to it precisely:
 
 ```dart
 DwChannelSubscriptionWidget(channel: 'chat:$chatId', child: messagesList)
 ```
 
-### Какой канал слушать и куда слать — это и есть решение
+### Which channel to listen to and where to send is the decision itself
 
-Канал — **широковещательная шина**: **всё**, что в него постят, прилетает **каждому** подписчику. Поэтому канал **скоупь под аудиторию, которой обновление реально нужно**. Вопрос всегда один: «кто по праву должен увидеть это изменение?» — и шли/подписывай ровно им.
+A channel is a **broadcast bus**: **everything** posted into it arrives at **every** subscriber. So **scope the channel to the audience that actually needs the update**. The question is always one: "who is entitled to see this change?" — and send to / subscribe exactly them.
 
-| Аудитория обновления | Канал |
+| Audience of the update | Channel |
 |---|---|
-| Публичное для всех (каталог, цены, остатки, новости) | `DwCoreConst.publicUpdatesChannel` — приложение подписано на него в корне |
-| Группа (чат-комната, доска) | канал с ключом группы: `'chat:$channelId'` — подписка на экране группы |
-| Приватное одному юзеру (его бронь отменили) | `session.sendUpdatesToUser(userId, ...)` — его личный канал, подписка не нужна |
+| Public to everyone (catalog, prices, stock, news) | `DwCoreConst.publicUpdatesChannel` — the app is subscribed to it in the root |
+| A group (chat room, board) | a channel keyed by the group: `'chat:$channelId'` — subscription on the group's screen |
+| Private to one user (their booking was cancelled) | `session.sendUpdatesToUser(userId, ...)` — their personal channel, no subscription needed |
 
-**Анти-паттерн — слать в общий канал всё подряд.** Опасен не сам общий канал (он и нужен для публичного), а то, что в него кладут: если туда уедет приватная строка, её получит каждый подписчик — `accessFilter` тут уже не работает, он про чтение через API. Проверка перед тем, как поставить `broadcastTo` с публичным каналом: **«эту строку и так вправе прочитать любой пользователь?»** Нет — значит канал уже, либо `sendUpdatesToUser`.
+**The anti-pattern is sending everything into the common channel.** What is dangerous is not the common channel itself (it exists precisely for the public), but what gets put into it: if a private row goes there, every subscriber gets it — `accessFilter` no longer works here, it is about reading through the API. The check before putting `broadcastTo` with a public channel: **"is any user entitled to read this row anyway?"** No — then the channel is narrower, or it's `sendUpdatesToUser`.
 
-Второй частый промах — вешать `broadcastTo` на конфиг приватной модели ради публичного побочного эффекта (сохраняем бронь, а показать надо счётчик мест). `broadcastTo` шлёт **всё, что затронуло сохранение**, включая саму бронь. В таком случае — императивный `session.sendUpdates(channels: [...], updatedModels: [публичнаяМодель])`, где ты выбираешь, что улетит.
+The second frequent miss is hanging `broadcastTo` on a private model's config for the sake of a public side effect (we save a booking, but what has to be shown is the seat counter). `broadcastTo` sends **everything the save touched**, including the booking itself. In that case — an imperative `session.sendUpdates(channels: [...], updatedModels: [publicModel])`, where you choose what flies out.
 
-Правило: **скоуп канала = ровно те, кому это изменение по праву видно.**
+The rule: **the channel's scope = exactly those who are entitled to see this change.**
 
 ---
 
-## 9. Файлы и картинки — `DwFileUploadHandler`
+## 9. Files and images — `DwFileUploadHandler`
 
-**Зачем:** выбор файла, заливка в хранилище и получение публичной ссылки — один вызов. Своего пикера, своего http-клиента и своего эндпоинта писать не нужно.
+**Why:** picking a file, uploading it to storage and getting a public link — one call. You don't need your own picker, your own http client and your own endpoint.
 
 ```dart
-// ✅ весь аплоад целиком: пикер → хранилище → публичный URL
+// ✅ the whole upload end to end: picker → storage → public URL
 final imageUrl = await DwFileUploadHandler.pickAndUploadImageUrl();
-if (imageUrl == null) return;              // null = пользователь закрыл пикер, это не ошибка
+if (imageUrl == null) return;              // null = the user closed the picker, that's not an error
 await dw.repo.saveModel(userProfile.copyWith(imageUrl: imageUrl));
 ```
 
-Дальше ссылка живёт как обычное поле модели и едет тем же CRUD-путём, что остальные — отдельного «файлового» слоя в приложении нет.
+From then on the link lives as an ordinary model field and travels the same CRUD path as the rest — there is no separate "file" layer in the app.
 
-Соседние формы: `pickAndUploadImage()` (вернёт `DwCloudFile` с размером и mime), `uploadXFileToServer(xFile:)` — когда файл уже получен (камера, drag-n-drop).
+Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size and mime), `uploadXFileToServer(xFile:)` — when the file is already obtained (camera, drag-n-drop).
 
-**Оберни в `dw.action`** — заливка долгая, и `DwActionBuilder` сам погасит повторный тап и отдаст `busy` для индикатора.
+**Wrap it in `dw.action`** — the upload is long, and `DwActionBuilder` will suppress a repeated tap by itself and hand back `busy` for the indicator.
 
-**Что нужно на сервере:** `cloudStorageConfig` в `DwCore.init` (в проекте это ключи `dwCloudStorage*` в `config/passwords.yaml`, а в разработке — сервис `minio` из `docker-compose.yaml`). Если хранилище не настроено, загрузка честно скажет об этом, а не упадёт молча.
+**What is needed on the server:** `cloudStorageConfig` in `DwCore.init` (in the project these are the `dwCloudStorage*` keys in `config/passwords.yaml`, and in development the `minio` service from `docker-compose.yaml`). If storage is not configured, the upload will honestly say so instead of failing silently.
 
 ---
 
-## Чек-лист data-layer
+## Data-layer checklist
 
-- [ ] Данные — только `dw.repo`: чтение — провайдеры `dw.repo.model/maybeModel/modelList` под `ref.watch/read/refresh`; запись — `dw.repo.saveModel/deleteModel`. Нет `ref.watchModel`, `DwRepository.`, репозиториев, ручных `Future`, прямого клиента.
-- [ ] Create и Update — один `saveModel` (не два разных метода).
-- [ ] Списки `AsyncValue` — через `dwBuildListAsync(loadingItemsCount:)`, не россыпь `when`.
-- [ ] Сужение запросом — `backendFilter`; локальную фильтрацию делаешь сам `.where` в виджете (фреймворк её не держит).
-- [ ] Действия из UI — `dw.action((context) async {...})`, не сырой `onPressed`/`() async {}`.
-- [ ] Уведомления — `dw.notify.success/warning/error/info`, не `SnackBar`/`ScaffoldMessenger`.
-- [ ] Профиль — `ref.watchUserProfile`/`readUserProfile` (геттеры), не `watchModel<UserProfile>()`.
-- [ ] Выход — `ref.read(dw.sessionProvider!.notifier).signOut()`.
-- [ ] Обновление должен увидеть **другой** пользователь? `dw.repo.modelList` сам этого не делает — `broadcastTo` в конфиге (публичное), канал с id группы (групповое), `sendUpdatesToUser` (приватное).
-- [ ] Ставишь `broadcastTo` с публичным каналом — ответил себе «эту строку вправе прочитать любой»? Если нет — канал уже или `sendUpdatesToUser`.
+- [ ] Data — only `dw.repo`: reads are the `dw.repo.model/maybeModel/modelList` providers under `ref.watch/read/refresh`; writes are `dw.repo.saveModel/deleteModel`. No `ref.watchModel`, no `DwRepository.`, no repositories, no manual `Future`s, no direct client.
+- [ ] Create and Update — one `saveModel` (not two different methods).
+- [ ] `AsyncValue` lists — through `dwBuildListAsync(loadingItemsCount:)`, not a scattering of `when`.
+- [ ] Narrowing by query — `backendFilter`; local filtering you do yourself with `.where` in the widget (the framework doesn't provide it).
+- [ ] Actions from the UI — `dw.action((context) async {...})`, not a raw `onPressed`/`() async {}`.
+- [ ] Notifications — `dw.notify.success/warning/error/info`, not `SnackBar`/`ScaffoldMessenger`.
+- [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`.
+- [ ] Sign-out — `ref.read(dw.sessionProvider!.notifier).signOut()`.
+- [ ] Must **another** user see the update? `dw.repo.modelList` doesn't do that by itself — `broadcastTo` in the config (public), a channel with the group id (group), `sendUpdatesToUser` (private).
+- [ ] Putting `broadcastTo` with a public channel — have you answered "any user is entitled to read this row"? If not — a narrower channel or `sendUpdatesToUser`.

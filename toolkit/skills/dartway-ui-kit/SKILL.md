@@ -1,84 +1,86 @@
 ---
 name: dartway-ui-kit
 description: >-
-  Правила UI Kit в DartWay Flutter: кит живёт ИСХОДНИКОМ в приложении (lib/ui_kit/) — фреймворк не
-  поставляет ни кнопок, ни текста, ни темы. AppText/AppButton — виджеты приложения с именованными
-  конструкторами, AppTextStyle — токен для мест, где Flutter требует TextStyle; тема (AppTheme) тоже
-  в ките. DwActionBuilder из фреймворка защищает действие (busy, повторный тап, валидация формы).
-  Внутри фич запрещены Color/TextStyle/BorderRadius/Theme.of/context.textTheme/colorScheme; импорт
-  только ui_kit.dart; part-of структура. Использовать при создании/правке UI-компонентов, стилей,
-  цветов, тем, кнопок, при добавлении виджетов в ui_kit.
+  UI Kit rules in DartWay Flutter: the kit lives as SOURCE inside the app (lib/ui_kit/) — the framework
+  ships neither buttons, nor text, nor a theme. AppText/AppButton are app widgets with named
+  constructors, AppTextStyle is a token for places where Flutter demands a TextStyle; the theme
+  (AppTheme) is in the kit too. DwActionBuilder from the framework guards the action (busy, double tap,
+  form validation). Inside features Color/TextStyle/BorderRadius/Theme.of/context.textTheme/colorScheme
+  are forbidden; the only import is ui_kit.dart; part-of structure. Use when creating/editing UI
+  components, styles, colors, themes, buttons, or when adding widgets to the kit.
 ---
 
 # DartWay — UI Kit
 
-**Кит принадлежит приложению.** Он лежит исходником в `__FLUTTER_PKG__/lib/ui_kit/`, его кладёт
-`dartway create`, и дальше проект правит его свободно — это его код, а не зависимость.
+**The kit belongs to the app.** It lives as source in `__FLUTTER_PKG__/lib/ui_kit/`, `dartway create`
+puts it there, and from then on the project edits it freely — it is its code, not a dependency.
 
-**Фреймворк не поставляет дизайн.** В `dartway_flutter` **нет** `DwButton`, `DwText`,
-`DwFlutterTheme`, `DwColorPreset` и пресетов стилей. Не ищи их и не импортируй — их не существует.
-Пакета `dartway_ui_kit` тоже нет и не будет: иначе у приложения оказалось бы два кита — наш в
-зависимостях и свой в `lib/`, и на каждый `AppButton` вставал бы вопрос «чей это».
+**The framework ships no design.** `dartway_flutter` has **no** `DwButton`, `DwText`,
+`DwFlutterTheme`, `DwColorPreset`, and no style presets. Don't look for them and don't import them —
+they do not exist. There is no `dartway_ui_kit` package either, and there won't be: otherwise the app
+would end up with two kits — ours in dependencies and its own in `lib/` — and every `AppButton` would
+raise the question "whose is this".
 
-Фреймворк даёт ровно то, что приложению не следует изобретать заново: **`DwActionBuilder`**
-(механика действия) и **`dwBuildAsync`** (единый рендер загрузки/ошибки/данных).
+The framework gives exactly what the app should not reinvent: **`DwActionBuilder`**
+(action mechanics) and **`dwBuildAsync`** (a single render of loading/error/data).
 
-**Конвенция имён.** `Dw*` — фреймворк: приезжает извне, обновляется, не правь. Кит — код
-приложения, префикса `Dw` в нём нет: `App*` там, где иначе коллизия с Flutter (`AppText`,
-`AppButton`), и без префикса, где коллизии нет (`ConditionalParent`, `MultiLinkText`,
-`DeviceFrameShell`). По одному взгляду на идентификатор видно, твоё это или фреймворка.
+**Naming convention.** `Dw*` — framework: comes from outside, gets updated, don't edit. The kit is app
+code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutter (`AppText`,
+`AppButton`), and no prefix where there is no collision (`ConditionalParent`, `MultiLinkText`,
+`DeviceFrameShell`). One look at an identifier tells you whether it is yours or the framework's.
 
-## Core-принципы
+## Core principles
 
-1. **Один импорт.** Компоненты импортируются только через корневой `ui_kit.dart`. Никогда не
-   импортируй отдельные кнопки/цвета/стили напрямую.
-2. **Всё объявлено в `ui_kit.dart`.** Каждый файл компонента начинается с `part of '../ui_kit.dart';`.
-   Корневой файл собирает всё `part`-директивами и реэкспортирует `dartway_flutter`.
-3. **Никакого raw-стайлинга в фичах.** Внутри `lib/<feature>` (`app/`/`auth/`/`common/`)
-   **запрещено**: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`, `Theme.of(context)`,
-   `context.theme`, `context.textTheme`, `context.colorScheme`. Это не пожелание — правило
-   `forbidden_ui_style_usage` из `dartway_lints` (через `custom_lint`) разрешает их **только внутри
-   `ui_kit/`** и различает `BuildContext` по типу, а не по имени переменной.
+1. **One import.** Components are imported only through the root `ui_kit.dart`. Never import
+   individual buttons/colors/styles directly.
+2. **Everything is declared in `ui_kit.dart`.** Every component file starts with `part of '../ui_kit.dart';`.
+   The root file assembles everything with `part` directives and re-exports `dartway_flutter`.
+3. **No raw styling in features.** Inside `lib/<feature>` (`app/`/`auth/`/`common/`)
+   the following are **forbidden**: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`, `Theme.of(context)`,
+   `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a wish — the
+   `forbidden_ui_style_usage` rule from `dartway_lints` (via `custom_lint`) allows them **only inside
+   `ui_kit/`** and recognizes `BuildContext` by type, not by variable name.
 
-   **Что делать, когда Flutter требует стиль, а не виджет** (`Icon(color:)`,
-   `InputDecoration.labelStyle`, `TextSpan`, чужой виджет со `style:`): такой виджет **целиком
-   переезжает в кит**, а фича его композит. Внутри кита стиль берётся токеном
-   (`AppTextStyle.body.resolve(context)`). Обход правила через `// ignore:` — это стиль, сбежавший
-   из кита; следующий экран о нём уже не узнает.
-4. **Изолированный визуальный слой.** Кит не зависит от бизнес-логики и стейта. Компонент =
-   чистые визуалы + минимальные пропсы.
-5. **Кит — дизайн-система приложения, а не библиотека общих виджетов.** Композит, нужный одной
-   фиче (карточка мероприятия, лента карточек, шапка секции), — тоже кит: зона `3_special/` для
-   этого и заведена. В фиче остаётся **маппинг домена** в параметры кита, а не вёрстка.
+   **What to do when Flutter demands a style, not a widget** (`Icon(color:)`,
+   `InputDecoration.labelStyle`, `TextSpan`, a third-party widget with `style:`): such a widget
+   **moves into the kit whole**, and the feature composes it. Inside the kit the style is taken from a
+   token (`AppTextStyle.body.resolve(context)`). Working around the rule with `// ignore:` is a style
+   that escaped the kit; the next screen will never learn about it.
+4. **Isolated visual layer.** The kit does not depend on business logic or state. A component =
+   pure visuals + minimal props.
+5. **The kit is the app's design system, not a library of shared widgets.** A composite needed by a
+   single feature (an event card, a card feed, a section header) is also the kit: the `3_special/` zone
+   exists for exactly this. What stays in the feature is **mapping the domain** to the kit's parameters,
+   not layout.
 
-6. **Публичный API кит-виджета не принимает визуальные типы.** Никаких `Color`, `TextStyle`,
-   `EdgeInsets`, `BorderRadius`, `BoxDecoration` в конструкторе — вид выбирается **именованными
-   конструкторами**, а наружу идут только данные, состояние и колбэки.
+6. **The public API of a kit widget takes no visual types.** No `Color`, `TextStyle`,
+   `EdgeInsets`, `BorderRadius`, `BoxDecoration` in the constructor — the look is chosen by **named
+   constructors**, and only data, state and callbacks go outward.
 
-   Это правило-близнец к пункту 3, и без него пункт 3 обходится **по построению**: `AppColors.x` —
-   легальный символ, поэтому пока кит принимает цвет, фича обязана его знать. Так и получилось на
-   боевом проекте: 40 виджетов кита с цветовыми полями, 268 обращений к палитре из фич и 48 токенов
-   из 131, названных по чужой фиче — бейдж мероприятия красился
-   `settingsNavigationRowLeadingFill` и `chatSendIconActive`.
+   This is the twin rule to point 3, and without it point 3 is bypassed **by construction**: `AppColors.x`
+   is a legal symbol, so as long as the kit accepts a color, the feature is obliged to know it. That is
+   exactly what happened on a production project: 40 kit widgets with color fields, 268 palette lookups
+   from features, and 48 tokens out of 131 named after somebody else's feature — an event badge was
+   painted with `settingsNavigationRowLeadingFill` and `chatSendIconActive`.
 
-   **Сигнал в ревью:** увидел в фиче токен, названный по другой фиче, — нужен конструктор кита,
-   а не подбор цвета по внешнему сходству.
+   **Review signal:** you see in a feature a token named after another feature — what's needed is a kit
+   constructor, not picking a color by visual resemblance.
 
-7. **Фича собирает поверхность руками только тогда, когда в ките её нет.** Прежде чем чинить
-   такое место, посмотри на примитив кита: скорее всего он **не покрывает нужный вариант**, и
-   переписывать надо его, а не двадцать вызовов.
+7. **A feature assembles a surface by hand only when the kit doesn't have it.** Before fixing such a
+   place, look at the kit primitive: most likely it **doesn't cover the needed variant**, and it is the
+   primitive that must be rewritten, not twenty call sites.
 
-   Как это выглядит в жизни: `AppContainer` умел заливку, но **не умел рамку** — зато принимал
-   наружу `fillColor` и `borderRadius`. Одновременно слишком слаб (нужного случая нет) и слишком
-   открыт (позволяет протащить цвет). Итог — десять почти одинаковых
-   `Container(decoration: BoxDecoration(...))` по фичам: бейдж, карточка категории, превью, тело
-   поста, диалог, попап. Правится это одной правкой примитива:
+   How it looks in real life: `AppContainer` could do a fill but **could not do a border** — while
+   accepting `fillColor` and `borderRadius` from outside. Simultaneously too weak (the needed case is
+   missing) and too open (it lets a color through). The result — ten nearly identical
+   `Container(decoration: BoxDecoration(...))` across features: a badge, a category card, a preview, a
+   post body, a dialog, a popup. It is fixed by one edit of the primitive:
 
    ```dart
-   // ❌ примитив, который заставляет фичу знать цвет и радиус
+   // ❌ a primitive that forces the feature to know the color and the radius
    const AppContainer.surface({required this.child, this.fillColor, this.borderRadius});
 
-   // ✅ вид выбирает конструктор, тон — смысловой enum; padding остаётся (это вёрстка экрана)
+   // ✅ the constructor picks the look, the tone is a semantic enum; padding stays (that's screen layout)
    const AppContainer.surface({required this.child, this.padding, this.onTap});
    const AppContainer.tinted({required this.child, required this.tone, ...});
    const AppContainer.outlined({required this.child, ...});
@@ -87,21 +89,21 @@ description: >-
    enum AppSurfaceTone { plain, muted, control, achieved }
    ```
 
-   **Правило переезда без смены визуала:** пройди по каждому вызову, который передавал визуальный
-   параметр, и сверь значение. Часть передаёт ровно дефолт — параметр просто убирается. Часть
-   передаёт своё — под неё нужен конструктор или тон **с тем же токеном**. Ни один цвет и ни один
-   радиус не должны поменять значение; тогда «переделали примитив» не превращается в «поехал
-   дизайн».
+   **Rule for migrating without changing the visuals:** walk through every call site that passed a
+   visual parameter and check the value. Some pass exactly the default — the parameter is simply
+   removed. Some pass their own — they need a constructor or a tone **with the same token**. Not a
+   single color and not a single radius may change value; then "we reworked the primitive" doesn't turn
+   into "the design drifted".
 
-   **Разделяй, что вообще принадлежит киту.** `padding` наружу — нормально: сколько воздуха внутри
-   блока, решает экран. Цвет, радиус, тень, рамка — нет.
+   **Distinguish what belongs to the kit at all.** `padding` outward is fine: how much air there is
+   inside a block is the screen's call. Color, radius, shadow, border — no.
 
-## Ассеты — словарь-enum плюс один рисователь, без генератора
+## Assets — an enum dictionary plus one renderer, no generator
 
-Два файла в ките, и всё:
+Two files in the kit, and that's it:
 
 ```dart
-// ui_kit/assets/app_icon.dart — словарь: что вообще можно показать
+// ui_kit/assets/app_icon.dart — the dictionary: what can be shown at all
 enum AppIcon {
   authRobot('assets/icons/auth/robot.svg'),
   lessonLock('assets/icons/lessons/lock.png');
@@ -111,88 +113,88 @@ enum AppIcon {
   bool get isVector => path.endsWith('.svg');
 }
 
-// ui_kit/assets/app_icon_view.dart — единственное место, где зовут Image.asset/SvgPicture.asset
+// ui_kit/assets/app_icon_view.dart — the only place that calls Image.asset/SvgPicture.asset
 class AppIconView extends StatelessWidget {
   const AppIconView(this.icon, {super.key, this.size});
   ...
 }
 ```
 
-Фича пишет `AppIconView(AppIcon.authRobot, size: 24)` — **называет смысл, а не файл**.
+A feature writes `AppIconView(AppIcon.authRobot, size: 24)` — it **names the meaning, not the file**.
 
-**Почему именно так, а не конструктор на каждый ассет:** параметры живут в одном месте. Добавить
-`semanticsLabel` — правка в одном виджете, а не в семидесяти конструкторах. И оба формата
-разбираются **внутри** по расширению: заменить PNG на SVG — правка одной строки в словаре, экраны
-не трогаются вовсе.
+**Why this way and not a constructor per asset:** the parameters live in one place. Adding
+`semanticsLabel` is an edit in one widget, not in seventy constructors. And both formats are resolved
+**inside**, by extension: replacing a PNG with an SVG is a one-line edit in the dictionary, the screens
+are not touched at all.
 
-**Один `size`, а не `width` и `height`.** Иконка держит свои пропорции; раздельные ширина и высота
-почти всегда означают, что взят не тот ассет, а не намеренное растяжение. То, что обязано залить
-область по ширине с `fit` — **не иконка, а обложка**: у неё свой виджет и свои параметры.
+**One `size`, not `width` and `height`.** An icon keeps its proportions; separate width and height
+almost always mean the wrong asset was taken, not a deliberate stretch. Something that must fill an
+area by width with `fit` is **not an icon but a cover**: it has its own widget and its own parameters.
 
-- **сырой путь в фиче запрещён** — `Image.asset('assets/…')` в экране означает, что картинку не
-  найти поиском и она переживёт переименование файла только случайно;
-- `flutter_gen` не нужен: что путь ведёт к существующему файлу, проверяет `dartway check` — и он же
-  ловит сырые пути, чего генератор не умел;
-- **шрифты** в код не попадают: они объявлены в pubspec и приходят через текстовые стили. Звуки и
-  видео — не виджеты, им место в data-слое рядом с плеером, а не в ките.
+- **a raw path in a feature is forbidden** — `Image.asset('assets/…')` in a screen means the image
+  cannot be found by search and will survive a file rename only by accident;
+- `flutter_gen` is not needed: that a path leads to an existing file is checked by `dartway check` — and
+  the same checker catches raw paths, which the generator never could;
+- **fonts** never reach the code: they are declared in the pubspec and arrive through text styles. Sounds
+  and video are not widgets, their place is in the data layer next to the player, not in the kit.
 
-## Именованный конструктор или параметр
+## Named constructor or parameter
 
-Оба выражают смысл, а не оформление, — вопрос в том, кто выбирает.
+Both express meaning, not decoration — the question is who chooses.
 
-- **Именованный конструктор** — когда выбор статичен в месте вызова: `AppEventCard.compact` в ленте,
-  `.wide` в списке. Вызывающий всегда знает, какой ему нужен.
-- **Семантический параметр** — когда у вызывающего рантайм-значение: `AppButton.filterChip(selected: isActive)`,
-  `AppBottomSheetPageBody(fillsScreen: isFullScreen)`. Заставить здесь выбирать конструктор — значит
-  получить тернарник на десять строк в фиче, то есть ту же композицию, только в профиль.
+- **Named constructor** — when the choice is static at the call site: `AppEventCard.compact` in a feed,
+  `.wide` in a list. The caller always knows which one it needs.
+- **Semantic parameter** — when the caller has a runtime value: `AppButton.filterChip(selected: isActive)`,
+  `AppBottomSheetPageBody(fillsScreen: isFullScreen)`. Forcing a constructor choice here means getting a
+  ten-line ternary in the feature — that is, the same composition, just sideways.
 
-Параметр называется по смыслу (`selected`, `fillsScreen`), а не по виду (`isDark`, `withShadow`),
-и если он меняет несколько вещей разом — это записывается в его доке: почему один флаг, а не три.
+A parameter is named by meaning (`selected`, `fillsScreen`), not by look (`isDark`, `withShadow`),
+and if it changes several things at once, that is written in its doc: why one flag and not three.
 
-## Компоновка узнаваемой единицы — в ките
+## Composing a recognizable unit — in the kit
 
-Карточка, лента карточек, шапка секции со ссылкой «все», поверхность экрана — это единицы, а не
-разовая вёрстка. Их геометрия, отступы, скругления и фон принадлежат киту целиком; фича передаёт
-данные и колбэки.
+A card, a card feed, a section header with an "all" link, a screen surface — these are units, not
+one-off layout. Their geometry, paddings, corner radii and background belong to the kit entirely; the
+feature passes data and callbacks.
 
-Два следствия, на которых легко ошибиться:
+Two consequences that are easy to get wrong:
 
-- **Системные вырезы (safe area) — внутри китового виджета.** Поверхность, приклеенная к низу, обязана
-  уважать нижний вырез по определению. Пока это считает вызывающий, каждый следующий экран повторяет
-  ту же арифметику, а однажды её забудет.
-- **Размеры публикует кит, а не фича.** Высота карточки, нужная ленте, — константа кита
-  (`AppEventCard.compactHeight`), а не публичное поле фичи. Фича может размер прочитать, но не назначить.
+- **System insets (safe area) — inside the kit widget.** A surface glued to the bottom must respect the
+  bottom inset by definition. As long as the caller computes it, every next screen repeats the same
+  arithmetic, and one day it will forget it.
+- **Sizes are published by the kit, not by the feature.** The card height a feed needs is a kit constant
+  (`AppEventCard.compactHeight`), not a public field of the feature. A feature may read the size, but not assign it.
 
-## Кит не знает домена
+## The kit does not know the domain
 
-Кит не импортирует модели приложения и не переключается по доменным перечислениям. Если виджет
-выбирает картинку по причине блокировки курса, а у этого перечисления внутри пользовательские
-тексты — **в кит переезжает виджет с двумя конструкторами**, а `switch` по домену остаётся в фиче
-одной строкой. Перетащить в кит само перечисление нельзя: вместе с ним приедут тексты, а текстовым
-константам в ките не место.
+The kit does not import app models and does not switch on domain enums. If a widget picks an image based
+on the reason a course is locked, and that enum carries user-facing texts inside — **a widget with two
+constructors moves into the kit**, and the domain `switch` stays in the feature as a single line. Moving
+the enum itself into the kit is not allowed: the texts would come with it, and text constants have no
+place in the kit.
 
-## Текст: виджет с именованными конструкторами + токен-enum
+## Text: a widget with named constructors + a token enum
 
-Две разные сущности, и их нельзя схлопывать в одну:
+Two different entities, and they must not be collapsed into one:
 
-- **`AppText`** — виджет с `const`-конструкторами. Это то, что пишут в 99% мест.
-- **`AppTextStyle`** — токен. Он нужен там, где Flutter требует именно `TextStyle`, а не виджет
-  (`InputDecoration.labelStyle`, `TextSpan`, `Icon`, чужие виджеты со `style:`).
+- **`AppText`** — a widget with `const` constructors. This is what you write in 99% of places.
+- **`AppTextStyle`** — a token. It is needed where Flutter demands exactly a `TextStyle`, not a widget
+  (`InputDecoration.labelStyle`, `TextSpan`, `Icon`, third-party widgets with `style:`).
 
 ```dart
-const AppText.title('DartWay.dev')          // const работает — и охватывающие const тоже
+const AppText.title('DartWay.dev')          // const works — and enclosing consts too
 AppText.body(post.description)
 AppText.caption('${date.dayLabel} · ${date.timeLabel}')
 ```
 
-**Весь пользовательский текст — из l10n, а не строковым литералом.** Скелет локализован (en/ru); `AppText.body('Book a spot')` захардкоженной строкой рассинхронит фичу с остальным приложением. Бери текст из `context.l10n`:
+**All user-facing text comes from l10n, not from a string literal.** The skeleton is localized (en/ru); `AppText.body('Book a spot')` with a hardcoded string desyncs the feature from the rest of the app. Take the text from `context.l10n`:
 
 ```dart
 final l10n = context.l10n;
 AppText.body(l10n.bookSpot)
 ```
 
-Новая строка = добавить ключ в **оба** ARB (`lib/l10n/app_en.arb` и `app_ru.arb`) и прогнать `flutter gen-l10n`. Литералом в UI остаются только не-текст (иконки, отладочные метки за `kDebugMode`).
+A new string = add a key to **both** ARBs (`lib/l10n/app_en.arb` and `app_ru.arb`) and run `flutter gen-l10n`. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
 
 ```dart
 // ui_kit/theme/app_text.dart
@@ -220,19 +222,19 @@ class AppText extends StatelessWidget {
 }
 ```
 
-**Почему не «вызываемый enum»** (`AppText.body('x')` как метод enum'а — так было раньше): метод
-никогда не может быть `const`-выражением. Один неконстантный текстовый лист утаскивает за собой все
-охватывающие `const Padding`, `const Center`, `const Expanded` — и `const` вымывается из дерева.
-Именованные конструкторы дают ровно тот же call-site, но `const` остаётся законным.
+**Why not a "callable enum"** (`AppText.body('x')` as an enum method — that's how it used to be): a
+method can never be a `const` expression. One non-const text leaf drags along every enclosing
+`const Padding`, `const Center`, `const Expanded` — and `const` gets washed out of the tree.
+Named constructors give exactly the same call site, but `const` stays legal.
 
-Нужен новый стиль — **добавь значение в `AppTextStyle` и конструктор в `AppText`**, не пиши
-`TextStyle` на месте.
+Need a new style — **add a value to `AppTextStyle` and a constructor to `AppText`**, don't write a
+`TextStyle` on the spot.
 
-## Кнопки: `AppButton` + `DwActionBuilder`
+## Buttons: `AppButton` + `DwActionBuilder`
 
-Кнопка — обычный виджет приложения. От фреймворка берётся только `DwActionBuilder`: он держит флаг
-«выполняется», **блокирует повторное нажатие**, при `requireValidation` валидирует `Form`, снимает
-фокус — и отдаёт готовые `onPressed` (`null`, пока действие бежит) и `busy`.
+A button is an ordinary app widget. From the framework you take only `DwActionBuilder`: it holds the
+"running" flag, **blocks a repeated tap**, validates the `Form` on `requireValidation`, drops focus —
+and hands back a ready `onPressed` (`null` while the action runs) and `busy`.
 
 ```dart
 AppButton.primary(
@@ -245,10 +247,10 @@ AppButton.primary(
 ```
 
 ```dart
-// ui_kit/theme/app_button.dart — тоже виджет с именованными конструкторами
-// (AppButton.primary / .secondary / .text). Вариант выбирает настоящий
-// Material-виджет, поэтому outlined-стиль носит OutlinedButton, а не крашеный
-// ElevatedButton.
+// ui_kit/theme/app_button.dart — also a widget with named constructors
+// (AppButton.primary / .secondary / .text). The variant is chosen by a real
+// Material widget, so the outlined style is worn by OutlinedButton, not by a
+// repainted ElevatedButton.
 DwActionBuilder(
   action: onTap,
   requireValidation: requireValidation,
@@ -261,16 +263,17 @@ DwActionBuilder(
 )
 ```
 
-**Ширина кнопки — не параметр кита.** Material-кнопка сама сжимается по контенту, а «на всю ширину»
-во Flutter делает родитель: `SizedBox(width: double.infinity)` или `Expanded`. Не заводи enum'ы
-режимов ширины — заводи родителя.
+**Button width is not a kit parameter.** A Material button shrinks to its content by itself, and
+"full width" in Flutter is done by the parent: `SizedBox(width: double.infinity)` or `Expanded`. Don't
+introduce width-mode enums — introduce a parent.
 
-⚠️ **`requireValidation: true` требует `Form` выше по дереву.** Без формы валидировать нечего:
-действие выполнится, а в дебаге сработает `assert` фреймворка. Не вешай флаг «на всякий случай».
+⚠️ **`requireValidation: true` requires a `Form` up the tree.** With no form there is nothing to
+validate: the action will run, and in debug the framework's `assert` will fire. Don't set the flag
+"just in case".
 
-**Надпись внутри кит-виджета обязана сжиматься.** Ряд из иконки и текста в `Row` с
-`mainAxisSize.min` переполняется, как только надпись не влезает в отведённую ширину — и вместо
-кнопки пользователь видит красную полосу `RenderFlex overflowed`. Текст в такой строке — всегда
+**A label inside a kit widget must be able to shrink.** A row of an icon and text in a `Row` with
+`mainAxisSize.min` overflows as soon as the label doesn't fit the allotted width — and instead of a
+button the user sees a red `RenderFlex overflowed` stripe. Text in such a row is always
 `Flexible` + `maxLines: 1` + `TextOverflow.ellipsis`:
 
 ```dart
@@ -283,13 +286,12 @@ Row(
 )
 ```
 
-Это касается любого кит-виджета с текстом в ряду, не только кнопки. Widget-тест на узкой ширине
-(`SizedBox(width: 360)` + `expect(tester.takeException(), isNull)`) ловит это сразу — и ловит в том
-числе давно лежавшие переполнения, про которые никто не знал, потому что экран открывали только
-широким.
+This applies to any kit widget with text in a row, not just a button. A widget test at a narrow width
+(`SizedBox(width: 360)` + `expect(tester.takeException(), isNull)`) catches this immediately — and it
+catches long-standing overflows nobody knew about, because the screen was only ever opened wide.
 
-**`DwActionBuilder` — не только для кнопок.** Любой тап (`ListTile`, иконка, карточка, свайп)
-делается безопасным тем же билдером — не городи `bool _busy` руками:
+**`DwActionBuilder` is not only for buttons.** Any tap (`ListTile`, an icon, a card, a swipe) is made
+safe by the same builder — don't hand-roll a `bool _busy`:
 
 ```dart
 DwActionBuilder(
@@ -301,14 +303,14 @@ DwActionBuilder(
 )
 ```
 
-Разделение труда: **`DwUiAction` — что действие делает** (подтверждение, уведомления, follow-up,
-отчёт об ошибке), **`DwActionBuilder` — что происходит в UI, пока оно бежит**.
+Division of labor: **`DwUiAction` — what the action does** (confirmation, notifications, follow-up,
+error report), **`DwActionBuilder` — what happens in the UI while it runs**.
 
-## Тема и брейкпоинты
+## Theme and breakpoints
 
-**Тема живёт в ките, а не в корне приложения.** `ThemeData` — это стили, а стили живут в ките; корень
-только монтирует её. Никаких `ThemeExtension` от фреймворка регистрировать не нужно: `AppText`/
-`AppButton` знают свои стили сами.
+**The theme lives in the kit, not in the app root.** `ThemeData` is styles, and styles live in the kit;
+the root only mounts it. No `ThemeExtension` from the framework needs to be registered: `AppText`/
+`AppButton` know their styles themselves.
 
 ```dart
 // ui_kit/theme/app_theme.dart
@@ -317,24 +319,24 @@ abstract final class AppTheme {
 
   static ThemeData get light => ThemeData(
     colorScheme: ColorScheme.fromSeed(seedColor: _seed),
-    bottomNavigationBarTheme: ..., // всё, что должно выглядеть одинаково везде — здесь
+    bottomNavigationBarTheme: ..., // everything that must look the same everywhere goes here
   );
 }
 
-// приложение
+// the app
 MaterialApp.router(theme: AppTheme.light, ...)
 ```
 
-Цвет, выставленный на виджете, — это цвет, о котором забудет следующий экран. Если что-то должно
-выглядеть одинаково во всём приложении, ему место в `AppTheme`, а не в параметрах виджета.
+A color set on a widget is a color the next screen will forget about. If something must look the same
+across the whole app, its place is in `AppTheme`, not in widget parameters.
 
-Доступ к теме — через extension кита (raw-доступ линт разрешает только здесь):
+Access to the theme goes through a kit extension (raw access is allowed by the lint only here):
 
 ```dart
 // ui_kit/theme/app_context.dart
 abstract final class AppBreakpoints {
-  static const double mobileMaxWidth = 600;      // где кончается мобильная вёрстка
-  static const double deviceFrameMinWidth = 1024; // где десктоп-шелл рисует рамку телефона
+  static const double mobileMaxWidth = 600;      // where mobile layout ends
+  static const double deviceFrameMinWidth = 1024; // where the desktop shell draws the phone frame
 }
 
 extension AppBuildContextX on BuildContext {
@@ -346,29 +348,30 @@ extension AppBuildContextX on BuildContext {
 }
 ```
 
-Это **два разных вопроса**, и им нужны две константы: «мобильная ли вёрстка» и «хватает ли ширины,
-чтобы обрамить телефон на десктопе». На одном пороге окно браузера в 700px получает рамку телефона.
+These are **two different questions**, and they need two constants: "is this mobile layout" and "is
+there enough width to frame a phone on desktop". On a single threshold a 700px browser window gets a
+phone frame.
 
-## Структура
+## Structure
 
 ```
 lib/ui_kit/
-  ui_kit.dart              // корень: импорты + part-директивы + export dartway_flutter
-  1_essentials/            // базовое: чекбокс, инпут, multi_link_text
-  2_frequent/              // частое: карточка, bottom sheet, рейтинг
-  3_special/               // узкое, сгруппировано по фиче: pin-код, чат-бабл
+  ui_kit.dart              // root: imports + part directives + export dartway_flutter
+  1_essentials/            // basics: checkbox, input, multi_link_text
+  2_frequent/              // frequent: card, bottom sheet, rating
+  3_special/               // narrow, grouped by feature: pin code, chat bubble
   theme/                   // app_theme.dart, app_text.dart, app_button.dart, app_context.dart
   layout/                  // device_frame_shell.dart
-  utils/                   // conditional_parent.dart, форматтеры, лейблы дат
+  utils/                   // conditional_parent.dart, formatters, date labels
 ```
 
-Нумерованные префиксы держат кит отсортированным по частоте использования — самое нужное сверху.
+The numbered prefixes keep the kit sorted by usage frequency — the most needed on top.
 
 ## Best practices
 
-- Пропсы — минимальные и семантичные, не визуальные детали.
-- Не плоди варианты копипастой — композиция и extensions (см. `dartway-clean-code`).
-- Не клади внешние `padding`/`margin` внутрь компонента — отступ задаёт родитель.
-- Консистентность важнее визуальных хаков.
-- Захотелось «хака под клиента» внутри виджета фреймворка — это сигнал, что не хватает точки
-  расширения. Заводи её в ките, а не форкай `dartway_flutter`.
+- Props are minimal and semantic, not visual details.
+- Don't breed variants by copy-paste — composition and extensions (see `dartway-clean-code`).
+- Don't put outer `padding`/`margin` inside a component — the parent sets the spacing.
+- Consistency beats visual hacks.
+- Tempted by a "client-specific hack" inside a framework widget — that's a signal that an extension
+  point is missing. Introduce it in the kit, don't fork `dartway_flutter`.

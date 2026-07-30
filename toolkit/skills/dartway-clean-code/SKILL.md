@@ -1,7 +1,7 @@
 ---
 name: dartway-clean-code
 description: >-
-  DartwayTeam strict clean-code rules for ALL Flutter/Dart work (DartWay-проекты):
+  DartwayTeam strict clean-code rules for ALL Flutter/Dart work (DartWay projects):
   self-explanatory naming (min 2 words), single responsibility per file
   (length is a soft signal: >200 lines a nudge, >350 a warning — split by
   responsibility, not by line count), never pass BuildContext or WidgetRef as params, no _buildXxx()
@@ -12,70 +12,70 @@ description: >-
   of truth, and tests for complex features / non-trivial bugfixes.
 ---
 
-# Dartway Clean Code — правила DartwayTeam
+# Dartway Clean Code — the DartwayTeam rules
 
-Свод обязательных правил для **любого** Dart/Flutter кода в проектах **DartwayTeam**
-(DartWay-проекты; dartway-first). Это не «рекомендации», а контракт стиля —
-команда сознательно держит код чистым, чтобы не накапливать перечисленные ниже антипаттерны.
+The set of mandatory rules for **any** Dart/Flutter code in **DartwayTeam** projects
+(DartWay projects; dartway-first). These are not "recommendations" but a style contract — the
+team deliberately keeps the code clean so the anti-patterns listed below never pile up.
 
-## Как пользоваться
+## How to use this
 
-- Сверяйся с правилами при **написании, генерации, рефакторинге и ревью** кода — даже маленького сниппета.
-- Каждый блок: коротко **зачем** правило, затем `❌` (как нельзя) и `✅` (как нужно).
-- Перед тем как отдать код — пройди [чек-лист](#чек-лист-перед-сдачей-кода) в конце.
-- Часть 1 — жёсткие правила команды (самые неочевидные, нарушаются чаще всего). Часть 2 — общие принципы чистого кода. Часть 3 — тесты для сложного.
+- Check against the rules while **writing, generating, refactoring and reviewing** code — even a tiny snippet.
+- Every block: briefly **why** the rule exists, then `❌` (how not to) and `✅` (how to).
+- Before you hand code over — walk the [checklist](#checklist-before-handing-code-over) at the end.
+- Part 1 — the team's hard rules (the least obvious, broken most often). Part 2 — general clean-code principles. Part 3 — tests for the complex stuff.
 
 ---
 
-# Часть 1. Жёсткие правила команды
+# Part 1. The team's hard rules
 
-Эти правила специфичны для dartway-стека и нарушаются чаще всего. Держи их в голове первыми.
+These rules are specific to the dartway stack and are broken most often. Keep them in mind first.
 
-## 1.1 Нейминг: self-explanatory, минимум 2 слова
+## 1.1 Naming: self-explanatory, at least 2 words
 
-**Зачем:** имя должно отвечать «что это» без чтения типа и тела. Однословные и абстрактные имена заставляют читателя гадать.
+**Why:** a name must answer "what is this" without reading the type or the body. One-word and abstract names make the reader guess.
 
 ```dart
-// ❌ что это — модель? виджет? dto?
+// ❌ what is this — a model? a widget? a dto?
 class User {}
 final model = UserProfileModel();
 final data = fetchData();
-final order2 = getNewOrder();        // order2 — это что?
+final order2 = getNewOrder();        // order2 — what is that?
 class DeliveryCard { final String s; final int n; final Function cb; }
 
-// ✅ имя несёт смысл
+// ✅ the name carries meaning
 class UserProfileModel {}
 final userProfile = UserProfileModel();
 final fetchedProfile = fetchProfile();
-final updatedOrder = getNewOrder();  // рядом: initialOrder
+final updatedOrder = getNewOrder();  // next to it: initialOrder
 class DeliveryCard { final String deliveryStatus; final int itemsCount; final VoidCallback onTap; }
 ```
 
-## 1.2 Одна ответственность на файл; длина — мягкий ориентир
+## 1.2 One responsibility per file; length is a soft guideline
 
-**Зачем:** один файл — одна причина для изменения. Модель + репозиторий + стейт + UI в одном файле невозможно ни читать, ни переиспользовать.
+**Why:** one file — one reason to change. A model + repository + state + UI in one file can be neither read nor reused.
 
-**Длина — самый слабый из индикаторов:** до 200 строк не говорим ничего; >200 — повод присмотреться; >350 — ворнинг, вероятно, файл собрал несколько ответственностей. **Осмысленный связный файл на 300 строк лучше бессмысленного попила** на кусочки без собственной ответственности. Дели по ответственности, а не по счётчику строк — тем более что в файле фичи теперь живёт и её `DwFeatureSpec`, а хорошее описание стоит два десятка строк.
+**Length is the weakest of the indicators:** under 200 lines we say nothing; >200 — a reason to look closer; >350 — a warning, the file has probably collected several responsibilities. **A meaningful, coherent 300-line file beats a pointless chop** into pieces with no responsibility of their own. Split by responsibility, not by the line counter — all the more so because a feature file now also holds its `DwFeatureSpec`, and a good description costs a couple dozen lines.
 
 ```
 // ❌ order_screen.dart: OrderItemModel + OrderRepository + OrderState + OrderListScreen
 
-// ✅ раздельно:
+// ✅ separately:
 //   models/order_item_model.dart
 //   data/order_repository.dart
 //   state/order_state.dart
 //   ui/order_list_screen.dart
 
-// ✅ тоже ок: цельный экран на 220 строк с одной ответственностью —
-//    не пили его на header_part_1.dart / header_part_2.dart ради лимита
+// ✅ also fine: a coherent 220-line screen with a single responsibility —
+//    don't chop it into header_part_1.dart / header_part_2.dart to fit a limit
 ```
 
-## 1.3 Не передавай `BuildContext` / `WidgetRef` как параметры
+## 1.3 Don't pass `BuildContext` / `WidgetRef` as parameters
 
-**Зачем:** сервис/доменный код не должен знать про UI и жизненный цикл виджета. Это рвёт слои и плодит «протухший context».
+**Why:** service/domain code must not know about the UI and the widget lifecycle. It tears the layers apart and breeds "stale context".
 
 ```dart
-// ❌ сервис лезет в UI
+// ❌ the service reaches into the UI
 class PaymentService {
   void processPayment(BuildContext context, double amount) {
     ScaffoldMessenger.of(context).showSnackBar(...);
@@ -84,17 +84,17 @@ class PaymentService {
 }
 void loadUserData(WidgetRef ref) { ref.read(userProvider); }
 
-// ✅ сервис возвращает результат, UI сам решает что показать
+// ✅ the service returns a result, the UI decides what to show
 class PaymentService {
   Future<PaymentResult> processPayment(double amount) async { ... }
 }
-// в виджете: final result = await service.processPayment(amount);
-//            if (result.isSuccess) { ScaffoldMessenger.of(context)...; Navigator.of(context).pop(); }
+// in the widget: final result = await service.processPayment(amount);
+//                if (result.isSuccess) { ScaffoldMessenger.of(context)...; Navigator.of(context).pop(); }
 ```
 
-## 1.4 Никаких `_buildXxx()`-методов, возвращающих виджет
+## 1.4 No `_buildXxx()` methods that return a widget
 
-**Зачем:** приватные build-методы не имеют `const`, не переиспользуются, ломают границы перестроения. Виджет — это класс, а не метод.
+**Why:** private build methods get no `const`, are not reused, and break rebuild boundaries. A widget is a class, not a method.
 
 ```dart
 // ❌
@@ -105,51 +105,51 @@ class ProfilePage extends StatelessWidget {
   Widget build(BuildContext context) => Column(children: [_buildHeader(), _buildStats(10, 5)]);
 }
 
-// ✅ отдельные виджет-классы
+// ✅ separate widget classes
 class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       const Column(children: [ProfileHeader(), ProfileStats(orders: 10, reviews: 5)]);
 }
-// ProfileHeader / ProfileStats — каждый в своём файле (см. 1.8)
+// ProfileHeader / ProfileStats — each in its own file (see 1.8)
 ```
 
-## 1.3a Никаких функций вне классов — только методы класса или extension
+## 1.3a No functions outside classes — only class methods or extensions
 
-**Зачем:** функция верхнего уровня — имя, висящее в пространстве библиотеки: её не найти от типа, с которым она работает, IDE не подскажет её через точку, а импортировать её приходится отдельно от того, к чему она относится. Логика, привязанная к типу, принадлежит этому типу.
+**Why:** a top-level function is a name dangling in the library namespace: you can't find it from the type it works with, the IDE won't suggest it after a dot, and you have to import it separately from whatever it belongs to. Logic bound to a type belongs to that type.
 
 ```dart
-// ❌ свободная функция — по имени не видно, к чему она относится
+// ❌ a free function — the name doesn't show what it relates to
 CourseLockState resolveCourseLockState({required UserCourse? userCourse, ...}) { ... }
 
-// ✅ фабрика на самом типе — находится через точку от него
+// ✅ a factory on the type itself — found through the dot from it
 class CourseLockState {
   factory CourseLockState.resolve({required UserCourse? userCourse, ...}) { ... }
 }
 
-// ✅ или extension, если тип чужой
+// ✅ or an extension, if the type is someone else's
 extension UserCourseAccess on UserCourse {
   bool isExpiredAt(DateTime now) => accessUntil.isBefore(now);
 }
 ```
 
-**Куда что кладём:** создаёт значение своего типа → **фабричный конструктор**; отвечает на вопрос о существующем значении → **метод или геттер**; тип чужой (модель из сгенерированного клиента, тип фреймворка) → **extension**; нужна общая утилита без своего типа → статический метод класса-хозяина, а не свободная функция.
+**Where things go:** creates a value of its own type → **factory constructor**; answers a question about an existing value → **method or getter**; the type is someone else's (a model from the generated client, a framework type) → **extension**; you need a shared utility with no type of its own → a static method on an owner class, not a free function.
 
-**Исключения — ровно два, и оба вынужденные:**
+**Exactly two exceptions, both forced:**
 
-- **точки входа провайдеров кодогена** — если проект всё-таки использует `riverpod_generator` (по умолчанию мы его не используем, см. политику кодогена в `CLAUDE.md`): `@riverpod`-функция обязана быть верхнего уровня, этого требует генератор;
-- **`main()`** и подобные точки входа рантайма.
+- **codegen provider entry points** — if the project does use `riverpod_generator` after all (by default we don't, see the codegen policy in `CLAUDE.md`): a `@riverpod` function must be top-level, the generator requires it;
+- **`main()`** and similar runtime entry points.
 
-## 1.3c Приватный метод виджета, считающий данные, — это extension в `logic/`
+## 1.3c A private widget method that computes data is an extension in `logic/`
 
-**Зачем:** правило 1.3 запрещает `_buildXxx()`, возвращающие виджеты, а это его половина про
-данные. Приватный метод виджета, который **преобразует домен** (фильтрует список, маппит модели в
-параметры кита, считает производное значение), — та же логика, спрятанная от типа, с которым она
-работает: её не найти от модели, не переиспользовать в соседнем виджете и не покрыть тестом,
-не поднимая всё дерево.
+**Why:** rule 1.4 forbids `_buildXxx()` that return widgets, and this is its data half. A private
+widget method that **transforms the domain** (filters a list, maps models into kit parameters,
+computes a derived value) is the same logic hidden from the type it works with: you can't find it
+from the model, can't reuse it in a neighbouring widget, and can't cover it with a test without
+spinning up the whole tree.
 
 ```dart
-// ❌ маппинг домена спрятан приватным методом виджета
+// ❌ domain mapping hidden inside a private widget method
 class AdminChatsFiltersBar extends ConsumerWidget {
   List<AdminSelectOption<int>> _postOptions(List<ChatPostListDto> posts) => [
     for (final post in posts)
@@ -158,34 +158,34 @@ class AdminChatsFiltersBar extends ConsumerWidget {
   ].take(20).toList();
 }
 
-// ✅ extension рядом с фичей, в logic/ — находится от списка через точку
+// ✅ an extension next to the feature, in logic/ — found from the list through the dot
 extension ChatPostFilterOptions on List<ChatPostListDto> {
   List<AdminSelectOption<int>> get commentParentOptions => [ ... ];
 }
 
-// в виджете: options: posts.commentParentOptions
+// in the widget: options: posts.commentParentOptions
 ```
 
-**Граница простая:** метод строит виджет → отдельный виджет-класс (1.3); метод считает данные →
-extension в `logic/` фичи (1.3a). В `build` остаётся вызов через точку.
+**The boundary is simple:** the method builds a widget → a separate widget class (1.4); the method
+computes data → an extension in the feature's `logic/` (1.3a). What stays in `build` is a call through the dot.
 
-Геттер, который читает только собственные поля виджета и ничего не считает
-(`bool get _hasImage => imageUrl?.isNotEmpty ?? false`), выносить не надо — он про сам виджет.
+A getter that reads only the widget's own fields and computes nothing
+(`bool get _hasImage => imageUrl?.isNotEmpty ?? false`) needs no extraction — it is about the widget itself.
 
-## 1.3b Дата-класс состояния пишем руками, а не `freezed`
+## 1.3b Write a state data class by hand, not with `freezed`
 
-`copyWith` и `==` на пяти-шести полях — это двадцать строк, которые пишутся один раз и читаются без
-дополнительных знаний. `freezed` за них берёт `build_runner` в цикле правки и генерируемый файл
-рядом с каждым классом.
+`copyWith` and `==` over five or six fields are twenty lines, written once and read without any
+extra knowledge. In exchange `freezed` charges you `build_runner` in the edit loop and a generated file
+next to every class.
 
-Исключение, где генератор реально окупается: **union-типы** (несколько конструкторов одного
-sealed-типа с исчерпывающим `switch`). Заводить его ради одного дата-класса — нет.
+The exception where the generator really pays off: **union types** (several constructors of one
+sealed type with an exhaustive `switch`). Bringing it in for a single data class — no.
 
-## 1.4a Виджет в локальной переменной, использованной один раз, — тот же `_buildXxx()`
+## 1.4a A widget in a local variable used once is the same `_buildXxx()`
 
-**Зачем:** `final content = Column(...)`, который ниже вставляют в единственное место, — это тот же
-разрыв дерева, что и `_buildXxx()`: читателю приходится держать в голове, где переменная объявлена и
-где применена. Вставляй прямо на место.
+**Why:** `final content = Column(...)` that is inserted below in a single place is the same tree
+break as `_buildXxx()`: the reader has to keep in mind where the variable is declared and where it
+is used. Inline it right where it belongs.
 
 ```dart
 // ❌
@@ -196,46 +196,46 @@ return AppBottomSheetPageBody(child: content);
 return AppBottomSheetPageBody(child: Column(children: [...]));
 ```
 
-**Исключение:** переменную стоит завести, если она используется **дважды и более** (две ветки
-условия) или если между объявлением и применением стоит вычисление, которое иначе придётся повторять.
+**Exception:** a variable is worth introducing if it is used **twice or more** (two branches of a
+condition) or if between the declaration and the use there is a computation you would otherwise have to repeat.
 
-## 1.4b Закомментированный код не носим
+## 1.4b We don't carry commented-out code
 
-Удаляем. История лежит в гите, а комментарий гниёт молча: в одном файле боевого проекта было 119
-закомментированных строк из 306 — целый виджет, написанный против API, которого больше не
-существует. Оживить такое всё равно нельзя, а читать приходится всем.
+Delete it. History lives in git, while a comment rots silently: one file in a production project held 119
+commented-out lines out of 306 — a whole widget written against an API that no longer
+exists. You can't revive that anyway, and everyone has to read it.
 
-## 1.5 Никакого `ref.invalidate(...)` для рефреша
+## 1.5 No `ref.invalidate(...)` for refreshing
 
-**Зачем:** `invalidate` — грубый сброс, который роняет связанные провайдеры и мигает UI. Обновляй состояние через нормальный механизм стейта (в dartway — refresh у `DwRepository`/state-провайдера, перезапрос данных).
+**Why:** `invalidate` is a blunt reset that takes down related providers and makes the UI flicker. Update the state through the proper state mechanism (in dartway — refresh on `DwRepository`/the state provider, re-fetching the data).
 
 ```dart
 // ❌
 onPressed: () { ref.invalidate(cartProvider); ref.invalidate(userProvider); }
 
-// ✅ явный рефреш стейта
+// ✅ explicit state refresh
 onPressed: () => ref.read(cartStateProvider.notifier).refresh(),
 ```
 
-## 1.6 Не ищи виджеты в дереве через `GlobalKey`
+## 1.6 Don't look widgets up in the tree via `GlobalKey`
 
-**Зачем:** `GlobalKey().currentState` — обращение к чужому состоянию мимо стейт-менеджмента. Управляй данными через провайдер/контроллер, а не дёргай дерево.
+**Why:** `GlobalKey().currentState` reaches into someone else's state past state management. Drive the data through a provider/controller instead of poking the tree.
 
 ```dart
 // ❌
 final nameFieldKey = GlobalKey<FormFieldState>();
 void validate() => nameFieldKey.currentState?.validate();
 
-// ✅ состояние формы — в провайдере/контроллере; валидация по данным, а не по виджету
+// ✅ form state lives in a provider/controller; validate by data, not by widget
 final isNameValid = ref.read(signUpFormProvider).isNameValid;
 ```
 
-## 1.7 Никаких внешних отступов (`padding`/`margin`) внутри виджета
+## 1.7 No outer padding (`padding`/`margin`) inside a widget
 
-**Зачем:** внешний отступ — ответственность **родителя**, который размещает виджет. Если виджет добавляет себе внешние поля, его нельзя переиспользовать в другом контексте.
+**Why:** outer padding is the responsibility of the **parent** that places the widget. If a widget gives itself outer margins, it can't be reused in another context.
 
 ```dart
-// ❌ виджет сам себе делает внешний отступ
+// ❌ the widget gives itself outer padding
 class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
@@ -244,61 +244,61 @@ class ProductCard extends StatelessWidget {
 class ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
-      Container(margin: const EdgeInsets.all(12), child: ElevatedButton(...)); // margin = внешний отступ
+      Container(margin: const EdgeInsets.all(12), child: ElevatedButton(...)); // margin = outer padding
 }
 
-// ✅ виджет рисует только себя; отступ задаёт родитель
+// ✅ the widget draws only itself; the parent sets the padding
 class ProductCard extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Container(...); // внутренний padding контента — можно
+  Widget build(BuildContext context) => Container(...); // inner content padding is fine
 }
-// родитель: Padding(padding: ..., child: ProductCard())  /  ListView(padding: ...)
+// parent: Padding(padding: ..., child: ProductCard())  /  ListView(padding: ...)
 ```
 
-**Правило действует и при рефакторинге чужого кода.** Переписываешь виджет — внешний `Padding`
-не «сохраняется как было», а переезжает к вызывающему (`itemBuilder`, `Column`, `ListView.padding`).
-Иначе рефакторинг узаконивает нарушение: файл стал чище, а отступ так и остался внутри.
+**The rule holds when refactoring someone else's code too.** Rewriting a widget — the outer `Padding`
+is not "kept as it was", it moves to the caller (`itemBuilder`, `Column`, `ListView.padding`).
+Otherwise the refactoring legalizes the violation: the file got cleaner, and the padding stayed inside.
 
-## 1.7a Виджет не решает, сколько места он занимает
+## 1.7a A widget doesn't decide how much space it takes
 
-Тот же принцип, что и 1.7, но про размер: **сколько места виджет получает — решает родитель.**
-Виджет, который сам себя раздувает, ломается при первом переиспользовании — и ломается в рантайме,
-анализатор об этом молчит.
+The same principle as 1.7, but about size: **how much space a widget gets is the parent's call.**
+A widget that inflates itself breaks on the first reuse — and it breaks at runtime, the analyzer
+says nothing about it.
 
 ```dart
-// ❌ виджет назначает себе размер и требует определённого родителя
-Widget build(BuildContext context) => Expanded(child: content);         // упадёт вне Row/Column
+// ❌ the widget assigns itself a size and demands a particular parent
+Widget build(BuildContext context) => Expanded(child: content);         // will crash outside Row/Column
 Widget build(BuildContext context) => SizedBox(height: double.infinity, child: content);
 
-// ✅ виджет рисует содержимое; место ему даёт тот, кто его вставил
+// ✅ the widget draws its content; space is given by whoever inserted it
 Widget build(BuildContext context) => content;
-// родитель: Expanded(child: MyWidget())  /  SizedBox(height: 200, child: MyWidget())
+// parent: Expanded(child: MyWidget())  /  SizedBox(height: 200, child: MyWidget())
 ```
 
-Особая ловушка: **`Expanded` требует flex-родителя**. Виджет, живущий в `Column` экрана, тем же
-кодом вставляют в боттом-шит, диалог или `SingleChildScrollView` — и приложение падает у
-пользователя. Прежде чем менять размерную обвязку виджета, пройди по **всем** вызывающим.
+A special trap: **`Expanded` requires a flex parent**. A widget living in a screen's `Column` gets
+inserted by the very same code into a bottom sheet, a dialog or a `SingleChildScrollView` — and the app
+crashes for the user. Before changing a widget's sizing wrapper, walk **all** its callers.
 
-Исключение — виджет, чья вся суть в размере (`AppEventCard.compact` с фиксированной шириной ленты):
-тогда размер объявлен в ките и виден по имени конструктора, а не спрятан в `build`.
+The exception is a widget whose whole point is its size (`AppEventCard.compact` with the feed's fixed width):
+then the size is declared in the kit and visible from the constructor name, not hidden in `build`.
 
-## 1.8 Виджет с самостоятельной ценностью — публичный класс в своём файле
+## 1.8 A widget with standalone value is a public class in its own file
 
-**Зачем:** `_MessageBubble` в `chat_message_list.dart` — это отдельная сущность фичи (рендер сообщения, своё поведение), которую спрятали приватной: её не переиспользовать и не протестировать снаружи. Такие выноси в свой файл публичным классом.
+**Why:** `_MessageBubble` in `chat_message_list.dart` is a separate entity of the feature (message rendering, its own behavior) that was hidden as private: it can't be reused or tested from the outside. Extract such things into their own file as a public class.
 
 ```dart
-// ❌ chat_message_list.dart содержит class _MessageBubble и class _DateSeparator
+// ❌ chat_message_list.dart contains class _MessageBubble and class _DateSeparator
 // ✅ message_bubble.dart -> class MessageBubble; date_separator.dart -> class DateSeparator
 ```
 
-**Исключение — тривиальный презентационный хелпер, используемый в этом же файле один раз** (напр. `_CounterTile` внутри `admin_counters.dart`): у него нет ценности для переиспользования или отдельного теста, выносить его в публичный файл — лишний шум. Такой приватный класс допустим. Критерий: сущность фичи, которую захочется переиспользовать/протестировать → публичный файл; локальная деталь вёрстки одного экрана → можно оставить приватной рядом.
+**Exception — a trivial presentational helper used once in the very same file** (e.g. `_CounterTile` inside `admin_counters.dart`): it has no value for reuse or a separate test, moving it into a public file is pure noise. Such a private class is allowed. The criterion: a feature entity you'll want to reuse/test → a public file; a local layout detail of a single screen → may stay private next to it.
 
-## 1.9 Не заводи виджет-прослойку: если он ничего не решает, вставляй кит на месте
+## 1.9 Don't create a pass-through widget: if it decides nothing, inline the kit widget
 
-**Зачем:** прослойка — это класс, который только пересобирает свои же параметры в один китовый виджет. Читателю приходится открыть лишний файл, чтобы узнать, что там ничего нет, а фича обрастает папкой из таких файлов.
+**Why:** a pass-through is a class that only re-assembles its own parameters into a single kit widget. The reader has to open an extra file just to learn there is nothing in it, and the feature grows a folder of such files.
 
 ```dart
-// ❌ course_locked_stub_card.dart — все поля уходят наружу как есть
+// ❌ course_locked_stub_card.dart — every field goes straight out as is
 class CourseLockedStubCard extends StatelessWidget {
   const CourseLockedStubCard({required this.child, required this.topInset});
   ...
@@ -308,109 +308,109 @@ class CourseLockedStubCard extends StatelessWidget {
   );
 }
 
-// ✅ то же самое прямо в месте использования — файла и класса просто нет
+// ✅ the same thing right at the call site — the file and the class simply don't exist
 ```
 
-**Как отличить прослойку от нужного виджета — по тому, что он делает с доменом:**
+**How to tell a pass-through from a widget you need — by what it does with the domain:**
 
-- **маппер** превращает модель или доменное перечисление в параметры кита (`CommunityEventCard` — модель в тексты и урл картинки; выбор конструктора по `CourseLockReason`). Это работа, и она обязана жить в фиче: кит про модели не знает. **Оставляем;**
-- **прослойка** передаёт наружу свои же параметры и добавляет к ним разве что константу отступа. Работы нет. **Удаляем, вставляя кит на месте.**
+- **a mapper** turns a model or a domain enum into kit parameters (`CommunityEventCard` — a model into texts and an image url; picking a constructor by `CourseLockReason`). That is work, and it must live in the feature: the kit knows nothing about models. **We keep it;**
+- **a pass-through** forwards its own parameters and adds at most a padding constant to them. There is no work. **We delete it and inline the kit widget.**
 
-Признак, по которому прослойка видна с порога: среди её импортов только `ui_kit.dart` — то есть про домен она ничего не знает, а значит и решать ей нечего.
+The sign that gives a pass-through away at the door: its only import is `ui_kit.dart` — it knows nothing about the domain, so it has nothing to decide.
 
-**Если такой виджет всё же нужен многим** (та же обёртка в пяти местах) — это не повод плодить прослойку в фиче, это повод завести **конструктор в ките** (`ChatCardContainer.bottomSheetSurface`): смысл переезжает туда, где живёт вид.
+**If such a widget really is needed by many** (the same wrapper in five places) — that is no reason to breed a pass-through in the feature, it is a reason to add a **constructor in the kit** (`ChatCardContainer.bottomSheetSurface`): the meaning moves to where the look lives.
 
 ---
 
-# Часть 2. Принципы чистого кода
+# Part 2. Clean code principles
 
-Общеизвестные принципы. Здесь — как они выглядят в Dart/Flutter и чего избегать.
+Well-known principles. Here — how they look in Dart/Flutter and what to avoid.
 
 ## 2.1 SRP — Single Responsibility
 
-**Зачем:** класс, который грузит данные, кэширует, валидирует, форматирует и показывает SnackBar, невозможно менять безопасно.
+**Why:** a class that loads data, caches, validates, formats and shows a SnackBar cannot be changed safely.
 
 ```dart
 // ❌ OrderManager: fetchOrdersFromApi + cacheOrder + validateOrder + formatPrice + trackAnalytics + showSuccess(context)
-// ✅ OrderRepository (данные) | OrderCache | OrderValidator (domain) | PriceFormatter (ui_kit) | AnalyticsService
+// ✅ OrderRepository (data) | OrderCache | OrderValidator (domain) | PriceFormatter (ui_kit) | AnalyticsService
 ```
 
 ## 2.2 OCP — Open/Closed
 
-**Зачем:** добавление нового типа не должно требовать правки старого кода. Расширяй абстракцией, а не новой веткой `if/switch`.
+**Why:** adding a new type must not require editing old code. Extend with an abstraction, not with another `if/switch` branch.
 
 ```dart
-// ❌ для нового канала лезем внутрь send()
+// ❌ a new channel means going inside send()
 void send(NotificationType type, String message) {
   if (type == email) {...} else if (type == push) {...} else if (type == telegram) {...}
 }
 // ✅ abstract class NotificationChannel { void send(String message); }
-//    EmailChannel / PushChannel / TelegramChannel — новый канал = новый класс, send() не трогаем
+//    EmailChannel / PushChannel / TelegramChannel — a new channel = a new class, send() is untouched
 ```
 
 ## 2.3 LSP — Liskov Substitution
 
-**Зачем:** наследник обязан работать везде, где работает родитель. Бросать `UnsupportedError` из переопределённого метода — сломанный контракт.
+**Why:** a subclass must work everywhere the parent works. Throwing `UnsupportedError` from an overridden method is a broken contract.
 
 ```dart
 // ❌ class CachedReadOnlyRepository extends ReadOnlyRepository { @override save(x) => throw UnsupportedError(); }
-// ✅ раздели интерфейсы: abstract Readable { getAll(); } / abstract Writable { save(x); }
+// ✅ split the interfaces: abstract Readable { getAll(); } / abstract Writable { save(x); }
 ```
 
 ## 2.4 ISP — Interface Segregation
 
-**Зачем:** «жирный» интерфейс заставляет реализовывать ненужное через заглушки/исключения.
+**Why:** a "fat" interface forces you to implement what you don't need through stubs/exceptions.
 
 ```dart
 // ❌ abstract Worker { writeCode(); reviewCode(); designUI(); manageTeam(); deployToProduction(); }
 //    class JuniorDeveloper implements Worker { designUI() => throw UnimplementedError(); ... }
-// ✅ узкие роли: Coder / Reviewer / Designer / Manager — реализуй только нужные
+// ✅ narrow roles: Coder / Reviewer / Designer / Manager — implement only the ones you need
 ```
 
 ## 2.5 DIP — Dependency Inversion
 
-**Зачем:** высокоуровневый код должен зависеть от абстракции, а не от конкретной реализации. Переезд Firebase→Supabase не должен трогать экраны.
+**Why:** high-level code must depend on an abstraction, not on a concrete implementation. A Firebase→Supabase move must not touch the screens.
 
 ```dart
-// ❌ final authService = FirebaseAuthService();    // прибили гвоздями к реализации
-// ✅ зависим от abstract class AuthService; конкретику внедряем через провайдер/DI
-final authService = ref.read(authServiceProvider); // -> FirebaseAuthService под капотом
+// ❌ final authService = FirebaseAuthService();    // nailed to the implementation
+// ✅ depend on abstract class AuthService; inject the concrete one through a provider/DI
+final authService = ref.read(authServiceProvider); // -> FirebaseAuthService under the hood
 ```
 
-## 2.6 KISS — проще
+## 2.6 KISS — simpler
 
-**Зачем:** лишняя сложность = лишние баги. Не пиши 15 строк и «паттерн стратегия» там, где хватит одной строки.
+**Why:** extra complexity = extra bugs. Don't write 15 lines and a "strategy pattern" where one line is enough.
 
 ```dart
-// ❌ 15 строк с циклом ради проверки пустоты;  Strategy+Context ради склейки двух строк
+// ❌ 15 lines with a loop just to check emptiness;  Strategy+Context just to join two strings
 // ✅ items?.isEmpty ?? true;      '$first $last';
-// ❌ Builder→LayoutBuilder→AnimatedContainer→MediaQuery→DefaultTextStyle ради одного Text
+// ❌ Builder→LayoutBuilder→AnimatedContainer→MediaQuery→DefaultTextStyle for a single Text
 // ✅ Text(text)
 ```
 
-## 2.7 DRY — не повторяйся
+## 2.7 DRY — don't repeat yourself
 
-**Зачем:** скопированная карточка/логика расходится при первом же изменении. Выноси в общий виджет / extension / domain.
+**Why:** a copy-pasted card/logic diverges at the very first change. Extract into a shared widget / extension / domain.
 
 ```dart
-// ❌ три одинаковых Container-карточки подряд через Ctrl+C; одинаковый маппинг в ViewModel и ExportService
+// ❌ three identical Container cards in a row via Ctrl+C; the same mapping in ViewModel and ExportService
 // ✅ OrderStatusCard(title: ..., status: ..., color: ...);
 //    extension ActiveOrderFilter on List<OrderItemModel> { List<String> get exportTitles => ...; }
 ```
 
-## 2.8 YAGNI — не делай впрок
+## 2.8 YAGNI — don't build for later
 
-**Зачем:** 20 полей «вдруг пригодятся» и абстракция при единственной реализации — это мёртвый груз, который надо поддерживать.
+**Why:** 20 fields "in case they come in handy" and an abstraction with a single implementation are dead weight you have to maintain.
 
 ```dart
-// ❌ UserProfileState с tiktokHandle/linkedInUrl/isInfluencer/... когда используются только name и email
-// ❌ abstract BaseAnalyticsProvider + единственный FirebaseAnalyticsProvider
-// ✅ держи только реальные поля; вводи абстракцию, когда появится второй провайдер
+// ❌ UserProfileState with tiktokHandle/linkedInUrl/isInfluencer/... when only name and email are used
+// ❌ abstract BaseAnalyticsProvider + a single FirebaseAnalyticsProvider
+// ✅ keep only the real fields; introduce the abstraction when a second provider appears
 ```
 
-## 2.9 Law of Demeter — не лезь в чужие кишки
+## 2.9 Law of Demeter — don't reach into someone else's guts
 
-**Зачем:** цепочка `a.b.c.d` означает, что вызывающий знает всю внутреннюю структуру чужих объектов. Сломается любое звено.
+**Why:** the chain `a.b.c.d` means the caller knows the entire internal structure of other objects. Any link will break.
 
 ```dart
 // ❌ company.department.team.teamLead.getEmail();
@@ -420,25 +420,25 @@ final authService = ref.read(authServiceProvider); // -> FirebaseAuthService п�
 
 ## 2.10 Composition over Inheritance
 
-**Зачем:** 5-уровневая иерархия `AnimatedShadowedRoundedStyledWidget` нечитаема и неотлаживаема. Собирай поведение из частей.
+**Why:** a 5-level `AnimatedShadowedRoundedStyledWidget` hierarchy is unreadable and undebuggable. Assemble behavior out of parts.
 
 ```dart
 // ❌ Base -> Styled -> RoundedStyled -> ShadowedRoundedStyled -> Animated...
-// ✅ композиция: AnimatedOpacity(child: DecoratedBox(child: ClipRRect(child: child)))  / миксины / параметры
+// ✅ composition: AnimatedOpacity(child: DecoratedBox(child: ClipRRect(child: child)))  / mixins / parameters
 ```
 
 ## 2.11 Separation of Concerns
 
-**Зачем:** виджет с HTTP-запросом, расчётом скидки и валидацией нельзя ни тестировать, ни переиспользовать. UI только отображает.
+**Why:** a widget with an HTTP request, a discount calculation and validation can be neither tested nor reused. The UI only displays.
 
 ```dart
-// ❌ _ProductPageState: http.get(...) + calculateDiscount(...) + canAddToCart(...) прямо в State
-// ✅ запросы -> repository; расчёты/правила -> domain; State только держит и показывает данные
+// ❌ _ProductPageState: http.get(...) + calculateDiscount(...) + canAddToCart(...) right in the State
+// ✅ requests -> repository; calculations/rules -> domain; State only holds and shows the data
 ```
 
-## 2.12 Fail Fast — не глотай ошибки
+## 2.12 Fail Fast — don't swallow errors
 
-**Зачем:** пустой `catch` прячет баг навсегда. Логируй, пробрасывай или обрабатывай конкретную ошибку.
+**Why:** an empty `catch` hides a bug forever. Log it, rethrow it, or handle the specific error.
 
 ```dart
 // ❌ try { ... } catch (e) { return null; }      try { ... } catch (_) {}
@@ -447,25 +447,25 @@ final authService = ref.read(authServiceProvider); // -> FirebaseAuthService п�
 
 ## 2.13 Avoid Premature Optimization
 
-**Зачем:** кастомный LRU-кэш на 50 пользователей — сложность без причины. Сначала измерь, потом оптимизируй.
+**Why:** a custom LRU cache for 50 users is complexity without a reason. Measure first, optimize after.
 
 ```dart
-// ❌ ручной LRU с _accessOrder и _maxCacheSize = 1000 для списка из 50 имён
-// ✅ простой Map (или вообще без кэша), пока профайлер не покажет реальную проблему
+// ❌ a hand-rolled LRU with _accessOrder and _maxCacheSize = 1000 for a list of 50 names
+// ✅ a plain Map (or no cache at all) until the profiler shows a real problem
 ```
 
 ## 2.14 Tell, Don't Ask
 
-**Зачем:** не вытаскивай поля объекта, чтобы посчитать снаружи — пусть объект сам себя считает. Логика живёт рядом с данными.
+**Why:** don't pull an object's fields out to compute outside — let the object compute itself. Logic lives next to the data.
 
 ```dart
-// ❌ снаружи: складываем cart.itemPrices, вычитаем cart.promoDiscount, клампим...
-// ✅ cart.total;   // ShoppingCart сам знает, как считать свой итог
+// ❌ outside: sum up cart.itemPrices, subtract cart.promoDiscount, clamp...
+// ✅ cart.total;   // ShoppingCart itself knows how to compute its total
 ```
 
 ## 2.15 Avoid God Object
 
-**Зачем:** класс, который держит auth + orders + cart + profile + settings + navigation + analytics, — это всё приложение в одном файле.
+**Why:** a class holding auth + orders + cart + profile + settings + navigation + analytics is the whole app in one file.
 
 ```dart
 // ❌ class AppController { login(); loadOrders(); addToCart(); updateProfile(); toggleTheme(); goToHome(); trackEvent(); }
@@ -474,52 +474,52 @@ final authService = ref.read(authServiceProvider); // -> FirebaseAuthService п�
 
 ## 2.16 Avoid Magic Numbers / Strings
 
-**Зачем:** `if (distance > 50)` и `status == 'pndng'` — опечатка не ловится компилятором, смысл числа неизвестен. Имена и enum'ы.
+**Why:** `if (distance > 50)` and `status == 'pndng'` — the compiler catches no typo, the meaning of the number is unknown. Names and enums.
 
 ```dart
 // ❌ return weight * 3.5 + 299;          if (status == 'pndng') ...
 // ✅ static const longDistanceBaseFee = 299;   enum OrderStatus { pending, delivered, inTransit }
-//    switch (status) { case OrderStatus.pending: ... }   // компилятор требует покрыть все ветки
+//    switch (status) { case OrderStatus.pending: ... }   // the compiler demands every branch is covered
 ```
 
 ## 2.17 Single Source of Truth
 
-**Зачем:** локальная копия глобального стейта рассинхронизируется — забыл записать обратно, и UI врёт.
+**Why:** a local copy of global state falls out of sync — you forget to write it back, and the UI lies.
 
 ```dart
 // ❌ initState() { userName = GlobalAppState.userName; }  save() { GlobalAppState.userName = userName; }
-// ✅ виджет читает и пишет напрямую через провайдер — один источник истины
+// ✅ the widget reads and writes directly through the provider — one source of truth
 final userName = ref.watch(userProfileProvider.select((p) => p.name));
 ```
 
 ---
 
-# Часть 3. Тесты для сложного
+# Part 3. Tests for the complex stuff
 
-**Зачем:** сложную логику нельзя проверить «на глаз» — она ломается на краевых случаях и тихо деградирует со временем. Тест фиксирует ожидаемое поведение и ловит регресс. Порог — по **сложности поведения**, а не по факту изменения.
+**Why:** complex logic can't be checked "by eye" — it breaks on edge cases and quietly degrades over time. A test pins down the expected behavior and catches regressions. The threshold is **behavior complexity**, not the mere fact of a change.
 
-**Что покрываем тестами:**
-- Сложные фичи и нетривиальная логика — расчёты, бизнес-правила, стейт-машины, деньги (напр. кошелёк/оплаты).
-- Краевые случаи и сценарии отката/деградации («даунгрейд»: истёк бизнес-профиль → снялся бейдж, отменили подписку, баланс ушёл в минус).
-- Любой багфикс нетривиального поведения.
+**What we cover with tests:**
+- Complex features and non-trivial logic — calculations, business rules, state machines, money (e.g. wallet/payments).
+- Edge cases and rollback/degradation scenarios ("downgrade": a business profile expired → the badge was removed, a subscription was cancelled, the balance went negative).
+- Any bugfix of non-trivial behavior.
 
-**Что НЕ тестируем:** косметику — перекрасил кнопку, поправил отступ, переименовал. Тест ради галочки противоречит KISS/YAGNI.
+**What we do NOT test:** cosmetics — recolored a button, fixed a padding, renamed something. A test for the sake of a checkbox contradicts KISS/YAGNI.
 
-**Багфикс — строго «причина → фикс»:**
-1. Сначала тест, **воспроизводящий баг**. Он падает — это и есть локализация причины.
-2. Чинишь код, пока тест не позеленеет.
-3. Тест остаётся в репо регрессионным стражем, чтобы баг не вернулся.
+**A bugfix is strictly "cause → fix":**
+1. First a test that **reproduces the bug**. It fails — that failure is the localization of the cause.
+2. You fix the code until the test goes green.
+3. The test stays in the repo as a regression guard, so the bug does not come back.
 
-**Уровень теста — по тому, где живёт поведение** (сам уровень не догма):
-- Логика (домен/сервисы/стейт/репозиторий) → юнит-тест. Сюда попадает большинство — логика и так вынесена из виджетов (см. 2.11 SoC).
-- Поведение в UI → widget-тест на ключевой сценарий.
+**The test level follows where the behavior lives** (the level itself is not dogma):
+- Logic (domain/services/state/repository) → a unit test. Most of it lands here — the logic is extracted out of widgets anyway (see 2.11 SoC).
+- Behavior in the UI → a widget test for the key scenario.
 
 ```dart
-// ❌ сложный расчёт кошелька правится «на глаз», тестов нет — регресс ловят пользователи
-// ❌ багфикс без теста: причина не зафиксирована, через месяц баг вернётся
+// ❌ a complex wallet calculation is patched "by eye", no tests — users catch the regression
+// ❌ a bugfix without a test: the cause is not pinned down, in a month the bug is back
 
-// ✅ багфикс reproduce-first: красный тест на причину → фикс → остаётся регрессионным
-test('кошелёк не уходит в минус при списании больше баланса', () {
+// ✅ reproduce-first bugfix: a red test on the cause → fix → it stays as a regression test
+test('wallet does not go negative when charged more than its balance', () {
   final wallet = Wallet(balance: 100);
   expect(() => wallet.charge(150), throwsA(isA<InsufficientFundsException>()));
 });
@@ -527,10 +527,10 @@ test('кошелёк не уходит в минус при списании б�
 
 ---
 
-## Капстоун: всё плохо → как надо
+## Capstone: everything wrong → how it should be
 
 ```dart
-// ❌ имя в 1 слово + build-метод + context/ref как параметры + invalidate + внешний padding + дублирование
+// ❌ 1-word name + build method + context/ref as parameters + invalidate + outer padding + duplication
 class Page extends ConsumerWidget {
   Widget _buildItem(BuildContext context, WidgetRef ref, dynamic d) => GestureDetector(
         onTap: () { ref.invalidate(someProvider); Navigator.of(context).pop(); },
@@ -538,10 +538,10 @@ class Page extends ConsumerWidget {
       );
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
-      Column(children: [_buildItem(context, ref, 'один'), _buildItem(context, ref, 'два')]);
+      Column(children: [_buildItem(context, ref, 'one'), _buildItem(context, ref, 'two')]);
 }
 
-// ✅ осмысленное имя + отдельный виджет-класс + данные через стейт + отступ снаружи + список без копипасты
+// ✅ meaningful name + separate widget class + data through state + padding outside + list without copy-paste
 class ItemsListPage extends ConsumerWidget {
   const ItemsListPage({super.key});
   @override
@@ -550,29 +550,29 @@ class ItemsListPage extends ConsumerWidget {
     return Column(children: [for (final item in items) ItemTile(item: item)]);
   }
 }
-// item_tile.dart -> class ItemTile (внешний отступ задаёт родитель/ListView, рефреш через notifier)
+// item_tile.dart -> class ItemTile (outer padding set by the parent/ListView, refresh through the notifier)
 ```
 
 ---
 
-## Чек-лист перед сдачей кода
+## Checklist before handing code over
 
-- [ ] **Имена** осмысленные, ≥2 слов; нет `model`/`data`/`list`/`s`/`n`/`cb`/`order2`.
-- [ ] **Файл** — одна ответственность (модель/репозиторий/стейт/UI раздельно); >200 строк — присмотреться, >350 — вероятно, пора делить (но по ответственности, не по счётчику).
-- [ ] **Нет функций вне классов** — фабрика/метод/extension; исключение только `@riverpod`-точки входа и `main()` (§1.3a).
-- [ ] **Нет виджета в переменной, использованной один раз** (§1.4a) и **нет закомментированного кода** (§1.4b).
-- [ ] **Нет виджетов-прослоек** — класс, который только передаёт свои параметры в китовый виджет и не знает домена (в импортах один `ui_kit.dart`), не заводим: вставляем кит на месте, а повторяющуюся обёртку делаем конструктором кита (§1.9).
-- [ ] **Нет** `BuildContext`/`WidgetRef` в параметрах сервисов и функций.
-- [ ] **Нет** `_buildXxx()`-методов, возвращающих виджет — это отдельные виджет-классы (§1.3).
-- [ ] **Нет** приватных методов виджета, преобразующих домен, — это extension в `logic/` фичи (§1.3c).
-- [ ] **Нет** `ref.invalidate(...)` — рефреш через стейт.
-- [ ] **Нет** `GlobalKey` для поиска виджетов в дереве.
-- [ ] **Нет** внешних `padding`/`margin` внутри виджета — отступ задаёт родитель (§1.7). При рефакторинге чужого виджета внешний отступ переезжает к вызывающему, а не «сохраняется как было».
-- [ ] **Нет** `Expanded`/`SizedBox(…: double.infinity)` в корне `build` — место виджету даёт родитель (§1.7a).
-- [ ] **Нет** приватных виджет-классов (`_Foo`) в публичных файлах фич.
-- [ ] **Сложное** (нетривиальная логика/поведение, деньги, откаты-«даунгрейд») покрыто тестом; багфикс — сначала падающий тест на причину, потом фикс. Косметику не тестируем.
-- [ ] Соблюдены SOLID, KISS, DRY, YAGNI, Law of Demeter.
-- [ ] Композиция вместо глубокого наследования; логика не в UI (SoC).
-- [ ] Ошибки не проглатываются (fail fast); нет преждевременной оптимизации.
-- [ ] Tell-don't-ask; нет god-объектов; нет магических чисел/строк (enum/const).
-- [ ] Один источник истины — нет локальных копий глобального стейта.
+- [ ] **Names** are meaningful, ≥2 words; no `model`/`data`/`list`/`s`/`n`/`cb`/`order2`.
+- [ ] **File** — one responsibility (model/repository/state/UI separately); >200 lines — look closer, >350 — probably time to split (but by responsibility, not by the counter).
+- [ ] **No functions outside classes** — factory/method/extension; the only exceptions are `@riverpod` entry points and `main()` (§1.3a).
+- [ ] **No widget in a variable used once** (§1.4a) and **no commented-out code** (§1.4b).
+- [ ] **No pass-through widgets** — a class that only forwards its own parameters into a kit widget and knows nothing about the domain (`ui_kit.dart` its only import) is not created: inline the kit widget, and turn a repeating wrapper into a kit constructor (§1.9).
+- [ ] **No** `BuildContext`/`WidgetRef` in the parameters of services and functions.
+- [ ] **No** `_buildXxx()` methods returning a widget — those are separate widget classes (§1.4).
+- [ ] **No** private widget methods that transform the domain — those are extensions in the feature's `logic/` (§1.3c).
+- [ ] **No** `ref.invalidate(...)` — refresh through the state.
+- [ ] **No** `GlobalKey` for looking widgets up in the tree.
+- [ ] **No** outer `padding`/`margin` inside a widget — the parent sets the padding (§1.7). When refactoring someone else's widget the outer padding moves to the caller instead of being "kept as it was".
+- [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
+- [ ] **No** private widget classes (`_Foo`) in public feature files.
+- [ ] **The complex stuff** (non-trivial logic/behavior, money, "downgrade" rollbacks) is covered by a test; a bugfix — first a failing test on the cause, then the fix. We don't test cosmetics.
+- [ ] SOLID, KISS, DRY, YAGNI, Law of Demeter are respected.
+- [ ] Composition instead of deep inheritance; logic is not in the UI (SoC).
+- [ ] Errors are not swallowed (fail fast); no premature optimization.
+- [ ] Tell-don't-ask; no god objects; no magic numbers/strings (enum/const).
+- [ ] One source of truth — no local copies of global state.

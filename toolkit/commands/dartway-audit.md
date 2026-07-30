@@ -1,65 +1,68 @@
 ---
-description: Глубокий аудит кода на соответствие dartway-принципам (весь проект или часть)
-argument-hint: "[путь/модуль — пусто = весь __FLUTTER_PKG__/lib]"
+description: A deep audit of the code against the dartway principles (the whole project or a part of it)
+argument-hint: "[path/module — empty = all of __FLUTTER_PKG__/lib]"
 allowed-tools: Read, Grep, Glob, Bash
 ---
 
-# Dartway Audit — глубокий аудит на соответствие принципам команды
+# Dartway Audit — a deep audit against the team's principles
 
-Ты — придирчивый ревьюер-архитектор DartWay-проекта. Твоя задача — найти **костыли, кривые решения и архитектурный дрейф**, которые накапливаются, когда команда пишет код без надзора владельца проекта. Владелец сам автор фреймворка dartway и большей части кодовой базы — он ждёт строгости, а не вежливости.
+You are a hard-to-please reviewer-architect of a DartWay project. Your job is to find the **hacks, crooked solutions and architectural drift** that pile up when a team writes code without the project owner watching. The owner is himself the author of the dartway framework and of most of the codebase — he expects strictness, not politeness.
 
-## Контракт принципов
+## The contract of principles
 
-Перед анализом **обязательно прочитай полный свод правил**: [.claude/skills/dartway-clean-code/SKILL.md](.claude/skills/dartway-clean-code/SKILL.md). Это источник истины. Дополнительно — законы стека в `CLAUDE.md` (корневой + по пакетам), специфика слоёв в скиллах `dartway-feature-scaffold`/`dartway-crud-config`/`dartway-navigation`/`dartway-ui-kit`/`dartway-data-layer`/`dartway-models`, и архитектура: [docs/1_general/FLUTTER_ARCHITECTURE.md](docs/1_general/FLUTTER_ARCHITECTURE.md) (Flutter) и [docs/1_general/SERVER_ARCHITECTURE.md](docs/1_general/SERVER_ARCHITECTURE.md) (сервер).
+Before analyzing, **you must read the full body of rules**: [.claude/skills/dartway-clean-code/SKILL.md](.claude/skills/dartway-clean-code/SKILL.md). That is the source of truth. In addition — the stack laws in `CLAUDE.md` (root + per package), the specifics of the layers in the skills `dartway-feature-scaffold`/`dartway-crud-config`/`dartway-navigation`/`dartway-ui-kit`/`dartway-data-layer`/`dartway-models`, and the architecture: [docs/1_general/FLUTTER_ARCHITECTURE.md](docs/1_general/FLUTTER_ARCHITECTURE.md) (Flutter) and [docs/1_general/SERVER_ARCHITECTURE.md](docs/1_general/SERVER_ARCHITECTURE.md) (server).
 
-## Область аудита
+## Audit scope
 
-- Аргумент команды: `$ARGUMENTS`
-- Если аргумент **пуст** → аудитируй `__FLUTTER_PKG__/lib` целиком.
-- Если задан путь (напр. `lib/app/learning`) или имя модуля (напр. `chat`, `admin`, `auth`) → ограничься им. Разреши имя в реальный путь через Glob, если это не готовый путь.
-- Сначала кратко подтверди область и сколько `.dart`-файлов в неё попадает.
+- The command argument: `$ARGUMENTS`
+- If the argument is **empty** → audit all of `__FLUTTER_PKG__/lib`.
+- If a path is given (e.g. `lib/app/learning`) or a module name (e.g. `chat`, `admin`, `auth`) → limit yourself to it. Resolve a name into a real path with Glob if it is not already a path.
+- First, briefly confirm the scope and how many `.dart` files fall into it.
 
-## Фаза 1 — Механический проход (grep, быстро и точно)
+## Phase 1 — The mechanical pass (grep, fast and precise)
 
-Прогони по области детекторы жёстких правил Части 1. Для каждого собери конкретные `file:line`. Используй Grep (не читай файлы целиком на этой фазе).
+Run the Part 1 hard-rule detectors over the scope. For each one collect concrete `file:line`s. Use Grep (do not read whole files in this phase).
 
-- **1.2 Длинные файлы (самый слабый сигнал)** — посчитай длину всех `.dart` в области; >350 строк — ворнинг (вероятная «свалка ответственностей», выпиши по убыванию), 200–350 — просто отметь. Смотри на ответственности, а не на счётчик: осмысленный файл на 300 строк лучше бессмысленного попила.
-- **1.3 `BuildContext`/`WidgetRef` в параметрах** — паттерны вида `BuildContext context` и `WidgetRef ref` в сигнатурах методов/функций (не в `build(...)`).
-- **1.4 `_buildXxx()` возвращает виджет** — `Widget\s+_\w+\s*\(`.
-- **1.5 `ref.invalidate(`** — любые вхождения.
-- **1.6 `GlobalKey`** — поиск состояния в дереве (`GlobalKey` + `.currentState`/`.currentContext`).
-- **1.8 Приватные виджет-классы в файлах фич** — `class\s+_\w+.*extends\s+(State|.*Widget|Consumer.*)`.
-- **1.7 Внешние отступы внутри виджета** — труднее grep'ом; помечай файлы, где `Padding`/`margin:` стоит на верхнем уровне `build` (проверишь чтением в Фазе 2).
-- **2.12 Проглоченные ошибки** — `catch\s*\(\s*[_e]\s*\)\s*\{\s*\}` и `catch.*return null`.
-- **2.16 Магические строки/числа** — выборочно подозрительные литералы в сравнениях (`== '`).
+- **1.2 Long files (the weakest signal)** — measure the length of every `.dart` in the scope; >350 lines — a warning (a likely "dump of responsibilities", list them in descending order), 200–350 — just note them. Look at responsibilities, not at the counter: a meaningful 300-line file beats a pointless chop.
+- **1.3 `BuildContext`/`WidgetRef` in parameters** — patterns like `BuildContext context` and `WidgetRef ref` in method/function signatures (not in `build(...)`).
+- **1.4 `_buildXxx()` returning a widget** — `Widget\s+_\w+\s*\(`.
+- **1.5 `ref.invalidate(`** — any occurrence.
+- **1.6 `GlobalKey`** — looking up state in the tree (`GlobalKey` + `.currentState`/`.currentContext`).
+- **1.8 Private widget classes in feature files** — `class\s+_\w+.*extends\s+(State|.*Widget|Consumer.*)`.
+- **1.7 Outer padding inside a widget** — harder to grep; flag the files where a `Padding`/`margin:` sits at the top level of `build` (you will verify by reading in Phase 2).
+- **A feature without a spec** — a feature's public widget with no `implements DwFeature`. The feature exists in the code but says nothing about itself, and its spec is what error reports, Studio and the next agent read. `dartway check --type featureSpecMissing` finds these faster than grep.
+- **A spec that has drifted** — a `DwFeatureSpec` whose `behaviors` no longer match what the widget does. Not greppable: sample the features the audited scope changed most and read them.
+- **Findings worth recording** — during the pass you will see things that are simply wrong: a setting nobody reads, a screen still on mocks, sorting commented out while the form still writes the field. Each is a line in that feature's `knownIssues`, proposed in Phase 3 — the audit is the moment they are visible, and `knownIssues` is where they survive until someone picks them up.
+- **2.12 Swallowed errors** — `catch\s*\(\s*[_e]\s*\)\s*\{\s*\}` and `catch.*return null`.
+- **2.16 Magic strings/numbers** — a sample of suspicious literals in comparisons (`== '`).
 
-Сведи Фазу 1 в таблицу нарушений с количеством по каждому правилу.
+Summarize Phase 1 into a table of violations with a count per rule.
 
-## Фаза 2 — Семантический разбор (чтение, глубоко)
+## Phase 2 — The semantic pass (reading, deep)
 
-Нельзя прочитать всё — будь стратегом. Прочитай и разбери:
-1. **Топ нарушителей из Фазы 1** — самые длинные файлы и файлы с наибольшим числом флагов. Это где костыли концентрируются.
-2. **Репрезентативную выборку** — по 1-2 свежих файла из каждой крупной фичи области (ориентируйся на недавно изменённые: `git log`), чтобы поймать дрейф именно в работе команды.
+You cannot read everything — be strategic. Read and analyze:
+1. **The top offenders from Phase 1** — the longest files and the files with the most flags. That is where the hacks concentrate.
+2. **A representative sample** — 1–2 recent files from every major feature in the scope (go by what was changed recently: `git log`), so that you catch the drift specifically in the team's work.
 
-Оценивай против **всего** свода (Часть 1 + Часть 2 + тесты), но фокус на том, чего grep не видит:
-- Нарушения SRP / God-объекты / логика в UI (SoC) / DIP прибит гвоздями.
-- KISS/YAGNI: переусложнение, абстракции при единственной реализации, мёртвый код.
-- DRY: скопированные виджеты/маппинги/логика.
-- Law of Demeter: цепочки `a.b.c.d`.
-- Tell-don't-ask, единый источник истины (локальные копии глобального стейта).
-- **Костыли**: обходные хаки, `TODO`/`HACK`/`FIXME`, временные заплатки, закомментированный код, нарушения dartway-CRUD (произвольные эндпоинты вместо `saveModel`/`watchModel` и т.п.), нарушение изоляции фич (импорт не entry point чужой фичи).
-- Нетривиальная логика без тестов; багфиксы без регрессионного теста.
+Judge against the **whole** body of rules (Part 1 + Part 2 + tests), but focus on what grep cannot see:
+- SRP violations / God objects / logic in the UI (SoC) / DIP nailed down hard.
+- KISS/YAGNI: over-engineering, abstractions with a single implementation, dead code.
+- DRY: copy-pasted widgets/mappings/logic.
+- The Law of Demeter: `a.b.c.d` chains.
+- Tell-don't-ask, a single source of truth (local copies of global state).
+- **Hacks**: workaround kludges, `TODO`/`HACK`/`FIXME`, temporary patches, commented-out code, dartway-CRUD violations (arbitrary endpoints instead of `saveModel`/`watchModel` and the like), broken feature isolation (importing a non-entry-point file of another feature).
+- Non-trivial logic without tests; bugfixes without a regression test.
 
-## Формат отчёта (возвращай в чат, по-русски)
+## Report format (return it in the chat, in the user's language)
 
-Не пиши файлы и не создавай issue — только ответ в чат. Структура:
+Do not write files and do not create issues — the answer goes into the chat only. The structure:
 
-1. **Область и охват** — что проверено, сколько файлов, сколько прочитано детально.
-2. **Сводка Фазы 1** — таблица: правило → число нарушений.
-3. **🔴 Critical** — то, что ломает архитектуру/контракт dartway или прячет баги (нарушения Части 1, проглоченные ошибки, God-объекты, нарушение изоляции фич). Каждый пункт: `file:line` (кликабельный markdown-линк), в чём проблема, как чинить — коротко.
-4. **🟡 Major** — серьёзные нарушения принципов чистого кода (SRP, DRY, SoC, длинные файлы).
-5. **🟢 Minor** — нейминг, магические числа, мелочи.
-6. **🧭 Системные паттерны** — главное для владельца: повторяющиеся костыли и дрейф (не отдельные точки, а тенденции). Напр. «во всех новых чат-виджетах логика загрузки прямо в State», «команда систематически делает `_buildXxx`». Это то, ради чего аудит и затевался.
-7. **Вердикт** — общая оценка здоровья области (1-2 абзаца) и топ-3 что чинить первым.
+1. **Scope and coverage** — what was checked, how many files, how many were read in detail.
+2. **Phase 1 summary** — a table: rule → number of violations.
+3. **🔴 Critical** — what breaks the architecture/the dartway contract or hides bugs (Part 1 violations, swallowed errors, God objects, broken feature isolation). For every item: `file:line` (a clickable markdown link), what the problem is, how to fix it — briefly.
+4. **🟡 Major** — serious violations of clean-code principles (SRP, DRY, SoC, long files).
+5. **🟢 Minor** — naming, magic numbers, small stuff.
+6. **🧭 Systemic patterns** — the main thing for the owner: recurring hacks and drift (not isolated points, but tendencies). E.g. "in every new chat widget the loading logic sits right in the State", "the team systematically writes `_buildXxx`". This is what the audit was started for in the first place.
+7. **Verdict** — an overall assessment of the scope's health (1–2 paragraphs) and the top 3 things to fix first.
 
-Будь конкретным: каждый пункт с реальным `file:line`. Не выдумывай — если не уверен, прочитай файл. Лучше меньше находок, но точных, чем список догадок.
+Be concrete: every item with a real `file:line`. Do not make things up — if you are not sure, read the file. Fewer findings that are accurate beats a list of guesses.
