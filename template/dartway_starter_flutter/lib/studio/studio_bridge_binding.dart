@@ -12,9 +12,7 @@ import 'logic/studio_session_state_provider.dart';
 /// The project wiring point between the app's semantic layer and the bridge:
 /// features are discovered from mounted [DwFeature] widgets and mapped onto
 /// the bridge wire model.
-List<StudioFeatureInfo> _mountedFeatureInfos() => [
-  for (final feature in DwFeature.scanMounted())
-    StudioFeatureInfo(
+StudioFeatureInfo _toWireModel(DwFeatureSpec feature) => StudioFeatureInfo(
       id: feature.id,
       title: feature.title,
       purpose: feature.purpose,
@@ -22,8 +20,29 @@ List<StudioFeatureInfo> _mountedFeatureInfos() => [
       requirements: feature.requirements,
       implementationNotes: feature.implementationNotes,
       knownIssues: feature.knownIssues,
+    );
+
+List<StudioFeatureInfo> _mountedFeatureInfos() =>
+    [for (final feature in DwFeature.scanMounted()) _toWireModel(feature)];
+
+/// Answers Studio's "pencil" tap-to-inspect flow: the point arrives as
+/// fractions of this app's own logical viewport, converted here (not by
+/// Studio, which only knows how it is displaying the preview, framed or
+/// scaled) into an [Offset] [DwFeature.hitTest] can use.
+StudioFeatureInfo? _featureAtPoint(
+  double horizontalFraction,
+  double verticalFraction,
+) {
+  final view = WidgetsBinding.instance.platformDispatcher.views.first;
+  final logicalSize = view.physicalSize / view.devicePixelRatio;
+  final feature = DwFeature.hitTest(
+    Offset(
+      horizontalFraction * logicalSize.width,
+      verticalFraction * logicalSize.height,
     ),
-];
+  );
+  return feature == null ? null : _toWireModel(feature);
+}
 
 /// Connects the app to DartWay Studio when it runs embedded in the Studio
 /// preview frame: attaches the bridge host, reports route/session changes and
@@ -80,6 +99,7 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       validateAccessKey: studioHashAccessValidator(
         const String.fromEnvironment('STUDIO_KEY_HASH'),
       ),
+      inspectPoint: _featureAtPoint,
     );
     if (_host == null) return;
 

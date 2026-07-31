@@ -141,3 +141,31 @@ class SessionChangedMessage extends StudioBridgeMessage {
         ),
       );
 }
+
+/// App → Studio: the answer to an [InspectPointRequestMessage] — the feature
+/// at that point, or null when nothing declared covers it (or the app
+/// predates this message and never answers at all, which the requester's own
+/// timeout handles the same way).
+class InspectPointResultMessage extends StudioBridgeMessage {
+  const InspectPointResultMessage(this.feature);
+
+  final StudioFeatureInfo? feature;
+
+  @override
+  String get type => StudioBridgeProtocol.inspectPointResult;
+
+  @override
+  Map<String, dynamic> payloadToJson() => {
+        if (feature != null) 'feature': feature!.toJson(),
+      };
+
+  factory InspectPointResultMessage.fromPayload(
+    Map<String, dynamic> payload,
+  ) =>
+      InspectPointResultMessage(
+        switch (payload['feature']) {
+          final Map<String, dynamic> json => StudioFeatureInfo.fromJson(json),
+          _ => null,
+        },
+      );
+}

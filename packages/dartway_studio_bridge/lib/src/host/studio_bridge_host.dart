@@ -26,6 +26,15 @@ abstract interface class StudioBridgeHostDelegate {
   void onLocaleRequest(String locale);
 }
 
+/// What is declared at a screen point, for the "pencil" tap-to-inspect flow.
+/// The point arrives as fractions of the app's own viewport (see
+/// [InspectPointRequestMessage]) — convert with the app's own logical
+/// viewport size, not any size Studio thinks the frame is.
+typedef StudioInspectPoint = FutureOr<StudioFeatureInfo?> Function(
+  double horizontalFraction,
+  double verticalFraction,
+);
+
 /// The app-side end of the Studio bridge: announces the app, answers the
 /// handshake with the manifest, reports route/session changes and dispatches
 /// Studio's requests to the [StudioBridgeHostDelegate].
@@ -39,6 +48,7 @@ class StudioBridgeHost {
     this._currentFeatures,
     this._currentLocale,
     this._validateAccessKey,
+    this._inspectPoint,
   ) {
     _subscription = _channel.messages.listen(_onMessage);
     _channel.send(const AppReadyMessage());
@@ -65,6 +75,11 @@ class StudioBridgeHost {
     // validator that always returns true) accepts any Studio — fine for local
     // dev, wide open in production.
     Future<bool> Function(String accessKey)? validateAccessKey,
+    // Answers the "pencil" tap-to-inspect flow. Null (the default for an app
+    // that hasn't wired it) means every inspect request finds nothing —
+    // Studio's own timeout treats that exactly like an old app that doesn't
+    // know the message at all.
+    StudioInspectPoint? inspectPoint,
   }) {
     final channel = createStudioHostChannel();
     if (channel == null) return null;
@@ -77,6 +92,7 @@ class StudioBridgeHost {
       currentFeatures ?? () => const [],
       currentLocale ?? () => '',
       validateAccessKey ?? (_) async => true,
+      inspectPoint ?? (_, _) => null,
     );
   }
 
@@ -88,6 +104,7 @@ class StudioBridgeHost {
   final List<StudioFeatureInfo> Function() _currentFeatures;
   final String Function() _currentLocale;
   final Future<bool> Function(String accessKey) _validateAccessKey;
+  final StudioInspectPoint _inspectPoint;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
   void _onMessage(StudioBridgeMessage message) {
@@ -106,6 +123,15 @@ class StudioBridgeHost {
         unawaited(_delegate.onSignOutRequest());
       case LocaleRequestMessage(:final locale):
         _delegate.onLocaleRequest(locale);
+      case InspectPointRequestMessage(
+          :final horizontalFraction,
+          :final verticalFraction,
+        ):
+        Future.sync(
+          () => _inspectPoint(horizontalFraction, verticalFraction),
+        ).then(
+          (feature) => _channel.send(InspectPointResultMessage(feature)),
+        );
       default:
         break; // App → Studio messages echoed back are ignored.
     }

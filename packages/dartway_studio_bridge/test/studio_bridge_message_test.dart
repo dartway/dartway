@@ -90,6 +90,35 @@ void main() {
       expect((decoded as LocaleChangedMessage).locale, 'en');
     });
 
+    test('inspectPointRequest carries the fractional point', () {
+      final decoded = _roundTrip(
+        const InspectPointRequestMessage(
+          horizontalFraction: 0.25,
+          verticalFraction: 0.75,
+        ),
+      );
+      final request = decoded as InspectPointRequestMessage;
+      expect(request.horizontalFraction, 0.25);
+      expect(request.verticalFraction, 0.75);
+    });
+
+    test('inspectPointResult carries the feature found there', () {
+      final decoded = _roundTrip(
+        const InspectPointResultMessage(
+          StudioFeatureInfo(id: 'ad/card', title: 'Ad card'),
+        ),
+      );
+      expect(
+        (decoded as InspectPointResultMessage).feature?.id,
+        'ad/card',
+      );
+    });
+
+    test('inspectPointResult carries null when nothing was found there', () {
+      final decoded = _roundTrip(const InspectPointResultMessage(null));
+      expect((decoded as InspectPointResultMessage).feature, isNull);
+    });
+
     test('sessionChanged carries the session', () {
       final decoded = _roundTrip(
         const SessionChangedMessage(

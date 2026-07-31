@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../models/studio_feature_info.dart';
 import '../protocol/studio_bridge_message.dart';
 import '../transport/studio_message_channel.dart';
 import 'studio_bridge_event.dart';
@@ -23,6 +24,7 @@ class StudioBridgeClient {
   final Duration connectRetryInterval;
 
   final _events = StreamController<StudioProjectEvent>.broadcast();
+  final _inspectResults = StreamController<StudioFeatureInfo?>.broadcast();
   StreamSubscription<StudioBridgeMessage>? _subscription;
   Timer? _retryTimer;
   bool _connected = false;
@@ -71,6 +73,8 @@ class StudioBridgeClient {
         );
       case LocaleChangedMessage(:final locale):
         _events.add(StudioProjectLocaleChanged(locale));
+      case InspectPointResultMessage(:final feature):
+        _inspectResults.add(feature);
       default:
         break; // Studio → app messages echoed back are ignored.
     }
@@ -96,9 +100,31 @@ class StudioBridgeClient {
   void requestLocale(String locale) =>
       _channel.send(LocaleRequestMessage(locale));
 
+  /// The feature at a point given as fractions of the app's viewport (see
+  /// [InspectPointRequestMessage]) — the "pencil" tap-to-inspect flow.
+  /// Null when nothing is declared there, or the app never answers: an app
+  /// built against an older bridge doesn't know this message and simply stays
+  /// silent, which [timeout] turns into the same "nothing here" as a real
+  /// miss rather than a hang.
+  Future<StudioFeatureInfo?> inspectPoint(
+    double horizontalFraction,
+    double verticalFraction, {
+    Duration timeout = const Duration(seconds: 3),
+  }) {
+    final next = _inspectResults.stream.first;
+    _channel.send(
+      InspectPointRequestMessage(
+        horizontalFraction: horizontalFraction,
+        verticalFraction: verticalFraction,
+      ),
+    );
+    return next.timeout(timeout, onTimeout: () => null);
+  }
+
   void dispose() {
     _retryTimer?.cancel();
     _subscription?.cancel();
     _events.close();
+    _inspectResults.close();
   }
 }

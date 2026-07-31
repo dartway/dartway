@@ -25,6 +25,7 @@ abstract final class StudioBridgeProtocol {
   static const sessionChanged = 'sessionChanged';
   static const featuresChanged = 'featuresChanged';
   static const localeChanged = 'localeChanged';
+  static const inspectPointResult = 'inspectPointResult';
 
   // Studio → app.
   static const studioConnect = 'studioConnect';
@@ -32,4 +33,5 @@ abstract final class StudioBridgeProtocol {
   static const signInRequest = 'signInRequest';
   static const signOutRequest = 'signOutRequest';
   static const localeRequest = 'localeRequest';
+  static const inspectPointRequest = 'inspectPointRequest';
 }

@@ -92,6 +92,12 @@ abstract interface class DwFeature {
   /// The [DwFeatureSpec]s of every [DwFeature] widget currently *on screen*,
   /// keyed by id (a feature declared by several instances appears once).
   ///
+  /// Deduplication is per id and never prunes a subtree: the walk continues
+  /// through a feature it has already seen. A list of near-identical cards
+  /// therefore yields one entry for the card, plus any nested feature that only
+  /// some of the cards build — collapsing to the first card's subtree instead
+  /// would silently drop the extras the later ones carry.
+  ///
   /// Scans from the app root — not a [BuildContext] — on purpose: this is the
   /// whole current screen's feature set, which is exactly what an error report
   /// or a Studio passport wants. Call from a post-frame callback after the
@@ -113,13 +119,9 @@ abstract interface class DwFeature {
 
     final found = <String, DwFeatureSpec>{};
     void visit(Element element) {
-      final widget = element.widget;
-      if (widget is Offstage && widget.offstage) return;
-      if (widget is Visibility && !widget.visible) return;
-      if (widget is TickerMode && !widget.enabled) return;
-      if (widget is DwFeature) {
-        final feature = (widget as DwFeature).dwFeature;
-        found[feature.id] = feature;
+      if (_isParkedOffscreen(element.widget)) return;
+      if (element.widget case DwFeature feature) {
+        found[feature.dwFeature.id] = feature.dwFeature;
       }
       element.visitChildren(visit);
     }
@@ -127,4 +129,42 @@ abstract interface class DwFeature {
     root.visitChildren(visit);
     return found.values.toList();
   }
+
+  /// The [DwFeatureSpec] at [globalPosition] (Studio's inspect-by-tap: pick a
+  /// screen point, describe whatever is there), or null over nothing declared.
+  ///
+  /// The last match wins rather than the first: a card and a "more actions"
+  /// row inside it can both contain the same point, and the row is what the
+  /// tap actually landed on. Depth-first order with no early return already
+  /// gives this for free — a child is visited, and so overwrites `found`,
+  /// after its parent.
+  static DwFeatureSpec? hitTest(Offset globalPosition) {
+    final root = WidgetsBinding.instance.rootElement;
+    if (root == null) return null;
+
+    DwFeatureSpec? found;
+    void visit(Element element) {
+      if (_isParkedOffscreen(element.widget)) return;
+      if (element.widget case DwFeature feature) {
+        final renderObject = element.renderObject;
+        if (renderObject is RenderBox && renderObject.attached) {
+          final rect = renderObject.localToGlobal(Offset.zero) &
+              renderObject.size;
+          if (rect.contains(globalPosition)) found = feature.dwFeature;
+        }
+      }
+      element.visitChildren(visit);
+    }
+
+    root.visitChildren(visit);
+    return found;
+  }
+
+  /// Whether [widget] roots a subtree Flutter itself parks out of sight:
+  /// see [scanMounted] for why being mounted is not the same as being on
+  /// screen.
+  static bool _isParkedOffscreen(Widget widget) =>
+      (widget is Offstage && widget.offstage) ||
+      (widget is Visibility && !widget.visible) ||
+      (widget is TickerMode && !widget.enabled);
 }
