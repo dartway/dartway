@@ -225,5 +225,61 @@ void main() {
 
       expect(DwFeature.hitTest(const Offset(50, 50)), isNull);
     });
+
+    // A scaled subtree draws smaller than it lays out. Matching on the
+    // unscaled size would claim the empty space next to it — the case a
+    // zoomable canvas or a running page transition puts on screen.
+    testWidgets('matches the scaled area, not the laid-out one',
+        (tester) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Transform.scale(
+              scale: 0.5,
+              alignment: Alignment.topLeft,
+              child: _SizedFeature(_spec('scaled')),
+            ),
+          ),
+        ),
+      );
+
+      // Laid out 100x100, drawn 50x50 at the top-left corner.
+      expect(DwFeature.hitTest(const Offset(20, 20))?.id, 'scaled');
+      expect(DwFeature.hitTest(const Offset(70, 70)), isNull);
+    });
+
+    // A list item scrolled past the edge of its viewport keeps its layout
+    // position and paints nothing. Being deeper in the tree it would win the
+    // last-match-wins rule, so it has to be cut by the viewport's clip.
+    testWidgets('skips a feature clipped away by a scroll viewport',
+        (tester) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 100,
+              height: 100, // one item tall
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _SizedFeature(_spec('in-view')),
+                    _SizedFeature(_spec('below-the-fold')),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(DwFeature.hitTest(const Offset(50, 50))?.id, 'in-view');
+      // 'below-the-fold' lays out at y 100..200 — outside the viewport, drawn
+      // nowhere.
+      expect(DwFeature.hitTest(const Offset(50, 150)), isNull);
+    });
   });
 }

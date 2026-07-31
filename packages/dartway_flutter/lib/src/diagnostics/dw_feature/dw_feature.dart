@@ -138,6 +138,12 @@ abstract interface class DwFeature {
   /// tap actually landed on. Depth-first order with no early return already
   /// gives this for free — a child is visited, and so overwrites `found`,
   /// after its parent.
+  ///
+  /// A feature is matched on the area it actually *paints* into — see
+  /// [_paintedGlobalRect] for what that excludes. This is a walk of the widget
+  /// tree, not Flutter's own hit test: going from the hit render objects back
+  /// to the widgets that declared them needs an element, and a `RenderObject`
+  /// has no way back to one outside debug mode.
   static DwFeatureSpec? hitTest(Offset globalPosition) {
     final root = WidgetsBinding.instance.rootElement;
     if (root == null) return null;
@@ -146,11 +152,9 @@ abstract interface class DwFeature {
     void visit(Element element) {
       if (_isParkedOffscreen(element.widget)) return;
       if (element.widget case DwFeature feature) {
-        final renderObject = element.renderObject;
-        if (renderObject is RenderBox && renderObject.attached) {
-          final rect = renderObject.localToGlobal(Offset.zero) &
-              renderObject.size;
-          if (rect.contains(globalPosition)) found = feature.dwFeature;
+        final rect = _paintedGlobalRect(element.renderObject);
+        if (rect != null && rect.contains(globalPosition)) {
+          found = feature.dwFeature;
         }
       }
       element.visitChildren(visit);
@@ -158,6 +162,48 @@ abstract interface class DwFeature {
 
     root.visitChildren(visit);
     return found;
+  }
+
+  /// Where [renderObject] lands on screen, in global coordinates — or null if
+  /// it lands nowhere visible.
+  ///
+  /// Two things a plain `localToGlobal(Offset.zero) & size` gets wrong, and
+  /// both of them make [hitTest] name a feature the user cannot see at that
+  /// point:
+  ///
+  /// * **Transforms.** The size is the *unscaled* one, so a subtree under a
+  ///   `Transform.scale(0.5)` (a zoomable canvas, a running page transition)
+  ///   claims twice the area it draws. The full transform to the root fixes
+  ///   both the scale and any rotation's bounding box.
+  /// * **Clips.** A list item scrolled past the edge of its viewport keeps its
+  ///   layout position and answers for a point where it paints nothing — and
+  ///   being deeper in the tree, it would beat the visible feature there.
+  ///   Every ancestor clip cuts the rect down; an empty result means the
+  ///   feature is scrolled or clipped away entirely.
+  static Rect? _paintedGlobalRect(RenderObject? renderObject) {
+    if (renderObject is! RenderBox ||
+        !renderObject.attached ||
+        !renderObject.hasSize) {
+      return null;
+    }
+
+    var rect = MatrixUtils.transformRect(
+      renderObject.getTransformTo(null),
+      Offset.zero & renderObject.size,
+    );
+
+    var child = renderObject as RenderObject;
+    for (var ancestor = child.parent;
+        ancestor != null;
+        child = ancestor, ancestor = ancestor.parent) {
+      final clip = ancestor.describeApproximatePaintClip(child);
+      if (clip == null) continue;
+      rect = rect.intersect(
+        MatrixUtils.transformRect(ancestor.getTransformTo(null), clip),
+      );
+      if (rect.isEmpty) return null;
+    }
+    return rect;
   }
 
   /// Whether [widget] roots a subtree Flutter itself parks out of sight:
