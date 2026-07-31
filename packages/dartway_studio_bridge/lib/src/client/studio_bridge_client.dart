@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../models/studio_feature_info.dart';
 import '../protocol/studio_bridge_message.dart';
 import '../transport/studio_message_channel.dart';
 import 'studio_bridge_event.dart';
@@ -23,6 +24,13 @@ class StudioBridgeClient {
   final Duration connectRetryInterval;
 
   final _events = StreamController<StudioProjectEvent>.broadcast();
+
+  /// Inspect requests still waiting for their answer, by request id. Keyed
+  /// rather than kept as a single "latest" future because two taps can be in
+  /// flight at once — see [InspectPointRequestMessage.requestId].
+  final _pendingInspects = <String, Completer<StudioFeatureInfo?>>{};
+  int _inspectCounter = 0;
+
   StreamSubscription<StudioBridgeMessage>? _subscription;
   Timer? _retryTimer;
   bool _connected = false;
@@ -71,6 +79,10 @@ class StudioBridgeClient {
         );
       case LocaleChangedMessage(:final locale):
         _events.add(StudioProjectLocaleChanged(locale));
+      case InspectPointResultMessage(:final requestId, :final feature):
+        // An answer whose request is gone (already timed out) is dropped, not
+        // handed to whoever is waiting now.
+        _pendingInspects.remove(requestId)?.complete(feature);
       default:
         break; // Studio → app messages echoed back are ignored.
     }
@@ -96,9 +108,47 @@ class StudioBridgeClient {
   void requestLocale(String locale) =>
       _channel.send(LocaleRequestMessage(locale));
 
+  /// The feature at a point given as fractions of the app's viewport (see
+  /// [InspectPointRequestMessage]) — the "pencil" tap-to-inspect flow.
+  /// Null when nothing is declared there, or the app never answers: an app
+  /// built against an older bridge doesn't know this message and simply stays
+  /// silent, which [timeout] turns into the same "nothing here" as a real
+  /// miss rather than a hang.
+  ///
+  /// Safe to call again while an earlier call is still pending: each request
+  /// resolves with its own answer, and a request abandoned to [timeout] is
+  /// forgotten rather than left to catch the next one's result.
+  Future<StudioFeatureInfo?> inspectPoint(
+    double horizontalFraction,
+    double verticalFraction, {
+    Duration timeout = const Duration(seconds: 3),
+  }) {
+    final requestId = 'inspect-${++_inspectCounter}';
+    final pending = Completer<StudioFeatureInfo?>();
+    _pendingInspects[requestId] = pending;
+    _channel.send(
+      InspectPointRequestMessage(
+        requestId: requestId,
+        horizontalFraction: horizontalFraction,
+        verticalFraction: verticalFraction,
+      ),
+    );
+    return pending.future.timeout(timeout, onTimeout: () {
+      _pendingInspects.remove(requestId);
+      return null;
+    });
+  }
+
   void dispose() {
     _retryTimer?.cancel();
     _subscription?.cancel();
     _events.close();
+    // Resolve, don't abandon: a caller awaiting an inspect when the preview
+    // closes gets the same "nothing here" as a miss, instead of an error out
+    // of a disposed client.
+    for (final pending in _pendingInspects.values) {
+      if (!pending.isCompleted) pending.complete(null);
+    }
+    _pendingInspects.clear();
   }
 }

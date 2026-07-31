@@ -94,13 +94,15 @@ cp -r "$SRC/commands/." .claude/commands/
 cp "$SRC/CLAUDE.md" .claude/CLAUDE.md
 
 find .claude/skills/dartway-* .claude/commands/commit.md .claude/commands/dartway-audit.md .claude/CLAUDE.md -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-  sed -i \
+  # Через временный файл, а не `sed -i`: у BSD sed (macOS) `-i` требует аргумент-суффикс,
+  # и `-i -e` там съедает первое выражение — установщик падает на маках.
+  sed \
     -e "s/__SERVER_PKG__/$SERVER_PKG/g" \
     -e "s/__FLUTTER_PKG__/$FLUTTER_PKG/g" \
     -e "s/__CLIENT_PKG__/$CLIENT_PKG/g" \
     -e "s/__SHARED_PKG__/$SHARED_PKG/g" \
     -e "s/__BASE_BRANCH__/$BASE_BRANCH/g" \
-    "$f"
+    "$f" > "$f.tmp" && mv "$f.tmp" "$f"
 done
 
 echo "Готово: .claude/CLAUDE.md, .claude/skills и .claude/commands установлены с подстановками."

@@ -92,6 +92,12 @@ abstract interface class DwFeature {
   /// The [DwFeatureSpec]s of every [DwFeature] widget currently *on screen*,
   /// keyed by id (a feature declared by several instances appears once).
   ///
+  /// Deduplication is per id and never prunes a subtree: the walk continues
+  /// through a feature it has already seen. A list of near-identical cards
+  /// therefore yields one entry for the card, plus any nested feature that only
+  /// some of the cards build — collapsing to the first card's subtree instead
+  /// would silently drop the extras the later ones carry.
+  ///
   /// Scans from the app root — not a [BuildContext] — on purpose: this is the
   /// whole current screen's feature set, which is exactly what an error report
   /// or a Studio passport wants. Call from a post-frame callback after the
@@ -113,13 +119,9 @@ abstract interface class DwFeature {
 
     final found = <String, DwFeatureSpec>{};
     void visit(Element element) {
-      final widget = element.widget;
-      if (widget is Offstage && widget.offstage) return;
-      if (widget is Visibility && !widget.visible) return;
-      if (widget is TickerMode && !widget.enabled) return;
-      if (widget is DwFeature) {
-        final feature = (widget as DwFeature).dwFeature;
-        found[feature.id] = feature;
+      if (_isParkedOffscreen(element.widget)) return;
+      if (element.widget case DwFeature feature) {
+        found[feature.dwFeature.id] = feature.dwFeature;
       }
       element.visitChildren(visit);
     }
@@ -127,4 +129,88 @@ abstract interface class DwFeature {
     root.visitChildren(visit);
     return found.values.toList();
   }
+
+  /// The [DwFeatureSpec] at [globalPosition] (Studio's inspect-by-tap: pick a
+  /// screen point, describe whatever is there), or null over nothing declared.
+  ///
+  /// The last match wins rather than the first: a card and a "more actions"
+  /// row inside it can both contain the same point, and the row is what the
+  /// tap actually landed on. Depth-first order with no early return already
+  /// gives this for free — a child is visited, and so overwrites `found`,
+  /// after its parent.
+  ///
+  /// A feature is matched on the area it actually *paints* into — see
+  /// [_paintedGlobalRect] for what that excludes. This is a walk of the widget
+  /// tree, not Flutter's own hit test: going from the hit render objects back
+  /// to the widgets that declared them needs an element, and a `RenderObject`
+  /// has no way back to one outside debug mode.
+  static DwFeatureSpec? hitTest(Offset globalPosition) {
+    final root = WidgetsBinding.instance.rootElement;
+    if (root == null) return null;
+
+    DwFeatureSpec? found;
+    void visit(Element element) {
+      if (_isParkedOffscreen(element.widget)) return;
+      if (element.widget case DwFeature feature) {
+        final rect = _paintedGlobalRect(element.renderObject);
+        if (rect != null && rect.contains(globalPosition)) {
+          found = feature.dwFeature;
+        }
+      }
+      element.visitChildren(visit);
+    }
+
+    root.visitChildren(visit);
+    return found;
+  }
+
+  /// Where [renderObject] lands on screen, in global coordinates — or null if
+  /// it lands nowhere visible.
+  ///
+  /// Two things a plain `localToGlobal(Offset.zero) & size` gets wrong, and
+  /// both of them make [hitTest] name a feature the user cannot see at that
+  /// point:
+  ///
+  /// * **Transforms.** The size is the *unscaled* one, so a subtree under a
+  ///   `Transform.scale(0.5)` (a zoomable canvas, a running page transition)
+  ///   claims twice the area it draws. The full transform to the root fixes
+  ///   both the scale and any rotation's bounding box.
+  /// * **Clips.** A list item scrolled past the edge of its viewport keeps its
+  ///   layout position and answers for a point where it paints nothing — and
+  ///   being deeper in the tree, it would beat the visible feature there.
+  ///   Every ancestor clip cuts the rect down; an empty result means the
+  ///   feature is scrolled or clipped away entirely.
+  static Rect? _paintedGlobalRect(RenderObject? renderObject) {
+    if (renderObject is! RenderBox ||
+        !renderObject.attached ||
+        !renderObject.hasSize) {
+      return null;
+    }
+
+    var rect = MatrixUtils.transformRect(
+      renderObject.getTransformTo(null),
+      Offset.zero & renderObject.size,
+    );
+
+    var child = renderObject as RenderObject;
+    for (var ancestor = child.parent;
+        ancestor != null;
+        child = ancestor, ancestor = ancestor.parent) {
+      final clip = ancestor.describeApproximatePaintClip(child);
+      if (clip == null) continue;
+      rect = rect.intersect(
+        MatrixUtils.transformRect(ancestor.getTransformTo(null), clip),
+      );
+      if (rect.isEmpty) return null;
+    }
+    return rect;
+  }
+
+  /// Whether [widget] roots a subtree Flutter itself parks out of sight:
+  /// see [scanMounted] for why being mounted is not the same as being on
+  /// screen.
+  static bool _isParkedOffscreen(Widget widget) =>
+      (widget is Offstage && widget.offstage) ||
+      (widget is Visibility && !widget.visible) ||
+      (widget is TickerMode && !widget.enabled);
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../models/studio_feature_info.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
@@ -26,6 +28,15 @@ abstract interface class StudioBridgeHostDelegate {
   void onLocaleRequest(String locale);
 }
 
+/// What is declared at a screen point, for the "pencil" tap-to-inspect flow.
+/// The point arrives as fractions of the app's own viewport (see
+/// [InspectPointRequestMessage]) — convert with the app's own logical
+/// viewport size, not any size Studio thinks the frame is.
+typedef StudioInspectPoint = FutureOr<StudioFeatureInfo?> Function(
+  double horizontalFraction,
+  double verticalFraction,
+);
+
 /// The app-side end of the Studio bridge: announces the app, answers the
 /// handshake with the manifest, reports route/session changes and dispatches
 /// Studio's requests to the [StudioBridgeHostDelegate].
@@ -39,6 +50,7 @@ class StudioBridgeHost {
     this._currentFeatures,
     this._currentLocale,
     this._validateAccessKey,
+    this._inspectPoint,
   ) {
     _subscription = _channel.messages.listen(_onMessage);
     _channel.send(const AppReadyMessage());
@@ -65,6 +77,11 @@ class StudioBridgeHost {
     // validator that always returns true) accepts any Studio — fine for local
     // dev, wide open in production.
     Future<bool> Function(String accessKey)? validateAccessKey,
+    // Answers the "pencil" tap-to-inspect flow. Null (the default for an app
+    // that hasn't wired it) means every inspect request finds nothing —
+    // Studio's own timeout treats that exactly like an old app that doesn't
+    // know the message at all.
+    StudioInspectPoint? inspectPoint,
   }) {
     final channel = createStudioHostChannel();
     if (channel == null) return null;
@@ -77,6 +94,7 @@ class StudioBridgeHost {
       currentFeatures ?? () => const [],
       currentLocale ?? () => '',
       validateAccessKey ?? (_) async => true,
+      inspectPoint ?? (_, _) => null,
     );
   }
 
@@ -88,6 +106,7 @@ class StudioBridgeHost {
   final List<StudioFeatureInfo> Function() _currentFeatures;
   final String Function() _currentLocale;
   final Future<bool> Function(String accessKey) _validateAccessKey;
+  final StudioInspectPoint _inspectPoint;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
   void _onMessage(StudioBridgeMessage message) {
@@ -106,9 +125,48 @@ class StudioBridgeHost {
         unawaited(_delegate.onSignOutRequest());
       case LocaleRequestMessage(:final locale):
         _delegate.onLocaleRequest(locale);
+      case InspectPointRequestMessage(
+          :final requestId,
+          :final horizontalFraction,
+          :final verticalFraction,
+        ):
+        unawaited(
+          _answerInspectPoint(
+            requestId,
+            horizontalFraction,
+            verticalFraction,
+          ),
+        );
       default:
         break; // App → Studio messages echoed back are ignored.
     }
+  }
+
+  /// Answers an inspect request — and answers it even when the app's own
+  /// [StudioInspectPoint] throws. Staying silent would be indistinguishable
+  /// from an app that predates the message, so Studio would sit out its whole
+  /// timeout and report a crash as "nothing declared here". The error is not
+  /// swallowed either: it goes to [FlutterError.reportError], which in a
+  /// DartWay app is the same path every other UI error takes.
+  Future<void> _answerInspectPoint(
+    String requestId,
+    double horizontalFraction,
+    double verticalFraction,
+  ) async {
+    StudioFeatureInfo? feature;
+    try {
+      feature = await _inspectPoint(horizontalFraction, verticalFraction);
+    } catch (error, stackTrace) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'dartway_studio_bridge',
+        context: ErrorDescription('answering a Studio inspect-point request'),
+      ));
+    }
+    _channel.send(
+      InspectPointResultMessage(requestId: requestId, feature: feature),
+    );
   }
 
   void _sendManifest() => _channel.send(ManifestMessage(

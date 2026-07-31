@@ -97,3 +97,51 @@ class LocaleRequestMessage extends StudioBridgeMessage {
   factory LocaleRequestMessage.fromPayload(Map<String, dynamic> payload) =>
       LocaleRequestMessage(payload['locale'] as String? ?? '');
 }
+
+/// Studio → app: what feature, if any, is at this point on screen — the
+/// "pencil" flow's tap-to-inspect. The point is given as *fractions* of the
+/// app's own viewport (0.0 top/left, 1.0 bottom/right), not pixels: Studio may
+/// be showing the preview scaled or letterboxed, but a fraction of the
+/// viewport means the same point regardless of how it is currently displayed.
+class InspectPointRequestMessage extends StudioBridgeMessage {
+  const InspectPointRequestMessage({
+    required this.requestId,
+    required this.horizontalFraction,
+    required this.verticalFraction,
+  });
+
+  /// Ties this request to the one answer that belongs to it. The app echoes it
+  /// back untouched in [InspectPointResultMessage.requestId], and the
+  /// requester matches on it instead of taking whatever result arrives next:
+  /// inspect is the one request that can be in flight twice (a second tap
+  /// while a slow first one is still being answered), and without an id the
+  /// late answer to the first tap resolves the second — Studio would show a
+  /// confidently wrong passport rather than nothing.
+  ///
+  /// Unique within one requester's session; the app treats it as opaque.
+  final String requestId;
+
+  final double horizontalFraction;
+  final double verticalFraction;
+
+  @override
+  String get type => StudioBridgeProtocol.inspectPointRequest;
+
+  @override
+  Map<String, dynamic> payloadToJson() => {
+        'requestId': requestId,
+        'horizontalFraction': horizontalFraction,
+        'verticalFraction': verticalFraction,
+      };
+
+  factory InspectPointRequestMessage.fromPayload(
+    Map<String, dynamic> payload,
+  ) =>
+      InspectPointRequestMessage(
+        requestId: payload['requestId'] as String? ?? '',
+        horizontalFraction:
+            (payload['horizontalFraction'] as num?)?.toDouble() ?? 0,
+        verticalFraction:
+            (payload['verticalFraction'] as num?)?.toDouble() ?? 0,
+      );
+}

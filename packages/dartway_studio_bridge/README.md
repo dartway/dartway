@@ -69,6 +69,7 @@ final host = StudioBridgeHost.attach(
   validateAccessKey: studioHashAccessValidator(
     const String.fromEnvironment('STUDIO_KEY_HASH'),
   ),
+  inspectPoint: featureAtPoint, // what is declared at a point (see below)
 );
 host?.reportRoute(newPath, routeName: 'scheduleList'); // on router changes
 host?.reportSession(newState);  // on auth changes
@@ -110,6 +111,36 @@ Report after the new screen has built — a route change fires before its widget
 mount, so reporting in the same turn describes the screen you just left. See
 `example/dartway_example_flutter/lib/studio/studio_bridge_binding.dart` for the
 reference binding.
+
+## Inspecting a point (the "pencil" flow)
+
+Studio can also ask the other question — not "what is on this screen" but "what
+is *here*", from a tap in the live preview:
+
+```dart
+final feature = await client.inspectPoint(0.42, 0.65); // Studio side
+```
+
+The point travels as **fractions** of the app's viewport (0.0 top/left, 1.0
+bottom/right), never pixels: Studio shows the preview scaled, framed or
+letterboxed, and only the app knows its own logical size. The app converts once,
+on its side:
+
+```dart
+StudioFeatureInfo? featureAtPoint(double horizontal, double vertical) {
+  final view = WidgetsBinding.instance.platformDispatcher.views.first;
+  final size = view.physicalSize / view.devicePixelRatio;
+  final feature = DwFeature.hitTest(
+    Offset(horizontal * size.width, vertical * size.height),
+  );
+  return feature == null ? null : toWireModel(feature);
+}
+```
+
+Each request carries an id the app echoes back, so a second tap sent while a
+slow first one is still being answered gets its own answer instead of the
+previous one's. An app that predates the message stays silent and the caller's
+timeout reports "nothing here" — a miss, never a hang.
 
 `attach` returns null when the app is not running on web inside an iframe —
 the app stays fully functional and the bridge dormant. The channel pins the

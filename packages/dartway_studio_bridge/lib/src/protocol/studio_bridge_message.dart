@@ -52,6 +52,8 @@ sealed class StudioBridgeMessage {
         FeaturesChangedMessage.fromPayload(payload),
       StudioBridgeProtocol.localeChanged =>
         LocaleChangedMessage.fromPayload(payload),
+      StudioBridgeProtocol.inspectPointResult =>
+        InspectPointResultMessage.fromPayload(payload),
       StudioBridgeProtocol.studioConnect =>
         StudioConnectMessage.fromPayload(payload),
       StudioBridgeProtocol.navigateRequest =>
@@ -61,6 +63,8 @@ sealed class StudioBridgeMessage {
       StudioBridgeProtocol.signOutRequest => const SignOutRequestMessage(),
       StudioBridgeProtocol.localeRequest =>
         LocaleRequestMessage.fromPayload(payload),
+      StudioBridgeProtocol.inspectPointRequest =>
+        InspectPointRequestMessage.fromPayload(payload),
       _ => null,
     };
   }

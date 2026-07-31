@@ -11,9 +11,10 @@ The open `dartway_studio_bridge` package is the only integration surface:
   language your team works in) in your app's code. Screens are identified by
   route path strings, so any router works.
 - **Runtime protocol** — a versioned `postMessage` protocol between Studio and
-  the app's web build running in an iframe: Studio navigates the live app and
-  switches its UI locale (when the manifest declares `supportedLocales`), the
-  app reports route, session and locale changes.
+  the app's web build running in an iframe: Studio navigates the live app,
+  switches its UI locale (when the manifest declares `supportedLocales`) and
+  asks what is declared at a point on screen; the app reports route, session
+  and locale changes.
 - **Demo personas are configured in Studio, not in the app.** Test users and
   their verification codes live in the platform's project config; on switch
   Studio sends them over the bridge and the app runs its **regular** auth flow
@@ -44,6 +45,15 @@ The open `dartway_studio_bridge` package is the only integration surface:
   but a running app cannot fill it: Dart has no reflection, so only mounted
   widgets are observable. Enumerating every feature of a project is a job for
   static analysis of the sources, not for the app.
+
+- **Tap to inspect.** Studio can point at a spot in the live preview and get
+  the feature declared there (`DwFeature.hitTest` on the app side), so a
+  passport is reachable by pointing rather than by knowing the feature's id.
+  The point crosses the bridge as fractions of the app's viewport, not pixels —
+  Studio may be showing the preview scaled or framed, and only the app knows
+  its own logical size, so the app converts. A feature is matched on the area
+  it actually paints into: something scaled down, scrolled out of its viewport
+  or clipped away does not answer for a point where the user sees nothing.
 
 See the package [README](../packages/dartway_studio_bridge/README.md) for the
 full API, and `example/dartway_example_flutter/lib/studio/` for the reference

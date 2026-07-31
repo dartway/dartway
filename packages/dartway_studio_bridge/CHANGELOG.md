@@ -1,6 +1,30 @@
 # Changelog
 
 
+## 0.6.0
+
+**Studio can ask what is at a point on screen.** A new request/answer pair —
+`InspectPointRequestMessage` / `InspectPointResultMessage` — carries the "pencil" tap-to-inspect
+flow: Studio names a spot in the live preview, the app answers with the feature declared there, or
+with nothing. `StudioBridgeClient.inspectPoint()` is the Studio side; `StudioBridgeHost.attach`
+takes an `inspectPoint` callback for the app side (a DartWay app hands it `DwFeature.hitTest`).
+
+**The point travels as fractions of the app's viewport, not pixels.** Studio shows the preview
+scaled, framed, letterboxed — whatever the panel needs — and only the app knows its own logical
+size. A fraction means the same point under every one of those, so the conversion happens once, in
+the app, instead of Studio guessing.
+
+**The request carries an id and the answer echoes it back.** Inspect is the first message that can
+be in flight twice: a second tap while a slow first one is still being answered. Matching on
+"whatever result arrives next" would resolve the second tap with the first tap's answer — a
+confidently wrong passport, which is worse than none. Requests that time out are forgotten, so
+their late answers are dropped rather than handed to whoever is waiting now.
+
+An app that predates this message stays silent, and the requester's timeout reads that as "nothing
+declared here" — the same as a real miss, never a hang. An app whose `inspectPoint` throws still
+answers (with nothing) and reports the error through `FlutterError.reportError`: silence would have
+cost Studio its full timeout and disguised a crash as an empty spot.
+
 ## 0.5.0
 
 `StudioFeatureInfo` follows `DwFeatureSpec` (package `dartway_flutter` 0.3.0) and carries
