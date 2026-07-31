@@ -183,6 +183,36 @@ chmod 600 '${target.appDir}/.env'
     return 1;
   }
 
+  // A rendered compose file names the database volume. If the server already
+  // carries a differently named one, starting the stack would silently create
+  // an empty database beside the real data and serve it — the application
+  // comes up, answers, and shows nothing. Refuse instead.
+  final volumes = await ssh.runAs(
+    target.deployUser,
+    "docker volume ls --format '{{.Name}}' 2>/dev/null || true",
+  );
+  final project = target.projectName;
+  final existing = volumes.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.startsWith('${project}_'))
+      .toList();
+  final expected = '${project}_postgres_data';
+  final strangers = existing
+      .where((name) => name != expected && name.contains('data'))
+      .where((name) => !name.contains('certbot'))
+      .toList();
+  if (!existing.contains(expected) && strangers.isNotEmpty) {
+    stderr.writeln(
+      '\nRefusing to continue: this server already has the volume(s) '
+      '${strangers.join(', ')}, and the rendered configuration would use '
+      '"$expected" instead — a fresh, empty database.\n'
+      'Point the existing volume at the postgres service in '
+      'deploy/compose.override.yml, then run setup again.',
+    );
+    return 1;
+  }
+
   if (!await step(
     'Compose and Nginx configuration',
     () => ssh.runAsWithInput(
