@@ -9,6 +9,7 @@ import '../deploy/remote_checks.dart';
 import '../deploy/serverpod_config.dart';
 import '../deploy/ssh_runner.dart';
 import 'deploy_run.dart';
+import 'deploy_setup.dart';
 import 'secret_commands.dart';
 import '../project_layout.dart';
 
@@ -16,6 +17,7 @@ import '../project_layout.dart';
 /// `check` comes first because it changes nothing.
 class DeployCommand extends Command<int> {
   DeployCommand() {
+    addSubcommand(DeploySetupCommand());
     addSubcommand(DeployRunCommand());
     addSubcommand(DeployCheckCommand());
     addSubcommand(SecretCommand());
@@ -26,6 +28,38 @@ class DeployCommand extends Command<int> {
 
   @override
   String get description => 'Deploy the project to a configured server.';
+}
+
+/// Provisions a server and renders the infrastructure it runs on.
+class DeploySetupCommand extends Command<int> {
+  DeploySetupCommand() {
+    argParser
+      ..addOption('env', help: 'Environment declared in deploy/config.yaml.')
+      ..addOption(
+        'as',
+        help: 'SSH login. Defaults to ssh_user from the config.',
+      )
+      ..addOption('identity', help: 'SSH private key file.')
+      ..addFlag(
+        'dry-run',
+        negatable: false,
+        help: 'Print the rendered files and change nothing.',
+      );
+  }
+
+  @override
+  String get name => 'setup';
+
+  @override
+  String get description =>
+      'Provision the server and render its Compose and Nginx configuration.';
+
+  @override
+  String get invocation =>
+      'dartway deploy setup --env <environment> [--dry-run]';
+
+  @override
+  Future<int> run() => runSetup(this, argResults!);
 }
 
 /// Deploys to an already-provisioned server.
