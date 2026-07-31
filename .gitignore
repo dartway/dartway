@@ -14,7 +14,6 @@ build/
 .claude/settings.local.json
 .claude/skills/
 # Project management — private nested repo (dartway_manager)
-project/
 
 # dartway.dev website — public nested repo (novikov-it/dartway.dev)
 website/
