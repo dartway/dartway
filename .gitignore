@@ -10,15 +10,14 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 
-# Claude Code — внутренняя кухня разработки фреймворка (не для публичного монорепо)
+# Machine-local Claude Code settings. Everything else under .claude/ is
+# tracked: the skills there are how this framework is developed.
 .claude/settings.local.json
-.claude/skills/
-# Project management — private nested repo (dartway_manager)
-
-# dartway.dev website — public nested repo (novikov-it/dartway.dev)
+# Neighbours, not parts of this repo: they live next door as their own
+# checkouts (novikov-it/dartway.dev, dartway/dartway_studio). These entries
+# stay as a guard — if a checkout ever lands inside the tree again, it must
+# not be committed here.
 website/
-
-# DartWay Studio platform — private nested repo (dartway/dartway_studio)
 platform/
 
 # custom_lint run artifact
