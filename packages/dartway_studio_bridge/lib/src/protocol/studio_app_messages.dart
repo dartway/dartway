@@ -147,7 +147,13 @@ class SessionChangedMessage extends StudioBridgeMessage {
 /// predates this message and never answers at all, which the requester's own
 /// timeout handles the same way).
 class InspectPointResultMessage extends StudioBridgeMessage {
-  const InspectPointResultMessage(this.feature);
+  const InspectPointResultMessage({required this.requestId, this.feature});
+
+  /// The [InspectPointRequestMessage.requestId] this answers, echoed back
+  /// untouched — the requester matches on it and drops anything else, so a
+  /// late answer to an abandoned tap cannot be read as the answer to the
+  /// current one.
+  final String requestId;
 
   final StudioFeatureInfo? feature;
 
@@ -156,6 +162,7 @@ class InspectPointResultMessage extends StudioBridgeMessage {
 
   @override
   Map<String, dynamic> payloadToJson() => {
+        'requestId': requestId,
         if (feature != null) 'feature': feature!.toJson(),
       };
 
@@ -163,7 +170,8 @@ class InspectPointResultMessage extends StudioBridgeMessage {
     Map<String, dynamic> payload,
   ) =>
       InspectPointResultMessage(
-        switch (payload['feature']) {
+        requestId: payload['requestId'] as String? ?? '',
+        feature: switch (payload['feature']) {
           final Map<String, dynamic> json => StudioFeatureInfo.fromJson(json),
           _ => null,
         },

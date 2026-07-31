@@ -22,6 +22,12 @@ class _FakeChannel implements StudioMessageChannel {
   void dispose() => _incoming.close();
 }
 
+/// The inspect requests the client put on the wire, in order.
+extension on _FakeChannel {
+  List<InspectPointRequestMessage> get inspectRequests =>
+      sent.whereType<InspectPointRequestMessage>().toList();
+}
+
 void main() {
   group('StudioBridgeClient.inspectPoint', () {
     test('sends the fractional point and resolves with the app\'s answer',
@@ -48,8 +54,9 @@ void main() {
       );
 
       channel.emit(
-        const InspectPointResultMessage(
-          StudioFeatureInfo(id: 'ad/card', title: 'Ad card'),
+        InspectPointResultMessage(
+          requestId: channel.inspectRequests.single.requestId,
+          feature: const StudioFeatureInfo(id: 'ad/card', title: 'Ad card'),
         ),
       );
 
@@ -71,6 +78,78 @@ void main() {
 
       expect(result, isNull);
       client.dispose();
+    });
+
+    // Without correlation this is the bug that bites in the real flow: tap a
+    // spot the app is slow to answer, give up on it, tap elsewhere — and the
+    // late answer to the first tap resolves the second, so Studio shows a
+    // confidently wrong passport instead of nothing.
+    test('drops a late answer to a request that already timed out', () async {
+      final channel = _FakeChannel();
+      final client = StudioBridgeClient(channel: channel)..start();
+
+      final abandoned = await client.inspectPoint(
+        0.1,
+        0.1,
+        timeout: const Duration(milliseconds: 20),
+      );
+      expect(abandoned, isNull);
+
+      final current = client.inspectPoint(
+        0.9,
+        0.9,
+        timeout: const Duration(milliseconds: 100),
+      );
+      channel.emit(
+        InspectPointResultMessage(
+          requestId: channel.inspectRequests.first.requestId,
+          feature: const StudioFeatureInfo(id: 'stale', title: 'Stale'),
+        ),
+      );
+
+      expect(await current, isNull);
+      client.dispose();
+    });
+
+    test('gives two in-flight requests their own answers', () async {
+      final channel = _FakeChannel();
+      final client = StudioBridgeClient(channel: channel)..start();
+
+      final first = client.inspectPoint(0.1, 0.1);
+      final second = client.inspectPoint(0.9, 0.9);
+      final requests = channel.inspectRequests;
+      expect(requests, hasLength(2));
+      expect(requests.first.requestId, isNot(requests.last.requestId));
+
+      // Answered out of order, as a busy app may well do.
+      channel.emit(
+        InspectPointResultMessage(
+          requestId: requests.last.requestId,
+          feature: const StudioFeatureInfo(id: 'second', title: 'Second'),
+        ),
+      );
+      channel.emit(
+        InspectPointResultMessage(
+          requestId: requests.first.requestId,
+          feature: const StudioFeatureInfo(id: 'first', title: 'First'),
+        ),
+      );
+
+      expect((await first)?.id, 'first');
+      expect((await second)?.id, 'second');
+      client.dispose();
+    });
+
+    // Closing the preview panel mid-inspect must not surface an error out of
+    // a disposed client — the awaiting caller just learns nothing was found.
+    test('resolves a pending request with null on dispose', () async {
+      final channel = _FakeChannel();
+      final client = StudioBridgeClient(channel: channel)..start();
+
+      final pending = client.inspectPoint(0.5, 0.5);
+      client.dispose();
+
+      expect(await pending, isNull);
     });
   });
 }

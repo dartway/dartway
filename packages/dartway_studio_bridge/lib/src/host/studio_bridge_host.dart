@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../models/studio_feature_info.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
@@ -124,17 +126,47 @@ class StudioBridgeHost {
       case LocaleRequestMessage(:final locale):
         _delegate.onLocaleRequest(locale);
       case InspectPointRequestMessage(
+          :final requestId,
           :final horizontalFraction,
           :final verticalFraction,
         ):
-        Future.sync(
-          () => _inspectPoint(horizontalFraction, verticalFraction),
-        ).then(
-          (feature) => _channel.send(InspectPointResultMessage(feature)),
+        unawaited(
+          _answerInspectPoint(
+            requestId,
+            horizontalFraction,
+            verticalFraction,
+          ),
         );
       default:
         break; // App → Studio messages echoed back are ignored.
     }
+  }
+
+  /// Answers an inspect request — and answers it even when the app's own
+  /// [StudioInspectPoint] throws. Staying silent would be indistinguishable
+  /// from an app that predates the message, so Studio would sit out its whole
+  /// timeout and report a crash as "nothing declared here". The error is not
+  /// swallowed either: it goes to [FlutterError.reportError], which in a
+  /// DartWay app is the same path every other UI error takes.
+  Future<void> _answerInspectPoint(
+    String requestId,
+    double horizontalFraction,
+    double verticalFraction,
+  ) async {
+    StudioFeatureInfo? feature;
+    try {
+      feature = await _inspectPoint(horizontalFraction, verticalFraction);
+    } catch (error, stackTrace) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'dartway_studio_bridge',
+        context: ErrorDescription('answering a Studio inspect-point request'),
+      ));
+    }
+    _channel.send(
+      InspectPointResultMessage(requestId: requestId, feature: feature),
+    );
   }
 
   void _sendManifest() => _channel.send(ManifestMessage(
