@@ -13,12 +13,5 @@ build/
 # Machine-local Claude Code settings. Everything else under .claude/ is
 # tracked: the skills there are how this framework is developed.
 .claude/settings.local.json
-# Neighbours, not parts of this repo: they live next door as their own
-# checkouts (novikov-it/dartway.dev, dartway/dartway_studio). These entries
-# stay as a guard — if a checkout ever lands inside the tree again, it must
-# not be committed here.
-website/
-platform/
-
 # custom_lint run artifact
 custom_lint.log

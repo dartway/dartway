@@ -40,5 +40,5 @@ happened here, and code was written against an API that had been deleted.
 
 - Per-feature documentation of an application — an app describes its features in its own code, in
   `DwFeatureSpec` (see `3-flutter/features-and-specs.md`).
-- Planning, roadmaps, decisions — those live in the private `project/` repo.
+- Planning, roadmaps, decisions — those live in a separate, private repository.
 - API reference — that is what doc comments are for, and pub.dev renders them.
