@@ -104,6 +104,47 @@ from the project root or from inside the `*_flutter` package — both work.
 What it checks, and why those checks exist, is a page of its own:
 [The conventions checker](conventions-checker.md).
 
+## `dartway deploy` — the server, without a folder of shell scripts
+
+```bash
+dartway deploy check --env staging
+dartway deploy run --env staging
+dartway deploy secret push --env production
+```
+
+Deployment is described by two files, and they do not overlap. `<project>_server/config/<env>.yaml`
+is the Serverpod configuration you already maintain — domains, ports, database. `deploy/config.yaml`
+adds only what Serverpod has no concept of: the host, the login, the repository and branch, the
+certificate contact, and the domain serving the Flutter build. The CLI **reads** the Serverpod file;
+it never rewrites it. That is the whole reason the pair stays honest — there is no second copy of a
+domain to drift.
+
+`check` changes nothing and answers whether a deployment would work. Ten assertions on the working
+copy, seven over the network — including that every `publicHost` resolves to the deployment host,
+which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone notices. With the
+server unreachable it degrades: the SSH check fails, the rest report as skipped.
+
+`run` updates the checkout, rebuilds, applies migrations and restarts, then polls every public URL.
+It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders infrastructure on
+every push turns a routine change into an infrastructure one.
+
+`secret` moves credentials between the maintainer's `passwords.yaml` and a server, one environment
+at a time: `push` sends `shared` plus that environment, `pull` brings back what the server has and
+the file lacks, `list` shows names only. Values travel on stdin, never as arguments, so they appear
+in neither shell history nor a remote process list. Two guards refuse a push that would lose
+information — one for keys the server has and the file does not, one for values the file would
+blank. Both are overridable, neither is silent.
+
+| Key in `deploy/config.yaml` | When you need it |
+|---|---|
+| `host`, `ssh_user`, `deploy_user`, `os` | always |
+| `repo`, `branch` | always |
+| `ssl_email`, `web_app_domain` | always |
+| `requires.secrets`, `requires.files` | to have `check` catch a credential nobody delivered |
+| `registry_mirror` | pulling base images through a mirror |
+| `firewall_ports` | a port beyond SSH, 80 and 443 |
+| `server_entrypoint` | only when the Dockerfile declares `ENTRYPOINT` in shell form — that form ignores the arguments `docker compose run` appends, so migrations would silently start an ordinary server instead |
+
 ## `dartway stats` — what actually grew this week
 
 ```bash

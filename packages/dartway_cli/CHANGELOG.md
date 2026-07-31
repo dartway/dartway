@@ -2,6 +2,23 @@
 
 ## 0.1.2
 
+- **`dartway deploy` — the server without a folder of shell scripts.** Three verbs: `check` reports
+  whether a deployment would work and changes nothing, `run` updates, rebuilds, migrates and
+  restarts, `secret` moves credentials between the maintainer's `passwords.yaml` and a server.
+
+  The Serverpod configuration is the source of truth. Domains, ports and the database stay in
+  `<project>_server/config/<env>.yaml` and the CLI reads them; `deploy/config.yaml` holds only what
+  Serverpod has no concept of. In the two projects this replaced, nine fields existed in both places
+  and a whole script existed to keep them from drifting.
+
+  `check` runs seventeen assertions. The one that pays for the rest is DNS: every `publicHost` must
+  resolve to the deployment host, because a domain that does not reach the box fails certificate
+  issuance and repeated failures hit a rate limit.
+
+  Secret values travel on stdin, never as arguments, and YAML encoding happens locally so the remote
+  side never escapes anything. Two guards refuse a push that would lose information: keys the server
+  has and the file does not, and values the file would blank.
+
 - **Two more conventions the analyzer cannot see.** `barrelFile` (error) fires on a file that only
   re-exports: it reads as convenience and acts as a hole in the feature boundary, because importers
   name the barrel and reaching into another feature's guts through it looks legitimate — one such
