@@ -139,6 +139,59 @@ usermod -aG docker '${target.deployUser}'
     return 1;
   }
 
+  // A private repository over SSH needs a key the server owns. It is generated
+  // here rather than sent from this machine so the private half never exists
+  // anywhere but the server it belongs to.
+  if (target.repo.startsWith('git@')) {
+    final key = await ssh.runAs(target.deployUser, '''
+set -e
+umask 077
+install -d -m 700 "\$HOME/.ssh"
+if [ ! -f "\$HOME/.ssh/id_ed25519_github" ]; then
+  ssh-keygen -t ed25519 -N "" -q -C "${target.deployUser}@${target.host}" \\
+    -f "\$HOME/.ssh/id_ed25519_github"
+  echo CREATED
+fi
+if ! grep -q "id_ed25519_github" "\$HOME/.ssh/config" 2>/dev/null; then
+  printf 'Host github.com\\n  IdentityFile ~/.ssh/id_ed25519_github\\n  IdentitiesOnly yes\\n' \\
+    >> "\$HOME/.ssh/config"
+  chmod 600 "\$HOME/.ssh/config"
+fi
+cat "\$HOME/.ssh/id_ed25519_github.pub"
+''');
+    if (!key.ok) {
+      stderr.writeln('\nCannot prepare the repository key: ${key.firstLine}');
+      return 1;
+    }
+
+    final reachable = await ssh.runAs(
+      target.deployUser,
+      'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new '
+      '-T git@github.com 2>&1 | grep -q "successfully authenticated"',
+    );
+    if (!reachable.ok) {
+      final publicKey = key.stdout
+          .split('\n')
+          .firstWhere(
+            (line) => line.startsWith('ssh-'),
+            orElse: () => key.stdout.trim(),
+          );
+      stderr
+        ..writeln('\nThe server cannot reach ${target.repo} yet.')
+        ..writeln(
+          'Register this key as a read-only deploy key on the repository, '
+          'then run setup again:',
+        )
+        ..writeln('\n$publicKey\n')
+        ..writeln(
+          'Read-only is deliberate: the server only ever fetches, and a '
+          'writable key turns access to the box into access to the repository.',
+        );
+      return 1;
+    }
+    stdout.writeln('\nRepository key\n  ok');
+  }
+
   if (!await step(
     'Repository checkout',
     () => ssh.runAs(target.deployUser, '''
