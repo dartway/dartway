@@ -1,6 +1,27 @@
 # Changelog
 
 
+## 0.4.0
+
+**A feature can be found by pointing at it.** `DwFeature.hitTest(globalPosition)` answers what is
+declared at a point on screen — the other half of `scanMounted`, which answers what is declared on
+the screen at all. Studio's tap-to-inspect is the first caller: pick a spot in the live preview, get
+that feature's passport, with no id to look up and no map to keep in your head.
+
+The innermost declaration wins. A card and the "more actions" row inside it both cover the tap, and
+the row is what the finger landed on — so the walk goes depth-first and takes the last match, not
+the first.
+
+A feature is matched on the area it actually **paints** into, not the one it lays out in. The two
+differ more often than they sound like they would: a subtree under a `Transform.scale` draws
+smaller than it measures, and a list item scrolled past the edge of its viewport keeps its layout
+position while painting nothing at all — and being deeper in the tree, it would have won over the
+feature you can see. Both are cut out by transforming through to the root and intersecting with
+every ancestor clip.
+
+Same rule as `scanMounted` for subtrees Flutter parks out of sight (offstage, invisible, disabled
+ticker) — being mounted is not being on screen, and now neither is being laid out.
+
 ## 0.3.0
 
 **A feature can say what is wrong with it.** `DwFeatureSpec` gains `knownIssues` — a setting nothing
