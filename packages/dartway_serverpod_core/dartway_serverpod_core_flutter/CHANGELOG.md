@@ -131,6 +131,15 @@ three-arm one — `disconnected` and `connecting` have no successor, because nei
 distinguishable from `waitingToRetry` in practice. `DwSessionService.invalidateSession` is public now,
 for the same story: something other than startup can decide a session is over.
 
+**A generated `futureCalls` extension no longer escapes the package.** Serverpod's generator writes
+`extension ServerpodFutureCallsGetter on Serverpod` into every project that has a future call of its
+own, and the core has had one since it started sweeping orphaned auth keys. Both were exported, so
+they collided by construction: a file importing this package's barrel and its own `generated/` failed
+with `ambiguous_extension_member_access` — on the app's line, in the app's file, the day the app
+wrote its first future call rather than the day it upgraded. The barrel now hides it. Nothing is
+lost: the core arms its own jobs through `DwRecurringJobs.startAll`. If an app worked around this
+with a `hide` of its own, the workaround can go.
+
 ## 0.2.3
 
 Moves to `dartway_flutter` 0.2.0, whose `DwFeatureSpec` dropped `description` for the

@@ -29,7 +29,7 @@ lib/app/<feature>/
     <feature>_filter.dart
 ```
 
-- **Entry point** — the only public file (a Page/Widget/context extension such as `context.showInviteDialog()`). From outside the feature, only it is imported — and that is enforced at any nesting depth.
+- **Entry point** — the only public file, and it is a widget: a Page, or a Widget that also carries its own way of being shown (see "Showing a feature" below). From outside the feature, only it is imported — and that is enforced at any nesting depth.
 - **widgets/** — the feature's visual blocks.
 - **logic/** — providers/enums/helpers belonging to this feature only.
 - Cross-feature business logic → `lib/domain` (extensions on models), not inside the feature.
@@ -123,9 +123,31 @@ that is a boundary violation, the checker will catch it, and it is cured by exac
 Decide the feature's entry point and its exit points. If a route is needed — add it (an enum route, see the `dartway-navigation` skill).
 
 ### 2. Interface (UI)
-Create the entry point (Page/Widget/extension), sketch the layout (buttons, lists, fields). Styles come from the UI Kit. Data can be mocked/hardcoded at this step.
+Create the entry point (a Page or a Widget), sketch the layout (buttons, lists, fields). Styles come from the UI Kit. Data can be mocked/hardcoded at this step.
 
 The entry-point widget **declares what feature it is** — `implements DwFeature` with a `DwFeatureSpec` right in its own file (see "Feature spec" below). Without it, `dartway check` emits a `featureSpecMissing` warning.
+
+**Showing a feature that is not a route.** A sheet, a dialog or an overlay publishes itself as a
+**static method on its own widget**, taking `BuildContext` first — `static Future<void> show(BuildContext context, …)`,
+or `showCreate` / `showEdit` when there are several ways in:
+
+```dart
+class UserFormSheet extends StatelessWidget implements DwFeature {
+  const UserFormSheet({super.key, this.userProfile});
+
+  static Future<void> showCreate(BuildContext context) =>
+      context.showAppBottomSheet(child: const UserFormSheet());
+
+  final UserProfile? userProfile;
+  ...
+}
+```
+
+So the feature keeps **one** public entity, and it is the widget: the caller writes
+`UserFormSheet.showCreate(context)` and can see from the name what opens. Do **not** publish the
+feature as an `extension on BuildContext` (`context.showUserForm()`): that splits the feature into
+two public files, hides the widget in `widgets/`, and names a screen without naming its feature —
+see `dartway-clean-code` §1.3, which this convention is the answer to.
 
 ### 3. State & Logic
 Decide what data the UI needs. Data access goes through `dw.repo` only: reads via the `dw.repo.model`/`maybeModel`/`modelList` providers under the native `ref` (`ref.watch(...)` reactively, `ref.read(....future)` one-off), writes via the `dw.repo.saveModel`/`deleteModel` methods. For complex scenarios or reuse inside the feature — a Riverpod provider. Local state — Riverpod + StatefulWidget + flutter_hooks. Describe every user action (create/edit/delete) before wiring it to the backend.
@@ -191,7 +213,7 @@ Write one sentence per item: what is wrong and what it costs. This is a pointer 
 
 **Write the spec from what the code does, not from what was intended.** While you phrase verifiable statements you find things nobody ever claimed — that is how it surfaced that the events block on the home screen does not sort them by date while the screen does.
 
-The spec is for a widget-feature. If the entry point is an extension or a function (`context.showInviteDialog()`), there is nothing to attach the spec to, and the checker leaves such a feature alone.
+The spec lives on a widget, which is another reason the entry point is one. A feature published as an extension or a bare function (`context.showInviteDialog()`) has nothing to attach the spec to — the checker cannot ask it for one, and the feature ends up with no description at all. If you meet one, that is what to fix: move the presentation into a static method on the widget (see "Showing a feature that is not a route") and the spec has a home.
 
 ## Entry point example
 

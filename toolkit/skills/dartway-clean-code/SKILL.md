@@ -70,7 +70,7 @@ class DeliveryCard { final String deliveryStatus; final int itemsCount; final Vo
 //    don't chop it into header_part_1.dart / header_part_2.dart to fit a limit
 ```
 
-## 1.3 Don't pass `BuildContext` / `WidgetRef` as parameters
+## 1.3 Don't pass `BuildContext` / `WidgetRef` into services and logic
 
 **Why:** service/domain code must not know about the UI and the widget lifecycle. It tears the layers apart and breeds "stale context".
 
@@ -91,6 +91,37 @@ class PaymentService {
 // in the widget: final result = await service.processPayment(amount);
 //                if (result.isSuccess) { ScaffoldMessenger.of(context)...; Navigator.of(context).pop(); }
 ```
+
+**The rule is about services, domain and logic — not about UI code whose job *is* the widget tree.**
+A feature that opens as a sheet, a dialog or an overlay publishes itself as a **static method on its
+own widget**, and `BuildContext` is its first parameter. That is the canonical shape, not an
+exception squeezed past the rule:
+
+```dart
+// ✅ the feature's own widget owns how it is shown
+class UserFormSheet extends StatelessWidget implements DwFeature {
+  static Future<void> showCreate(BuildContext context) =>
+      context.showAppBottomSheet(child: const UserFormSheet());
+  static Future<void> showEdit(BuildContext context, UserProfile userProfile) => ...;
+}
+
+// ❌ the same call, moved onto someone else's type to dodge the rule
+extension UserFormExtension on BuildContext {
+  Future<void> showCreateUserForm() => showAppBottomSheet(child: const UserForm());
+}
+```
+
+**An `extension on BuildContext` that opens your own screens is an antipattern.** It reads as
+compliance and costs more than the parameter ever would: the feature ends up with two public files
+instead of one (the extension at the root, the widget hidden in `widgets/`), the entry point stops
+being the widget, and `context.showCreateUserForm()` no longer says which feature it opens.
+
+What this does **not** forbid: the framework's navigation extensions (`context.pushTo`,
+`context.goNamed`) are the supported way to move between routes, and the UI Kit's own presentation
+primitives (`context.showAppBottomSheet(child: …)`, theme and l10n accessors) are exactly where a
+`BuildContext` extension belongs — they take any child and name no feature. The line is whether the
+extension names **a screen of yours**: presentation chrome on `BuildContext` is fine, a feature on
+`BuildContext` is not.
 
 ## 1.4 No `_buildXxx()` methods that return a widget
 
@@ -562,7 +593,7 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No functions outside classes** — factory/method/extension; the only exceptions are `@riverpod` entry points and `main()` (§1.3a).
 - [ ] **No widget in a variable used once** (§1.4a) and **no commented-out code** (§1.4b).
 - [ ] **No pass-through widgets** — a class that only forwards its own parameters into a kit widget and knows nothing about the domain (`ui_kit.dart` its only import) is not created: inline the kit widget, and turn a repeating wrapper into a kit constructor (§1.9).
-- [ ] **No** `BuildContext`/`WidgetRef` in the parameters of services and functions.
+- [ ] **No** `BuildContext`/`WidgetRef` in the parameters of services and functions — and **no `extension on BuildContext` that opens the app's own screens**: showing a feature is a static method on that feature's widget (§1.3).
 - [ ] **No** `_buildXxx()` methods returning a widget — those are separate widget classes (§1.4).
 - [ ] **No** private widget methods that transform the domain — those are extensions in the feature's `logic/` (§1.3c).
 - [ ] **No** `ref.invalidate(...)` — refresh through the state.
