@@ -1,7 +1,7 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 
-import '../../../core/router/router.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
 
 /// Adapter from the app's typed routes to the bridge's path-based specs:
 /// the only place where the router types and Studio declarations meet.

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 
-import '../../../core/app_l10n.dart';
-import '../../../ui_kit/ui_kit.dart';
-import '../common/admin_scaffold.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_flutter/shared/widgets/admin_scaffold.dart';
 import 'widgets/admin_settings_form.dart';
 
 /// Application settings backed by the AppSetting model — write access is

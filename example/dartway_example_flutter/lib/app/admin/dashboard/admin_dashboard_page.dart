@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 
-import '../../../core/app_l10n.dart';
-import '../../../ui_kit/ui_kit.dart';
-import '../common/admin_scaffold.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_flutter/shared/widgets/admin_scaffold.dart';
 import 'widgets/admin_counters.dart';
 
 /// Admin home: headline counters over live model lists. Event analytics

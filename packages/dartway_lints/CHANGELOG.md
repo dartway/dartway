@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.1
+
+`deep_relative_import`: a relative import that walks more than two levels up is a warning. One or two
+`../` read as "the feature next door" — the shape the rule keeps legal, and the reason this is not
+`always_use_package_imports`, which forbids the neighbour too. Past two steps the path stops naming
+anything: `'../../../../ui_kit/ui_kit.dart'` says neither what is imported nor from where, while
+`package:my_app/ui_kit/ui_kit.dart` says both.
+
+The limit is also a structure signal. If a *sibling* feature is suddenly four levels away it is not a
+sibling: either the group fell apart, or what is being imported belongs in `shared/` or `domain/`.
+
 ## 0.1.0
 
 First public release — the DartWay conventions, enforced by machine.

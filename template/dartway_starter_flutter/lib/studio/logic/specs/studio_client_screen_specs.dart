@@ -1,4 +1,4 @@
-import '../../../core/router/router.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
 import 'studio_route_specs.dart';
 
 /// Screen passports: what a screen is *for*, what it does, and what is still

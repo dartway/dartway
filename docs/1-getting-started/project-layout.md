@@ -135,6 +135,12 @@ The boundary is enforced rather than remembered: raw `Color(...)`, `TextStyle(..
 and direct `Theme.of(context)` access **outside** `ui_kit/` are a lint (`dartway_lints`, wired into
 `custom_lint`). A style that leaks into a feature is a style nobody can change centrally later.
 
+The same lint package draws one more line, this time about imports: a relative import may walk at
+most two levels up (`deep_relative_import`). One or two `../` read as "the feature next door";
+past that the path names nothing, and the destination — `core/`, `data/`, `domain/`, `shared/`,
+`ui_kit/`, another zone — is spelled out with a `package:` import instead. The limit doubles as a
+structure signal: a sibling four levels away is not a sibling.
+
 ## `.claude/` — generated, and committed
 
 The agent toolkit is installed into `.claude/` by `create` (and refreshed by `dartway setup-ai`):

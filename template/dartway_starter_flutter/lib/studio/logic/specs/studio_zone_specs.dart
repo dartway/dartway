@@ -1,7 +1,7 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 
-import '../../../core/router/router.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
 import 'studio_client_screen_specs.dart';
 import 'studio_route_specs.dart';
 

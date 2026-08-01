@@ -34,6 +34,7 @@ lib/app/<feature>/
 - **logic/** — providers/enums/helpers belonging to this feature only.
 - Cross-feature business logic → `lib/domain` (extensions on models), not inside the feature.
 - Styles → `ui_kit.dart` only.
+- Imports — relative for your own internals and for a sibling feature (never deeper than two `../`), `package:` for everything further away: `core/`, `data/`, `domain/`, `shared/`, `ui_kit/`, another zone. See `dartway-clean-code` §1.2a; `deep_relative_import` flags the rest in the editor.
 
 ### Groups: when a feature stopped being one feature
 
@@ -126,6 +127,14 @@ admin_chats_filters/
 
 The inverse symptom — the state sits in one feature's `logic/` and a neighboring feature imports it:
 that is a boundary violation, the checker will catch it, and it is cured by exactly this move.
+
+**State only this feature uses may keep the notifier and the provider in one file — and then the
+provider goes first.** What the file is imported for is the provider; the notifier is how it is
+implemented. Written the other way round (the default that habit and the Riverpod docs produce), you
+open the file, meet twenty-five lines of implementation, and scroll for the one line you came for.
+Same principle as the feature's own folder — the public surface is one thing and it is in plain
+sight — applied to a file. Either order it that way or split it as above; what is not an option is
+the provider hidden underneath its own implementation.
 
 ## Order of work
 

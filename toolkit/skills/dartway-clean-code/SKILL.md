@@ -70,6 +70,27 @@ class DeliveryCard { final String deliveryStatus; final int itemsCount; final Vo
 //    don't chop it into header_part_1.dart / header_part_2.dart to fit a limit
 ```
 
+## 1.2a Imports: `../` means "next door", not "up the tree"
+
+**Why:** a path made of dots says nothing. `'../../../../ui_kit/ui_kit.dart'` tells the reader neither
+what is imported nor where it lives; `package:my_app_flutter/ui_kit/ui_kit.dart` tells both. The rule
+is about **distance**, not about a blanket `package:` everywhere — a relative import of the file next
+to you is the clearer one.
+
+| What you import | How |
+|---|---|
+| Your own internals (`widgets/`, `logic/`) | relative — `import 'widgets/user_list_item.dart';` |
+| A sibling feature in the same group | relative, one or two steps — `import '../user_form/user_form.dart';` |
+| `core/`, `data/`, `domain/`, `shared/`, `ui_kit/`, another zone | **`package:`** — `import 'package:my_app_flutter/ui_kit/ui_kit.dart';` |
+
+**Two `../` is the limit**, and `deep_relative_import` (`dartway_lints`, warning) says so in the
+editor. One or two steps read as "the feature next door"; three or four mean you left your group, and
+a jump that big should be visible by name rather than counted in dots.
+
+The limit doubles as a structure signal: if a *sibling* feature is suddenly four levels away, it is
+not a sibling — either the group fell apart, or what you are importing belongs in `shared/` or
+`domain/`.
+
 ## 1.3 Don't pass `BuildContext` / `WidgetRef` into services and logic
 
 **Why:** service/domain code must not know about the UI and the widget lifecycle. It tears the layers apart and breeds "stale context".
@@ -602,6 +623,8 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
 - [ ] **No** private widget classes (`_Foo`) in public feature files.
 - [ ] **A building block** — a widget with no product behaviour to describe — lives in `lib/shared/` with a doc comment, not in a zone with an empty `DwFeatureSpec`.
+- [ ] **Imports:** own internals and sibling features are relative and no deeper than two `../`; `core`/`data`/`domain`/`shared`/`ui_kit`/another zone are `package:` (§1.2a).
+- [ ] **The provider is the first thing in its file** (or lives in the feature's root file), not appended after the notifier that implements it.
 - [ ] **The complex stuff** (non-trivial logic/behavior, money, "downgrade" rollbacks) is covered by a test; a bugfix — first a failing test on the cause, then the fix. We don't test cosmetics.
 - [ ] SOLID, KISS, DRY, YAGNI, Law of Demeter are respected.
 - [ ] Composition instead of deep inheritance; logic is not in the UI (SoC).

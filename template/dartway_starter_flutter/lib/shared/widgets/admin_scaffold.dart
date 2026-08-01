@@ -1,9 +1,9 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/app_l10n.dart';
-import '../../../core/router/router.dart';
-import '../../../ui_kit/ui_kit.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
 /// Shell of the admin zone. Deliberately not wrapped in the device frame:
 /// the admin panel is a working surface, so it uses the full viewport and

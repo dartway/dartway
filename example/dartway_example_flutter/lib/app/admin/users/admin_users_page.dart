@@ -4,9 +4,9 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../../core/app_l10n.dart';
-import '../../../ui_kit/ui_kit.dart';
-import '../common/admin_scaffold.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_flutter/shared/widgets/admin_scaffold.dart';
 import 'widgets/admin_users_table.dart';
 
 /// Member management: search, role filter and inline role editing over the

@@ -1,4 +1,4 @@
-import '../../../core/router/router.dart';
+import 'package:dartway_example_flutter/core/router/router.dart';
 import 'studio_route_specs.dart';
 
 final scheduleStudioSpec = studioSpecForRoute(

@@ -15,11 +15,22 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
   a style rather than a widget — `InputDecoration.labelStyle`, a `TextSpan`, an
   `Icon`'s colour — that widget belongs in the kit, and the feature composes it.
 
+- **deep_relative_import** (warning) — a relative import may walk at most two
+  levels up. One or two `../` read as "the feature next door"; beyond that the
+  path names nothing (`'../../../../ui_kit/ui_kit.dart'`) and the destination
+  belongs in the line: `package:my_app/ui_kit/ui_kit.dart`.
+
+  Deliberately not `always_use_package_imports`, which also forbids the
+  legitimate neighbour. The limit doubles as a structure signal: a "sibling"
+  four levels away is not a sibling — either the group fell apart, or the thing
+  being imported belongs in `shared/` or `domain/`.
+
 ## Testing
 
 `example/` is the rule's test suite: files under `lib/app/` carry
-`// expect_lint: forbidden_ui_style_usage` above every line that must be
-reported, and `lib/ui_kit/` writes the same styles freely and must stay silent.
+`// expect_lint: <rule>` above every line that must be reported, and the files
+that must stay silent — `lib/ui_kit/` writing styles freely, a feature importing
+its neighbour one `../` away — are there to catch an over-eager rule.
 
 ```bash
 cd example && dart run custom_lint   # fails on a missed or an unexpected lint
