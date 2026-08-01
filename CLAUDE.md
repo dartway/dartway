@@ -1,137 +1,138 @@
-# DartWay — монорепо фреймворка
+# DartWay — the framework monorepo
 
-Это репозиторий **самого фреймворка** DartWay (fullstack Dart: Flutter + Serverpod), а не приложения на нём. Для приложений методология лежит в `toolkit/` и ставится в их `.claude/` установщиком — не путай два CLAUDE.md: этот — про разработку фреймворка.
+This is the repository of **the DartWay framework itself** (fullstack Dart: Flutter + Serverpod), not of an application built on it. The methodology for applications lives in `toolkit/` and is installed into their `.claude/` by the installer — do not confuse the two CLAUDE.md files: this one is about developing the framework.
 
-## Карта монорепо
+## Monorepo map
 
-| Папка | Роль |
+| Folder | Role |
 |---|---|
-| `packages/dartway_serverpod_core/` | Ядро (4 пакета: server / client / flutter / shared) — generic CRUD, real-time, auth, фильтры |
-| `packages/dartway_flutter` | Flutter-тулбокс (скелет приложения): DwAppRunner, guarded actions (`dw.action`), async-UI контракт, нотификации, error reporting, `DwPlugins`. Ships no design |
-| `packages/dartway_shared_preferences` | Плагин локального хранилища: reactive riverpod-провайдеры над SharedPreferences, доступ `dw.plugins.prefs`. Опционален — ядро его не тянет |
-| `packages/dartway_lints` | Enforcement конвенций (custom_lint-правила) |
-| `packages/dartway_cli` | CLI: `create` / `setup-ai` / `check` (встроенный чекер конвенций) / `stats` |
-| `template/` | **Скелет** — единственное, что копирует `dartway create`. Auth, роли, навигация, админка, UI-кит, ноль доменных моделей. Пакеты `dartway_starter_*` (CLI переименовывает их в имя проекта) |
-| `example/` | Канонический проект (фитнес-клуб) — эталонный пример, проект курса, демо Studio. **Его больше не раздаёт CLI**: читать, а не наследовать |
-| `toolkit/` | Claude-обвязка для app-проектов (скиллы `dartway-*`, токены `__*__`, установщик) |
-| `docs/` | Документация фреймворка и единственный источник контента для сайта dartway.dev (см. «Соседи») |
-| `packages/dartway_studio_bridge` | Открытый мост приложение ↔ Studio: модели спеков экранов (в коде приложения) + runtime postMessage-протокол (host в приложении, client в Studio) |
+| `packages/dartway_serverpod_core/` | The core (4 packages: server / client / flutter / shared) — generic CRUD, real-time, auth, filters |
+| `packages/dartway_flutter` | The Flutter toolbox (application skeleton): DwAppRunner, guarded actions (`dw.action`), the async-UI contract, notifications, error reporting, `DwPlugins`. Ships no design |
+| `packages/dartway_shared_preferences` | Local-storage plugin: reactive riverpod providers over SharedPreferences, reached through `dw.plugins.prefs`. Optional — the core does not pull it in |
+| `packages/dartway_lints` | Convention enforcement (custom_lint rules) |
+| `packages/dartway_cli` | CLI: `create` / `setup-ai` / `check` (the built-in convention checker) / `stats` |
+| `template/` | **The skeleton** — the only thing `dartway create` copies. Auth, roles, navigation, admin panel, UI kit, zero domain models. Packages named `dartway_starter_*` (the CLI renames them to the project's name) |
+| `example/` | The canonical project (a fitness club) — reference example, course project, Studio demo. **The CLI no longer hands it out**: read it, do not inherit from it |
+| `toolkit/` | The Claude harness for application projects (`dartway-*` skills, `__*__` tokens, the installer) |
+| `docs/` | Framework documentation and the single source of content for the dartway.dev site (see "Neighbours") |
+| `packages/dartway_studio_bridge` | The open bridge between an application and Studio: screen-spec models (in the application's code) plus the runtime postMessage protocol (host in the application, client in Studio) |
 
-Этот репозиторий самодостаточен: всё, что в нём есть, здесь и живёт. Вложенных чужих репозиториев в дереве нет.
+This repository is self-contained: everything it holds lives here. There are no foreign repositories nested in the tree.
 
-## Соседи
+## Neighbours
 
-Два отдельных репозитория, которые к фреймворку примыкают, но его частью не являются. Если чекауты есть на машине — они лежат рядом, а не внутри.
+Two separate repositories that adjoin the framework without being part of it. If checkouts exist on the machine, they sit beside this tree, not inside it.
 
-| Репозиторий | Что это | Связь с монорепо |
+| Repository | What it is | Relation to the monorepo |
 |---|---|---|
-| `dartway/dartway_studio` | **DartWay Studio** — закрытая платформа: живое превью, паспорта экранов, дальше фидбек и агенты | Потребитель `packages/dartway_studio_bridge`. Мост — контракт с двумя сторонами: поменял мост — сторона Studio должна догнать |
-| `novikov-it/dartway.dev` | Сайт документации (Docusaurus → GitHub Pages) | Потребитель `docs/`. **Внимание:** пайплайн `docs/` → сайт ещё не настроен, сайт пока тянет контент из легаси-репо `dartway_guidelines` |
+| `dartway/dartway_studio` | **DartWay Studio** — the closed platform: live preview, screen passports, later feedback and agents | A consumer of `packages/dartway_studio_bridge`. The bridge is a contract with two sides: change the bridge and the Studio side has to catch up |
+| `novikov-it/dartway.dev` | The documentation site (Docusaurus → GitHub Pages) | A consumer of `docs/`. **Note:** the `docs/` → site pipeline is not wired up yet; the site still pulls its content from the legacy `dartway_guidelines` repository |
 
-Держать их синхронными — не обязанность этого репозитория и не повод лезть в чужое дерево. Когда меняешь мост или доки, скажи об этом в отчёте; обновятся они сами или по прямой просьбе.
+Keeping them in sync is neither this repository's duty nor a reason to reach into someone else's tree. When you change the bridge or the docs, say so in your report; they will catch up on their own or on request.
 
-## Закон синхронизации (Definition of Done)
+## The synchronisation law (Definition of Done)
 
-Монорепо существует ради синхронной эволюции. Изменение **публичного API** любого пакета не завершено, пока в том же PR не обновлены:
+The monorepo exists so that its parts evolve together. A change to the **public API** of any package is not finished until the same PR also updates:
 
-1. `example/` — компилируется и использует новый API;
-2. `template/` — компилируется (это то, что получает каждый новый проект; сгнивший шаблон — сломанный `dartway create`, и узнаешь об этом от чужого человека);
-3. затронутые скиллы в `toolkit/skills/` (скилл, отставший от API, хуже отсутствующего — агент уверенно пишет неработающий код);
-4. `docs/` — затронутые страницы;
-5. `CHANGELOG.md` пакета.
+1. `example/` — compiles and uses the new API;
+2. `template/` — compiles (this is what every new project receives; a rotted template is a broken `dartway create`, and you will hear about it from a stranger);
+3. the affected skills in `toolkit/skills/` (a skill that has fallen behind the API is worse than a missing one — the agent confidently writes code that does not work);
+4. `docs/` — the affected pages;
+5. the package's `CHANGELOG.md`.
 
-**Ритуал промоушена на `stable` теперь включает шаблон:** analyze/tests зелёные + **example и template собираются** + `dartway create` из свежего клона даёт запускающийся проект + `framework-finish` без рассинхронов.
+**The promotion ritual for `stable` now includes the template:** analyze/tests green + **example and template both build** + `dartway create` from a fresh clone produces a project that runs + `framework-finish` reporting no drift.
 
-Перед коммитом изменений фреймворка прогоняй скилл `framework-finish` — он ищет рассинхроны по диффу.
+Run the `framework-finish` skill before committing framework changes — it looks for drift across the diff.
 
-## Стандарты
+## Standards
 
-- **Версионирование:** semver. Четвёрка `dartway_serverpod_core_*` — lockstep (одна версия на все четыре). Остальные пакеты — независимо.
-- **Workspace-гигиена:** внутри монорепо зависимости между пакетами резолвятся через workspace (корневой `pubspec.yaml`), **не** через git-ссылки на `dartway.git`.
-- **Версия Serverpod — сейчас `3.4.11`; этой же версией CLI сгенерирован весь код.** Генерируешь (`serverpod generate` / `create-migration`) — сначала убедись, что `dart pub global list` показывает **ровно** её: CLI пишет генерат под свою версию, и разъезд CLI с рантаймом даёт молчаливые баги. Ограничения: **пакеты фреймворка — каретка** (`^3.4.11`), чтобы оставаться совместимыми с любым патчем serverpod у приложения (точный пин в библиотеке делает её неустановимой рядом с чужим патчем); **`template/` — точный пин**, чтобы новый проект стартовал на связке, заведомо совпадающей с генератором. Воспроизводимость сборки монорепо держит закоммиченный `pubspec.lock`, а не сужение ограничений. Бамп serverpod = регенерация в **четырёх** местах (ядро, push-модуль, example, template) + проверка патча протокола + перегенерация агрегированных миграций example/template.
-- **Язык:** **всё, что может оказаться на людях, — английский.** Критерий один: **увидит ли это посторонний, открыв GitHub.** Если да — английский, без исключений и без оглядки на то, кому оно адресовано.
-  - Под правило попадают: доки, README пакетов, строки ошибок, комментарии в коде пакетов, **сообщения коммитов, заголовки и описания PR, комментарии в PR и issue, имена веток** — и **`toolkit/` тоже**: он едет в `.claude/` каждого проекта на фреймворке и лежит в публичном репозитории, то есть уже на людях.
-  - **Разговор по-русски не делает русским артефакт, который из него родился.** Описание PR обращено к Евгению, но лежит в публичном репозитории и читается кем угодно — это публикация, а не продолжение диалога. Ровно на этой подмене правило один раз уже нарушили.
-  - Русский остаётся только там, куда посторонний не попадает: приватный репозиторий управления проектом и наш чат.
-  - На каком языке проект пишет **свои** паспорта фич и доки — его дело, это настройка проекта, а не наша.
-- **Коммиты:** conventional commits — `feat:` / `fix:` / `chore:` (+ scope по желанию: `feat(session): ...`).
-- **Git — см. раздел «Работа с git»** ниже: ветки, PR, промоушен на `stable`, параллельные сессии.
-- **Тулкит-инвариант:** в `toolkit/` нет проектных литералов — только токены `__*__`. Проверка: `grep -rniE 'tvolkova|tvaity|kerla' toolkit/` → пусто.
-- **Архивы:** папки `zarchive/`/`zarchiv/` — легаси на выпил; ничего нового туда не добавлять, при рефакторинге — удалять, а не пополнять.
-- **Секьюрити-принцип (цель):** generic CRUD должен быть secure-by-default — не сконфигурирован доступ ⇒ запрещено. Новый код не должен вводить «открыто всем» как умолчание.
-- **Дизайн публичного API — `docs/DESIGN.md` (закон, не пожелание).** Прежде чем добавлять/менять публичный символ любого пакета, свериться: единый корень `dw.` (ядро) / `dw.plugins.<name>` (расширения); критерий «фабрика на `dw.` vs конструктор типа» (3 вопроса); один способ, не два; ядро — минимальный контракт (опциональное — в плагины); проверяй по бою (tvolkova/kerla3), а не по демо, и смотри происхождение символа. У пакета может быть свой `DESIGN.md` (напр. `packages/dartway_flutter/DESIGN.md`) — **не путать философию фреймворка с философией пакета**.
+- **Versioning:** semver. The four `dartway_serverpod_core_*` packages move in lockstep (one version across all four). Every other package is versioned independently.
+- **Workspace hygiene:** inside the monorepo, dependencies between packages resolve through the workspace (the root `pubspec.yaml`), **not** through git references to `dartway.git`.
+- **The Serverpod version is `3.4.11`, and all generated code was produced by that same CLI version.** Before you generate (`serverpod generate` / `create-migration`), confirm that `dart pub global list` reports **exactly** that version: the CLI writes generated code for its own version, and a CLI that has drifted from the runtime produces silent bugs. Constraints: **framework packages use a caret** (`^3.4.11`) so they stay compatible with whatever serverpod patch an application has (an exact pin in a library makes it uninstallable next to someone else's patch); **`template/` uses an exact pin** so a new project starts on a combination known to match the generator. Build reproducibility across the monorepo is held by the committed `pubspec.lock`, not by narrowing constraints. Bumping serverpod means regenerating in **four** places (the core, the push module, example, template), verifying the protocol patch, and regenerating the aggregated migrations for example and template.
+- **Language: everything that can end up in front of people is written in English.** One test decides it: **would an outsider see this by opening GitHub?** If yes, English — no exceptions, and regardless of whom it is addressed to.
+  - The rule covers: docs, package READMEs, error strings, comments in package code, **commit messages, PR titles and descriptions, PR and issue comments, branch names** — and **`toolkit/` as well**: it ships into the `.claude/` of every project built on the framework and sits in a public repository, so it is already in front of people.
+  - **This file too.** It is the repository's constitution, and outside contributors are held to it — the automated review enforces the synchronisation law, the protocol patch, and the toolkit invariant on their pull requests. Rules that judge a contributor have to be readable by that contributor.
+  - **A conversation held in Russian does not make the artefact born from it Russian.** A PR description addresses Evgenii, yet it sits in a public repository and anyone reads it — that is publication, not a continuation of the conversation. This substitution is exactly how the rule got broken once already.
+  - Russian remains only where an outsider never reaches: the private project-management repository and our chat.
+  - Which language a project uses for **its own** feature passports and docs is that project's business — a project setting, not ours.
+- **Commits:** conventional commits — `feat:` / `fix:` / `chore:` (an optional scope is welcome: `feat(session): ...`).
+- **Git — see "Working with git"** below: branches, PRs, promotion to `stable`, parallel sessions.
+- **The toolkit invariant:** `toolkit/` carries no project literals, only `__*__` tokens. Check: `grep -rniE 'tvolkova|tvaity|kerla' toolkit/` → empty.
+- **Archives:** the `zarchive/`/`zarchiv/` folders are legacy awaiting removal; add nothing new to them, and when refactoring delete rather than extend.
+- **Security principle (the goal):** generic CRUD must be secure by default — access not configured ⇒ access denied. New code must not introduce "open to everyone" as a default.
+- **Public API design lives in `docs/DESIGN.md` (law, not preference).** Before adding or changing a public symbol in any package, check it against: a single root, `dw.` for the core and `dw.plugins.<name>` for extensions; the "factory on `dw.` vs constructor on the type" test (three questions); one way to do a thing, not two; the core is a minimal contract (anything optional belongs in a plugin); validate against real projects (tvolkova/kerla3) rather than against the demo, and mind where a symbol came from. A package may carry its own `DESIGN.md` (for example `packages/dartway_flutter/DESIGN.md`) — **do not confuse the framework's philosophy with a package's**.
 
-## Работа с git
+## Working with git
 
-Правила одни для всех — для Евгения, для Claude, для внешних контрибьюторов. Репозиторий публичный, история — часть продукта.
+The rules are the same for everyone — for Evgenii, for Claude, for outside contributors. The repository is public and its history is part of the product.
 
-**Ветки.**
+**Branches.**
 
-| Ветка | Роль |
+| Branch | Role |
 |---|---|
-| `master` | Транк разработки. Может быть «в разобранном виде» |
-| `stable` | Последнее проверенное состояние. **Только fast-forward с master**, своя история запрещена. На него смотрят setup-скрипты/CLI (дефолтный канал) и git-зависимости внешних проектов |
-| `feat/*`, `fix/*`, `chore/*`, `docs/*` | Рабочие ветки. Живут до мержа и удаляются |
-| `kerla*`, `tvaity` | Проектные срезы под конкретные приложения. В master не мержатся, живут своей жизнью, **не удалять** |
+| `master` | The development trunk. May be in pieces at any moment |
+| `stable` | The last verified state. **Fast-forward from master only**, a history of its own is forbidden. Setup scripts and the CLI (the default channel) follow it, as do the git dependencies of external projects |
+| `feat/*`, `fix/*`, `chore/*`, `docs/*` | Working branches. They live until merged, then they go |
+| `kerla*`, `tvaity` | Project slices for specific applications. They are never merged into master, they live their own life, **do not delete them** |
 
-Гитфлоу (develop, release-ветки) не заводим.
+No gitflow — no develop branch, no release branches.
 
-**Как код попадает в master — только через ветку и PR со squash-merge.** На GitHub это единственный разрешённый способ: merge-коммиты и rebase выключены, один PR = один коммит в master. Прямых коммитов в master нет ни у кого и ни для чего — правки в `docs/` и `toolkit/` тоже едут веткой. Единое правило дешевле порога, о котором каждый раз надо думать. Однострочный фикс закрывается в два шага: `gh pr create --fill` → `gh pr merge --squash`.
+**Code reaches master one way only: through a branch and a PR with squash merge.** On GitHub that is the only method left enabled — merge commits and rebase are off, so one PR equals one commit on master. Nobody pushes to master directly, for anything: changes to `docs/` and `toolkit/` travel by branch too. A single rule is cheaper than a threshold you have to reason about every time. A one-line fix closes in two steps: `gh pr create --fill` → `gh pr merge --squash`.
 
-**Следствие, о котором легко забыть: при squash-мерже заголовок PR становится сообщением коммита в `master`.** То есть заголовок PR — это не подпись к обсуждению, а строка постоянной публичной истории; отсюда требование писать его по-английски (см. «Язык»). Исправить задним числом нельзя: `protect-trunk` запрещает force-push в трунк, и отключать защиту ради косметики не стоит. Один такой коммит в истории уже есть — `b9917ab`.
+**The consequence that is easy to forget: a squash merge turns the PR title into the commit message on `master`.** The PR title is therefore not a caption on a discussion but a line of permanent public history — hence the requirement to write it in English (see "Language"). It cannot be corrected afterwards: `protect-trunk` forbids force-pushing the trunk, and the protection is not worth disabling for cosmetics. One such commit is already stuck in the history — `b9917ab`.
 
-**Ветка заводится в начале задачи, а не в конце.** Иначе `framework-finish` смотрит на грязный master вместо диффа ветки, а параллельная работа становится невозможной в принципе.
+**Create the branch at the start of the task, not at the end.** Otherwise `framework-finish` inspects a dirty master instead of the branch's diff, and parallel work becomes impossible in principle.
 
-**Параллельные сессии — только через `git worktree`.** Две сессии в одном рабочем каталоге делят индекс и рабочее дерево, то есть затирают друг друга; ветка, отпочкованная в конце, это не разводит. Одна сессия = одна ветка = один каталог:
+**Parallel sessions run in `git worktree` and nowhere else.** Two sessions sharing one working directory share the index and the working tree, which means they overwrite each other; a branch split off at the end does not separate them. One session = one branch = one directory:
 
 ```bash
 git worktree add ../dartway-wt/<slug> -b feat/<slug> master
 ```
 
-Каталог worktree держать **вне** дерева репозитория. Цена: у каждого worktree свой `.dart_tool` и свой `dart pub get` по всему workspace; если сессия поднимает `example` — развести порты с соседней. Заводить worktree под реально параллельную работу, а не под каждую задачу.
+Keep the worktree directory **outside** the repository tree. The price: every worktree carries its own `.dart_tool` and its own `dart pub get` across the workspace, and a session that runs `example` has to move its ports off the neighbour's. Create a worktree for genuinely parallel work, not for every task.
 
-### Протокол Claude (жёстко)
+### Claude's protocol (hard rules)
 
-Это не рекомендации: каждый пункт закрывает способ, которым сессия уничтожает чужую работу.
+These are not suggestions: each item closes off a way for one session to destroy another's work.
 
-1. **Первым делом в задаче — `git status`.** Дерево чистое ⇒ `git switch -c <type>/<slug>` и работать здесь. Дерево грязное ⇒ **в нём уже работает другая сессия**; в общем каталоге не работать вообще, завести worktree и уйти в него. Спросить, чьи изменения, — не вариант: пока идёт диалог, чужая сессия пишет дальше.
-2. **В общем дереве с чужими изменениями запрещено:** `git switch`, `git checkout <ветка>`, `git stash`, `git reset`, `git restore`, `git clean`. Все они подменяют файлы под руками у работающей сессии. Единственное исключение — переключение, где `git diff --name-only <откуда> <куда>` пусто или содержит только твои файлы, и это проверено **до** переключения, а не после.
-3. **Индексировать только свои файлы, поимённо:** `git add <путь> <путь>`. **`git add -A`, `git add .`, `git commit -a` запрещены всегда** — в общем дереве они молча утаскивают в твой коммит чужую незаконченную работу, и разбирать это придётся `rebase --onto`.
-4. **Ветка заводится в начале задачи, не в конце.** Пока на ветке нет коммитов, любое пересечение сессий чинится разделением файлов; после первого чужого коммита в твою ветку — только `cherry-pick` и ручное расщепление.
-5. **Не создавать ветку от чужого HEAD.** Ответвляться явно от точки: `git switch -c <name> master`. Иначе в твой PR уедет чужой коммит.
-6. **Пушить и открывать PR — только по прямой просьбе.** Никогда не мержить PR, не пушить в `master` напрямую, не трогать `stable` без явной команды.
-7. **Перед тем как предлагать PR** — `framework-finish`, analyze и тесты зелёные.
-8. **Убирать за собой worktree:** `git worktree remove ../dartway-wt/<slug>` после мержа ветки. Брошенные worktree держат ветки checked out, и следующая сессия не может их переключить.
-9. **Всё, что уезжает в GitHub, — по-английски:** имя ветки, сообщение коммита, заголовок и описание PR, комментарии в PR. Перед `gh pr create` перечитать заголовок: он станет коммитом в `master` и правке уже не подлежит. То, что задача обсуждалась по-русски, значения не имеет — см. «Язык».
+1. **`git status` first, before anything else.** Clean tree ⇒ `git switch -c <type>/<slug>` and work here. Dirty tree ⇒ **another session is already working in it**; do not work in the shared directory at all — create a worktree and move there. Asking whose changes those are is not an option: while the conversation happens, the other session keeps writing.
+2. **In a shared tree holding someone else's changes, these are forbidden:** `git switch`, `git checkout <branch>`, `git stash`, `git reset`, `git restore`, `git clean`. Every one of them swaps files out from under a running session. The single exception is a switch where `git diff --name-only <from> <to>` is empty or lists only your own files — verified **before** the switch, not after.
+3. **Stage your own files, by name:** `git add <path> <path>`. **`git add -A`, `git add .` and `git commit -a` are forbidden, always** — in a shared tree they silently drag someone else's unfinished work into your commit, and undoing that takes `rebase --onto`.
+4. **Create the branch at the start of the task, not at the end.** While a branch has no commits, any collision between sessions is resolved by splitting files; after the first foreign commit lands on your branch, only `cherry-pick` and manual surgery remain.
+5. **Never branch from someone else's HEAD.** Branch from an explicit point: `git switch -c <name> master`. Otherwise a foreign commit rides into your PR.
+6. **Push and open PRs only when asked directly.** Never merge a PR, never push to `master` directly, never touch `stable` without an explicit instruction.
+7. **Before offering a PR** — `framework-finish`, analyze and tests all green.
+8. **Clean up your worktree:** `git worktree remove ../dartway-wt/<slug>` once the branch is merged. Abandoned worktrees hold branches checked out, and the next session cannot switch to them.
+9. **Everything that travels to GitHub is written in English:** branch name, commit message, PR title and description, PR comments. Re-read the title before `gh pr create` — it becomes a commit on `master` and is not editable afterwards. That the task was discussed in Russian makes no difference — see "Language".
 
-**Ритуал промоушена на `stable`:** analyze/tests зелёные + **example и template собираются** + `dartway create` из свежего клона даёт запускающийся проект + `framework-finish` без рассинхронов → `git push origin master:stable`. Локальную ветку `stable` не держим — промоушен идёт refspec'ом, а протухшая локальная копия только путает.
+**The promotion ritual for `stable`:** analyze/tests green + **example and template both build** + `dartway create` from a fresh clone produces a project that runs + `framework-finish` reporting no drift → `git push origin master:stable`. We keep no local `stable` branch — promotion travels by refspec, and a stale local copy only confuses matters.
 
-**Защита.** На `master` и `stable` висит ruleset `protect-trunk`: force-push и удаление запрещены, обходов нет. Fast-forward-пуш (в том числе промоушен) проходит нормально. Если понадобилось переписать историю трунка — это повод остановиться и обсудить, а не отключить правило.
+**Protection.** `master` and `stable` are covered by the `protect-trunk` ruleset: force-pushes and deletion are forbidden, with no bypass. A fast-forward push (promotion included) goes through normally. Needing to rewrite the trunk's history is a reason to stop and discuss, not to switch the rule off.
 
-**Гигиена.** Ветка удаляется автоматически при мерже PR (`deleteBranchOnMerge`). Локально: `fetch.prune=true` (мёртвые remote-ссылки не копятся), `pull.rebase=true`, `rerere.enabled=true`. В этом репозитории `user.email` задан локально — рабочий адрес, потому что репозиторий публичный.
+**Hygiene.** A branch is deleted automatically when its PR merges (`deleteBranchOnMerge`). Locally: `fetch.prune=true` (dead remote references stop piling up), `pull.rebase=true`, `rerere.enabled=true`. In this repository `user.email` is set locally to the work address, because the repository is public.
 
 ### CI
 
-Два workflow в `.github/workflows/`:
+Two workflows in `.github/workflows/`:
 
-| Файл | Когда | Что делает |
+| File | When | What it does |
 |---|---|---|
-| `claude-review.yml` | PR открыт / обновлён / выведен из draft | Автоматическое ревью диффа. Помимо обычных багов проверяет три вещи, специфичные для репозитория: закон синхронизации, наличие ручного патча `manualDeserialization` в сгенерированном `protocol.dart`, отсутствие проектных литералов в `toolkit/` |
-| `telegram-notify.yml` | Ревью завершилось | Присылает вердикт и ссылку на PR в Telegram — единственное уведомление, которое требует решения. Сигналы для команды (мержи, промоушен на `stable`) сюда сознательно не добавлены: это отдельная задача с другим адресатом |
+| `claude-review.yml` | A PR is opened, updated, or taken out of draft | Reviews the diff automatically. Beyond ordinary bugs it checks three things specific to this repository: the synchronisation law, the presence of the hand-written `manualDeserialization` patch in the generated `protocol.dart`, and the absence of project literals in `toolkit/` |
+| `telegram-notify.yml` | A review finishes | Sends the verdict and a link to the PR to Telegram — the one notification that asks for a decision. Signals meant for the team (merges, promotion to `stable`) are deliberately absent: that is a separate task addressing a different audience |
 
-Ревью не запускается на PR из форков: секреты репозитория им недоступны, и шаг всё равно упал бы на авторизации. Такой PR остаётся и без уведомления — все текущие контрибьюторы коллабораторы и пушат ветки в репозиторий, так что случай пока теоретический.
+The review does not run on PRs from forks: repository secrets are unavailable to them and the step would fail on authentication anyway. Such a PR also goes unannounced — every current contributor is a collaborator pushing branches into the repository, so the case is theoretical for now.
 
-Ревью требует **двух** вещей, не одной. Секрет `CLAUDE_CODE_OAUTH_TOKEN` (выдаётся командой `claude setup-token`) аутентифицирует, а право писать в репозиторий даёт **GitHub App [`claude`](https://github.com/apps/claude)**, установленный на этот репозиторий. Без приложения обмен OIDC-токена падает с `401 — Claude Code is not installed on this repository`, даже когда секрет на месте.
+The review needs **two** things, not one. The `CLAUDE_CODE_OAUTH_TOKEN` secret (issued by `claude setup-token`) authenticates, while the right to write to the repository comes from the **[`claude` GitHub App](https://github.com/apps/claude)** installed on this repository. Without the app the OIDC token exchange fails with `401 — Claude Code is not installed on this repository`, even when the secret is in place.
 
-Остальные секреты (Settings → Secrets and variables → Actions): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Без них не работают уведомления; ревью при этом не ломается.
+The remaining secrets (Settings → Secrets and variables → Actions): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Without them notifications stop; the review keeps working.
 
-`workflow_run` читается только с дефолтной ветки — правка `telegram-notify.yml` начинает действовать после мержа в `master`, а не в PR, где она сделана.
+`workflow_run` is read from the default branch only — a change to `telegram-notify.yml` takes effect once merged into `master`, not in the PR that makes it.
 
-## Ловушка: `serverpod generate` в ядре стирает ручной патч протокола
+## The trap: `serverpod generate` in the core erases a hand-written protocol patch
 
-**Это для Claude — Евгений генерацию не запускает.** Прогнал `serverpod generate` в `packages/dartway_serverpod_core/dartway_serverpod_core_server` — обязан проверить и восстановить патч в сгенерированном `dartway_serverpod_core_client/lib/src/protocol/protocol.dart`.
+**This one is for Claude — Evgenii does not run generation.** Having run `serverpod generate` in `packages/dartway_serverpod_core/dartway_serverpod_core_server`, you are required to check and restore the patch in the generated `dartway_serverpod_core_client/lib/src/protocol/protocol.dart`.
 
-**Что за патч.** В `Protocol.deserialize<T>`, сразу после `t ??= T;`, должен стоять блок:
+**What the patch is.** Inside `Protocol.deserialize<T>`, immediately after `t ??= T;`, this block must be present:
 
 ```dart
 if (data is Map<String, dynamic>) {
@@ -143,22 +144,22 @@ if (data is Map<String, dynamic>) {
 }
 ```
 
-`_iNN` — **алиас импорта `dw_api_response.dart` в заново сгенерированном файле**, а не константа: номер меняется от генерации к генерации (сейчас `_i19`). Возьми его из шапки файла, не копируй вслепую.
+`_iNN` is **the import alias for `dw_api_response.dart` in the freshly generated file**, not a constant: the number changes from one generation to the next (currently `_i19`). Take it from the file's header rather than copying blindly.
 
-**Почему без него всё разваливается.** `extraClasses` в Serverpod не понимает дженерики: для `DwApiResponse<T>` генератор пишет проверку по **сырому** типу — `if (t == _i19.DwApiResponse)`, то есть `DwApiResponse<dynamic>`. А на проводе приезжают `DwApiResponse<DwModelWrapper>`, `<List<DwModelWrapper>>`, `<int>`, `<bool>` — как `Type` они сырому не равны, ветка не срабатывает **никогда**, и любой CRUD-ответ падает на десериализации. Патч подставляет `DwApiResponse.manualDeserialization<K>`, которая разбирает конкретные инстанциации руками.
+**Why everything falls apart without it.** Serverpod's `extraClasses` does not understand generics: for `DwApiResponse<T>` the generator emits a check against the **raw** type — `if (t == _i19.DwApiResponse)`, meaning `DwApiResponse<dynamic>`. What actually arrives over the wire is `DwApiResponse<DwModelWrapper>`, `<List<DwModelWrapper>>`, `<int>`, `<bool>` — as a `Type` none of them equals the raw one, the branch therefore **never** fires, and every CRUD response fails to deserialise. The patch routes the call to `DwApiResponse.manualDeserialization<K>`, which unpacks the concrete instantiations by hand.
 
-**Проверка после генерации:**
+**The check to run after generating:**
 
 ```bash
 grep -n 'manualDeserialization' packages/dartway_serverpod_core/dartway_serverpod_core_client/lib/src/protocol/protocol.dart
 ```
 
-Пусто → патч потерян, приложение сломано в рантайме (компиляция при этом проходит — в этом и коварство). Восстановить и убедиться, что example поднимается и грузит списки.
+Empty output means the patch is gone and the application is broken at runtime — while still compiling, which is what makes it treacherous. Restore it, then confirm that example starts up and loads its lists.
 
-Разовое лечение мины (в очереди, не сделано): идемпотентный скрипт-патчер + регрессионный тест в `core_client`, который краснеет, если патч не на месте. Радикальное — убрать дженерики с провода, но это переделка CRUD-эндпоинтов, а Serverpod после v1 всё равно выпиливается.
+Defusing the mine for good (queued, not done): an idempotent patcher script plus a regression test in `core_client` that turns red when the patch is missing. The radical option is to take generics off the wire, but that means reworking the CRUD endpoints, and Serverpod is being removed after v1 anyway.
 
-## Рабочий процесс
+## Workflow
 
-Задача приходит снаружи — из трекера или разговором. Здесь остаётся только работа над кодом: ветка под задачу, правка, `framework-finish` перед коммитом, коммит, PR по просьбе (см. «Работа с git»).
+A task arrives from outside — from the tracker or in conversation. What remains here is the work on the code: a branch for the task, the change, `framework-finish` before committing, the commit, and a PR when asked (see "Working with git").
 
-Управление проектом — стратегия, roadmap, очередь задач, координаты доски — живёт **в отдельном репозитории** (`dartway/dartway_manager`) и в этом монорепо не лежит. Раньше он подключался папкой `project/` и читался командой `/next`; и папку, и команду убрали: репозиторий фреймворка занимается фреймворком.
+Project management — strategy, roadmap, the task queue, board coordinates — lives **in a separate repository** (`dartway/dartway_manager`) and is not kept in this monorepo. It used to be mounted as a `project/` folder and read by a `/next` command; both the folder and the command are gone: the framework repository deals with the framework.
