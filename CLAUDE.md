@@ -114,7 +114,9 @@ git worktree add ../dartway-wt/<slug> -b feat/<slug> master
 
 Ревью не запускается на PR из форков: секреты репозитория им недоступны, и шаг всё равно упал бы на авторизации. Такой PR остаётся и без уведомления — все текущие контрибьюторы коллабораторы и пушат ветки в репозиторий, так что случай пока теоретический.
 
-Секреты (Settings → Secrets and variables → Actions): `CLAUDE_CODE_OAUTH_TOKEN` (выдаётся командой `claude setup-token`), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Без первого не работает ревью, без второй пары — уведомления; остальной CI при этом не ломается.
+Ревью требует **двух** вещей, не одной. Секрет `CLAUDE_CODE_OAUTH_TOKEN` (выдаётся командой `claude setup-token`) аутентифицирует, а право писать в репозиторий даёт **GitHub App [`claude`](https://github.com/apps/claude)**, установленный на этот репозиторий. Без приложения обмен OIDC-токена падает с `401 — Claude Code is not installed on this repository`, даже когда секрет на месте.
+
+Остальные секреты (Settings → Secrets and variables → Actions): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Без них не работают уведомления; ревью при этом не ломается.
 
 `workflow_run` читается только с дефолтной ветки — правка `telegram-notify.yml` начинает действовать после мержа в `master`, а не в PR, где она сделана.
 
