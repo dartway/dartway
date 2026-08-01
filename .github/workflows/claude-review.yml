@@ -77,13 +77,13 @@ jobs:
             only through GitHub comments — do not emit the review as a chat message.
 
             Write the review in English: this repository is public.
-          # TEMPORARY: the action hides Claude's output, so a failed run reports
-          # only `is_error` with no reason. Remove once the cause is known —
-          # this repository is public and so are its run logs.
-          show_full_output: true
           # No --model on purpose: the action picks one the account is entitled
-          # to. Pinning Opus failed identically on two different ids, so the
-          # entitlement is the suspect, not the id.
+          # to. Pin one only after a live run proves it works.
+          #
+          # When a run fails with a bare `is_error` and no reason, the action is
+          # hiding Claude's output. Add `show_full_output: true` here, re-run,
+          # read the `result` field — and take the flag back out: this
+          # repository is public and so are its run logs.
           claude_args: |
             --max-turns 50
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
