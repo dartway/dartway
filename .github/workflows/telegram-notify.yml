@@ -55,9 +55,12 @@ jobs:
             # The review publishes its summary as a comment. Take the newest bot
             # comment created after this run started, so a silent run cannot pick
             # up the previous run's verdict and report it as fresh.
+            # Truncation happens in jq, which slices by codepoint. Cutting the
+            # text in the shell instead (`head -c`) counts bytes, splits a
+            # multi-byte character in half, and Telegram answers 400 to the
+            # malformed UTF-8 that results.
             summary=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
-              --jq "[.[] | select(.user.type == \"Bot\") | select(.created_at >= \"$RUN_STARTED\")] | last | .body // empty" \
-              | head -c 2000)
+              --jq "[.[] | select(.user.type == \"Bot\") | select(.created_at >= \"$RUN_STARTED\")] | last | (.body // \"\")[0:2000]")
             [ -n "$summary" ] || summary="(the review left no summary comment — see the run log)"
             text="Review finished — PR #$pr: $title
 
@@ -66,8 +69,13 @@ jobs:
           $url"
           fi
 
-          curl -sS --fail-with-body -X POST \
+          # Keep the response: on a rejection Telegram explains itself in the
+          # body, and discarding it into /dev/null once cost a debugging round.
+          if ! response=$(curl -sS --fail-with-body -X POST \
             "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
             --data-urlencode "text=$text" \
-            --data-urlencode "disable_web_page_preview=true" > /dev/null
+            --data-urlencode "disable_web_page_preview=true"); then
+            echo "Telegram rejected the message: $response"
+            exit 1
+          fi
