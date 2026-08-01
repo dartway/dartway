@@ -3,6 +3,10 @@
 A monorepo on the **Serverpod + DartWay + Flutter + Riverpod** stack. DartWay is a **highly opinionated** framework: less freedom in *how* to do things → more consistency and speed. Don't invent alternative approaches — follow the established patterns.
 
 > This harness (methodology + skills + commands) ships from the DartWay monorepo (`toolkit/`, branch `stable`) and is installed into this repository's `.claude/` (committed). The files `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-audit` commands are **managed**: don't edit them here, they get overwritten on update; customize by copying under your own name. The source of truth is the toolkit in the monorepo. The package structure is detected automatically; the paths below were substituted at install time.
+>
+> **A rule that let you down is not fixed here** — the fix would be overwritten on the next update. Write it down in `dartway_notes.md` at the project root instead; see "Notes back to the framework" below.
+
+**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `dartway_notes.md`, its own docs — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, error strings, and anything going back into the framework.
 
 ## Monorepo structure
 
@@ -82,6 +86,27 @@ For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/d
 
 **Finishing a task (Law 6):** when a feature/task is done, run `dartway-finish` before the commit/PR. It audits the diff against the contract, checks the feature's documentation for drift and the test coverage, and **shows suggestions and applies only what was confirmed**.
 
+## Notes back to the framework (`dartway_notes.md`)
+
+The harness is managed and gets overwritten on update, so a rule that let you down cannot be fixed
+here. It also cannot be left unsaid: the rules are only ever proven wrong by real code, and this
+project is the real code. `dartway_notes.md` at the project root is where such findings wait to be
+carried into the DartWay monorepo. It is git-ignored — a working journal, not a shared document.
+
+**Write there without being asked when:**
+
+- the code broke a rule that does not exist, or exists too vaguely to have prevented it;
+- the app had to work around a `dartway_*` API — an extra wrapper, a `hide`, a copied private helper;
+- you are tempted to edit a managed file (`CLAUDE.md`, `skills/dartway-*`, the `commit` /
+  `dartway-audit` commands). That temptation *is* the note.
+
+Write it the way it would have to be written in the toolkit: the example from the code, why the
+existing rule did not catch it, and the concrete wording to add — not "something is off here". An
+entry nobody can act on without re-deriving it is the same as no entry.
+
+`dartway-finish` shows what is still open at the end of a task, so the journal gets carried over
+rather than accumulated.
+
 ## Migrations: a project that lives by an older version of a law
 
 A law is written for a clean start ("a zone holds only features"), and says nothing to a project that
@@ -92,6 +117,11 @@ already grew under the previous wording. Two rules cover that gap:
   it breaks other people's branches, and nobody reviews it on the merits.
 - **A gap you left is said out loud.** Decided not to touch the legacy — say so in the report. What
   must not happen is the agent quietly picking one of the two readings.
+
+An entry below answers three things, in this order: **how to tell** the project still has the old
+shape (something greppable, not "you'll know"), **what the target is**, and **what to do with what
+has already accumulated**. A law changed without those three is a law that gets applied differently
+in every project it reaches.
 
 Live migrations (delete an entry once no project is on the old shape):
 

@@ -18,6 +18,14 @@ class SetupAiCommand extends Command<int> {
         help: 'Base branch of THIS project (used by PR/commit skills).',
       )
       ..addOption(
+        'language',
+        defaultsTo: 'English',
+        help:
+            "Language this project writes its own texts in (feature specs, doc "
+            "comments, dartway_notes.md). Package APIs and error strings stay "
+            "English regardless.",
+      )
+      ..addOption(
         'channel',
         defaultsTo:
             Platform.environment['DARTWAY_BRANCH'] ??
@@ -44,6 +52,7 @@ class SetupAiCommand extends Command<int> {
     final projectRoot = _findProjectRoot();
     final layout = ProjectLayout.detect(projectRoot);
     final baseBranch = argResults!['base-branch'] as String;
+    final language = argResults!['language'] as String;
 
     stdout.writeln(
       'Packages: server=${layout.serverPackage} '
@@ -52,6 +61,7 @@ class SetupAiCommand extends Command<int> {
       'shared=${layout.sharedPackage ?? '<none>'}',
     );
     stdout.writeln('Base branch: $baseBranch');
+    stdout.writeln('Project language: $language');
 
     final monorepoDir = await MonorepoSource(
       branch: argResults!['channel'] as String,
@@ -61,7 +71,10 @@ class SetupAiCommand extends Command<int> {
     await ToolkitInstaller.install(
       toolkitDir: Directory(p.join(monorepoDir.path, 'toolkit')),
       projectRoot: projectRoot,
-      tokens: layout.toolkitTokens(baseBranch: baseBranch),
+      tokens: layout.toolkitTokens(
+        baseBranch: baseBranch,
+        language: language,
+      ),
     );
 
     stdout.writeln(

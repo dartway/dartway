@@ -24,6 +24,9 @@ The skills are **generic**: project-specific values are extracted into placehold
 |---|---|---|
 | `__SERVER_PKG__` / `__CLIENT_PKG__` / `__FLUTTER_PKG__` / `__SHARED_PKG__` | the Dart package names | auto-detected by `*_server`/`*_client`/`*_flutter`/`*_shared` |
 | `__BASE_BRANCH__` | the base branch | a parameter of the installer run |
+| `__PROJECT_LANGUAGE__` | the language the project writes its own texts in | `--language`, default English |
+
+`dartway_notes.md` is the one file installed outside `.claude/`: a git-ignored journal at the project root where findings about the framework itself are recorded — a rule that did not catch a mistake, an API that forced a workaround. Managed files cannot be fixed in place (they are overwritten on update), so this is where the fix waits to be carried into the monorepo. An existing journal is never overwritten.
 
 The docs paths (`docs/1_general`, `docs/audits`) are a DartWay convention, hardcoded as-is; there are no separate per-feature docs, the description lives in `DwFeatureSpec` next to the code. The ticket for `/commit` is passed as an argument, and the project's CI checks the format.
 

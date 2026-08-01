@@ -2,6 +2,24 @@
 
 ## 0.1.3
 
+- **The harness now ships the channel back.** A project on the framework is where the rules get
+  disproved — but the harness is overwritten on update, so a rule that let you down cannot be fixed
+  where you found it, and the finding used to die in a chat. `setup-ai` and `create` now leave a
+  git-ignored `dartway_notes.md` at the project root (never overwriting an existing one) and
+  `dartway-finish` lists its open entries at the end of a task. `CLAUDE.md` says when to write there:
+  a rule that does not exist or is too vague, an API the app had to work around, and the moment you
+  are tempted to edit a managed file — that temptation *is* the note.
+
+- **`--language`** records what the project writes its own texts in — feature specs, doc comments,
+  its journal — into the installed `CLAUDE.md`. Default English; package APIs and error strings are
+  English regardless, since those ship to other people.
+
+- **Leftovers of the old shell installer are reported, not removed.** `tools/dw_claude_setup/` is
+  usually a gitlink with no `.gitmodules` entry — invisible to `git submodule update`, silent in
+  `git status`, and an empty folder on disk. The installer names it and prints the two commands that
+  clear it. It does not run them: an installer that edits somebody's git index is a different kind of
+  tool than one that copies files.
+
 - **`unusedFeatureFile` (warning): dead code inside a feature.** A file in `widgets/`/`logic/` that
   its own feature never mentions is unreachable — nobody outside may import it — and the analyzer
   cannot say so, because to it a public class is always possibly used elsewhere. Law 3 is what makes

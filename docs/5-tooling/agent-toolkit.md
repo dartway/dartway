@@ -62,6 +62,12 @@ truth is the toolkit in the monorepo, and there is no reverse sync.
 
 Updating is a deliberate act with a visible diff: run `setup-ai` again, read what changed, commit.
 
+That is also why the install leaves a `dartway_notes.md` at the project root, git-ignored. A rule
+that did not catch a mistake, two skills that disagree, an API the app had to work around — none of
+that can be fixed in the installed copy, and all of it is worth keeping: the rules are only ever
+proven wrong by real code. The journal is where such findings wait to be carried into the monorepo,
+and `dartway-finish` lists the open ones at the end of a task so they do not just accumulate.
+
 ## The skills
 
 The lifecycle of a task runs left to right: `dartway-requirements` → `dartway-plan` →

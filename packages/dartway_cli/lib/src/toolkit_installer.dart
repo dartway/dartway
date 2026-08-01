@@ -57,6 +57,70 @@ class ToolkitInstaller {
     managedFiles.add(installedClaudeMd);
 
     _substituteTokens(managedFiles, tokens);
+
+    _installNotesJournal(toolkitDir, projectRoot, tokens);
+    _reportLegacyInstallerTraces(projectRoot);
+  }
+
+  /// Puts `dartway_notes.md` at the project root and git-ignores it.
+  ///
+  /// The one file the installer writes outside `.claude/`, and the only one it
+  /// refuses to overwrite: the journal is where a project records what the
+  /// framework got wrong, so its content is the project's, not ours. Without
+  /// this step the practice exists only where somebody set it up by hand, which
+  /// is exactly how the last one was lost.
+  static void _installNotesJournal(
+    Directory toolkitDir,
+    Directory projectRoot,
+    Map<String, String> tokens,
+  ) {
+    final template = File(p.join(toolkitDir.path, 'dartway_notes.md'));
+    final journal = File(p.join(projectRoot.path, 'dartway_notes.md'));
+
+    if (template.existsSync() && !journal.existsSync()) {
+      template.copySync(journal.path);
+      _substituteTokens([journal], tokens);
+      stdout.writeln('Created dartway_notes.md (findings for the framework)');
+    }
+
+    _ignoreJournal(projectRoot);
+  }
+
+  static void _ignoreJournal(Directory projectRoot) {
+    final gitignore = File(p.join(projectRoot.path, '.gitignore'));
+    if (!gitignore.existsSync()) return;
+
+    final lines = gitignore.readAsLinesSync();
+    if (lines.any((line) => line.trim() == 'dartway_notes.md')) return;
+
+    gitignore.writeAsStringSync(
+      '\n# Findings to carry back into the DartWay monorepo — a local journal.\n'
+      'dartway_notes.md\n',
+      mode: FileMode.append,
+    );
+    stdout.writeln('Added dartway_notes.md to .gitignore');
+  }
+
+  /// The toolkit used to be installed by a shell script from a private
+  /// repository, which left `tools/dw_claude_setup/` behind — usually as a
+  /// gitlink with no `.gitmodules` entry, so `git submodule update` does not see
+  /// it and `git status` says nothing while the folder sits there empty.
+  ///
+  /// Reported, never removed: taking it out means `git rm --cached` in somebody
+  /// else's repository, and an installer that edits the git index is a
+  /// different kind of tool than one that copies files.
+  static void _reportLegacyInstallerTraces(Directory projectRoot) {
+    final legacyDir = Directory(p.join(projectRoot.path, 'tools', 'dw_claude_setup'));
+    if (!legacyDir.existsSync()) return;
+
+    stdout.writeln(
+      '\nLeftovers from the old shell installer are still in this project:\n'
+      '  tools/dw_claude_setup/\n'
+      'Nothing here needs it any more. To remove it:\n'
+      '  git rm -r --cached tools/dw_claude_setup\n'
+      '  rm -rf tools/dw_claude_setup\n'
+      'and drop any .gitignore comment pointing at that path.',
+    );
   }
 
   static void _removeManagedFiles(

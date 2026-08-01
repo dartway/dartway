@@ -57,7 +57,11 @@ class ProjectLayout {
     );
   }
 
-  Map<String, String> toolkitTokens({required String baseBranch}) => {
+  Map<String, String> toolkitTokens({
+    required String baseBranch,
+    String language = 'English',
+  }) => {
+    '__PROJECT_LANGUAGE__': language,
     '__SERVER_PKG__': serverPackage,
     '__FLUTTER_PKG__': flutterPackage,
     '__CLIENT_PKG__': clientPackage,

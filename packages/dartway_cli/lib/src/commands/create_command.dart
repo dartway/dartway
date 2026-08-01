@@ -31,6 +31,13 @@ class CreateCommand extends Command<int> {
             'Path to a local DartWay monorepo checkout '
             '(skips clone; also read from DARTWAY_MONOREPO_DIR).',
       )
+      ..addOption(
+        'language',
+        defaultsTo: 'English',
+        help:
+            "Language the new project writes its own texts in (feature specs, "
+            "doc comments, dartway_notes.md).",
+      )
       ..addFlag(
         'git',
         defaultsTo: true,
@@ -90,7 +97,10 @@ class CreateCommand extends Command<int> {
     await ToolkitInstaller.install(
       toolkitDir: Directory(p.join(monorepoDir.path, 'toolkit')),
       projectRoot: targetDir,
-      tokens: layout.toolkitTokens(baseBranch: 'master'),
+      tokens: layout.toolkitTokens(
+        baseBranch: 'master',
+        language: argResults!['language'] as String,
+      ),
     );
 
     if (argResults!['git'] as bool) {

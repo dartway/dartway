@@ -108,6 +108,19 @@ is verified through the public kit widget. A test of a private composition → a
 - **`dart run custom_lint` in the Flutter package is mandatory.** `flutter analyze` does NOT run its rules, and it is `dartway_lints` that catches the ban on raw `Color`/`TextStyle`/`BorderRadius` outside ui_kit and the other conventions. A green `flutter analyze` with a red `custom_lint` is a classic trap.
 - **`flutter test` was actually run, not "the tests probably weren't touched".** The analyzer proves that the code compiles and says nothing about behavior: an overflow in a narrow layout, an uninitialized `dw`, a layout that fell apart — all of that is only visible in a run. A test failing after a refactoring starts with the hypothesis "I broke it", and only after checking against HEAD becomes "the test was red before me".
 
+### A.6 Findings about the framework itself
+
+While auditing, some findings are not about this code at all: a rule that does not exist or is too
+vague to have prevented the mistake, two skills that disagree, an API that forced a workaround. Those
+belong in `dartway_notes.md` at the project root — the managed files cannot be fixed here, they are
+overwritten on update (see `CLAUDE.md`, "Notes back to the framework").
+
+- Anything you noticed of that kind and have not written down yet — write it down now, in the shape
+  the journal asks for: the example, why the rule missed it, the wording to add.
+- Then read the journal and **list the `open` entries** in the report, grouped by where they land
+  (harness / packages / tooling). It is a reminder, not a gate: the task is finished either way, but
+  the entries stop being invisible.
+
 ---
 
 ## Phase B — Suggestions (show, do not apply)
@@ -119,6 +132,8 @@ Produce a structured report in the chat:
 3. **🟢 Minor** — naming, magic numbers, small stuff.
 4. **📄 Docs** — which feature docs/`CLAUDE.md`/skills are outdated, **with a concrete proposed diff** for the fix.
 5. **🧪 Tests** — which non-trivial parts are uncovered.
+6. **📓 For the framework** — the `open` entries in `dartway_notes.md`, one line each: what it is and
+   where it lands. Nothing to apply here — this is what to carry into the DartWay monorepo.
 
 For every item give a **concrete proposed edit**, ready to apply. Mark anything debatable/architectural as "for the author to decide" — do not propose an automatic fix.
 

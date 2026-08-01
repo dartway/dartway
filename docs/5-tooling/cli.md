@@ -78,6 +78,16 @@ directory), then detects the package layout by directory suffix: `*_server`, `*_
 the command stops with a layout error rather than guessing. The detected names are substituted
 into the installed markdown, so the skills speak your package names, not placeholders.
 
+`--language` records what the project writes its own texts in — feature specs, doc comments, its
+journal — straight into the installed `CLAUDE.md`. It defaults to English and does not touch what
+ships to other people: package APIs and error strings stay English either way.
+
+Two things land outside `.claude/`. `dartway_notes.md` is created at the project root (and added to
+`.gitignore`) unless it is already there — the journal of what the *framework* got wrong, which the
+project cannot fix in place because the harness is overwritten on update. And leftovers of the old
+shell installer (`tools/dw_claude_setup/`) are reported with the commands to remove them, never
+removed: that folder is usually a gitlink, and taking it out means editing the git index.
+
 Only managed files are overwritten — see [The agent toolkit](agent-toolkit.md) for what that means
 and how to customize without losing your changes. Commit `.claude/` afterwards: it is a
 generated-but-committed artifact, like the Serverpod client.
