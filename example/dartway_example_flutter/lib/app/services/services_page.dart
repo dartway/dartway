@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/services/widgets/service_card.dart';
-import 'package:dartway_example_flutter/common/app_scaffold.dart';
+import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 

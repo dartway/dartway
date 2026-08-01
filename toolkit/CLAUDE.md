@@ -26,12 +26,14 @@ A project may add a fourth one, `*_shared` — pure Dart for code that has to be
    - a **feature** is a folder with **exactly one** `.dart` at its root. That file is its entire public surface;
    - the **internals** are only `widgets/` and `logic/`; nobody imports them from outside;
    - a **group** is a folder **without** root-level `.dart` files. It only groups features, encapsulates nothing, and has no `widgets/`/`logic/` of its own. Grouping **does not affect visibility**: the router is allowed to import `app/learning/lesson/lesson_page.dart`, because `lesson` is a feature and `learning` is a group;
-   - **what two features share is one more feature**, not a `shared/` folder. A card drawn both by the block on the home screen and by the list screen goes into its own folder with a single public file;
+   - **behaviour two features share is one more feature.** A card drawn both by the block on the home screen and by the list screen goes into its own folder with a single public file;
    - a feature has **exactly one public entity**. A second one appeared (a page plus an embeddable block, a three-screen flow) — that is a group of several features.
 
-   Many small folders are fine: atomicity matters more than a short tree. Checked by `dartway check` — it builds a "zone → group → feature" tree and grades every feature A–D.
+   **A zone holds features and nothing else. A widget with no story of its own is a building block, and blocks live in `lib/shared/`** (its inner layout is the project's business). The line is not how many places use it but whether there is anything to tell: a card with rules about what it shows and when is a feature even with one consumer; a form field, a badge row, a layout wrapper is a block — its description is a doc comment over the class, not a `DwFeatureSpec`. Blocks in a zone were the old shape, and the cost showed up as passports that only restate the class name. Don't create a `common/`, `shared/` or `widgets/` folder *inside* a zone: that is a block asking for the wrong home.
 
-   **Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; cross-feature domain logic — `lib/domain/`. If such a file sits in some feature's `logic/`, everyone else starts importing that feature's internals.
+   **Splitting into small features is the recommendation, not a tolerated evil** — and the reason is the passport. Every feature brings a `DwFeatureSpec`, so the finer the cut, the denser the description of the interface: one big feature is described in generalities, ten small ones each carry their own `behaviors`, `requirements` and `knownIssues`. That description is what error reports, Studio and the agent read, and merging features is how it gets lost. Checked by `dartway check` — it builds a "zone → group → feature" tree and grades every feature A–D.
+
+   **Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; cross-feature domain logic — `lib/domain/`; a building block — `lib/shared/`. If such a file sits in some feature's `logic/`, everyone else starts importing that feature's internals.
 4. **3 levels of escalating logic** (in order of "last resort"): Event models → CRUD configuration (`SaveConfig`/`GetConfig`/...) → a custom endpoint (only when there is no other way; document it as an exception).
 5. **Naming.** Classes — at least 2 words (`UserProfile`, not `User`). Variables are fully descriptive and match the type (`userProfile`, `userProfileId`). Fields relating to a user always carry the word Profile: `userProfileId`, `authorProfileId`, `updatedByProfileId`. Forbidden: `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
 6. **Done = audit + a description next to the code.** A feature is not finished until `dartway-finish` has been run: an audit of the diff against the cleanliness contract, and a reconciliation of the feature's description with the new behavior. **The description lives in the code, not in a separate doc:** a screen's behavior — in the `DwFeatureSpec` of the feature widget, the server-side agreements — in the doc comments above the CRUD config. We do not keep separate "a doc per feature" files: a description far from the code drifts from it on the very first edit, and it drifts silently — the code compiles while the doc lies. Verified on a production project: a feature's doc described an API that had not been in the code for a year, and the agent wrote non-working code from it.
@@ -80,6 +82,25 @@ For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/d
 
 **Finishing a task (Law 6):** when a feature/task is done, run `dartway-finish` before the commit/PR. It audits the diff against the contract, checks the feature's documentation for drift and the test coverage, and **shows suggestions and applies only what was confirmed**.
 
+## Migrations: a project that lives by an older version of a law
+
+A law is written for a clean start ("a zone holds only features"), and says nothing to a project that
+already grew under the previous wording. Two rules cover that gap:
+
+- **Legacy moves as you touch it, never as a sweep.** Refactored a feature — bring along what it drags
+  with it. Converting a whole folder at once is a separate task a human asks for: it is a large diff,
+  it breaks other people's branches, and nobody reviews it on the merits.
+- **A gap you left is said out loud.** Decided not to touch the legacy — say so in the report. What
+  must not happen is the agent quietly picking one of the two readings.
+
+Live migrations (delete an entry once no project is on the old shape):
+
+- **Blocks inside zones → `lib/shared/` (Law 3).** *You have the old shape if:* a zone contains a
+  `common/`, `shared/` or `widgets/` folder, or `dartway check` reports `featureSpecMissing` for
+  folders whose passport would only restate the class name. *Target:* only features in a zone,
+  building blocks in `lib/shared/`, a block described by a doc comment. *A passport with nothing in it
+  is deleted with the move, not reworded* — an empty spec means the thing was never a feature.
+
 ## Skills and commands
 
 - Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — loaded by relevance to the task.
@@ -108,15 +129,19 @@ The `lib/src/` structure: `app/` (session-aware workflows) · `crud/` (CRUD conf
 
 ## Flutter (`__FLUTTER_PKG__`)
 
-The `lib/` structure: `admin/` · `app/` (the main features) · `auth/` · `common/` · `core/` (router, dw_core) · `data/` (the data layer) · `domain/` (cross-feature extensions) · `ui_kit/`.
+The `lib/` structure: `admin/` · `app/` (the main features) · `auth/` · `common/` (features shared across zones) · `core/` (router, dw_core) · `data/` (the data layer) · `domain/` (cross-feature extensions) · `shared/` (building blocks — widgets with no story of their own) · `ui_kit/`. The zones are `admin`/`app`/`auth`/`common`; the rest are layers.
 
 - **Features:** a feature = an entry point (one public file) + `widgets/` + `logic/`. From outside, import **only the entry point**. Cross-feature logic goes to `lib/domain/`. The entry-point widget declares the feature spec (`implements DwFeature` with a `DwFeatureSpec`) right in its own file — the description lives next to the code, not in a separate registry; it is read by error reports, Studio and the agent. Skill — `dartway-feature-scaffold`.
 - **Data (the data layer):** access only through `dw.repo` — reads are providers under the native `ref.watch`/`read`/`refresh` (`dw.repo.model`/`maybeModel`/`modelList`), writes are `dw.repo.saveModel`/`deleteModel`. Lists — `dwBuildListAsync(loadingItemsCount:)`; narrowing by query — `backendFilter`, local filtering you do yourself with `.where` in the widget. The contract — `dartway-data-layer`, creating a feature — `dartway-feature-scaffold`.
-- **The UI Kit is the only source of styles:** in `app/`/`auth/`/`common/` direct `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme` are forbidden; the only import is `ui_kit.dart`. Skill — `dartway-ui-kit`.
+- **The UI Kit is the only source of styles:** in the zones and in `shared/`, direct `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme` are forbidden; the only import is `ui_kit.dart`. Skill — `dartway-ui-kit`.
 - **Navigation:** the DartWay Router — enum routes, enum parameters, transitions through context extensions (`context.goNamed`/`pushTo`/`replaceWith`, not `router.go()`), guards centralized. Skill — `dartway-navigation`.
 - **Specials:** notifications — `dw.notify.*` (not `SnackBar`); the profile — `ref.watchUserProfile`/`readUserProfile` (not `watchModel<UserProfile>`); actions from the UI — `dw.action`; sign-out — `signOut()`.
 
 ## Shared (the optional `*_shared`)
+
+Not to be confused with `lib/shared/` in the Flutter package: that one holds building blocks — widgets
+with no story of their own. This is a separate Dart **package**, for code that must behave identically
+on the server and in Flutter.
 
 **The skeleton does not include this package** — create it once code appears that has to behave **identically** on the backend and the frontend (format validation, shared enums, computations over fields without IO). Until such code exists there is nothing to duplicate and the package is not needed.
 

@@ -15,18 +15,30 @@ import 'dw_feature_tree.dart';
 const dwFileLongThreshold = 200;
 const dwFileTooLongThreshold = 350;
 
-/// Areas whose folders are expected to be shaped as features.
+/// Areas whose folders must be shaped as features — and are asked for a
+/// `DwFeatureSpec`.
 ///
-/// The checker looks at these areas **and nothing else**: `core/`, `data/` and
-/// `domain/` are skipped entirely, not merely exempted from the structure
-/// rules. That is worth knowing, because a raw `TextStyle` in `data/` is as
-/// wrong as one in `app/` and currently goes unseen — widening the scope is an
-/// open decision, not an oversight to fix in passing.
-bool _isStructuralArea(String name) =>
+/// `shared/` is deliberately absent: it holds building blocks, and a block has
+/// no product behaviour to describe. Asking it for a spec is what produced
+/// passports that only restate the class name, and a spec nobody believes is
+/// worse than none.
+bool _isFeatureArea(String name) =>
     name.startsWith('app') ||
     name.startsWith('auth') ||
     name.startsWith('common') ||
     name.startsWith('admin');
+
+/// Areas whose files are read for the cleanliness and UI-Kit rules.
+///
+/// A superset of [_isFeatureArea]: a raw `TextStyle` in a shared widget is as
+/// wrong as one in `app/`, and until these two lists were told apart, moving a
+/// widget out of a zone moved it out of every check at once.
+///
+/// Still not everything — `core/`, `data/` and `domain/` are skipped entirely.
+/// That is a known gap, and widening it is an open decision rather than an
+/// oversight to fix in passing.
+bool _isCheckedArea(String name) =>
+    _isFeatureArea(name) || name.startsWith('shared');
 
 /// A single finding, attributed to the feature that owns the file.
 class _Finding {
@@ -110,7 +122,7 @@ class DwFlutterInspector {
     for (final area in areas) {
       final nodes = buildAreaNodes(Directory(p.join(_libPath, area)));
       trees[area] = nodes;
-      if (_isStructuralArea(area)) {
+      if (_isFeatureArea(area)) {
         for (final node in nodes) {
           _checkStructure(node, scope);
         }
@@ -207,8 +219,7 @@ class DwFlutterInspector {
       final rel = _libRelative(file.path);
       if (rel.startsWith('ui_kit/')) continue;
       if (p.posix.split(rel).any(dwIgnoredFolders.contains)) continue;
-      // Same scope the checker has always had: the feature-shaped areas.
-      if (!_isStructuralArea(p.posix.split(rel).first)) continue;
+      if (!_isCheckedArea(p.posix.split(rel).first)) continue;
       if (scope != null && !rel.startsWith('$scope/') && rel != scope) continue;
       _validateFileContent(rel, await file.readAsString());
     }
@@ -385,6 +396,12 @@ class DwFlutterInspector {
       // Reaching into another feature's internals. Grouping folders do not
       // change visibility: what is forbidden is the `widgets/` and `logic/` of
       // a feature that is not the importer's own.
+      //
+      // Only inside a feature area, though: `widgets/`/`logic/` are a feature's
+      // shape, and `lib/shared/` holds no features. Its inner layout is the
+      // project's business, so `shared/widgets/…` is a public path, not the
+      // internals of anything.
+      if (!_isFeatureArea(p.posix.split(target).first)) continue;
       if (!isFeatureInternalPath(target)) continue;
       final targetOwner = ownerFeatureOf(target);
       if (targetOwner == null || targetOwner == owner) continue;

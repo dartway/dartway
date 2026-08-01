@@ -6,7 +6,7 @@ import 'package:dartway_starter_flutter/auth/widgets/verify_otp_block.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
-import '../common/app_scaffold.dart';
+import '../shared/widgets/app_scaffold.dart';
 import 'logic/auth_state.dart';
 import 'widgets/greeting_block.dart';
 

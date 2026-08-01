@@ -74,7 +74,9 @@ used to catch `context.textTheme` but not `Theme.of(context).textTheme.bodySmall
 ordinary Flutter and means exactly the same thing — a screen deciding how it looks.
 
 "More than one root file" is a structural claim, not a style one. A feature has exactly one public
-file; anything a sibling also needs belongs in a feature of its own, not in a `shared/` folder.
+file; behaviour a sibling also needs belongs in a feature of its own. A widget with no story of its
+own is not a feature at all — it is a building block, it lives in `lib/shared/`, and the checker
+never asks it for a spec.
 `featureSpecMissing` is checked only when the entry point is a widget — a feature whose entry
 point is an extension or a plain function has nothing to hang a spec on. The spec matters because
 error reports, Studio and the agent all read it: without one the feature exists in the code and
@@ -84,8 +86,13 @@ Filter with `--type <name>` or `--level error|warning|info`, or narrow the run t
 with `--dir lib/app/booking`. Note that `--dir` skips the `ui_kit/` pass — the kit is checked as a
 whole or not at all.
 
-Scope: the feature-shaped areas `app*`, `auth*`, `common*`, `admin*`, plus `ui_kit/`. `core/`,
-`data/` and `domain/` hold infrastructure with a shape of its own. Generated files (`.g.dart`,
+Scope, and it is two scopes rather than one. The **feature-shaped** areas — `app*`, `auth*`,
+`common*`, `admin*` — must be built out of features and are asked for a `DwFeatureSpec`. The
+**checked** areas add `shared*` and `ui_kit/`: their content is read for the cleanliness and UI-Kit
+rules, but no spec is expected, because a building block has no product behaviour to describe.
+Keeping the two apart is what makes `lib/shared/` safe to recommend — before, a widget moved out of
+a zone left every check behind, not just the passport one. `core/`, `data/` and `domain/` hold
+infrastructure with a shape of its own and are skipped entirely. Generated files (`.g.dart`,
 `.gen.dart`, `.freezed.dart`) and the folders `generated/`, `gen/`, `l10n/`, `zarchive/` are
 nobody's code and are skipped everywhere.
 

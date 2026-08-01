@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_starter_flutter/app/profile/profile_page/widgets/profile_settings_widget.dart';
-import 'package:dartway_starter_flutter/common/app_scaffold.dart';
+import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';

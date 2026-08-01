@@ -34,7 +34,9 @@ Two rules follow, and the checker enforces both:
 
 - **more than one root file is an error** (`invalidFeatureStructure`). A second public entity means
   the feature became a *group of features* — a screen plus an embeddable block, a card two screens
-  both draw. What two features share is one more feature, not a `shared/` folder;
+  both draw. Behaviour two features share is one more feature — but a widget with no story of its
+  own is not a feature at all: that is a building block, it belongs in `lib/shared/`, and the
+  checker asks it for no spec;
 - **importing another feature's `widgets/` or `logic/` is an error** (`forbiddenFeatureImport`). If
   a file in one feature's `logic/` is wanted by three others, it was never that feature's internal.
 

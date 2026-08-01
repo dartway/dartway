@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.3
+
+- **`dartway check` tells apart "must be a feature" from "is checked at all".** The two used to be one
+  list, so a widget outside a zone was exempt from the passport rule *and* from every cleanliness and
+  UI-Kit rule at once. `lib/shared/` — the home for building blocks under Law 3 — is now read for the
+  content rules but never asked for a `DwFeatureSpec`, which is what made moving blocks out of zones
+  safe to recommend. `widgets/`/`logic/` are treated as a feature's internals only inside a feature
+  area, so `shared/widgets/…` is importable rather than being flagged as reaching into somebody's
+  internals. `core/`, `data/` and `domain/` are still skipped entirely — a known gap, unchanged here.
+
 ## 0.1.2
 
 - **`dartway deploy` — the server without a folder of shell scripts.** Three verbs: `check` reports

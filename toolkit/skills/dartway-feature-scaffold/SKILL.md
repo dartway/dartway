@@ -54,7 +54,17 @@ app/community_events/                  // group
     logic/   event_format_label_extension.dart
 ```
 
-**What two features share is one more feature, not a `shared/` folder.** No new kind of entity is introduced: the card has exactly the same single public file as the screen. Many small folders are fine — atomicity matters more than a short tree.
+**Behaviour two features share is one more feature.** No new kind of entity is introduced: the card has exactly the same single public file as the screen.
+
+**A widget with no story of its own is a building block, and blocks live in `lib/shared/`** — never in a `common/`/`shared/`/`widgets/` folder inside a zone. The line is not how many places use it but whether there is anything to tell:
+
+| | Where | Described by |
+|---|---|---|
+| **Feature** — product behaviour you can name in a user's words (a screen, a dialog, a flow, a block on a screen) | a zone: `app/`, `admin/`, `auth/`, `common/` | `DwFeatureSpec` |
+| **Building block** — a widget/helper features draw with: a form field, a badge row, a layout wrapper | `lib/shared/` | a doc comment over the class |
+| **Layer** — presentation, infrastructure, data, domain | `ui_kit/`, `core/`, `data/`, `domain/` | — |
+
+**Split small: that is the recommendation, not a tolerated evil.** Every feature brings a passport, so the finer the cut, the denser the description of the interface — one big feature is described in generalities, ten small ones each carry their own `behaviors` and `knownIssues`. A single consumer is not a sign of an internal; the sign of an internal is that there is nothing to tell (a slice of layout extracted so `build` stops growing).
 
 **Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; cross-feature domain logic — `lib/domain/`. The sign that the placement is wrong: the file sits in one feature's `logic/` and is imported from other features — then all of them are reaching into its internals.
 

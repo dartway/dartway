@@ -601,6 +601,7 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** outer `padding`/`margin` inside a widget — the parent sets the padding (§1.7). When refactoring someone else's widget the outer padding moves to the caller instead of being "kept as it was".
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
 - [ ] **No** private widget classes (`_Foo`) in public feature files.
+- [ ] **A building block** — a widget with no product behaviour to describe — lives in `lib/shared/` with a doc comment, not in a zone with an empty `DwFeatureSpec`.
 - [ ] **The complex stuff** (non-trivial logic/behavior, money, "downgrade" rollbacks) is covered by a test; a bugfix — first a failing test on the cause, then the fix. We don't test cosmetics.
 - [ ] SOLID, KISS, DRY, YAGNI, Law of Demeter are respected.
 - [ ] Composition instead of deep inheritance; logic is not in the UI (SoC).

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/bookings/widgets/booking_card.dart';
-import 'package:dartway_example_flutter/common/app_scaffold.dart';
+import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
