@@ -55,6 +55,14 @@ enum DwCheckType {
   /// until it was deleted.
   barrelFile,
 
+  /// A file in a feature's `widgets/`/`logic/` that nothing in that feature
+  /// references — dead code, and the kind that hides best: nobody outside the
+  /// feature may import it, so the compiler is content and it survives every
+  /// refactor. Checkable at all only because Law 3 closes the search to one
+  /// folder; the analyzer cannot see it, since a public class is always
+  /// "possibly used from elsewhere".
+  unusedFeatureFile,
+
   /// `Expanded` or an infinite `SizedBox` as the root of `build` — the widget
   /// deciding how much room it gets. It works until someone puts it in a
   /// bottom sheet or a scroll view, and then it throws at runtime while the
@@ -66,6 +74,7 @@ enum DwCheckType {
     DwCheckType.uiKitContainsText ||
     DwCheckType.featureSpecMissing ||
     DwCheckType.forbiddenAssetPath ||
+    DwCheckType.unusedFeatureFile ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

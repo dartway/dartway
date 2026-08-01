@@ -2,6 +2,18 @@
 
 ## 0.1.3
 
+- **`unusedFeatureFile` (warning): dead code inside a feature.** A file in `widgets/`/`logic/` that
+  its own feature never mentions is unreachable — nobody outside may import it — and the analyzer
+  cannot say so, because to it a public class is always possibly used elsewhere. Law 3 is what makes
+  the check possible at all: the search is one folder deep, so the answer is complete rather than a
+  guess. On one real admin panel a single pass found a replaced save-button bar and a stale copy of a
+  moderation list, both compiling and both travelling through every refactor.
+
+  Two false positives cost the first version four hits out of six, and both are now tested: a type is
+  not how it is called (an extension answers to its member name, a notifier to its provider
+  variable), and dead code keeps dead code alive (a handler nobody calls still calls its own
+  settings file, so the sweep repeats until a pass buries nobody).
+
 - **`dartway check` tells apart "must be a feature" from "is checked at all".** The two used to be one
   list, so a widget outside a zone was exempt from the passport rule *and* from every cleanliness and
   UI-Kit rule at once. `lib/shared/` — the home for building blocks under Law 3 — is now read for the

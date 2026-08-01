@@ -61,6 +61,7 @@ commit over a 210-line file is a check people disable.
 | `invalidFeatureStructure` | error | A feature folder with more than one root file |
 | `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
 | `featureSpecMissing` | warning | A feature widget that declares no `DwFeatureSpec` |
+| `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `barrelFile` | error | A file that only re-exports |
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
 | `assetPathMissing` | error | An `assets/...` string that names no file |
@@ -81,6 +82,19 @@ never asks it for a spec.
 point is an extension or a plain function has nothing to hang a spec on. The spec matters because
 error reports, Studio and the agent all read it: without one the feature exists in the code and
 says nothing about itself.
+
+**`unusedFeatureFile`** (warning) is the one check the analyzer structurally cannot replace. A public
+class is always "possibly used from somewhere else" — unless the somewhere else is a finite place,
+which Law 3 makes it: nobody outside a feature may import its `widgets/`/`logic/`, so a file in there
+that its own feature never mentions is unreachable. It compiles, it survives refactors, and it is
+found in one folder-deep pass.
+
+Two things it does *not* get wrong, because both cost real false positives before they were fixed: a
+type is not how it is called (an extension is reached by member name, a notifier through its provider
+variable, so every public name a file declares counts), and dead code keeps dead code alive (a
+handler nobody calls still calls its own settings, so the sweep repeats until a pass buries nobody).
+What it cannot see: a reference made through a string, and a file whose own halves only reference
+each other.
 
 Filter with `--type <name>` or `--level error|warning|info`, or narrow the run to a single folder
 with `--dir lib/app/booking`. Note that `--dir` skips the `ui_kit/` pass — the kit is checked as a

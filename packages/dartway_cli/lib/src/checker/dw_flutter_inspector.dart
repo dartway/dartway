@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'dw_check_type.dart';
 import 'dw_feature_tree.dart';
+import 'dw_unused_feature_files.dart';
 
 /// Line-length model: nothing is said below 200 lines, >200 is a nudge
 /// (info) and >350 a warning.
@@ -126,6 +127,7 @@ class DwFlutterInspector {
         for (final node in nodes) {
           _checkStructure(node, scope);
         }
+        _checkUnusedFiles(nodes, scope);
       }
     }
 
@@ -204,6 +206,29 @@ class DwFlutterInspector {
         'read that spec)',
         rel,
       );
+    }
+  }
+
+  /// Dead code inside features: a file in `widgets/`/`logic/` that nothing in
+  /// its own feature mentions. Reported against the feature, because that is
+  /// where the decision to delete it gets made.
+  void _checkUnusedFiles(List<DwFeatureNode> nodes, String? scope) {
+    for (final feature in featuresIn(nodes)) {
+      final owner = _libRelative(feature.dir.path);
+      if (scope != null && owner != scope && !owner.startsWith('$scope/')) {
+        continue;
+      }
+
+      for (final unused in findUnusedFeatureFiles(feature)) {
+        _add(
+          DwCheckType.unusedFeatureFile,
+          '${_libRelative(unused.file.path)} is referenced by nothing in '
+          '$owner (${unused.declaredNames.join(', ')}) — nobody outside the '
+          'feature may import it, so this is dead code the compiler cannot '
+          'see',
+          owner,
+        );
+      }
     }
   }
 
