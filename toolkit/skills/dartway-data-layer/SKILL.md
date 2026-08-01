@@ -318,6 +318,8 @@ A channel can be narrowed to the audience you need and built from the context �
 DwChannelSubscriptionWidget(channel: 'chat:$chatId', child: messagesList)
 ```
 
+**Both halves or neither:** a channel the app names itself must also be declared on the server, in `DwCore.init(channelConfigurations: ...)` — see `dartway-crud-config`. An undeclared channel is refused, and a refusal is not retried: the screen simply never updates, and the reason arrives in the error handler rather than on screen.
+
 ### Which channel to listen to and where to send is the decision itself
 
 A channel is a **broadcast bus**: **everything** posted into it arrives at **every** subscriber. So **scope the channel to the audience that actually needs the update**. The question is always one: "who is entitled to see this change?" — and send to / subscribe exactly them.

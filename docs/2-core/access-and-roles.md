@@ -186,7 +186,14 @@ everywhere", a changed phone number. The framework cannot know about those event
 Deleting the row is enough for ordinary calls: `dwAuthenticationHandler` reads the key from the
 database on every request, so there is no signed token that outlives its revocation. It is not enough
 for a connection already open — a websocket resolves its authentication once, when it opens — which
-is why `revokeAuthKeys` also broadcasts Serverpod's revocation message and tears those down.
+is why `revokeAuthKeys` also broadcasts Serverpod's revocation message.
+
+Every realtime subscription that user holds ends on that message: the stream closes with a
+`DwChannelClosed(reason: authenticationRevoked)`, the client does not reconnect, and the local
+session ends — a banned user lands on the sign-in screen rather than watching a screen that quietly
+stopped updating. The framework listens for the broadcast itself rather than leaving it to Serverpod,
+which acts on it only for endpoints declaring `requireLogin` or scopes; the one CRUD endpoint serving
+public and private models alike can declare neither.
 
 Because forgetting the call costs a token that works forever, register the sweeper next to your other
 jobs; it deletes keys whose profile no longer exists:

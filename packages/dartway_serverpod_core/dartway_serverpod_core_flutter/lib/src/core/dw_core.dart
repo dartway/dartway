@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart'
     as dartway;
@@ -31,12 +33,11 @@ class DwCore<
 
   final int? Function(UserProfileClass? user) getUserId;
 
-  /// Optional outbound hook fired whenever the streaming connection status
-  /// changes. Default `null` (no-op) — apps may wire it to their own status UI
-  /// or telemetry. Connection-level retry errors are swallowed internally and
+  /// Optional outbound hook fired whenever the realtime status changes.
+  /// Default `null` (no-op) — apps may wire it to their own status UI or
+  /// telemetry. Connection-level retry errors are swallowed internally and
   /// never reach the global error handler.
-  final void Function(dartway.StreamingConnectionStatus status)?
-  onStreamingStatusChanged;
+  final void Function(DwSocketStatus status)? onSocketStatusChanged;
 
   DwCore({
     required super.config,
@@ -44,7 +45,7 @@ class DwCore<
     required this.dwAlerts,
     required this.getUserId,
     super.plugins,
-    this.onStreamingStatusChanged,
+    this.onSocketStatusChanged,
   }) {
     setDwInstance(this);
 
@@ -61,7 +62,15 @@ class DwCore<
       );
     }
     endpointCaller = dartwayCaller as dartway.Caller;
-    socketService = DwSocketService(onStatusChanged: onStreamingStatusChanged);
+    socketService = DwSocketService(
+      onStatusChanged: onSocketStatusChanged,
+      // The server ended this app's subscriptions because the account is no
+      // longer allowed to act. Nothing is retried and no key is deleted — the
+      // server already took it — the local session simply ends, so the user
+      // lands on the sign-in screen instead of watching realtime go quiet.
+      onAuthenticationRevoked: () =>
+          unawaited(sessionService?.invalidateSession() ?? Future.value()),
+    );
 
     final keyProvider = client.authKeyProvider;
 

@@ -273,10 +273,12 @@ class DwAuth<UserProfileClass extends TableRow> {
   /// tears those down, and it is why revoking is a framework method rather than
   /// a `deleteWhere` an app writes for itself.
   ///
-  /// Not covered: Serverpod only listens for revocation on method streams. The
-  /// legacy streaming endpoint ([DwRealTimeEndpoint]) does not, so a connection
-  /// held by it survives until it closes on its own — one more reason to finish
-  /// its migration.
+  /// Serverpod acts on that broadcast only for endpoints that declare
+  /// `requireLogin` or scopes, which the one CRUD endpoint serving public and
+  /// private models alike cannot. So the framework listens for the same message
+  /// in `openChannelStream`: every channel subscription this user holds ends
+  /// with a `DwChannelClosed`, and the client signs itself out rather than
+  /// reconnecting.
   Future<int> revokeAuthKeys(
     Session session, {
     required int userProfileId,

@@ -1,8 +1,6 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
-import '../endpoints/dw_real_time_endpoint.dart';
-
 extension DwSessionExtension on Session {
   /// The profile id the caller presented a token for, or `null` for a caller
   /// with no session.
@@ -71,7 +69,7 @@ extension DwSessionExtension on Session {
     List<TableRow?>? updatedModels,
     List<TableRow?>? deletedModels,
   }) => sendUpdates(
-    channels: [DwRealTimeEndpoint.userUpdatesChannel(userProfileId)],
+    channels: [DwCoreConst.userUpdatesChannel(userProfileId)],
     updatedModels: updatedModels,
     deletedModels: deletedModels,
   );

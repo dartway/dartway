@@ -10,7 +10,6 @@ import '../business/cloud_storage/dw_cloud_storage.dart';
 import '../crud/dw_auth_key_config.dart';
 import '../crud/dw_auth_request_config.dart';
 import '../domain/crud/domain/dw_crud_entity.dart';
-import '../endpoints/dw_real_time_endpoint.dart';
 import '../private/dw_singleton.dart';
 import '../utils/iterable_extension.dart';
 
@@ -161,7 +160,7 @@ class DwCore<UserProfileClass extends TableRow> {
       // edge of all: the name is a number away from every other user's, so it
       // was readable by anyone signed in, not just by its owner.
       const DwChannelConfig.owner(
-        prefix: DwRealTimeEndpoint.userUpdatesChannelPrefix,
+        prefix: DwCoreConst.userUpdatesChannelPrefix,
       ),
       const DwChannelConfig.public(prefix: DwCoreConst.publicUpdatesChannel),
       ...channelConfigurations,

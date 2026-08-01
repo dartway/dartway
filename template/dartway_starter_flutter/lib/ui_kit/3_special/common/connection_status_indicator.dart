@@ -1,6 +1,6 @@
 part of '../../ui_kit.dart';
 
-/// Live streaming-connection indicator built directly on the framework's public
+/// Live realtime-connection indicator built directly on the framework's public
 /// `DwSocketService.statusNotifier`. Reacts to reconnects without leaking
 /// connection errors into the app's error handler.
 class ConnectionStatusIndicator extends StatelessWidget {
@@ -11,7 +11,7 @@ class ConnectionStatusIndicator extends StatelessWidget {
     final socket = dw.socketService;
     if (socket == null) return const SizedBox.shrink();
 
-    return ValueListenableBuilder<StreamingConnectionStatus>(
+    return ValueListenableBuilder<DwSocketStatus>(
       valueListenable: socket.statusNotifier,
       builder: (context, status, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -27,17 +27,16 @@ class ConnectionStatusIndicator extends StatelessWidget {
     );
   }
 
-  Color _statusColor(StreamingConnectionStatus status) => switch (status) {
-    StreamingConnectionStatus.connected => Colors.green,
-    StreamingConnectionStatus.connecting => Colors.orange,
-    StreamingConnectionStatus.waitingToRetry => Colors.orange,
-    StreamingConnectionStatus.disconnected => Colors.red,
+  Color _statusColor(DwSocketStatus status) => switch (status) {
+    DwSocketStatus.connected => Colors.green,
+    DwSocketStatus.waitingToRetry => Colors.orange,
+    // Nothing is subscribed, so there is nothing to be offline about.
+    DwSocketStatus.idle => Colors.grey,
   };
 
-  String _statusLabel(StreamingConnectionStatus status) => switch (status) {
-    StreamingConnectionStatus.connected => 'online',
-    StreamingConnectionStatus.connecting => 'connecting',
-    StreamingConnectionStatus.waitingToRetry => 'reconnecting',
-    StreamingConnectionStatus.disconnected => 'offline',
+  String _statusLabel(DwSocketStatus status) => switch (status) {
+    DwSocketStatus.connected => 'online',
+    DwSocketStatus.waitingToRetry => 'reconnecting',
+    DwSocketStatus.idle => 'idle',
   };
 }

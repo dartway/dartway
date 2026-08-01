@@ -119,14 +119,6 @@ class EndpointDwCrud extends _i1.EndpointRef {
 }
 
 /// {@category Endpoint}
-class EndpointDwRealTime extends _i1.EndpointRef {
-  EndpointDwRealTime(_i1.EndpointCaller caller) : super(caller);
-
-  @override
-  String get name => 'dartway_serverpod_core.dwRealTime';
-}
-
-/// {@category Endpoint}
 class EndpointDwUpload extends _i1.EndpointRef {
   EndpointDwUpload(_i1.EndpointCaller caller) : super(caller);
 
@@ -151,20 +143,16 @@ class EndpointDwUpload extends _i1.EndpointRef {
 class Caller extends _i1.ModuleEndpointCaller {
   Caller(_i1.ServerpodClientShared client) : super(client) {
     dwCrud = EndpointDwCrud(this);
-    dwRealTime = EndpointDwRealTime(this);
     dwUpload = EndpointDwUpload(this);
   }
 
   late final EndpointDwCrud dwCrud;
-
-  late final EndpointDwRealTime dwRealTime;
 
   late final EndpointDwUpload dwUpload;
 
   @override
   Map<String, _i1.EndpointRef> get endpointRefLookup => {
     'dartway_serverpod_core.dwCrud': dwCrud,
-    'dartway_serverpod_core.dwRealTime': dwRealTime,
     'dartway_serverpod_core.dwUpload': dwUpload,
   };
 }

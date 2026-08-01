@@ -5,7 +5,6 @@ dwCrud:
   - getAll:
   - saveModel:
   - delete:
-dwRealTime:
 dwUpload:
   - getUploadDescription:
   - verifyUpload:

@@ -106,7 +106,7 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
       if (profile == null) {
         // The server answered, and the answer is "no such session". Trusting
         // the cache here is what used to keep a signed-out user signed in.
-        await _invalidateSession();
+        await invalidateSession();
         return;
       }
 
@@ -130,7 +130,12 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
   /// cached profile go, and every listener sees a signed-out user. Unlike
   /// [signOut] it makes no server call — there is no live session left to
   /// delete a key with.
-  Future<void> _invalidateSession() async {
+  ///
+  /// Called on startup when the stored key no longer identifies a user, and
+  /// when a live subscription is closed with
+  /// `DwChannelClosedReason.authenticationRevoked` — the server saying, mid
+  /// session, that this account is done.
+  Future<void> invalidateSession() async {
     await keyManager.remove();
     _setCurrentUser(null, null);
   }

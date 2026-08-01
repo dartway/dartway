@@ -118,7 +118,12 @@ Name a public channel in full, and give a parametrised one a separator you would
 
 ## Subscribing to a narrower channel
 
-The root subscription covers the public channel. A screen that watches a group channel adds its own:
+The root subscription covers the public channel, and the signed-in user's own channel needs no
+subscription at all: the framework follows `userUpdates<id>` for whoever is signed in, and drops it
+on sign-out. That is the other half of `sendUpdatesToUser` — one name, built from `DwCoreConst` on
+both sides, and handed by the server to nobody else.
+
+A screen that watches a group channel adds its own:
 
 ```dart
 DwChannelSubscriptionWidget(
@@ -131,9 +136,27 @@ The channel name is built the same way on both sides, and the server refuses it 
 above covers it. `DwCoreConst.publicUpdatesChannel` exists so the common case has one spelling both
 halves import rather than two string literals that drift.
 
+## Reconnects, and when a subscription ends for good
+
+A channel subscription is a stream, and a stream dies with the socket that carried it. What the app
+asked to follow outlives that: `DwSocketService` keeps the requests apart from the streams and opens
+every requested channel again, five seconds after a failure, for as long as it takes.
+
+`dw.socketService.statusNotifier` says where that stands — `DwSocketStatus.idle` when nothing is
+subscribed (there is no connection without a subscription: the socket opens with the first channel
+and closes with the last), `connected`, or `waitingToRetry`. It is not a heartbeat: a socket that
+dies silently reads as connected until the client's keep-alive notices, which takes up to 40 seconds.
+
+Two things end a subscription rather than pausing it, and neither is retried:
+
+- **The channel was refused** — no declaration covers it, or this user is not in its audience. Asking
+  again would get the same answer, so it is reported through the app's error handler instead. A
+  screen that never updates and an error naming the channel is the pair to look for.
+- **The authentication was revoked** — [`revokeAuthKeys`](access-and-roles.md#ending-a-session) ended
+  this account's sessions while it was listening. Every channel closes and the local session ends.
+
 ## What is not covered
 
 Broadcasting is delivery, not authorisation, and not persistence: a client that was offline when the
-message went out learns about the change when it next reads. Reconnects keep their subscriptions —
-`DwSocketService` reopens every requested channel on each connect — but messages sent while the socket
-was down are not replayed.
+message went out learns about the change when it next reads. Reconnects keep their subscriptions, but
+messages sent while the socket was down are not replayed.

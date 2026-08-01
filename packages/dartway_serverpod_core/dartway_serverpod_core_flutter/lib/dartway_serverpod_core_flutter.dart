@@ -7,6 +7,7 @@ export 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart
 export 'src/app/session/dw_session_extensions.dart';
 export 'src/app/session/dw_user_async_scope.dart';
 export 'src/app/session/service/dw_authentification_key_manager.dart';
+export 'src/app/socket/domain/dw_socket_status.dart';
 export 'src/app/socket/dw_channel_subscription_widget.dart';
 export 'src/app/socket/service/streaming_error_classifier.dart';
 export 'src/core/dw_core.dart';

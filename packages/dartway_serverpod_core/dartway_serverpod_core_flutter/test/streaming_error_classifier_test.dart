@@ -1,11 +1,46 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 import 'package:dartway_serverpod_core_flutter/src/app/socket/service/streaming_error_classifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('isStreamingConnectionError', () {
+    test('swallows every failure the method-stream client raises', () {
+      final connectionErrors = <Object>[
+        const WebSocketClosedException(),
+        const WebSocketConnectException('offline'),
+        const WebSocketListenException('dropped'),
+        const ConnectionClosedException(),
+        ConnectionAttemptTimedOutException(),
+        const MethodStreamIdleTimeoutException(),
+      ];
+
+      for (final error in connectionErrors) {
+        expect(
+          isStreamingConnectionError(error),
+          isTrue,
+          reason: 'should swallow: $error',
+        );
+      }
+    });
+
+    test('does not swallow a subscription the server closed', () {
+      // The one error on this path that is an answer rather than noise: it
+      // ends a session or names a broken channel declaration, and filtering it
+      // out here would hide both.
+      expect(
+        isStreamingConnectionError(
+          DwChannelClosed(
+            channel: 'userUpdates1',
+            reason: DwChannelClosedReason.authenticationRevoked,
+          ),
+        ),
+        isFalse,
+      );
+    });
+
     test('recognizes each connection-level pattern as noise', () {
       final connectionErrors = <Object>[
         Exception('Failed to connect WebSocket'),

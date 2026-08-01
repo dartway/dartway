@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
 /// Opens a stream of the messages posted to [channelName] on this server.
@@ -54,7 +55,10 @@ Stream<T> _yieldIfAllowed<T extends SerializableModel>(
     // `onCancel` below. Without it a refused subscription would leak exactly
     // what an accepted one does not.
     await source.listen(null).cancel();
-    throw Exception('notAllowed(channel: $channelName)');
+    throw DwChannelClosed(
+      channel: channelName,
+      reason: DwChannelClosedReason.notAllowed,
+    );
   }
 
   yield* source;
@@ -66,7 +70,27 @@ Stream<T> openChannelStream<T extends SerializableModel>(
 ) {
   late final StreamController<T> controller;
   late final WillCloseListener sessionCloseListener;
+  late final MessageCentralListenerCallback revocationListener;
   var detached = false;
+
+  // A websocket resolves its authentication once, when it opens, so a stream
+  // that outlives the token it was opened with would keep delivering to a
+  // banned or deleted account until the client itself went away. Ordinary
+  // requests need no such handling — `dwAuthenticationHandler` reads the key
+  // from the database every time.
+  //
+  // Serverpod ends its *own* method streams on revocation, but only for
+  // endpoints that declare `requireLogin` or scopes
+  // (`_RevokedAuthenticationHandler.createIfAuthenticationIsRequired`), and
+  // `DwCrudEndpoint` can declare neither: one endpoint serves the public
+  // catalogue and the private order list alike. So the framework listens for
+  // itself, and every channel stream is covered whatever the endpoint says.
+  final authentication = session.authenticated;
+  final revokedAuthenticationChannel = authentication == null
+      ? null
+      : MessageCentralServerpodChannels.revokedAuthentication(
+          authentication.userIdentifier,
+        );
 
   void channelListener(SerializableModel message) {
     // postMessage broadcasts over a snapshot of the listener set, so a listener
@@ -88,7 +112,47 @@ Stream<T> openChannelStream<T extends SerializableModel>(
 
     session.removeWillCloseListener(sessionCloseListener);
     session.messages.removeListener(channelName, channelListener);
+
+    if (revokedAuthenticationChannel != null) {
+      session.messages.removeListener(
+        revokedAuthenticationChannel,
+        revocationListener,
+      );
+    }
   }
+
+  /// Whether [message] revokes the authentication this stream was opened with.
+  ///
+  /// `RevokedAuthenticationScope` cannot: `dwAuthenticationHandler`
+  /// authenticates with an empty scope set, so a DartWay session holds no scope
+  /// to lose. Roles live in the app, and the app's own rule is re-read whenever
+  /// a channel is opened.
+  bool revokesThisStream(SerializableModel message) => switch (message) {
+    RevokedAuthenticationUser _ => true,
+    RevokedAuthenticationAuthId revoked =>
+      revoked.authId == authentication!.authId,
+    _ => false,
+  };
+
+  revocationListener = (message) {
+    if (!revokesThisStream(message)) return;
+
+    if (!controller.isClosed) {
+      // A serializable error rather than a bare one: it is the only way the
+      // client can tell "the server ended this on purpose" from "the network
+      // dropped", and it must not reconnect its way back in.
+      controller.addError(
+        DwChannelClosed(
+          channel: channelName,
+          reason: DwChannelClosedReason.authenticationRevoked,
+        ),
+      );
+    }
+
+    detachFromChannel();
+    // Not awaited, for the same reason as in the close listener below.
+    unawaited(controller.close());
+  };
 
   sessionCloseListener = (_) {
     detachFromChannel();
@@ -100,6 +164,12 @@ Stream<T> openChannelStream<T extends SerializableModel>(
   controller = StreamController<T>(onCancel: detachFromChannel);
 
   session.messages.addListener(channelName, channelListener);
+  if (revokedAuthenticationChannel != null) {
+    session.messages.addListener(
+      revokedAuthenticationChannel,
+      revocationListener,
+    );
+  }
   session.addWillCloseListener(sessionCloseListener);
 
   return controller.stream;

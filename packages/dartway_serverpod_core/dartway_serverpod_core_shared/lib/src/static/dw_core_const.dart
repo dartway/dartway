@@ -17,4 +17,18 @@ class DwCoreConst {
   /// what is left in stock, a published post. Anything narrower deserves a
   /// narrower channel.
   static const publicUpdatesChannel = 'dwPublicUpdates';
+
+  /// The prefix of the per-user channel behind [userUpdatesChannel].
+  ///
+  /// Declared once so the name and the `DwChannelConfig.owner` that guards it
+  /// cannot drift apart.
+  static const userUpdatesChannelPrefix = 'userUpdates';
+
+  /// The channel one user's own updates travel on — what `sendUpdatesToUser`
+  /// posts to, and what the app subscribes to for the signed-in user.
+  ///
+  /// Both halves build the name from here rather than from two string literals
+  /// that agree today. The server refuses it for anyone but the user it names.
+  static String userUpdatesChannel(int userProfileId) =>
+      '$userUpdatesChannelPrefix$userProfileId';
 }

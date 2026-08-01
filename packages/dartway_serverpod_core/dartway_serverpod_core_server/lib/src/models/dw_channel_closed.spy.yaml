@@ -1,0 +1,7 @@
+### The server ended a channel subscription on purpose. Travels to the client so
+### it can tell a refusal from a dropped connection: one must not be retried,
+### the other must.
+exception: DwChannelClosed
+fields:
+  channel: String
+  reason: DwChannelClosedReason

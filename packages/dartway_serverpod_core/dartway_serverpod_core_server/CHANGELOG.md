@@ -90,6 +90,47 @@ Also: `DwDeleteConfig.delete` now answers `notConfigured` before it touches the 
 probing by unauthenticated callers is closed by the gate above; a signed-in caller can still tell a
 missing row from one they may not delete, which is documented in the code as a remaining decision.
 
+**Realtime leaves Serverpod's deprecated streaming endpoint, and revoking a session now reaches the
+connections it already holds.**
+
+`DwRealTimeEndpoint` is deleted rather than ported. It ran on `streamOpened(StreamingSession)` — the
+lifecycle Serverpod deprecated — and subscribed each connection to the signed-in user's channel from
+the server side. That channel now travels on the method stream that already carried every other one,
+`dwCrud.subscribeOnUpdates`: the client asks for `userUpdates<id>` by name, and the `owner`
+declaration hands it to nobody else. Deleting the endpoint was only possible because the declarations
+landed first — before them, moving the personal channel onto a name the client sends would have
+opened it to everyone. `DwCoreConst.userUpdatesChannel(id)` is that name, and both halves build it
+from there.
+
+**Revocation is why this could not wait.** A websocket resolves its authentication once, when it
+opens, so `revokeAuthKeys` broadcasts Serverpod's revocation message to end what a deleted key alone
+cannot. Serverpod acts on that message only for endpoints declaring `requireLogin` or scopes, and the
+one CRUD endpoint serving the public catalogue and the private order list alike can declare neither —
+so migrating the endpoint would not, on its own, have closed anything. The framework now listens for
+the message itself, in every channel stream: the subscription ends with a `DwChannelClosed`, the
+client does not reconnect, and the local session ends. A banned user reaches the sign-in screen
+instead of a screen that quietly stopped updating.
+
+`DwChannelClosed(channel:, reason:)` is a serializable exception on purpose. Anything else arrives at
+the client as an ordinary dropped connection, which it would reconnect its way out of — `notAllowed`
+would become a hot retry loop against a channel nobody may listen to, and `authenticationRevoked`
+would be indistinguishable from a lift blocking the signal.
+
+**`DwSocketStatus` replaces `StreamingConnectionStatus` on `dw.socketService.statusNotifier`, and
+`onStreamingStatusChanged` is now `onSocketStatusChanged`.** Under method streams there is no
+connection apart from the subscriptions: Serverpod's client opens the socket with the first stream
+and closes it with the last. So the states are the three that can be observed — `idle` (nothing
+subscribed, and therefore nothing to be offline about), `connected`, `waitingToRetry` — rather than
+four describing a connection that no longer exists. Reconnection moved with it: nothing in Serverpod
+retries a method stream, so `DwSocketService` reopens every requested channel five seconds after a
+failure, for as long as it takes.
+
+**Breaking, and it will not compile:** `dw.socketService.statusNotifier` changes type, and the
+`DwCore` hook is renamed. An indicator built on the old enum is a four-arm switch that becomes a
+three-arm one — `disconnected` and `connecting` have no successor, because neither was ever
+distinguishable from `waitingToRetry` in practice. `DwSessionService.invalidateSession` is public now,
+for the same story: something other than startup can decide a session is over.
+
 ## 0.2.3
 
 Lockstep release: no changes of its own.

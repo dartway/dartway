@@ -1,0 +1,11 @@
+### Why the server ended a channel subscription. Serialized by name so a reason
+### added later cannot renumber the ones already on the wire.
+enum: DwChannelClosedReason
+serialized: byName
+values:
+  ### No declaration covers the channel, or the caller is not in its audience.
+  ### Asking again with the same session will be refused again.
+  - notAllowed
+  ### The caller's authentication was revoked while it was listening — the
+  ### account was deleted, banned or signed out everywhere.
+  - authenticationRevoked

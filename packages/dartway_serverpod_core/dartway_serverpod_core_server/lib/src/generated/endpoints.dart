@@ -12,14 +12,16 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
 import '../endpoints/dw_crud_endpoint.dart' as _i2;
-import '../endpoints/dw_real_time_endpoint.dart' as _i3;
-import '../endpoints/dw_upload_endpoint.dart' as _i4;
+import '../endpoints/dw_upload_endpoint.dart' as _i3;
 import 'package:dartway_serverpod_core_server/src/domain/api/dw_backend_filter.dart'
-    as _i5;
+    as _i4;
 import 'package:dartway_serverpod_core_server/src/domain/api/dw_order_by.dart'
-    as _i6;
+    as _i5;
 import 'package:dartway_serverpod_core_server/src/domain/api/dw_model_wrapper.dart'
+    as _i6;
+import 'package:dartway_serverpod_core_server/src/generated/future_calls.dart'
     as _i7;
+export 'future_calls.dart' show ServerpodFutureCallsGetter;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -31,13 +33,7 @@ class Endpoints extends _i1.EndpointDispatch {
           'dwCrud',
           'dartway_serverpod_core',
         ),
-      'dwRealTime': _i3.DwRealTimeEndpoint()
-        ..initialize(
-          server,
-          'dwRealTime',
-          'dartway_serverpod_core',
-        ),
-      'dwUpload': _i4.DwUploadEndpoint()
+      'dwUpload': _i3.DwUploadEndpoint()
         ..initialize(
           server,
           'dwUpload',
@@ -58,7 +54,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'filter': _i1.ParameterDescription(
               name: 'filter',
-              type: _i1.getType<_i5.DwBackendFilter>(),
+              type: _i1.getType<_i4.DwBackendFilter>(),
               nullable: false,
             ),
             'apiGroup': _i1.ParameterDescription(
@@ -88,7 +84,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'filter': _i1.ParameterDescription(
               name: 'filter',
-              type: _i1.getType<_i5.DwBackendFilter?>(),
+              type: _i1.getType<_i4.DwBackendFilter?>(),
               nullable: true,
             ),
             'apiGroup': _i1.ParameterDescription(
@@ -118,12 +114,12 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'filter': _i1.ParameterDescription(
               name: 'filter',
-              type: _i1.getType<_i5.DwBackendFilter?>(),
+              type: _i1.getType<_i4.DwBackendFilter?>(),
               nullable: true,
             ),
             'orderByList': _i1.ParameterDescription(
               name: 'orderByList',
-              type: _i1.getType<List<_i6.DwOrderBy>?>(),
+              type: _i1.getType<List<_i5.DwOrderBy>?>(),
               nullable: true,
             ),
             'limit': _i1.ParameterDescription(
@@ -161,7 +157,7 @@ class Endpoints extends _i1.EndpointDispatch {
           params: {
             'wrappedModel': _i1.ParameterDescription(
               name: 'wrappedModel',
-              type: _i1.getType<_i7.DwModelWrapper>(),
+              type: _i1.getType<_i6.DwModelWrapper>(),
               nullable: false,
             ),
             'apiGroup': _i1.ParameterDescription(
@@ -234,11 +230,6 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
       },
     );
-    connectors['dwRealTime'] = _i1.EndpointConnector(
-      name: 'dwRealTime',
-      endpoint: endpoints['dwRealTime']!,
-      methodConnectors: {},
-    );
     connectors['dwUpload'] = _i1.EndpointConnector(
       name: 'dwUpload',
       endpoint: endpoints['dwUpload']!,
@@ -256,7 +247,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['dwUpload'] as _i4.DwUploadEndpoint)
+              ) async => (endpoints['dwUpload'] as _i3.DwUploadEndpoint)
                   .getUploadDescription(
                     session,
                     path: params['path'],
@@ -276,12 +267,17 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['dwUpload'] as _i4.DwUploadEndpoint).verifyUpload(
+                  (endpoints['dwUpload'] as _i3.DwUploadEndpoint).verifyUpload(
                     session,
                     path: params['path'],
                   ),
         ),
       },
     );
+  }
+
+  @override
+  _i1.FutureCallDispatch? get futureCalls {
+    return _i7.FutureCalls();
   }
 }

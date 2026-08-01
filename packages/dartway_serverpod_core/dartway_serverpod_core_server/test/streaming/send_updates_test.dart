@@ -1,8 +1,4 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
-// Not exported: the channel name is an implementation detail of the endpoint,
-// and the test asserts on the same string the framework builds.
-// ignore: implementation_imports
-import 'package:dartway_serverpod_core_server/src/endpoints/dw_real_time_endpoint.dart';
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
@@ -77,8 +73,8 @@ void main() {
   });
 
   test('sendUpdatesToUser reaches that user and no one else', () async {
-    final mine = listenOn(DwRealTimeEndpoint.userUpdatesChannel(42));
-    final theirs = listenOn(DwRealTimeEndpoint.userUpdatesChannel(43));
+    final mine = listenOn(DwCoreConst.userUpdatesChannel(42));
+    final theirs = listenOn(DwCoreConst.userUpdatesChannel(43));
 
     session.sendUpdatesToUser(42);
     await pumpEventQueue();

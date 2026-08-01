@@ -47,7 +47,7 @@ void initExampleDwCore({required String backendUrl}) {
     // `DwAlerts.init(logErrors: true, logFunction: debugPrint)`.
     dwAlerts: dwAlerts,
     getUserId: (userProfile) => userProfile?.id,
-    onStreamingStatusChanged: (status) =>
-        debugPrint('[example] streaming status → $status'),
+    onSocketStatusChanged: (status) =>
+        debugPrint('[app] realtime status → $status'),
   );
 }

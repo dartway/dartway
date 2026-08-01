@@ -72,10 +72,18 @@ class RecordingSessionMessages implements MessageCentralAccess {
 /// A session carrying the part of the lifecycle streaming teardown depends on:
 /// the will-close listeners and [close], copied from `Session.close()`.
 class FakeStreamingSession implements Session {
-  FakeStreamingSession(this.sessionLabel, MessageCentral messageCentral)
-    : _messageCentral = messageCentral {
+  FakeStreamingSession(
+    this.sessionLabel,
+    MessageCentral messageCentral, {
+    this.authenticated,
+  }) : _messageCentral = messageCentral {
     channelMessages = RecordingSessionMessages(messageCentral, this);
   }
+
+  /// A session opened with a valid key, as every websocket that carries a
+  /// signed-in user's channels is. `null` is an anonymous caller.
+  @override
+  final AuthenticationInfo? authenticated;
 
   final String sessionLabel;
   final MessageCentral _messageCentral;

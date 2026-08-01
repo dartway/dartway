@@ -1,101 +1,120 @@
-// ignore_for_file: deprecated_member_use
-
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 import 'package:dartway_serverpod_core_flutter/src/private/dw_singleton.dart';
+import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../repository/dw_repository.dart';
+import '../domain/dw_socket_status.dart';
 import 'dw_channel_subscriptions.dart';
-import 'streaming_error_classifier.dart';
 
-// TODO(serverpod-legacy-streams): This service still relies on Serverpod's
-// deprecated StreamingConnectionHandler / streaming endpoint API. Keep it for
-// compatibility during the current upgrade, then replace it with streaming
-// methods.
+/// The app's half of realtime: which channels it follows, and what arrives on
+/// them.
+///
+/// Everything travels on method streams — one per channel, opened through
+/// `dwCrud.subscribeOnUpdates` and refused by the server unless a
+/// `DwChannelConfig` covers it. There is no connection to manage besides them:
+/// Serverpod's client opens the socket with the first stream and closes it with
+/// the last, so subscribing *is* connecting.
 class DwSocketService {
-  DwSocketService({this.onStatusChanged});
+  DwSocketService({this.onStatusChanged, this.onAuthenticationRevoked});
 
-  // final ServerpodClientShared client;
-  // final dynamic endpointCaller;
+  /// Optional outbound hook fired on every status change. Default is `null`
+  /// (no-op) — the framework raises no alerts on its own.
+  final void Function(DwSocketStatus status)? onStatusChanged;
 
-  /// Optional outbound hook fired on every streaming status change. Default is
-  /// `null` (no-op) — the framework raises no alerts on its own.
-  final void Function(StreamingConnectionStatus status)? onStatusChanged;
-
-  StreamingConnectionHandler? _connectionHandler;
-  StreamSubscription<SerializableModel>? _mainStreamSub;
+  /// Called when the server ended this app's subscriptions because its
+  /// authentication was revoked — the account was deleted, banned or signed out
+  /// everywhere. Wired by `DwCore` to end the local session.
+  final void Function()? onAuthenticationRevoked;
 
   late final _channelSubscriptions = DwChannelSubscriptions(
     openChannelStream: (channel) =>
         dw.endpointCaller.dwCrud.subscribeOnUpdates(channel: channel),
     onUpdate: _processUpdate,
+    onStatusChanged: _handleStatusChanged,
+    onChannelClosedByServer: _handleChannelClosedByServer,
   );
 
-  final ValueNotifier<StreamingConnectionStatus> statusNotifier = ValueNotifier(
-    StreamingConnectionStatus.disconnected,
+  final ValueNotifier<DwSocketStatus> statusNotifier = ValueNotifier(
+    DwSocketStatus.idle,
   );
 
   void init() {
-    // Run the handler (and its retry timer) inside a child zone so retry errors
-    // inherit this zone instead of the app's root zone from DwAppRunner.
-    runZonedGuarded(() {
-      // Reconnect delay is left at Serverpod's own default of 5 seconds. The
-      // handler retries on a fixed interval with no backoff, so a shorter one
-      // turns an unstable network into a reconnect storm: every attempt opens a
-      // fresh server-side session, with its own log buffer and websocket.
-      _connectionHandler = StreamingConnectionHandler(
-        client: dw.client,
-        listener: (_) => _refresh(),
-      );
-
-      _connectionHandler!.connect();
-    }, _onConnectionZoneError);
-  }
-
-  void _onConnectionZoneError(Object error, StackTrace stack) {
-    if (isStreamingConnectionError(error)) {
-      debugPrint(
-        '[DwSocketService] swallowed streaming connection error: $error',
-      );
-      return; // connection-level noise → swallow, never surface it
-    }
-    // Real error → forward to the parent (app) zone so genuine bugs are not hidden.
-    Zone.current.handleUncaughtError(error, stack);
+    _channelSubscriptions.start();
   }
 
   Future<void> dispose() async {
-    await _mainStreamSub?.cancel();
-    _mainStreamSub = null;
-    await unsubscribeAllChannels();
-    _connectionHandler?.client.closeStreamingConnection();
-    _connectionHandler = null;
+    await _channelSubscriptions.dispose();
   }
 
+  /// Follows the signed-in user's own channel, and drops the previous user's.
+  ///
+  /// The framework subscribes to it rather than leaving it to the app: it is
+  /// where `session.sendUpdatesToUser` delivers, so an app that forgot the
+  /// subscription would lose every private update with nothing to show for it.
+  /// The name is built from [DwCoreConst] on both sides, and the server hands
+  /// it to no one but its owner.
   void onUserChanged(int? previousUserId, int? nextUserId) {
-    if (previousUserId != nextUserId) {
-      _connectionHandler?.client.closeStreamingConnection();
-      unsubscribeAllChannels();
-    }
+    if (previousUserId == nextUserId) return;
+
+    unawaited(_followUser(previousUserId, nextUserId));
   }
 
-  void _refresh() {
-    final status =
-        _connectionHandler?.status.status ??
-        StreamingConnectionStatus.disconnected;
-
-    if (status == StreamingConnectionStatus.connected) {
-      _startMainStream();
-      // Channel streams do not survive the connection they were opened on, so
-      // every reconnect reopens the ones the app still follows.
-      _channelSubscriptions.handleConnected();
-    } else {
-      _channelSubscriptions.handleDisconnected();
+  Future<void> _followUser(int? previousUserId, int? nextUserId) async {
+    if (previousUserId != null) {
+      await unsubscribeFromChannel(
+        DwCoreConst.userUpdatesChannel(previousUserId),
+      );
     }
 
+    if (nextUserId != null) {
+      await subscribeToChannel(DwCoreConst.userUpdatesChannel(nextUserId));
+    }
+
+    // The app's own channels are kept, and reopened rather than left running: a
+    // stream carries the authentication it was opened with, so one that
+    // survives the switch would go on delivering the previous user's channel
+    // into the next user's app. Reopening asks the server again, with the new
+    // session — and a channel the new user may not follow is refused there
+    // rather than assumed here.
+    await _channelSubscriptions.reopenAll();
+  }
+
+  void _handleStatusChanged(DwSocketStatus status) {
     statusNotifier.value = status;
     onStatusChanged?.call(status);
+  }
+
+  void _handleChannelClosedByServer(
+    String channel,
+    DwChannelClosedReason reason,
+  ) {
+    switch (reason) {
+      case DwChannelClosedReason.authenticationRevoked:
+        debugPrint(
+          '[DwSocketService] authentication revoked; ending the session',
+        );
+        // Every other channel is about to be refused for the same reason, and
+        // the stored key is already gone from the server.
+        unawaited(unsubscribeAllChannels());
+        onAuthenticationRevoked?.call();
+
+      case DwChannelClosedReason.notAllowed:
+        // Not noise, and not retried: either the channel is undeclared or this
+        // user is not in its audience. Both are bugs in the app's channel
+        // declarations, and both are silent until someone asks why a screen
+        // stopped updating.
+        dw.handleError(
+          Exception(
+            'Subscription to "$channel" was refused. Declare it in '
+            'DwCore.init(channelConfigurations: ...) and check that its rule '
+            'admits this user.',
+          ),
+          StackTrace.current,
+        );
+    }
   }
 
   void _processUpdatedModels(List<DwModelWrapper> updatedModels) {
@@ -112,14 +131,6 @@ class DwSocketService {
     } else if (update is DwUpdatesTransport) {
       _processUpdatedModels(update.wrappedModelUpdates);
     }
-  }
-
-  Future<void> _startMainStream() async {
-    await _mainStreamSub?.cancel();
-
-    dw.endpointCaller.dwRealTime.resetStream();
-
-    _mainStreamSub = dw.endpointCaller.dwRealTime.stream.listen(_processUpdate);
   }
 
   /// Follows [channel] until told otherwise. Asking while the connection is
