@@ -103,6 +103,21 @@ git worktree add ../dartway-wt/<slug> -b feat/<slug> master
 
 **Гигиена.** Ветка удаляется автоматически при мерже PR (`deleteBranchOnMerge`). Локально: `fetch.prune=true` (мёртвые remote-ссылки не копятся), `pull.rebase=true`, `rerere.enabled=true`. В этом репозитории `user.email` задан локально — рабочий адрес, потому что репозиторий публичный.
 
+### CI
+
+Два workflow в `.github/workflows/`:
+
+| Файл | Когда | Что делает |
+|---|---|---|
+| `claude-review.yml` | PR открыт / обновлён / выведен из draft | Автоматическое ревью диффа. Помимо обычных багов проверяет три вещи, специфичные для репозитория: закон синхронизации, наличие ручного патча `manualDeserialization` в сгенерированном `protocol.dart`, отсутствие проектных литералов в `toolkit/` |
+| `telegram-notify.yml` | Ревью завершилось / PR не от мейнтейнера / пуш в `stable` | Уведомления в Telegram. PR, открытый мейнтейнером, намеренно молчит — уведомление о собственном действии это шум |
+
+Ревью не запускается на PR из форков: секреты репозитория им недоступны, и шаг всё равно упал бы на авторизации. Внешние PR приходят уведомлением, ревью по ним запускается вручную после того, как ветка перенесена в репозиторий.
+
+Секреты (Settings → Secrets and variables → Actions): `CLAUDE_CODE_OAUTH_TOKEN` (выдаётся командой `claude setup-token`), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Без первого не работает ревью, без второй пары — уведомления; остальной CI при этом не ломается.
+
+`workflow_run` читается только с дефолтной ветки — правка `telegram-notify.yml` начинает действовать после мержа в `master`, а не в PR, где она сделана.
+
 ## Ловушка: `serverpod generate` в ядре стирает ручной патч протокола
 
 **Это для Claude — Евгений генерацию не запускает.** Прогнал `serverpod generate` в `packages/dartway_serverpod_core/dartway_serverpod_core_server` — обязан проверить и восстановить патч в сгенерированном `dartway_serverpod_core_client/lib/src/protocol/protocol.dart`.

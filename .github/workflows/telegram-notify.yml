@@ -1,0 +1,138 @@
+name: Telegram Notifications
+
+# Three signals, each earning its place:
+#   - a finished automated review, because the verdict asks for a decision;
+#   - a pull request opened by someone other than the maintainer, because it
+#     arrives from outside and is not otherwise visible;
+#   - a push to `stable`, because that is the only real release — the CLI's
+#     default channel and external projects' git dependencies follow it.
+#
+# A pull request the maintainer opens is deliberately silent: an alert about
+# your own action is noise, and a noisy channel stops being read.
+
+on:
+  workflow_run:
+    workflows: ["Claude PR Review"]
+    types: [completed]
+  pull_request:
+    types: [opened, ready_for_review]
+  push:
+    branches: [stable]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  review-finished:
+    if: ${{ github.event_name == 'workflow_run' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send the review verdict
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+
+          pr=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            echo "No pull request for $HEAD_SHA — nothing to report."
+            exit 0
+          fi
+
+          title=$(gh pr view "$pr" --repo "$REPO" --json title --jq .title)
+          url=$(gh pr view "$pr" --repo "$REPO" --json url --jq .url)
+
+          if [ "$RUN_CONCLUSION" != "success" ]; then
+            text="Review did not finish — PR #$pr: $title
+          Conclusion: $RUN_CONCLUSION
+          $RUN_URL"
+          else
+            # The review publishes its summary as the last bot comment on the PR.
+            summary=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
+              --jq '[.[] | select(.user.type == "Bot")] | last | .body // empty' \
+              | head -c 2000)
+            [ -n "$summary" ] || summary="(the review left no summary comment)"
+            text="Review finished — PR #$pr: $title
+
+          $summary
+
+          $url"
+          fi
+
+          curl -sS --fail-with-body -X POST \
+            "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$text" \
+            --data-urlencode "disable_web_page_preview=true" > /dev/null
+
+  outside-pull-request:
+    # Anyone but the maintainer. Change the login here if that ever changes.
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login != 'Disregard-Therest' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Announce the pull request
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          text="Pull request from $AUTHOR — #$NUMBER: $TITLE
+          $URL"
+          curl -sS --fail-with-body -X POST \
+            "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$text" \
+            --data-urlencode "disable_web_page_preview=true" > /dev/null
+
+  stable-promoted:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Announce the promotion
+        env:
+          REPO: ${{ github.repository }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+
+          # `before` is all-zeroes when the branch is created, and the old commit
+          # may be unreachable after a history rewrite — fall back to the tip.
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            log=$(git log -10 --format='- %s' "$AFTER")
+            count="most recent 10"
+          else
+            log=$(git log --format='- %s' "$BEFORE..$AFTER")
+            count=$(git rev-list --count "$BEFORE..$AFTER")
+          fi
+
+          text="stable promoted — $count commits
+
+          $(printf '%s' "$log" | head -c 2500)
+
+          https://github.com/$REPO/compare/$BEFORE...$AFTER"
+
+          curl -sS --fail-with-body -X POST \
+            "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$text" \
+            --data-urlencode "disable_web_page_preview=true" > /dev/null
