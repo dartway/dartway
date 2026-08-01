@@ -60,6 +60,11 @@ void initDartwayCore({
       appSettingCrudConfig,
     ],
     dtoConfigurations: [],
+    // Empty on purpose, and not because channels are unused: the only one this
+    // app listens to is `DwCoreConst.publicUpdatesChannel`, which the framework
+    // declares itself. An app channel of its own — per chat, per team, per
+    // order — is declared here, or the server refuses the subscription.
+    channelConfigurations: [],
     userProfileConstructor: _buildUserProfile,
     dwAlerts: DwAlerts.init(),
     // Uploads are optional: configured when this run mode carries the

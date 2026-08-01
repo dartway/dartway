@@ -55,3 +55,29 @@ By default the first run happens one `interval` after startup. Override
 @override
 Duration get initialDelay => Duration.zero;
 ```
+
+## The one job the framework ships
+
+`DwOrphanedAuthKeyCleanup` deletes auth keys whose user profile is gone. Register it with
+your own:
+
+```dart
+await DwRecurringJobs.startAll(pod, [
+  DwOrphanedAuthKeyCleanup(),          // hourly by default; pass `interval:` to change it
+  SessionClosureFutureCall(),
+]);
+```
+
+It exists because an auth key has no expiry and `DwAuthKey.userId` cannot carry a foreign key —
+the user profile table belongs to the app, so nothing cascades from it. An account deleted without
+`dw.auth!.revokeAuthKeys` therefore leaves a token that works forever.
+
+Which makes this the honest home for an aliveness check. Until 0.3.0 one ran by accident on the
+hot path: reading the caller's id fetched the whole profile row, so a deleted profile read back as
+"not signed in" — correct, and paid for with a database round trip on **every request**. Here the
+same fact costs one statement per interval, and the price is a window: up to `interval` during
+which a forgotten revocation still authenticates. Shorten it if that trade reads wrong for your
+app.
+
+The job only sees hard deletion. A ban or a soft delete leaves the row in place, and that session
+ends only when you call `revokeAuthKeys` yourself.

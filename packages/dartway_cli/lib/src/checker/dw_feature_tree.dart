@@ -89,11 +89,12 @@ List<DwFeatureNode> buildAreaNodes(Directory areaDir) {
 DwFeatureNode buildNode(Directory dir) {
   final entries = dir.listSync();
 
-  final rootFiles = entries
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.dart') && !_isGeneratedDart(f.path))
-      .toList()
-    ..sort((a, b) => a.path.compareTo(b.path));
+  final rootFiles =
+      entries
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart') && !_isGeneratedDart(f.path))
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
 
   final subDirs = entries
       .whereType<Directory>()
@@ -109,7 +110,9 @@ DwFeatureNode buildNode(Directory dir) {
         sub
             .listSync(recursive: true)
             .whereType<File>()
-            .where((f) => f.path.endsWith('.dart') && !_isGeneratedDart(f.path)),
+            .where(
+              (f) => f.path.endsWith('.dart') && !_isGeneratedDart(f.path),
+            ),
       );
     } else {
       children.add(buildNode(sub));

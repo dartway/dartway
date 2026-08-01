@@ -128,7 +128,7 @@ final noteCrudConfig = DwCrudConfig<Note>(
     // Who may write at all. The relation is declared nullable above, so the
     // generated `authorProfileId` is `int?` — an unowned note matches nobody.
     allowSave: (session, ctx) async =>
-        await session.isUser(ctx.currentModel.authorProfileId ?? -1),
+        session.isUser(ctx.currentModel.authorProfileId ?? -1),
 
     // The business rule. Returning a string rejects the write, and the string
     // reaches the user — the rule lives here and the client cannot forget it.

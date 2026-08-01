@@ -28,7 +28,17 @@ class DwCrudEndpoint extends Endpoint {
     required String channel,
   }) {
     session.log('subscribeOnUpdates for $channel', level: LogLevel.debug);
-    return openChannelStream<SerializableModel>(session, channel);
+
+    // The channel arrives as a bare string chosen by the client, so this guard
+    // is the only thing standing between a guessed name and someone else's
+    // updates. See [DwChannelConfig] for why authentication alone would not
+    // have done it: every channel name in practice is a number away from
+    // another user's.
+    return guardedChannelStream<SerializableModel>(
+      session,
+      channel,
+      canListen: dw.canListenTo,
+    );
   }
 
   /// Rejects an unauthenticated caller unless the resolved config opted in.
@@ -39,7 +49,7 @@ class DwCrudEndpoint extends Endpoint {
   /// share it. Checked before the config runs, so an unauthenticated caller
   /// never reaches the database.
   Future<bool> _isCallerAllowed(Session session, bool allowAnonymous) async =>
-      allowAnonymous || await session.currentUserProfileId != null;
+      allowAnonymous || session.signedInUserProfileId != null;
 
   Future<DwApiResponse<DwModelWrapper>> getOne(
     Session session, {
@@ -199,64 +209,6 @@ class DwCrudEndpoint extends Endpoint {
     } catch (ex, st) {
       return returnError(
         'Unexpected error during saveModel ${wrappedModel.dwMappingClassname}',
-        exception: ex,
-        stackTrace: st,
-      );
-    }
-  }
-
-  Stream<SerializableModel> saveModelStream(
-    Session session, {
-    required DwModelWrapper wrappedModel,
-    required String channelName,
-    String? apiGroup,
-  }) async* {
-    try {
-      final model = wrappedModel.object;
-      if (model is! TableRow) {
-        throw UnsupportedError(
-          'Received item of unsupported type: ${model.runtimeType}. Only TableRow could be saved to database',
-        );
-      }
-
-      final className = wrappedModel.dwMappingClassname;
-      final caller = dw.getCrudConfig(className, api: apiGroup)?.saveConfig;
-
-      if (caller == null) {
-        throw Exception('notConfigured(source: saveModelStream $className');
-      }
-
-      final stream = openChannelStream<SerializableModel>(session, channelName);
-
-      () async {
-        try {
-          final res = await caller.save(session, model);
-
-          await session.messages.postMessage(
-            channelName,
-            DwUpdatesTransport(
-              wrappedModelUpdates: [
-                if (res.value != null) res.value!,
-                if (res.updatedModels != null) ...res.updatedModels!,
-              ],
-            ),
-          );
-        } catch (ex, st) {
-          return returnError(
-            'Unexpected error during saveModelStream for ${model.id == null ? 'new' : 'existing'} ${wrappedModel.dwMappingClassname} ${model.id != null ? 'with id ${model.id} ' : ''}',
-            exception: ex,
-            stackTrace: st,
-          );
-        }
-      }(); // fire-and-forget
-
-      await for (var message in stream) {
-        yield message;
-      }
-    } catch (ex, st) {
-      final id = wrappedModel.modelId;
-      returnError(
-        'Unexpected error during saveModelStream for ${id == null ? 'new' : 'existing'} ${wrappedModel.dwMappingClassname} ${id != null ? 'with id $id ' : ''}',
         exception: ex,
         stackTrace: st,
       );

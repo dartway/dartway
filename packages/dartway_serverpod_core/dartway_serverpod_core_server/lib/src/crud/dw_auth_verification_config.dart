@@ -10,6 +10,16 @@ const verificationCodeKey = 'verificationCode';
 final dwAuthVerificationConfig = DwCrudConfig<DwAuthVerification>(
   table: DwAuthVerification.t,
   saveConfig: DwSaveConfig<DwAuthVerification>(
+    // Second half of the sign-in path, and open for the same reason as
+    // [dwAuthRequestConfig]: this is the call that submits the code, so the
+    // caller cannot possibly have a session yet.
+    //
+    // What guards it is `beforeSaveTransaction` below: one attempt per request
+    // at a time, attempts counted against `maxVerificationAttempts`, the
+    // request burned once the budget runs out or the code expires. A wrong
+    // guess is cheap to make and expensive to repeat — which is the property
+    // that matters here, not authentication.
+    allowAnonymous: true,
     allowSave:
         (
           Session session,

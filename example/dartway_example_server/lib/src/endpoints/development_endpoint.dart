@@ -10,7 +10,7 @@ class DevelopmentEndpoint extends Endpoint {
     Session session, {
     String notificationText = 'Test notification',
   }) async {
-    final userId = await session.currentUserProfileId;
+    final userId = session.signedInUserProfileId;
 
     if (userId == null) {
       throw Exception('User not found');

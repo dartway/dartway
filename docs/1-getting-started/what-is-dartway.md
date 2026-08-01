@@ -29,7 +29,7 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
   saveConfig: DwSaveConfig<NewsPost>(
     allowSave: (session, ctx) async =>
         await session.isStaffMember &&
-        await session.isUser(ctx.currentModel.authorProfileId),
+        session.isUser(ctx.currentModel.authorProfileId),
     validateSave: (session, ctx) async =>
         ctx.currentModel.title.trim().isEmpty ? 'Title is required' : null,
     broadcastTo: (session, ctx) => [DwCoreConst.publicUpdatesChannel],

@@ -3,8 +3,12 @@ import 'package:dartway_example_server/src/dartway/dartway_session_extension.dar
 import 'package:dartway_example_server/src/generated/protocol.dart';
 
 /// CRUD configuration for the ChatMessage model (staff chat).
-/// Realtime comes from the framework: subscribed lists receive new messages
-/// with no extra code. Clients are cut off by the same staff-only filter.
+/// Clients are cut off by the staff-only filter, on read and on write alike.
+///
+/// No `broadcastTo`, so a new message reaches the author's own list and nobody
+/// else's until they refetch. Making it live means naming a channel per chat,
+/// broadcasting to it here, and declaring it in `DwCore.init` so the server
+/// will let a subscriber in.
 final chatMessageCrudConfig = DwCrudConfig<ChatMessage>(
   table: ChatMessage.t,
   getListConfig: DwGetModelListConfig(
@@ -14,7 +18,7 @@ final chatMessageCrudConfig = DwCrudConfig<ChatMessage>(
   saveConfig: DwSaveConfig<ChatMessage>(
     allowSave: (session, saveContext) async =>
         await session.isStaffMember &&
-        await session.isUser(saveContext.currentModel.authorProfileId),
+        session.isUser(saveContext.currentModel.authorProfileId),
     validateSave: (session, saveContext) async =>
         saveContext.currentModel.messageText.trim().isEmpty
             ? 'Message cannot be empty'

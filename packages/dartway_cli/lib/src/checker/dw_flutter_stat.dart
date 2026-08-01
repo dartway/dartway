@@ -8,8 +8,7 @@ class DwFlutterStat {
   final Directory packageDir;
 
   Future<void> run() async {
-    final libDir =
-        Directory('${packageDir.path}${Platform.pathSeparator}lib');
+    final libDir = Directory('${packageDir.path}${Platform.pathSeparator}lib');
     if (!libDir.existsSync()) {
       print('❌ No lib/ folder in ${packageDir.path}');
       return;
@@ -79,10 +78,7 @@ $title
   }
 }
 
-Future<void> _collectStatsRecursively(
-  Directory dir,
-  _CodeStats stats,
-) async {
+Future<void> _collectStatsRecursively(Directory dir, _CodeStats stats) async {
   for (final entity in dir.listSync(recursive: true)) {
     if (entity is File && entity.path.endsWith('.dart')) {
       stats.addFile(await entity.readAsString());

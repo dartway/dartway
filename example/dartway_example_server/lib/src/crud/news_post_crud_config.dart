@@ -17,7 +17,7 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
   saveConfig: DwSaveConfig<NewsPost>(
     allowSave: (session, saveContext) async =>
         await session.isStaffMember &&
-        await session.isUser(saveContext.currentModel.authorProfileId),
+        session.isUser(saveContext.currentModel.authorProfileId),
     validateSave: (session, saveContext) async {
       final post = saveContext.currentModel;
       if (post.title.trim().isEmpty) {

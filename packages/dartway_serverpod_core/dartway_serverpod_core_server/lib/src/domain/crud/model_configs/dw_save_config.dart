@@ -154,7 +154,7 @@ class DwSaveConfig<T extends TableRow> {
     }
 
     final saveContext = DwSaveContext<T>(
-      currentUserId: await session.currentUserProfileId,
+      currentUserId: session.signedInUserProfileId,
       isInsert: isInsert,
       initialModel: initialModel,
       currentModel: model,
@@ -217,7 +217,7 @@ class DwSaveConfig<T extends TableRow> {
 
         final context =
             DwSaveContext<T>(
-              currentUserId: await session.currentUserProfileId,
+              currentUserId: session.signedInUserProfileId,
               isInsert: false,
               initialModel: initialModel,
               currentModel: model,

@@ -14,7 +14,7 @@ final userProfileCrudConfig = DwCrudConfig<UserProfile>(
     // A signed-in user saves only their own profile; the admin saves anyone's.
     allowSave: (session, saveContext) async =>
         await session.isAdmin ||
-        await session.isUser(saveContext.currentModel.id ?? -1),
+        session.isUser(saveContext.currentModel.id ?? -1),
     // Privilege escalation guard: only the admin can change roles.
     validateSave: (session, saveContext) async {
       final roleChanged =

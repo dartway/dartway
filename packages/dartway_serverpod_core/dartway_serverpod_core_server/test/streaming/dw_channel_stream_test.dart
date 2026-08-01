@@ -1,4 +1,3 @@
-import 'package:dartway_serverpod_core_server/src/endpoints/dw_crud_endpoint.dart';
 import 'package:dartway_serverpod_core_server/src/private/dw_channel_stream.dart';
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
@@ -11,7 +10,7 @@ import '../support/streaming_session_double.dart';
 /// it the request, the buffered session log and the socket it came in on. On an
 /// unstable network those add up to a connection graph every few seconds.
 void main() {
-  const channelName = 'userUpdates1';
+  const channelName = 'teardownProbe';
 
   late MessageCentral messageCentral;
   late FakeStreamingSession session;
@@ -21,8 +20,16 @@ void main() {
     session = FakeStreamingSession('subscriber', messageCentral);
   });
 
+  /// The stream `subscribeOnUpdates` hands to Serverpod, guard and all — the
+  /// `async*` wrapper is part of the teardown path, so it is part of what these
+  /// tests exercise. Who may listen is decided in dw_channel_config_test.dart;
+  /// here the answer is always yes.
   Stream<SerializableModel> subscribeThroughEndpoint(Session session) =>
-      DwCrudEndpoint().subscribeOnUpdates(session, channel: channelName);
+      guardedChannelStream<SerializableModel>(
+        session,
+        channelName,
+        canListen: (_, __) async => true,
+      );
 
   group('openChannelStream delivery', () {
     test('delivers the messages posted to the channel', () async {
@@ -145,6 +152,42 @@ void main() {
       await session.close().timeout(const Duration(seconds: 2));
 
       expect(session.channelMessages.activeListenerCount, 0);
+    });
+  });
+
+  group('guardedChannelStream refusal', () {
+    Stream<SerializableModel> refusedSubscription(Session session) =>
+        guardedChannelStream<SerializableModel>(
+          session,
+          channelName,
+          canListen: (_, __) async => false,
+        );
+
+    test('errors instead of delivering anything', () async {
+      expect(refusedSubscription(session), emitsError(isException));
+    });
+
+    test('leaves no listener behind on the channel', () async {
+      await expectLater(
+        refusedSubscription(session).toList(),
+        throwsA(isException),
+      );
+
+      expect(session.channelMessages.activeListenerCount, 0);
+      expect(session.pendingWillCloseListenerCount, 0);
+    });
+
+    test('never yields what the channel carried during the check', () async {
+      final delivered = <SerializableModel>[];
+
+      final subscription = refusedSubscription(
+        session,
+      ).listen(delivered.add, onError: (_) {});
+      await session.messages.postMessage(channelName, ChannelPing());
+      await settleStreamEvents();
+
+      expect(delivered, isEmpty);
+      await subscription.cancel();
     });
   });
 }

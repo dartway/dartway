@@ -232,39 +232,6 @@ class Endpoints extends _i1.EndpointDispatch {
                     channel: params['channel'],
                   ),
         ),
-        'saveModelStream': _i1.MethodStreamConnector(
-          name: 'saveModelStream',
-          params: {
-            'wrappedModel': _i1.ParameterDescription(
-              name: 'wrappedModel',
-              type: _i1.getType<_i7.DwModelWrapper>(),
-              nullable: false,
-            ),
-            'channelName': _i1.ParameterDescription(
-              name: 'channelName',
-              type: _i1.getType<String>(),
-              nullable: false,
-            ),
-            'apiGroup': _i1.ParameterDescription(
-              name: 'apiGroup',
-              type: _i1.getType<String?>(),
-              nullable: true,
-            ),
-          },
-          streamParams: {},
-          returnType: _i1.MethodStreamReturnType.streamType,
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-                Map<String, Stream> streamParams,
-              ) => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).saveModelStream(
-                session,
-                wrappedModel: params['wrappedModel'],
-                channelName: params['channelName'],
-                apiGroup: params['apiGroup'],
-              ),
-        ),
       },
     );
     connectors['dwRealTime'] = _i1.EndpointConnector(

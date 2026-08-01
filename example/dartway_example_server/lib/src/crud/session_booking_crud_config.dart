@@ -8,7 +8,7 @@ Future<Expression<dynamic>?> _bookingAccessFilter(Session session) async {
   if (await session.isStaffMember) {
     return null;
   }
-  final userProfileId = await session.currentUserProfileId;
+  final userProfileId = session.signedInUserProfileId;
   return SessionBooking.t.clientProfileId.equals(userProfileId ?? -1);
 }
 
@@ -28,7 +28,7 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
   saveConfig: DwSaveConfig<SessionBooking>(
     allowSave: (session, saveContext) async =>
         await session.isStaffMember ||
-        await session.isUser(saveContext.currentModel.clientProfileId),
+        session.isUser(saveContext.currentModel.clientProfileId),
     validateSave: (session, saveContext) async {
       final booking = saveContext.currentModel;
       final clubSession =

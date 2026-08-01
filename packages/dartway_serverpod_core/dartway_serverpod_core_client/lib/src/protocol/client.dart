@@ -103,25 +103,6 @@ class EndpointDwCrud extends _i1.EndpointRef {
     },
   );
 
-  _i2.Stream<_i1.SerializableModel> saveModelStream({
-    required _i4.DwModelWrapper wrappedModel,
-    required String channelName,
-    String? apiGroup,
-  }) =>
-      caller.callStreamingServerEndpoint<
-        _i2.Stream<_i1.SerializableModel>,
-        _i1.SerializableModel
-      >(
-        'dartway_serverpod_core.dwCrud',
-        'saveModelStream',
-        {
-          'wrappedModel': wrappedModel,
-          'channelName': channelName,
-          'apiGroup': apiGroup,
-        },
-        {},
-      );
-
   _i2.Future<_i3.DwApiResponse<bool>> delete({
     required String className,
     required int modelId,

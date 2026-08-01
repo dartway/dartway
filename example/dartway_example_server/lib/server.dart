@@ -1,7 +1,10 @@
 import 'dart:io';
 
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart'
-    show dwAuthenticationHandler;
+    show
+        DwOrphanedAuthKeyCleanup,
+        DwRecurringJobs,
+        dwAuthenticationHandler;
 import 'package:dartway_example_server/src/web/routes/root.dart';
 import 'package:serverpod/serverpod.dart';
 
@@ -32,4 +35,10 @@ void run(List<String> args) async {
   initDartwayCore(passwords: pod.server.passwords);
 
   await pod.start();
+
+  // Recurring jobs are armed after the server is up. The cleanup is a
+  // safety net under `dw.auth.revokeAuthKeys`: an auth key never expires
+  // on its own, so a profile deleted without revoking would leave a
+  // working token behind forever.
+  await DwRecurringJobs.startAll(pod, [DwOrphanedAuthKeyCleanup()]);
 }

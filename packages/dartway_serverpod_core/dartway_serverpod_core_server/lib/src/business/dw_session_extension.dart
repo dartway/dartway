@@ -2,14 +2,34 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 
 import '../endpoints/dw_real_time_endpoint.dart';
-import '../private/dw_singleton.dart';
 
 extension DwSessionExtension on Session {
-  Future<int?> get currentUserProfileId async =>
-      await dw.currentUserProfile(this).then((value) => value?.id);
+  /// The profile id the caller presented a token for, or `null` for a caller
+  /// with no session.
+  ///
+  /// Synchronous, and it costs nothing: Serverpod resolves authentication in
+  /// the factory of every session type that can carry a key, before any
+  /// endpoint code runs, and caches it on the session. `authenticated` is a
+  /// plain getter over that cache.
+  ///
+  /// **It says the token is valid, not that the profile still exists.** Until
+  /// 0.3.0 this read the whole profile row from the database, so a deleted
+  /// profile whose token was still around came back as `null` — an aliveness
+  /// check nobody wrote down, paid for with a query on every single request.
+  /// The check now lives where it belongs: [DwAuth.revokeAuthKeys] ends a
+  /// user's sessions when the account does, and orphaned keys are swept up by
+  /// [DwOrphanedAuthKeyCleanup]. Use [DwCore.currentUserProfile] when you
+  /// actually need the row.
+  int? get signedInUserProfileId =>
+      int.tryParse(authenticated?.userIdentifier ?? '');
 
-  Future<bool> isUser(int userProfileId) async =>
-      userProfileId == await currentUserProfileId;
+  /// Whether [userProfileId] is the signed-in caller.
+  ///
+  /// Takes a non-nullable id on purpose. Written as a comparison against
+  /// [signedInUserProfileId], an ownership check over a nullable column reads
+  /// `null == null` for an anonymous caller and grants access — so the caller
+  /// is made to resolve the absent case instead.
+  bool isUser(int userProfileId) => userProfileId == signedInUserProfileId;
 
   /// Sends the models to every client listening on [channels].
   ///

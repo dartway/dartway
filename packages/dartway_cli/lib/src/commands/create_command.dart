@@ -66,21 +66,16 @@ class CreateCommand extends Command<int> {
   @override
   Future<int> run() async {
     final projectName = _requireProjectName();
-    final targetDir = Directory(
-      p.join(Directory.current.path, projectName),
-    );
+    final targetDir = Directory(p.join(Directory.current.path, projectName));
     if (targetDir.existsSync()) {
       throw StateError('Directory already exists: ${targetDir.path}');
     }
 
-    final monorepoDir =
-        await MonorepoSource(
-          branch: argResults!['channel'] as String,
-          localDir: argResults!['local-repo'] as String?,
-        ).resolve();
-    final templateDir = Directory(
-      p.join(monorepoDir.path, _sourceDirectory),
-    );
+    final monorepoDir = await MonorepoSource(
+      branch: argResults!['channel'] as String,
+      localDir: argResults!['local-repo'] as String?,
+    ).resolve();
+    final templateDir = Directory(p.join(monorepoDir.path, _sourceDirectory));
     if (!templateDir.existsSync()) {
       throw StateError(
         'No $_sourceDirectory/ found in monorepo at ${monorepoDir.path}',
@@ -110,14 +105,20 @@ class CreateCommand extends Command<int> {
       ..writeln('  claude')
       ..writeln('')
       ..writeln('Then ask for it in your own words — "bring the project up".')
-      ..writeln('The AI toolkit shipped in .claude/ knows this stack: it starts '
-          'Postgres, applies')
-      ..writeln('the migrations, seeds a dev user, runs the server and the app, '
-          'and tells you how')
+      ..writeln(
+        'The AI toolkit shipped in .claude/ knows this stack: it starts '
+        'Postgres, applies',
+      )
+      ..writeln(
+        'the migrations, seeds a dev user, runs the server and the app, '
+        'and tells you how',
+      )
       ..writeln('to sign in.')
       ..writeln('')
-      ..writeln('Prefer your own hands, or no agent at hand? Every command is in '
-          'README.md.');
+      ..writeln(
+        'Prefer your own hands, or no agent at hand? Every command is in '
+        'README.md.',
+      );
     return 0;
   }
 
@@ -199,9 +200,9 @@ class CreateCommand extends Command<int> {
         continue;
       }
       final lines = pubspecFile.readAsLinesSync();
-      final rewritten = _stripDependencyOverrides(lines)
-          .map((line) => line.replaceAll('ref: master', 'ref: stable'))
-          .toList();
+      final rewritten = _stripDependencyOverrides(
+        lines,
+      ).map((line) => line.replaceAll('ref: master', 'ref: stable')).toList();
       pubspecFile.writeAsStringSync('${rewritten.join('\n')}\n');
     }
   }

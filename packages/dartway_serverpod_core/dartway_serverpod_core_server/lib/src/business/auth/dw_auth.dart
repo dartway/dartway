@@ -256,4 +256,48 @@ class DwAuth<UserProfileClass extends TableRow> {
     }
     return insertedAuthKey;
   }
+
+  /// Ends every session [userProfileId] holds, and returns how many keys went.
+  ///
+  /// Call this whenever an account stops being allowed to act — deletion, a
+  /// ban, a deactivation, "sign out everywhere", a changed identifier. The
+  /// framework cannot know about those events, and until one of them revokes,
+  /// a key lives forever: keys carry no expiry, and nothing else deletes them.
+  ///
+  /// Deleting the row is enough for ordinary calls, because
+  /// [dwAuthenticationHandler] reads the key from the database on every
+  /// request — there is no signed token to outlive its revocation. It is *not*
+  /// enough for a connection that is already open: a websocket resolves its
+  /// authentication once, when it opens, so a subscription started a minute ago
+  /// would keep receiving. [Session.messages.authenticationRevoked] is what
+  /// tears those down, and it is why revoking is a framework method rather than
+  /// a `deleteWhere` an app writes for itself.
+  ///
+  /// Not covered: Serverpod only listens for revocation on method streams. The
+  /// legacy streaming endpoint ([DwRealTimeEndpoint]) does not, so a connection
+  /// held by it survives until it closes on its own — one more reason to finish
+  /// its migration.
+  Future<int> revokeAuthKeys(
+    Session session, {
+    required int userProfileId,
+    Transaction? transaction,
+  }) async {
+    final revoked = await DwAuthKey.db.deleteWhere(
+      session,
+      where: (t) => t.userId.equals(userProfileId),
+      transaction: transaction,
+    );
+
+    await session.messages.authenticationRevoked(
+      userProfileId.toString(),
+      RevokedAuthenticationUser(),
+    );
+
+    session.log(
+      'Revoked ${revoked.length} auth key(s) for user profile $userProfileId',
+      level: LogLevel.info,
+    );
+
+    return revoked.length;
+  }
 }

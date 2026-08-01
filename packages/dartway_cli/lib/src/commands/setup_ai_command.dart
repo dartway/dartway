@@ -53,11 +53,10 @@ class SetupAiCommand extends Command<int> {
     );
     stdout.writeln('Base branch: $baseBranch');
 
-    final monorepoDir =
-        await MonorepoSource(
-          branch: argResults!['channel'] as String,
-          localDir: argResults!['local-repo'] as String?,
-        ).resolve();
+    final monorepoDir = await MonorepoSource(
+      branch: argResults!['channel'] as String,
+      localDir: argResults!['local-repo'] as String?,
+    ).resolve();
 
     await ToolkitInstaller.install(
       toolkitDir: Directory(p.join(monorepoDir.path, 'toolkit')),

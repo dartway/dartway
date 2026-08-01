@@ -41,6 +41,19 @@ void initDartwayCore({
       appSettingCrudConfig,
     ],
     dtoConfigurations: [],
+    // One entry per realtime channel the app names itself. A channel that is
+    // not declared here cannot be subscribed to — a channel name arrives from
+    // the client as a bare string, and this list is how the server tells a real
+    // name from a guessed one. `DwCoreConst.publicUpdatesChannel`, which the
+    // skeleton already listens to, is declared by the framework.
+    //
+    //   DwChannelConfig.public(prefix: 'catalogue'),
+    //   DwChannelConfig.owner(prefix: 'orders'),   // orders42 -> user 42 only
+    //   DwChannelConfig.guarded(
+    //     prefix: 'team_',
+    //     allowListen: (session, suffix) async => /* is caller in the team? */,
+    //   ),
+    channelConfigurations: [],
     userProfileConstructor: _buildUserProfile,
     dwAlerts: DwAlerts.init(),
     // Uploads are optional: configured when this run mode carries the

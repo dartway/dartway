@@ -59,12 +59,12 @@ Future<Expression<dynamic>?> _bookingAccessFilter(Session session) async {
   if (await session.isStaffMember) {
     return null; // no restrictions
   }
-  final userProfileId = await session.currentUserProfileId;
+  final userProfileId = session.signedInUserProfileId;
   return SessionBooking.t.clientProfileId.equals(userProfileId ?? -1);
 }
 ```
 
-The current user's id is `await session.currentUserProfileId` (not `session.userId`).
+The current user's id is `session.signedInUserProfileId` (not `session.userId`) — **synchronous**, read off the token Serverpod already resolved, so it costs nothing and needs no `await`. It says the caller presented a valid token, not that the profile row still exists. Ownership checks go through `session.isUser(profileId)`, which is also synchronous and takes a **non-nullable** id on purpose: written as `model.ownerId == session.signedInUserProfileId` over a nullable column, an anonymous caller reads `null == null` and is let in. Need the whole profile row — `dw.currentUserProfile(session)`, and that one does hit the database.
 
 ## DwGetModelConfig — a single entity by filter
 
@@ -131,7 +131,22 @@ broadcastTo: (session, ctx) => [DwCoreConst.publicUpdatesChannel],   // public m
 broadcastTo: (session, ctx) => ['chat:${ctx.currentModel.chatId}'],  // a narrower audience
 ```
 
-**A channel is an audience the framework cannot verify:** everything the save touched flies out to every subscriber, regardless of `accessFilter`. Hence the default of `null`, and the public channel is only for models everyone is entitled to read anyway. If a private row is being saved while something else changed publicly (the booking is private, the seat counter is public) — do not attach `broadcastTo`; instead pick in `afterSaveSideEffects` what exactly to send: `session.sendUpdates(channels: [...], updatedModels: [publicModel])`.
+**A channel your app names itself has to be declared**, or nobody can subscribe to it. Add it to `channelConfigurations` in `DwCore.init` next to the `broadcastTo` that invented it — a channel name arrives from the client as a bare string, and the declaration is how the server tells a real one from a guess:
+
+```dart
+channelConfigurations: [
+  DwChannelConfig.public(prefix: 'catalogue'),                    // anyone, signed in or not
+  DwChannelConfig.owner(prefix: 'orders'),                        // orders42 — user 42 only
+  DwChannelConfig.guarded(                                        // your own check
+    prefix: 'chat:',
+    allowListen: (session, suffix) async => await session.isChatMember(int.parse(suffix)),
+  ),
+],
+```
+
+`DwCoreConst.publicUpdatesChannel` is declared by the framework — a config that broadcasts only there needs nothing added. Forgetting the declaration fails silently at runtime: the app compiles, the save broadcasts, and the subscription is refused. A prefix is a prefix, so give a parametrised channel a separator (`chat:`, not `chat`) and name a public one in full.
+
+**A channel is an audience whose payload the framework cannot verify:** everything the save touched flies out to every subscriber, regardless of `accessFilter`. The declaration says who may be in the audience; it does not filter what travels. Hence the default of `null`, and the public channel is only for models everyone is entitled to read anyway. If a private row is being saved while something else changed publicly (the booking is private, the seat counter is public) — do not attach `broadcastTo`; instead pick in `afterSaveSideEffects` what exactly to send: `session.sendUpdates(channels: [...], updatedModels: [publicModel])`.
 
 ```dart
 beforeSaveTransaction: (session, saveContext) async {

@@ -18,6 +18,7 @@ void main() {
           userProfileTable: UserProfile.t,
           crudConfigurations: const [],
           dtoConfigurations: const [],
+          channelConfigurations: const [],
           userProfileConstructor:
               (session, {required registrationRequest}) async =>
                   throw UnsupportedError(

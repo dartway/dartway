@@ -7,11 +7,16 @@ import 'package:serverpod/serverpod.dart';
 // deprecated streaming endpoint lifecycle. Keep it as-is while the app upgrade
 // is in progress, then migrate it to streaming methods.
 class DwRealTimeEndpoint extends Endpoint {
-  static userUpdatesChannel(int userId) => 'userUpdates$userId';
+  /// The prefix of the per-user channel, declared once so the name and the
+  /// `DwChannelConfig.owner` that guards it cannot drift apart.
+  static const userUpdatesChannelPrefix = 'userUpdates';
+
+  static userUpdatesChannel(int userId) =>
+      '$userUpdatesChannelPrefix$userId';
 
   @override
   Future<void> streamOpened(StreamingSession session) async {
-    final userId = await session.currentUserProfileId;
+    final userId = session.signedInUserProfileId;
 
     if (userId == null) {
       return;

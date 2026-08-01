@@ -25,13 +25,12 @@ class ProjectLayout {
 
   static ProjectLayout detect(Directory root) {
     String? findBySuffix(String suffix, {required bool required}) {
-      final matches =
-          root
-              .listSync()
-              .whereType<Directory>()
-              .map((directory) => p.basename(directory.path))
-              .where((directoryName) => directoryName.endsWith('_$suffix'))
-              .toList();
+      final matches = root
+          .listSync()
+          .whereType<Directory>()
+          .map((directory) => p.basename(directory.path))
+          .where((directoryName) => directoryName.endsWith('_$suffix'))
+          .toList();
       if (matches.length == 1) {
         return matches.single;
       }

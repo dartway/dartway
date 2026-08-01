@@ -10,6 +10,15 @@ const verificationCodeKey = 'verificationCode';
 final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
   table: DwAuthRequest.t,
   saveConfig: DwSaveConfig<DwAuthRequest>(
+    // The one config that has to be open, and the reason the flag exists as an
+    // opt-out rather than a hard rule: this *is* how a caller signs in.
+    // Requiring a session here would mean "log in to log in".
+    //
+    // What guards it instead is below, in `beforeSaveTransaction`: an attempt
+    // is prevalidated, identifiers are locked one at a time, and requests per
+    // identifier are rate-limited inside the window. Authentication is not the
+    // gate here — those are.
+    allowAnonymous: true,
     allowSave: (Session session, DwSaveContext<DwAuthRequest> ctx) async {
       // // Update is not allowed
       // if (ctx.currentModel.id != null) {

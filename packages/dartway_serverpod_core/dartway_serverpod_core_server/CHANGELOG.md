@@ -22,6 +22,70 @@ A public catalog or settings the splash screen reads now say so in a word that s
 that served data to signed-out callers keeps compiling and starts refusing them. Audit every config
 whose `accessFilter` is absent or can return `null`, and mark the deliberately public ones.
 
+The framework's own sign-in path needed exactly that treatment, and it is worth knowing about before
+you audit your own: `dwAuthRequestConfig` and `dwAuthVerificationConfig` are marked
+`allowAnonymous: true`, because requesting a code and submitting it *are* how a caller acquires a
+session. Without the exception, authentication asks you to authenticate first. What guards them is
+not the session but rate limiting, per-identifier locking and a bounded attempt count, all of which
+were already there. `dwAuthKeyConfig` needs no exception — it only exposes delete, and deleting a key
+requires being its owner.
+
+`saveModelStream` is gated the same way as `saveModel`; a write does not become public by returning
+its result over a channel.
+
+**Realtime channels are declared, and an undeclared channel cannot be subscribed to.**
+`subscribeOnUpdates` took a channel name as a plain string from the client and opened it, unchecked.
+Channel names are guessable by construction — `userUpdates42` is one character from `userUpdates43` —
+so the framework's own per-user channel was readable by anyone signed in, not by its owner. That is
+why this is not another `allowAnonymous`: authentication was never the missing check.
+
+`DwCore.init` now takes a required `channelConfigurations`, and `DwChannelConfig` says who may listen:
+`public` (anyone), `owner` (the user whose profile id the name ends with), `guarded` (your own
+predicate over the session and the part of the name after the prefix, with `allowAnonymous` defaulting
+to `false`). Declarations match by prefix, longest first. The framework declares its own two —
+`DwCoreConst.publicUpdatesChannel` and the per-user channel behind `sendUpdatesToUser`.
+
+**Breaking twice over:** `channelConfigurations` is required, so `DwCore.init` stops compiling until
+you pass it; and every channel your app names itself must be listed or its subscriptions are refused
+at runtime while everything still compiles. Grep for `broadcastTo` and for
+`DwChannelSubscriptionWidget` — between them they name every channel the app has.
+
+**`Session.currentUserProfileId` is now `Session.signedInUserProfileId`, and it is synchronous.**
+It read the whole user profile row from the database to return an id that was already in the token —
+a habit from the version of Serverpod where `session.authenticated` was itself a `Future` and the
+extra query was invisible because everything was async anyway. Since 3.x `authenticated` is a cached
+synchronous getter, resolved before any endpoint code runs, so the round trip bought nothing. With
+the authentication gate above running on every CRUD call and every subscription, it was no longer a
+rounding error. `isUser(profileId)` is synchronous for the same reason.
+
+The rename is deliberate, because dropping `Future` alone would have broken nothing: `await` on a
+non-`Future` compiles. The **meaning** changed and had to be looked at, once, at every call site.
+What changed: the old getter returned `null` when the profile row was missing, so a deleted profile
+whose token was still around read as "not signed in". That was an aliveness check nobody wrote down,
+and it only ever caught hard deletion — a banned or soft-deleted user passed it then and passes it
+now.
+
+**That check now exists on purpose.** `DwAuth.revokeAuthKeys(session, userProfileId:)` ends every
+session a user holds: it deletes the keys, and — because a websocket resolves its authentication once
+when it opens and would otherwise keep receiving — broadcasts Serverpod's revocation message to tear
+open connections down. Call it on deletion, ban, deactivation, "sign out everywhere", a changed
+identifier. Ordinary requests need no more than the delete: `dwAuthenticationHandler` reads the key
+from the database every time, so nothing outlives its revocation. Serverpod only listens for
+revocation on method streams, so a connection held by the legacy `DwRealTimeEndpoint` survives until
+it closes on its own.
+
+**`DwOrphanedAuthKeyCleanup`** is the net under that. A `DwRecurringFutureCall` (hourly by default)
+that deletes keys whose profile no longer exists — needed because keys carry no expiry and
+`DwAuthKey.userId` cannot carry a foreign key: the profile table belongs to the app, so nothing
+cascades from it. Register it with `DwRecurringJobs.startAll(pod, [DwOrphanedAuthKeyCleanup()])`;
+`example/` and `template/` now do. It replaces a per-request check with a per-interval one, and the
+window it opens is the honest price.
+
+While closing this, a leak was fixed in the same path: guarding a subscription means an `await`
+before the stream opens, and a session that closed during that await left a channel listener behind
+that nothing would remove. The stream is now opened before the check and torn down if the check
+refuses.
+
 Also: `DwDeleteConfig.delete` now answers `notConfigured` before it touches the database. Existence
 probing by unauthenticated callers is closed by the gate above; a signed-in caller can still tell a
 missing row from one they may not delete, which is documented in the code as a remaining decision.

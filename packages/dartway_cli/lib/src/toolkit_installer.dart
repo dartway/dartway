@@ -45,9 +45,7 @@ class ToolkitInstaller {
       );
       managedFiles.addAll(_copyDirectory(skillDir, installedDir));
     }
-    for (final commandFile in toolkitCommandsDir
-        .listSync()
-        .whereType<File>()) {
+    for (final commandFile in toolkitCommandsDir.listSync().whereType<File>()) {
       final installedFile = File(
         p.join(commandsDir.path, p.basename(commandFile.path)),
       );

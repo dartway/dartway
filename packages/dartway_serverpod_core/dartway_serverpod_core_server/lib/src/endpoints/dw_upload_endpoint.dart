@@ -66,7 +66,7 @@ class DwUploadEndpoint extends Endpoint {
 
     final file = await session.db.insertRow(
       _storage.createCloudFile(
-        userId: await session.currentUserProfileId,
+        userId: session.signedInUserProfileId,
         objectPath: path,
         size: info.size!,
       ),

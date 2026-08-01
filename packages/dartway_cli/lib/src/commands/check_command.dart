@@ -15,7 +15,8 @@ class CheckCommand extends Command<int> {
     argParser
       ..addOption(
         'type',
-        help: 'Run a single check by name '
+        help:
+            'Run a single check by name '
             '(${DwCheckType.values.map((t) => t.name).join(', ')}).',
       )
       ..addOption(
@@ -37,7 +38,8 @@ class CheckCommand extends Command<int> {
       'Run DartWay convention checks on the Flutter package.';
 
   @override
-  String get invocation => 'dartway check [--type <check>] [--level <severity>] [--dir <folder>]';
+  String get invocation =>
+      'dartway check [--type <check>] [--level <severity>] [--dir <folder>]';
 
   @override
   Future<int> run() async {

@@ -1,5 +1,6 @@
 // ignore_for_file: invalid_use_of_internal_member
 
+import 'package:collection/collection.dart';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:dartway_serverpod_core_server/src/crud/dw_auth_verification_config.dart';
 import 'package:serverpod/serverpod.dart';
@@ -9,6 +10,7 @@ import '../business/cloud_storage/dw_cloud_storage.dart';
 import '../crud/dw_auth_key_config.dart';
 import '../crud/dw_auth_request_config.dart';
 import '../domain/crud/domain/dw_crud_entity.dart';
+import '../endpoints/dw_real_time_endpoint.dart';
 import '../private/dw_singleton.dart';
 import '../utils/iterable_extension.dart';
 
@@ -31,12 +33,12 @@ import '../utils/iterable_extension.dart';
 /// - [getUserProfile]: Gets the user profile.
 /// - [getUserProfileByIdentifier]: Gets the user profile by identifier.
 class DwCore<UserProfileClass extends TableRow> {
-  static int? _authenticatedUserId(Session session) =>
-      int.tryParse(session.authenticated?.userIdentifier ?? '');
-
   final Table userProfileTable;
   final Map<String, Map<String, DwCrudConfig>> _crudConfiguration = {};
   final Map<String, Map<String, DwCrudEntity>> _dtoConfiguration = {};
+
+  /// Channel declarations, longest prefix first — see [canListenTo].
+  final List<DwChannelConfig> _channelConfiguration = [];
 
   late final ColumnInt _userInfoIdColumn;
   late final ColumnString _userIdentifierColumn;
@@ -59,6 +61,7 @@ class DwCore<UserProfileClass extends TableRow> {
     required Table userProfileTable,
     required List<DwCrudConfig> crudConfigurations,
     required List<DwCrudEntity> dtoConfigurations,
+    required List<DwChannelConfig> channelConfigurations,
     Include? userProfileInclude,
     required Future<UserProfileClass> Function(
       Session session, {
@@ -73,6 +76,7 @@ class DwCore<UserProfileClass extends TableRow> {
       userProfileTable: userProfileTable,
       crudConfigurations: crudConfigurations,
       dtoConfigurations: dtoConfigurations,
+      channelConfigurations: channelConfigurations,
       userProfileInclude: userProfileInclude,
       userProfileConstructor: userProfileConstructor,
       alerts: dwAlerts,
@@ -93,6 +97,7 @@ class DwCore<UserProfileClass extends TableRow> {
     required this.userProfileTable,
     required List<DwCrudConfig> crudConfigurations,
     required List<DwCrudEntity> dtoConfigurations,
+    required List<DwChannelConfig> channelConfigurations,
     required Include? userProfileInclude,
     required Future<UserProfileClass> Function(
       Session session, {
@@ -132,7 +137,7 @@ class DwCore<UserProfileClass extends TableRow> {
           getModelConfigs: [
             DwGetModelConfig<UserProfileClass>(
               accessFilter: (session) async =>
-                  _userInfoIdColumn.equals(_authenticatedUserId(session) ?? 0),
+                  _userInfoIdColumn.equals(session.signedInUserProfileId ?? 0),
               filterPrototype: DwBackendFilter.equalsPrototype(
                 fieldName: DwCoreConst.userProfileIdColumnName,
               ),
@@ -150,6 +155,22 @@ class DwCore<UserProfileClass extends TableRow> {
     _crudConfiguration[DwCoreConst.defaultApi] = Map.fromEntries(
       crudConfigurations.map((config) => MapEntry(config.className, config)),
     );
+
+    _channelConfiguration.addAll([
+      // The two the framework names itself. `userUpdates$id` was the sharpest
+      // edge of all: the name is a number away from every other user's, so it
+      // was readable by anyone signed in, not just by its owner.
+      const DwChannelConfig.owner(
+        prefix: DwRealTimeEndpoint.userUpdatesChannelPrefix,
+      ),
+      const DwChannelConfig.public(prefix: DwCoreConst.publicUpdatesChannel),
+      ...channelConfigurations,
+    ]);
+
+    // Sorted once at startup so `canListenTo` can take the first match: with
+    // prefixes, `chatPost_admin_` and `chatPost_` both match the same name, and
+    // the more specific one has to be the one that answers.
+    _channelConfiguration.sort((a, b) => b.prefix.length - a.prefix.length);
   }
 
   /// Non-blocking, transaction-scoped advisory locks — `dw.advisoryLock`.
@@ -162,6 +183,27 @@ class DwCore<UserProfileClass extends TableRow> {
     String className, {
     String? api,
   }) => _dtoConfiguration[api ?? DwCoreConst.defaultApi]?[className];
+
+  /// Whether [session] may listen to [channel].
+  ///
+  /// A channel no declaration matches is refused. That is the point of the
+  /// list: a channel name is invented by whoever writes `broadcastTo`, arrives
+  /// from the client as a bare string, and nothing else in the system can tell
+  /// a real one from a guess. Declaring it is how the server learns the name is
+  /// real and who it is for. See [DwChannelConfig].
+  Future<bool> canListenTo(Session session, String channel) async {
+    final config = _channelConfiguration.firstWhereOrNull(
+      (candidate) => candidate.matches(channel),
+    );
+
+    if (config == null) return false;
+
+    return config.allows(
+      session,
+      channel,
+      userProfileId: session.signedInUserProfileId,
+    );
+  }
 
   Future<UserProfileClass?> getUserProfile(Session session, int userId) async {
     final profile = await session.db.findFirstRow<UserProfileClass>(
@@ -193,7 +235,7 @@ class DwCore<UserProfileClass extends TableRow> {
   }
 
   Future<UserProfileClass?> currentUserProfile(Session session) async {
-    final userId = _authenticatedUserId(session);
+    final userId = session.signedInUserProfileId;
     if (userId == null) return null;
     return getUserProfile(session, userId);
   }

@@ -39,6 +39,19 @@ The gate is per config rather than on the endpoint because one CRUD endpoint ser
 Serverpod's `requireLogin` is all-or-nothing for a whole endpoint, so switching it on would have
 taken the public catalog down together with the private order list.
 
+The framework's own sign-in path is the clearest case for the exception. `dwAuthRequestConfig` and
+`dwAuthVerificationConfig` are `allowAnonymous: true`: requesting a code and submitting it are how a
+caller gets a session in the first place, so requiring one would mean "sign in to sign in". What
+protects them is not authentication but a rate limit per identifier, a lock so parallel attempts
+cannot each pass it, and a bounded number of guesses before the request is burned. That is the shape
+of a correct exception — open the door, then say what stands behind it.
+
+Realtime subscriptions are gated too, but not by this flag: a channel carries no model, so there is
+no config to read `allowAnonymous` from, and "is there a session" would not have been the right
+question anyway — channel names are guessable by a signed-in stranger just as easily. Channels are
+declared separately and answer "may *this* caller listen to *this* channel". See
+[Realtime](realtime.md#declaring-a-channel).
+
 ## Gate 3 — `accessFilter`, a `WHERE` clause and not a check
 
 Both read configs take one, and it is a **required** parameter — you cannot construct a read config
@@ -56,7 +69,7 @@ Future<Expression<dynamic>?> _bookingAccessFilter(Session session) async {
   if (await session.isStaffMember) {
     return null;                       // staff see everything
   }
-  final userProfileId = await session.currentUserProfileId;
+  final userProfileId = session.signedInUserProfileId;
   return SessionBooking.t.clientProfileId.equals(userProfileId ?? -1);
 }
 ```
@@ -98,7 +111,7 @@ public on purpose. Nothing will fail to compile — the change is in behaviour, 
 saveConfig: DwSaveConfig<UserProfile>(
   allowSave: (session, saveContext) async =>
       await session.isClubAdmin ||
-      await session.isUser(saveContext.currentModel.id ?? -1),
+      session.isUser(saveContext.currentModel.id ?? -1),
   // ...
 ),
 deleteConfig: DwDeleteConfig<ClubService>(
@@ -142,10 +155,48 @@ extension DwSessionExtension on Session {
 }
 ```
 
-What the framework does provide on `Session`: `currentUserProfileId` — the **profile** id, resolved
-from the authenticated user, which is the id your foreign keys point at — and `isUser(profileId)`.
+What the framework does provide on `Session` is two synchronous members:
+
+- **`signedInUserProfileId`** — the **profile** id the caller presented a token for, which is the id
+  your foreign keys point at. Free: Serverpod resolves authentication when the session is created
+  and caches it, so this reads a field. It says the token is valid, not that the profile row still
+  exists — see [Ending a session](#ending-a-session).
+- **`isUser(profileId)`** — the same comparison, with a **non-nullable** parameter. That is the whole
+  reason it exists: written by hand as `model.ownerId == session.signedInUserProfileId` over a
+  nullable column, an anonymous caller reads `null == null` and is let in.
+
+When you need the profile itself and not its id, `dw.currentUserProfile(session)` reads the row — and
+being a database call, it is the one you should not put in a hot path.
+
 Serverpod scopes are not used: `dwAuthenticationHandler` authenticates with an empty scope set, so
 scope annotations on endpoints would gate nothing.
+
+## Ending a session
+
+An auth key has no expiry, and nothing deletes it on its own. A token therefore works until somebody
+takes it away, which is a thing the server has to do on purpose:
+
+```dart
+await dw.auth!.revokeAuthKeys(session, userProfileId: profile.id!);
+```
+
+Call it wherever an account stops being allowed to act — deletion, a ban, a deactivation, "sign out
+everywhere", a changed phone number. The framework cannot know about those events.
+
+Deleting the row is enough for ordinary calls: `dwAuthenticationHandler` reads the key from the
+database on every request, so there is no signed token that outlives its revocation. It is not enough
+for a connection already open — a websocket resolves its authentication once, when it opens — which
+is why `revokeAuthKeys` also broadcasts Serverpod's revocation message and tears those down.
+
+Because forgetting the call costs a token that works forever, register the sweeper next to your other
+jobs; it deletes keys whose profile no longer exists:
+
+```dart
+await DwRecurringJobs.startAll(pod, [DwOrphanedAuthKeyCleanup()]);
+```
+
+It is a net, not a substitute. A banned user still has a profile row, so only the explicit call ends
+that session.
 
 Keeping roles in the app is what lets a project have `coach`, `owner` and `accountant` without the
 framework knowing, and what stops a two-role framework abstraction from being wrong for every third
