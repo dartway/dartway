@@ -1,0 +1,83 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Forks cannot read repository secrets, so the review would fail on auth.
+    if: ${{ github.event.pull_request.head.repo.fork != true && github.event.pull_request.draft != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review the changes in this pull request (diff against `master`).
+
+            This repository is the DartWay framework itself — a Dart monorepo of
+            Flutter + Serverpod packages — not an application built on it. Read
+            `CLAUDE.md` at the repository root for the conventions that apply;
+            `docs/DESIGN.md` is the law for public API design.
+
+            Do not comment on generated or platform files: `**/lib/src/generated/**`,
+            `packages/dartway_serverpod_core/dartway_serverpod_core_client/lib/src/protocol/**`,
+            `**/migrations/**`, `*.g.dart`, `*.freezed.dart`, `*.mocks.dart`;
+            iOS/Android project files (`*.pbxproj`, `*.xcconfig`, `*.xcscheme`,
+            `*.plist`, `*.entitlements`, `Podfile.lock`, `Runner.xcodeproj/**`);
+            lockfiles and assets (`pubspec.lock`, `*.lock`, `*.png`, `*.jpg`,
+            `*.svg`, `*.webp`). Focus on hand-written Dart.
+
+            Look for: bugs and logic errors, null-safety and typing problems, races
+            and unintended side effects, security issues. Report only findings you
+            are confident about.
+
+            Three checks specific to this repository, in addition to the above:
+
+            1. **The synchronisation law.** A change to the public API of any package
+               is incomplete until the same PR updates `example/`, `template/`, the
+               affected skills in `toolkit/skills/`, the affected pages in `docs/`,
+               and the package `CHANGELOG.md`. Flag whichever of those is missing.
+
+            2. **The protocol patch.** If the diff touches
+               `dartway_serverpod_core_client/lib/src/protocol/protocol.dart`, verify
+               that `Protocol.deserialize<T>` still contains the manual
+               `DwApiResponse.manualDeserialization<T>(data)` block right after
+               `t ??= T;`. Regenerating the protocol silently drops it, the code still
+               compiles, and every CRUD response then fails to deserialise at runtime.
+               A missing patch is a blocking finding.
+
+            3. **The toolkit invariant.** `toolkit/` must carry no project literals —
+               only `__*__` tokens. Flag any occurrence of a concrete project name
+               (for example `tvolkova`, `tvaity`, `kerla`) introduced under `toolkit/`.
+
+            Use mcp__github_inline_comment__create_inline_comment (with
+            confirmed: true) for line-level remarks. Use `gh pr comment` for the
+            summary. Say so in the summary comment if the change is clean. Publish
+            only through GitHub comments — do not emit the review as a chat message.
+
+            Write the review in English: this repository is public.
+          claude_args: |
+            --model claude-opus-5
+            --max-turns 50
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
