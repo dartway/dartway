@@ -255,7 +255,7 @@ packages:
       path: "../../packages/dartway_cli"
       relative: true
     source: path
-    version: "0.1.3"
+    version: "0.2.0"
   dartway_flutter:
     dependency: "direct main"
     description:
@@ -269,7 +269,7 @@ packages:
       path: "../../packages/dartway_lints"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   dartway_router:
     dependency: "direct main"
     description:

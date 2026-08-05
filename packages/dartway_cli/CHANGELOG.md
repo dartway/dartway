@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.2.0
+
+- **`dartway quickstart` — the framework's front door, and it is not a plugin.** It prints the whole
+  setup brief to stdout: prerequisites, how to create a project, the order the bring-up steps come in
+  and why, the liveness check, how to hand over the sign-in. A human pastes two commands anywhere —
+  `dart pub global activate dartway_cli` and `dartway quickstart` — and whatever assistant is at hand
+  has the instruction in context. An extension would have tied the way into an open framework to one
+  vendor's format and left everyone else copying prose; a printed text is read by all of them, and by
+  people. The brief is deliberately shell-neutral: it states the step and the reason and lets the
+  agent phrase the command its own platform wants.
+
+- **`dartway doctor` — the failures that are never DartWay's.** Dart and Flutter versions, a
+  *responding* Docker daemon (reported separately from a missing one), `serverpod_cli` against the
+  pin read from the project's own server package, and the pub global bin directory on PATH. Each
+  failure prints the command that fixes it; exit code 1 when something is blocking, so an agent or a
+  CI step can branch on it. These surface late and expensively otherwise — as `connection refused`
+  during migrations, as generated code that compiles and then misbehaves, as `dartway: command not
+  found` right after a successful install.
+
+- **`dartway create .`** uses the current empty folder as the project root instead of nesting a
+  directory inside it — the shape people actually start in, an empty folder already open in an editor
+  or an agent. The folder names the project, as in `flutter create .`, converting the separators a
+  directory may carry and a Dart package may not (`dartway-demo` → `dartway_demo`); a name that
+  cannot be converted is refused with the reason. An initialized-but-empty git repository is allowed
+  through, since that is how such a folder often arrives, and the initial commit lands in it.
+
+- **`.claude/settings.json` is seeded by the installer**, only when the project has none and never
+  overwritten afterwards. It pre-approves this stack's build commands so a first run is not a queue
+  of permission prompts, and denies reading `config/passwords.yaml` — a rule the skills stated and
+  nothing enforced. Nothing destructive is on the list.
+
+- **Removed dead pubspec rewriting.** `create` no longer retargets `ref: master` to `ref: stable`:
+  the template stopped carrying git dependencies, and the code had quietly become a no-op that the
+  docs still described.
+
 ## 0.1.3
 
 - **The harness now ships the channel back.** A project on the framework is where the rules get

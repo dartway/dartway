@@ -154,8 +154,9 @@ changes, but commit the result so the repository is self-contained. See
 Copying is not all it does. Every occurrence of `dartway_starter` becomes your project name and
 `DartwayStarter` becomes its PascalCase form, in file names and in file contents alike. Each
 package's `dependency_overrides` block — which points at the monorepo checkout and only makes sense
-inside it — is stripped, and any git dependency is retargeted from `ref: master` to `ref: stable`,
-so a standalone project follows the verified channel rather than the development trunk.
+inside it — is stripped, so the framework dependencies resolve from pub.dev like any other. The
+toolkit lands in `.claude/`, with a default `settings.json` if the project has none, and
+`dartway_notes.md` at the root.
 
 ## Where to go next
 

@@ -33,7 +33,7 @@ class CheckboxFormField extends StatelessWidget {
       enabled: enabled,
       validator: (v) => validator?.call(v ?? false),
       builder: (fieldState) {
-        // --- Синхронизация внешних изменений VN -> FormFieldState ---
+        // Propagate an external change of the notifier into the FormFieldState.
         if ((fieldState.value ?? false) != value) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (fieldState.mounted) fieldState.didChange(value);

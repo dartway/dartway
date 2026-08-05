@@ -124,7 +124,7 @@ It is a poor fit when:
 | `dartway_serverpod_core_*` | The CRUD engine: configs, access, filters, realtime, auth, uploads |
 | `dartway_flutter` | The app skeleton: bootstrap, actions, async-UI, notifications, error reports |
 | `dartway_lints` | The conventions that can be enforced by the analyzer |
-| `dartway_cli` | `dartway create`, `setup-ai`, `check`, `stats`, `deploy` |
+| `dartway_cli` | `dartway quickstart`, `doctor`, `create`, `setup-ai`, `check`, `stats`, `deploy` |
 | `dartway_studio_bridge` | The protocol an app opens to [Studio](../6-studio/studio-bridge.md) |
 
 Optional plugins live outside the core and are reached as `dw.plugins.<name>` — local storage

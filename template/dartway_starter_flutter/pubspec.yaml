@@ -71,8 +71,8 @@ dev_dependencies:
   custom_lint: ^0.8.0
   dartway_lints: ^0.1.0
 
-# Внутри монорепо темплейт собирается против ЛОКАЛЬНЫХ пакетов фреймворка.
-# При копировании в самостоятельный проект — удалить весь блок dependency_overrides.
+# Inside the monorepo the template builds against the LOCAL framework packages.
+# `dartway create` removes this whole block when it copies the template.
 dependency_overrides:
   dartway_flutter:
     path: ../../packages/dartway_flutter

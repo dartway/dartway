@@ -128,7 +128,7 @@ class _AppTextFormFieldState extends State<AppTextFormField> {
     if (text != _lastExternalValue) {
       _lastExternalValue = text;
 
-      // делаем отложенный вызов
+      // Defer: notifying during a build would rebuild the parent mid-frame.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.onChanged(text);
       });

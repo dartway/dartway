@@ -34,15 +34,26 @@ Serverpod gives you a backend. **DartWay removes the need to write one.**
 
 ## Start
 
-Open an empty folder, run `claude` in it, and ask in your own words:
+Open an empty folder in whatever AI coding assistant you use — Claude Code, Cursor, Codex, aider —
+and ask it to run these two commands:
 
-> Set up a DartWay project here called `my_app`. The instructions are in
-> https://github.com/dartway/dartway — see "For the agent".
+```bash
+dart pub global activate dartway_cli
+dartway quickstart
+```
 
-That is the whole setup. The agent installs the CLI, creates the project, starts Postgres, applies
-the migrations, seeds a user, runs the server and the app, and tells you how to sign in. From then
-on the project carries its own toolkit in `.claude/` — you keep working in prompts, and the agent
-already knows the conventions.
+The second one prints the whole setup instruction: what the machine needs, how to create the
+project, the order the bring-up steps come in and why, how to verify the server is answering, and
+how to hand you the sign-in. Then say what you want — *"set up a DartWay project called my_app and
+bring it up"*.
+
+That is the whole setup. The agent creates the project, starts Postgres, applies the migrations,
+seeds a user, runs the server and the app, and tells you how to sign in. From then on the project
+carries its own toolkit in `.claude/` — you keep working in prompts, and the agent already knows the
+conventions.
+
+The instruction is a printed text rather than a plugin on purpose: an extension lives in one
+vendor's format, and the front door of an open framework should not. It is equally readable by you.
 
 You get a running app: passwordless phone auth, roles, navigation, an admin panel and a UI kit you
 own — and **no domain models**, because your domain is yours to write.
@@ -50,39 +61,9 @@ own — and **no domain models**, because your domain is yours to write.
 No agent at hand? Every command is in the created project's `README.md`, and the walkthrough is at
 [dartway.dev/docs/quick-start](https://dartway.dev/docs/quick-start).
 
-## For the agent
-
-*If you are an AI assistant asked to set up a DartWay project, follow this. Report facts — the
-applied migration, the API status code, the sign-in identifier — not assumptions.*
-
-**Check first, and ask the human if something is missing:** `dart --version`, `flutter --version`,
-and a running Docker daemon (`docker ps`). Do not work around a stopped Docker — Postgres comes
-from it.
-
-1. **Create the project**, from the folder that should contain it:
-
-   ```bash
-   dart pub global activate dartway_cli
-   dartway create <project_name>     # lowercase snake_case — it is a Dart package name
-   ```
-
-   This pulls the framework's `stable` channel and writes three packages — `<name>_server`,
-   `<name>_client` (generated; never edited by hand) and `<name>_flutter` — plus the AI toolkit
-   in `.claude/`.
-
-2. **From here the project instructs you.** Read `.claude/skills/dartway-run/SKILL.md` inside the
-   new project and follow it: it carries the order that matters (seeding before migrating fails; a
-   started container is not yet a database accepting connections), the ports, the failure table and
-   the verification step. In short: dependencies → Postgres in Docker → migrations → dev seed →
-   server → app.
-
-3. **Verify before reporting success.** `curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/`
-   must print `200`.
-
-4. **Hand over the sign-in.** The seed prints the phone numbers; the one-time code is printed in the
-   server console — find the real one and pass it on rather than telling the human to guess.
-
-Never print the contents of `config/passwords.yaml`.
+> **If you are an AI assistant reading this repository** because you were asked to set up a DartWay
+> project: run `dart pub global activate dartway_cli` and then `dartway quickstart`, and follow what
+> it prints. That text is maintained with the code; this page is not the instruction.
 
 ## What is in this repository
 

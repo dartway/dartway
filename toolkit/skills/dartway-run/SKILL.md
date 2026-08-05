@@ -24,6 +24,18 @@ Project packages: `__SERVER_PKG__` (backend), `__FLUTTER_PKG__` (app),
 
 ---
 
+## Before anything else
+
+```bash
+dartway doctor
+```
+
+It reports Dart, Flutter, a running Docker daemon, whether `serverpod_cli` matches this
+project's pin, and whether globally activated executables are on PATH — with the exact fix
+for each. Exit code 1 means something below will fail; relay what it names and ask the human
+rather than working around it. Half the failure table further down is a problem doctor names
+in a second.
+
 ## The order (it is not arbitrary)
 
 ```bash

@@ -13,7 +13,7 @@ skills/dartway-*/SKILL.md     # the DartWay methodology — 12 skills: requireme
                               #   feature-scaffold, models, crud-config, data-layer, navigation,
                               #   ui-kit, clean-code, push-delivery, finish
 commands/{commit,dartway-audit}.md
-setup-claude.sh / .ps1        # legacy installers, superseded by `dartway setup-ai` — nothing calls them
+settings.json                 # default permissions, seeded once as .claude/settings.json
 ```
 
 `CLAUDE.md` is installed as `.claude/CLAUDE.md` and committed with the project, which Claude Code automatically keeps in context — which is why a client repo needs no project `CLAUDE.md` files: the methodology rides in from the toolkit, and project knowledge lives in `docs/`.
@@ -25,6 +25,8 @@ The skills are **generic**: project-specific values are extracted into placehold
 | `__SERVER_PKG__` / `__CLIENT_PKG__` / `__FLUTTER_PKG__` / `__SHARED_PKG__` | the Dart package names | auto-detected by `*_server`/`*_client`/`*_flutter`/`*_shared` |
 | `__BASE_BRANCH__` | the base branch | a parameter of the installer run |
 | `__PROJECT_LANGUAGE__` | the language the project writes its own texts in | `--language`, default English |
+
+`settings.json` is installed as `.claude/settings.json` **only when the project has none**, and is never overwritten afterwards — a project adds its own permissions to it, and losing those on an update would cost more than a stale default. It pre-approves this stack's build commands (`dart pub get`, `docker compose up`, `serverpod generate`, the test runners) so that bringing a fresh project up is not a queue of permission prompts, and it denies reading `config/passwords.yaml` — turning a rule the skills merely state into one the harness enforces. Nothing destructive is on the allow list: `docker compose down`, commits and pushes still ask.
 
 `dartway_notes.md` is the one file installed outside `.claude/`: a git-ignored journal at the project root where findings about the framework itself are recorded — a rule that did not catch a mistake, an API that forced a workaround. Managed files cannot be fixed in place (they are overwritten on update), so this is where the fix waits to be carried into the monorepo. An existing journal is never overwritten.
 

@@ -7,7 +7,8 @@ import 'package:path/path.dart' as p;
 /// `.claude/` is a generated-but-committed artifact (like the Serverpod
 /// client). Only MANAGED files are overwritten: `CLAUDE.md`, skills named
 /// `dartway-*` and the `commit` / `dartway-audit` commands. Project-own
-/// skills and commands are never touched.
+/// skills and commands are never touched, and `settings.json` is seeded once
+/// and then belongs to the project.
 class ToolkitInstaller {
   static const managedCommandFiles = ['commit.md', 'dartway-audit.md'];
 
@@ -58,8 +59,33 @@ class ToolkitInstaller {
 
     _substituteTokens(managedFiles, tokens);
 
+    _installSettings(toolkitDir, claudeDir);
     _installNotesJournal(toolkitDir, projectRoot, tokens);
     _reportLegacyInstallerTraces(projectRoot);
+  }
+
+  /// Puts a default `.claude/settings.json` in place, unless the project
+  /// already has one.
+  ///
+  /// It pre-approves the build commands of this stack — `dart pub get`,
+  /// `docker compose up`, `serverpod generate`, the test runners — so that
+  /// bringing a fresh project up is not a queue of permission prompts, and it
+  /// denies reading `config/passwords.yaml`, turning a rule the skills merely
+  /// state into one the harness enforces. Nothing destructive is on the list:
+  /// `docker compose down`, commits and pushes still ask.
+  ///
+  /// **Not a managed file** — unlike the skills it is never overwritten, since
+  /// a project adds its own permissions to it and losing those on an update
+  /// would be worse than shipping a stale default. The consequence: changes
+  /// here reach existing projects only if someone deletes the file first.
+  static void _installSettings(Directory toolkitDir, Directory claudeDir) {
+    final template = File(p.join(toolkitDir.path, 'settings.json'));
+    final settings = File(p.join(claudeDir.path, 'settings.json'));
+    if (!template.existsSync() || settings.existsSync()) {
+      return;
+    }
+    template.copySync(settings.path);
+    stdout.writeln('Created .claude/settings.json (pre-approved dev commands)');
   }
 
   /// Puts `dartway_notes.md` at the project root and git-ignores it.
@@ -110,7 +136,9 @@ class ToolkitInstaller {
   /// else's repository, and an installer that edits the git index is a
   /// different kind of tool than one that copies files.
   static void _reportLegacyInstallerTraces(Directory projectRoot) {
-    final legacyDir = Directory(p.join(projectRoot.path, 'tools', 'dw_claude_setup'));
+    final legacyDir = Directory(
+      p.join(projectRoot.path, 'tools', 'dw_claude_setup'),
+    );
     if (!legacyDir.existsSync()) return;
 
     stdout.writeln(
