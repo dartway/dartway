@@ -97,42 +97,60 @@ class AppTextFormField extends StatefulWidget {
 
 class _AppTextFormFieldState extends State<AppTextFormField> {
   late final TextEditingController _controller;
-  late String _lastExternalValue;
+
+  /// True only while this state is writing the parent's value into the
+  /// controller, so the resulting notification is not echoed straight back.
+  bool _adoptingExternalValue = false;
 
   @override
   void initState() {
     super.initState();
-    _lastExternalValue = widget.value;
     _controller = TextEditingController(text: widget.value);
     _controller.addListener(_onControllerChanged);
   }
 
+  /// Adopt the parent's value **only when the parent actually changed it** —
+  /// the comparison is against the previous widget, not against a value this
+  /// state tracked for itself.
+  ///
+  /// The difference is the whole bug this replaced. `onChanged` is delivered a
+  /// frame late (see below), so between a keystroke and the parent catching up
+  /// there is a window in which `widget.value` is stale. Any rebuild landing in
+  /// that window — a network response, a neighbouring provider, a theme change —
+  /// used to look like "the parent set a new value" and overwrote the field with
+  /// the stale text, cursor to the end. Typing then continued on a truncated
+  /// prefix: "Fitness Club" was saved as "Fitne".
+  ///
+  /// `oldWidget.value` cannot be stale in that way: it is what the parent held
+  /// on the previous build, so a difference means a real external change.
   @override
   void didUpdateWidget(covariant AppTextFormField oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.value != _lastExternalValue &&
-        widget.value != _controller.text) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _syncControllerText(
-          widget.value,
-          placeCursorAtEnd: widget.cursorToEndOnExternalUpdate,
-        );
-        _lastExternalValue = widget.value;
-      });
+    if (widget.value != oldWidget.value && widget.value != _controller.text) {
+      _adoptingExternalValue = true;
+      _syncControllerText(
+        widget.value,
+        placeCursorAtEnd: widget.cursorToEndOnExternalUpdate,
+      );
+      _adoptingExternalValue = false;
     }
   }
 
   void _onControllerChanged() {
-    final text = _controller.text;
-    if (text != _lastExternalValue) {
-      _lastExternalValue = text;
+    if (_adoptingExternalValue) return;
 
-      // делаем отложенный вызов
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        widget.onChanged(text);
-      });
-    }
+    final text = _controller.text;
+    if (text == widget.value) return;
+
+    // Defer: notifying during a build would rebuild the parent mid-frame.
+    // Every keystroke schedules one of these, and they all run in the same
+    // post-frame batch — the guard lets only the one still matching the field
+    // through, so the parent hears the latest text instead of a replay.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _controller.text != text) return;
+      widget.onChanged(text);
+    });
   }
 
   void _syncControllerText(String newText, {required bool placeCursorAtEnd}) {

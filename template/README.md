@@ -60,6 +60,13 @@ docker compose up -d          # dev database on 8090, test database on 9090
 dart test
 ```
 
+The app has widget tests of its own, and those need nothing running:
+
+```bash
+cd dartway_starter_flutter
+flutter test
+```
+
 The suites commit real transactions (`RollbackDatabase.disabled`) and wipe the
 auth tables around themselves, which makes them stateful neighbours rather than
 isolated units: run in parallel they wipe each other's rows mid-test. Files

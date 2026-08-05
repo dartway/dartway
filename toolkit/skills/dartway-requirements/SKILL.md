@@ -30,7 +30,7 @@ Find everything already related to the topic (Glob/Grep/Read; for broad coverage
 - **Models** — are there suitable `.spy.yaml` files (fields, relations, enums): what to reuse, what to extend, what is missing. Domain-first (`dartway-models`).
 - **CRUD/logic** — existing `DwCrudConfig`, permissions (`allowSave`/`allowDelete`), validations, side effects (`dartway-crud-config`).
 - **Features** — nearby features in Flutter (entry point, flow), what is reusable; remember feature isolation.
-- **Current behaviour** — read the `DwFeatureSpec` of the affected features (in their public files) and the `knownIssues` there: what is already acknowledged as wrong is most likely the subject of the task. Architecture and cross-cutting conventions — `docs/1_general/*`.
+- **Current behaviour** — read the `DwFeatureSpec` of the affected features (in their public files) and the `knownIssues` there: what is already acknowledged as wrong is most likely the subject of the task. Cross-cutting conventions are in code — the registries and enums of `lib/core/`, the doc comments above the CRUD configs.
 
 Reduce it to three lists: **what already exists → what is missing → what gets in the way** (constraints of the current schema/permissions/architecture).
 

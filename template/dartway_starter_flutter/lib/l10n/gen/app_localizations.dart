@@ -218,6 +218,12 @@ abstract class AppLocalizations {
   /// **'Fill registration data'**
   String get fillRegistrationData;
 
+  /// No description provided for @enterYourPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your phone number'**
+  String get enterYourPhone;
+
   /// No description provided for @nameLabel.
   ///
   /// In en, this message translates to:

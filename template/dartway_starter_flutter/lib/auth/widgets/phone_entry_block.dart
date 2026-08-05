@@ -30,7 +30,9 @@ class PhoneEntryBlock extends HookConsumerWidget {
 
     return Column(
       children: [
-        AppText.title(l10n.fillRegistrationData),
+        AppText.title(
+          isRegistration ? l10n.fillRegistrationData : l10n.enterYourPhone,
+        ),
         const Gap(36),
         if (isRegistration)
           Padding(
