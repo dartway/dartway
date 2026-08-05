@@ -4,6 +4,8 @@ import 'package:args/command_runner.dart';
 import 'package:dartway_cli/src/commands/check_command.dart';
 import 'package:dartway_cli/src/commands/create_command.dart';
 import 'package:dartway_cli/src/commands/deploy_command.dart';
+import 'package:dartway_cli/src/commands/doctor_command.dart';
+import 'package:dartway_cli/src/commands/quickstart_command.dart';
 import 'package:dartway_cli/src/commands/setup_ai_command.dart';
 import 'package:dartway_cli/src/commands/stats_command.dart';
 
@@ -11,8 +13,11 @@ Future<void> main(List<String> args) async {
   final runner =
       CommandRunner<int>(
           'dartway',
-          'DartWay framework CLI: project scaffolding, AI toolkit setup and convention checks.',
+          'DartWay framework CLI: setup instructions, environment checks, '
+              'project scaffolding, AI toolkit setup and convention checks.',
         )
+        ..addCommand(QuickstartCommand())
+        ..addCommand(DoctorCommand())
         ..addCommand(CreateCommand())
         ..addCommand(SetupAiCommand())
         ..addCommand(CheckCommand())

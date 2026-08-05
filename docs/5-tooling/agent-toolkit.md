@@ -62,6 +62,15 @@ truth is the toolkit in the monorepo, and there is no reverse sync.
 
 Updating is a deliberate act with a visible diff: run `setup-ai` again, read what changed, commit.
 
+`.claude/settings.json` sits on the other side of that line: it is written once, when the project
+has none, and never touched again. It pre-approves this stack's build commands — `dart pub get`,
+`docker compose up`, `serverpod generate`, the test runners — so a first run is not a queue of
+permission prompts, and it denies reading `config/passwords.yaml`, which turns a rule the skills
+merely state into one the harness enforces. Nothing destructive is on the allow list: `docker
+compose down`, commits and pushes still ask. A project adds its own permissions there, and an
+update will not take them away — the price being that a changed default reaches an existing project
+only if someone deletes the file first.
+
 That is also why the install leaves a `dartway_notes.md` at the project root, git-ignored. A rule
 that did not catch a mistake, two skills that disagree, an API the app had to work around — none of
 that can be fixed in the installed copy, and all of it is worth keeping: the rules are only ever

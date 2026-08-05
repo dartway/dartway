@@ -1,7 +1,8 @@
 # What does the `dartway` command do?
 
-Four commands: one creates a project, one installs the agent toolkit into an existing one, and two
-read your code back to you — the conventions checker and a size report.
+It is the front door and the toolbox: one command prints the whole setup instruction, one checks
+whether the machine can run any of it, one creates a project, one installs the agent toolkit into
+an existing one, two read your code back to you, and one deploys the server.
 
 ```bash
 dart pub global activate dartway_cli
@@ -19,6 +20,53 @@ monorepo — a shallow clone cached in `~/.dartway/monorepo`, on the `stable` br
 `stable` is the last state that was verified end to end; `master` is the development trunk and may
 be mid-refactor. That is why the version of the CLI you installed does not decide what your
 project gets — the channel does.
+
+## `dartway quickstart` — the instruction, printed
+
+```bash
+dartway quickstart
+```
+
+Prints the full setup brief to stdout: what the machine needs, how to create a project, the order
+the bring-up steps come in and why, how to verify the server is actually answering, and how to hand
+over the sign-in. It writes nothing and asks nothing.
+
+This is the framework's entry point, and the reason it is a printed text rather than an extension
+for one assistant: **whatever agent you use, its way in is two commands** —
+
+```bash
+dart pub global activate dartway_cli
+dartway quickstart
+```
+
+— after which the instruction is in that agent's context and it proceeds on its own. A plugin for
+one vendor would have made the front door of an open framework depend on a format we do not
+control, and would have left everyone else with prose to copy. The brief is deliberately shell-
+neutral: it states the step and the reason, and lets the agent phrase the command the way its own
+platform wants.
+
+It is equally readable by a human, and it is the same text an agent gets — there is no second,
+friendlier version to drift from it.
+
+## `dartway doctor` — is this machine ready?
+
+```bash
+dartway doctor
+```
+
+Checks the five things that break a first run, and prints the exact fix for each:
+
+| Check | Why it is here |
+|---|---|
+| Dart `>=3.11` | The SDK running the CLI is the one that will run the project |
+| Flutter `>=3.41` | |
+| A responding Docker daemon | Postgres comes from it, and there is no second path. Installed-but-stopped is reported separately from missing |
+| `serverpod_cli` matching the project's pin | The generator writes code for its own version; a drifted CLI produces a protocol that compiles and then misbehaves at runtime. Inside a project the expected version is read from the server package rather than assumed |
+| The pub global bin directory on PATH | The cause of `dartway: command not found` right after a successful install. A warning, not a failure — the fallback is `dart pub global run dartway_cli:dartway` |
+
+Exit code 1 if anything is blocking, 0 otherwise, so an agent or a CI step can branch on it. Run it
+before `create` and again inside a project — the Serverpod check gets sharper once there is a pin
+to read.
 
 ## `dartway create <project_name>` — a project that already runs
 
@@ -43,24 +91,37 @@ What the copy does beyond copying:
 - skips build residue — `.dart_tool`, `build`, `.git`, `.idea`, `.fvm`, `ephemeral`,
   `node_modules`, `pubspec.lock`;
 - strips the monorepo-only `dependency_overrides` block from every package pubspec — those
-  overrides point at sibling folders that do not exist in your project;
-- retargets git dependencies from `ref: master` to `ref: stable`, so a standalone project follows
-  the verified channel and not the trunk.
+  overrides point at sibling folders that do not exist in your project, and what is left resolves
+  from pub.dev like any other dependency.
 
 The project name must be a lower_snake_case Dart identifier — it becomes three package names. The
 target directory must not exist yet; `create` refuses rather than merging into it.
+
+```bash
+dartway create .
+```
+
+A dot covers the shape people actually start in — an empty folder already opened in an editor or an
+agent — and uses that folder as the project root instead of nesting one inside it. The folder then
+names the project, the way `flutter create .` does: `dartway-demo/` becomes `dartway_demo`, since a
+folder may carry dashes and a Dart package may not. A name that cannot be converted is refused with
+the reason rather than mangled.
+
+The folder has to be empty; an initialized-but-empty git repository is allowed through, since that is
+how such a folder often arrives, and the initial commit then lands in it rather than in a new one.
 
 | Option | Meaning |
 |---|---|
 | `--channel` | Monorepo branch to create from. Default `stable`, or `DARTWAY_BRANCH` |
 | `--local-repo` | Use a local monorepo checkout instead of cloning (framework development) |
+| `--language` | The language the project writes its own texts in. Default English |
 | `--no-git` | Skip `git init` and the initial commit |
 
-The last thing `create` prints is not a wall of commands. It says to `cd` in and run `claude`,
-then ask for the project to come up in your own words. Every new project ships an AI toolkit that
-knows this stack — telling people to type `docker compose up -d` by hand while installing that
-toolkit was a contradiction. The manual sequence still exists, in the project's `README.md`, for
-people without an agent at hand and for anyone who wants to see what actually happens.
+The last thing `create` prints is not a wall of commands: it points at `dartway doctor` and
+`dartway quickstart`, and says to ask whatever assistant you use to bring the project up. Every new
+project ships a toolkit that knows this stack — telling people to type `docker compose up -d` by
+hand while installing that toolkit was a contradiction. The manual sequence still exists, in the
+project's `README.md`, for anyone who wants to see what actually happens.
 
 ## `dartway setup-ai` — the toolkit in a project you already have
 
@@ -69,8 +130,8 @@ dartway setup-ai --base-branch develop
 ```
 
 Installs or updates `.claude/` in the current project: the methodology `CLAUDE.md`, the
-`dartway-*` skills and the `commit` / `dartway-audit` commands. It replaces the old
-`setup-claude.sh` / `.ps1` scripts.
+`dartway-*` skills and the `commit` / `dartway-audit` commands. It replaced the old
+`setup-claude.sh` / `.ps1` scripts, which are gone.
 
 It finds the project root through `git rev-parse --show-toplevel` (falling back to the current
 directory), then detects the package layout by directory suffix: `*_server`, `*_client`,
@@ -81,6 +142,11 @@ into the installed markdown, so the skills speak your package names, not placeho
 `--language` records what the project writes its own texts in — feature specs, doc comments, its
 journal — straight into the installed `CLAUDE.md`. It defaults to English and does not touch what
 ships to other people: package APIs and error strings stay English either way.
+
+`.claude/settings.json` is written only when the project has none, and never touched again: it
+pre-approves this stack's build commands so a first run is not a queue of permission prompts, and
+denies reading `config/passwords.yaml`. A project extends it; an update will not take those edits
+away, at the price of an old default staying put until someone deletes the file.
 
 Two things land outside `.claude/`. `dartway_notes.md` is created at the project root (and added to
 `.gitignore`) unless it is already there — the journal of what the *framework* got wrong, which the

@@ -9,7 +9,7 @@ dependencies:
 
   dartway_serverpod_core_client: ^0.3.0
 
-# Внутри монорепо — локальная сборка. В самостоятельном проекте удалить блок.
+# Inside the monorepo — a local build. `dartway create` removes this block.
 dependency_overrides:
   dartway_serverpod_core_client:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_client

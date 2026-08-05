@@ -23,9 +23,9 @@ dev_dependencies:
   # legacy-verifier test migrates away from.
   crypto: ^3.0.0
 
-# Внутри монорепо темплейт собирается против ЛОКАЛЬНЫХ пакетов фреймворка.
-# При копировании в самостоятельный проект — удалить весь блок dependency_overrides
-# (зависимости поедут из git, объявленного выше).
+# Inside the monorepo the template builds against the LOCAL framework packages.
+# `dartway create` removes this whole block when it copies the template, so a
+# standalone project resolves the dependencies declared above from pub.dev.
 dependency_overrides:
   dartway_serverpod_core_server:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_server

@@ -10,7 +10,7 @@ This is the repository of **the DartWay framework itself** (fullstack Dart: Flut
 | `packages/dartway_flutter` | The Flutter toolbox (application skeleton): DwAppRunner, guarded actions (`dw.action`), the async-UI contract, notifications, error reporting, `DwPlugins`. Ships no design |
 | `packages/dartway_shared_preferences` | Local-storage plugin: reactive riverpod providers over SharedPreferences, reached through `dw.plugins.prefs`. Optional — the core does not pull it in |
 | `packages/dartway_lints` | Convention enforcement (custom_lint rules) |
-| `packages/dartway_cli` | CLI: `create` / `setup-ai` / `check` (the built-in convention checker) / `stats` |
+| `packages/dartway_cli` | CLI: `quickstart` (the agent-facing setup brief — the framework's front door) / `doctor` (prerequisite checks) / `create` / `setup-ai` / `check` (the built-in convention checker) / `stats` / `deploy` |
 | `template/` | **The skeleton** — the only thing `dartway create` copies. Auth, roles, navigation, admin panel, UI kit, zero domain models. Packages named `dartway_starter_*` (the CLI renames them to the project's name) |
 | `example/` | The canonical project (a fitness club) — reference example, course project, Studio demo. **The CLI no longer hands it out**: read it, do not inherit from it |
 | `toolkit/` | The Claude harness for application projects (`dartway-*` skills, `__*__` tokens, the installer) |

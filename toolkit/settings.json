@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dart pub get:*)",
+      "Bash(dart pub upgrade:*)",
+      "Bash(dart analyze:*)",
+      "Bash(dart format:*)",
+      "Bash(dart test:*)",
+      "Bash(dart run:*)",
+      "Bash(dart bin/main.dart:*)",
+      "Bash(dart bin/seed_dev.dart:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter test:*)",
+      "Bash(flutter run:*)",
+      "Bash(flutter build:*)",
+      "Bash(serverpod generate:*)",
+      "Bash(serverpod create-migration:*)",
+      "Bash(dartway:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose exec:*)",
+      "Bash(curl:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(./**/config/passwords.yaml)"
+    ]
+  }
+}

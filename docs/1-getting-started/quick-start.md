@@ -3,6 +3,9 @@
 > Goal: a running fullstack Dart app in ten minutes, and your first feature — database to live
 > screen — in twenty more. No endpoints are written anywhere in this guide.
 
+This page is the path by hand. Working with an AI assistant instead? Two commands do all of part 1
+and 2 for you — [start with an agent](start-with-an-agent.md).
+
 ## Prerequisites
 
 - Dart SDK `>=3.11` and Flutter `>=3.41` (FVM works; the template carries a `.fvmrc`)
@@ -15,13 +18,16 @@
 
   You need it as soon as you add your own models. Pin it: the CLI generates code for its own
   version, and a CLI newer than the `serverpod` in your pubspec produces a generated protocol that
-  compiles and then misbehaves at runtime. Check with `dart pub global list`.
+  compiles and then misbehaves at runtime.
+
+`dartway doctor` checks all four and prints the fix for whatever is missing — run it instead of
+checking by hand.
 
 ## 1. Create the project
 
 ```bash
 dart pub global activate dartway_cli
-dartway create my_app
+dartway create my_app          # or `dartway create .` to use the current empty folder
 ```
 
 You get three packages — `my_app_server`, `my_app_client` (generated), `my_app_flutter` — the agent
@@ -34,18 +40,10 @@ the part you write. What each folder is for: [project layout](project-layout.md)
 
 ## 2. Run it
 
-The toolkit knows this stack, so the shortest path is to ask for it:
+In VS Code this is three launch configurations: **Server**, then **Seed dev data**, then
+**Flutter (web)**. With an assistant it is one sentence — [start with an agent](start-with-an-agent.md).
 
-```bash
-cd my_app
-claude
-```
-
-…then say *"bring the project up"*. It starts Postgres, applies the migrations, seeds a dev user,
-runs the server and the app, and tells you how to sign in. In VS Code the same thing is three launch
-configurations: **Server**, then **Seed dev data**, then **Flutter (web)**.
-
-By hand it is four commands, and the order matters:
+By hand it is five commands, and the order matters:
 
 ```bash
 cd my_app/my_app_server

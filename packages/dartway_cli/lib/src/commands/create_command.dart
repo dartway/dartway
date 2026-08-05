@@ -68,15 +68,17 @@ class CreateCommand extends Command<int> {
       'Create a new DartWay project from the canonical template.';
 
   @override
-  String get invocation => 'dartway create <project_name>';
+  String get invocation => 'dartway create <project_name> | .';
 
   @override
   Future<int> run() async {
-    final projectName = _requireProjectName();
-    final targetDir = Directory(p.join(Directory.current.path, projectName));
-    if (targetDir.existsSync()) {
-      throw StateError('Directory already exists: ${targetDir.path}');
-    }
+    final createInPlace = _requireSingleArgument() == '.';
+    final projectName = createInPlace
+        ? _projectNameFromCurrentDirectory()
+        : _requireValidProjectName(_requireSingleArgument());
+    final targetDir = createInPlace
+        ? _requireEmptyCurrentDirectory()
+        : _requireFreeSubdirectory(projectName);
 
     final monorepoDir = await MonorepoSource(
       branch: argResults!['channel'] as String,
@@ -110,40 +112,99 @@ class CreateCommand extends Command<int> {
     stdout
       ..writeln('')
       ..writeln('Project $projectName is ready.')
+      ..writeln('');
+    if (!createInPlace) {
+      stdout.writeln('  cd $projectName');
+    }
+    stdout
+      ..writeln('  dartway doctor        # is this machine ready?')
+      ..writeln('  dartway quickstart    # what to do next, in full')
       ..writeln('')
-      ..writeln('  cd $projectName')
-      ..writeln('  claude')
-      ..writeln('')
-      ..writeln('Then ask for it in your own words — "bring the project up".')
       ..writeln(
-        'The AI toolkit shipped in .claude/ knows this stack: it starts '
-        'Postgres, applies',
+        'Open the project in whatever AI assistant you use and ask it to bring '
+        'the project',
       )
       ..writeln(
-        'the migrations, seeds a dev user, runs the server and the app, '
-        'and tells you how',
+        'up: `dartway quickstart` prints everything it needs to know. Prefer '
+        'your own hands?',
       )
-      ..writeln('to sign in.')
-      ..writeln('')
-      ..writeln(
-        'Prefer your own hands, or no agent at hand? Every command is in '
-        'README.md.',
-      );
+      ..writeln('The same commands are in README.md.');
     return 0;
   }
 
-  String _requireProjectName() {
+  Directory _requireFreeSubdirectory(String projectName) {
+    final targetDir = Directory(p.join(Directory.current.path, projectName));
+    if (targetDir.existsSync()) {
+      throw StateError('Directory already exists: ${targetDir.path}');
+    }
+    return targetDir;
+  }
+
+  /// `dartway create .` is for the shape people actually start in: an empty
+  /// folder already open in an editor or an agent. Creating a subdirectory
+  /// inside it buries the project one level below where the session is running.
+  ///
+  /// An initialized-but-empty git repository is allowed through, since that is
+  /// how such a folder often arrives; anything else is refused rather than
+  /// merged into — this command writes hundreds of files.
+  Directory _requireEmptyCurrentDirectory() {
+    final currentDir = Directory.current;
+    final occupants = currentDir
+        .listSync()
+        .map((entity) => p.basename(entity.path))
+        .where((name) => name != '.git')
+        .toList();
+    if (occupants.isNotEmpty) {
+      throw StateError(
+        'The current directory is not empty (${occupants.take(3).join(', ')}'
+        '${occupants.length > 3 ? ', …' : ''}). '
+        'Run `dartway create <name>` to create the project in a subdirectory.',
+      );
+    }
+    return currentDir;
+  }
+
+  String _requireSingleArgument() {
     final rest = argResults!.rest;
     if (rest.length != 1) {
-      usageException('Provide exactly one project name.');
+      usageException('Provide exactly one project name, or `.`.');
     }
-    final projectName = rest.single;
-    if (!RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(projectName)) {
+    return rest.single;
+  }
+
+  /// With `.` the folder names the project, the way `flutter create .` does.
+  /// A folder is allowed to be called `my-app` while a Dart package is not, so
+  /// the obvious separators are converted rather than rejected.
+  String _projectNameFromCurrentDirectory() {
+    final directoryName = p.basename(Directory.current.absolute.path);
+    final candidate = directoryName.toLowerCase().replaceAll(
+      RegExp(r'[\s\-.]+'),
+      '_',
+    );
+    if (!_isValidProjectName(candidate)) {
+      usageException(
+        'Cannot use "$directoryName" as a project name: it has to become three '
+        'Dart package names, which must be lower_snake_case identifiers. '
+        'Rename the folder, or run `dartway create <name>` from its parent.',
+      );
+    }
+    return _rejectTemplateName(candidate);
+  }
+
+  String _requireValidProjectName(String projectName) {
+    if (!_isValidProjectName(projectName)) {
       usageException(
         'Project name must be a lower_snake_case Dart identifier '
         '(got "$projectName").',
       );
     }
+    return _rejectTemplateName(projectName);
+  }
+
+  bool _isValidProjectName(String candidate) =>
+      RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(candidate);
+
+  String _rejectTemplateName(String projectName) {
     if (projectName == _sourceProjectName) {
       usageException('Pick a name other than "$_sourceProjectName".');
     }
@@ -199,20 +260,19 @@ class CreateCommand extends Command<int> {
     );
   }
 
-  /// In every package pubspec: drop the monorepo-only `dependency_overrides`
-  /// block (with its leading comments) and retarget git dependencies from
-  /// `ref: master` to `ref: stable` — standalone projects follow the verified
-  /// channel, not the development trunk.
+  /// Drops the monorepo-only `dependency_overrides` block (with its leading
+  /// comments) from every package pubspec: inside the monorepo those overrides
+  /// point at sibling folders, and in a standalone project the same paths lead
+  /// nowhere. What is left resolves from pub.dev, like any other dependency.
   void _rewritePubspecs(Directory projectRoot) {
     for (final packageDir in projectRoot.listSync().whereType<Directory>()) {
       final pubspecFile = File(p.join(packageDir.path, 'pubspec.yaml'));
       if (!pubspecFile.existsSync()) {
         continue;
       }
-      final lines = pubspecFile.readAsLinesSync();
       final rewritten = _stripDependencyOverrides(
-        lines,
-      ).map((line) => line.replaceAll('ref: master', 'ref: stable')).toList();
+        pubspecFile.readAsLinesSync(),
+      );
       pubspecFile.writeAsStringSync('${rewritten.join('\n')}\n');
     }
   }
@@ -249,8 +309,13 @@ class CreateCommand extends Command<int> {
       .join();
 
   void _initGit(Directory projectRoot) {
+    // With `create .` the folder may already be a repository — initializing it
+    // again is harmless but noisy, and reinitializing somebody's repo is worse.
+    final alreadyARepository = Directory(
+      p.join(projectRoot.path, '.git'),
+    ).existsSync();
     final commands = [
-      ['init', '-q'],
+      if (!alreadyARepository) ['init', '-q'],
       ['add', '-A'],
       ['commit', '-q', '-m', 'chore: initial commit from DartWay template'],
     ];
