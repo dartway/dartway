@@ -20,6 +20,7 @@
   "registrationAction": "Регистрация",
   "loginAction": "Вход",
   "fillRegistrationData": "Заполните данные регистрации",
+  "enterYourPhone": "Введите номер телефона",
   "nameLabel": "Имя",
   "requiredField": "Обязательное поле",
   "youMustAgree": "Нужно согласие",

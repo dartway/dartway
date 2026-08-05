@@ -13,11 +13,17 @@ my_app/
   my_app_server/     Serverpod backend — models, CRUD configs, business logic
   my_app_client/     generated protocol + API client — never edited by hand
   my_app_flutter/    the app — features, UI kit, navigation
-  docs/              the project's own architecture notes
   .claude/           the agent toolkit (installed, then committed)
   .vscode/           Server / Seed dev data / Flutter (web) launch configs
   .github/           a Claude PR-review workflow (delete it to turn review off)
 ```
+
+**There is no `docs/` folder, deliberately.** What a screen does belongs in its
+[`DwFeatureSpec`](../3-flutter/features-and-specs.md), the server-side rules in doc comments above
+the CRUD config, a cross-cutting registry — analytics events, settings keys, roles — in code under
+`lib/core/`, where the compiler knows the list and a typo is an error. A document sitting apart from
+the code goes stale without anything failing: nothing compiles it, no checker sees it, and the next
+reader — increasingly an agent — believes it.
 
 ## Why three packages
 

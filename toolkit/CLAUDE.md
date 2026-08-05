@@ -6,7 +6,7 @@ A monorepo on the **Serverpod + DartWay + Flutter + Riverpod** stack. DartWay is
 >
 > **A rule that let you down is not fixed here** — the fix would be overwritten on the next update. Write it down in `dartway_notes.md` at the project root instead; see "Notes back to the framework" below.
 
-**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `dartway_notes.md`, its own docs — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, error strings, and anything going back into the framework.
+**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `dartway_notes.md` — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, error strings, and anything going back into the framework.
 
 ## Monorepo structure
 
@@ -73,12 +73,19 @@ A project is free to decide otherwise (a large asset library, union types where 
 
 **Why so.** A doc sitting apart from the code drifts from it silently: the compiler does not check it, the checker does not see it, and the agent reads it and believes it. On a production project such a doc described an API deleted a year earlier, and non-working code was written from it. A spec in the feature's file and a comment above the config survive a code edit because they lie in the same diff — they are impossible to miss.
 
-What stays in `docs/`:
+**There is no `docs/` folder, and a new project does not get one.** The rule has no exception carved out for "but this one is architectural": a document nobody compiles is a document nobody notices going stale, and the architectural ones rot fastest, because the code they describe changes under them without a single error.
 
-- **`docs/1_general/`** — architecture and infrastructure (`FLUTTER_ARCHITECTURE.md`, `SERVER_ARCHITECTURE.md`, release playbooks) and the **cross-cutting references** that have no feature of their own: the analytics event registry, the settings key catalog, the roles and access matrix, an external integration's payload. The sign of such a file — it describes not a screen but a convention that holds across the whole app.
-- **`docs/audits/`** — `/dartway-audit` reports.
+The cases that used to justify one, and where they go instead:
 
-Don't create a file in `docs/` that could be named after a feature. If you're tempted, it means the description did not fit into the spec, and the question is not "where to put the doc" but "why doesn't the spec answer it".
+| What it is | Where it lives now |
+|---|---|
+| A cross-cutting registry — analytics events, settings keys, roles | Code in `lib/core/`: an enum or a class of constants with doc comments. The compiler then knows the list, `dartway check` sees it, and a typo is an error rather than a discrepancy |
+| The roles and access matrix | Doc comments above the `DwCrudConfig`s — the rule sits where it is enforced |
+| An external integration's payload | Doc comments on the model or the endpoint that receives it |
+| "How this app is put together" | The skills. That is what they are: the methodology ships from the framework and is updated with it, and a copy inside the project would only fall behind it |
+| An audit report | The chat. `/dartway-audit` writes no files on purpose; what deserves to survive becomes a line in that feature's `knownIssues` |
+
+If you feel the urge to start a document, name what it would say that a `DwFeatureSpec`, a doc comment or a piece of code cannot. Usually the answer is that the spec is silent where it should not be, and the fix is in the spec.
 
 ## Cleanliness and finishing
 
@@ -136,7 +143,7 @@ Live migrations (delete an entry once no project is on the old shape):
 - Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — loaded by relevance to the task.
 - Commands (`.claude/commands/`): `/dartway-audit` — a deep audit of a module; `/commit` — a commit in the project's CI format.
 
-**Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + docs sync + tests before the PR).
+**Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + reconciling the specs and doc comments with the code + tests before the PR).
 
 **Bringing the project up locally** (a fresh clone, "it won't start", after a model change) — `dartway-run`: DB, migrations, seed, server, app, plus diagnostics for the typical failures. A liveness check is mandatory — report it as a fact (the API response code, the applied migrations), not as an assumption.
 

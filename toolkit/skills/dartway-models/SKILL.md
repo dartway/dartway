@@ -12,7 +12,7 @@ description: >-
 
 # DartWay — models (Serverpod, server)
 
-**Domain-first:** every feature starts with its model(s) (Law 2). A model reflects domain reality, not the momentary needs of the UI. The schema is the single source; Flutter models are generated from it, never duplicated by hand. See also `__SERVER_PKG__/CLAUDE.md`, `dartway-crud-config`, and `docs/1_general/SERVER_ARCHITECTURE.md` if the project keeps one.
+**Domain-first:** every feature starts with its model(s) (Law 2). A model reflects domain reality, not the momentary needs of the UI. The schema is the single source; Flutter models are generated from it, never duplicated by hand. See also `__SERVER_PKG__/CLAUDE.md` and `dartway-crud-config`.
 
 ## Where models live
 

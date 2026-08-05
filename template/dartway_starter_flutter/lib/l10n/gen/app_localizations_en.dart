@@ -87,6 +87,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fillRegistrationData => 'Fill registration data';
 
   @override
+  String get enterYourPhone => 'Enter your phone number';
+
+  @override
   String get nameLabel => 'Name';
 
   @override

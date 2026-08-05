@@ -16,7 +16,7 @@ commands/{commit,dartway-audit}.md
 settings.json                 # default permissions, seeded once as .claude/settings.json
 ```
 
-`CLAUDE.md` is installed as `.claude/CLAUDE.md` and committed with the project, which Claude Code automatically keeps in context — which is why a client repo needs no project `CLAUDE.md` files: the methodology rides in from the toolkit, and project knowledge lives in `docs/`.
+`CLAUDE.md` is installed as `.claude/CLAUDE.md` and committed with the project, which Claude Code automatically keeps in context — which is why a client repo needs no project `CLAUDE.md` files: the methodology rides in from the toolkit, and project knowledge lives in the code that holds it — `DwFeatureSpec`, doc comments, the registries of `lib/core/`.
 
 The skills are **generic**: project-specific values are extracted into placeholder tokens that the installer substitutes at install time:
 
@@ -30,7 +30,7 @@ The skills are **generic**: project-specific values are extracted into placehold
 
 `dartway_notes.md` is the one file installed outside `.claude/`: a git-ignored journal at the project root where findings about the framework itself are recorded — a rule that did not catch a mistake, an API that forced a workaround. Managed files cannot be fixed in place (they are overwritten on update), so this is where the fix waits to be carried into the monorepo. An existing journal is never overwritten.
 
-The docs paths (`docs/1_general`, `docs/audits`) are a DartWay convention, hardcoded as-is; there are no separate per-feature docs, the description lives in `DwFeatureSpec` next to the code. The ticket for `/commit` is passed as an argument, and the project's CI checks the format.
+A DartWay project keeps no `docs/` folder: the description of a feature lives in its `DwFeatureSpec`, the server-side rules in doc comments above the `DwCrudConfig`, cross-cutting registries in code under `lib/core/`, and the methodology in these skills. The ticket for `/commit` is passed as an argument, and the project's CI checks the format.
 
 ## Wiring it into a client repo
 

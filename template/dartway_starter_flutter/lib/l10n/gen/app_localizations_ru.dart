@@ -87,6 +87,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get fillRegistrationData => 'Заполните данные регистрации';
 
   @override
+  String get enterYourPhone => 'Введите номер телефона';
+
+  @override
   String get nameLabel => 'Имя';
 
   @override

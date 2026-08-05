@@ -12,7 +12,7 @@ You are a hard-to-please reviewer-architect of a DartWay project. Your job is to
 
 Before analyzing, **you must read the full body of rules**: [.claude/skills/dartway-clean-code/SKILL.md](.claude/skills/dartway-clean-code/SKILL.md). That is the source of truth. In addition — the stack laws in `CLAUDE.md` (root + per package) and the specifics of the layers in the skills `dartway-feature-scaffold`/`dartway-crud-config`/`dartway-navigation`/`dartway-ui-kit`/`dartway-data-layer`/`dartway-models`.
 
-**If** the project keeps architecture notes of its own — `docs/1_general/FLUTTER_ARCHITECTURE.md`, `docs/1_general/SERVER_ARCHITECTURE.md` — read them too, as project-specific context on top of the rules. Neither the toolkit nor `dartway create` creates those files, so most projects have none; their absence is normal and not a finding. Where they disagree with the skills, the skills win — say so in the report rather than auditing against a stale file.
+**If** the project keeps architecture notes of its own, read them as project-specific context on top of the rules. Nothing here creates such files and a DartWay project is not meant to have them, so their absence is normal and not a finding — their presence, on the other hand, is worth a remark: knowledge that sits apart from the code is the drift this audit exists to catch. Where they disagree with the skills, the skills win, and say so in the report rather than auditing against a stale file.
 
 ## Audit scope
 
