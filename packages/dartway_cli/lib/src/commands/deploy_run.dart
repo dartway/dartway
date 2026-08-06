@@ -67,6 +67,7 @@ Future<int> runDeploy(Command<int> command, ArgResults results) async {
   final context = DwDeployContext(
     projectRoot: projectRoot,
     serverPackage: layout.serverPackage,
+    flutterPackage: layout.flutterPackage,
     target: target,
     serverpod: serverpod,
     ssh: ssh,

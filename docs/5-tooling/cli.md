@@ -195,10 +195,24 @@ certificate contact, and the domain serving the Flutter build. The CLI **reads**
 it never rewrites it. That is the whole reason the pair stays honest — there is no second copy of a
 domain to drift.
 
-`check` changes nothing and answers whether a deployment would work. Ten assertions on the working
-copy, seven over the network — including that every `publicHost` resolves to the deployment host,
-which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone notices. With the
-server unreachable it degrades: the SSH check fails, the rest report as skipped.
+`check` changes nothing and answers whether a deployment would work. Twelve assertions on the
+working copy, seven over the network — including that every `publicHost` resolves to the deployment
+host, which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone notices.
+With the server unreachable it degrades: the SSH check fails, the rest report as skipped.
+
+Two of the local assertions are about the images. The rendered compose file builds both of them
+from the project root — `<project>_server/Dockerfile` and `<project>_flutter/Dockerfile`, named by
+convention rather than configured — so a project that never wrote one fails on the server, after the
+checkout has already moved. The other is the shape of the server image's `ENTRYPOINT`: migrations
+run as `docker compose run backend … --apply-migrations`, and shell form ignores appended arguments,
+so an unnoticed shell form turns every migration into an ordinary server start that reports success.
+The template ships the canonical pair; `server_entrypoint` remains the escape for an image you did
+not write.
+
+The web image gets one build argument, `DW_BACKEND_URL`, and it comes from `publicHost` in the
+Serverpod configuration. A web build compiles the API address into itself, so something has to
+supply it — having the deploy do it is what keeps the domain written down once. The template's
+`main.dart` reads it through `String.fromEnvironment` and falls back to localhost for a local run.
 
 `run` updates the checkout, rebuilds, applies migrations and restarts, then polls every public URL.
 It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders infrastructure on
@@ -219,7 +233,7 @@ blank. Both are overridable, neither is silent.
 | `requires.secrets`, `requires.files` | to have `check` catch a credential nobody delivered |
 | `registry_mirror` | pulling base images through a mirror |
 | `firewall_ports` | a port beyond SSH, 80 and 443 |
-| `server_entrypoint` | only when the Dockerfile declares `ENTRYPOINT` in shell form — that form ignores the arguments `docker compose run` appends, so migrations would silently start an ordinary server instead |
+| `server_entrypoint` | only when the Dockerfile declares `ENTRYPOINT` in shell form — that form ignores the arguments `docker compose run` appends, so migrations would silently start an ordinary server instead. Setting it is also what tells `check` the shell form is deliberate |
 
 ## `dartway stats` — what actually grew this week
 

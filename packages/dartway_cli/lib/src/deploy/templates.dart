@@ -59,8 +59,18 @@ services:
       context: .
       dockerfile: __SERVERPACKAGE__/Dockerfile
     restart: unless-stopped
+    # The run mode is stated twice because the two Dockerfile forms read it
+    # differently: the canonical exec-form image takes it from `command`, while
+    # a shell-form one interpolates the environment variable and ignores
+    # `command` altogether. `docker compose run` replaces `command` — that is
+    # how the migration run gets its own arguments.
     environment:
       runmode: __SERVERPODENV__
+    command:
+      - "--mode=__SERVERPODENV__"
+      - "--server-id=default"
+      - "--logging=normal"
+      - "--role=monolith"
     expose:
       - "__APIPORT__"
       - "__INSIGHTSPORT__"
@@ -76,7 +86,12 @@ services:
       context: .
       dockerfile: __FLUTTERPACKAGE__/Dockerfile
       args:
-        FLUTTER_ENV: __SERVERPODENV__
+        # A web build compiles the API address into itself, so the deploy has
+        # to supply it — and it supplies the one from the Serverpod
+        # configuration. Otherwise the domain would have to be repeated in the
+        # Flutter code or in the override, which is a copy nothing compares
+        # against: the build would keep succeeding against yesterday's API.
+        DW_BACKEND_URL: https://__APIDOMAIN__/
     restart: unless-stopped
     expose:
       - "80"

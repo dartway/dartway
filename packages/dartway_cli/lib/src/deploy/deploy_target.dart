@@ -94,7 +94,8 @@ class DwDeployTarget {
     if (!file.existsSync()) {
       throw StateError(
         'No $_configRelativePath in ${projectRoot.path}.\n'
-        'Create it, or run this command from a DartWay project root.',
+        'Copy deploy/config.yaml.example over it and fill it in, or run this '
+        'command from a DartWay project root.',
       );
     }
 

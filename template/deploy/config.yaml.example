@@ -1,0 +1,47 @@
+# Copy to config.yaml and fill in. `dartway deploy` reads it; nothing writes it.
+#
+# This file describes the **machine** and nothing else. Domains, ports, the
+# database and Redis live in dartway_starter_server/config/<env>.yaml, the
+# Serverpod configuration you already maintain — the deploy reads that file and
+# never rewrites it. Nothing is duplicated between the two, which is the whole
+# reason neither can quietly go stale.
+#
+# One environment per top-level key, and the key is the Serverpod run mode:
+# `staging` here means config/staging.yaml there.
+
+staging:
+  # Where to connect and who to become. The first login provisions the machine
+  # (`dartway deploy setup`) and is usually root; everything afterwards runs as
+  # the deploy user, who owns the checkout and needs no privileges beyond it.
+  host: 203.0.113.10
+  ssh_user: root
+  deploy_user: your-project-admin
+  os: ubuntu
+
+  # The server mirrors this repository: a deploy resets the checkout to the tip
+  # of the branch, so a stray edit on the machine cannot block one.
+  repo: git@github.com:your-org/your-project.git
+  branch: master
+
+  # Where Let's Encrypt writes about expiring certificates.
+  ssl_email: ops@example.com
+
+  # Serverpod has no concept of the host serving the Flutter build, so this is
+  # one of the few domains declared on this side. It must differ from every
+  # publicHost in the Serverpod configuration — Nginx routes by server_name.
+  web_app_domain: app.example.com
+
+  # Optional. Pull base images through a mirror when Docker Hub rate-limits.
+  # registry_mirror: mirror.gcr.io
+
+  # Optional. Ports to open beyond SSH, 80 and 443.
+  # firewall_ports: [5432]
+
+  # Optional. Credentials nobody can generate — an API token, a service account
+  # file. Listing them turns "the container starts and immediately dies" into a
+  # pre-deploy error.
+  # requires:
+  #   secrets:
+  #     - firebaseServiceAccountKey
+  #   files:
+  #     - integrations.env

@@ -1,39 +1,40 @@
-# Build stage
-FROM dart:3.5.0 AS build
-WORKDIR /app
-COPY . .
+# Built from the **project root**, not from this folder: the compose file
+# `dartway deploy setup` renders declares `context: .` and names this file
+# explicitly, because the web image next to it needs two packages and a context
+# can only be one directory. Every path below is therefore relative to the root.
+FROM dart:3.12.0 AS build
 
-# Install dependencies and compile the server executable
+WORKDIR /workspace
+COPY dartway_example_server/ dartway_example_server/
+
+WORKDIR /workspace/dartway_example_server
 RUN dart pub get
-RUN dart compile exe bin/main.dart -o bin/server
+RUN dart compile exe bin/main.dart -o /server
 
-# Final stage
 FROM alpine:latest
 
-# Environment variables
-ENV runmode=production
-ENV serverid=default
-ENV logging=normal
-ENV role=monolith
-
-# Copy runtime dependencies
+# The compiled binary is dynamically linked; /runtime holds exactly the
+# libraries it needs. ca-certificates is not part of them, and without it every
+# outbound HTTPS call from the server fails on an unverifiable certificate.
 COPY --from=build /runtime/ /
+RUN apk add --no-cache ca-certificates
 
-# Copy compiled server executable
-COPY --from=build /app/bin/server server
+WORKDIR /app
+COPY --from=build /server /app/server
+# The Serverpod configuration is source, not something the deploy renders; only
+# passwords.yaml is mounted over this directory at runtime.
+COPY --from=build /workspace/dartway_example_server/config/ /app/config/
+COPY --from=build /workspace/dartway_example_server/web/ /app/web/
+COPY --from=build /workspace/dartway_example_server/migrations/ /app/migrations/
+# Insights reads this file to filter endpoint logs.
+COPY --from=build /workspace/dartway_example_server/lib/src/generated/protocol.yaml /app/lib/src/generated/protocol.yaml
 
-# Copy configuration files and resources
-COPY --from=build /app/config/ config/
-COPY --from=build /app/web/ web/
-COPY --from=build /app/migrations/ migrations/
+EXPOSE 8080 8081 8082
 
-# This file is required to enable the endpoint log filter in Insights.
-COPY --from=build /app/lib/src/generated/protocol.yaml lib/src/generated/protocol.yaml
-
-# Expose ports
-EXPOSE 8080
-EXPOSE 8081
-EXPOSE 8082
-
-# Define the entrypoint command
-ENTRYPOINT ./server --mode=$runmode --server-id=$serverid --logging=$logging --role=$role
+# Exec form on purpose. Migrations run as `docker compose run backend
+# --mode=... --apply-migrations`, and those arguments replace CMD — which only
+# happens in this form. Shell form (`ENTRYPOINT ./server --mode=$runmode`)
+# ignores them and starts an ordinary server instead, so the deploy reports a
+# migration that never ran. `dartway deploy check` fails on that form.
+ENTRYPOINT ["/app/server"]
+CMD ["--mode=production", "--server-id=default", "--logging=normal", "--role=monolith"]

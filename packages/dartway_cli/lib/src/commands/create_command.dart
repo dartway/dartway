@@ -96,6 +96,7 @@ class CreateCommand extends Command<int> {
     _rewritePubspecs(targetDir);
 
     final layout = ProjectLayout.detect(targetDir);
+    _writeLocalPasswords(layout);
     await ToolkitInstaller.install(
       toolkitDir: Directory(p.join(monorepoDir.path, 'toolkit')),
       projectRoot: targetDir,
@@ -130,6 +131,28 @@ class CreateCommand extends Command<int> {
       )
       ..writeln('The same commands are in README.md.');
     return 0;
+  }
+
+  /// Gives the new project the local secrets it needs to run, from the
+  /// committed example.
+  ///
+  /// The file itself is git-ignored, which is why the template cannot simply
+  /// ship it: a project that carried its passwords file in Git would sooner or
+  /// later carry a real password in it, and `dartway deploy check` fails on a
+  /// tracked copy. Writing it here keeps `dartway create` → `dart run` working
+  /// without that.
+  void _writeLocalPasswords(ProjectLayout layout) {
+    final configDir = Directory(p.join(layout.serverPackageDir.path, 'config'));
+    final example = File(p.join(configDir.path, 'passwords.yaml.example'));
+    final passwords = File(p.join(configDir.path, 'passwords.yaml'));
+    if (!example.existsSync() || passwords.existsSync()) {
+      return;
+    }
+    example.copySync(passwords.path);
+    stdout.writeln(
+      'Created ${p.relative(passwords.path, from: layout.root.path)} '
+      '(local development secrets, not tracked by Git)',
+    );
   }
 
   Directory _requireFreeSubdirectory(String projectName) {

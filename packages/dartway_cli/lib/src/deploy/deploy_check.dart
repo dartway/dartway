@@ -19,6 +19,7 @@ class DwDeployContext {
   DwDeployContext({
     required this.projectRoot,
     required this.serverPackage,
+    required this.flutterPackage,
     required this.target,
     required this.serverpod,
     this.ssh,
@@ -26,6 +27,7 @@ class DwDeployContext {
 
   final Directory projectRoot;
   final String serverPackage;
+  final String flutterPackage;
   final DwDeployTarget target;
   final DwServerpodConfig serverpod;
 
@@ -193,6 +195,20 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     stage: DwDeployCheckStage.local,
     severity: DwCheckSeverity.warning,
     evaluate: _checkDockerContext,
+  ),
+  DwDeployCheck(
+    id: 'dockerfiles-present',
+    title: 'Both images the compose file builds have a Dockerfile',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkDockerfiles,
+  ),
+  DwDeployCheck(
+    id: 'dockerfile-entrypoint-form',
+    title: 'The server image can be handed migration arguments',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkEntrypointForm,
   ),
 ];
 
@@ -393,6 +409,72 @@ Future<DwDeployVerdict> _checkPasswordsCoverEnvironment(
         'Add the section and push it with "dartway deploy secret push --env '
         '$environment", or create the values on the server with '
         '"dartway deploy secret init".',
+  );
+}
+
+/// The compose file names two Dockerfiles by convention rather than by
+/// configuration, so a project that never wrote one fails at build time on the
+/// server — after the checkout has already moved.
+Future<DwDeployVerdict> _checkDockerfiles(DwDeployContext context) async {
+  final missing = [
+    for (final package in [context.serverPackage, context.flutterPackage])
+      if (!File(
+        p.join(context.projectRoot.path, package, 'Dockerfile'),
+      ).existsSync())
+        '$package/Dockerfile',
+  ];
+  if (missing.isEmpty) {
+    return const DwDeployVerdict.pass('server and web images both build');
+  }
+  return DwDeployVerdict.fail(
+    'missing: ${missing.join(', ')}',
+    fix:
+        'The rendered compose file builds both images from the project root. '
+        'Copy the canonical pair from the DartWay template — the web one also '
+        'has to accept the DW_BACKEND_URL build argument the deploy passes.',
+  );
+}
+
+/// Migrations run as `docker compose run backend --apply-migrations`, and
+/// Compose appends those arguments to the image's entrypoint. Shell-form
+/// `ENTRYPOINT` drops them, so the container starts an ordinary server, exits
+/// nothing, and the deploy reports a successful migration that never happened.
+Future<DwDeployVerdict> _checkEntrypointForm(DwDeployContext context) async {
+  final file = File(
+    p.join(context.projectRoot.path, context.serverPackage, 'Dockerfile'),
+  );
+  if (!file.existsSync()) {
+    return const DwDeployVerdict.skip('no server Dockerfile');
+  }
+  if (context.target.serverEntrypoint != null) {
+    return DwDeployVerdict.pass(
+      'overridden by server_entrypoint: ${context.target.serverEntrypoint}',
+    );
+  }
+
+  final entrypoints = file
+      .readAsLinesSync()
+      .map((line) => line.trim())
+      .where((line) => line.startsWith('ENTRYPOINT'))
+      .toList();
+  if (entrypoints.isEmpty) {
+    return const DwDeployVerdict.pass('no ENTRYPOINT; arguments reach CMD');
+  }
+  final shellForm = entrypoints
+      .where(
+        (line) =>
+            !line.substring('ENTRYPOINT'.length).trimLeft().startsWith('['),
+      )
+      .toList();
+  if (shellForm.isEmpty) {
+    return const DwDeployVerdict.pass('exec form');
+  }
+  return DwDeployVerdict.fail(
+    'shell form: ${shellForm.last}',
+    fix:
+        'Rewrite it as exec form — ENTRYPOINT ["/app/server"] with the ordinary '
+        'flags in CMD — or name the binary in server_entrypoint, which makes '
+        'the deploy override the entrypoint for the migration run only.',
   );
 }
 
