@@ -10,6 +10,7 @@ class _DartwayLintsPlugin extends PluginBase {
   List<LintRule> getLintRules(CustomLintConfigs configs) => const [
     ForbiddenUiStyleUsageRule(),
     DeepRelativeImportRule(),
+    ForbiddenProviderScopeRule(),
   ];
 }
 
@@ -88,6 +89,71 @@ class DeepRelativeImportRule extends DartLintRule {
       steps++;
     }
     return steps;
+  }
+}
+
+/// Tests are the one place a `ProviderScope` is written by hand: a widget test
+/// builds its own root scope with `overrides:`, and nothing outside the tree it
+/// just pumped reads through a provider's `Ref`.
+bool _isTestFile(String path) {
+  final segments = path.replaceAll('\\', '/').split('/');
+  return segments.last.endsWith('_test.dart') ||
+      segments.contains('test') ||
+      segments.contains('integration_test');
+}
+
+/// DartWay convention: the application never writes a `ProviderScope`. The only
+/// one belongs to `DwAppRunner`, which creates it around the whole app; tests
+/// build their own.
+///
+/// A nested scope *looks* like it works, which is exactly why it needs a rule.
+/// Widgets under it do read the override — a `WidgetRef` resolves from the
+/// nearest scope above its widget. But a provider that reads the same provider
+/// through its own `Ref` resolves from the container hosting **it**, which for
+/// anything declaring no `dependencies` is the root, and so it quietly gets the
+/// base value. No exception, no warning: the screen just shows something else.
+///
+/// Nothing else catches this. `riverpod_lint` has a rule for the case
+/// (`scoped_providers_should_specify_dependencies`), and it skips every
+/// provider it cannot statically prove scoped — which it can only do for
+/// generated ones. DartWay writes providers by hand, so that rule stays silent
+/// here no matter what.
+///
+/// A value that must differ per subtree travels as a family key or a
+/// constructor argument. That is the whole replacement, and it puts the
+/// difference in the call rather than in the widget tree somewhere above it.
+class ForbiddenProviderScopeRule extends DartLintRule {
+  const ForbiddenProviderScopeRule() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'forbidden_provider_scope',
+    problemMessage:
+        'ProviderScope is created by DwAppRunner, not by the app: an override '
+        'in a nested scope is invisible to providers reading through Ref.',
+    correctionMessage:
+        'Pass the value as a family key or a constructor argument. Tests may '
+        'build their own scope.',
+    errorSeverity: DiagnosticSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    DiagnosticReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = resolver.path;
+
+    if (_isTestFile(path) || _isGeneratedFile(path)) return;
+
+    // Matched by name rather than by type: the rule has to hold in the package
+    // that has not yet added riverpod as much as in the one that has, and an
+    // unresolved type would make it silently pass.
+    context.registry.addInstanceCreationExpression((node) {
+      if (node.constructorName.type.name.lexeme == 'ProviderScope') {
+        reporter.atNode(node.constructorName, code);
+      }
+    });
   }
 }
 

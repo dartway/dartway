@@ -25,12 +25,25 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
   four levels away is not a sibling — either the group fell apart, or the thing
   being imported belongs in `shared/` or `common/`.
 
+- **forbidden_provider_scope** (warning) — the application does not write a
+  `ProviderScope`. The only one belongs to `DwAppRunner`, which wraps the whole
+  app; files under `test/` (and `*_test.dart`) build their own freely.
+
+  A nested scope with `overrides:` is the mistake that does not look like one:
+  widgets under it *do* read the override, while a provider reaching the same
+  provider through its own `Ref` resolves from the root container and silently
+  gets the base value. `riverpod_lint`'s rule for this skips providers it cannot
+  prove scoped — which it can only do for generated ones, and DartWay writes
+  them by hand. A value that must differ per subtree is a family key or a
+  constructor argument.
+
 ## Testing
 
-`example/` is the rule's test suite: files under `lib/app/` carry
+`example/` is the rules' test suite: files under `lib/app/` carry
 `// expect_lint: <rule>` above every line that must be reported, and the files
 that must stay silent — `lib/ui_kit/` writing styles freely, a feature importing
-its neighbour one `../` away — are there to catch an over-eager rule.
+its neighbour one `../` away, `test/` building its own `ProviderScope` — are
+there to catch an over-eager rule.
 
 ```bash
 cd example && dart run custom_lint   # fails on a missed or an unexpected lint
@@ -47,7 +60,7 @@ unit test of its logic would still have passed.
 # pubspec.yaml
 dev_dependencies:
   custom_lint: ^0.8.0
-  dartway_lints: ^0.1.0
+  dartway_lints: ^0.2.0
 ```
 
 ```yaml

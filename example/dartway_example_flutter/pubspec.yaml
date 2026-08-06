@@ -91,8 +91,8 @@ dev_dependencies:
       ref: master
       path: packages/dartway_lints
 
-# Внутри монорепо темплейт собирается против ЛОКАЛЬНЫХ пакетов фреймворка.
-# При копировании в самостоятельный проект — удалить весь блок dependency_overrides.
+# Inside the monorepo the example builds against the LOCAL framework packages.
+# Copied out into a standalone project — drop the whole dependency_overrides block.
 dependency_overrides:
   dartway_flutter:
     path: ../../packages/dartway_flutter

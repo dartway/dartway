@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0
+
+`forbidden_provider_scope`: writing a `ProviderScope` in application code is a warning. The only one
+belongs to `DwAppRunner`, which wraps the whole app; tests build their own and are left alone.
+
+The rule exists because the mistake it catches does not look like one. A nested scope with
+`overrides:` genuinely works for widgets — a `WidgetRef` resolves from the nearest scope above its
+widget. A provider reading the same provider through its own `Ref` resolves from the container
+hosting *it*, which for anything declaring no `dependencies` is the root, so it quietly gets the base
+value. Nothing throws and nothing warns; the screen shows a different value than the one that was
+overridden.
+
+`riverpod_lint` has a rule for this case and it cannot help here: it skips every provider it cannot
+statically prove scoped, which it can only do for generated ones. DartWay writes providers by hand.
+
+The replacement is not a workaround — a value that must differ per subtree is a family key or a
+constructor argument, which puts the difference in the call instead of in the widget tree above it.
+
 ## 0.1.1
 
 `deep_relative_import`: a relative import that walks more than two levels up is a warning. One or two

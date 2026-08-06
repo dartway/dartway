@@ -153,6 +153,43 @@ be a second thing to learn. Keep the search string in an ordinary provider and r
 `ref.watch`. The moment you find yourself hunting for "the DartWay way" here, you have found a place
 where there is none, on purpose.
 
+## Providers live at the root
+
+Your app writes no `ProviderScope`. `DwAppRunner` creates the only one, around everything; tests
+build their own and are welcome to.
+
+The temptation it forbids is a nested scope that overrides a provider for one subtree — a screen
+showing the same widgets "as an admin", a route fixing a mode, a panel with its own copy of some
+state. It reads as a clean way to inject a value without threading it through the tree, and for
+widgets it genuinely works: a `WidgetRef` resolves from the nearest scope above its widget and sees
+the override.
+
+A provider does not. Reading through its own `Ref`, it resolves from the container hosting *it* —
+the root, for anything that declares no `dependencies` — and gets the base value. Nothing throws,
+nothing warns, and the screen shows something other than what you overrode. The failure appears
+later, when someone adds a provider that reads a value two other widgets were reading happily.
+
+So a value that differs per subtree is passed, not scoped: a family key, or a constructor argument
+to a notifier.
+
+```dart
+// ❌ the override is invisible to any provider that reads workspaceModeProvider
+ProviderScope(
+  overrides: [workspaceModeProvider.overrideWith(() => IssuesMode())],
+  child: const WorkspacePage(),
+)
+
+// ✅ the mode is an argument — visible in the call, and the same value for everyone
+final workspaceStateProvider =
+    NotifierProvider.family<WorkspaceState, WorkspaceData, WorkspaceMode>(
+  WorkspaceState.new,
+);
+```
+
+`dartway_lints` enforces this as `forbidden_provider_scope`. Riverpod ships a rule for the same trap
+(`scoped_providers_should_specify_dependencies`) which cannot help you here: it only reasons about
+providers written with code generation, and DartWay writes them by hand.
+
 ## Writing
 
 ```dart
