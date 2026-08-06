@@ -541,7 +541,7 @@ final authService = ref.read(authServiceProvider); // -> FirebaseAuthService und
 ```dart
 // ❌ initState() { userName = GlobalAppState.userName; }  save() { GlobalAppState.userName = userName; }
 // ✅ the widget reads and writes directly through the provider — one source of truth
-final userName = ref.watch(userProfileProvider.select((p) => p.name));
+final userName = ref.watch(dw.requireUserProfileProvider.select((p) => p.name));
 ```
 
 ---

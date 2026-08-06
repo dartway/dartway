@@ -261,8 +261,6 @@ dw.notify.info('Upload started');
 
 **Why:** the current profile is a special source, not an ordinary model. Don't pull it through `watchModel<UserProfile>()`.
 
-**These getters are the project's, not the framework's.** `dartway create` scaffolds them into `__FLUTTER_PKG__/lib/core/user_profile_provider.dart`, because the framework does not know your profile model — it only knows the signed-in id (`watchSignedInUserId` / `readSignedInUserId`). So don't look for `watchUserProfile` in the packages, and don't remove the file it lives in.
-
 ```dart
 // ❌ the profile through ordinary CRUD
 final me = ref.watch(dw.repo.model<UserProfile>(...));
@@ -270,6 +268,19 @@ final me = ref.watch(dw.repo.model<UserProfile>(...));
 // ✅ special getters (no parentheses!) — they return UserProfile directly
 final isMine = post.authorProfileId == ref.watchUserProfile.id;   // reactive
 final myId   = ref.readUserProfile.id;                            // one-off
+```
+
+**The providers underneath are the framework's, the getters are the project's.** `dw` carries a pair, already typed with your profile model:
+
+- `dw.userProfileProvider` → `UserProfile?` — where signed out is a legal answer: router guards, the auth zone, a splash;
+- `dw.requireUserProfileProvider` → `UserProfile` — everything under `DwUserAsyncScope`; throws a `StateError` when nobody is signed in.
+
+The getters above are two lines of shorthand over the second one, scaffolded by `dartway create` into `__FLUTTER_PKG__/lib/core/user_profile_provider.dart` (Dart has no generic getters, so the framework cannot name your model in an extension on `Ref`). Don't delete that file — but don't reimplement the providers in it either.
+
+Reach for the provider directly in two cases: the user may be signed out, or you want to rebuild on one field only —
+
+```dart
+final name = ref.watch(dw.requireUserProfileProvider.select((p) => p.firstName));
 ```
 
 ## 7. Sign-out — through `sessionProvider`
@@ -372,7 +383,7 @@ Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size an
 - [ ] Narrowing by query — `backendFilter`; local filtering you do yourself with `.where` in the widget (the framework doesn't provide it).
 - [ ] Actions from the UI — `dw.action((context) async {...})`, not a raw `onPressed`/`() async {}`.
 - [ ] Notifications — `dw.notify.success/warning/error/info`, not `SnackBar`/`ScaffoldMessenger`.
-- [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`.
+- [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`. Signed out is a legal answer, or you want `.select` — `dw.userProfileProvider` / `dw.requireUserProfileProvider`.
 - [ ] Sign-out — `ref.read(dw.sessionProvider!.notifier).signOut()`.
 - [ ] Must **another** user see the update? `dw.repo.modelList` doesn't do that by itself — `broadcastTo` in the config (public), a channel with the group id (group), `sendUpdatesToUser` (private).
 - [ ] Putting `broadcastTo` with a public channel — have you answered "any user is entitled to read this row"? If not — a narrower channel or `sendUpdatesToUser`.
