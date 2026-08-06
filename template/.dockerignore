@@ -1,0 +1,27 @@
+# Both images build from the project root, so without this file the whole
+# working copy — Git history, build output, local secrets — is handed to the
+# Docker daemon on every build.
+#
+# Deny everything, then admit the packages the Dockerfiles copy. A new package
+# is invisible to a build until it is listed here, which is the failure mode
+# worth having: loud at build time rather than silently shipped.
+**
+
+!dartway_starter_client/
+!dartway_starter_client/**
+!dartway_starter_flutter/
+!dartway_starter_flutter/**
+!dartway_starter_server/
+!dartway_starter_server/**
+
+**/.dart_tool/
+**/build/
+**/.fvm/
+**/ephemeral/
+# custom_lint.log alone reaches hundreds of megabytes when the analyzer trips.
+**/*.log
+
+# Runtime secrets never travel in a build context: a credential baked into an
+# image layer is a credential in every copy of that image. The deployment
+# mounts this file from outside the checkout instead.
+**/config/passwords.yaml

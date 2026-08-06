@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- **The deploy now supplies the web build's API address, and the template ships the two Dockerfiles
+  the compose file has always named.** The rendered compose file builds `<project>_server/Dockerfile`
+  and `<project>_flutter/Dockerfile` from the project root, but neither the template nor the example
+  had ever contained the second one, and the build argument the first version passed — `FLUTTER_ENV`
+  — was read by nothing in the framework. A project reaching deployment therefore wrote its own
+  image and invented its own way to tell the app which API to talk to, which is a domain written
+  down twice with nothing comparing the copies. The argument is now `DW_BACKEND_URL`, rendered from
+  `publicHost` in the Serverpod configuration, and `main.dart` reads it through
+  `String.fromEnvironment` with the localhost fallback for local runs.
+
+- Two new local checks. `dockerfiles-present` fails when either image the compose file builds has no
+  Dockerfile — previously that surfaced on the server, after the checkout had already moved.
+  `dockerfile-entrypoint-form` fails on a shell-form `ENTRYPOINT` in the server image: `docker
+  compose run backend … --apply-migrations` appends arguments that this form ignores, so migrations
+  quietly start an ordinary server and the deploy reports success. Setting `server_entrypoint`
+  declares the shell form deliberate and satisfies the check.
+
+- The rendered compose file states the server's run mode as a `command`, not only as the `runmode`
+  environment variable: an exec-form entrypoint takes its arguments from there, and `docker compose
+  run` replaces them wholesale for the migration pass.
+
+- **`create` writes `config/passwords.yaml` instead of the template carrying it.** The template used
+  to commit the file with throwaway development values so that a new project ran immediately; the
+  values were harmless, the habit was not, and `deploy check` fails on a tracked passwords file —
+  every project therefore started life with an error against it. The committed record is now
+  `passwords.yaml.example`, `create` copies it onto the new project's disk, and `.gitignore` covers
+  the copy from the first commit.
+
 - **`invalidTopLevelLayout` — the top level of a project is a closed list, and now something checks
   it.** The Flutter package: `main.dart` and `<project>_app.dart`, the zones `app/` `admin/` `auth/`
   `common/`, the layers `core/` `shared/` `ui_kit/` `l10n/`. The server package: `server.dart` and
