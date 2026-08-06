@@ -7,7 +7,7 @@ import 'core/app_l10n.dart';
 import 'core/default_models.dart';
 import 'core/dw_core.dart';
 import 'core/router/router.dart';
-import 'studio/studio_bridge_binding.dart';
+import 'core/studio/studio_bridge_binding.dart';
 import 'ui_kit/ui_kit.dart';
 
 /// The application: all wiring lives here, while `main` only supplies concrete

@@ -77,5 +77,5 @@ Studio sends the credentials from its config, and the app runs its **regular** a
 — exactly as if the user typed the code (DartWay server side: per-user rotatable
 `testVerificationCode`). No special sign-in path ships in the app.
 
-The canonical wiring is `example/dartway_example_flutter/lib/studio/` in the
+The canonical wiring is `example/dartway_example_flutter/lib/core/studio/` in the
 [DartWay monorepo](https://github.com/dartway/dartway).

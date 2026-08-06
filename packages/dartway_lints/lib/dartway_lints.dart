@@ -41,7 +41,7 @@ const _maxRelativeImportDepth = 2;
 
 /// DartWay convention: a relative import is for **neighbours** — the feature's
 /// own `widgets/`/`logic/` and a sibling feature in the same group. Anything
-/// further away (`core/`, `data/`, `domain/`, `shared/`, `ui_kit/`, another
+/// further away (`core/`, `shared/`, `ui_kit/`, another
 /// zone) is named with a `package:` import, so the destination is visible in
 /// the line rather than counted in dots.
 ///
@@ -49,7 +49,7 @@ const _maxRelativeImportDepth = 2;
 /// legitimate neighbour. The rule here is about **distance**, and the distance
 /// doubles as a structure signal — if a "sibling" feature is suddenly four
 /// levels away, it is not a sibling, and either the group fell apart or what is
-/// being imported belongs in `shared/` or `domain/`.
+/// being imported belongs in `shared/` or `common/`.
 class DeepRelativeImportRule extends DartLintRule {
   const DeepRelativeImportRule() : super(code: _code);
 

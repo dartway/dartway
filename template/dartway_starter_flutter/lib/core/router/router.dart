@@ -2,9 +2,9 @@ import 'package:dartway_router/dartway_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../dw_core.dart';
-import '../../app/admin/dashboard/admin_dashboard_page.dart';
-import '../../app/admin/settings/admin_settings_page.dart';
-import '../../app/admin/users/admin_users_page.dart';
+import '../../admin/dashboard/admin_dashboard_page.dart';
+import '../../admin/settings/admin_settings_page.dart';
+import '../../admin/users/admin_users_page.dart';
 import '../../app/home/home_page.dart';
 import '../../app/profile/profile_page/profile_page.dart';
 import '../../auth/auth_page.dart';

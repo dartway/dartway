@@ -1,8 +1,8 @@
-import 'package:dartway_example_client/dartway_example_client.dart';
-import 'package:dartway_example_flutter/app/admin/settings/widgets/admin_setting_row.dart';
-import 'package:dartway_example_flutter/core/app_settings/app_setting_key.dart';
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_client/dartway_starter_client.dart';
+import 'package:dartway_starter_flutter/admin/settings/widgets/admin_setting_row.dart';
+import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 

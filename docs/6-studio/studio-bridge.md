@@ -23,7 +23,7 @@ The open `dartway_studio_bridge` package is the only integration surface:
   path. Role-gating of zones stays entirely in the app — guards and server
   filters, not spec metadata.
 - **`StudioBridgeHost.attach`** — call it once in your app shell (see
-  `lib/studio/studio_bridge_binding.dart` in the example). The host is inert
+  `lib/core/studio/studio_bridge_binding.dart` in the example). The host is inert
   unless the app runs on web embedded in an iframe; the channel pins the
   origin of the first valid Studio message for its replies.
 - **Access control is per project.** Studio holds a random secret per project;
@@ -56,5 +56,5 @@ The open `dartway_studio_bridge` package is the only integration surface:
   or clipped away does not answer for a point where the user sees nothing.
 
 See the package [README](../packages/dartway_studio_bridge/README.md) for the
-full API, and `example/dartway_example_flutter/lib/studio/` for the reference
+full API, and `example/dartway_example_flutter/lib/core/studio/` for the reference
 integration (manifest, sign-in executor, binding widget).

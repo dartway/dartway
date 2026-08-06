@@ -35,7 +35,7 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
    individual buttons/colors/styles directly.
 2. **Everything is declared in `ui_kit.dart`.** Every component file starts with `part of '../ui_kit.dart';`.
    The root file assembles everything with `part` directives and re-exports `dartway_flutter`.
-3. **No raw styling in features.** Inside `lib/<feature>` (`app/`/`auth/`/`common/`)
+3. **No raw styling in features.** Inside a zone (`app/`, `admin/`, `auth/`, `common/`) and in `shared/`
    the following are **forbidden**: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`, `Theme.of(context)`,
    `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a wish — the
    `forbidden_ui_style_usage` rule from `dartway_lints` (via `custom_lint`) allows them **only inside

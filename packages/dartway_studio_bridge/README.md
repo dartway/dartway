@@ -109,7 +109,7 @@ catalog, so open questions are visible without reading every passport.
 
 Report after the new screen has built — a route change fires before its widgets
 mount, so reporting in the same turn describes the screen you just left. See
-`example/dartway_example_flutter/lib/studio/studio_bridge_binding.dart` for the
+`example/dartway_example_flutter/lib/core/studio/studio_bridge_binding.dart` for the
 reference binding.
 
 ## Inspecting a point (the "pencil" flow)

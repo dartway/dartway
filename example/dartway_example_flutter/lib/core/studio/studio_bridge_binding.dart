@@ -3,8 +3,8 @@ import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../core/app_l10n.dart';
-import '../core/router/router.dart';
+import '../app_l10n.dart';
+import '../router/router.dart';
 import 'logic/studio_persona_switcher.dart';
 import 'logic/studio_project_manifest.dart';
 import 'logic/studio_session_state_provider.dart';

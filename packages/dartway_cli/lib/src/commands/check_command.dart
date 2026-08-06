@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
+import '../checker/dw_layout.dart';
 import '../project_layout.dart';
 
 /// Runs the built-in DartWay convention checks on the project's Flutter
@@ -61,10 +62,26 @@ class CheckCommand extends Command<int> {
         ? null
         : DwCheckSeverity.values.byName(levelArg);
 
-    final flutterPackageDir = _findFlutterPackage();
+    final layout = _detectLayout();
+    final flutterPackageDir =
+        layout?.flutterPackageDir ?? Directory.current;
     stdout.writeln('Checking ${flutterPackageDir.path} ...');
 
-    final errorCount = await DwFlutterInspector(
+    var errorCount = 0;
+
+    // The layout check judges the whole package, so it has nothing to say when
+    // the run is narrowed to one folder — the same reason `--dir` skips the
+    // ui_kit pass.
+    if (results.option('dir') == null) {
+      errorCount += DwLayoutInspector(
+        flutterPackageDir: flutterPackageDir,
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
+    }
+
+    errorCount += await DwFlutterInspector(
       packageDir: flutterPackageDir,
       filterType: filterType,
       filterSeverity: filterSeverity,
@@ -74,11 +91,22 @@ class CheckCommand extends Command<int> {
     return errorCount > 0 ? 1 : 0;
   }
 
-  Directory _findFlutterPackage() {
+  /// The project root, whether the command was run there or inside the Flutter
+  /// package. Returns null only for a Flutter package standing on its own —
+  /// it is still worth checking, minus the server pass. Run from anywhere
+  /// else, the detector's own "this is not a DartWay project" wins.
+  ProjectLayout? _detectLayout() {
     final currentDir = Directory.current;
-    if (p.basename(currentDir.path).endsWith('_flutter')) {
-      return currentDir;
+    final insideFlutterPackage = p
+        .basename(currentDir.path)
+        .endsWith('_flutter');
+    try {
+      return ProjectLayout.detect(
+        insideFlutterPackage ? currentDir.parent : currentDir,
+      );
+    } on StateError {
+      if (!insideFlutterPackage) rethrow;
+      return null;
     }
-    return ProjectLayout.detect(currentDir).flutterPackageDir;
   }
 }

@@ -18,6 +18,8 @@ See also: `__FLUTTER_PKG__/CLAUDE.md`, `__SERVER_PKG__/CLAUDE.md`, skills `dartw
 
 ## Feature structure (Flutter)
 
+A feature lives in a **zone**, and the zones are the four folders at the top of `lib/`: `app/` (the app itself), `admin/` (the admin panel), `auth/` (signing in), `common/` (features more than one zone draws on). That list is closed — a fifth navigation zone in the router is a group inside `app/`, not a folder of its own — and so is the rest of the top level: `core/`, `shared/`, `ui_kit/`, `l10n/`, plus `main.dart` and `__FLUTTER_APP_FILE__`. `dartway check` reports anything else as `invalidTopLevelLayout`, a zone name used lower down included: `app/admin/` is not the admin panel, it is a group that has quietly left every check written for zones.
+
 ```
 lib/app/<feature>/
   <feature>_page.dart        // entry point — the only public file
@@ -32,9 +34,9 @@ lib/app/<feature>/
 - **Entry point** — the only public file, and it is a widget: a Page, or a Widget that also carries its own way of being shown (see "Showing a feature" below). From outside the feature, only it is imported — and that is enforced at any nesting depth.
 - **widgets/** — the feature's visual blocks.
 - **logic/** — providers/enums/helpers belonging to this feature only.
-- Cross-feature business logic → `lib/domain` (extensions on models), not inside the feature.
+- Cross-feature logic — an extension on a model, a formatter, a predicate — → `lib/shared/`, not inside the feature. (There is no `lib/domain/`: the rules of a DartWay app live in CRUD configs on the server, and what is left on this side is a helper.)
 - Styles → `ui_kit.dart` only.
-- Imports — relative for your own internals and for a sibling feature (never deeper than two `../`), `package:` for everything further away: `core/`, `data/`, `domain/`, `shared/`, `ui_kit/`, another zone. See `dartway-clean-code` §1.2a; `deep_relative_import` flags the rest in the editor.
+- Imports — relative for your own internals and for a sibling feature (never deeper than two `../`), `package:` for everything further away: `core/`, `shared/`, `ui_kit/`, another zone. See `dartway-clean-code` §1.2a; `deep_relative_import` flags the rest in the editor.
 
 ### Groups: when a feature stopped being one feature
 
@@ -62,12 +64,12 @@ app/community_events/                  // group
 | | Where | Described by |
 |---|---|---|
 | **Feature** — product behaviour you can name in a user's words (a screen, a dialog, a flow, a block on a screen) | a zone: `app/`, `admin/`, `auth/`, `common/` | `DwFeatureSpec` |
-| **Building block** — a widget/helper features draw with: a form field, a badge row, a layout wrapper | `lib/shared/` | a doc comment over the class |
-| **Layer** — presentation, infrastructure, data, domain | `ui_kit/`, `core/`, `data/`, `domain/` | — |
+| **Building block** — a widget/helper features draw with: a form field, a badge row, a layout wrapper, an extension on a model | `lib/shared/` | a doc comment over the class |
+| **Layer** — presentation, infrastructure, localisation | `ui_kit/`, `core/`, `l10n/` | — |
 
 **Split small: that is the recommendation, not a tolerated evil.** Every feature brings a passport, so the finer the cut, the denser the description of the interface — one big feature is described in generalities, ten small ones each carry their own `behaviors` and `knownIssues`. A single consumer is not a sign of an internal; the sign of an internal is that there is nothing to tell (a slice of layout extracted so `build` stops growing).
 
-**Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; cross-feature domain logic — `lib/domain/`. The sign that the placement is wrong: the file sits in one feature's `logic/` and is imported from other features — then all of them are reaching into its internals.
+**Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; a helper several features share — `lib/shared/`. The sign that the placement is wrong: the file sits in one feature's `logic/` and is imported from other features — then all of them are reaching into its internals.
 
 The check is `dartway check`: it builds a "zone → group → feature" tree and grades every feature A–D.
 
