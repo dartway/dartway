@@ -38,21 +38,31 @@ recognises it by the `*_shared` directory suffix if you add it.
 
 ## `my_app_server` — where the rules live
 
+`lib/src/` here is a closed list too, for the same reason and enforced by the same check.
+
 ```
 my_app_server/
   bin/main.dart          the server entry point
   bin/seed_dev.dart      dev-only seed: one user per role
   config/                development / staging / production / test + passwords.yaml
   migrations/            generated schema migrations
+  lib/server.dart        the package's public surface
   lib/src/
     models/              your *.spy.yaml model definitions
     generated/           serverpod generate output — do not edit
     crud/                one DwCrudConfig per model — the feature's whole behaviour
     dartway/             DwCore.init and the session role helpers
+    domain/              pure rules over models — no Session, no IO, no DB
+    app/                 session-aware workflows that span models
     endpoints/           hand-written Serverpod endpoints, for the things CRUD is not
     web/                 server-rendered pages, if you want any
   test/                  DartWay's auth and password integration suites, against a real DB
 ```
+
+`domain/` and `app/` are the one boundary worth holding on the server — pure rules against
+session-aware side effects — and the skeleton ships neither, because until such code exists the
+folder is empty. They are declared, so creating one is not an invention; anything *else* under
+`lib/src/` is.
 
 **Models are YAML, not Dart.** `lib/src/models/note/note.spy.yaml` declares a class, its table and
 its fields; `serverpod generate` turns it into Dart in `lib/src/generated/` **and** in the client
@@ -83,21 +93,52 @@ config on the server, an extension over a model belongs in the Flutter package.
 
 ## `my_app_flutter` — where the app is
 
+**The top level of `lib/` is a closed list: two files, four zones, four layers.** Nothing else may sit
+there, and each of these means one thing and is spelled one way.
+
 ```
 my_app_flutter/lib/
   main.dart              development parameters only (backend URL, version label)
   my_app_app.dart        all the wiring: DwAppRunner, MaterialApp.router, the root subscription
-  app/                   the features — app/home/, app/profile/, app/admin/...
+
+  ZONES — features, each with a DwFeatureSpec
+  app/                   the app itself — app/home/, app/profile/, ...
+  admin/                 the admin panel
   auth/                  the sign-in flow
-  shared/                building blocks features draw with, e.g. widgets/app_scaffold.dart
-  core/                  app-wide infrastructure: router/, dw_core.dart, app_settings/, dev/
+  common/                features more than one zone draws on (create it when that happens)
+
+  LAYERS — everything that is not a feature
+  core/                  app-wide wiring: router/, dw_core.dart, app_settings/, studio/, dev/
+  shared/                building blocks: widgets and helpers with no story of their own
   ui_kit/                your design system, as source
   l10n/                  ARB files and their generated output
-  studio/                the DartWay Studio bridge binding — inert unless embedded
 ```
 
 `main.dart` holds nothing but the concrete environment (the backend URL differs on an Android
 device, which is the one line most people edit first). Everything structural is in the app file.
+
+**A zone is not a feature and not a folder you invent.** The four are the kinds of thing an app is
+made of, not a list of sections: a fifth navigation zone in the router does *not* earn a folder of
+its own — it is a group inside `app/`, like any other group. The zones are also the only places
+asked for a `DwFeatureSpec`, which is why the admin panel has to be one and cannot live at
+`app/admin/`: nested in a zone it reads as an ordinary group, and the whole panel disappears from
+every question the checker asks about zones.
+
+`core/studio/` is the [DartWay Studio](../6-studio/studio-bridge.md) bridge binding — the host that talks to
+Studio when the app runs inside its preview frame, plus the screen passports Studio renders beside
+it. It is wiring like the router, inert outside an iframe, and a project that never opens Studio can
+delete the folder.
+
+**There is no `data/` and no `domain/`.** The data layer is `dw.repo`, so a `data/` folder in a
+DartWay app is either empty or a second way to do the same thing; and the rules of a DartWay app
+live in CRUD configs on the server, so what is left on the Flutter side — extensions on models,
+formatting, predicates — is a helper, and helpers live in `shared/`. Both folders were conventional
+once, both stayed empty in every skeleton, and a name that exists only in a document is how a layout
+drifts.
+
+The [conventions checker](../5-tooling/conventions-checker.md) enforces this list rather than
+describing it: an undeclared folder, a stray file at the root of `lib/`, a missing `my_app_app.dart`
+and a top-level name nested inside a zone are all errors.
 
 ### A feature is a folder with one public file
 
@@ -119,10 +160,10 @@ building block and lives in `lib/shared/`, where no spec is expected of it. The 
 declares what it is, in a `DwFeatureSpec` next to its own code rather than in a document that drifts
 — see [features and specs](../3-flutter/features-and-specs.md).
 
-Two further areas are conventional but not generated: `lib/domain/` for logic that spans features
-(extensions on models), and `lib/data/` if a project ever needs data plumbing of its own. The
-skeleton has neither, because `dw.repo` is the data layer and cross-feature logic does not exist on
-day one.
+A feature lives in a zone, and only there. The zone it belongs to is the one that owns the
+behaviour, not the one that happens to show it first: a screen the admin panel and the app both
+open belongs in `common/`, and a widget both draw with is not a feature at all — it is a block in
+`shared/`.
 
 ### Why the kit is source in your app, not a dependency
 
@@ -143,7 +184,7 @@ and direct `Theme.of(context)` access **outside** `ui_kit/` are a lint (`dartway
 
 The same lint package draws one more line, this time about imports: a relative import may walk at
 most two levels up (`deep_relative_import`). One or two `../` read as "the feature next door";
-past that the path names nothing, and the destination — `core/`, `data/`, `domain/`, `shared/`,
+past that the path names nothing, and the destination — `core/`, `shared/`,
 `ui_kit/`, another zone — is spelled out with a `package:` import instead. The limit doubles as a
 structure signal: a sibling four levels away is not a sibling.
 

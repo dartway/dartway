@@ -81,15 +81,15 @@ to you is the clearer one.
 |---|---|
 | Your own internals (`widgets/`, `logic/`) | relative — `import 'widgets/user_list_item.dart';` |
 | A sibling feature in the same group | relative, one or two steps — `import '../user_form/user_form.dart';` |
-| `core/`, `data/`, `domain/`, `shared/`, `ui_kit/`, another zone | **`package:`** — `import 'package:my_app_flutter/ui_kit/ui_kit.dart';` |
+| `core/`, `shared/`, `ui_kit/`, another zone | **`package:`** — `import 'package:my_app_flutter/ui_kit/ui_kit.dart';` |
 
 **Two `../` is the limit**, and `deep_relative_import` (`dartway_lints`, warning) says so in the
 editor. One or two steps read as "the feature next door"; three or four mean you left your group, and
 a jump that big should be visible by name rather than counted in dots.
 
 The limit doubles as a structure signal: if a *sibling* feature is suddenly four levels away, it is
-not a sibling — either the group fell apart, or what you are importing belongs in `shared/` or
-`domain/`.
+not a sibling — either the group fell apart, or what you are importing belongs in `shared/` or in
+`common/`.
 
 ## 1.3 Don't pass `BuildContext` / `WidgetRef` into services and logic
 

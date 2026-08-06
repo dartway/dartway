@@ -1,5 +1,5 @@
 import 'package:dartway_starter_client/dartway_starter_client.dart';
-import 'package:dartway_starter_flutter/app/admin/settings/logic/app_setting_label.dart';
+import 'package:dartway_starter_flutter/admin/settings/logic/app_setting_label.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_settings_reader.dart';

@@ -23,6 +23,8 @@ class ProjectLayout {
   Directory get flutterPackageDir =>
       Directory(p.join(root.path, flutterPackage));
 
+  Directory get serverPackageDir => Directory(p.join(root.path, serverPackage));
+
   static ProjectLayout detect(Directory root) {
     String? findBySuffix(String suffix, {required bool required}) {
       final matches = root
@@ -57,6 +59,12 @@ class ProjectLayout {
     );
   }
 
+  /// The app's wiring file — `main.dart`'s counterpart, holding `DwAppRunner`
+  /// and the router. `create` renames the template's copy along with the
+  /// package, so the name follows the project rather than being chosen.
+  String get flutterAppFile =>
+      '${flutterPackage.replaceAll(RegExp(r'_flutter$'), '')}_app.dart';
+
   Map<String, String> toolkitTokens({
     required String baseBranch,
     String language = 'English',
@@ -64,6 +72,7 @@ class ProjectLayout {
     '__PROJECT_LANGUAGE__': language,
     '__SERVER_PKG__': serverPackage,
     '__FLUTTER_PKG__': flutterPackage,
+    '__FLUTTER_APP_FILE__': flutterAppFile,
     '__CLIENT_PKG__': clientPackage,
     '__SHARED_PKG__': sharedPackage ?? '',
     '__BASE_BRANCH__': baseBranch,

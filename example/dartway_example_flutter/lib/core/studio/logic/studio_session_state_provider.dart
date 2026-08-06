@@ -1,7 +1,7 @@
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../core/user_profile_provider.dart';
+import '../../user_profile_provider.dart';
 import 'studio_persona_switcher.dart';
 
 /// The session as reported to Studio: signed-in state, who it is (by phone —

@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+- **`invalidTopLevelLayout` — the top level of a project is a closed list, and now something checks
+  it.** The Flutter package: `main.dart` and `<project>_app.dart`, the zones `app/` `admin/` `auth/`
+  `common/`, the layers `core/` `shared/` `ui_kit/` `l10n/`. The server package: `server.dart` and
+  `src/`, and under it `app/` `crud/` `dartway/` `domain/` `endpoints/` `generated/` `models/`
+  `web/`. Anything else is an error, as is a missing fixed name — and so is a top-level name used
+  one level down, which is the case that prompted the check: `app/admin/` is an ordinary group as
+  far as every other rule can tell, so the admin panel sat outside the checks written for zones
+  without anything noticing. The list had been written down in three places — the docs, the agent
+  toolkit and this checker — and the three had already drifted apart. Now there is one list, in
+  code.
+
+- The checker's zone names are matched exactly rather than by prefix, and `data/`/`domain/` are gone
+  from the Flutter side: the data layer is `dw.repo`, and what is left of Flutter-side domain logic
+  is a helper, so it belongs in `shared/`. Both folders had been conventional and empty since the
+  beginning.
+
+- `--dir` skips the layout pass, the same way it already skips `ui_kit/`: both judge a package as a
+  whole.
+
+- A new toolkit token, `__FLUTTER_APP_FILE__` — the app's wiring file, whose name follows the
+  project (`my_app_flutter` → `my_app_app.dart`).
+
 ## 0.2.0
 
 - **`dartway quickstart` — the framework's front door, and it is not a plugin.** It prints the whole

@@ -1,8 +1,8 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../core/dw_core.dart';
-import '../../core/router/router.dart';
+import '../../dw_core.dart';
+import '../../router/router.dart';
 
 /// Programmatic sign-in with credentials received from Studio: the regular
 /// OTP flow, with the verification code Studio sent (the server accepts it

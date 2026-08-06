@@ -67,7 +67,14 @@ enum DwCheckType {
   /// deciding how much room it gets. It works until someone puts it in a
   /// bottom sheet or a scroll view, and then it throws at runtime while the
   /// analyzer stays silent. Space is the parent's call.
-  widgetSizesItself;
+  widgetSizesItself,
+
+  /// A folder or file at the top level of a package that the declared layout
+  /// does not name — or a fixed name that is missing. The top level is a
+  /// closed list (`dwFlutterZones` / `dwFlutterLayers` / `dwServerAreas`), and
+  /// it is closed because it had been declared in three places that drifted
+  /// apart: an undeclared folder is where the next divergence starts.
+  invalidTopLevelLayout;
 
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,

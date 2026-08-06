@@ -7,7 +7,7 @@ import 'core/app_l10n.dart';
 import 'core/default_models.dart';
 import 'core/dw_core.dart';
 import 'core/router/router.dart';
-import 'studio/studio_bridge_binding.dart';
+import 'core/studio/studio_bridge_binding.dart';
 import 'ui_kit/ui_kit.dart';
 
 /// The DartWay example application. All app wiring lives here; `main` only

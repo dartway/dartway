@@ -23,7 +23,7 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
   Deliberately not `always_use_package_imports`, which also forbids the
   legitimate neighbour. The limit doubles as a structure signal: a "sibling"
   four levels away is not a sibling — either the group fell apart, or the thing
-  being imported belongs in `shared/` or `domain/`.
+  being imported belongs in `shared/` or `common/`.
 
 ## Testing
 

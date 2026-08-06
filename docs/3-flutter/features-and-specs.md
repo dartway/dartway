@@ -41,7 +41,9 @@ Two rules follow, and the checker enforces both:
   a file in one feature's `logic/` is wanted by three others, it was never that feature's internal.
 
 Not everything is a feature. App-wide infrastructure (routers, analytics, push init, the model
-registry) lives in `lib/core/`; business logic shared across features lives in `lib/domain/`.
+registry) lives in `lib/core/`; a widget or helper features draw with — extensions on models
+included — lives in `lib/shared/`. And a feature always sits in one of the four zones, never
+outside them: see [the project layout](../1-getting-started/project-layout.md).
 
 ## The spec lives in the code
 

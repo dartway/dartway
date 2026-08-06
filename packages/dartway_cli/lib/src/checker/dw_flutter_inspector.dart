@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'dw_check_type.dart';
 import 'dw_feature_tree.dart';
+import 'dw_layout.dart';
 import 'dw_unused_feature_files.dart';
 
 /// Line-length model: nothing is said below 200 lines, >200 is a nudge
@@ -17,17 +18,15 @@ const dwFileLongThreshold = 200;
 const dwFileTooLongThreshold = 350;
 
 /// Areas whose folders must be shaped as features — and are asked for a
-/// `DwFeatureSpec`.
+/// `DwFeatureSpec`. Exactly the zones of [dwFlutterZones], by name: the top
+/// level is a closed list, so a prefix match would only let an undeclared
+/// folder in through the side door.
 ///
 /// `shared/` is deliberately absent: it holds building blocks, and a block has
 /// no product behaviour to describe. Asking it for a spec is what produced
 /// passports that only restate the class name, and a spec nobody believes is
 /// worse than none.
-bool _isFeatureArea(String name) =>
-    name.startsWith('app') ||
-    name.startsWith('auth') ||
-    name.startsWith('common') ||
-    name.startsWith('admin');
+bool _isFeatureArea(String name) => dwFlutterZones.contains(name);
 
 /// Areas whose files are read for the cleanliness and UI-Kit rules.
 ///
@@ -35,11 +34,10 @@ bool _isFeatureArea(String name) =>
 /// wrong as one in `app/`, and until these two lists were told apart, moving a
 /// widget out of a zone moved it out of every check at once.
 ///
-/// Still not everything — `core/`, `data/` and `domain/` are skipped entirely.
-/// That is a known gap, and widening it is an open decision rather than an
-/// oversight to fix in passing.
-bool _isCheckedArea(String name) =>
-    _isFeatureArea(name) || name.startsWith('shared');
+/// Still not everything — `core/` is skipped entirely. That is a known gap,
+/// and widening it is an open decision rather than an oversight to fix in
+/// passing.
+bool _isCheckedArea(String name) => _isFeatureArea(name) || name == 'shared';
 
 /// A single finding, attributed to the feature that owns the file.
 class _Finding {

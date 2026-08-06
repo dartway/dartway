@@ -58,6 +58,7 @@ commit over a 210-line file is a check people disable.
 | `forbiddenUiKitImport` | error | Importing inside `ui_kit/` instead of the `ui_kit.dart` barrel |
 | `uiKitPartMissing` | error | A kit file without `part of '../ui_kit.dart'` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
+| `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, or a fixed name that is missing |
 | `invalidFeatureStructure` | error | A feature folder with more than one root file |
 | `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
 | `featureSpecMissing` | warning | A feature widget that declares no `DwFeatureSpec` |
@@ -100,15 +101,24 @@ Filter with `--type <name>` or `--level error|warning|info`, or narrow the run t
 with `--dir lib/app/booking`. Note that `--dir` skips the `ui_kit/` pass — the kit is checked as a
 whole or not at all.
 
-Scope, and it is two scopes rather than one. The **feature-shaped** areas — `app*`, `auth*`,
-`common*`, `admin*` — must be built out of features and are asked for a `DwFeatureSpec`. The
-**checked** areas add `shared*` and `ui_kit/`: their content is read for the cleanliness and UI-Kit
-rules, but no spec is expected, because a building block has no product behaviour to describe.
-Keeping the two apart is what makes `lib/shared/` safe to recommend — before, a widget moved out of
-a zone left every check behind, not just the passport one. `core/`, `data/` and `domain/` hold
-infrastructure with a shape of its own and are skipped entirely. Generated files (`.g.dart`,
+Scope, and it is two scopes rather than one. The **feature-shaped** areas are the four zones —
+`app/`, `admin/`, `auth/`, `common/` — which must be built out of features and are asked for a
+`DwFeatureSpec`. The **checked** areas add `shared/` and `ui_kit/`: their content is read for the
+cleanliness and UI-Kit rules, but no spec is expected, because a building block has no product
+behaviour to describe. Keeping the two apart is what makes `lib/shared/` safe to recommend —
+before, a widget moved out of a zone left every check behind, not just the passport one. `core/`
+holds infrastructure with a shape of its own and is skipped entirely. Generated files (`.g.dart`,
 `.gen.dart`, `.freezed.dart`) and the folders `generated/`, `gen/`, `l10n/`, `zarchive/` are
 nobody's code and are skipped everywhere.
+
+The zone names are matched exactly, and that is the point of
+[`invalidTopLevelLayout`](../1-getting-started/project-layout.md): the top level of both packages is
+a closed list, so an undeclared folder, a stray file at the root of `lib/`, a missing
+`my_app_app.dart` and a zone name nested inside a zone are all errors. The last one is the reason
+the check exists at all — `app/admin/` is a perfectly ordinary group as far as every other rule is
+concerned, which is how the admin panel spent a release outside the checks that were written for
+it. The pass covers the server package too (`lib/src/`), and `--dir` skips it, the same way it
+skips `ui_kit/`.
 
 ## Why 200 and 350
 
