@@ -1,17 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../user_profile_provider.dart';
+import '../dw_core.dart';
 import '../user_profile_roles.dart';
 
 /// True once a user profile is loaded (i.e. signed in).
 final isSignedInProvider = Provider<bool>((ref) {
-  return ref.watch(userProfileProvider) != null;
+  return ref.watch(dw.userProfileProvider) != null;
 });
 
 /// True when the signed-in user is an admin — gates the `/admin` zone.
 final isAdminProvider = Provider<bool>((ref) {
-  return ref.watch(userProfileProvider)?.isAdmin ?? false;
+  return ref.watch(dw.userProfileProvider)?.isAdmin ?? false;
 });
 
 /// Refresh listenable for the DartWay router. Tracks sign-in and admin state and

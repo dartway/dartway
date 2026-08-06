@@ -60,6 +60,32 @@ callback or an action; `ref.refresh(provider.future)` discards and refetches. Th
 `ref.read(dwGlobalRefreshStateProvider.notifier).refresh()` rebuilds all of them at once. That is a
 last resort, not an everyday tool.
 
+### The signed-in profile is not one of these reads
+
+The current user is a special source, not a row you fetch by id. It arrives with the session and is
+kept up to date by it, so it has its own pair of providers on `dw` — never
+`dw.repo.model<UserProfile>(...)`:
+
+```dart
+// UserProfile? — signed out is a legal answer: splash, router guards, the auth zone
+ref.watch(dw.userProfileProvider)
+
+// UserProfile — non-nullable, for anything drawn under DwUserAsyncScope
+ref.watch(dw.requireUserProfileProvider)
+ref.watch(dw.requireUserProfileProvider.select((p) => p.firstName))
+```
+
+The split is the same one as `maybeModel` vs `model`, for the same reason: `require` throws a
+`StateError` when nobody is signed in, because on an authenticated screen that is a wiring mistake
+and not a state to render.
+
+Both are typed by the profile model you gave `DwCore<Client, UserProfile>`, so your own model comes
+out of them without a provider of your own. `dartway create` still scaffolds
+`lib/core/user_profile_provider.dart` on top — `ref.watchUserProfile` / `ref.readUserProfile`, two
+getters over `requireUserProfileProvider`, because Dart has no generic getters and the framework
+cannot name your model in an extension on `Ref`. They are shorthand, not the source: delete the file
+and the providers still work.
+
 ## Rendering a list
 
 An `AsyncValue` has three branches, and writing `when(loading:, error:, data:)` in every feature is

@@ -82,7 +82,8 @@ AppButton.primary(
 
 (`AppButton` is the app's own kit widget — DartWay ships no design system; `dartway create`
 scaffolds the kit into `lib/ui_kit/` as source you own. `myProfileId` is the signed-in profile:
-the session service holds it, and apps usually expose it as a one-line provider — see
+it comes from `dw.requireUserProfileProvider`, typed with the profile model you gave `DwCore`, and
+apps usually wrap it in the `ref.watchUserProfile` getter — see
 `lib/core/user_profile_provider.dart` in the example app.)
 
 If the session is full, `validateSave` on the server rejects the write and its message

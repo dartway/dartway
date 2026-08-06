@@ -1,26 +1,24 @@
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'dw_core.dart';
 
-/// Currently signed-in profile, derived from the DartWay session.
-/// `null` while signed out or before the session is initialized.
-final userProfileProvider = Provider<UserProfile?>((ref) {
-  final session = dw.sessionProvider;
-  if (session == null) return null;
-  return ref.watch(session).signedInUserProfile;
-});
-
+/// Shorthand for the framework's profile providers. `dw` is typed with this
+/// project's [UserProfile], so `dw.requireUserProfileProvider` already returns
+/// it — these getters only spare you the `ref.watch(...)` around it.
+///
+/// Both throw when nobody is signed in: use them under an authenticated
+/// subtree (`DwUserAsyncScope`). Where the user may be signed out, read
+/// `dw.userProfileProvider`; to rebuild on one field only, watch
+/// `dw.requireUserProfileProvider.select(...)` directly.
 extension UserProfileWidgetRefExtension on WidgetRef {
-  /// Non-null current profile. Only use inside an authenticated subtree
-  /// (e.g. under [DwUserAsyncScope]); throws if no user is signed in.
-  UserProfile get watchUserProfile => watch(userProfileProvider)!;
+  UserProfile get watchUserProfile => watch(dw.requireUserProfileProvider);
 
-  UserProfile get readUserProfile => read(userProfileProvider)!;
+  UserProfile get readUserProfile => read(dw.requireUserProfileProvider);
 }
 
 extension UserProfileRefExtension on Ref {
-  UserProfile get watchUserProfile => watch(userProfileProvider)!;
+  UserProfile get watchUserProfile => watch(dw.requireUserProfileProvider);
 
-  UserProfile get readUserProfile => read(userProfileProvider)!;
+  UserProfile get readUserProfile => read(dw.requireUserProfileProvider);
 }

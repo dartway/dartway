@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/session/domain/dw_session_state_model.dart';
 import '../app/session/service/dw_session_service.dart';
 import '../app/session/state/dw_session_state_notifier.dart';
+import '../app/session/state/dw_user_profile_providers.dart';
 import '../app/socket/service/dw_socket_service.dart';
 import '../private/dw_singleton.dart';
 import '../repository/dw_repository.dart';
@@ -28,6 +29,34 @@ class DwCore<
     DwSessionStateModel<UserProfileClass>
   >?
   sessionProvider;
+
+  /// Built on first read rather than in the constructor: an app that never asks
+  /// for the profile never gets the providers. [sessionProvider] is assigned by
+  /// then — the constructor has to have finished for anyone to reach this.
+  late final DwUserProfileProviders<UserProfileClass> _userProfileProviders =
+      DwUserProfileProviders<UserProfileClass>(sessionProvider);
+
+  /// The signed-in profile, or `null` while signed out, before the session is
+  /// initialized, or when the app runs without an auth key manager at all.
+  ///
+  /// Typed by this core's `UserProfileClass`, so an app reads its own model out
+  /// of it without declaring a provider of its own. Use it where the user may
+  /// legitimately be absent — a splash screen, a router guard, the auth zone.
+  /// Under an authenticated subtree reach for [requireUserProfileProvider]
+  /// instead and stop writing `!`.
+  Provider<UserProfileClass?> get userProfileProvider =>
+      _userProfileProviders.userProfile;
+
+  /// The signed-in profile as a non-nullable value, for everything drawn under
+  /// an authenticated subtree (see `DwUserAsyncScope`).
+  ///
+  /// Throws when nobody is signed in — that is a wiring mistake, not a state to
+  /// render, and the message says where to look. (A [StateError], reaching the
+  /// reader inside Riverpod's own `ProviderException`.) Being non-nullable it
+  /// also makes `.select` usable:
+  /// `ref.watch(dw.requireUserProfileProvider.select((p) => p.name))`.
+  Provider<UserProfileClass> get requireUserProfileProvider =>
+      _userProfileProviders.requireUserProfile;
 
   late final dartway.Caller endpointCaller;
 
