@@ -195,6 +195,11 @@ pass-through, and half the team didn't know what they were calling.
 
 ### Overriding a provider in a test
 
+**A test is the only place that writes a `ProviderScope`** — in the app the single one belongs to
+`DwAppRunner`, and `forbidden_provider_scope` (`dartway_lints`, warning) flags any other. A nested
+scope with `overrides:` is read by widgets and silently missed by providers, which resolve from the
+root container; a value that must differ per subtree is a family key or a constructor argument.
+
 A **hand-written** `NotifierProvider` has no `overrideWithValue` — that method exists only on value
 providers. What gets overridden is the factory: a subclass that overrides `build()` with a ready value.
 

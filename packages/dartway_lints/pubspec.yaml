@@ -1,6 +1,6 @@
 name: dartway_lints
-description: "Custom lint rules enforcing DartWay conventions: the UI kit is the single source of styles — raw Color/TextStyle/BorderRadius and direct theme access are flagged outside ui_kit/."
-version: 0.1.1
+description: "Custom lint rules enforcing DartWay conventions: the UI kit as the single source of styles, relative imports kept short, and ProviderScope left to the app bootstrap and tests."
+version: 0.2.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
