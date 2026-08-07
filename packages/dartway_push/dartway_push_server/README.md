@@ -1,3 +1,65 @@
 # dartway_push_server
 
-A sample Serverpod module.
+The reliable half of push delivery, as a Serverpod module.
+
+Sending one notification to one device is a single HTTP call. Sending to fifteen thousand people
+when a post goes live is not: some devices are offline, the provider rate-limits you, a worker
+crashes mid-run, the same campaign gets triggered twice, and someone deletes their account while a
+send to them is in flight. The hard part of push is never the send — it is the queue, the retries
+and the races around it. This module owns that part so an app does not hand-roll it again.
+
+It is **optional**: an app that needs push adds the dependency and gets the `dw_push_*` tables; an
+app that does not gets none of them.
+
+## What it owns
+
+- A durable queue over six tables — one stored message payload, compact membership rows per
+  recipient, short pending delivery rows.
+- A worker that claims batches with `FOR UPDATE ... SKIP LOCKED`, leases them, retries transient
+  failures with backoff, deduplicates by a stable key, and reclaims the leases of a crashed worker.
+  Terminal deliveries are deleted; hourly metric buckets and a periodic `cleanup()` keep storage
+  bounded.
+- Two built-in providers, both pure Dart: `DwFcmPushProvider` (FCM HTTP v1) and
+  `DwRuStorePushProvider`. Provider outcomes are a classified enum rather than a raw response, and
+  RuStore fallback fires only on an explicit "not this provider's token" signal — never on a
+  timeout, a 429 or a 5xx. Raw tokens and response bodies are never logged, only a fingerprint.
+- The device-token plumbing every push app needs — normalization, byte-length validation, a
+  per-recipient cap with newest-N eviction, refresh windows, canonical-token dedup, and skipping
+  enqueue for recipients with no usable token. Keyed on an opaque `recipientId`, with no app types
+  in sight.
+- Source-linked cancellation: map business `(sourceType, sourceId)` values to a queued message and
+  cancel it when the source disappears, so an immutable payload never goes out stale.
+
+## What your app owns
+
+Who receives a message and when it is enqueued, the device tokens and their lifecycle, user consent
+and categories, provider credentials — and **authorization**. The module ships no endpoints and no
+gating, so it cannot leak an "open to everyone" default; deciding who may send a marketing blast,
+pause the worker or read metrics belongs where the role model lives.
+
+## Wiring
+
+Push is not part of `DwCore` — the app constructs and owns a `DwPush`:
+
+```dart
+dwPush = DwPush(
+  config: DwPushConfig(
+    recipientResolver: AppPushRecipientResolver(),
+    transport: DwPushProviderTransport(provider: fcm),
+  ),
+);
+```
+
+`DwPushConfig` is deliberately small: a `DwPushRecipientResolver` and a `DwPushTransport` are the
+whole surface most apps ever write. Every performance and retention knob lives on an optional
+`fineTuning: DwPushFineTuning(...)`, where each field documents what it trades off.
+
+The full guide — module registration, migrations, the domain seam, the tuning knobs and what
+`maxConcurrentDeliveries` costs your connection pool — is at
+[dartway.dev](https://dartway.dev) under Server → Push delivery.
+
+## Part of DartWay
+
+[DartWay](https://dartway.dev) is a fullstack Dart framework (Flutter + Serverpod). This module is
+one of its optional pieces; the framework itself lives in the same
+[repository](https://github.com/dartway/dartway).
