@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.4.0 is the
+Flutter side gaining `dw.userProfileProvider` / `dw.requireUserProfileProvider` — see the changelog
+of `dartway_serverpod_core_flutter`. Nothing in this package changed.
+
 ## 0.3.0
 
 **Generic CRUD is closed to anonymous callers by default.** `DwCrudEndpoint` never overrode

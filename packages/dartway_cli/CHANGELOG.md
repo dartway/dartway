@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - **The deploy now supplies the web build's API address, and the template ships the two Dockerfiles
   the compose file has always named.** The rendered compose file builds `<project>_server/Dockerfile`
