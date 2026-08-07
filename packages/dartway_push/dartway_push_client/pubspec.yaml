@@ -10,3 +10,9 @@ resolution: workspace
 
 dependencies:
   serverpod_client: ^3.4.11
+
+  # The generated protocol imports it: a push message carries DartWay's own
+  # wrapper types. Inside the workspace this resolved without being declared,
+  # which is exactly the kind of dependency that only fails once the package is
+  # published and somebody else resolves it.
+  dartway_serverpod_core_client: ^0.4.0
