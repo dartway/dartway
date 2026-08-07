@@ -20,9 +20,22 @@ String exampleAppVersion = 'local';
 /// backend URL can be supplied as a runtime development parameter.
 late final DwCore<Client, UserProfile> dw;
 
-/// Builds the global [dw] core using the development [backendUrl]. Called once
-/// from `DartwayStarterApp.run` before any widget reads `dw`.
+bool _coreInitialized = false;
+
+/// Builds the global [dw] core using the development [backendUrl]. Called from
+/// `DartwayStarterApp.run` before any widget reads `dw`.
+///
+/// Calling it again does nothing, and that is what makes it usable from a
+/// widget test's `setUpAll`. Tests need it more often than it looks: anything
+/// reached through `dw.` — `dw.userProfileProvider` among them — needs the core
+/// to exist merely to be *named*, so a test that pumps a subtree touching the
+/// router needs a booted core even when it knows nothing about the session.
+/// Without the guard, the second test file in a run would meet a
+/// `LateInitializationError` on an already-initialized field.
 void initExampleDwCore({required String backendUrl}) {
+  if (_coreInitialized) return;
+  _coreInitialized = true;
+
   dw = DwCore<Client, UserProfile>(
     config: DwConfig(
       defaultModelGetter: dwGetDefault,

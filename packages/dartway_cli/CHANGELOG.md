@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0
+
+- **`dartway check` now sees the features it had been walking past, and stops contradicting its own
+  exit code.** Three findings, one cause: the checker recognised a widget by matching a list of base
+  class names — `(Stateless|Stateful|Consumer|HookConsumer|Hook)Widget` — which silently missed
+  `ConsumerStatefulWidget`, the class every form and dialog extends. It now asks whether a public
+  class extends anything named `*Widget`: a shape rather than a memory. Its twin, the new
+  `notAFeature` (error), closes the other end — a folder in a zone whose entry point declares no
+  widget is not a feature, and belongs in `core/` (state several features watch) or `shared/` (a
+  helper with no story). While only the spec check existed, a provider-only folder passed *because*
+  it was not a widget; a real project had ten of them, every one graded A. Finally, the verdict line
+  moves out of the Flutter inspector and into the command: the inspector knew nothing of the layout
+  check that ran before it, so a run could print two layout errors, announce "No errors — check
+  passes", and exit 1.
+
 ## 0.3.0
 
 - **The deploy now supplies the web build's API address, and the template ships the two Dockerfiles

@@ -138,6 +138,15 @@ Live migrations (delete an entry once no project is on the old shape):
   building blocks in `lib/shared/`, a block described by a doc comment. *A passport with nothing in it
   is deleted with the move, not reworded* — an empty spec means the thing was never a feature.
 
+- **State and queries out of zones → `core/` and `shared/` (Law 3).** *You have the old shape if:*
+  `dartway check` reports `notAFeature` — a folder in a zone whose entry point declares no widget.
+  Until that check existed the "how to tell" was a reading, and a reading is what let one project
+  gather ten such folders with every one graded A. *Target:* state that several features watch is
+  wiring, so `lib/core/`; a query or helper with no story of its own is a building block, so
+  `lib/shared/`. *What has accumulated:* move it as you touch the feature that reads it — and note
+  that a provider named in tests through `overrideWith` stays a named provider, it just changes
+  address.
+
 ## Skills and commands
 
 - Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — loaded by relevance to the task.

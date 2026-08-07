@@ -88,6 +88,18 @@ class CheckCommand extends Command<int> {
       targetDirPath: results.option('dir'),
     ).run();
 
+    // Said once, by the only place that has both counts. The Flutter inspector
+    // used to print it from inside itself, knowing nothing of the layout check
+    // that ran first — so a run could show two layout errors and then announce
+    // that the check passes, while exiting 1.
+    if (errorCount > 0) {
+      stdout.writeln(
+        '\n🔴 Errors: $errorCount (warnings/infos do not fail the check)',
+      );
+    } else {
+      stdout.writeln('\n🟡 No errors — only warnings/infos, check passes');
+    }
+
     return errorCount > 0 ? 1 : 0;
   }
 

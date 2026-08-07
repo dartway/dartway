@@ -39,6 +39,16 @@ enum DwCheckType {
   /// reports, Studio and the agent see it as a blank.
   featureSpecMissing,
 
+  /// A folder in a zone whose entry point declares no widget. A zone holds
+  /// features; a provider several features watch is wiring (`core/`), and a
+  /// helper with no story of its own is a building block (`shared/`).
+  ///
+  /// The twin of [featureSpecMissing], and neither works without the other:
+  /// while only widgets were asked for a spec, a folder that was not a widget
+  /// passed *because* it was not one. A real project accumulated ten of them,
+  /// every one graded A.
+  notAFeature,
+
   /// An `assets/...` path that points at no file. Nothing else catches this:
   /// the code compiles and the screen renders a blank where the image was.
   assetPathMissing,

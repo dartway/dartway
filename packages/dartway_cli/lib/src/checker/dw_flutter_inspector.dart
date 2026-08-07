@@ -79,6 +79,11 @@ class DwFlutterInspector {
   final _findings = <_Finding>[];
   final _stats = <DwCheckType, int>{};
 
+  /// The kinds of finding this run made. Exposed for the tests, the same way
+  /// [DwLayoutInspector] exposes its findings: the report is printed, but what
+  /// the rule *said* is the thing worth asserting.
+  Set<DwCheckType> get findingTypes => _stats.keys.toSet();
+
   late final String _packageName = _readPackageName();
 
   String get _libPath => p.join(packageDir.path, 'lib');
@@ -173,7 +178,7 @@ class DwFlutterInspector {
           rel,
         );
       } else {
-        _checkFeatureSpec(node, rel);
+        _checkFeatureEntryPoint(node, rel);
       }
     }
 
@@ -182,19 +187,40 @@ class DwFlutterInspector {
     }
   }
 
-  /// A feature's public widget is expected to declare what the feature is —
-  /// `implements DwFeature` with a `DwFeatureSpec`. Checked only for widgets:
-  /// a feature whose entry point is an extension or a plain function has
-  /// nothing to hang a spec on.
-  void _checkFeatureSpec(DwFeatureNode node, String rel) {
+  /// What a feature's entry point has to be, read from both ends.
+  ///
+  /// A zone holds features and nothing else, so a folder in one whose entry
+  /// point declares no widget is not a feature — and a folder that does declare
+  /// one owes a `DwFeatureSpec`. Those are the same rule, and until both were
+  /// checked each covered for the other's absence: a provider-only folder was
+  /// silently accepted *because* it was not a widget.
+  ///
+  /// The widget test asks whether a **public class extends anything named
+  /// `*Widget`**, rather than matching a list of base classes. The list was
+  /// `(Stateless|Stateful|Consumer|HookConsumer|Hook)Widget` and quietly missed
+  /// `ConsumerStatefulWidget` — the base class of every form and dialog, which
+  /// is to say the features with the most behaviour to describe. A list of
+  /// remembered names goes stale in silence; a shape does not.
+  void _checkFeatureEntryPoint(DwFeatureNode node, String rel) {
     final entry = node.entryFile;
     if (entry == null) return;
 
     final content = entry.readAsStringSync();
-    final isWidget = RegExp(
-      r'extends\s+(Stateless|Stateful|Consumer|HookConsumer|Hook)Widget',
+    final declaresPublicWidget = RegExp(
+      r'class\s+[A-Z]\w*\s+extends\s+\w*Widget\b',
     ).hasMatch(content);
-    if (!isWidget) return;
+
+    if (!declaresPublicWidget) {
+      _add(
+        DwCheckType.notAFeature,
+        '$rel — a zone holds features, and this entry point declares no '
+        'widget. State that several features watch is wiring and belongs in '
+        'lib/core/; a helper with no story of its own is a building block and '
+        'belongs in lib/shared/',
+        rel,
+      );
+      return;
+    }
 
     if (!content.contains('DwFeature')) {
       _add(
@@ -569,15 +595,14 @@ class DwFlutterInspector {
       );
     }
 
-    final errorCount = _stats.entries
+    // The verdict is not printed here. This inspector knows its own findings
+    // and nothing about the layout check that ran before it, and printing
+    // "No errors" from inside it is how the report came to contradict the exit
+    // code: two layout errors on screen, "check passes" underneath, and a
+    // process exiting 1. Whoever counts both says it.
+    return _stats.entries
         .where((entry) => entry.key.severity == DwCheckSeverity.error)
         .fold(0, (sum, entry) => sum + entry.value);
-    if (errorCount > 0) {
-      print('\n🔴 Errors: $errorCount (warnings/infos do not fail the check)');
-    } else {
-      print('\n🟡 No errors — only warnings/infos, check passes');
-    }
-    return errorCount;
   }
 
   void _printNode(
