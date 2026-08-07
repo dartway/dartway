@@ -96,6 +96,8 @@ values:
   - trial
 ```
 
+**A `default=` may not name a value that is closed.** When a path is retired — legally, commercially, or because it was replaced — the enum keeps the value for the rows that already carry it, and the default moves the same day. Otherwise every record created from then on is stamped with the way you decided not to do things, and nothing complains: it compiles, it saves, it looks deliberate. A real project kept `default=subscription` on its agent-auth enum for the whole time that path was known to be unusable, and the discrepancy surfaced in an audit rather than in a test. Retiring a value: change the default in the same change that closes the path, then migrate the existing rows, then remove the value once nothing references it.
+
 ## Model change workflow
 
 1. Edit/add a `.spy.yaml` in `lib/src/models/<domain>/`.

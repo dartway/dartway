@@ -18,6 +18,8 @@ In DartWay, **all server logic goes through CRUD configs**, not through arbitrar
 
 One `DwCrudConfig<T>` per model aggregates all the rules — it is the place both the developer and the AI look at.
 
+**One config per file, and the file is named after its model.** The rule sounds like tidiness and is not: a config carries the model's whole access story, so a file holding several of them is several access stories under one name, and the name stops being a place to look. It rots the way you would expect — a real project had `studio_issue_activity_crud_config.dart` at 556 lines with five configs inside, named after `StudioIssueActivity`, a model that has never existed. Private helpers (`_validate…`, `_prepare…`) live with the config they serve; if one is genuinely needed by two models, that is a shared file of its own, not a reason to merge two configs.
+
 ```dart
 final userProfileCrudConfig = DwCrudConfig<UserProfile>(
   table: UserProfile.t,

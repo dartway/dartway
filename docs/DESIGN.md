@@ -21,6 +21,27 @@ Corollary: **the current usage count in existing code is not a design argument.*
 inherits whatever the API was when it was written; it migrates. Design for what is right, not for
 what there is most of right now.
 
+### The price of this principle, which is not zero
+
+"`dw` is always in scope" is true of an application and **false of a widget test**: a test pumps a
+subtree, not an app, so `DwAppRunner` never runs and nobody has built the core. Every symbol moved
+onto `dw.` therefore widens the set of tests that must boot one — including tests that only ever
+name the symbol, because `dw.somethingProvider` dereferences `dw` to *produce the provider object*,
+before riverpod mounts anything or applies a single `overrides:` entry.
+
+This is a real cost, paid by consumers, and it is invisible from inside the framework. Moving
+`userProfileProvider` onto `dw.` broke **14 widget tests** in a real project — in files about a
+feature card, which know nothing about profiles and reached the core through
+`router → project context → profile`. The failure reads `LateInitializationError` and names a
+provider the author never touched.
+
+So, when you move a symbol onto `dw.`:
+
+- **say so in the changelog as a test-contract change**, not only as an API addition;
+- expect consumers to need `initDwCore` in `setUpAll`, and keep that initializer **idempotent** so
+  no test file has to know whether another one booted the core first (the template's is);
+- prefer not to break the rule — the namespace is worth it — but do not pretend the move is free.
+
 ## 2. `dw.` is the core; `dw.plugins.<name>` is the extensions
 
 `dw.` is a **closed, known set** — the services and actions the core always provides (`dw.notify`,
