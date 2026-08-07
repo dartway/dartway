@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0
+
+**The signed-in profile is a framework provider now: `dw.userProfileProvider` and
+`dw.requireUserProfileProvider`.** The core knew the signed-in id (`watchSignedInUserId`) but stopped
+short of the profile itself, so every project wrote the same derived provider over
+`sessionProvider` — with the same null-guard for the case where the app runs without an auth key
+manager, and the same `!` at each reading. It never needed to be the project's: `DwCore` is generic
+over the profile model, so a provider declared on it comes out typed as the app's own `UserProfile`.
+
+The pair splits the way `maybeModel` and `model` do. `userProfileProvider` returns `UserProfile?` —
+signed out is a legal answer for a splash, a router guard, the auth zone. `requireUserProfileProvider`
+returns a non-nullable profile and throws a `StateError` naming `DwUserAsyncScope` when nobody is
+signed in, because under an authenticated subtree that is a wiring mistake, not a state to render.
+Being non-nullable it also makes `.select` usable — `requireUserProfileProvider.select((p) => p.name)`
+rebuilds on one field, which a `UserProfile?` provider cannot express.
+
+Nothing breaks: a project's own provider keeps working. What `dartway create` scaffolds shrinks to
+the two getters `ref.watchUserProfile` / `ref.readUserProfile` over the framework provider — they
+stay in the project because Dart has no generic getters, and an extension on `Ref` inside the package
+cannot name your profile model.
+
 ## 0.3.0
 
 **Generic CRUD is closed to anonymous callers by default.** `DwCrudEndpoint` never overrode
@@ -139,25 +160,6 @@ with `ambiguous_extension_member_access` — on the app's line, in the app's fil
 wrote its first future call rather than the day it upgraded. The barrel now hides it. Nothing is
 lost: the core arms its own jobs through `DwRecurringJobs.startAll`. If an app worked around this
 with a `hide` of its own, the workaround can go.
-
-**The signed-in profile is a framework provider now: `dw.userProfileProvider` and
-`dw.requireUserProfileProvider`.** The core knew the signed-in id (`watchSignedInUserId`) but stopped
-short of the profile itself, so every project wrote the same derived provider over
-`sessionProvider` — with the same null-guard for the case where the app runs without an auth key
-manager, and the same `!` at each reading. It never needed to be the project's: `DwCore` is generic
-over the profile model, so a provider declared on it comes out typed as the app's own `UserProfile`.
-
-The pair splits the way `maybeModel` and `model` do. `userProfileProvider` returns `UserProfile?` —
-signed out is a legal answer for a splash, a router guard, the auth zone. `requireUserProfileProvider`
-returns a non-nullable profile and throws a `StateError` naming `DwUserAsyncScope` when nobody is
-signed in, because under an authenticated subtree that is a wiring mistake, not a state to render.
-Being non-nullable it also makes `.select` usable — `requireUserProfileProvider.select((p) => p.name)`
-rebuilds on one field, which a `UserProfile?` provider cannot express.
-
-Nothing breaks: a project's own provider keeps working. What `dartway create` scaffolds shrinks to
-the two getters `ref.watchUserProfile` / `ref.readUserProfile` over the framework provider — they
-stay in the project because Dart has no generic getters, and an extension on `Ref` inside the package
-cannot name your profile model.
 
 ## 0.2.3
 
