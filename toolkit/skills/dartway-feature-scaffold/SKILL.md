@@ -148,6 +148,13 @@ Create the entry point (a Page or a Widget), sketch the layout (buttons, lists, 
 
 The entry-point widget **declares what feature it is** — `implements DwFeature` with a `DwFeatureSpec` right in its own file (see "Feature spec" below). Without it, `dartway check` emits a `featureSpecMissing` warning.
 
+**A folder in a zone whose entry point is not a widget is not a feature**, and `dartway check`
+reports it as `notAFeature` (error). The case that produces it is always the same: a provider that
+several features watch, given a folder of its own because it felt like it deserved one. It does not
+belong in a zone — **state several features watch is wiring (`lib/core/`), and a helper with no
+story of its own is a building block (`lib/shared/`)**. The tell is the passport: if you cannot
+write `purpose` and `behaviors` for it without restating the type name, it was never a feature.
+
 **Showing a feature that is not a route.** A sheet, a dialog or an overlay publishes itself as a
 **static method on its own widget**, taking `BuildContext` first — `static Future<void> show(BuildContext context, …)`,
 or `showCreate` / `showEdit` when there are several ways in:
