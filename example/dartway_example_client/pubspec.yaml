@@ -7,11 +7,7 @@ environment:
 dependencies:
   serverpod_client: 3.4.11
 
-  dartway_serverpod_core_client:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: master
-      path: packages/dartway_serverpod_core/dartway_serverpod_core_client
+  dartway_serverpod_core_client: ^0.4.0
 
   # The client half of the optional push module. Required because the generated
   # protocol imports it — the server consumes the module, so its `Caller` shows
@@ -20,7 +16,7 @@ dependencies:
   dartway_push_client:
     git:
       url: https://github.com/dartway/dartway.git
-      ref: master
+      ref: stable
       path: packages/dartway_push/dartway_push_client
 
 # Inside the monorepo — a local build. In a standalone project, drop this block.
