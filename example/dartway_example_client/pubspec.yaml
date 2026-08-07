@@ -13,11 +13,7 @@ dependencies:
   # protocol imports it — the server consumes the module, so its `Caller` shows
   # up in this package's `client.dart`. Drop both together if an app does not
   # need push.
-  dartway_push_client:
-    git:
-      url: https://github.com/dartway/dartway.git
-      ref: stable
-      path: packages/dartway_push/dartway_push_client
+  dartway_push_client: ^0.1.0
 
 # Inside the monorepo — a local build. In a standalone project, drop this block.
 dependency_overrides:
