@@ -21,6 +21,18 @@ monorepo — a shallow clone cached in `~/.dartway/monorepo`, on the `stable` br
 be mid-refactor. That is why the version of the CLI you installed does not decide what your
 project gets — the channel does.
 
+**The harness channel follows the framework channel, and the default is only right for a project on
+the default.** A project that takes the `dartway_*` packages from `master` and installs its harness
+from `stable` gets an agent instructed in the rules of a framework it is not running — and the
+mismatch is silent, because both halves are internally consistent. It happened: a project on
+`master` carried a `stable` harness five commits behind and was told to put code in `data/` and
+`domain/`, the two folders the current layout check rejects. Take the harness from wherever the
+packages come from:
+
+```bash
+dartway setup-ai --channel master   # a project whose pubspec points at master
+```
+
 ## `dartway quickstart` — the instruction, printed
 
 ```bash
