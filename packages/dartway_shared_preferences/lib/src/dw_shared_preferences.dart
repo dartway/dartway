@@ -13,6 +13,21 @@ extension DwPrefsAccess on DwPlugins {
   DwSharedPreferences get prefs => of<DwSharedPreferences>();
 }
 
+/// What [DwSharedPreferences.provider] returns.
+///
+/// Exported so a consumer can name it. Without a name of ours the type is
+/// `NotifierProvider<PrefNotifier<T>, T>`, which only a library that imports
+/// riverpod can write down — and a file that just wants to remember a setting
+/// has no other reason to. Worse, when riverpod is absent the analyzer does not
+/// say so: it reports *"the getter 'prefs' isn't defined for the type
+/// DwPlugins"*, pointing at a getter that is perfectly fine, while
+/// `unused_import` simultaneously suggests removing the import that fixes it.
+typedef DwPrefProvider<T> = NotifierProvider<PrefNotifier<T>, T>;
+
+/// What [DwSharedPreferences.mappedProvider] returns — see [DwPrefProvider].
+typedef DwMappedPrefProvider<T> =
+    NotifierProvider<MappedPrefNotifier<T>, T>;
+
 /// The shared-preferences plugin: a reactive wrapper over [SharedPreferences].
 /// Declare it at startup, then reach it as `dw.plugins.prefs`:
 ///
@@ -57,7 +72,7 @@ class DwSharedPreferences extends DwPlugin {
   /// custom types.
   ///
   /// Assign the result to a top-level `final` once — see the class doc.
-  NotifierProvider<PrefNotifier<T>, T> provider<T>({
+  DwPrefProvider<T> provider<T>({
     required String key,
     required T defaultValue,
   }) {
@@ -70,7 +85,7 @@ class DwSharedPreferences extends DwPlugin {
   /// [mapFrom]/[mapTo] — for enums and custom types.
   ///
   /// Assign the result to a top-level `final` once — see the class doc.
-  NotifierProvider<MappedPrefNotifier<T>, T> mappedProvider<T>({
+  DwMappedPrefProvider<T> mappedProvider<T>({
     required String key,
     required T Function(String?) mapFrom,
     required String Function(T) mapTo,
