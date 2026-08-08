@@ -18,12 +18,18 @@ my_app/
   .github/           a Claude PR-review workflow (delete it to turn review off)
 ```
 
-**There is no `docs/` folder, deliberately.** What a screen does belongs in its
+**A new project gets no `docs/` folder, deliberately.** What a screen does belongs in its
 [`DwFeatureSpec`](../3-flutter/features-and-specs.md), the server-side rules in doc comments above
 the CRUD config, a cross-cutting registry — analytics events, settings keys, roles — in code under
 `lib/core/`, where the compiler knows the list and a typo is an error. A document sitting apart from
 the code goes stale without anything failing: nothing compiles it, no checker sees it, and the next
 reader — increasingly an agent — believes it.
+
+A project may still keep the documents it genuinely needs there, and one kind is known to the
+framework because it keeps being reinvented: **`docs/adr/` — the decisions and what they ruled out**.
+An ADR exists for the one thing that cannot live beside code — the *rejected* alternatives, which
+have no file to sit next to. The rules for writing one (and for never editing it) are in the agent
+toolkit's `CLAUDE.md`; `dartway-plan` reads the folder before proposing an approach.
 
 ## Why three packages
 

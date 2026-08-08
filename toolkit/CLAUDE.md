@@ -73,7 +73,7 @@ A project is free to decide otherwise (a large asset library, union types where 
 
 **Why so.** A doc sitting apart from the code drifts from it silently: the compiler does not check it, the checker does not see it, and the agent reads it and believes it. On a production project such a doc described an API deleted a year earlier, and non-working code was written from it. A spec in the feature's file and a comment above the config survive a code edit because they lie in the same diff — they are impossible to miss.
 
-**There is no `docs/` folder, and a new project does not get one.** The rule has no exception carved out for "but this one is architectural": a document nobody compiles is a document nobody notices going stale, and the architectural ones rot fastest, because the code they describe changes under them without a single error.
+**A new project gets no `docs/` folder, and most of what you would put in one belongs elsewhere.** A document nobody compiles is a document nobody notices going stale, and the ones about architecture rot fastest, because the code they describe changes under them without a single error.
 
 The cases that used to justify one, and where they go instead:
 
@@ -85,7 +85,29 @@ The cases that used to justify one, and where they go instead:
 | "How this app is put together" | The skills. That is what they are: the methodology ships from the framework and is updated with it, and a copy inside the project would only fall behind it |
 | An audit report | The chat. `/dartway-audit` writes no files on purpose; what deserves to survive becomes a line in that feature's `knownIssues` |
 
-If you feel the urge to start a document, name what it would say that a `DwFeatureSpec`, a doc comment or a piece of code cannot. Usually the answer is that the spec is silent where it should not be, and the fix is in the spec.
+Before starting any document, name what it would say that a `DwFeatureSpec`, a doc comment or a piece of code cannot. Usually the answer is that the spec is silent where it should not be, and the fix is in the spec.
+
+**`docs/` is for what survives that question** — the documents this project genuinely needs. One kind is known to the framework and has rules, because it is the one that keeps being reinvented.
+
+### `docs/adr/` — the decisions, and what they ruled out
+
+An ADR records **the alternatives that were rejected, and why**. That is the one thing which cannot live beside the code: a rejected option has no file to sit next to. What the decision *produced* is in the code already.
+
+**The admission test is one question:** is there an alternative someone will propose again in six months? If not, this is not an ADR, and what you wanted to write belongs in a spec or a doc comment.
+
+`docs/adr/NNNN-slug.md` — four digits, flat, written in this project's language. Each one carries:
+
+- **Status** — `accepted` or `superseded by NNNN` — and the date;
+- **Context** — what forced a choice;
+- **Decision** — what was chosen;
+- **Rejected alternatives, each with its reason** — without this section the document is not an ADR;
+- **Limitations accepted knowingly** — what you are choosing to live with.
+
+**Never write "how it works now".** That is the part that rots, and it rots silently, because the code changes under it without an error. A real ADR described a `--dart-define` as the source of an app's URL while the README on the very same commit said that mechanism was gone.
+
+**An ADR is never edited — it is superseded by a new one**, and the old one gets `superseded by NNNN` in its status. Editing destroys the only thing it is for: what was known at the moment of the choice. A record you may rewrite is not a record.
+
+**Planning reads them.** `dartway-plan` looks in `docs/adr/` before proposing an approach, so a decision whose alternatives were already weighed is not re-argued from scratch — and a plan that itself makes such a choice proposes a new ADR as one of its steps.
 
 ## Cleanliness and finishing
 
