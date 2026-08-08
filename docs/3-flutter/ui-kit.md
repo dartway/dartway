@@ -190,5 +190,36 @@ constructors and the domain `switch` stays in the feature as one line. The enum 
 move — its user-facing texts would come with it, and text constants have no place in the kit
 (`dartway check` warns on them).
 
+## Text is content, and neither the kit nor the feature invents it
+
+The kit's ban on text constants is half of one rule, and the other half is easy to miss because
+nothing mechanical enforces it: **a string the user reads is content, not decoration.** The kit may
+not hold it because the kit does not own meaning; a feature may not hardcode it because the feature
+does not own the language.
+
+```dart
+AppText.body(context.l10n.issuesTitle)   // ✅
+AppText.body('Issues')                   // ❌ — content, nailed into a widget
+```
+
+Every DartWay project is localized from the first day, and the skeleton arrives that way: `l10n/*.arb`,
+`appLocaleProvider` (the system locale by default, switchable at runtime — and by DartWay Studio over
+the bridge), `context.l10n` inside widgets, `appL10n` for the code that runs outside the tree, such as
+notification bodies and error toasts. One language means one `.arb` file and costs nothing; adding
+localization afterwards means walking every screen, which is why it is not decided per project.
+
+**Yes, this costs you `const`.** A widget that displays a localized string cannot be `const` — the
+value is resolved from the context at runtime. The boundary simply moves one level down: `const Icon`,
+`const Gap`, `const EdgeInsets`, `const SizedBox` are unaffected, and they are most of what a tree is
+made of. What `const` buys is skipping the *construction* of a widget object; for a `Text` that is
+cheap, and layout and paint — the expensive part — are driven by whether the render object's inputs
+changed, not by constness. It is a real cost and a small one, and every localized Flutter app pays it.
+
+**Outside `ui_kit/` this is not checked, deliberately.** Telling `'Issues'` from `'issues/board'` or
+`'dd.MM'` requires reading the meaning, which no regular expression or lint rule does; a rule that
+guesses at meaning grows an exception list and teaches people to switch it off. `/dartway-audit`
+looks for hardcoded user text as part of its semantic pass. Inside the kit the guess is safe — a kit
+file has no content to speak of — which is why `uiKitContainsText` can be mechanical.
+
 Finally: tempted to add a client-specific hack inside a framework widget? That is the signal an
 extension point is missing. Add it to your kit — do not fork `dartway_flutter`.

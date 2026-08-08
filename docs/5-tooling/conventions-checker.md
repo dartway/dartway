@@ -16,6 +16,27 @@ Three examples of what nothing else catches:
 The checker is not a second analyzer. It exists because DartWay's structural conventions are the
 part of the framework that a compiler has no opinion about.
 
+## Where a rule belongs: the deciding question
+
+DartWay enforces its conventions in three places, and picking the wrong one is how a rule ends up
+disliked and switched off. The question is not "how important is this" — it is **whether the answer
+is decidable without understanding what the code means**.
+
+| The answer is… | Where the rule goes | Example |
+|---|---|---|
+| decidable from the shape of an expression | `dartway_lints` (a `custom_lint` rule, live in the IDE) | is this a raw `Color` outside `ui_kit/`? |
+| decidable from the shape of the project | `dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
+| **only decidable by reading the meaning** | `/dartway-audit` | is this string something a *user* reads, or is it an identifier, a key, a date pattern? |
+
+The third row is the one worth defending. `'Issues'`, `'issues/board'` and `'dd.MM'` are the same
+shape and different things, so a mechanical rule about hardcoded text can only guess — and a guessing
+rule grows an exception list with every complaint until somebody turns it off. That is not
+hypothetical: `uiKitContainsText` carries eight hand-grown exceptions today, and it survives only
+because its scope is narrow enough for the guess to be safe (a kit file has no content to speak of).
+Widened to features, the same rule would be noise.
+
+A rule that needs understanding is not a weaker rule. It is a rule for a reader.
+
 ## Three commands, and none of them implies the others
 
 A DartWay project has three separate gates, and each has to be run by name:
