@@ -1,6 +1,6 @@
 name: dartway_shared_preferences
 description: "Shared-preferences plugin for DartWay: typed riverpod providers over local storage, reached as dw.plugins.prefs. Optional by design."
-version: 0.1.1
+version: 0.2.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

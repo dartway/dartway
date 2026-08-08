@@ -21,20 +21,37 @@ provider once, as a top-level `final`**, like any riverpod provider:
 
 ```dart
 // A reactive value — the UI watches a preference like any other provider.
-final darkModeProvider = dw.plugins.prefs.provider<bool>(
+final DwPrefProvider<bool> darkModeProvider = dw.plugins.prefs.provider<bool>(
   key: 'darkMode',
   defaultValue: false,
 );
 
 // Enums / custom types stored as a String.
-final themeProvider = dw.plugins.prefs.mappedProvider<AppThemeMode>(
-  key: 'theme',
-  mapFrom: (raw) => AppThemeMode.values.byName(raw ?? 'system'),
-  mapTo: (mode) => mode.name,
-);
+final DwMappedPrefProvider<AppThemeMode> themeProvider =
+    dw.plugins.prefs.mappedProvider<AppThemeMode>(
+      key: 'theme',
+      mapFrom: (raw) => AppThemeMode.values.byName(raw ?? 'system'),
+      mapTo: (mode) => mode.name,
+    );
 
 // One-off imperative access.
 final token = dw.plugins.prefs.raw.getString('token');
+```
+
+**Write the type out.** `DwPrefProvider<T>` and `DwMappedPrefProvider<T>` come from this package, so
+the file needs no other import — that is what they are for. Leave the type to inference and the
+declaration only compiles where riverpod happens to be imported, which a file that just wants to
+remember a setting has no reason to do. And it does not fail helpfully: the analyzer says *"the
+getter `prefs` isn't defined for the type `DwPlugins`"*, pointing at a getter that is perfectly fine,
+while `unused_import` suggests removing the very import that fixes it.
+
+**The extension has to be in scope.** `dw.plugins.prefs` is declared here, so every file reading it
+imports this package. If that gets noisy, re-export the package from wherever the app declares `dw`
+— the same way a UI kit's root file re-exports `dartway_flutter`:
+
+```dart
+// lib/core/dw_core.dart
+export 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 ```
 
 Update through the notifier:
