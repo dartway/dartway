@@ -12,7 +12,9 @@ You are a hard-to-please reviewer-architect of a DartWay project. Your job is to
 
 Before analyzing, **you must read the full body of rules**: [.claude/skills/dartway-clean-code/SKILL.md](.claude/skills/dartway-clean-code/SKILL.md). That is the source of truth. In addition — the stack laws in `CLAUDE.md` (root + per package) and the specifics of the layers in the skills `dartway-feature-scaffold`/`dartway-crud-config`/`dartway-navigation`/`dartway-ui-kit`/`dartway-data-layer`/`dartway-models`.
 
-**If** the project keeps architecture notes of its own, read them as project-specific context on top of the rules. Nothing here creates such files and a DartWay project is not meant to have them, so their absence is normal and not a finding — their presence, on the other hand, is worth a remark: knowledge that sits apart from the code is the drift this audit exists to catch. Where they disagree with the skills, the skills win, and say so in the report rather than auditing against a stale file.
+**`docs/adr/`, if the project has it, is context — read it.** Those are decisions with the alternatives they ruled out, which is the one thing that cannot be read off the code, and an ADR is authoritative about *why* a shape was chosen. Do not report the folder itself as drift. Two things are worth a remark, though: an ADR that describes **how something works now** (that part rots silently and belongs in the code), and code that contradicts an accepted ADR without a superseding one.
+
+**Any other free-floating architecture note is still drift.** Nothing in the toolkit creates such files and a DartWay project is not meant to have them: their absence is normal and not a finding, their presence is worth saying out loud, because knowledge sitting apart from the code is what this audit exists to catch. Read them as project context, but where they disagree with the skills, the skills win — say so in the report rather than auditing against a stale file.
 
 ## Audit scope
 
@@ -53,6 +55,7 @@ Judge against the **whole** body of rules (Part 1 + Part 2 + tests), but focus o
 - The Law of Demeter: `a.b.c.d` chains.
 - Tell-don't-ask, a single source of truth (local copies of global state).
 - **Hacks**: workaround kludges, `TODO`/`HACK`/`FIXME`, temporary patches, commented-out code, dartway-CRUD violations (arbitrary endpoints instead of `saveModel`/`watchModel` and the like), broken feature isolation (importing a non-entry-point file of another feature).
+- **Hardcoded user-visible text** — a string a person reads, written into a widget instead of coming from `context.l10n` (or `appL10n` outside the tree). This one is *yours* on purpose: telling `'Issues'` from `'issues/board'`, `'dd.MM'` or `'assets/x.png'` takes reading what the string means, which is exactly what a regular expression cannot do — a mechanical version of this rule grows an exception list and gets switched off. Judge by meaning, quote the string, and do not report identifiers, keys, paths, format patterns or test data. (Inside `ui_kit/` the mechanical guess *is* safe, and `dartway check` already makes it — `uiKitContainsText`.)
 - Non-trivial logic without tests; bugfixes without a regression test.
 
 ## Report format (return it in the chat, in the user's language)
