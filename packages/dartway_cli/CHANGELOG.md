@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.0
+
+- **`/dartway-audit` becomes `/dartway-checkup`, and looks at the project rather than at the code.**
+  The audit judged the Flutter package against the clean-code contract, which left out everything
+  that is not code — and that turned out to be where the worst findings live: a check declared in
+  `analysis_options.yaml` and executed by no CI step, a test suite excluded months ago with a comment
+  older than its reason, a pin trailing the framework so that a local workaround silently duplicates
+  what upstream now does. The checkup runs the project's own gates *before* reading anything — those
+  answers are certain and cost a minute — then compares them against what CI actually runs, and
+  measures the distance to the framework.
+- **Depth is budgeted and remembered, so repeated runs go deeper instead of skimming.** Breadth and
+  depth compete for one budget and breadth always wins, so the command reads three to five features
+  properly per run and records them in a coverage table: never-visited first, then whatever changed
+  most since its last pass. A first pass over a feature finds the structural problems; once those are
+  fixed the next one sees the design underneath.
+- **A finding a command could confirm is a hypothesis until the command has been run**, and is
+  labelled as one. Two real errors motivated the rule: a widget parameter called legacy because a doc
+  comment said so while the code said otherwise, and a folder reported as missing a passport the
+  checker does not in fact demand.
+- **`dev_notes.md` — the second journal.** `dartway_notes.md` holds what the *framework* got wrong;
+  this one holds what *this project* carries and nobody else can fix — CI, pins, configs, tendencies.
+  What belongs to a single feature goes in neither: it is a line in that feature's `knownIssues`,
+  next to the code. Installed and git-ignored like its sibling, never overwritten, written by
+  `dartway-finish` as well as by the checkup, and both journals' open entries are listed when a task
+  ends. Entries are deliberately short — where, what is wrong, what it leads to — because a journal
+  of treatises is a journal nobody reads.
+- A retired command is now removed from a project on update rather than lingering as a stale
+  `/slash`: `managedCommandFiles` keeps the old name until no project can still be carrying it.
+
 ## 0.4.0
 
 - **`dartway check` now sees the features it had been walking past, and stops contradicting its own

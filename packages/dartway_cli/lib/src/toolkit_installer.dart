@@ -6,11 +6,23 @@ import 'package:path/path.dart' as p;
 ///
 /// `.claude/` is a generated-but-committed artifact (like the Serverpod
 /// client). Only MANAGED files are overwritten: `CLAUDE.md`, skills named
-/// `dartway-*` and the `commit` / `dartway-audit` commands. Project-own
+/// `dartway-*` and the `commit` / `dartway-checkup` commands. Project-own
 /// skills and commands are never touched, and `settings.json` is seeded once
 /// and then belongs to the project.
 class ToolkitInstaller {
-  static const managedCommandFiles = ['commit.md', 'dartway-audit.md'];
+  /// Removed before every install, then re-copied from the toolkit — so a
+  /// command that has been retired disappears from a project instead of
+  /// lingering as a stale `/slash` nobody maintains.
+  ///
+  /// `dartway-audit.md` stays on the list for exactly that reason: the toolkit
+  /// no longer contains it, and this entry is what clears it out of the
+  /// projects that still have it. A retired name is removed from here only once
+  /// no project can still be carrying it.
+  static const managedCommandFiles = [
+    'commit.md',
+    'dartway-checkup.md',
+    'dartway-audit.md',
+  ];
 
   /// Copies the toolkit from [toolkitDir] into `<projectRoot>/.claude/`,
   /// substituting [tokens] in the managed markdown files.
@@ -88,43 +100,61 @@ class ToolkitInstaller {
     stdout.writeln('Created .claude/settings.json (pre-approved dev commands)');
   }
 
-  /// Puts `dartway_notes.md` at the project root and git-ignores it.
+  /// Puts the two journals at the project root and git-ignores them.
   ///
-  /// The one file the installer writes outside `.claude/`, and the only one it
-  /// refuses to overwrite: the journal is where a project records what the
-  /// framework got wrong, so its content is the project's, not ours. Without
-  /// this step the practice exists only where somebody set it up by hand, which
-  /// is exactly how the last one was lost.
+  /// The only files the installer writes outside `.claude/`, and the only ones
+  /// it refuses to overwrite: a journal holds what this project found, so its
+  /// content is the project's and not ours. Without this step the practice
+  /// exists only where somebody set it up by hand, which is exactly how the
+  /// last one was lost.
+  ///
+  /// Two of them, because a finding has two possible addresses and mixing them
+  /// loses both: `dartway_notes.md` is what the *framework* got wrong and has
+  /// to travel to the monorepo; `dev_notes.md` is what *this project* carries
+  /// and nobody else can fix. What belongs to a single feature goes in neither —
+  /// it is a line in that feature's `knownIssues`, next to the code.
   static void _installNotesJournal(
     Directory toolkitDir,
     Directory projectRoot,
     Map<String, String> tokens,
   ) {
-    final template = File(p.join(toolkitDir.path, 'dartway_notes.md'));
-    final journal = File(p.join(projectRoot.path, 'dartway_notes.md'));
+    const journals = {
+      'dartway_notes.md':
+          'Findings to carry back into the DartWay monorepo — a local journal.',
+      'dev_notes.md':
+          "This project's own findings — risks and nuances, a local journal.",
+    };
 
-    if (template.existsSync() && !journal.existsSync()) {
-      template.copySync(journal.path);
-      _substituteTokens([journal], tokens);
-      stdout.writeln('Created dartway_notes.md (findings for the framework)');
+    for (final entry in journals.entries) {
+      final template = File(p.join(toolkitDir.path, entry.key));
+      final journal = File(p.join(projectRoot.path, entry.key));
+
+      if (template.existsSync() && !journal.existsSync()) {
+        template.copySync(journal.path);
+        _substituteTokens([journal], tokens);
+        stdout.writeln('Created ${entry.key}');
+      }
+
+      _ignoreJournal(projectRoot, entry.key, entry.value);
     }
-
-    _ignoreJournal(projectRoot);
   }
 
-  static void _ignoreJournal(Directory projectRoot) {
+  static void _ignoreJournal(
+    Directory projectRoot,
+    String fileName,
+    String comment,
+  ) {
     final gitignore = File(p.join(projectRoot.path, '.gitignore'));
     if (!gitignore.existsSync()) return;
 
     final lines = gitignore.readAsLinesSync();
-    if (lines.any((line) => line.trim() == 'dartway_notes.md')) return;
+    if (lines.any((line) => line.trim() == fileName)) return;
 
     gitignore.writeAsStringSync(
-      '\n# Findings to carry back into the DartWay monorepo — a local journal.\n'
-      'dartway_notes.md\n',
+      '\n# $comment\n$fileName\n',
       mode: FileMode.append,
     );
-    stdout.writeln('Added dartway_notes.md to .gitignore');
+    stdout.writeln('Added $fileName to .gitignore');
   }
 
   /// The toolkit used to be installed by a shell script from a private

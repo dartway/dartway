@@ -217,7 +217,7 @@ changed, not by constness. It is a real cost and a small one, and every localize
 
 **Outside `ui_kit/` this is not checked, deliberately.** Telling `'Issues'` from `'issues/board'` or
 `'dd.MM'` requires reading the meaning, which no regular expression or lint rule does; a rule that
-guesses at meaning grows an exception list and teaches people to switch it off. `/dartway-audit`
+guesses at meaning grows an exception list and teaches people to switch it off. `/dartway-checkup`
 looks for hardcoded user text as part of its semantic pass. Inside the kit the guess is safe — a kit
 file has no content to speak of — which is why `uiKitContainsText` can be mechanical.
 

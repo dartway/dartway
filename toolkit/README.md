@@ -2,7 +2,7 @@
 
 The Claude Code harness for DartWay apps: reusable `dartway-*` skills and commands. **The single source of truth** is the `toolkit/` folder of the `dartway` monorepo: the skills are versioned and evolve together with the framework code (a change to a package's public API updates the affected skills in the same PR — see the monorepo's root `CLAUDE.md`).
 
-In client repos the harness is installed by a script and **committed** (`.claude/` is a generated-but-committed artifact, like the Serverpod client): you clone the project and the skills are already there, the history records which skills the code was written with, and updating is a deliberate action with a visible diff. The installer overwrites **only the managed files** (`CLAUDE.md`, the `dartway-*` skills, the `commit`/`dartway-audit` commands) — the project's own skills and commands live alongside under their own names and are left alone. Want to customize a dartway skill — copy it under a different name.
+In client repos the harness is installed by a script and **committed** (`.claude/` is a generated-but-committed artifact, like the Serverpod client): you clone the project and the skills are already there, the history records which skills the code was written with, and updating is a deliberate action with a visible diff. The installer overwrites **only the managed files** (`CLAUDE.md`, the `dartway-*` skills, the `commit`/`dartway-checkup` commands) — the project's own skills and commands live alongside under their own names and are left alone. Want to customize a dartway skill — copy it under a different name.
 
 ## Structure
 
@@ -12,7 +12,7 @@ CLAUDE.md                     # the generic methodology (the always-in-context "
 skills/dartway-*/SKILL.md     # the DartWay methodology — 12 skills: requirements, plan, run,
                               #   feature-scaffold, models, crud-config, data-layer, navigation,
                               #   ui-kit, clean-code, push-delivery, finish
-commands/{commit,dartway-audit}.md
+commands/{commit,dartway-checkup}.md
 settings.json                 # default permissions, seeded once as .claude/settings.json
 ```
 

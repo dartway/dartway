@@ -28,7 +28,7 @@ Options: `--channel` (monorepo branch, default `stable`), `--local-repo` (use a 
 
 ### `dartway setup-ai`
 
-Installs or updates the DartWay AI toolkit (Claude Code skills, commands and methodology) in the current project's `.claude/` directory. `.claude/` is a generated-but-committed artifact: only managed files (`CLAUDE.md`, `dartway-*` skills, `commit`/`dartway-audit` commands) are overwritten — your own skills and commands survive updates.
+Installs or updates the DartWay AI toolkit (Claude Code skills, commands and methodology) in the current project's `.claude/` directory. `.claude/` is a generated-but-committed artifact: only managed files (`CLAUDE.md`, `dartway-*` skills, `commit`/`dartway-checkup` commands) are overwritten — your own skills and commands survive updates.
 
 ```bash
 dartway setup-ai --base-branch develop
