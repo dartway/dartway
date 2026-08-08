@@ -33,7 +33,7 @@ worse than a missing one — the agent writes non-working code with full confide
   CLAUDE.md                    # the methodology, always in the agent's context
   skills/dartway-*/SKILL.md    # 12 skills, loaded by relevance to the task
   commands/commit.md
-  commands/dartway-audit.md
+  commands/dartway-checkup.md
 ```
 
 `CLAUDE.md` is the always-loaded brain: the cross-stack laws (CRUD first, domain-first, a feature
@@ -53,7 +53,7 @@ the methodology a piece of code was written under.
 ## Managed files, and how to customize
 
 Reinstalling overwrites **only what the toolkit manages**: `CLAUDE.md`, every skill directory
-named `dartway-*`, and the `commit` / `dartway-audit` commands. Anything else in `.claude/` — your
+named `dartway-*`, and the `commit` / `dartway-checkup` commands. Anything else in `.claude/` — your
 own skills, your own commands — is never touched.
 
 So do not edit a `dartway-*` skill in place; the next `setup-ai` will drop your changes on the
@@ -130,9 +130,22 @@ progress. Opt-in — an app that does not depend on it has no push tables.
 contract, checks the feature's description for drift and the test coverage, then shows suggestions
 and applies only what you confirm.
 
-Two commands come with them: `/dartway-audit` — a deep review of a module or the whole app against
-the same contract; `/commit` — a commit in the format the project's CI checks, with the ticket
-passed as an argument.
+Two commands come with them. `/commit` — a commit in the format the project's CI checks, with the
+ticket passed as an argument. And `/dartway-checkup` — the state of the project and what is worth
+taking into work next.
+
+The checkup answers two questions for the same person on different days: *how bad is it* and *what
+do I fix first*. It runs the project's own gates before reading anything — the checker, the lints,
+the analyzer, the tests — then compares that against what CI actually executes, because a rule
+declared and never run reads as covered while enforcing nothing. It measures how far the project's
+pin trails the framework, since a workaround here may already be a duplicate of something upstream
+now does. Only then does it spend reading on a handful of features, chosen from a coverage table so
+that successive runs go deeper instead of skimming the same surface.
+
+What it finds gets placed rather than announced: a finding that belongs to a feature becomes a line
+in its `knownIssues`, one about the framework goes to `dartway_notes.md`, and a project-wide risk
+that fits neither goes to `dev_notes.md`. Both journals live at the project root, git-ignored, and
+`dartway-finish` lists their open entries at the end of a task.
 
 ## What the toolkit does not do
 

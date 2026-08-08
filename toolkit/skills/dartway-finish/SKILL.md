@@ -17,7 +17,7 @@ The "definition of done" for a dartway task. Run it when the work on a task/feat
 
 The skill works in three phases and **never changes code or docs without the author's explicit confirmation**. Phases A (audit) and B (suggestions) are read-only. Phase C (application) covers only what the author confirmed. Anything debatable or architectural the skill **does not touch** — it leaves it to the author with a note.
 
-The rules come from `dartway-clean-code` (the cleanliness contract), plus `dartway-data-layer`, `dartway-models`, `dartway-crud-config`, `dartway-navigation`, `dartway-ui-kit`. It is the same body of rules the `/dartway-audit` command uses; the difference: `dartway-finish` looks at **the diff of a single task** and adds docs sync + a test check + a confirmation loop.
+The rules come from `dartway-clean-code` (the cleanliness contract), plus `dartway-data-layer`, `dartway-models`, `dartway-crud-config`, `dartway-navigation`, `dartway-ui-kit`. It is the same body of rules the `/dartway-checkup` command uses; the difference: `dartway-finish` looks at **the diff of a single task** and adds docs sync + a test check + a confirmation loop.
 
 ---
 
@@ -108,18 +108,26 @@ is verified through the public kit widget. A test of a private composition → a
 - **`dart run custom_lint` in the Flutter package is mandatory.** `flutter analyze` does NOT run its rules, and it is `dartway_lints` that catches the ban on raw `Color`/`TextStyle`/`BorderRadius` outside ui_kit and the other conventions. A green `flutter analyze` with a red `custom_lint` is a classic trap.
 - **`flutter test` was actually run, not "the tests probably weren't touched".** The analyzer proves that the code compiles and says nothing about behavior: an overflow in a narrow layout, an uninitialized `dw`, a layout that fell apart — all of that is only visible in a run. A test failing after a refactoring starts with the hypothesis "I broke it", and only after checking against HEAD becomes "the test was red before me".
 
-### A.6 Findings about the framework itself
+### A.6 Findings that outlive this task
 
-While auditing, some findings are not about this code at all: a rule that does not exist or is too
-vague to have prevented the mistake, two skills that disagree, an API that forced a workaround. Those
-belong in `dartway_notes.md` at the project root — the managed files cannot be fixed here, they are
-overwritten on update (see `CLAUDE.md`, "Notes back to the framework").
+Some of what you noticed is not about this diff at all, and it dies in the chat unless it is placed.
+Every finding has exactly one home — take the first line that fits:
 
-- Anything you noticed of that kind and have not written down yet — write it down now, in the shape
-  the journal asks for: the example, why the rule missed it, the wording to add.
-- Then read the journal and **list the `open` entries** in the report, grouped by where they land
-  (harness / packages / tooling). It is a reminder, not a gate: the task is finished either way, but
-  the entries stop being invisible.
+| The finding… | Goes to |
+|---|---|
+| is being fixed in this task | fix it — no entry anywhere |
+| belongs to one feature | that feature's `knownIssues`, proposed in Phase B |
+| is about the **framework**: a rule that does not exist or is too vague to have prevented the mistake, two skills that disagree, an API that forced a workaround | `dartway_notes.md` |
+| is a nuance, problem or technical risk of **this project** that does not fit the task and is not confined to one feature | `dev_notes.md` |
+
+Both journals sit at the project root and are git-ignored. The framework one exists because the
+managed files cannot be fixed here — they are overwritten on update (see `CLAUDE.md`).
+
+- **Write down now** anything of either kind you have not written yet. `dartway_notes.md` asks for
+  the example, why the rule missed it and the wording to add. `dev_notes.md` asks for three lines:
+  where, what is wrong, what it leads to — an option may be named, not written up.
+- **Then list the `open` entries of both** in the report, one line each. A reminder, not a gate: the
+  task is finished either way, but the entries stop being invisible.
 
 ---
 
@@ -132,8 +140,9 @@ Produce a structured report in the chat:
 3. **🟢 Minor** — naming, magic numbers, small stuff.
 4. **📄 Docs** — which feature docs/`CLAUDE.md`/skills are outdated, **with a concrete proposed diff** for the fix.
 5. **🧪 Tests** — which non-trivial parts are uncovered.
-6. **📓 For the framework** — the `open` entries in `dartway_notes.md`, one line each: what it is and
-   where it lands. Nothing to apply here — this is what to carry into the DartWay monorepo.
+6. **📓 Journals** — the `open` entries of both, one line each. From `dartway_notes.md`: what it is
+   and where in the monorepo it lands. From `dev_notes.md`: what this project is carrying. Nothing to
+   apply here — the first list is what to take to the framework, the second is what to schedule.
 
 For every item give a **concrete proposed edit**, ready to apply. Mark anything debatable/architectural as "for the author to decide" — do not propose an automatic fix.
 
@@ -149,13 +158,13 @@ For every item give a **concrete proposed edit**, ready to apply. Mark anything 
 
 ---
 
-## How this differs from `/dartway-audit`
+## How this differs from `/dartway-checkup`
 
-| | `dartway-finish` (skill) | `/dartway-audit` (command) |
+| | `dartway-finish` (skill) | `/dartway-checkup` (command) |
 |---|---|---|
-| Scope | the diff of one task vs the base branch | a whole module/folder on request |
-| Extra checks | docs sync + tests + application | code audit only |
-| Output | report + edits on confirmation | report in the chat |
-| When | finishing a task, before a PR | a deep check of an area on demand |
+| Scope | the diff of one task vs the base branch | the whole project by default — packages, CI, configs, pins — narrowed by an argument |
+| Extra checks | docs sync + tests + application | the gates actually running, the distance to the framework, a rolling deep pass over features |
+| Output | report + edits on confirmation | report in the chat + entries placed in `knownIssues` / the journals |
+| When | finishing a task, before a PR | on demand, and periodically — its findings change without a commit here |
 
 The detectors are shared (their source is `dartway-clean-code`). Do not duplicate the logic — reference the contract.

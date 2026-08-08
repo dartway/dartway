@@ -48,9 +48,9 @@ Split the findings into two groups:
 - 🔧 **Blocking debt** — existing code that **gets in the way of or complicates the new work**: a god object you will have to extend; a direct field update (e.g. `balance`) instead of an Event model in money logic the feature will touch; a missing abstraction/extension; a broken feature isolation on the integration path. Such debt **must be accounted for** in the scope, risks and estimate of the corresponding option (Phase E).
 - 🧹 **Adjacent debt** — contract violations **near** the work area, which can be tidied up along the way (boy-scout rule) but which do not block the task. Optional, **the author's call**.
 
-**Discipline:** read-only, no auto-fixes; do not inflate this into a full repository audit (that is the job of `/dartway-audit`); every finding comes with a `file:line` and a short "why this is debt".
+**Discipline:** read-only, no auto-fixes; do not inflate this into a full repository audit (that is the job of `/dartway-checkup`); every finding comes with a `file:line` and a short "why this is debt".
 
-**Boundary:** `dartway-finish` audits the finished **diff** before a PR, `/dartway-audit` audits a **module on request**; here it is a look **forward** at the area before the work starts, so that the chosen approach accounts for the existing debt.
+**Boundary:** `dartway-finish` audits the finished **diff** before a PR, `/dartway-checkup` audits a **module on request**; here it is a look **forward** at the area before the work starts, so that the chosen approach accounts for the existing debt.
 
 ## Phase D — Pool of clarifying questions
 

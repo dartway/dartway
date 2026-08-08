@@ -142,7 +142,7 @@ dartway setup-ai --base-branch develop
 ```
 
 Installs or updates `.claude/` in the current project: the methodology `CLAUDE.md`, the
-`dartway-*` skills and the `commit` / `dartway-audit` commands. It replaced the old
+`dartway-*` skills and the `commit` / `dartway-checkup` commands. It replaced the old
 `setup-claude.sh` / `.ps1` scripts, which are gone.
 
 It finds the project root through `git rev-parse --show-toplevel` (falling back to the current

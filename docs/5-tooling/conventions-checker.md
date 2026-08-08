@@ -26,7 +26,7 @@ is decidable without understanding what the code means**.
 |---|---|---|
 | decidable from the shape of an expression | `dartway_lints` (a `custom_lint` rule, live in the IDE) | is this a raw `Color` outside `ui_kit/`? |
 | decidable from the shape of the project | `dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
-| **only decidable by reading the meaning** | `/dartway-audit` | is this string something a *user* reads, or is it an identifier, a key, a date pattern? |
+| **only decidable by reading the meaning** | `/dartway-checkup` | is this string something a *user* reads, or is it an identifier, a key, a date pattern? |
 
 The third row is the one worth defending. `'Issues'`, `'issues/board'` and `'dd.MM'` are the same
 shape and different things, so a mechanical rule about hardcoded text can only guess — and a guessing

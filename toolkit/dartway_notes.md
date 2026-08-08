@@ -5,7 +5,7 @@ that did not catch a mistake, two skills that disagree, an API that forced a wor
 — a working journal, kept until its entries are carried over.
 
 **Why not fix it in place.** `.claude/CLAUDE.md`, `.claude/skills/dartway-*` and the `commit` /
-`dartway-audit` commands come from the toolkit and are overwritten on every update; the `dartway_*`
+`dartway-checkup` commands come from the toolkit and are overwritten on every update; the `dartway_*`
 packages are external. The source of truth is the monorepo, so the fix has to travel there.
 
 **Language:** whatever this project writes in (`__PROJECT_LANGUAGE__`). What travels to the monorepo

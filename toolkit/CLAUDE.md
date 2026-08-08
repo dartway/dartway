@@ -2,7 +2,7 @@
 
 A monorepo on the **Serverpod + DartWay + Flutter + Riverpod** stack. DartWay is a **highly opinionated** framework: less freedom in *how* to do things → more consistency and speed. Don't invent alternative approaches — follow the established patterns.
 
-> This harness (methodology + skills + commands) ships from the DartWay monorepo (`toolkit/`, branch `stable`) and is installed into this repository's `.claude/` (committed). The files `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-audit` commands are **managed**: don't edit them here, they get overwritten on update; customize by copying under your own name. The source of truth is the toolkit in the monorepo. The package structure is detected automatically; the paths below were substituted at install time.
+> This harness (methodology + skills + commands) ships from the DartWay monorepo (`toolkit/`, branch `stable`) and is installed into this repository's `.claude/` (committed). The files `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-checkup` commands are **managed**: don't edit them here, they get overwritten on update; customize by copying under your own name. The source of truth is the toolkit in the monorepo. The package structure is detected automatically; the paths below were substituted at install time.
 >
 > **A rule that let you down is not fixed here** — the fix would be overwritten on the next update. Write it down in `dartway_notes.md` at the project root instead; see "Notes back to the framework" below.
 
@@ -83,7 +83,7 @@ The cases that used to justify one, and where they go instead:
 | The roles and access matrix | Doc comments above the `DwCrudConfig`s — the rule sits where it is enforced |
 | An external integration's payload | Doc comments on the model or the endpoint that receives it |
 | "How this app is put together" | The skills. That is what they are: the methodology ships from the framework and is updated with it, and a copy inside the project would only fall behind it |
-| An audit report | The chat. `/dartway-audit` writes no files on purpose; what deserves to survive becomes a line in that feature's `knownIssues` |
+| A checkup report | The chat. `/dartway-checkup` writes no report file on purpose: what belongs to a feature becomes a line in its `knownIssues`, what belongs to the project goes to `dev_notes.md`, and the rest was worth saying once |
 
 Before starting any document, name what it would say that a `DwFeatureSpec`, a doc comment or a piece of code cannot. Usually the answer is that the spec is silent where it should not be, and the fix is in the spec.
 
@@ -127,7 +127,7 @@ carried into the DartWay monorepo. It is git-ignored — a working journal, not 
 - the code broke a rule that does not exist, or exists too vaguely to have prevented it;
 - the app had to work around a `dartway_*` API — an extra wrapper, a `hide`, a copied private helper;
 - you are tempted to edit a managed file (`CLAUDE.md`, `skills/dartway-*`, the `commit` /
-  `dartway-audit` commands). That temptation *is* the note.
+  `dartway-checkup` commands). That temptation *is* the note.
 
 Write it the way it would have to be written in the toolkit: the example from the code, why the
 existing rule did not catch it, and the concrete wording to add — not "something is off here". An
@@ -172,7 +172,7 @@ Live migrations (delete an entry once no project is on the old shape):
 ## Skills and commands
 
 - Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — loaded by relevance to the task.
-- Commands (`.claude/commands/`): `/dartway-audit` — a deep audit of a module; `/commit` — a commit in the project's CI format.
+- Commands (`.claude/commands/`): `/dartway-checkup` — the state of the project and what to take into work next (whole project by default, a path narrows it); `/commit` — a commit in the project's CI format.
 
 **Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + reconciling the specs and doc comments with the code + tests before the PR).
 
@@ -209,7 +209,7 @@ Nothing else may sit at the top level, and nothing may carry one of those names 
 
   The reason is one sentence and it covers both places the rule bites: **a string the user reads is content, not decoration** — so `ui_kit` may not hold it (the kit does not own meaning) and a feature may not hardcode it (the feature does not own the language). `AppText.body(context.l10n.issuesTitle)`, never `AppText.body('Issues')`.
 
-  Not mechanically enforced outside the kit, and deliberately so: telling `'Issues'` from `'issues/board'` or `'dd.MM'` takes reading the meaning, which no regex or lint rule does. `/dartway-audit` looks for it. Inside `ui_kit/` the guess is safe — a kit file has no content to speak of — and `dartway check` reports it as `uiKitContainsText`.
+  Not mechanically enforced outside the kit, and deliberately so: telling `'Issues'` from `'issues/board'` or `'dd.MM'` takes reading the meaning, which no regex or lint rule does. `/dartway-checkup` looks for it. Inside `ui_kit/` the guess is safe — a kit file has no content to speak of — and `dartway check` reports it as `uiKitContainsText`.
 - **Navigation:** the DartWay Router — enum routes, enum parameters, transitions through context extensions (`context.goNamed`/`pushTo`/`replaceWith`, not `router.go()`), guards centralized. Skill — `dartway-navigation`.
 - **Specials:** notifications — `dw.notify.*` (not `SnackBar`); the profile — `ref.watchUserProfile`/`readUserProfile` (not `watchModel<UserProfile>`); actions from the UI — `dw.action`; sign-out — `signOut()`.
 
