@@ -21,6 +21,8 @@ The plan follows the DartWay order of layers (domain-first, CRUD-first): first t
 
 Record: the agreed requirement + the **chosen implementation option** (from `dartway-requirements`). If no option is chosen or the requirements are not agreed — stop and send it back to `dartway-requirements`.
 
+**Read `docs/adr/` if the project has it.** Those are decisions already taken, each with the alternatives it ruled out and why. Two things follow: an approach listed there as rejected is not proposed again as if it were new — and if you believe it should be reconsidered, say so explicitly, naming the ADR and what has changed since. A decision quietly re-litigated is how a project ends up arguing the same question twice a year. Skip an ADR whose status says `superseded by NNNN` and read that one instead.
+
 ## Phase B — Re-analysis for the chosen option
 
 Determine precisely what and where you are touching (Glob/Grep/Read): the specific `.spy.yaml` models, the CRUD configs, the Flutter features and their `DwFeatureSpec`. What is **reused** (existing models/widgets/extensions), which layer patterns apply — lean on `dartway-models`, `dartway-crud-config`, `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`, `dartway-feature-scaffold`.
@@ -36,6 +38,7 @@ Order the steps end-to-end. Each step: **what to do → which files → which sk
 5. **Flutter** — navigation (the route) → the feature's entry point → data layer (watch/save) → UI Kit → specials. `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit`.
 6. **Tests** — non-trivial logic / Event models / permissions; for a bugfix — the failing test first.
 7. **Description** — reconcile the feature's `DwFeatureSpec` with the new behaviour, server-side rules go in doc comments above the CRUD config. No separate doc is created for a feature.
+8. **An ADR — only if this plan itself settles a choice.** The test is whether a real alternative was rejected here: a second storage, a different protocol, a library not taken, a shape of the API that lost. If so, the plan's last step is `docs/adr/NNNN-slug.md` with the alternatives and the reasons — that is the part which cannot be read off the code afterwards. If nothing was rejected, there is no ADR, and inventing one produces exactly the document the framework tells projects not to write.
 
 ## Phase D — Subtleties and risks
 
