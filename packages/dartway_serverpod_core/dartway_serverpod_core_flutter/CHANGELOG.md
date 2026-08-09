@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.5.0 is the
+server side gaining a `global` flag on `sendUpdates` / `sendUpdatesToUser` — see the changelog of
+`dartway_serverpod_core_server`.
+
 ## 0.4.0
 
 **The signed-in profile is a framework provider now: `dw.userProfileProvider` and

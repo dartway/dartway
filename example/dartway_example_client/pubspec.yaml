@@ -7,7 +7,7 @@ environment:
 dependencies:
   serverpod_client: 3.4.11
 
-  dartway_serverpod_core_client: ^0.4.0
+  dartway_serverpod_core_client: ^0.5.0
 
   # The client half of the optional push module. Required because the generated
   # protocol imports it — the server consumes the module, so its `Caller` shows

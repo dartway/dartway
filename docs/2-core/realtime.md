@@ -78,6 +78,29 @@ saveConfig: DwSaveConfig<SessionBooking>(
 `sendUpdates` takes the channels and the models explicitly. `sendUpdatesToUser` is the shortcut for
 the one audience that is always safe — a single known user — and delegates to it.
 
+## Sending from a process the clients are not connected to
+
+Both take a `global` flag, default `false`, and the default is right for the common case: an app that
+is one server process, where every client is connected to the process doing the sending.
+
+**Pass `global: true` when the sender is somewhere else** — a background worker in its own container,
+a future call, a cron job. The message then travels through Redis to the other instances, and reaches
+the clients hanging off the API server.
+
+```dart
+// inside a worker process, whose own connections list is empty
+session.sendUpdatesToUser(job.requestedByProfileId, updatedModels: [job], global: true);
+```
+
+**Get this wrong and nothing tells you.** The call compiles, throws nothing, and delivers to nobody:
+the sending process has no subscribers on that channel, and an audience of zero is not an error. It is
+the whole reason the flag is documented here rather than left in the signature — a real project found
+it only by reading Serverpod's own `postMessage`, and had hand-assembled the transport to get at it.
+
+A test will not catch it either, unless you go out of your way: a worker's publisher is usually
+injected, so the suite exercises *who* the recipients are while the delivery itself is a fake — and
+`redis: enabled: false` in a test config is normal.
+
 ## Declaring a channel
 
 A channel name reaches the server as a plain string chosen by the client. Nothing else in the system
