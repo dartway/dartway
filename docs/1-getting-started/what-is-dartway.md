@@ -129,7 +129,8 @@ It is a poor fit when:
 
 Optional plugins live outside the core and are reached as `dw.plugins.<name>` — local storage
 (`dartway_shared_preferences`), Telegram (`dartway_telegram`), push (`dartway_push`). An app that
-needs none of them never downloads them.
+needs none of them never downloads them. They ship on pub.dev and are added like any other package —
+see [plugins](../3-flutter/plugins.md).
 
 ## Where to go next
 
