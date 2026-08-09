@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0
+
+- **`sendUpdates` and `sendUpdatesToUser` take `global`, so an update can leave the process that
+  sends it.** Default `false` — the right answer while an app is one server process, where the
+  clients are connected to the process doing the sending. Pass `true` from somewhere else: a
+  background worker in its own container, a future call, a cron job. The message then travels through
+  Redis and reaches the clients hanging off the API server.
+
+  Until now the flag was not reachable at all: the extension called Serverpod's `postMessage` without
+  it. **A worker calling `sendUpdatesToUser` therefore compiled, threw nothing and delivered to
+  nobody** — its own process has no subscribers on that channel, and an audience of zero is not an
+  error. A real project found this only by reading Serverpod's own source, and had hand-assembled
+  `DwUpdatesTransport` to get at the flag; the workaround was correct and should never have been
+  necessary. Its tests did not catch it and could not have: a worker's publisher is injected, so the
+  suite checked *who* the recipients were while delivery was a fake, and `redis: enabled: false` in a
+  test config looks perfectly ordinary.
+
+  Existing calls are unaffected — the default preserves today's behaviour, and the trap is now
+  written down in the doc comment, in `docs/2-core/realtime.md` and in the `dartway-data-layer` skill.
+
 ## 0.4.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.4.0 is the

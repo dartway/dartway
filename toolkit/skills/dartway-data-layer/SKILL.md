@@ -328,6 +328,14 @@ session.sendUpdates(
 );
 ```
 
+**Sending from a worker, a future call or a cron job — `global: true`.** Both methods take the flag, default `false`, and the default is right while the app is one process: the clients are connected to the process doing the sending. A background worker in its own container is not that process, and its own subscriber list is empty.
+
+```dart
+session.sendUpdatesToUser(job.requestedByProfileId, updatedModels: [job], global: true);
+```
+
+**Forgetting it fails silently** — the call compiles, throws nothing and delivers to nobody, because an audience of zero is not an error. Tests do not save you either: a worker's publisher is normally injected, so the suite checks *who* the recipients are while the delivery is a fake, and a test config with `redis: enabled: false` looks perfectly ordinary.
+
 A channel can be narrowed to the audience you need and built from the context — `['chat:${ctx.currentModel.chatId}']`. Then a screen subscribes to it precisely:
 
 ```dart

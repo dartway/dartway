@@ -40,10 +40,22 @@ extension DwSessionExtension on Session {
   /// would have shown them that row through the API. Scope the channel to the
   /// audience that may see the data — per chat, per team, per user — rather than
   /// sending private rows to a wide one.
+  ///
+  /// **[global] decides whether the message can leave this process.** Default
+  /// `false`: delivery to the clients connected to *this* server, which is every
+  /// client when the app is one process. Pass `true` when the sender is not the
+  /// process holding the connections — a background worker, a future call, a
+  /// cron job: the message then travels through Redis to the other instances.
+  ///
+  /// Getting this wrong fails silently, which is the reason it is documented
+  /// here rather than left to be discovered. A worker calling this without
+  /// [global] compiles, throws nothing, and delivers to nobody — its own process
+  /// has no subscribers, and no error is raised for an audience of zero.
   sendUpdates({
     required List<String> channels,
     List<TableRow?>? updatedModels,
     List<TableRow?>? deletedModels,
+    bool global = false,
   }) {
     if (channels.isEmpty) return;
 
@@ -58,19 +70,24 @@ extension DwSessionExtension on Session {
     );
 
     for (final channel in channels) {
-      messages.postMessage(channel, transport);
+      messages.postMessage(channel, transport, global: global);
     }
   }
 
   /// Sends the models to one user's private channel — the common case of
   /// [sendUpdates], and the safe one: the audience is a single known user.
+  ///
+  /// [global] carries the same meaning as on [sendUpdates], and the same trap:
+  /// a worker process sending without it reaches nobody, quietly.
   sendUpdatesToUser(
     int userProfileId, {
     List<TableRow?>? updatedModels,
     List<TableRow?>? deletedModels,
+    bool global = false,
   }) => sendUpdates(
     channels: [DwCoreConst.userUpdatesChannel(userProfileId)],
     updatedModels: updatedModels,
     deletedModels: deletedModels,
+    global: global,
   );
 }
