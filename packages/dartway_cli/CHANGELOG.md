@@ -2,6 +2,15 @@
 
 ## 0.5.0
 
+- **`deploy check` now reads `compose.override.yml`, which nothing did before.** The override is the
+  one deploy file a project writes by hand, and the deploy copies it to the server unexamined. The
+  new `override-web-build` warns when it carries a `build` block for the `web` service: the deploy
+  builds that image itself and hands it `DW_BACKEND_URL` from `publicHost`, so an override that
+  builds it too states the API domain a second time with nothing comparing the copies — the build
+  keeps succeeding against yesterday's API. This is not hypothetical: it is what Studio's deployment
+  did, under a comment claiming a check that did not exist. Overriding `web` for a label or a limit
+  stays legitimate, which is why this is a warning and why only the build block trips it.
+
 - **`/dartway-audit` becomes `/dartway-checkup`, and looks at the project rather than at the code.**
   The audit judged the Flutter package against the clean-code contract, which left out everything
   that is not code — and that turned out to be where the worst findings live: a check declared in
