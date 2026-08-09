@@ -25,10 +25,14 @@ dartway deploy secret --help                # runtime secrets on the server
 | `nginx.d/{http,api,app}/*.conf` | extra Nginx directives, if any are ever needed |
 
 A domain appears in exactly one of the first two, and `dartway deploy check`
-fails when they disagree. `docker-compose.yml` and `nginx.conf` are rendered by
-`setup` on the server and are not part of this repository — a deploy that
-re-renders infrastructure on every push turns a routine change into an
-infrastructure one.
+fails when they disagree. One thing does not belong in the override: a `build`
+block for the `web` service. The deploy builds that image itself and passes it
+the API address from the Serverpod configuration, so building it here writes the
+domain down a second time, and `check` warns about it.
+
+`docker-compose.yml` and `nginx.conf` are rendered by `setup` on the server and
+are not part of this repository — a deploy that re-renders infrastructure on
+every push turns a routine change into an infrastructure one.
 
 ## Secrets
 

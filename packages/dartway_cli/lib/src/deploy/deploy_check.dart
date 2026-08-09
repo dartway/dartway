@@ -210,6 +210,13 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     severity: DwCheckSeverity.error,
     evaluate: _checkEntrypointForm,
   ),
+  DwDeployCheck(
+    id: 'override-web-build',
+    title: 'The compose override leaves the web image to the deploy',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.warning,
+    evaluate: _checkOverrideWebBuild,
+  ),
 ];
 
 Future<DwDeployVerdict> _checkPublicScheme(DwDeployContext context) async {
@@ -475,6 +482,57 @@ Future<DwDeployVerdict> _checkEntrypointForm(DwDeployContext context) async {
         'Rewrite it as exec form — ENTRYPOINT ["/app/server"] with the ordinary '
         'flags in CMD — or name the binary in server_entrypoint, which makes '
         'the deploy override the entrypoint for the migration run only.',
+  );
+}
+
+/// The deploy renders the `web` service itself, build argument included: the
+/// API address comes from `publicHost`, which is what keeps the domain written
+/// down once. An override that builds `web` states it a second time, and
+/// nothing compares the two copies — the image keeps building successfully
+/// against yesterday's API, which is a failure with no error message.
+///
+/// A warning rather than an error: overriding `web` for something that is not
+/// the build (a label, a limit, a volume) is legitimate, and only the build
+/// block reintroduces the second copy.
+Future<DwDeployVerdict> _checkOverrideWebBuild(DwDeployContext context) async {
+  final file = File(
+    p.join(context.projectRoot.path, 'deploy', 'compose.override.yml'),
+  );
+  if (!file.existsSync()) {
+    return const DwDeployVerdict.skip('no deploy/compose.override.yml');
+  }
+
+  final Object? document;
+  try {
+    document = loadYaml(file.readAsStringSync());
+  } on YamlException catch (error) {
+    return DwDeployVerdict.fail(
+      'deploy/compose.override.yml is not valid YAML: ${error.message}',
+      fix:
+          'Compose merges this file over the rendered one on the server, so a '
+          'file it cannot parse stops the deployment there rather than here.',
+    );
+  }
+
+  final services = document is YamlMap ? document['services'] : null;
+  final web = services is YamlMap ? services['web'] : null;
+  if (web is! YamlMap) {
+    return const DwDeployVerdict.pass('the web image is the deploy\'s alone');
+  }
+  if (!web.containsKey('build')) {
+    return const DwDeployVerdict.pass(
+      'the override touches web without rebuilding it',
+    );
+  }
+  return const DwDeployVerdict.fail(
+    'deploy/compose.override.yml rebuilds the web service',
+    fix:
+        'The deploy already builds web and passes it DW_BACKEND_URL from '
+        'publicHost in the Serverpod configuration. A build block here names '
+        'the API address a second time and nothing compares the copies, so a '
+        'changed domain silently ships an app talking to the old one. Drop the '
+        'build block; change the Dockerfile instead when the image itself has '
+        'to differ.',
   );
 }
 

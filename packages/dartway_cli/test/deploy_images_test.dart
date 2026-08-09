@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dartway_cli/src/checker/dw_check_type.dart';
 import 'package:dartway_cli/src/deploy/deploy_check.dart';
 import 'package:dartway_cli/src/deploy/deploy_target.dart';
 import 'package:dartway_cli/src/deploy/renderer.dart';
@@ -146,6 +147,86 @@ void main() {
         expect(verdict.passed, isTrue);
       },
     );
+  });
+
+  group('override-web-build', () {
+    void writeOverride(String contents) {
+      final file = File(p.join(root.path, 'deploy', 'compose.override.yml'))
+        ..parent.createSync(recursive: true);
+      file.writeAsStringSync(contents);
+    }
+
+    test('has nothing to judge without an override', () async {
+      final verdict = await checkNamed(
+        'override-web-build',
+      ).evaluate(contextIn(root));
+
+      expect(verdict.skipped, isTrue);
+    });
+
+    test('warns when the override builds the web image itself', () async {
+      writeOverride('''
+services:
+  web:
+    build:
+      context: .
+      dockerfile: shop_flutter/Dockerfile
+      args:
+        DW_BACKEND_URL: https://api.yesterday.example.com/
+''');
+
+      final verdict = await checkNamed(
+        'override-web-build',
+      ).evaluate(contextIn(root));
+
+      expect(verdict.passed, isFalse);
+      expect(verdict.fix, contains('DW_BACKEND_URL'));
+      expect(
+        checkNamed('override-web-build').severity,
+        DwCheckSeverity.warning,
+      );
+    });
+
+    test('leaves an override that adds a service of its own alone', () async {
+      writeOverride('''
+services:
+  automation-worker:
+    build:
+      context: .
+      dockerfile: shop_server/Dockerfile.worker
+''');
+
+      final verdict = await checkNamed(
+        'override-web-build',
+      ).evaluate(contextIn(root));
+
+      expect(verdict.passed, isTrue);
+    });
+
+    test('allows overriding web for anything but the build', () async {
+      writeOverride('''
+services:
+  web:
+    restart: always
+''');
+
+      final verdict = await checkNamed(
+        'override-web-build',
+      ).evaluate(contextIn(root));
+
+      expect(verdict.passed, isTrue);
+    });
+
+    test('reports a file Compose would fail to merge on the server', () async {
+      writeOverride('services:\n  web:\n   - build\n    bad: indent\n');
+
+      final verdict = await checkNamed(
+        'override-web-build',
+      ).evaluate(contextIn(root));
+
+      expect(verdict.passed, isFalse);
+      expect(verdict.detail, contains('not valid YAML'));
+    });
   });
 
   group('rendered compose file', () {

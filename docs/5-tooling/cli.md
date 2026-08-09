@@ -207,7 +207,7 @@ certificate contact, and the domain serving the Flutter build. The CLI **reads**
 it never rewrites it. That is the whole reason the pair stays honest — there is no second copy of a
 domain to drift.
 
-`check` changes nothing and answers whether a deployment would work. Twelve assertions on the
+`check` changes nothing and answers whether a deployment would work. Thirteen assertions on the
 working copy, seven over the network — including that every `publicHost` resolves to the deployment
 host, which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone notices.
 With the server unreachable it degrades: the SSH check fails, the rest report as skipped.
@@ -225,6 +225,13 @@ The web image gets one build argument, `DW_BACKEND_URL`, and it comes from `publ
 Serverpod configuration. A web build compiles the API address into itself, so something has to
 supply it — having the deploy do it is what keeps the domain written down once. The template's
 `main.dart` reads it through `String.fromEnvironment` and falls back to localhost for a local run.
+
+`deploy/compose.override.yml` is where a project adds what a standard deployment does not have, and
+a third local assertion guards the one thing that does not belong in it: a `build` block for the
+`web` service. Overriding `web` for a label or a limit is fine, but building it there means naming
+the API address a second time, and nothing compares the two copies — the image keeps building
+successfully against yesterday's API, which is the failure mode with no error message. A warning
+rather than an error, because only the build block reintroduces the duplicate.
 
 `run` updates the checkout, rebuilds, applies migrations and restarts, then polls every public URL.
 It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders infrastructure on
