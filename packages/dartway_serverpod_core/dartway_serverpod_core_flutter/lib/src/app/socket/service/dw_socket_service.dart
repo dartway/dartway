@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
-import 'package:dartway_serverpod_core_flutter/src/private/dw_singleton.dart';
 import 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 import 'package:flutter/foundation.dart';
 
@@ -18,7 +17,22 @@ import 'dw_channel_subscriptions.dart';
 /// Serverpod's client opens the socket with the first stream and closes it with
 /// the last, so subscribing *is* connecting.
 class DwSocketService {
-  DwSocketService({this.onStatusChanged, this.onAuthenticationRevoked});
+  DwSocketService({
+    required this.openChannelStream,
+    required this.reportError,
+    this.onStatusChanged,
+    this.onAuthenticationRevoked,
+  });
+
+  /// Opens the server-side stream for a channel. Injected rather than reached
+  /// for through the `dw` singleton, for the reason [DwSessionService] takes
+  /// its own dependencies that way: what this service decides — see
+  /// [_handleChannelClosedByServer] — is then testable without a booted client.
+  final Stream<SerializableModel> Function(String channel) openChannelStream;
+
+  /// Reports a bug in the app's channel declarations. Wired by `DwCore` to
+  /// `dw.handleError`, and injected for the same reason as [openChannelStream].
+  final void Function(Object error, StackTrace stackTrace) reportError;
 
   /// Optional outbound hook fired on every status change. Default is `null`
   /// (no-op) — the framework raises no alerts on its own.
@@ -29,9 +43,13 @@ class DwSocketService {
   /// everywhere. Wired by `DwCore` to end the local session.
   final void Function()? onAuthenticationRevoked;
 
+  /// Who the app is signed in as, as far as realtime is concerned — `null`
+  /// while signed out. Kept because a refusal means opposite things on either
+  /// side of it; see [_handleChannelClosedByServer].
+  int? _signedInUserProfileId;
+
   late final _channelSubscriptions = DwChannelSubscriptions(
-    openChannelStream: (channel) =>
-        dw.endpointCaller.dwCrud.subscribeOnUpdates(channel: channel),
+    openChannelStream: openChannelStream,
     onUpdate: _processUpdate,
     onStatusChanged: _handleStatusChanged,
     onChannelClosedByServer: _handleChannelClosedByServer,
@@ -58,6 +76,10 @@ class DwSocketService {
   /// it to no one but its owner.
   void onUserChanged(int? previousUserId, int? nextUserId) {
     if (previousUserId == nextUserId) return;
+
+    // Set before the reopening below is scheduled, so a refusal caused by it is
+    // judged against the session that will carry it, not the one that ended.
+    _signedInUserProfileId = nextUserId;
 
     unawaited(_followUser(previousUserId, nextUserId));
   }
@@ -102,11 +124,27 @@ class DwSocketService {
         onAuthenticationRevoked?.call();
 
       case DwChannelClosedReason.notAllowed:
+        // Signing out reopens the app's channels (see [_followUser]) — with
+        // nobody signed in, so every `guarded` one among them is refused. That
+        // is the server working, not the app misdeclaring: the refusal is the
+        // expected answer to a question asked on the way out, and reporting it
+        // put an error in front of a user whose last action was to leave.
+        //
+        // Dropped quietly instead. The screen that wants the channel asks for
+        // it again when it is rebuilt under the next signed-in session.
+        if (_signedInUserProfileId == null) {
+          debugPrint(
+            '[DwSocketService] "$channel" is closed to a signed-out app; '
+            'dropped until the next sign-in',
+          );
+          return;
+        }
+
         // Not noise, and not retried: either the channel is undeclared or this
         // user is not in its audience. Both are bugs in the app's channel
         // declarations, and both are silent until someone asks why a screen
         // stopped updating.
-        dw.handleError(
+        reportError(
           Exception(
             'Subscription to "$channel" was refused. Declare it in '
             'DwCore.init(channelConfigurations: ...) and check that its rule '
