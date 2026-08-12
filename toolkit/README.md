@@ -55,8 +55,6 @@ dartway setup-ai --local-repo ../dartway    # or DARTWAY_MONOREPO_DIR=../dartway
 
 Edit → re-run `setup-ai` in the project → test → `git push`. There is no reverse sync: the source of truth is always here.
 
-The invariant: `CLAUDE.md`, `skills/` and `commands/` **must contain no project literals** — only `__*__` tokens. The check:
+The invariant: `CLAUDE.md`, `skills/` and `commands/` **must contain no project literals** — only `__*__` tokens. These files land in the `.claude/` of every project on the framework, so a role name, a package name or a domain lifted from the project you were looking at while writing arrives in all of them.
 
-```bash
-grep -rniE 'tvolkova|tvaity|kerla|RAZRABOTKA|BAGI|DEVOPS' CLAUDE.md skills commands   # must be empty
-```
+Nothing greps for it. A pattern can only list the projects we already know, which is the one set of names a fresh leak will not come from — and the version that lived here matched nothing but itself. Read your own diff instead: a name that means something in exactly one project is either a token or an invented example.
