@@ -146,6 +146,11 @@ subscription at all: the framework follows `userUpdates<id>` for whoever is sign
 on sign-out. That is the other half of `sendUpdatesToUser` — one name, built from `DwCoreConst` on
 both sides, and handed by the server to nobody else.
 
+The app's own channels are reopened whenever the signed-in user changes. A stream carries the
+authentication it was opened with, so one kept across an account switch would go on delivering the
+previous user's channel into the next user's app; reopening asks the server again, with the session
+that now applies.
+
 A screen that watches a group channel adds its own:
 
 ```dart
@@ -175,6 +180,12 @@ Two things end a subscription rather than pausing it, and neither is retried:
 - **The channel was refused** — no declaration covers it, or this user is not in its audience. Asking
   again would get the same answer, so it is reported through the app's error handler instead. A
   screen that never updates and an error naming the channel is the pair to look for.
+
+  With one exception: a user change reopens the app's channels, so signing out asks for every one of
+  them with nobody signed in and each `guarded` one is refused. That refusal is the server working,
+  not the app misdeclaring — it is dropped quietly, and the screen that wants the channel asks again
+  under the next session. Only a refusal that arrives while a user *is* signed in points at the
+  declarations.
 - **The authentication was revoked** — [`revokeAuthKeys`](access-and-roles.md#ending-a-session) ended
   this account's sessions while it was listening. Every channel closes and the local session ends.
 

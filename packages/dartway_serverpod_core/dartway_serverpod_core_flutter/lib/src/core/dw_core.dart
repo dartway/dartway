@@ -92,6 +92,9 @@ class DwCore<
     }
     endpointCaller = dartwayCaller as dartway.Caller;
     socketService = DwSocketService(
+      openChannelStream: (channel) =>
+          endpointCaller.dwCrud.subscribeOnUpdates(channel: channel),
+      reportError: handleError,
       onStatusChanged: onSocketStatusChanged,
       // The server ended this app's subscriptions because the account is no
       // longer allowed to act. Nothing is retried and no key is deleted — the
