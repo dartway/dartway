@@ -94,11 +94,13 @@ class _StudioBridgeBindingState extends ConsumerState<StudioBridgeBinding>
       // freshly connected Studio sees them without waiting for navigation.
       currentFeatures: _mountedFeatureInfos,
       currentLocale: () => ref.read(appLocaleProvider).languageCode,
-      // Accept only a Studio that presents this project's secret. The build
-      // bakes only the secret's HASH (STUDIO_KEY_HASH); the secret stays in
-      // Studio. Empty define = local dev, no check.
-      validateAccessKey: studioHashAccessValidator(
-        const String.fromEnvironment('STUDIO_KEY_HASH'),
+      // Accept only a Studio presenting a token signed for this deployment's
+      // own address, so a token taken from here is useless anywhere else. The
+      // key that checks the signature ships inside the bridge package; the
+      // build names nothing but where it answers. Empty define = local dev,
+      // no check.
+      validateAccessToken: studioSignedAccessValidator(
+        const String.fromEnvironment('STUDIO_APP_ORIGIN'),
       ),
       inspectPoint: _featureAtPoint,
     );

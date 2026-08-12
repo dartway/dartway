@@ -16,15 +16,17 @@ void main() {
       expect(_roundTrip(const AppReadyMessage()), isA<AppReadyMessage>());
     });
 
-    test('studioConnect carries the access key', () {
-      final decoded = _roundTrip(const StudioConnectMessage(accessKey: 'abc'));
-      expect((decoded as StudioConnectMessage).accessKey, 'abc');
-      // A legacy connect with no accessKey decodes to an empty key.
+    test('studioConnect carries the access token', () {
+      final decoded =
+          _roundTrip(const StudioConnectMessage(accessToken: 'abc'));
+      expect((decoded as StudioConnectMessage).accessToken, 'abc');
+      // A connect with no token at all decodes to an empty one — which only a
+      // build in its zero-config local-dev mode accepts.
       expect(
         (StudioBridgeMessage.tryDecode(
-          '{"dartwayStudioBridge":3,"type":"studioConnect","payload":{}}',
+          '{"dartwayStudioBridge":4,"type":"studioConnect","payload":{}}',
         ) as StudioConnectMessage)
-            .accessKey,
+            .accessToken,
         '',
       );
     });

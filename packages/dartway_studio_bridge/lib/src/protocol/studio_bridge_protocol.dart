@@ -10,7 +10,10 @@ abstract final class StudioBridgeProtocol {
   /// config — `personaRequest` replaced by `signInRequest` carrying the
   /// credentials, the manifest no longer lists personas, and the session
   /// reports the signed-in `userIdentifier` instead of a persona id.
-  static const version = 3;
+  /// v4: `studioConnect` presents a short-lived `accessToken` — signed by
+  /// Studio, issued for the app's own origin — instead of the shared
+  /// per-project secret (`accessKey`) it used to carry.
+  static const version = 4;
 
   /// Envelope marker key carrying [version].
   static const envelopeKey = 'dartwayStudioBridge';

@@ -49,7 +49,7 @@ class StudioBridgeHost {
     this._currentSession,
     this._currentFeatures,
     this._currentLocale,
-    this._validateAccessKey,
+    this._validateAccessToken,
     this._inspectPoint,
   ) {
     _subscription = _channel.messages.listen(_onMessage);
@@ -71,12 +71,13 @@ class StudioBridgeHost {
     List<StudioFeatureInfo> Function()? currentFeatures,
     String Function()? currentLocale,
     // Decides whether a connecting Studio may drive this app, from the access
-    // key it presents. The bridge is agnostic to *how* — pass
-    // `studioHashAccessValidator(const String.fromEnvironment('STUDIO_KEY_HASH'))`
-    // for the baked-hash check, a server call, or your own scheme. Null (or a
-    // validator that always returns true) accepts any Studio — fine for local
-    // dev, wide open in production.
-    Future<bool> Function(String accessKey)? validateAccessKey,
+    // token it presents. Pass
+    // `studioSignedAccessValidator(const String.fromEnvironment('STUDIO_APP_ORIGIN'))`
+    // — a token signed by Studio and issued for this app's own address gets in,
+    // and a build that names no address stays open for local dev. Null (or a
+    // validator that always returns true) accepts any Studio — fine on a
+    // laptop, wide open in production.
+    Future<bool> Function(String accessToken)? validateAccessToken,
     // Answers the "pencil" tap-to-inspect flow. Null (the default for an app
     // that hasn't wired it) means every inspect request finds nothing —
     // Studio's own timeout treats that exactly like an old app that doesn't
@@ -93,7 +94,7 @@ class StudioBridgeHost {
       currentSession,
       currentFeatures ?? () => const [],
       currentLocale ?? () => '',
-      validateAccessKey ?? (_) async => true,
+      validateAccessToken ?? (_) async => true,
       inspectPoint ?? (_, _) => null,
     );
   }
@@ -105,16 +106,16 @@ class StudioBridgeHost {
   final StudioSessionState Function() _currentSession;
   final List<StudioFeatureInfo> Function() _currentFeatures;
   final String Function() _currentLocale;
-  final Future<bool> Function(String accessKey) _validateAccessKey;
+  final Future<bool> Function(String accessToken) _validateAccessToken;
   final StudioInspectPoint _inspectPoint;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
   void _onMessage(StudioBridgeMessage message) {
     switch (message) {
-      case StudioConnectMessage(:final accessKey):
-        // Answer the handshake only if the access key is accepted; on refusal
-        // stay silent — the app keeps running, Studio shows "not connected".
-        _validateAccessKey(accessKey).then((accepted) {
+      case StudioConnectMessage(:final accessToken):
+        // Answer the handshake only if the token is accepted; on refusal stay
+        // silent — the app keeps running, Studio shows "not connected".
+        _validateAccessToken(accessToken).then((accepted) {
           if (accepted) _sendManifest();
         });
       case NavigateRequestMessage(:final path):

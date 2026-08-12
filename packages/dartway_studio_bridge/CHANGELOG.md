@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.7.0
+
+**Access is proved by a signature, not by a shared secret** (protocol version 4 — breaking). An app
+built against 0.6.0 or earlier will not accept a token, and a Studio on the new protocol presents no
+secret: both sides move together.
+
+`studioConnect` now carries an `accessToken` — short-lived, signed by Studio with an **Ed25519** key
+and issued for **one origin**, the address the app answers at.
+
+```text
+<payload>.<signature>
+payload   = base64url( utf8( {"origin":"https://app.example","exp":1765540000} ) )
+signature = base64url( ed25519_sign( privateKey, ascii(payload) ) )
+```
+
+`verifyStudioBridgeToken` accepts a token only when the signature checks out against Studio's key,
+the origin is this app's own, and the expiry is still ahead. Anything else is a plain `false` rather
+than an exception: a refused connection looks the same whatever is wrong with it, and the app
+carries on running.
+
+**The public key ships inside this package** (`studioSigningPublicKey`). A public key verifies
+signatures and cannot make them, so it is harmless in the open, and it is the same for every
+project — which is the point: a team connecting its app has nothing to copy out of Studio, nothing
+to store and nothing to replace when the pair is rotated. They update the package.
+
+**The signature has to be asymmetric.** An HMAC over a shared secret is simpler and would put that
+secret straight back into the app's public web bundle — whatever is baked into a web build is
+public. That was the hole in 0.3.0's scheme, and rotating the secret could not close it, because
+rotating it meant releasing the app.
+
+**A stolen token travels nowhere.** The origin claim is what the old scheme had no room for: a
+secret lifted out of one build worked against every deployment that shared it, indefinitely. A
+token works at one address, for minutes.
+
+**What changed in the API:**
+
+- `StudioBridgeHost.attach`: `validateAccessKey` → `validateAccessToken`.
+- `studioSignedAccessValidator(appOrigin)` replaces `studioHashAccessValidator(expectedHash)`, and
+  `studioAccessKeyHash` goes with the scheme it belonged to. Two ways to authenticate the bridge is
+  not compatibility, it is a second door — so the old one is deleted rather than deprecated.
+- The build names its own address instead of a hash copied out of Studio:
+  `--dart-define=STUDIO_APP_ORIGIN=https://app.example` in place of `STUDIO_KEY_HASH`. **An empty
+  define still accepts any connection** — the zero-config local-dev mode is unchanged, and without
+  it nobody could run Studio against the build on their laptop.
+- `StudioBridgeClient`: `accessKey` (a string read once) → `accessToken`, a supplier asked on every
+  connect attempt. A preview outlives any short-lived token, so the reconnect after an app reload
+  hours later has to carry a live one; caching and re-issuing is the supplier's business. Attempts
+  never overlap, and a supplier that throws leaves that attempt unsent for the retry timer to
+  repeat.
+- The `crypto` dependency is replaced by `cryptography`.
 
 ## 0.6.0
 

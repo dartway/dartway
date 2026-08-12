@@ -26,12 +26,19 @@ The open `dartway_studio_bridge` package is the only integration surface:
   `lib/core/studio/studio_bridge_binding.dart` in the example). The host is inert
   unless the app runs on web embedded in an iframe; the channel pins the
   origin of the first valid Studio message for its replies.
-- **Access control is per project.** Studio holds a random secret per project;
-  the app accepts a connection only if the presented key passes its
-  `validateAccessKey`. The shipped `studioHashAccessValidator` bakes only the
-  secret's hash into the build (`--dart-define=STUDIO_KEY_HASH=...`), so the
-  secret never lives in the app's public bundle — only its hash does. Grab the
-  hash from the project's settings in Studio.
+- **Access is proved by a signature.** Studio presents a short-lived token,
+  signed with its own Ed25519 key and issued for a single origin — the address
+  your build answers at — and the app accepts the connection only if that token
+  passes its `validateAccessToken`. A token taken off the wire is therefore
+  useless anywhere else, and it expires on its own.
+
+  Your build holds no secret and copies nothing out of Studio: the public half
+  of the pair ships inside the bridge package, and a public key can only check
+  signatures, never make them. The build names one thing — where it answers:
+  `--dart-define=STUDIO_APP_ORIGIN=https://app.example`, wired through the
+  shipped `studioSignedAccessValidator`. Leave the define out and the build
+  accepts any connection, which is what makes running Studio against your local
+  build a zero-config affair.
 - **Features** arrive per screen, as the app navigates: every widget that
   implements `DwFeature` declares its `DwFeatureSpec` next to itself, and the
   binding reports the ones currently mounted. What a feature says about itself

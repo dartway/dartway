@@ -64,10 +64,11 @@ final host = StudioBridgeHost.attach(
   currentSession: () => mySessionState,
   currentFeatures: mountedFeatureInfos, // the features on screen right now
   currentLocale: () => myLocale.languageCode, // omit if not localized
-  // Accept only a Studio that presents this project's secret. The build bakes
-  // only the secret's HASH; the secret itself stays in Studio.
-  validateAccessKey: studioHashAccessValidator(
-    const String.fromEnvironment('STUDIO_KEY_HASH'),
+  // Accept only a Studio holding a token signed for this app's own address.
+  // Nothing secret is baked in: the key that checks the signature ships with
+  // this package, and the build names only where it answers.
+  validateAccessToken: studioSignedAccessValidator(
+    const String.fromEnvironment('STUDIO_APP_ORIGIN'),
   ),
   inspectPoint: featureAtPoint, // what is declared at a point (see below)
 );
@@ -146,13 +147,40 @@ timeout reports "nothing here" — a miss, never a hang.
 the app stays fully functional and the bridge dormant. The channel pins the
 origin of the first valid Studio message for its replies.
 
-**Access control.** The `studioConnect` handshake carries an `accessKey`; the
-host answers with its manifest only if `validateAccessKey` accepts it,
-otherwise it stays silent (Studio shows "not connected"). The bridge is
-agnostic to *how* you check — the shipped `studioHashAccessValidator(hash)`
-keeps the secret out of the public build: Studio holds a per-project random
-secret, the app bakes only its hash (`studioAccessKeyHash`, hex SHA-256) and
-compares. An empty expected hash accepts any key (zero-config local dev).
+## Access control
+
+The `studioConnect` handshake carries an `accessToken`; the host answers with
+its manifest only if `validateAccessToken` accepts it, otherwise it stays
+silent (Studio shows "not connected"). The gate covers every command, not just
+the manifest — otherwise an embedding page could walk the app through its
+screens without presenting anything.
+
+The token is short-lived, signed by Studio with an Ed25519 key, and issued for
+**one origin**: the address your build answers at. A token lifted off the wire
+is worthless anywhere else, and it expires on its own.
+
+```text
+<payload>.<signature>
+payload   = base64url( utf8( {"origin":"https://app.example","exp":1765540000} ) )
+signature = base64url( ed25519_sign( privateKey, ascii(payload) ) )
+```
+
+`exp` is whole seconds since the Unix epoch, and the signature covers the
+payload *segment as written* — so signer and verifier agree byte for byte
+without agreeing on how a map is serialised.
+
+**Your build holds no secret.** The public half of Studio's pair ships in this
+package as `studioSigningPublicKey`: a public key checks signatures and cannot
+make them, it is the same for every project, and it changes only when you
+update the package. There is nothing to copy out of Studio, store, or rotate.
+The signature must be asymmetric for exactly this reason — an HMAC over a
+shared secret would put that secret back into a public web bundle.
+
+`studioSignedAccessValidator('')` — a build that names no origin — **accepts
+any connection**. That is the zero-config local-dev mode: Studio on your laptop
+previews your local build without anyone issuing keys. A deployed build names
+its address (`--dart-define=STUDIO_APP_ORIGIN=https://app.example`) and from
+then on only a signed token gets in.
 
 ## Connecting (Studio side)
 
@@ -160,7 +188,10 @@ compares. An empty expected hash accepts any key (zero-config local dev).
 final controller = createStudioFrameController(appUrl: 'http://localhost:8091/');
 final client = StudioBridgeClient(
   channel: controller.channel,
-  accessKey: project.accessSecret, // the raw secret; the app checks its hash
+  // Asked for once per connect attempt, not read once: tokens expire long
+  // before a preview is closed, so the supplier caches a live one and issues
+  // a fresh one when it runs out.
+  accessToken: () => myTokenCache.tokenFor(project),
 )..start();
 // render: HtmlElementView(viewType: controller.viewType)
 client.events.listen(...); // connected / route / session / locale changed
