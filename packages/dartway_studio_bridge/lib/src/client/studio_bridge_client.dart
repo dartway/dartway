@@ -5,21 +5,32 @@ import '../protocol/studio_bridge_message.dart';
 import '../transport/studio_message_channel.dart';
 import 'studio_bridge_event.dart';
 
+/// Hands over the access token to present to the app, asked for once per
+/// connect attempt rather than read once at construction: the token is
+/// short-lived, and a preview stays open far longer than one — an app reload
+/// hours later re-handshakes and has to carry a token that is still valid.
+/// Caching a live one and issuing a new one when it runs out is the supplier's
+/// business; the bridge only asks.
+typedef StudioAccessTokenSupplier = FutureOr<String> Function();
+
 /// The Studio-side end of the bridge: handshakes with the app in the frame
 /// (connect retries survive reloads of either side) and translates protocol
 /// messages into [StudioProjectEvent]s.
 class StudioBridgeClient {
   StudioBridgeClient({
     required StudioMessageChannel channel,
-    this.accessKey = '',
+    StudioAccessTokenSupplier? accessToken,
     this.connectRetryInterval = const Duration(seconds: 2),
-  }) : _channel = channel;
+  })  : _channel = channel,
+        _accessToken = accessToken ?? _noAccessToken;
+
+  static String _noAccessToken() => '';
 
   final StudioMessageChannel _channel;
 
-  /// The project's access secret, sent with every connect attempt so the app
-  /// can decide whether to accept this Studio (see `StudioBridgeHost.attach`).
-  final String accessKey;
+  /// Where each connect attempt gets its token. Omitted, it presents nothing —
+  /// which only an app in its zero-config local-dev mode accepts.
+  final StudioAccessTokenSupplier _accessToken;
 
   final Duration connectRetryInterval;
 
@@ -34,26 +45,48 @@ class StudioBridgeClient {
   StreamSubscription<StudioBridgeMessage>? _subscription;
   Timer? _retryTimer;
   bool _connected = false;
+  bool _connecting = false;
+  bool _disposed = false;
 
   Stream<StudioProjectEvent> get events => _events.stream;
 
   void start() {
     _subscription ??= _channel.messages.listen(_onMessage);
-    _sendConnect();
+    unawaited(_sendConnect());
     _retryTimer ??= Timer.periodic(connectRetryInterval, (_) {
-      if (!_connected) _sendConnect();
+      if (!_connected) unawaited(_sendConnect());
     });
   }
 
-  void _sendConnect() =>
-      _channel.send(StudioConnectMessage(accessKey: accessKey));
+  /// One connect attempt: fetch a token, then present it.
+  ///
+  /// Attempts do not overlap — the retry timer keeps ticking while a slow
+  /// supplier is still answering, and a queue of stale tokens behind it would
+  /// help nobody. A supplier that fails leaves this attempt unsent and the next
+  /// tick tries again; saying *why* it failed is the supplier's job, since only
+  /// it knows.
+  Future<void> _sendConnect() async {
+    if (_connecting || _disposed) return;
+    _connecting = true;
+    try {
+      final accessToken = await _accessToken();
+      if (!_disposed) {
+        _channel.send(StudioConnectMessage(accessToken: accessToken));
+      }
+    } catch (_) {
+      // Nothing to present this time round; the retry timer comes back.
+    } finally {
+      _connecting = false;
+    }
+  }
 
   void _onMessage(StudioBridgeMessage message) {
     switch (message) {
       case AppReadyMessage():
-        // The app (re)started — whatever we knew is stale; re-handshake.
+        // The app (re)started — whatever we knew is stale; re-handshake, with
+        // a token asked for afresh (the old one may have run out meanwhile).
         _connected = false;
-        _sendConnect();
+        unawaited(_sendConnect());
       case ManifestMessage(
           :final manifest,
           :final currentPath,
@@ -140,6 +173,7 @@ class StudioBridgeClient {
   }
 
   void dispose() {
+    _disposed = true;
     _retryTimer?.cancel();
     _subscription?.cancel();
     _events.close();

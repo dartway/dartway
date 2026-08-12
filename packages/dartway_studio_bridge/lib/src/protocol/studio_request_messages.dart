@@ -1,27 +1,30 @@
 part of 'studio_bridge_message.dart';
 
 /// Studio → app: connection request; the app answers with a manifest message
-/// only if it accepts [accessKey]. Sent on Studio start, retried while
+/// only if it accepts [accessToken]. Sent on Studio start, retried while
 /// unconnected, and re-sent whenever an app-ready message arrives (covers
 /// reloads of either side).
 ///
-/// [accessKey] is the project's raw access secret, held by Studio. The app
-/// checks it however it likes (see `StudioBridgeHost.attach`); the typical
-/// check is `hash(accessKey) == <hash baked into the build>`, so the secret
-/// never lives in the app's public bundle — only its hash does.
+/// [accessToken] is short-lived, signed by Studio and issued for one app
+/// origin — see `verifyStudioBridgeToken` for the format and
+/// `StudioBridgeHost.attach` for the app's side of the check. Nothing secret
+/// travels here: the token is useless at any other address and expires on its
+/// own, so a build accepts it while holding only a public key.
 class StudioConnectMessage extends StudioBridgeMessage {
-  const StudioConnectMessage({this.accessKey = ''});
+  const StudioConnectMessage({this.accessToken = ''});
 
-  final String accessKey;
+  final String accessToken;
 
   @override
   String get type => StudioBridgeProtocol.studioConnect;
 
   @override
-  Map<String, dynamic> payloadToJson() => {'accessKey': accessKey};
+  Map<String, dynamic> payloadToJson() => {'accessToken': accessToken};
 
   factory StudioConnectMessage.fromPayload(Map<String, dynamic> payload) =>
-      StudioConnectMessage(accessKey: payload['accessKey'] as String? ?? '');
+      StudioConnectMessage(
+        accessToken: payload['accessToken'] as String? ?? '',
+      );
 }
 
 /// Studio → app: navigate the live app to the given route path.
