@@ -83,8 +83,12 @@ class StudioBridgeHost {
     // Studio's own timeout treats that exactly like an old app that doesn't
     // know the message at all.
     StudioInspectPoint? inspectPoint,
+    // The pipe to talk over. Defaults to the embedding window, which is the
+    // only thing an app ever wants; pass one to drive the host from a test, or
+    // to embed the app somewhere that is not an iframe.
+    StudioMessageChannel? channel,
   }) {
-    final channel = createStudioHostChannel();
+    channel ??= createStudioHostChannel();
     if (channel == null) return null;
     return StudioBridgeHost._(
       channel,
@@ -110,14 +114,32 @@ class StudioBridgeHost {
   final StudioInspectPoint _inspectPoint;
   late final StreamSubscription<StudioBridgeMessage> _subscription;
 
+  /// Set once a connecting Studio has presented an accepted token, and the
+  /// gate on everything that follows. Without it the token would guard the
+  /// manifest alone, and an embedding page that presented nothing could still
+  /// walk the app through its screens or sign it in — which is precisely what
+  /// this class documents that it does not allow.
+  bool _connected = false;
+
+  /// True once a Studio has been let in. Nothing crosses the bridge before it,
+  /// in either direction, beyond the app-ready announcement.
+  bool get isConnected => _connected;
+
   void _onMessage(StudioBridgeMessage message) {
+    if (message case StudioConnectMessage(:final accessToken)) {
+      // Answer the handshake only if the token is accepted; on refusal stay
+      // silent — the app keeps running, Studio shows "not connected".
+      _validateAccessToken(accessToken).then((accepted) {
+        if (!accepted) return;
+        _connected = true;
+        _sendManifest();
+      });
+      return;
+    }
+
+    if (!_connected) return;
+
     switch (message) {
-      case StudioConnectMessage(:final accessToken):
-        // Answer the handshake only if the token is accepted; on refusal stay
-        // silent — the app keeps running, Studio shows "not connected".
-        _validateAccessToken(accessToken).then((accepted) {
-          if (accepted) _sendManifest();
-        });
       case NavigateRequestMessage(:final path):
         _delegate.onNavigateRequest(path);
       case SignInRequestMessage(:final identifier, :final secret):
@@ -178,18 +200,33 @@ class StudioBridgeHost {
         currentLocale: _currentLocale(),
       ));
 
-  void reportRoute(String path, {String? routeName}) =>
-      _channel.send(RouteChangedMessage(path, routeName: routeName));
+  /// The reports below are dropped until a Studio has been let in. Nothing is
+  /// lost by that: whoever connects is handed the whole state in the handshake
+  /// response, so an unconnected app has nobody to tell anything to — while a
+  /// page that has presented nothing would otherwise be sent the app's feature
+  /// passports, `implementationNotes` and `knownIssues` included.
+  void reportRoute(String path, {String? routeName}) {
+    if (!_connected) return;
+    _channel.send(RouteChangedMessage(path, routeName: routeName));
+  }
 
-  void reportSession(StudioSessionState session) =>
-      _channel.send(SessionChangedMessage(session));
+  void reportSession(StudioSessionState session) {
+    if (!_connected) return;
+    _channel.send(SessionChangedMessage(session));
+  }
 
-  void reportFeatures(String path, List<StudioFeatureInfo> features) =>
-      _channel.send(FeaturesChangedMessage(path: path, features: features));
+  void reportFeatures(String path, List<StudioFeatureInfo> features) {
+    if (!_connected) return;
+    _channel.send(FeaturesChangedMessage(path: path, features: features));
+  }
 
-  void reportLocale(String locale) => _channel.send(LocaleChangedMessage(locale));
+  void reportLocale(String locale) {
+    if (!_connected) return;
+    _channel.send(LocaleChangedMessage(locale));
+  }
 
   void detach() {
+    _connected = false;
     _subscription.cancel();
     _channel.dispose();
   }
