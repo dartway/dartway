@@ -15,6 +15,7 @@ This is the repository of **the DartWay framework itself** (fullstack Dart: Flut
 | `example/` | The canonical project (a fitness club) — reference example, course project, Studio demo. **The CLI no longer hands it out**: read it, do not inherit from it |
 | `toolkit/` | The Claude harness for application projects (`dartway-*` skills, `__*__` tokens, the installer) |
 | `docs/` | Framework documentation and the single source of content for the dartway.dev site (see "Neighbours") |
+| `packages/dartway_push/` | Push notifications, optional and in five packages: the Serverpod module (`_server` + `_client`) holding the delivery queue, and the app half — `_flutter` (the `dw.plugins.push` plugin, no vendor SDK) with the `_firebase` and `_rustore` transports beside it. The two halves are held together by the wire keys of the data payload, pinned by a test on each side |
 | `packages/dartway_studio_bridge` | The open bridge between an application and Studio: screen-spec models (in the application's code) plus the runtime postMessage protocol (host in the application, client in Studio) |
 | `js/studio-bridge` | The same bridge's application half for JavaScript apps (`@dartway/studio-bridge` on npm: core + React and Vue bindings). **Outside `packages/`**: that tree is the pub workspace (`packages/*`), and while pub does skip a folder without a `pubspec.yaml`, a JS package has no business sitting inside a Dart resolution. A second implementation of one protocol: it is held to the Dart one by golden wire strings in its tests, not by a shared schema |
 

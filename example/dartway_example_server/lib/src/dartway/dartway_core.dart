@@ -23,6 +23,17 @@ late DwCore<UserProfile> dw;
 /// `null` when no push provider is configured.
 DwPush? dwPush;
 
+/// Everything between "something happened" and a queued message: who is
+/// eligible, how long the message is worth delivering, how the audience is
+/// chunked. Null exactly when [dwPush] is.
+DwPushDispatcher? dwPushDispatcher;
+
+/// Categories this app sends, and what each is worth after a while.
+abstract final class ExamplePushCategories {
+  static const newsPost = 'news_post';
+  static const bookingReminder = 'booking_reminder';
+}
+
 bool _initialized = false;
 
 String _randomVerificationCode() =>
@@ -45,6 +56,22 @@ void initDartwayCore({
   if (_initialized) return;
   _initialized = true;
 
+  // Built before the core, because the token registration action below is one
+  // of its configs: a device registers through the app's ordinary CRUD
+  // endpoint, and the module ships the config rather than a route of its own.
+  dwPush = _buildDwPush(passwords);
+  dwPushDispatcher = dwPush == null
+      ? null
+      : DwPushDispatcher(
+          push: dwPush!,
+          // A club announcement is stale tomorrow; a booking reminder is stale
+          // in an hour. Anything not listed keeps the default day.
+          categoryLifetimes: const {
+            ExamplePushCategories.bookingReminder: Duration(hours: 2),
+          },
+          audienceFilter: _pushAudienceFilter,
+        );
+
   dw = DwCore.init<UserProfile>(
     userProfileTable: UserProfile.t,
     userProfileInclude: UserProfile.include(),
@@ -59,7 +86,18 @@ void initDartwayCore({
       newsPostCrudConfig,
       appSettingCrudConfig,
     ],
-    dtoConfigurations: [],
+    // The device token registration action, shipped by the push module and
+    // declared here — nothing of the module's is reachable until an app says
+    // so. The recipient comes from the session, never from the request.
+    dtoConfigurations: [
+      if (dwPush != null)
+        dwPush!.tokenRegistrationConfig(
+          canRegister: (session, recipientId) async {
+            final profile = await UserProfile.db.findById(session, recipientId);
+            return profile != null;
+          },
+        ),
+    ],
     // Empty on purpose, and not because channels are unused: this app listens
     // to `DwCoreConst.publicUpdatesChannel` and to the signed-in user's own
     // channel, and the framework declares both. An app channel of its own —
@@ -108,11 +146,6 @@ void initDartwayCore({
     ),
   );
 
-  // Push lives in a separate module, not in DwCore: the app owns the engine and
-  // schedules its worker. Stays null without provider credentials. Authorising
-  // who may send marketing or pause the worker is the app's job — it owns the
-  // endpoints; the module ships no gating.
-  dwPush = _buildDwPush(passwords);
 }
 
 /// Builds the optional push delivery engine from provider credentials.
@@ -131,30 +164,64 @@ DwPush? _buildDwPush(Map<String, String> passwords) {
 
   return DwPush(
     config: DwPushConfig(
-      recipientResolver: const _ExamplePushRecipientResolver(),
-      transport: DwPushProviderTransport(
-        provider: fcm ?? ruStore!,
-        fallbackProvider: fcm == null ? null : ruStore,
+      // The module's own token store, plus the one question it cannot answer:
+      // may this person be sent this. Everything else — reading the tokens,
+      // canonicalizing them, dropping the ones a provider rejected — is the
+      // same in every app and lives in the resolver.
+      recipientResolver: const DwDevicePushTokenResolver(
+        isEligible: _isEligibleForPush,
+      ),
+      // Each device is sent through the transport that issued its token, which
+      // the app reports at registration. A token from an older build carries no
+      // provider yet and is probed once, in this order.
+      transport: DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: ?fcm,
+          DwPushProviders.ruStore: ?ruStore,
+        },
       ),
     ),
   );
 }
 
-/// Minimal resolver that shows the seam. A real app looks up active app-owned
-/// device tokens and per-recipient preferences here and returns only the
-/// targets that are eligible to receive [payload].
-final class _ExamplePushRecipientResolver extends DwPushRecipientResolver {
-  const _ExamplePushRecipientResolver();
+/// Consent, checked at the moment of sending — the world may have changed since
+/// the message was queued, and a marketing blast queued yesterday must not
+/// reach somebody who withdrew their consent this morning.
+Future<bool> _isEligibleForPush(
+  Session session, {
+  required int recipientId,
+  required DwPushPayload payload,
+  required Transaction transaction,
+}) async {
+  final profile = await UserProfile.db.findById(
+    session,
+    recipientId,
+    transaction: transaction,
+  );
+  if (profile == null) return false;
+  return payload.category != ExamplePushCategories.newsPost ||
+      profile.agreedForMarketingCommunications;
+}
 
-  @override
-  Future<DwPushRecipient> resolve(
-    Session session, {
-    required int recipientId,
-    required DwPushPayload payload,
-    required Transaction transaction,
-  }) async {
-    return DwPushRecipient(const []);
-  }
+/// The same rule in bulk, before anything is queued. An optimisation, not a
+/// guarantee: the resolver asks again per recipient when the send happens.
+Future<Set<int>> _pushAudienceFilter(
+  Session session, {
+  required Set<int> recipientIds,
+  required String category,
+  required Transaction transaction,
+}) async {
+  if (category != ExamplePushCategories.newsPost) return recipientIds;
+  final profiles = await UserProfile.db.find(
+    session,
+    where: (table) => table.id.inSet(recipientIds),
+    transaction: transaction,
+  );
+  return profiles
+      .where((profile) => profile.agreedForMarketingCommunications)
+      .map((profile) => profile.id)
+      .whereType<int>()
+      .toSet();
 }
 
 /// Builds a new [UserProfile] when a user registers via the DartWay auth flow.

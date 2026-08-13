@@ -20,6 +20,7 @@ final class DwPushTargetResult {
     required this.status,
     this.errorCode,
     this.retryAfter,
+    this.discoveredProvider,
   });
 
   final String target;
@@ -28,6 +29,11 @@ final class DwPushTargetResult {
 
   /// Provider-requested minimum delay before retrying this target.
   final Duration? retryAfter;
+
+  /// The transport this target turned out to belong to, when the send had to
+  /// find out by trying. Null when the target was already routed, which is the
+  /// normal case — this is only ever set once per token.
+  final String? discoveredProvider;
 }
 
 /// Aggregated provider outcome for one recipient delivery attempt.
@@ -82,4 +88,12 @@ final class DwPushTransportResult {
       .where((result) => result.status == DwPushTargetStatus.invalid)
       .map((result) => result.target)
       .toList(growable: false);
+
+  /// Targets whose transport was discovered during this attempt, as
+  /// token → provider. Worth persisting so the next delivery skips the probe.
+  Map<String, String> get discoveredProviders => {
+    for (final result in results)
+      if (result.discoveredProvider != null)
+        result.target: result.discoveredProvider!,
+  };
 }

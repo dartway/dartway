@@ -122,14 +122,20 @@ combinations that were never tested instead of failing at runtime.
 |---|---|---|
 | [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) | `dw.plugins.prefs` | Reactive riverpod providers over local storage |
 | [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) | `dw.plugins.telegram` | Telegram Mini App: viewport, safe-area insets, Telegram user id |
+| [`dartway_push_flutter`](https://pub.dev/packages/dartway_push_flutter) | `dw.plugins.push` | [Push notifications](push-notifications.md): permissions, token lifecycle, taps — with the transport itself in a package of its own |
 
 `dartway_telegram` shows the other half of what a plugin buys you: `DwTelegramWebApp.create()`
 returns the real bridge on web and an inert stub on mobile and desktop, and outside Telegram every
 getter answers as if Telegram were absent instead of throwing. One declaration, every platform still
 builds.
 
-**`dartway_push` is not this kind of plugin.** It is a Serverpod module — server-side machinery with
-its own tables, wired on the server rather than declared in `plugins:`. See
+Push shows the pattern taken one step further: `dartway_push_flutter` is the
+plugin, and the vendor SDKs sit behind it in `dartway_push_firebase` and
+`dartway_push_rustore`, so an app that ships only to the App Store never
+downloads a Russian store's SDK, and an app that ships only to RuStore never
+downloads Firebase. The server side of push is something else again — a Serverpod
+module with its own tables, wired on the server rather than declared in
+`plugins:`. See [push on the device](push-notifications.md) and
 [push delivery](../4-server/push-delivery.md).
 
 ## Writing your own

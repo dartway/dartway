@@ -9,7 +9,7 @@ page and the code it describes travel in the same PR — the sync law in the roo
 |---|---|
 | `1-getting-started/` | What DartWay is, how to start a project, what you get |
 | `2-core/` | The CRUD core: models, configs, access, realtime, error reports |
-| `3-flutter/` | The app side: data layer, actions, features, the kit, navigation, plugins |
+| `3-flutter/` | The app side: data layer, actions, features, the kit, navigation, plugins, push |
 | `4-server/` | Serverpod-side capabilities: uploads, jobs, locks, secrets, push |
 | `5-tooling/` | The CLI, the conventions checker, the agent toolkit |
 | `6-studio/` | DartWay Studio and the bridge an app opens to it |

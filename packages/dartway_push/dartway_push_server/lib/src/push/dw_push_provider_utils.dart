@@ -5,7 +5,19 @@ import 'package:crypto/crypto.dart';
 
 const dwPushMaximumProviderBodyLength = 200;
 const dwPushMaximumProviderRequestBytes = 4096;
+
+/// Data keys a provider falls back to when it cannot carry a notification of
+/// its own — RuStore with an image, which has to arrive as data and be drawn by
+/// the device.
+///
+/// This is the wire contract between the two halves of the module: the same
+/// three literals appear in `dartway_push_flutter`, and a device reading a key
+/// the server stopped writing shows nothing at all, silently. Both sides pin
+/// them with a test against the literal strings rather than against each
+/// other's constant.
 const dwPushImageUrlDataKey = 'image_url';
+const dwPushTitleDataKey = 'push_title';
+const dwPushBodyDataKey = 'push_body';
 
 String dwPushTruncateProviderBody(String body) =>
     body.length > dwPushMaximumProviderBodyLength

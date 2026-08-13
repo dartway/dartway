@@ -1,3 +1,46 @@
+## 0.2.0
+
+The half of push that faces the app: a device can now register its token, and
+the module knows which transport that token belongs to instead of guessing.
+
+**Breaking.** `DwPushRecipient` and `DwPushDeliveryAttempt.targets` carry
+`DwPushTarget` (token + provider) instead of bare strings. A resolver that
+returned tokens becomes `DwPushRecipient.tokens([...])`; a custom
+`DwPushTransport` reads `target.token`.
+
+- **Targets know their transport.** `DwDevicePushToken` gained a `provider`
+  column and `DwPushProviderTransport.routed(providers: {...})` sends each
+  target through the transport that issued it. A token of unknown provenance is
+  probed once, in `probeOrder`, and what the probe found is reported through
+  `DwPushTargetResult.discoveredProvider` and persisted by the resolver
+  (`rememberTargetProvider`), so no token is probed twice. The probe treats any
+  non-accepting answer as a reason to try the next transport and drops a token
+  only when **every** transport refused the target itself — previously an FCM
+  `UNREGISTERED` answer to a RuStore token deleted a live registration.
+  Identifiers are plain strings (`DwPushProviders.fcm`, `.ruStore`), so an app
+  can plug in a transport the module has never heard of.
+- **Token registration without an endpoint.** `dwPush.tokenRegistrationConfig()`
+  returns a `DwDtoActionConfig<DwPushTokenRegistration>` for the app's
+  `dtoConfigurations`; the device calls it through the ordinary CRUD action.
+  The recipient comes from the authenticated session and is not a field on the
+  request, the write runs under the same recipient lock a delivery takes, and
+  nothing is reachable until an app declares the config.
+- **`DwDevicePushTokenStore.register` / `unregister` / `setProvider` /
+  `targetsForRecipient`** — the registration transaction itself: canonical
+  form, an advisory lock on the token so two devices cannot collide on the
+  unique index, duplicate collapse, the per-recipient cap and the refresh
+  window. A token that turns up under another recipient is reassigned by
+  default (`DwDevicePushTokenConflict.reassign`): an installation changes
+  hands, and leaving the old owner attached sends their notifications to
+  somebody else's phone.
+- **`DwDevicePushTokenResolver`** — the resolver most apps want, reading the
+  module's own token store and asking the app only `isEligible` (consent, muted
+  categories, deleted accounts).
+- **`DwPushDispatcher`** — everything between a domain event and `enqueue`:
+  drop the actor, drop recipients with no device, apply the app's audience
+  filter, invent a deduplication key, pick a per-category lifetime, chunk a
+  large audience, and page through "everybody" with an app-supplied callback.
+
 ## 0.1.0
 
 Initial release of the DartWay push delivery module — a standalone Serverpod

@@ -1,6 +1,6 @@
 name: dartway_push_server
 description: "Server side of the DartWay push module — a Serverpod module: a compact, reliable push delivery queue with worker, retries, dedup and built-in FCM/RuStore providers. Optional; add it only when an app needs push."
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/dartway/dartway
 
 resolution: workspace

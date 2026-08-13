@@ -22,6 +22,7 @@ abstract class DwDevicePushToken
     this.id,
     required this.recipientId,
     required this.token,
+    this.provider,
     DateTime? createdAt,
     required this.updatedAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -30,6 +31,7 @@ abstract class DwDevicePushToken
     int? id,
     required int recipientId,
     required String token,
+    String? provider,
     DateTime? createdAt,
     required DateTime updatedAt,
   }) = _DwDevicePushTokenImpl;
@@ -39,6 +41,7 @@ abstract class DwDevicePushToken
       id: jsonSerialization['id'] as int?,
       recipientId: jsonSerialization['recipientId'] as int,
       token: jsonSerialization['token'] as String,
+      provider: jsonSerialization['provider'] as String?,
       createdAt: jsonSerialization['createdAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
@@ -59,6 +62,13 @@ abstract class DwDevicePushToken
 
   String token;
 
+  /// Identifier of the transport that issued this token, as reported by the
+  /// device ('fcm', 'rustore', ...) or discovered by probing it once. A plain
+  /// string rather than an enum on purpose: an app may add a provider the
+  /// module has never heard of, and an enum would make the module the place
+  /// that has to know about it. Null means "not established yet".
+  String? provider;
+
   DateTime createdAt;
 
   DateTime updatedAt;
@@ -73,6 +83,7 @@ abstract class DwDevicePushToken
     int? id,
     int? recipientId,
     String? token,
+    String? provider,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
@@ -83,6 +94,7 @@ abstract class DwDevicePushToken
       if (id != null) 'id': id,
       'recipientId': recipientId,
       'token': token,
+      if (provider != null) 'provider': provider,
       'createdAt': createdAt.toJson(),
       'updatedAt': updatedAt.toJson(),
     };
@@ -130,12 +142,14 @@ class _DwDevicePushTokenImpl extends DwDevicePushToken {
     int? id,
     required int recipientId,
     required String token,
+    String? provider,
     DateTime? createdAt,
     required DateTime updatedAt,
   }) : super._(
          id: id,
          recipientId: recipientId,
          token: token,
+         provider: provider,
          createdAt: createdAt,
          updatedAt: updatedAt,
        );
@@ -148,6 +162,7 @@ class _DwDevicePushTokenImpl extends DwDevicePushToken {
     Object? id = _Undefined,
     int? recipientId,
     String? token,
+    Object? provider = _Undefined,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -155,6 +170,7 @@ class _DwDevicePushTokenImpl extends DwDevicePushToken {
       id: id is int? ? id : this.id,
       recipientId: recipientId ?? this.recipientId,
       token: token ?? this.token,
+      provider: provider is String? ? provider : this.provider,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -172,6 +188,11 @@ class DwDevicePushTokenUpdateTable
 
   _i1.ColumnValue<String, String> token(String value) => _i1.ColumnValue(
     table.token,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> provider(String? value) => _i1.ColumnValue(
+    table.provider,
     value,
   );
 
@@ -200,6 +221,10 @@ class DwDevicePushTokenTable extends _i1.Table<int?> {
       'token',
       this,
     );
+    provider = _i1.ColumnString(
+      'provider',
+      this,
+    );
     createdAt = _i1.ColumnDateTime(
       'createdAt',
       this,
@@ -217,6 +242,13 @@ class DwDevicePushTokenTable extends _i1.Table<int?> {
 
   late final _i1.ColumnString token;
 
+  /// Identifier of the transport that issued this token, as reported by the
+  /// device ('fcm', 'rustore', ...) or discovered by probing it once. A plain
+  /// string rather than an enum on purpose: an app may add a provider the
+  /// module has never heard of, and an enum would make the module the place
+  /// that has to know about it. Null means "not established yet".
+  late final _i1.ColumnString provider;
+
   late final _i1.ColumnDateTime createdAt;
 
   late final _i1.ColumnDateTime updatedAt;
@@ -226,6 +258,7 @@ class DwDevicePushTokenTable extends _i1.Table<int?> {
     id,
     recipientId,
     token,
+    provider,
     createdAt,
     updatedAt,
   ];

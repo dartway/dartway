@@ -8,6 +8,12 @@ serverOnly: true
 fields:
   recipientId: int
   token: String
+  ### Identifier of the transport that issued this token, as reported by the
+  ### device ('fcm', 'rustore', ...) or discovered by probing it once. A plain
+  ### string rather than an enum on purpose: an app may add a provider the
+  ### module has never heard of, and an enum would make the module the place
+  ### that has to know about it. Null means "not established yet".
+  provider: String?
   createdAt: DateTime, default=now
   updatedAt: DateTime
 indexes:

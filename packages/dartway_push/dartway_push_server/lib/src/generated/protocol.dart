@@ -22,6 +22,7 @@ import 'dw_push_metric_bucket.dart' as _i8;
 import 'dw_push_recipient_state.dart' as _i9;
 import 'dw_push_runtime_state.dart' as _i10;
 import 'dw_push_source_link.dart' as _i11;
+import 'dw_push_token_registration.dart' as _i12;
 export 'dw_device_push_token.dart';
 export 'dw_push_delivery.dart';
 export 'dw_push_message.dart';
@@ -30,6 +31,7 @@ export 'dw_push_metric_bucket.dart';
 export 'dw_push_recipient_state.dart';
 export 'dw_push_runtime_state.dart';
 export 'dw_push_source_link.dart';
+export 'dw_push_token_registration.dart';
 
 class Protocol extends _i1.SerializationManagerServer {
   Protocol._();
@@ -63,6 +65,12 @@ class Protocol extends _i1.SerializationManagerServer {
           columnType: _i2.ColumnType.text,
           isNullable: false,
           dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'provider',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
         ),
         _i2.ColumnDefinition(
           name: 'createdAt',
@@ -940,6 +948,9 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i11.DwPushSourceLink) {
       return _i11.DwPushSourceLink.fromJson(data) as T;
     }
+    if (t == _i12.DwPushTokenRegistration) {
+      return _i12.DwPushTokenRegistration.fromJson(data) as T;
+    }
     if (t == _i1.getType<_i4.DwDevicePushToken?>()) {
       return (data != null ? _i4.DwDevicePushToken.fromJson(data) : null) as T;
     }
@@ -966,6 +977,10 @@ class Protocol extends _i1.SerializationManagerServer {
     }
     if (t == _i1.getType<_i11.DwPushSourceLink?>()) {
       return (data != null ? _i11.DwPushSourceLink.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i12.DwPushTokenRegistration?>()) {
+      return (data != null ? _i12.DwPushTokenRegistration.fromJson(data) : null)
+          as T;
     }
     if (t == Map<String, String>) {
       return (data as Map).map(
@@ -1001,6 +1016,7 @@ class Protocol extends _i1.SerializationManagerServer {
       _i9.DwPushRecipientState => 'DwPushRecipientState',
       _i10.DwPushRuntimeState => 'DwPushRuntimeState',
       _i11.DwPushSourceLink => 'DwPushSourceLink',
+      _i12.DwPushTokenRegistration => 'DwPushTokenRegistration',
       _ => null,
     };
   }
@@ -1034,6 +1050,8 @@ class Protocol extends _i1.SerializationManagerServer {
         return 'DwPushRuntimeState';
       case _i11.DwPushSourceLink():
         return 'DwPushSourceLink';
+      case _i12.DwPushTokenRegistration():
+        return 'DwPushTokenRegistration';
     }
     className = _i2.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -1075,6 +1093,9 @@ class Protocol extends _i1.SerializationManagerServer {
     }
     if (dataClassName == 'DwPushSourceLink') {
       return deserialize<_i11.DwPushSourceLink>(data['data']);
+    }
+    if (dataClassName == 'DwPushTokenRegistration') {
+      return deserialize<_i12.DwPushTokenRegistration>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);

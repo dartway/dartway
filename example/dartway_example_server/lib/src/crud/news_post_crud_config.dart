@@ -1,5 +1,6 @@
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
+import 'package:dartway_example_server/src/dartway/dartway_core.dart';
 import 'package:dartway_example_server/src/dartway/dartway_session_extension.dart';
 import 'package:dartway_example_server/src/generated/protocol.dart';
 
@@ -46,6 +47,35 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
     // config whose rows belong to one person must not do this — see
     // sessionBookingCrudConfig, which picks what travels instead.
     broadcastTo: (session, saveContext) => [DwCoreConst.publicUpdatesChannel],
+    // A broadcast reaches the screens that are open; a push reaches the rest.
+    // Only on insert, and only when push is configured at all — the dispatcher
+    // drops everyone without a device or without marketing consent, and gives
+    // the message a lifetime, so nothing here has to think about audiences.
+    afterSaveSideEffects: (session, saveContext) async {
+      if (!saveContext.isInsert) return;
+      final post = saveContext.currentModel;
+      await dwPushDispatcher?.sendToEveryone(
+        session,
+        page: (session, {required afterId, required limit, required transaction}) async {
+          final profiles = await UserProfile.db.find(
+            session,
+            where: afterId == null ? null : (table) => table.id > afterId,
+            orderBy: (table) => table.id,
+            limit: limit,
+            transaction: transaction,
+          );
+          return profiles.map((profile) => profile.id).whereType<int>().toList();
+        },
+        category: ExamplePushCategories.newsPost,
+        title: post.title,
+        body: post.text,
+        data: {'news_post_id': '${post.id}'},
+        // Stable, so publishing the same post twice — a retried request, a
+        // double tap — does not notify the club twice.
+        deduplicationKey: 'news_post:${post.id}',
+        excludeRecipientId: post.authorProfileId,
+      );
+    },
   ),
   deleteConfig: DwDeleteConfig<NewsPost>(
     allowDelete: (session, model) => session.isStaffMember,
