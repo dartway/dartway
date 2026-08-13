@@ -179,6 +179,112 @@ describe('verifyStudioBridgeToken', () => {
   });
 });
 
+describe('when the token cannot be checked at all', () => {
+  test('no WebCrypto on the page — refuses, and says which context it needs', async () => {
+    const console = captureConsole();
+    const platform = usePlatform(undefined);
+    try {
+      assert.equal(
+        await verifyStudioBridgeToken(validToken, { appOrigin, publicKey: studioPublicKey }),
+        false,
+      );
+    } finally {
+      platform.restore();
+      console.restore();
+    }
+    assert.equal(console.messages.length, 1);
+    assert.match(console.messages[0] ?? '', /secure context/);
+  });
+
+  test('a browser without Ed25519 — refuses, and names the browsers that have it', async () => {
+    const console = captureConsole();
+    const platform = usePlatform({
+      importKey: () => {
+        throw new Error('Unrecognized algorithm name');
+      },
+    });
+    try {
+      assert.equal(
+        await verifyStudioBridgeToken(validToken, { appOrigin, publicKey: studioPublicKey }),
+        false,
+      );
+    } finally {
+      platform.restore();
+      console.restore();
+    }
+    assert.equal(console.messages.length, 1);
+    assert.match(console.messages[0] ?? '', /cannot verify Ed25519/);
+  });
+
+  test('a misconfigured public key is named as such, and named once', async () => {
+    const sixteenBytes = base64(new Uint8Array(16));
+    const console = captureConsole();
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        assert.equal(
+          await verifyStudioBridgeToken(validToken, { appOrigin, publicKey: sixteenBytes }),
+          false,
+        );
+      }
+    } finally {
+      console.restore();
+    }
+    // Studio retries its handshake every couple of seconds; a message per retry
+    // would bury itself.
+    assert.equal(console.messages.length, 1);
+    assert.match(console.messages[0] ?? '', /16 bytes, not the 32/);
+  });
+
+  test('an ordinary forged token is refused without a word', async () => {
+    const console = captureConsole();
+    try {
+      const forged = `${validToken.split('.')[0]}.${base64UrlSegment(new Uint8Array(64))}`;
+      assert.equal(
+        await verifyStudioBridgeToken(forged, { appOrigin, publicKey: studioPublicKey }),
+        false,
+      );
+      assert.equal(
+        await verifyStudioBridgeToken('not-a-token', { appOrigin, publicKey: studioPublicKey }),
+        false,
+      );
+    } finally {
+      console.restore();
+    }
+    // Refusing a bad token is the function working, not something to report.
+    assert.deepEqual(console.messages, []);
+  });
+});
+
+/** Swaps in a platform whose WebCrypto behaves as the test needs. */
+function usePlatform(subtle: unknown): { restore: () => void } {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+  Object.defineProperty(globalThis, 'crypto', {
+    value: subtle === undefined ? undefined : { subtle },
+    configurable: true,
+    writable: true,
+  });
+  return {
+    restore: () => {
+      if (original === undefined) delete (globalThis as { crypto?: unknown }).crypto;
+      else Object.defineProperty(globalThis, 'crypto', original);
+    },
+  };
+}
+
+function captureConsole(): { messages: string[]; restore: () => void } {
+  const original = globalThis.console.error;
+  const messages: string[] = [];
+  globalThis.console.error = (...args: unknown[]) => {
+    messages.push(args.map((arg) => String(arg)).join(' '));
+  };
+  return {
+    messages,
+    restore: () => {
+      globalThis.console.error = original;
+    },
+  };
+}
+
 describe('studioSignedAccessValidator', () => {
   test('lets a valid token in and keeps everything else out', async () => {
     const validator = studioSignedAccessValidator(appOrigin, { publicKey: studioPublicKey });

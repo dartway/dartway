@@ -22,12 +22,13 @@ Studio; nothing on the Studio side knows which implementation it is talking to.
   bound to an element also answers Studio's tap-to-inspect.
 - Route changes are picked up from `history` and `popstate`, so any router
   reports itself without wiring.
+- A token that cannot be **checked** — no WebCrypto (the page is not a secure
+  context), a browser without Ed25519, a misconfigured `publicKey` — is refused
+  like any other, and the reason is written to the console once. A token that is
+  checked and found wanting stays silent: refusing it is the check working.
 
-Two deliberate differences from the Dart implementation, neither of them visible
-on the wire:
-
-- **Every command is gated on the handshake**, not just the manifest — an
-  embedding page that presents no accepted token cannot navigate the app or sign
-  it in.
-- **Nothing is reported before a Studio has been let in**, so passports do not
-  travel to a frame that never proved who it was.
+Two things this implementation did from the start and the Dart one did not:
+**every command is gated on the handshake**, not just the manifest, and
+**nothing is reported before a Studio has been let in**. Writing them here is
+what surfaced the same gap in the Dart host, fixed in `dartway_studio_bridge`
+0.7.1 — the two now agree.
