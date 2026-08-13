@@ -153,7 +153,10 @@ The `studioConnect` handshake carries an `accessToken`; the host answers with
 its manifest only if `validateAccessToken` accepts it, otherwise it stays
 silent (Studio shows "not connected"). The gate covers every command, not just
 the manifest — otherwise an embedding page could walk the app through its
-screens without presenting anything.
+screens without presenting anything. It covers the app's own reports too
+(`reportRoute`, `reportSession`, `reportLocale`, `reportFeatures`): they are
+dropped until a Studio is let in, since whoever connects is handed the whole
+state in the handshake response anyway.
 
 The token is short-lived, signed by Studio with an Ed25519 key, and issued for
 **one origin**: the address your build answers at. A token lifted off the wire

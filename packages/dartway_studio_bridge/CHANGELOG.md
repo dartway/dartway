@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.7.1
+
+**The access gate now covers every command, which is what this package has been
+documenting all along.** The token was checked on the handshake alone: the
+manifest was withheld from a Studio that presented nothing, but `navigate`,
+`sign in`, `sign out`, `locale` and `inspect point` were dispatched to the
+delegate regardless. Any page that embedded a public web build in an iframe
+could therefore walk the app through its screens and sign it in with test
+credentials without presenting anything at all — while the token looked like it
+was doing its job, since the manifest never arrived.
+
+The host now holds the handshake result and drops everything else until a token
+has been accepted. `reportRoute`, `reportSession`, `reportLocale` and
+`reportFeatures` are dropped the same way: whoever connects is handed the whole
+state in the handshake response, so nothing is lost — and a page that presented
+nothing is no longer sent the app's feature passports, `implementationNotes` and
+`knownIssues` included.
+
+No protocol change: Studio sends `studioConnect` first and retries until it gets
+a manifest, so the Studio side needs nothing. An app that never had a Studio in
+front of it sees no difference either.
+
+- `StudioBridgeHost.isConnected` — true once a Studio has been let in.
+- `StudioBridgeHost.attach` takes an optional `channel`. The host used to build
+  its own and could therefore only exist inside an iframe, which is why it had
+  no tests, which is why the gate could go missing in the first place. It now
+  has a file of them.
+
 ## 0.7.0
 
 **Access is proved by a signature, not by a shared secret** (protocol version 4 — breaking). An app

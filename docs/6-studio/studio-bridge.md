@@ -32,6 +32,11 @@ The open `dartway_studio_bridge` package is the only integration surface:
   passes its `validateAccessToken`. A token taken off the wire is therefore
   useless anywhere else, and it expires on its own.
 
+  The gate is on **everything**, not on the manifest alone: until a token has
+  been accepted the app runs no command it is sent and reports nothing back, so
+  a page that embedded the build without presenting anything can neither drive
+  it nor read its feature passports.
+
   Your build holds no secret and copies nothing out of Studio: the public half
   of the pair ships inside the bridge package, and a public key can only check
   signatures, never make them. The build names one thing — where it answers:
