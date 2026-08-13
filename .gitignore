@@ -10,6 +10,13 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 
+# JavaScript packages under js/: dependencies and compiler output. The Dart
+# side has no `node_modules` or `dist` of its own, so both patterns are safe
+# repository-wide — and one rule at the root beats one per package, which is
+# how a second JS package would end up committing its build.
+node_modules/
+dist/
+
 # Machine-local Claude Code settings. Everything else under .claude/ is
 # tracked: the skills there are how this framework is developed.
 .claude/settings.local.json

@@ -16,6 +16,7 @@ This is the repository of **the DartWay framework itself** (fullstack Dart: Flut
 | `toolkit/` | The Claude harness for application projects (`dartway-*` skills, `__*__` tokens, the installer) |
 | `docs/` | Framework documentation and the single source of content for the dartway.dev site (see "Neighbours") |
 | `packages/dartway_studio_bridge` | The open bridge between an application and Studio: screen-spec models (in the application's code) plus the runtime postMessage protocol (host in the application, client in Studio) |
+| `js/studio-bridge` | The same bridge's application half for JavaScript apps (`@dartway/studio-bridge` on npm: core + React and Vue bindings). **Outside `packages/`**: that tree is the pub workspace (`packages/*`), and while pub does skip a folder without a `pubspec.yaml`, a JS package has no business sitting inside a Dart resolution. A second implementation of one protocol: it is held to the Dart one by golden wire strings in its tests, not by a shared schema |
 
 This repository is self-contained: everything it holds lives here. There are no foreign repositories nested in the tree.
 
