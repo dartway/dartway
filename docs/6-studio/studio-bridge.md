@@ -80,11 +80,10 @@ Studio, unmodified. The app half of the bridge exists a second time as
 bindings (`/react`, `/vue`), speaking the same protocol version, checking the
 same signature against the same shipped public key.
 
-Two things differ, and neither of them on the wire. A JS app **can** enumerate
-its features, because a declaration is a component and components are what a
-framework already tracks — where a Flutter app reports what is mounted, a React
-or Vue app declares `<StudioFeature>` and the registry does the rest. And every
-Studio command is gated on the handshake there, not just the manifest.
+One thing differs, and not on the wire: a JS app **can** enumerate its features,
+because a declaration is a component and components are what a framework already
+tracks — where a Flutter app reports what is mounted, a React or Vue app
+declares `<StudioFeature>` and the registry does the rest.
 
 The two implementations are kept honest by golden wire strings in the JS
 package's tests: the Dart encoder's exact output, key order included. Change the

@@ -56,7 +56,9 @@ export interface VerifyStudioBridgeTokenOptions {
  * **Requires Ed25519 in the platform's WebCrypto** (Chrome 137+, Safari 17+,
  * Firefox 130+, Node 18.4+) and a secure context — https or localhost. Where it
  * is missing, verification fails closed: the app refuses the connection instead
- * of trusting an unchecked token.
+ * of trusting an unchecked token, and says why once in the console — a refusal
+ * is otherwise silence, and silence is what a browser too old to check looks
+ * like from Studio's side as well.
  */
 export async function verifyStudioBridgeToken(
   accessToken: string,
@@ -89,11 +91,34 @@ export async function verifyStudioBridgeToken(
   if (expiresAtSeconds * 1000 <= (now ?? new Date()).getTime()) return false;
 
   const subtle = globalThis.crypto?.subtle;
-  if (subtle === undefined) return false;
+  if (subtle === undefined) {
+    reportOnce(
+      'WebCrypto is unavailable on this page. `crypto.subtle` exists only in a ' +
+        'secure context, so serve the app over https (localhost counts).',
+    );
+    return false;
+  }
+
+  let key: CryptoKey;
   try {
-    const key = await subtle.importKey('raw', publicKeyBytes, { name: 'Ed25519' }, false, [
-      'verify',
-    ]);
+    key = await subtle.importKey('raw', publicKeyBytes, { name: 'Ed25519' }, false, ['verify']);
+  } catch (error) {
+    // A 32-byte key that the platform still refuses to import is the platform
+    // saying it does not do Ed25519; any other length is this build's own
+    // `publicKey` being wrong. Both are worth saying out loud — see below.
+    reportOnce(
+      publicKeyBytes.length === 32
+        ? 'this browser cannot verify Ed25519 signatures with WebCrypto. It needs ' +
+            'Chrome 137+, Safari 17+ or Firefox 130+.'
+        : `the configured publicKey is ${publicKeyBytes.length} bytes, not the 32 ` +
+            'an Ed25519 public key has. Leave it unset to use the key shipped with ' +
+            'this package.',
+      error,
+    );
+    return false;
+  }
+
+  try {
     return await subtle.verify(
       { name: 'Ed25519' },
       key,
@@ -101,9 +126,35 @@ export async function verifyStudioBridgeToken(
       new TextEncoder().encode(payloadSegment),
     );
   } catch {
+    // A signature of the wrong shape. Ordinary traffic, not a diagnosis:
+    // refusing it is the function working, and saying so on every retry would
+    // bury the messages above.
     return false;
   }
 }
+
+/**
+ * Said once per page, and only when the token could not be *checked* at all —
+ * as opposed to being checked and refused, which is this function's day job and
+ * says nothing about the app.
+ *
+ * The failure it describes is otherwise mute: the app simply does not answer
+ * the handshake, Studio shows "not connected", and nothing anywhere points at
+ * the cause. A refusal stays a refusal — nothing here weakens the check — but
+ * whoever is looking at the console learns why.
+ */
+function reportOnce(reason: string, error?: unknown): void {
+  if (reported.has(reason)) return;
+  reported.add(reason);
+  console.error(
+    `[dartway/studio-bridge] Studio's access token could not be checked: ${reason} ` +
+      'The connection is refused rather than trusted. For local development, leave ' +
+      '`appOrigin` unset — that mode verifies nothing and needs none of this.',
+    ...(error === undefined ? [] : [error]),
+  );
+}
+
+const reported = new Set<string>();
 
 export interface StudioSignedAccessOptions {
   /**

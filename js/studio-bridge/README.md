@@ -167,8 +167,11 @@ all — and it is why a deployed build should always name its address.
 
 Signature checking uses Ed25519 in WebCrypto (Chrome 137+, Safari 17+, Firefox
 130+) in a secure context. Where it is unavailable the app refuses the
-connection rather than trusting an unchecked token; the local-dev mode above is
-unaffected, since it verifies nothing.
+connection rather than trusting an unchecked token — and writes one line to the
+console saying which of the two is missing. Without it the preview would just
+sit at "not connected" with nothing anywhere pointing at the reason, since a
+refusal is silence by design. The local-dev mode above is unaffected: it
+verifies nothing and needs neither.
 
 ## Licence
 
