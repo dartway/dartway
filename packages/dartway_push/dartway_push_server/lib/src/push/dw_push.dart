@@ -1,8 +1,10 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 import 'package:dartway_push_server/src/generated/protocol.dart';
+import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 
+import 'dw_device_push_token_store.dart';
 import 'dw_push_contracts.dart';
 import 'dw_push_metrics.dart';
 import 'dw_push_queue.dart';
@@ -47,6 +49,74 @@ final class DwPush {
   static const _recipientLockWaitTimeout = Duration(seconds: 30);
 
   bool _storageSettingsEnsured = false;
+
+  /// The CRUD action a device registers (and hands back) its push token
+  /// through — add it to `dtoConfigurations` and the app writes no endpoint:
+  ///
+  /// ```dart
+  /// DwCore.init(
+  ///   dtoConfigurations: [dwPush.tokenRegistrationConfig()],
+  /// );
+  /// ```
+  ///
+  /// The module ships the *config*, not a registered route, so nothing becomes
+  /// reachable until an app declares it. The recipient is always the
+  /// authenticated caller — it is not a field on the request, so nobody can
+  /// register a token against somebody else's account — and the write happens
+  /// under the same recipient lock a delivery takes, so a token cannot slip in
+  /// behind an account deletion already in flight.
+  ///
+  /// [canRegister] is where an app refuses a caller it still considers signed
+  /// in — a soft-deleted or suspended profile.
+  DwDtoActionConfig<DwPushTokenRegistration> tokenRegistrationConfig({
+    DwDevicePushTokenConflict onConflict = DwDevicePushTokenConflict.reassign,
+    Future<bool> Function(Session session, int recipientId)? canRegister,
+  }) => DwDtoActionConfig<DwPushTokenRegistration>(
+    actionProcessing: (session, transaction, registration) async {
+      final recipientId = session.signedInUserProfileId;
+      if (recipientId == null) return const [];
+
+      await withRecipientLock(
+        session,
+        recipientId: recipientId,
+        transaction: transaction,
+        action: (lockedTransaction) async {
+          if (canRegister != null && !await canRegister(session, recipientId)) {
+            return;
+          }
+          if (registration.revoke) {
+            await DwDevicePushTokenStore.unregister(
+              session,
+              recipientId: recipientId,
+              token: registration.token,
+              transaction: lockedTransaction,
+            );
+            return;
+          }
+          final outcome = await DwDevicePushTokenStore.register(
+            session,
+            recipientId: recipientId,
+            token: registration.token,
+            provider: registration.provider,
+            transaction: lockedTransaction,
+            onConflict: onConflict,
+            now: config.clock(),
+          );
+          if (outcome != DwDevicePushTokenRegistration.registered) {
+            // Reported, not raised: the device cannot fix either outcome by
+            // asking again, and a failed response would only make it retry.
+            session.log(
+              'DwPush: device token registration ended as ${outcome.name}',
+              level: LogLevel.warning,
+            );
+          }
+        },
+      );
+      // Nothing the client holds a copy of changed: the token store is
+      // server-only, so there is no model to hand back for a cache to refresh.
+      return const [];
+    },
+  );
 
   Future<DwPushBatchResult> processBatch(
     Session session, {

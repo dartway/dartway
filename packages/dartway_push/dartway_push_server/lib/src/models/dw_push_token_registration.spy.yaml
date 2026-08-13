@@ -1,0 +1,15 @@
+### A device reporting its push token to the server, or handing it back.
+###
+### Not a table: this is the request itself, handled by the module's CRUD DTO
+### action, which decides what to store. The recipient is never a field — it
+### comes from the authenticated session, so a caller cannot register a token
+### against somebody else's account.
+class: DwPushTokenRegistration
+fields:
+  token: String
+  ### Which transport issued the token ('fcm', 'rustore', ...). Optional: a
+  ### client that cannot tell leaves it out and the server probes once.
+  provider: String?
+  ### True when the device is giving the token back — sign-out, or a token the
+  ### platform has replaced.
+  revoke: bool

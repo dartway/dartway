@@ -125,15 +125,70 @@ final class DwPushPayload {
   final DateTime expiresAt;
 }
 
+/// Identifiers of the transports the module ships providers for.
+///
+/// Plain strings, not an enum: an app may plug in a transport the module has
+/// never heard of (a direct APNs client, a vendor gateway), and an enum would
+/// make the module the place that has to learn about it first.
+abstract final class DwPushProviders {
+  static const fcm = 'fcm';
+  static const ruStore = 'rustore';
+}
+
+/// One provider address a message can be delivered to.
+///
+/// [provider] is what turns "send and see" into "send to the right place": two
+/// tokens sitting side by side in one recipient's row can belong to different
+/// transports, and nothing about the strings themselves says which. A null
+/// provider means nobody has established it yet — the transport may probe and
+/// report back what it found.
+final class DwPushTarget {
+  DwPushTarget({required String token, String? provider})
+    : token = token.trim(),
+      provider = _normalizeProvider(provider);
+
+  final String token;
+  final String? provider;
+
+  static String? _normalizeProvider(String? provider) {
+    final normalized = provider?.trim();
+    return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DwPushTarget &&
+      other.token == token &&
+      other.provider == provider;
+
+  @override
+  int get hashCode => Object.hash(token, provider);
+}
+
 /// Active provider targets resolved by the host application for one user.
 final class DwPushRecipient {
-  DwPushRecipient(Iterable<String> targets)
-    : targets = List.unmodifiable(
-        LinkedHashSet.of(targets.map((target) => target.trim()))
-          ..removeWhere((target) => target.isEmpty),
-      );
+  DwPushRecipient(Iterable<DwPushTarget> targets)
+    : targets = List.unmodifiable(_deduplicate(targets));
 
-  final List<String> targets;
+  /// Targets whose transport is unknown — every one of them may be probed.
+  DwPushRecipient.tokens(Iterable<String> tokens)
+    : this(tokens.map((token) => DwPushTarget(token: token)));
+
+  final List<DwPushTarget> targets;
+
+  List<String> get tokens =>
+      targets.map((target) => target.token).toList(growable: false);
+
+  /// One entry per token: the same device must not be sent to twice because two
+  /// rows disagree about its transport.
+  static List<DwPushTarget> _deduplicate(Iterable<DwPushTarget> targets) {
+    final byToken = <String, DwPushTarget>{};
+    for (final target in targets) {
+      if (target.token.isEmpty) continue;
+      byToken.putIfAbsent(target.token, () => target);
+    }
+    return byToken.values.toList(growable: false);
+  }
 }
 
 /// Context supplied to the transport for a single recipient attempt.
@@ -150,7 +205,7 @@ final class DwPushDeliveryAttempt {
   final int recipientId;
   final int attemptNumber;
   final DwPushPayload payload;
-  final List<String> targets;
+  final List<DwPushTarget> targets;
 
   /// Stable across retries and suitable for transports with idempotency keys.
   String get idempotencyKey => 'dw-push-delivery:$deliveryId';
@@ -172,6 +227,21 @@ abstract class DwPushRecipientResolver {
     Session session, {
     required int recipientId,
     required List<String> targets,
+    required Transaction transaction,
+  }) async {}
+
+  /// Records the transport a target turned out to belong to, so the next
+  /// delivery routes straight to it instead of probing again.
+  ///
+  /// Called only for targets whose provider was unknown and became known
+  /// during a send. Best effort by design — a delivery that already succeeded
+  /// must not fail because this could not be written. Doing nothing is a valid
+  /// implementation: it costs one extra probe per delivery, nothing more.
+  Future<void> rememberTargetProvider(
+    Session session, {
+    required int recipientId,
+    required String token,
+    required String provider,
     required Transaction transaction,
   }) async {}
 }

@@ -8,8 +8,6 @@ import 'dw_push_provider.dart';
 import 'dw_push_provider_utils.dart';
 
 const _ruStoreHost = 'vkpns.rustore.ru';
-const _pushTitleDataKey = 'push_title';
-const _pushBodyDataKey = 'push_body';
 
 final class DwRuStorePushProviderConfig {
   DwRuStorePushProviderConfig({
@@ -143,8 +141,8 @@ final class DwRuStorePushProvider implements DwPushProvider {
     final providerData = <String, String>{...request.data}
       ..remove(dwPushImageUrlDataKey);
     if (imageUrl != null) {
-      providerData[_pushTitleDataKey] = payload.title;
-      providerData[_pushBodyDataKey] = body;
+      providerData[dwPushTitleDataKey] = payload.title;
+      providerData[dwPushBodyDataKey] = body;
       providerData[dwPushImageUrlDataKey] = imageUrl;
     }
 

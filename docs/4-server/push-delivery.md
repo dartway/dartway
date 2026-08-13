@@ -21,12 +21,15 @@ lease recovery after a crash, hourly metric buckets, bounded cleanup, and two
 built-in providers — `DwFcmPushProvider` (FCM HTTP v1) and
 `DwRuStorePushProvider`, both pure Dart.
 
-Your app owns who receives a message, when it is enqueued, the device tokens and
-their lifecycle, user consent and categories, provider credentials, and — this
-part matters — **authorization**: who may send a marketing blast, pause the
-worker, or read metrics. The module ships no endpoints and no gating, so it can
-never leak an "open to everyone" default; gating those privileged operations is
-your app's job, where the role model lives.
+Your app owns who receives a message, when it is enqueued, user consent and
+categories, provider credentials, and — this part matters — **authorization**:
+who may send a marketing blast, pause the worker, or read metrics. The module
+ships no endpoints and nothing routable, so it can never leak an "open to
+everyone" default; gating those privileged operations is your app's job, where
+the role model lives.
+
+The device half of push — asking for permission, obtaining the token, turning a
+tap into a screen — is [`dartway_push_flutter`](../3-flutter/push-notifications.md).
 
 ## Wiring it up
 
@@ -38,12 +41,21 @@ DwPush? dwPush;
 void bootPush(Map<String, String> passwords) {
   final fcmConfig = DwFcmPushProviderConfig.fromPasswords(passwords);
   final fcm = fcmConfig.isConfigured ? DwFcmPushProvider(config: fcmConfig) : null;
-  if (fcm == null) return; // no provider configured → push stays inert
+  final ruStoreConfig = DwRuStorePushProviderConfig.fromPasswords(passwords);
+  final ruStore = ruStoreConfig.isConfigured
+      ? DwRuStorePushProvider(config: ruStoreConfig)
+      : null;
+  if (fcm == null && ruStore == null) return; // no provider → push stays inert
 
   dwPush = DwPush(
     config: DwPushConfig(
-      recipientResolver: AppPushRecipientResolver(),
-      transport: DwPushProviderTransport(provider: fcm),
+      recipientResolver: DwDevicePushTokenResolver(isEligible: appConsentCheck),
+      transport: DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: ?fcm,
+          DwPushProviders.ruStore: ?ruStore,
+        },
+      ),
     ),
   );
 }
@@ -59,26 +71,78 @@ the whole provider round-trip, so keep it a small fraction of your Postgres pool
 
 ## The domain seam
 
-Two objects carry your domain into the engine.
+Two objects carry your domain into the engine, and for most apps neither is much
+code.
 
 `DwPushRecipientResolver.resolve` runs under a per-recipient advisory lock inside
-a transaction. Given a recipient id, return the active device tokens that are
-eligible right now — after checking consent, disabled categories and account
-deletion. An empty list is a clean "skip this one". Tokens the provider rejects
-are removed through `invalidateTargets`.
+a transaction and returns the targets that are eligible right now.
+`DwDevicePushTokenResolver` is the one to use: it reads the module's own token
+store, keeps values canonical, deletes the targets a provider rejected, and asks
+your app the single question it cannot answer — `isEligible`, which is where
+consent, muted categories and deleted accounts live. An empty result is a clean
+"skip this one".
 
-`DwPushTransport` sends resolved targets. The default `DwPushProviderTransport`
-wraps one or two providers; give it a `fallbackProvider` and it falls back
-**only** on an explicit "this isn't my kind of token" signal — never after a
-timeout, a 429 or a 5xx, which are retried instead. Provider outcomes are a
-small classified enum, not a raw response body, and raw tokens or bodies never
-reach your logs — only a fingerprint.
+`DwPushTransport` sends those targets. `DwPushProviderTransport.routed` sends
+each one through the transport that issued it — which the device reported when it
+registered — so nothing is guessed. A token from a build too old to report a
+provider is probed once, in `probeOrder`, and what the probe found is written
+back, so it is probed at most once. A token is dropped only when **every**
+configured transport refused the target itself: anything transient keeps it. That
+matters more than it sounds, because the alternative is real: FCM answering a
+RuStore token with `UNREGISTERED` used to delete a perfectly live registration.
+
+Provider outcomes are a small classified enum, not a raw response body, and raw
+tokens or bodies never reach your logs — only a fingerprint.
+
+## Registering a device token
+
+The device sends its token through the module's own CRUD action, so your app
+writes no endpoint:
+
+```dart
+dw = DwCore.init<UserProfile>(
+  dtoConfigurations: [dwPush!.tokenRegistrationConfig()],
+  // ...
+);
+```
+
+Nothing becomes reachable until you declare it. The recipient is taken from the
+authenticated session and is not a field on the request, so a caller cannot
+register a token against somebody else's account, and the write runs under the
+same recipient lock a delivery takes — a token cannot slip in behind an account
+deletion already in flight.
+
+A token that turns up under a different recipient is **reassigned** to the caller
+by default. A push token identifies an app installation, not a person: hand the
+phone over, sign in as somebody else, and the previous owner's notifications
+would otherwise keep arriving on a device they no longer hold.
 
 ## Enqueue, worker, cleanup
 
-Enqueue is idempotent on a stable `deduplicationKey`, enforced by a unique index
-as the last guard, so triggering the same logical campaign twice does not
-double-send:
+Between a domain event and the queue there is always the same stretch of code:
+drop the person who caused the event, drop the ones who muted this, drop the ones
+with no device at all, invent a key so a retry does not double-send, decide how
+long the message is worth delivering, and cut a large audience into chunks.
+`DwPushDispatcher` is that stretch:
+
+```dart
+await dwPushDispatcher!.send(
+  session,
+  recipientIds: recipientIds,
+  category: 'chat_reply',
+  title: title,
+  body: body,
+  deduplicationKey: 'chat_reply:$messageId',
+  excludeRecipientId: actorId,
+);
+```
+
+`sendToEveryone(page: ...)` pages through a whole user base with a callback of
+yours, keeping one message and one deduplication key for the campaign.
+
+Underneath, enqueue is idempotent on a stable `deduplicationKey`, enforced by a
+unique index as the last guard, so triggering the same logical campaign twice
+does not double-send:
 
 ```dart
 await dwPush!.queue.enqueue(
@@ -88,6 +152,7 @@ await dwPush!.queue.enqueue(
     category: category,
     title: title,
     body: body,
+    scheduledAt: now,
     expiresAt: expiresAt,
   ),
   recipientIds: recipientIds,
@@ -135,8 +200,9 @@ snapshot, not a live millisecond gauge — the right tradeoff for a progress vie
 Two pieces of plumbing every push app needs ship with the module, so you don't
 rebuild them. `DwDevicePushToken` plus `DwDevicePushTokenStore` and
 `DwDevicePushTokenPolicy` keep device tokens canonical (whitespace-normalized,
-deduped), bounded (a per-recipient cap with newest-first eviction) and usable
-(filter out recipients with no valid token before you enqueue). And when a
+deduped), bounded (a per-recipient cap with newest-first eviction), routed (each
+row remembers the transport that issued it) and usable (filter out recipients
+with no valid token before you enqueue). And when a
 message is queued "about" something that can vanish — a post deleted before its
 notification goes out — `dwPush.linkMessageSources(...)` records the link and
 `dwPush.cancelMessagesBySources(...)` cancels the message when the source is
@@ -144,6 +210,8 @@ gone, so an immutable payload never ships stale.
 
 ## See also
 
+- [Push on the device](../3-flutter/push-notifications.md) — the app half:
+  permissions, the token, and what happens between a tap and a screen.
 - [Advisory locks](advisory-locks.md) — the non-blocking primitive the delivery
   and account-deletion guards are built on.
 - [Recurring jobs](recurring-jobs.md) — how to schedule the worker.

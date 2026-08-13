@@ -23,19 +23,27 @@ app that does not gets none of them.
   `DwRuStorePushProvider`. Provider outcomes are a classified enum rather than a raw response, and
   RuStore fallback fires only on an explicit "not this provider's token" signal — never on a
   timeout, a 429 or a 5xx. Raw tokens and response bodies are never logged, only a fingerprint.
-- The device-token plumbing every push app needs — normalization, byte-length validation, a
-  per-recipient cap with newest-N eviction, refresh windows, canonical-token dedup, and skipping
-  enqueue for recipients with no usable token. Keyed on an opaque `recipientId`, with no app types
-  in sight.
+- Delivery routed by the transport that issued the token, not guessed:
+  `DwPushProviderTransport.routed` sends each target where it belongs, probes a token of unknown
+  provenance once, and remembers the answer. A token is dropped only when every configured
+  transport refuses the target itself.
+- The device-token plumbing every push app needs — registration as a CRUD action rather than an
+  endpoint you write, normalization, byte-length validation, a per-recipient cap with newest-N
+  eviction, refresh windows, canonical-token dedup, and skipping enqueue for recipients with no
+  usable token. Keyed on an opaque `recipientId`, with no app types in sight.
+- `DwPushDispatcher` — the stretch between a domain event and `enqueue`: exclude the actor, drop
+  recipients with no device, apply the app's audience filter, invent a deduplication key, pick a
+  per-category lifetime, and chunk a large audience.
 - Source-linked cancellation: map business `(sourceType, sourceId)` values to a queued message and
   cancel it when the source disappears, so an immutable payload never goes out stale.
 
 ## What your app owns
 
-Who receives a message and when it is enqueued, the device tokens and their lifecycle, user consent
-and categories, provider credentials — and **authorization**. The module ships no endpoints and no
-gating, so it cannot leak an "open to everyone" default; deciding who may send a marketing blast,
-pause the worker or read metrics belongs where the role model lives.
+Who receives a message and when it is enqueued, user consent and categories, provider credentials —
+and **authorization**. The module ships no endpoints and nothing routable: token registration comes
+as a `DwDtoActionConfig` an app adds to its own CRUD configuration, so nothing is reachable until
+the app says so, and deciding who may send a marketing blast, pause the worker or read metrics
+belongs where the role model lives.
 
 ## Wiring
 
@@ -44,14 +52,17 @@ Push is not part of `DwCore` — the app constructs and owns a `DwPush`:
 ```dart
 dwPush = DwPush(
   config: DwPushConfig(
-    recipientResolver: AppPushRecipientResolver(),
-    transport: DwPushProviderTransport(provider: fcm),
+    recipientResolver: DwDevicePushTokenResolver(isEligible: appConsentCheck),
+    transport: DwPushProviderTransport.routed(
+      providers: {DwPushProviders.fcm: fcm, DwPushProviders.ruStore: ruStore},
+    ),
   ),
 );
 ```
 
 `DwPushConfig` is deliberately small: a `DwPushRecipientResolver` and a `DwPushTransport` are the
-whole surface most apps ever write. Every performance and retention knob lives on an optional
+whole surface most apps ever write — and with `DwDevicePushTokenResolver` the first one is one
+callback about consent. Every performance and retention knob lives on an optional
 `fineTuning: DwPushFineTuning(...)`, where each field documents what it trades off.
 
 The full guide — module registration, migrations, the domain seam, the tuning knobs and what

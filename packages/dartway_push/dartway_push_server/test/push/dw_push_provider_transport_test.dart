@@ -172,6 +172,189 @@ void main() {
       );
     });
   });
+
+  group('DwPushProviderTransport.routed', () {
+    test('sends each target through the provider that issued it', () async {
+      final fcm = _RecordingProvider(
+        outcomesByTarget: {'fcm-token': const DwPushProviderOutcome.accepted()},
+      );
+      final ruStore = _RecordingProvider(
+        outcomesByTarget: {'ru-token': const DwPushProviderOutcome.accepted()},
+      );
+      final transport = DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: fcm,
+          DwPushProviders.ruStore: ruStore,
+        },
+      );
+
+      final result = await transport.send(
+        _FakeSession(),
+        _attempt(
+          targets: ['fcm-token', 'ru-token'],
+          providersByToken: {
+            'fcm-token': DwPushProviders.fcm,
+            'ru-token': DwPushProviders.ruStore,
+          },
+        ),
+      );
+
+      expect(fcm.requests.map((request) => request.target), ['fcm-token']);
+      expect(ruStore.requests.map((request) => request.target), ['ru-token']);
+      expect(
+        result.results.map((item) => item.status),
+        everyElement(DwPushTargetStatus.sent),
+      );
+      expect(result.discoveredProviders, isEmpty);
+    });
+
+    test('probes a target of unknown provenance and reports what it '
+        'found', () async {
+      final fcm = _RecordingProvider(
+        outcomesByTarget: {
+          'ru-token': const DwPushProviderOutcome.targetNotSupported(),
+        },
+      );
+      final ruStore = _RecordingProvider(
+        outcomesByTarget: {'ru-token': const DwPushProviderOutcome.accepted()},
+      );
+      final transport = DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: fcm,
+          DwPushProviders.ruStore: ruStore,
+        },
+      );
+
+      final result = await transport.send(
+        _FakeSession(),
+        _attempt(targets: ['ru-token']),
+      );
+
+      expect(fcm.requests, hasLength(1));
+      expect(ruStore.requests, hasLength(1));
+      expect(result.results.single.status, DwPushTargetStatus.sent);
+      expect(result.discoveredProviders, {'ru-token': DwPushProviders.ruStore});
+    });
+
+    test('keeps a live token when one provider fails transiently', () async {
+      // The regression this whole mechanism exists for: FCM answering a
+      // foreign token with UNREGISTERED used to delete a working RuStore
+      // token. Only a refusal of the target by *every* provider may do that.
+      final fcm = _RecordingProvider(
+        outcomesByTarget: {
+          'ru-token': const DwPushProviderOutcome.invalidTarget(
+            errorCode: 'fcm_unregistered',
+          ),
+        },
+      );
+      final ruStore = _RecordingProvider(
+        outcomesByTarget: {
+          'ru-token': const DwPushProviderOutcome.retryableFailure(
+            errorCode: 'rustore_503',
+            retryAfter: Duration(minutes: 3),
+          ),
+        },
+      );
+      final transport = DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: fcm,
+          DwPushProviders.ruStore: ruStore,
+        },
+      );
+
+      final result = await transport.send(
+        _FakeSession(),
+        _attempt(targets: ['ru-token']),
+      );
+
+      expect(result.results.single.status, DwPushTargetStatus.retryableFailure);
+      expect(result.results.single.retryAfter, const Duration(minutes: 3));
+      expect(result.invalidTargets, isEmpty);
+    });
+
+    test('invalidates a target every provider refuses', () async {
+      final transport = DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: _RecordingProvider(
+            outcomesByTarget: {
+              'dead-token': const DwPushProviderOutcome.invalidTarget(),
+            },
+          ),
+          DwPushProviders.ruStore: _RecordingProvider(
+            outcomesByTarget: {
+              'dead-token': const DwPushProviderOutcome.targetNotSupported(),
+            },
+          ),
+        },
+      );
+
+      final result = await transport.send(
+        _FakeSession(),
+        _attempt(targets: ['dead-token']),
+      );
+
+      expect(result.results.single.status, DwPushTargetStatus.invalid);
+    });
+
+    test('fails a target whose provider this deployment does not run', () async {
+      final transport = DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: _RecordingProvider(outcomesByTarget: const {}),
+        },
+      );
+
+      final result = await transport.send(
+        _RecordingSession(),
+        _attempt(
+          targets: ['ru-token'],
+          providersByToken: {'ru-token': DwPushProviders.ruStore},
+        ),
+      );
+
+      // Terminal, but not "invalid": the token is fine, the deployment is not,
+      // and deleting it would cost the device its registration for good.
+      expect(result.results.single.status, DwPushTargetStatus.permanentFailure);
+      expect(result.results.single.errorCode, 'provider_not_configured');
+      expect(result.invalidTargets, isEmpty);
+    });
+
+    test('probes in the configured order', () async {
+      final fcm = _RecordingProvider(
+        outcomesByTarget: {'token': const DwPushProviderOutcome.accepted()},
+      );
+      final ruStore = _RecordingProvider(
+        outcomesByTarget: {'token': const DwPushProviderOutcome.accepted()},
+      );
+      final transport = DwPushProviderTransport.routed(
+        providers: {
+          DwPushProviders.fcm: fcm,
+          DwPushProviders.ruStore: ruStore,
+        },
+        probeOrder: [DwPushProviders.ruStore, DwPushProviders.fcm],
+      );
+
+      final result = await transport.send(
+        _FakeSession(),
+        _attempt(targets: ['token']),
+      );
+
+      expect(ruStore.requests, hasLength(1));
+      expect(fcm.requests, isEmpty);
+      expect(result.discoveredProviders, {'token': DwPushProviders.ruStore});
+    });
+
+    test('rejects a probe order naming an unconfigured provider', () {
+      expect(
+        () => DwPushProviderTransport.routed(
+          providers: {
+            DwPushProviders.fcm: _RecordingProvider(outcomesByTarget: const {}),
+          },
+          probeOrder: [DwPushProviders.ruStore],
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
 }
 
 final class _RecordingProvider implements DwPushProvider {
@@ -222,7 +405,10 @@ final class _PeakConcurrencyProvider implements DwPushProvider {
   }
 }
 
-DwPushDeliveryAttempt _attempt({required List<String> targets}) {
+DwPushDeliveryAttempt _attempt({
+  required List<String> targets,
+  Map<String, String> providersByToken = const {},
+}) {
   return DwPushDeliveryAttempt(
     deliveryId: 17,
     recipientId: 5,
@@ -236,7 +422,10 @@ DwPushDeliveryAttempt _attempt({required List<String> targets}) {
       data: {'course_id': '42'},
       expiresAt: DateTime.utc(2026, 7, 21, 12),
     ),
-    targets: targets,
+    targets: [
+      for (final token in targets)
+        DwPushTarget(token: token, provider: providersByToken[token]),
+    ],
   );
 }
 

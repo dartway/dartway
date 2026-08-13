@@ -435,6 +435,12 @@ ORDER BY classified."availableAt", classified."id"
         sendStarted = true;
         final transportResult = await _config.transport.send(session, attempt);
         _verifyTransportResult(attempt, transportResult);
+        await _rememberDiscoveredProviders(
+          session,
+          recipientId: delivery.recipientId,
+          result: transportResult,
+          transaction: transaction,
+        );
 
         if (transportResult.wasDelivered) {
           await DwPushDelivery.db.deleteRow(
@@ -639,12 +645,45 @@ WHERE "id" = @deliveryId
     expiresAt: message.expiresAt,
   );
 
+  /// Persists what a probing send found out, under the lock already held for
+  /// this recipient. Never fails the delivery: the cost of losing it is one
+  /// more probe next time.
+  Future<void> _rememberDiscoveredProviders(
+    Session session, {
+    required int recipientId,
+    required DwPushTransportResult result,
+    required Transaction transaction,
+  }) async {
+    final discovered = result.discoveredProviders;
+    if (discovered.isEmpty) return;
+    for (final entry in discovered.entries) {
+      try {
+        await _config.recipientResolver.rememberTargetProvider(
+          session,
+          recipientId: recipientId,
+          token: entry.key,
+          provider: entry.value,
+          transaction: transaction,
+        );
+      } catch (error, stackTrace) {
+        session.log(
+          'Failed to remember the push provider of a target '
+          '(${dwPushSafeExceptionCode(error)})',
+          level: LogLevel.warning,
+          stackTrace: stackTrace,
+        );
+      }
+    }
+  }
+
   void _verifyTransportResult(
     DwPushDeliveryAttempt attempt,
     DwPushTransportResult result,
   ) {
     const equality = SetEquality<String>();
-    final expected = attempt.targets.toSet();
+    final expected = attempt.targets
+        .map((target) => target.token)
+        .toSet();
     final actual = result.results.map((item) => item.target).toSet();
     if (!equality.equals(expected, actual)) {
       throw StateError(

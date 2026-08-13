@@ -1,0 +1,31 @@
+name: dartway_push_firebase
+description: "Firebase Cloud Messaging transport for DartWay push: tokens, permissions and notification taps on Android, iOS and web, behind the dw.plugins.push contract."
+version: 0.1.0
+repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, push, notifications, firebase, fcm]
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  dartway_push_flutter: ^0.1.0
+
+  firebase_core: ^3.13.1
+  firebase_messaging: ^15.2.5
+
+  # Only reached on web, where the service worker handles the click outside
+  # Flutter and hands the path back through postMessage.
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
