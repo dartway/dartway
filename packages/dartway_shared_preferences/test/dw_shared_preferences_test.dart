@@ -65,4 +65,92 @@ void main() {
     expect(container.read(theme), _Theme.dark);
     expect(prefs.raw.getString('theme'), 'dark');
   });
+
+  group('providerFamily', () {
+    test('two arguments keep separate values under separate keys', () async {
+      final sort = prefs.providerFamily<String, int>(
+        keyFor: (projectId) => 'project.$projectId.sort',
+        defaultValue: 'name',
+      );
+
+      await container.read(sort(1).notifier).update('createdAt');
+
+      expect(container.read(sort(1)), 'createdAt');
+      // The other project never heard about it — this is the whole point.
+      expect(container.read(sort(2)), 'name');
+
+      expect(prefs.raw.getString('project.1.sort'), 'createdAt');
+      expect(prefs.raw.getString('project.2.sort'), isNull);
+    });
+
+    test('the same argument resolves to one provider, shared by every reader',
+        () async {
+      final sort = prefs.providerFamily<String, int>(
+        keyFor: (projectId) => 'project.$projectId.sort',
+        defaultValue: 'name',
+      );
+
+      // Two separate calls with the same argument. Riverpod compares family
+      // providers by (family, argument), so the container holds one state
+      // behind both — the guarantee a loop over `provider` cannot give.
+      expect(sort(7), sort(7));
+      expect(container.read(sort(7).notifier), same(container.read(sort(7).notifier)));
+
+      await container.read(sort(7).notifier).update('createdAt');
+
+      // A second reader that resolved the family independently sees the write.
+      expect(container.read(sort(7)), 'createdAt');
+    });
+
+    test('reads a value already in storage instead of the default', () async {
+      SharedPreferences.setMockInitialValues({'project.3.sort': 'createdAt'});
+      prefs = DwSharedPreferences();
+      await prefs.init(dwInstance);
+
+      final sort = prefs.providerFamily<String, int>(
+        keyFor: (projectId) => 'project.$projectId.sort',
+        defaultValue: 'name',
+      );
+
+      expect(container.read(sort(3)), 'createdAt');
+      expect(container.read(sort(4)), 'name');
+    });
+  });
+
+  group('mappedProviderFamily', () {
+    test('two arguments keep separate values under separate keys', () async {
+      final theme = prefs.mappedProviderFamily<_Theme, String>(
+        keyFor: (section) => 'section.$section.theme',
+        mapFrom: (raw) => _Theme.values.byName(raw ?? 'system'),
+        mapTo: (mode) => mode.name,
+      );
+
+      await container.read(theme('billing').notifier).update(_Theme.dark);
+
+      expect(container.read(theme('billing')), _Theme.dark);
+      expect(container.read(theme('reports')), _Theme.system);
+
+      expect(prefs.raw.getString('section.billing.theme'), 'dark');
+      expect(prefs.raw.getString('section.reports.theme'), isNull);
+    });
+
+    test('the same argument resolves to one provider, shared by every reader',
+        () async {
+      final theme = prefs.mappedProviderFamily<_Theme, String>(
+        keyFor: (section) => 'section.$section.theme',
+        mapFrom: (raw) => _Theme.values.byName(raw ?? 'system'),
+        mapTo: (mode) => mode.name,
+      );
+
+      expect(theme('billing'), theme('billing'));
+      expect(
+        container.read(theme('billing').notifier),
+        same(container.read(theme('billing').notifier)),
+      );
+
+      await container.read(theme('billing').notifier).update(_Theme.dark);
+
+      expect(container.read(theme('billing')), _Theme.dark);
+    });
+  });
 }

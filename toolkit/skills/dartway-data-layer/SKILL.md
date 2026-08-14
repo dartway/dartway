@@ -8,7 +8,9 @@ description: >-
   narrowing by query via backendFilter, local filtering you do yourself with .where in the widget,
   actions from the UI via dw.action (unified error/loading handling), notifications via dw.notify.* (not SnackBar),
   the profile via ref.watchUserProfile/readUserProfile (getters, not CRUD), sign-out via
-  sessionProvider.notifier.signOut(). Use when working with data, actions, notifications,
+  sessionProvider.notifier.signOut(), local screen state that survives a restart via
+  dw.plugins.prefs (providerFamily/mappedProviderFamily when the value belongs to an entity).
+  Use when working with data, actions, notifications, local state,
   loading/saving models in Flutter features.
 ---
 
@@ -244,6 +246,53 @@ class FakeAudioControllerNotifier extends AudioControllerNotifier {
 }
 ```
 
+## 4b. Local screen state — two questions decide where it lives
+
+**Why:** "the sort order of this list", "is this panel collapsed", "which tab was open" is state
+too, and an app that answers the question differently in every feature ends up with three ways to
+store the same thing — chosen by copying the neighbouring file rather than by a rule. There are two
+questions, in this order.
+
+**1. Does the value survive a restart?** No — an ordinary `Notifier` (§4a), it is in-memory state
+like any other. Yes — `dw.plugins.prefs`, the local-storage plugin
+(`dartway_shared_preferences`, declared in `plugins:` next to the config). It gives back a riverpod
+provider, so persistence costs you no reactivity: the same `ref.watch`, and every reader on the
+screen sees the same value.
+
+**2. Does the value belong to an entity?** No (one setting for the whole app) — a constant key.
+Yes (one per project, per chat, per section) — the **family** form, where the key is built from the
+argument:
+
+```dart
+// ❌ a hand-rolled store: read in initState, re-read in didUpdateWidget, write on change
+class _SortStore { String read(int id) => ...; void write(int id, String v) => ...; }
+
+// ❌ provider() called per id: every call builds a *new* provider, and two over one key
+//    do not see each other's writes
+final p = dw.plugins.prefs.provider(key: 'project.$projectId.sort', defaultValue: 'name');
+
+// ✅ the family is the top-level `final`; riverpod holds one provider per argument value
+final projectSortProvider = dw.plugins.prefs.providerFamily<String, int>(
+  keyFor: (projectId) => 'project.$projectId.sort',
+  defaultValue: 'name',
+);
+
+// in the widget — an ordinary watch, and any other reader of the same id sees the same state
+final sort = ref.watch(projectSortProvider(project.id));
+ref.read(projectSortProvider(project.id).notifier).update('createdAt');
+```
+
+`mappedProviderFamily(keyFor:, mapFrom:, mapTo:)` is the same for enums and custom types, exactly as
+`mappedProvider` is to `provider`. Storage keys are namespaced by hand (`'project.$id.sort'`) —
+`keyFor` returns the whole key, so a prefix that says which feature owns it costs one string.
+
+**The hand-rolled store is the thing to stop writing.** A class with injected read/write over
+`dw.plugins.prefs.raw` plus a `StatefulWidget` that re-reads in `didUpdateWidget` is thirty lines
+that work — and have no subscribers. The state then lives in one widget's `State`, so a second
+reader (a counter in the header, a "reset" button in another panel) can only receive it through
+constructor arguments. `raw` is for a genuine one-off imperative read, not for state a screen
+watches.
+
 ## 5. Notifications — `dw.notify.*` (not `SnackBar`)
 
 **Why:** a single style of toasts/notifications across the whole app. Don't poke `ScaffoldMessenger`/`SnackBar`/custom popups.
@@ -399,6 +448,7 @@ Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size an
 - [ ] Narrowing by query — `backendFilter`; local filtering you do yourself with `.where` in the widget (the framework doesn't provide it).
 - [ ] Actions from the UI — `dw.action((context) async {...})`, not a raw `onPressed`/`() async {}`.
 - [ ] Notifications — `dw.notify.success/warning/error/info`, not `SnackBar`/`ScaffoldMessenger`.
+- [ ] Local screen state — survives a restart? `dw.plugins.prefs`, not a store over `raw`. Belongs to an entity? `providerFamily(keyFor:)`, not `provider` per id.
 - [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`. Signed out is a legal answer, or you want `.select` — `dw.userProfileProvider` / `dw.requireUserProfileProvider`. Only the id — `dw.signedInUserIdProvider`.
 - [ ] Sign-out — `ref.read(dw.sessionProvider!.notifier).signOut()`.
 - [ ] Must **another** user see the update? `dw.repo.modelList` doesn't do that by itself — `broadcastTo` in the config (public), a channel with the group id (group), `sendUpdatesToUser` (private).

@@ -1,5 +1,6 @@
 import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'logic/mapped_pref_notifier.dart';
@@ -28,6 +29,17 @@ typedef DwPrefProvider<T> = NotifierProvider<PrefNotifier<T>, T>;
 typedef DwMappedPrefProvider<T> =
     NotifierProvider<MappedPrefNotifier<T>, T>;
 
+/// What [DwSharedPreferences.providerFamily] returns — see [DwPrefProvider] for
+/// why the plugin names its own return types. Call it with an [Arg] to get a
+/// [DwPrefProvider] over the key that argument maps to.
+typedef DwPrefProviderFamily<T, Arg> =
+    NotifierProviderFamily<PrefNotifier<T>, T, Arg>;
+
+/// What [DwSharedPreferences.mappedProviderFamily] returns — see
+/// [DwPrefProviderFamily].
+typedef DwMappedPrefProviderFamily<T, Arg> =
+    NotifierProviderFamily<MappedPrefNotifier<T>, T, Arg>;
+
 /// The shared-preferences plugin: a reactive wrapper over [SharedPreferences].
 /// Declare it at startup, then reach it as `dw.plugins.prefs`:
 ///
@@ -50,6 +62,21 @@ typedef DwMappedPrefProvider<T> =
 ///
 /// // one-off imperative read, no provider:
 /// final token = dw.plugins.prefs.raw.getString('token');
+/// ```
+///
+/// When the key depends on an entity — one value per project, per chat, per
+/// user — reach for [providerFamily] / [mappedProviderFamily] instead of
+/// calling [provider] per id. The family is the top-level `final`; riverpod
+/// then holds one provider per argument value, which is exactly the guarantee
+/// a loop over [provider] cannot give you.
+///
+/// ```dart
+/// final projectSortProvider = dw.plugins.prefs.providerFamily<String, int>(
+///   keyFor: (projectId) => 'project.$projectId.sort',
+///   defaultValue: 'name',
+/// );
+///
+/// ref.watch(projectSortProvider(project.id));
 /// ```
 class DwSharedPreferences extends DwPlugin {
   DwSharedPreferences();
@@ -92,6 +119,66 @@ class DwSharedPreferences extends DwPlugin {
   }) {
     return NotifierProvider<MappedPrefNotifier<T>, T>(() {
       return MappedPrefNotifier<T>(raw, key, mapFrom, mapTo);
+    });
+  }
+
+  /// [provider], but the key is built per argument — for a value that belongs
+  /// to an entity rather than to the app: a sort order per project, a collapsed
+  /// flag per section, a draft per chat.
+  ///
+  /// [keyFor] turns the argument into the storage key; everything else matches
+  /// [provider], including the natively-stored types and the [UnsupportedError]
+  /// any other `T` throws on the first write.
+  ///
+  /// **This is what makes per-entity state safe.** Calling [provider] once per
+  /// id hits the hazard the class doc warns about — two providers over one key,
+  /// blind to each other's writes. A family is declared once and riverpod keeps
+  /// a single provider per argument value, so every reader of `family(id)` sees
+  /// the same state. Declare the *family* as a top-level `final`; calling it
+  /// with an argument inside `build` is the intended use.
+  ///
+  /// ```dart
+  /// final projectSortProvider = dw.plugins.prefs.providerFamily<String, int>(
+  ///   keyFor: (projectId) => 'project.$projectId.sort',
+  ///   defaultValue: 'name',
+  /// );
+  ///
+  /// final sort = ref.watch(projectSortProvider(project.id));
+  /// ref.read(projectSortProvider(project.id).notifier).update('createdAt');
+  /// ```
+  ///
+  /// [Arg] must be a value riverpod can compare — a `String`, an `int`, or any
+  /// type with `==` and `hashCode`. Two arguments that are `==` share one
+  /// provider; two that are not get one each, and their keys must differ too,
+  /// which is [keyFor]'s job.
+  DwPrefProviderFamily<T, Arg> providerFamily<T, Arg>({
+    required String Function(Arg arg) keyFor,
+    required T defaultValue,
+  }) {
+    return NotifierProvider.family<PrefNotifier<T>, T, Arg>((arg) {
+      return PrefNotifier<T>(raw, keyFor(arg), defaultValue);
+    });
+  }
+
+  /// [mappedProvider], but the key is built per argument — the enum-and-custom-
+  /// type half of [providerFamily], whose doc explains why a family is the
+  /// right tool for per-entity state.
+  ///
+  /// ```dart
+  /// final projectViewProvider =
+  ///     dw.plugins.prefs.mappedProviderFamily<ProjectView, int>(
+  ///       keyFor: (projectId) => 'project.$projectId.view',
+  ///       mapFrom: (raw) => ProjectView.values.byName(raw ?? 'list'),
+  ///       mapTo: (view) => view.name,
+  ///     );
+  /// ```
+  DwMappedPrefProviderFamily<T, Arg> mappedProviderFamily<T, Arg>({
+    required String Function(Arg arg) keyFor,
+    required T Function(String?) mapFrom,
+    required String Function(T) mapTo,
+  }) {
+    return NotifierProvider.family<MappedPrefNotifier<T>, T, Arg>((arg) {
+      return MappedPrefNotifier<T>(raw, keyFor(arg), mapFrom, mapTo);
     });
   }
 }
