@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
 
 import {
+  looksLikeStudioBridgeToken,
   studioSignedAccessValidator,
   studioSigningPublicKey,
   verifyStudioBridgeToken,
@@ -284,6 +285,42 @@ function captureConsole(): { messages: string[]; restore: () => void } {
     },
   };
 }
+
+describe('looksLikeStudioBridgeToken', () => {
+  test('recognises the shape of a real token', () => {
+    assert.equal(looksLikeStudioBridgeToken(validToken), true);
+  });
+
+  test('recognises an expired, foreign or forged one just the same — shape is all it reads', async () => {
+    const expired = await signToken({
+      signingKey: studioKeyPair.privateKey,
+      origin: 'https://someone-else.example.com',
+      expiresAt: new Date(Date.now() - 24 * 3600 * 1000),
+    });
+    assert.equal(looksLikeStudioBridgeToken(expired), true);
+    assert.equal(
+      await verifyStudioBridgeToken(expired, { appOrigin, publicKey: studioPublicKey }),
+      false,
+      'shape must never be mistaken for validity',
+    );
+  });
+
+  test('turns down anything that is not a token', () => {
+    const notTokens = [
+      '', // nothing presented at all
+      'not-a-token', // no segments
+      'a.b.c', // three of them
+      'aGk=.###', // a segment that is not base64url
+      'not.atoken', // two segments, neither one base64url json
+      'e30.AAAA', // a payload that parses, claiming nothing
+      '.AAAA', // an empty payload segment
+      'eyJvcmlnaW4iOiJodHRwczovL2EuYiJ9.AAAA', // origin, no expiry
+    ];
+    for (const value of notTokens) {
+      assert.equal(looksLikeStudioBridgeToken(value), false, `took "${value}" for a token`);
+    }
+  });
+});
 
 describe('studioSignedAccessValidator', () => {
   test('lets a valid token in and keeps everything else out', async () => {

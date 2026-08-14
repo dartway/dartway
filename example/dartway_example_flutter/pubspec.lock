@@ -327,7 +327,7 @@ packages:
       path: "../../packages/dartway_studio_bridge"
       relative: true
     source: path
-    version: "0.7.1"
+    version: "0.8.0"
   dbus:
     dependency: transitive
     description:

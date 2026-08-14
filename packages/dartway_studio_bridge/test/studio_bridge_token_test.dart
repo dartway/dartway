@@ -180,6 +180,51 @@ void main() {
     });
   });
 
+  group('looksLikeStudioBridgeToken', () {
+    test('recognises the shape of a real token', () async {
+      expect(looksLikeStudioBridgeToken(validToken), isTrue);
+    });
+
+    test('recognises one that is expired, foreign or forged just the same — '
+        'shape is all it reads', () async {
+      final expired = await _signToken(
+        signingKeyPair: studioKeyPair,
+        origin: 'https://someone-else.example.com',
+        expiresAt: DateTime.now().subtract(const Duration(days: 1)),
+      );
+      expect(looksLikeStudioBridgeToken(expired), isTrue);
+      expect(
+        await verifyStudioBridgeToken(
+          expired,
+          appOrigin: appOrigin,
+          publicKey: studioPublicKey,
+        ),
+        isFalse,
+        reason: 'shape must never be mistaken for validity',
+      );
+    });
+
+    test('turns down anything that is not a token', () {
+      const notTokens = [
+        '', // nothing presented at all
+        'not-a-token', // no segments
+        'a.b.c', // three of them
+        'aGk=.###', // a segment that is not base64url
+        'not.atoken', // two segments, neither one base64url json
+        'e30.AAAA', // a payload that parses, claiming nothing
+        '.AAAA', // an empty payload segment
+        'eyJvcmlnaW4iOiJodHRwczovL2EuYiJ9.AAAA', // origin, no expiry
+      ];
+      for (final value in notTokens) {
+        expect(
+          looksLikeStudioBridgeToken(value),
+          isFalse,
+          reason: 'took "$value" for a token',
+        );
+      }
+    });
+  });
+
   group('studioSignedAccessValidator', () {
     test('lets a valid token in and keeps everything else out', () async {
       final validator = studioSignedAccessValidator(

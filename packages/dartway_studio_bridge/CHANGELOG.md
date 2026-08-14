@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.8.0
+
+**The bridge can be asked whether it is there, and it can say no.** Two halves
+of one gap: there was no way to put the question without building a live
+preview, and no way to tell "this build carries no bridge" from "your signature
+was refused". Both came out as the same thing — an empty frame.
+
+**`probeStudioBridge(appUrl: …)` — one handshake and nothing else.** It answers
+with a `StudioHandshakeResult`:
+
+- `accepted` — the app answered and took the token;
+- `rejected` — the app answered and refused it (new, see below);
+- `silent` — nobody answered inside the timeout.
+
+The frame is opened and closed inside the call. That is the point of it:
+`StudioFrameController` hands out a *platform view*, so its iframe loads nothing
+until the embedder lays it out — a detached iframe never fetches its `src`, and
+no load means no handshake. Asking the question through the preview's own
+machinery therefore cost a 1×1 frame parked on screen for the lifetime of the
+app, which could be neither hidden nor moved off the viewport. The probe appends
+its own hidden container to the document instead, outside the widget tree, and
+takes it away again on the answer or on the timeout.
+
+`silent` is honestly several outcomes at once — no bridge in the build, a page
+that never loaded, a deployment that forbids being framed, or an older app
+refusing in silence. Cross-origin those are one silence and always will be; the
+distinctions come from checks made *before* the probe (is the page served? does
+it allow `frame-ancestors`?), and the doc comment says so, so nobody waits for
+`silent` to get sharper.
+
+Split in two so that the interesting half is testable: `runStudioHandshake`
+(the state machine, over any `StudioMessageChannel`) and `StudioProbeFrame` (the
+web element's lifecycle). All three outcomes are covered by tests; only the DOM
+is not, as with the other two transports.
+
+**A refused handshake gets an answer: `ConnectRefusedMessage`.** The host used
+to stay silent on refusal, deliberately — but that left the person connecting a
+project unable to tell a missing bridge from a stale key, which are two entirely
+different repairs.
+
+It is answered **only when the presented token parses as a signed Studio token**
+(`looksLikeStudioBridgeToken`) and then fails the check. An empty, absent or
+garbled token is still met with silence, so a stranger who guessed the preview
+URL does not learn that there is a bridge here. Studio signs correctly by
+construction, so what it gets back means "your signature is stale or your key is
+wrong". The zero-config local-dev mode accepts everyone and therefore refuses
+nobody.
+
+**No protocol version bump — 4 stays 4, and this is deliberate.** The version is
+checked strictly on decode, so bumping it would silence every build in the field
+in *both* directions the moment it shipped. A new message *type* is additive
+instead: an app that predates it never sends it, a probe reads that as `silent`
+— exactly what it read before — and a newer app hands back a diagnosis. The
+constant carries a note saying so; do not "fix" the version on this message's
+account.
+
+The same message and the same refusal rule ship in `@dartway/studio-bridge`
+0.2.0, held to this implementation by an identical golden wire string in both
+packages' tests.
+
 ## 0.7.1
 
 **The access gate now covers every command, which is what this package has been

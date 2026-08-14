@@ -23,5 +23,7 @@ export 'src/host/studio_bridge_host.dart';
 // Studio side.
 export 'src/client/studio_bridge_client.dart';
 export 'src/client/studio_bridge_event.dart';
+export 'src/client/studio_handshake_probe.dart';
 export 'src/transport/client/studio_frame_controller.dart';
+export 'src/transport/client/studio_probe_frame.dart';
 export 'src/transport/studio_message_channel.dart';

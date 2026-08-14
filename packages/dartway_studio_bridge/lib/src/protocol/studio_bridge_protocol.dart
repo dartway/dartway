@@ -13,6 +13,13 @@ abstract final class StudioBridgeProtocol {
   /// v4: `studioConnect` presents a short-lived `accessToken` — signed by
   /// Studio, issued for the app's own origin — instead of the shared
   /// per-project secret (`accessKey`) it used to carry.
+  ///
+  /// **Adding a message type is not a schema change and must not bump this.**
+  /// The version is checked strictly on decode, so a bump silences every build
+  /// already in the field, in both directions, the moment it ships. A new type
+  /// costs nothing instead: an old side drops the envelope it does not
+  /// recognise and carries on, which is how [connectRefused] arrived inside
+  /// v4. Bump only when the *meaning* of an existing message changes.
   static const version = 4;
 
   /// Envelope marker key carrying [version].
@@ -29,6 +36,11 @@ abstract final class StudioBridgeProtocol {
   static const featuresChanged = 'featuresChanged';
   static const localeChanged = 'localeChanged';
   static const inspectPointResult = 'inspectPointResult';
+
+  /// The refusal of a handshake: the app heard [studioConnect], understood the
+  /// token it carried, and would not accept it. Added *inside* version 4 — see
+  /// [version] for why adding a type is not a schema change.
+  static const connectRefused = 'connectRefused';
 
   // Studio → app.
   static const studioConnect = 'studioConnect';

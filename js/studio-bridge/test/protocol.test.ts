@@ -22,6 +22,17 @@ describe('the wire format matches the Dart implementation byte for byte', () => 
     );
   });
 
+  test('connectRefused', () => {
+    // The same string, character for character, as the golden in
+    // `packages/dartway_studio_bridge/test/studio_bridge_message_test.dart`.
+    // Note the envelope still says 4: a new message type is additive, and
+    // bumping the version would cut off every build in the field instead.
+    assert.equal(
+      encodeStudioBridgeMessage({ type: 'connectRefused' }),
+      '{"dartwayStudioBridge":4,"type":"connectRefused","payload":{}}',
+    );
+  });
+
   test('manifest — the handshake response', () => {
     assert.equal(
       encodeStudioBridgeMessage({
@@ -250,6 +261,10 @@ describe('decoding rejects foreign and malformed input', () => {
   });
 
   test('unknown message type', () => {
+    // Also the reason the protocol version stayed at 4 when `connectRefused`
+    // was added: an unknown *type* is dropped here, exactly as it would be on a
+    // build that predates the message — whereas an unknown *version* drops
+    // every message, in both directions, for every build in the field.
     assert.equal(
       decodeStudioBridgeMessage(
         `{"dartwayStudioBridge":${studioBridgeProtocol.version},"type":"bogus","payload":{}}`,
@@ -267,6 +282,7 @@ describe('decoding rejects foreign and malformed input', () => {
 test('every message type survives a round trip', () => {
   const messages: StudioBridgeMessage[] = [
     { type: 'appReady' },
+    { type: 'connectRefused' },
     { type: 'routeChanged', path: '/ad/1', routeName: 'adDetail' },
     { type: 'sessionChanged', session: { isSignedIn: true, userIdentifier: '1', isBusy: false } },
     {

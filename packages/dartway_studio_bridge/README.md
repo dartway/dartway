@@ -150,8 +150,16 @@ origin of the first valid Studio message for its replies.
 ## Access control
 
 The `studioConnect` handshake carries an `accessToken`; the host answers with
-its manifest only if `validateAccessToken` accepts it, otherwise it stays
-silent (Studio shows "not connected"). The gate covers every command, not just
+its manifest only if `validateAccessToken` accepts it. A refusal is answered
+with `ConnectRefusedMessage` — but **only when the token was a token**: it has
+to parse as a signed Studio token (`looksLikeStudioBridgeToken`) and then fail
+the check. An empty, absent or garbled one is met with silence as before, so a
+stranger who guessed the preview's URL learns nothing, while a Studio — which
+signs correctly by construction — is told that its signature is stale rather
+than left guessing whether the app has a bridge at all. A build in the
+zero-config mode accepts everyone and so refuses nobody.
+
+The gate covers every command, not just
 the manifest — otherwise an embedding page could walk the app through its
 screens without presenting anything. It covers the app's own reports too
 (`reportRoute`, `reportSession`, `reportLocale`, `reportFeatures`): they are
@@ -204,3 +212,35 @@ client.requestLocale('ru');
 
 The handshake is dual-initiated and survives reloads and hot restarts of either
 side. Protocol details live in `StudioBridgeProtocol`.
+
+## Asking one question (Studio side)
+
+Sometimes the question is not "preview this app" but "does this URL answer at
+all". `probeStudioBridge` performs a single handshake and returns what came
+back:
+
+```dart
+final result = await probeStudioBridge(
+  appUrl: 'https://feature-x.preview.example.com/',
+  accessToken: () => myTokenCache.tokenFor(project),
+);
+// accepted — the app took the token
+// rejected — the app answered and refused it: a stale signature or a foreign key
+// silent   — nobody answered inside the timeout
+```
+
+The frame is created and removed inside the call: nothing to render, nothing to
+hold on to. `StudioFrameController` cannot serve this — it hands out a platform
+view, so its iframe is not in the document until the embedder lays it out, and a
+detached iframe never fetches its `src`. No layout, no load, no handshake; the
+frame has to be *somewhere* on screen for the question to be asked at all. The
+probe owns its element instead, in a hidden container outside the widget tree.
+
+`silent` is several answers at once — no bridge in the build, a page that never
+loaded, a deployment that refuses to be framed, an older app refusing without a
+word. Cross-origin those cannot be told apart from here, and they never will be.
+Check that the URL serves a page, and that it permits `frame-ancestors`, as
+separate steps before this one.
+
+`runStudioHandshake(channel)` is the same state machine over a channel you
+already own — what the probe is with the frame taken out of it.

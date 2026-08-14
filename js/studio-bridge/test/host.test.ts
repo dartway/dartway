@@ -168,7 +168,7 @@ describe('the handshake', () => {
     host?.detach();
   });
 
-  test('a token issued for someone else gets nothing at all', async () => {
+  test('a token issued for someone else gets no manifest', async () => {
     const studio = new FakeStudio();
     const host = attachStudioBridge({
       manifest,
@@ -188,7 +188,7 @@ describe('the handshake', () => {
     host?.detach();
   });
 
-  test('an expired token gets nothing at all', async () => {
+  test('an expired token gets no manifest', async () => {
     const studio = new FakeStudio();
     const host = attachStudioBridge({
       manifest,
@@ -205,6 +205,63 @@ describe('the handshake', () => {
 
     assert.deepEqual(studio.of('manifest'), []);
     assert.equal(host?.isConnected, false);
+    host?.detach();
+  });
+
+  test('a refused token is told so — Studio signs correctly, so a refusal it can read means its signature is stale', async () => {
+    const studio = new FakeStudio();
+    const host = attachStudioBridge({
+      manifest,
+      appOrigin,
+      publicKey: studioPublicKey,
+      transport: studio,
+    });
+
+    studio.say({
+      type: 'studioConnect',
+      accessToken: await tokenFor(appOrigin, new Date(Date.now() - 1000)),
+    });
+    await waitFor(() => studio.of('connectRefused').length === 1, 'the refusal');
+
+    // Being answered is not being let in.
+    assert.equal(host?.isConnected, false);
+    studio.say({ type: 'navigateRequest', path: '/admin' });
+    await settle();
+    assert.deepEqual(studio.of('manifest'), []);
+    host?.detach();
+  });
+
+  test('anything that is not a token is met with silence, so a stranger who guessed the URL learns nothing', async () => {
+    const studio = new FakeStudio();
+    const host = attachStudioBridge({
+      manifest,
+      appOrigin,
+      publicKey: studioPublicKey,
+      transport: studio,
+    });
+
+    for (const accessToken of ['', 'forged', 'not.atoken', 'e30.AAAA']) {
+      studio.say({ type: 'studioConnect', accessToken });
+    }
+    await settle();
+
+    assert.deepEqual(studio.heard, [{ type: 'appReady' }]);
+    assert.equal(host?.isConnected, false);
+    host?.detach();
+  });
+
+  test('the zero-config mode refuses nobody, so it answers no refusals', async () => {
+    const studio = new FakeStudio();
+    const host = attachStudioBridge({ manifest, transport: studio });
+
+    studio.say({ type: 'studioConnect', accessToken: 'not.atoken' });
+    studio.say({
+      type: 'studioConnect',
+      accessToken: await tokenFor('https://someone-else.example.com', new Date(Date.now() - 1000)),
+    });
+    await waitFor(() => studio.of('manifest').length === 2, 'the manifests');
+
+    assert.deepEqual(studio.of('connectRefused'), []);
     host?.detach();
   });
 
