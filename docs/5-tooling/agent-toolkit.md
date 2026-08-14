@@ -77,6 +77,17 @@ that can be fixed in the installed copy, and all of it is worth keeping: the rul
 proven wrong by real code. The journal is where such findings wait to be carried into the monorepo,
 and `dartway-finish` lists the open ones at the end of a task so they do not just accumulate.
 
+One kind of finding needs a second half, in the code. A workaround over a `dartway_*` API is written
+down as an entry *and* marked where it lives — `// TODO(dartway, checked: 518ae6d): …`, naming the
+framework version it was last confirmed against. The reason is that the entry alone answers the
+wrong question: it says the workaround exists, never that it is still needed, and the framework
+moves while the code does not. A real one outlived its fix by weeks on a project already pinned past
+it, and it was not an idle duplicate — it threw where the framework had chosen to degrade softly,
+so the app died on an offline start. `dartway-finish` compares `checked:` against the version
+resolved in `pubspec.lock` and raises the marker **only** when they have diverged, which is the only
+moment the answer can have changed; `/dartway-checkup` runs the same comparison across the whole
+project, for the workarounds no task has touched.
+
 ## The skills
 
 The lifecycle of a task runs left to right: `dartway-requirements` → `dartway-plan` →
