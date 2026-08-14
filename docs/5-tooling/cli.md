@@ -106,6 +106,12 @@ What the copy does beyond copying:
   overrides point at sibling folders that do not exist in your project, and what is left resolves
   from pub.dev like any other dependency.
 
+Stripping that block is also the moment the framework constraints are read for the first time,
+because **an overridden package has its constraints skipped entirely** — see
+[what `create` changes](../1-getting-started/project-layout.md#what-create-changes-on-the-way-in).
+Your project is where they finally have to hold, so if a `dartway create` fails to resolve, the
+version line it names is the answer rather than a mystery.
+
 The project name must be a lower_snake_case Dart identifier — it becomes three package names. The
 target directory must not exist yet; `create` refuses rather than merging into it.
 

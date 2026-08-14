@@ -44,7 +44,7 @@ dependencies:
 
   dartway_serverpod_core_flutter: ^0.7.0
 
-  dartway_studio_bridge: ^0.6.0
+  dartway_studio_bridge: ^0.7.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -62,7 +62,7 @@ dev_dependencies:
     sdk: flutter
 
 
-  dartway_cli: ^0.4.0
+  dartway_cli: ^0.7.0
 
   # The UI-kit law is enforced here, not just written down: raw Color/TextStyle/
   # BorderRadius and direct theme access outside `ui_kit/` are lints. Needs

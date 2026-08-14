@@ -106,6 +106,7 @@ commit over a 210-line file is a check people disable.
 | `uiKitPartMissing` | error | A kit file without `part of '../ui_kit.dart'` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, or a fixed name that is missing |
+| `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `invalidFeatureStructure` | error | A feature folder with more than one root file |
 | `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
 | `featureSpecMissing` | warning | A feature widget that declares no `DwFeatureSpec` |
@@ -159,9 +160,26 @@ handler nobody calls still calls its own settings, so the sweep repeats until a 
 What it cannot see: a reference made through a string, and a file whose own halves only reference
 each other.
 
+**`frameworkRefsDiverged`** (warning) is the one check that reads no Dart at all. A project that
+consumes DartWay by git writes `ref: master` on every framework package, which reads as "all of it
+from master" and is not what the lock does: a git dependency is pinned to a commit the moment it is
+*added*, and stays there until something upgrades it by name. Add the core in March and the push
+module in May and the app runs two framework releases against each other — and a git dependency
+carries no version number, so nothing in the project says so. The check groups the `dartway_*` git
+entries of every `pubspec.lock` under the project root by repository, and reports a repository that
+came out on more than one commit, naming the packages, the commits and the directories to run
+`dart pub upgrade` in. Different repositories are never compared, and hosted packages are left out
+because semver already answers the question for them.
+
+It is a warning because the state is wrong while the code is not, and because what fixes it is a
+command rather than an edit. The related trap on the framework side — a `dependency_overrides` block
+switching off constraint checking for the packages it names — is described in
+[what `create` changes](../1-getting-started/project-layout.md#what-create-changes-on-the-way-in).
+
 Filter with `--type <name>` or `--level error|warning|info`, or narrow the run to a single folder
 with `--dir lib/app/booking`. Note that `--dir` skips the `ui_kit/` pass — the kit is checked as a
-whole or not at all.
+whole or not at all, and for the same reason it skips the layout, generated-format and
+framework-lock passes, which judge the project rather than any one folder.
 
 Scope, and it is two scopes rather than one. The **feature-shaped** areas are the four zones —
 `app/`, `admin/`, `auth/`, `common/` — which must be built out of features and are asked for a
