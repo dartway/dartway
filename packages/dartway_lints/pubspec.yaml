@@ -1,6 +1,6 @@
 name: dartway_lints
-description: "Custom lint rules enforcing DartWay conventions: the UI kit as the single source of styles, relative imports kept short, and ProviderScope left to the app bootstrap and tests."
-version: 0.2.0
+description: "Custom lint rules enforcing DartWay conventions: the UI kit as the single source of styles, relative imports kept short, ProviderScope left to the app bootstrap and tests, and a stored model rebuilt with copyWith rather than field by field."
+version: 0.3.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

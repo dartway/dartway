@@ -40,6 +40,8 @@ await dw.repo.deleteModel(post);
 
 **Reads are the `dw.repo.model/maybeModel/modelList` providers under the native `ref`; writes are the `dw.repo.saveModel/deleteModel` methods.** No `ref.watchModel` and no `DwRepository.` — the single data access point is `dw.repo`. `model` throws a `StateError` if the model is missing; `maybeModel` returns `null`. A forced fetch is `ref.refresh(dw.repo.maybeModel(...).future)` (the fetching provider). **Create and Update are one `saveModel`** (the CRUD law).
 
+**What you hand to `saveModel` is a `copyWith`, not a rebuilt model.** `saveModel(SessionBooking(id: booking.id, …))` compiles today and silently resets tomorrow's field to its default — `default=` and nullable make those constructor arguments optional. See `dartway-clean-code` §1.10; `model_rebuild_by_constructor` (`dartway_lints`, warning) flags it in the editor.
+
 ## 2. Lists — through `dwBuildListAsync`
 
 **Why:** a single render of `AsyncValue<List<T>>` with skeletons on loading and error handling — without a scattering of `when(loading/error/data)`.

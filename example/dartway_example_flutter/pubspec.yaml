@@ -69,7 +69,7 @@ dev_dependencies:
   # `analyzer: plugins: [custom_lint]` in analysis_options.yaml, and runs in the
   # IDE and via `dart run custom_lint`.
   custom_lint: ^0.8.0
-  dartway_lints: ^0.2.0
+  dartway_lints: ^0.3.0
 
 # Inside the monorepo the example builds against the LOCAL framework packages.
 # Copied out into a standalone project — drop the whole dependency_overrides block.

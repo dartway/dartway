@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.0
+
+`model_rebuild_by_constructor`: a Serverpod model constructor called with a non-null `id:` is a
+warning. A row being created never passes an id — it comes back from the database — so the call is
+rebuilding a row that already exists, and rebuilding is what `copyWith` is for.
+
+The rule exists because the bug it catches is invisible by construction. Serverpod makes a field with
+`default=`, and any nullable field, an *optional* argument. A method that rebuilds a model by naming
+its fields therefore keeps compiling when a field is added to the model, and silently substitutes the
+default for it. One project reset a `priority` field to `medium` on every single edit of the record
+it belonged to — the agent's draft, the manual correction, the approval — and the discrepancy
+surfaced in an audit rather than in a test. The method carried an honest doc comment asking for the
+opposite; the field was added by another task that never opened that file, which is what a rule
+living in a comment at the far end of the system is worth.
+
+The ban takes nothing away. The one reason to rebuild by hand — "`copyWith` reads null as *not
+passed*, and I need to clear a nullable field" — is not true of the generated one: it takes
+`Object? field = _Undefined` and tests `field is T? ? field : this.field`, so passing `null` clears
+the field and omitting it keeps the value.
+
+Matched through `SerializableModel` rather than through `TableRow`: on the server a generated model
+implements both, but the client half implements only the former — and the client half is what an
+application is written against, in the one package where these lints are configured to run. Serverpod's
+own output (`lib/src/protocol/`, `lib/src/generated/`) is skipped, as is `// ignore`d code: the
+framework's skeleton mocks in `core/default_models.dart` are invented from nothing with a synthetic
+id, which is the one hand-built instance a DartWay app legitimately has.
+
 ## 0.2.0
 
 `forbidden_provider_scope`: writing a `ProviderScope` in application code is a warning. The only one

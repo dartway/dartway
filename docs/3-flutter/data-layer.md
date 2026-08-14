@@ -237,6 +237,12 @@ persisted model, so post-processing (computed fields, timestamps) comes back to 
 returns `true` when nothing is left on the server; a model that was never persisted returns `true`
 without a round trip.
 
+The `copyWith` above is not a style choice. Rebuilding an existing row by naming its fields —
+`SessionBooking(id: booking.id, …)` — is how a field added later gets silently reset to its default
+on every save, and `model_rebuild_by_constructor` (`dartway_lints`) warns about it. The reasoning,
+and why clearing a nullable field is `copyWith`'s job too, is in
+[models](../2-core/models.md#an-existing-row-is-rebuilt-with-copywith-never-field-by-field).
+
 Both dispatch the server's `updatedModels` into every open watcher of that type, which is why a
 booking cancelled from a card updates the list behind it with no refresh code anywhere. That
 reactivity covers **your own writes**. Another user's write reaching your screen is a server-side

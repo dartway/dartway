@@ -22,6 +22,10 @@ dependencies:
   # For the forbidden_provider_scope fixtures: the rule matches ProviderScope by
   # name, but a fixture that cannot compile proves nothing about real code.
   flutter_riverpod: ^3.0.0
+  # For the model_rebuild_by_constructor fixtures: that rule matches by *type*,
+  # walking up to `SerializableModel`, so the real interface has to be there —
+  # a locally declared look-alike would prove the opposite of what is wanted.
+  serverpod_client: ^3.4.11
 
 dev_dependencies:
   custom_lint: ^0.8.0

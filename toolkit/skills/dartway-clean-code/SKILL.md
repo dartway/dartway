@@ -7,7 +7,8 @@ description: >-
   responsibility, not by line count), never pass BuildContext or WidgetRef as params, no _buildXxx()
   widget-returning methods, no ref.invalidate, no GlobalKey tree lookups, no
   outer padding/margin inside a widget, no private widget classes in public
-  feature files; plus SOLID, KISS, DRY, YAGNI, Law of Demeter, composition over
+  feature files, a Serverpod model rebuilt with copyWith and never by listing
+  its fields; plus SOLID, KISS, DRY, YAGNI, Law of Demeter, composition over
   inheritance, separation of concerns, fail-fast, tell-don't-ask, single source
   of truth, and tests for complex features / non-trivial bugfixes.
 ---
@@ -372,6 +373,74 @@ The sign that gives a pass-through away at the door: its only import is `ui_kit.
 
 **If such a widget really is needed by many** (the same wrapper in five places) — that is no reason to breed a pass-through in the feature, it is a reason to add a **constructor in the kit** (`ChatCardContainer.bottomSheetSurface`): the meaning moves to where the look lives.
 
+## 1.10 A Serverpod model is rebuilt with `copyWith` only
+
+**Why:** calling the generated constructor and listing the fields is for **creating a new row**. A field
+with `default=`, and any nullable field, is an **optional argument** — so a field you forget is not a
+compile error, it is a silent substitution of the default.
+
+That is not a hypothetical. In a real project a `priority` field was reset to `medium` on **every**
+edit of the record it belonged to — the agent's draft, the manual correction, the approval of the
+requirements — because one method rebuilt the model by naming its fields and the field had been added
+after that method was written. Priority is what the backlog is sorted by. Neither the compiler, nor a
+test, nor a review can see this.
+
+```dart
+// ❌ a rebuild by naming the fields — `priority` is not in the list, so it silently becomes the default
+Future<void> approve(FeatureRequest request) => repository.save(FeatureRequest(
+      id: request.id,
+      title: request.title,
+      description: request.description,
+      status: RequestStatus.approved,
+    ));
+
+// ✅ copyWith — a field nobody touched keeps its value, whatever fields the model grows later
+Future<void> approve(FeatureRequest request) =>
+    repository.save(request.copyWith(status: RequestStatus.approved));
+```
+
+**The ban takes nothing away.** The one reason to reach for a field-by-field rebuild — "I need to
+clear a nullable field, and `copyWith` treats null as *not passed*" — does not hold for a generated
+Serverpod `copyWith`: it takes `Object? field = _Undefined` and tests `field is T? ? field : this.field`.
+Pass `null` explicitly and the field is cleared; leave it out and it is kept.
+
+```dart
+// ✅ clearing a field is copyWith's job too
+request.copyWith(assigneeProfileId: null);
+```
+
+**`model_rebuild_by_constructor`** (`dartway_lints`, warning) says this in the editor: a constructor
+call on a Serverpod model that is passed a non-null `id:` is a rebuild, because a row being created
+never carries an id — it comes back from the database. The one legitimate exception in a DartWay app
+is `core/default_models.dart`, where mock instances are invented from nothing with a synthetic id;
+it carries an `// ignore_for_file:` that says so.
+
+**A doc comment is not a rule.** The method in that project had an honest request written above it —
+*"anything added to the model belongs here too"* — and it changed nothing, because the field was
+added by a different task that never opened that file. A rule that lives in a comment at the other
+end of the system does not exist.
+
+**The same failure, one level up: an enumeration written out by hand.** If a field-by-field pass over
+something really is unavoidable, build it by **iterating the values**, not by listing them — then a
+new member arrives everywhere on its own.
+
+```dart
+// ❌ a hand-written list — a new BookingStatus is added, and this bar quietly stops showing it
+final filters = [
+  BookingFilterChip(status: BookingStatus.pending),
+  BookingFilterChip(status: BookingStatus.confirmed),
+];
+
+// ✅ driven by the enum — the new value is there the moment it is declared
+final filters = [
+  for (final status in BookingStatus.values) BookingFilterChip(status: status),
+];
+```
+
+Where a per-value *decision* is needed rather than a uniform pass, the tool is an exhaustive
+`switch` **without a `default:`** — Dart then makes the missing branch a compile error. A map literal
+or an `if`/`else if` chain over the same values gives you nothing.
+
 ---
 
 # Part 2. Clean code principles
@@ -622,6 +691,7 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** outer `padding`/`margin` inside a widget — the parent sets the padding (§1.7). When refactoring someone else's widget the outer padding moves to the caller instead of being "kept as it was".
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
 - [ ] **No** private widget classes (`_Foo`) in public feature files.
+- [ ] **A Serverpod model is rebuilt with `copyWith`**, never by listing its fields in the constructor — a field with `default=` or a nullable one is optional, so a forgotten one is a silent default, not an error. Clearing a nullable field is `copyWith(field: null)` (§1.10). An unavoidable enumeration is driven by `Enum.values` or an exhaustive `switch`, not written out by hand.
 - [ ] **A building block** — a widget with no product behaviour to describe — lives in `lib/shared/` with a doc comment, not in a zone with an empty `DwFeatureSpec`.
 - [ ] **Imports:** own internals and sibling features are relative and no deeper than two `../`; `core`/`data`/`domain`/`shared`/`ui_kit`/another zone are `package:` (§1.2a).
 - [ ] **The provider is the first thing in its file** (or lives in the feature's root file), not appended after the notifier that implements it.

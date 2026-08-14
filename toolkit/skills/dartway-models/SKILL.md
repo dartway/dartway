@@ -5,7 +5,8 @@ description: >-
   enums in enums/. Base vs Event models (current state vs changes on top of the base — for money/
   transactions), field types and nullable discipline (nullable only if the value is genuinely absent
   in the domain), 1-1/1-N/N-N relations via relation(name=...) (bidirectional — the same name on both
-  sides), onDelete=Cascade, indexes/unique, default=, enum models (serialized: byName). Workflow:
+  sides), onDelete=Cascade, indexes/unique, default= (and why it makes copyWith the only way to
+  rebuild a stored model), enum models (serialized: byName). Workflow:
   edit YAML → serverpod generate → create-migration → DwCrudConfig + registration in crudConfigurations
   → migrations at startup. Use when creating or changing models, fields, relations, enums and the DB schema.
 ---
@@ -52,6 +53,14 @@ title: String
 # ✅ a default instead of nullable, when there is a meaningful default value
 isDeleted: bool, default=false
 ```
+
+**What `default=` does to the generated code — and why the rebuild rule follows from it.** A field
+with a default (and any nullable field) becomes an **optional** argument of the generated
+constructor. So a method that rebuilds an existing model by naming its fields keeps compiling when
+you add a field here, and silently writes the default into it — a real project reset a `priority`
+field on every single edit that way, and nothing but an audit could see it. Hence: **a stored model
+is rebuilt with `copyWith`, never by listing its fields.** See `dartway-clean-code` §1.10;
+`model_rebuild_by_constructor` (`dartway_lints`) reports the shape in the editor.
 
 **Exception — relation object fields.** For them `?` means not "may be absent in the domain" but "the object may not be loaded" (without `include` it does not arrive at all). Do not apply the rule above to them: almost always write `?`.
 
@@ -113,6 +122,7 @@ values:
 - [ ] A `.spy.yaml` file in `lib/src/models/<domain>/`; enums in `enums/`.
 - [ ] Class name ≥2 words; `table` snake_case.
 - [ ] Nullable only if the value is genuinely absent in the domain (not "for the form's sake"); where appropriate — `default=`.
+- [ ] Existing rows are rebuilt with `copyWith`, not by listing the fields in the constructor — `default=` and nullable make those arguments optional, so a forgotten field is a silent default (`dartway-clean-code` §1.10).
 - [ ] Relations are explicit; bidirectional ones use the same `relation(name=...)` on both sides; fields relating to the user carry the word `Profile`.
 - [ ] Transactional/money logic goes through an Event model, not a direct field update.
 - [ ] After editing: `serverpod generate` → `create-migration`; the new model is added to `crudConfigurations` with a `DwCrudConfig`.
