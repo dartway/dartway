@@ -32,7 +32,7 @@ Determine precisely what and where you are touching (Glob/Grep/Read): the specif
 Order the steps end-to-end. Each step: **what to do → which files → which skill to lean on**. Skip the layers that are not relevant.
 
 1. **Models/schema** — `.spy.yaml` edits (fields, relations, enums, nullable discipline). `dartway-models`.
-2. **Generation/migrations** — `serverpod generate` → `create-migration`.
+2. **Generation/migrations** — `serverpod generate` → `create-migration` → `dart format` over both generated paths, in that order (`create-migration` regenerates, so formatting placed earlier is undone). `dartway-models`.
 3. **CRUD configs** — `DwCrudConfig`: permissions, validations, before/after, side effects; registration in `crudConfigurations`. `dartway-crud-config`.
 4. **Server-side logic** — `domain` (pure) / `app` (session-aware).
 5. **Flutter** — navigation (the route) → the feature's entry point → data layer (watch/save) → UI Kit → specials. `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit`.

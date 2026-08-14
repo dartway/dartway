@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
+import '../checker/dw_generated_format.dart';
 import '../checker/dw_layout.dart';
 import '../project_layout.dart';
 
@@ -76,6 +77,16 @@ class CheckCommand extends Command<int> {
       errorCount += DwLayoutInspector(
         flutterPackageDir: flutterPackageDir,
         serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
+
+      // Judges the server and client packages, so it is out of scope for a run
+      // narrowed to a folder of the Flutter package, and silent when the
+      // Flutter package was found standing on its own.
+      errorCount += DwGeneratedFormatInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        clientPackageDir: layout?.clientPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();

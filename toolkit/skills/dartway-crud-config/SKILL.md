@@ -265,4 +265,4 @@ Only when it does not fit into CRUD (file upload/download — often still shaped
 
 ## Workflow and tests
 
-Model in `/models` → `serverpod generate` → `create-migration` → a `DwCrudConfig` in `/crud` → logic in `/domain` or `/app` → tests. Unit tests for every config (permissions, validation, pre/post, sideEffects) and for Event models. A bugfix starts with a failing test for the cause.
+Model in `/models` → `serverpod generate` → `create-migration` → `dart format` over both generated paths (in that order — `create-migration` regenerates, and the generator's `dart_style` is not the project's; see `dartway-models`) → a `DwCrudConfig` in `/crud` → logic in `/domain` or `/app` → tests. Unit tests for every config (permissions, validation, pre/post, sideEffects) and for Event models. A bugfix starts with a failing test for the cause.

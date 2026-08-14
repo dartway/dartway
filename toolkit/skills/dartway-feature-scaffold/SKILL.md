@@ -184,7 +184,7 @@ Decide what data the UI needs. Data access goes through `dw.repo` only: reads vi
 Every user action maps onto the CRUD layer — no arbitrary endpoints. Use `SaveConfig`/`DeleteConfig`/`GetModelConfig`/`GetListConfig`, wrap responses in `DwModelWrapper`. The configs hold permissions, validations, pre/post processing, side effects. Details — the `dartway-crud-config` skill.
 
 ### 5. Models & DB
-Refine the models against the feature's real needs: fields and relations (1–1, 1–N, N–N). A field is nullable only if the value really can be absent in the domain, not for the UI's convenience. The schema reflects domain reality. After editing the YAML — `serverpod generate` + a migration.
+Refine the models against the feature's real needs: fields and relations (1–1, 1–N, N–N). A field is nullable only if the value really can be absent in the domain, not for the UI's convenience. The schema reflects domain reality. After editing the YAML — `serverpod generate` → `create-migration` → `dart format` over both generated paths, in that order (`dartway-models`).
 
 ### 6. Tests
 Server: unit tests for every CRUD config (permissions, validations, pre/post, sideEffects), tests for Event models. Flutter: a widget test for the entry point, provider tests for the logic, integration tests for navigation and the key actions. The threshold depends on complexity (see `dartway-clean-code`, Part 3).

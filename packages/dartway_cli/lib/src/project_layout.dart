@@ -25,6 +25,8 @@ class ProjectLayout {
 
   Directory get serverPackageDir => Directory(p.join(root.path, serverPackage));
 
+  Directory get clientPackageDir => Directory(p.join(root.path, clientPackage));
+
   static ProjectLayout detect(Directory root) {
     String? findBySuffix(String suffix, {required bool required}) {
       final matches = root

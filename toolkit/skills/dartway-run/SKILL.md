@@ -93,7 +93,8 @@ identifier from `bootstrapAdminIdentifier` yields the admin; any other number yi
 | `Address already in use` on 8080 | The server is already running in another terminal | Do not start a second one; check `curl localhost:8080` |
 | A migration does not apply, complaining about a schema mismatch | The DB survived a model change | For local development the simplest fix is to recreate it: `docker compose down -v` (**deletes the data**) → `up -d` → migrations → restart the server. Ask for confirmation before destroying the volume. Registered accounts go with the volume; the administrator comes back on the next boot, everyone else registers again |
 | The admin panel is not in the navigation after signing in | The account is a regular user | `bootstrapAdminIdentifier` is unset, or it does not match the identifier that registered. The comparison is case-insensitive but otherwise exact — no country-code guessing. Fix the key and restart the server: the promotion happens on boot |
-| The client does not see a new model field | Generation was not run after editing `.spy.yaml` | `serverpod generate`, then `serverpod create-migration`, then apply the migrations |
+| The client does not see a new model field | Generation was not run after editing `.spy.yaml` | `serverpod generate`, then `serverpod create-migration`, then `dart format` over both generated paths, then apply the migrations ("After a model change" below) |
+| Generation rewrote dozens of files the task never touched | The generator's `dart_style` is not the project's, and `create-migration` regenerates | Run `dart format` over both generated paths **after** `create-migration`, not before ("After a model change" below) |
 | Strange generation/protocol errors | The `serverpod_cli` version drifted from the `serverpod` pin in the project's pubspec | Compare `dart pub global list` with the version in `__SERVER_PKG__/pubspec.yaml`; the generator must match the runtime |
 | `Default Objects Repository doesn't contain a model of type X` | The new model has no registered default instance | Add `dw.repo.setupRepository(defaultModel: X(...))` in `__FLUTTER_PKG__/lib/core/default_models.dart` |
 | The API answers `notConfigured` | The model has no `DwCrudConfig`, or it is not registered | Create the config and add it to `crudConfigurations` (skill `dartway-crud-config`) |
@@ -115,9 +116,18 @@ The full cycle if the user changed a `.spy.yaml`:
 ```bash
 cd __SERVER_PKG__
 serverpod generate           # ~24 s — updates the server's generated code and __CLIENT_PKG__
-serverpod create-migration   # ~6 s  — a new migration in migrations/
+serverpod create-migration   # ~6 s  — a new migration in migrations/; regenerates as well
+dart format lib/src/generated ../__CLIENT_PKG__/lib/src/protocol   # ~1 s — must come last
 dart bin/main.dart --apply-migrations --role maintenance
 ```
+
+**The formatting step is not optional, and its position is not free.** The generator formats its
+output with the `dart_style` bundled with the Serverpod CLI, not with the `dart format` of the
+project's SDK, so every generation rewrites files the change never touched — a single nullable field
+has produced a 29-file, 1900-line diff. And `create-migration` runs the generation again to diff the
+schema, so formatting placed before it is silently undone. Generate, migrate, then format — once, in
+that order, over **both** packages. `git diff --stat` afterwards should name only the models you
+touched; if it names more, one of the two rules above was broken.
 
 Then: a `DwCrudConfig` for the new model + registration in `crudConfigurations`,
 a default instance in `default_models.dart`, and only after that the screen.
