@@ -33,9 +33,8 @@ class AdminUsersPage extends HookConsumerWidget implements DwFeature {
           'request comes from somewhere other than this table.',
     ],
     implementationNotes: [
-      'Search and role filter are local hook state handed to the table — the '
-          'narrowing happens client-side over a list the server already '
-          'restricted.',
+      'Search and role narrowing happen client-side: the server has already '
+          'restricted the list, so a backend filter would buy nothing.',
     ],
   );
 

@@ -214,7 +214,7 @@ class BookingListPage extends ConsumerWidget implements DwFeature {
       'A client sees only their own bookings — decided by accessFilter on the backend, not by the widget.',
     ],
     implementationNotes: [
-      'One watch on dw.repo.modelList<Booking> with a backendFilter — realtime and pagination come included.',
+      'The list is not cached: a booking changes more often than the screen is opened.',
     ],
     knownIssues: [
       'Sorting by date is commented out in the list even though the field is still in the form —'
@@ -230,7 +230,7 @@ Rules per field:
 - **`purpose`** — why the user needs it. **Optional and often unnecessary:** a card or a list row has no purpose of its own, it serves the screen; repeating the screen's purpose on every one of its parts is noise.
 - **`behaviors`** — what the feature observably does, one verifiable statement per item. **The criterion that keeps this field alive: every item can be verified by looking at the running app.** The moment "works well with long titles" shows up, the field has turned back into an essay.
 - **`requirements`** — what the feature is obliged to honor, imposed **from the outside** (authorized users only, the price is not shown before confirmation, works offline). If it is phrased as an observable action, it belongs in `behaviors`.
-- **`implementationNotes`** — decisions that would otherwise be rediscovered ("why the preview is in the row and the full image in the list"). Written for the team, not for the client: Studio shows them on the technical side.
+- **`implementationNotes`** — what the code cannot say about itself: why it is done this way, a trap that is not visible from the outside, a decision that would otherwise be re-opened. Written for the team, not for the client: Studio shows them on the technical side. **The test: would this still be worth reading after the feature is rewritten?** A reason survives ("the list is not cached — it changes more often than it is read"); a trap survives ("the server sends the date in UTC, the screen shows it local"). A map of the code does not: "the list comes from `dw.repo.modelList` and is drawn by a `ListView`" is what the code already says, and it starts lying the moment someone moves the widget.
 - **`knownIssues`** — what is **wrong** in the feature and worth picking up: a setting nobody reads; a screen still sitting on mocks; sorting commented out while the field is still live in the form.
 
 **The line between `implementationNotes` and `knownIssues` is what the reader is supposed to do about it.** A note says "this is intentional, don't touch it", a finding says "this is wrong, fix it". The agent needs that distinction **before** it changes anything: otherwise it either "fixes" a deliberate decision or carefully preserves a bug. One question settles it: **if this gets fixed, does the entry disappear?** It disappears — `knownIssues`. It stays as an explanation — `implementationNotes`.

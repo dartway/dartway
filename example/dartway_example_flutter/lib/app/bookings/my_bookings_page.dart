@@ -30,9 +30,8 @@ class MyBookingsPage extends ConsumerWidget implements DwFeature {
           'decision is the server access filter, not this screen.',
     ],
     implementationNotes: [
-      'Two watches, joined locally: the bookings themselves and the reviews, '
-          'intersected by bookingId. A review count on the booking model would '
-          'remove the second watch — it is kept to show the join is cheap.',
+      'A review count on the booking model would remove the second read; the '
+          'local join is kept to show it costs little.',
     ],
   );
 

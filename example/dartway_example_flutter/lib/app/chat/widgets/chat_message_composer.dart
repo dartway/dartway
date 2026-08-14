@@ -21,10 +21,6 @@ class ChatMessageComposer extends HookConsumerWidget implements DwFeature {
       'Sending clears the input.',
       'An empty or whitespace-only message is not sent.',
     ],
-    implementationNotes: [
-      'Sending is a single dw.repo.saveModel(ChatMessage) — the list above '
-          'updates in realtime, with no extra wiring.',
-    ],
   );
 
   @override

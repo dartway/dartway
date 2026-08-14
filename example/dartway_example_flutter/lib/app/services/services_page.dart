@@ -23,8 +23,8 @@ class ServicesPage extends ConsumerWidget implements DwFeature {
       'While the list loads, four placeholder cards are shown.',
     ],
     implementationNotes: [
-      'An unfiltered dw.repo.modelList<ClubService> — the price list is '
-          'readable by anyone signed in, so there is nothing to narrow.',
+      'Nothing is narrowed here: the price list is readable by anyone signed '
+          'in, so there is no filter to write.',
     ],
   );
 
