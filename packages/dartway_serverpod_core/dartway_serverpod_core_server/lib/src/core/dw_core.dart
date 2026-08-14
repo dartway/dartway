@@ -175,6 +175,13 @@ class DwCore<UserProfileClass extends TableRow> {
   /// Non-blocking, transaction-scoped advisory locks — `dw.advisoryLock`.
   DwAdvisoryLock get advisoryLock => const DwAdvisoryLock();
 
+  /// Generic, model-agnostic database access for [session] — `dw.db(session)`.
+  ///
+  /// For an operation shared by several models, where Serverpod's per-model
+  /// repositories cannot help. See [DwDb] for what it is and why it is not a
+  /// second `session.db`.
+  DwDb db(Session session) => DwDb(session);
+
   DwCrudConfig<TableRow>? getCrudConfig(String className, {String? api}) =>
       _crudConfiguration[api ?? DwCoreConst.defaultApi]?[className];
 
@@ -204,10 +211,26 @@ class DwCore<UserProfileClass extends TableRow> {
     );
   }
 
-  Future<UserProfileClass?> getUserProfile(Session session, int userId) async {
+  /// The profile row for [userId], or `null` when there is none.
+  ///
+  /// **Pass [transaction] when you are inside one** — a CRUD save hook has it as
+  /// `saveContext.transaction`. Omitted, the read runs on its own connection:
+  /// blind to the uncommitted rows around it in production, and under
+  /// `serverpod_test` with database rollbacks enabled (the default) it fails
+  /// outright as a concurrent database call, which makes the config
+  /// untestable rather than merely stale.
+  ///
+  /// When all you need is the caller's id, `session.signedInUserProfileId` is
+  /// synchronous and costs no query at all.
+  Future<UserProfileClass?> getUserProfile(
+    Session session,
+    int userId, {
+    Transaction? transaction,
+  }) async {
     final profile = await session.db.findFirstRow<UserProfileClass>(
       where: _userInfoIdColumn.equals(userId),
       include: _userProfileInclude,
+      transaction: transaction,
     );
 
     if (profile == null) {
@@ -217,13 +240,18 @@ class DwCore<UserProfileClass extends TableRow> {
     return profile;
   }
 
+  /// The profile row carrying [identifier], or `null` when there is none.
+  ///
+  /// [transaction] carries the same meaning as on [getUserProfile].
   Future<UserProfileClass?> getUserProfileByIdentifier(
     Session session,
-    String identifier,
-  ) async {
+    String identifier, {
+    Transaction? transaction,
+  }) async {
     final profile = await session.db.findFirstRow<UserProfileClass>(
       where: _userIdentifierColumn.equals(identifier),
       include: _userProfileInclude,
+      transaction: transaction,
     );
 
     if (profile == null) {
@@ -233,10 +261,16 @@ class DwCore<UserProfileClass extends TableRow> {
     return profile;
   }
 
-  Future<UserProfileClass?> currentUserProfile(Session session) async {
+  /// The signed-in caller's profile row, or `null` for a caller with no session.
+  ///
+  /// [transaction] carries the same meaning as on [getUserProfile].
+  Future<UserProfileClass?> currentUserProfile(
+    Session session, {
+    Transaction? transaction,
+  }) async {
     final userId = session.signedInUserProfileId;
     if (userId == null) return null;
-    return getUserProfile(session, userId);
+    return getUserProfile(session, userId, transaction: transaction);
   }
 
   Future<int> createUserProfile(

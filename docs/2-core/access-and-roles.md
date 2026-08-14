@@ -166,7 +166,14 @@ What the framework does provide on `Session` is two synchronous members:
   nullable column, an anonymous caller reads `null == null` and is let in.
 
 When you need the profile itself and not its id, `dw.currentUserProfile(session)` reads the row — and
-being a database call, it is the one you should not put in a hot path.
+being a database call, it is the one you should not put in a hot path. It has two siblings for the
+cases where the caller is not the subject: `dw.getUserProfile(session, userProfileId)` and
+`dw.getUserProfileByIdentifier(session, identifier)`.
+
+All three take an optional `transaction`, and **inside a CRUD save hook it has to be passed**:
+`dw.currentUserProfile(session, transaction: saveContext.transaction)`. Without it the read leaves
+the transaction it is running in — which production tolerates and the test suite does not. The
+failure mode is written up in [CRUD configs](crud-configs.md).
 
 Serverpod scopes are not used: `dwAuthenticationHandler` authenticates with an empty scope set, so
 scope annotations on endpoints would gate nothing.

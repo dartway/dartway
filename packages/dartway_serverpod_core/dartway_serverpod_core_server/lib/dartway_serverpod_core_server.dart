@@ -4,6 +4,7 @@ export 'src/business/auth/dw_auth_config.dart';
 export 'src/business/auth/dw_authentification_handler.dart';
 export 'src/business/auth/dw_password_hashing.dart';
 export 'src/business/dw_advisory_lock.dart';
+export 'src/business/dw_db.dart';
 export 'src/business/auth/dw_orphaned_auth_key_cleanup.dart';
 export 'src/business/dw_recurring_future_call.dart';
 export 'src/business/cloud_storage/dw_cloud_storage_config.dart';

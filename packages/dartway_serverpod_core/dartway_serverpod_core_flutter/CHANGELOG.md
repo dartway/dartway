@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.7.0 is the
+server side gaining a `Transaction` parameter on the profile reads and the generic `dw.db(session)`
+facade — see the changelog of `dartway_serverpod_core_server`.
+
 ## 0.6.0
 
 **Breaking: the `ref.watchSignedInUserId` / `ref.readSignedInUserId` extensions are gone, replaced by
