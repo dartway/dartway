@@ -124,6 +124,19 @@ Execution order and signatures:
 
 **Why this and not `validateSave`:** steps 1–2 run BEFORE the transaction, so a rule guarding a shared counter (seats, stock, limits) is evaluated there — two parallel saves would both get a "yes". Check such a rule in `beforeSaveTransaction`, taking a **row lock** in the same transaction: `findById(..., transaction:, lockMode: LockMode.forUpdate)` — a single call both locks the row (`SELECT ... FOR UPDATE`) and returns it. `validateSave` checks the model, `beforeSaveTransaction` checks the world around it.
 
+**A hook that runs inside the transaction reads the database only through `saveContext.transaction`.** That is `beforeSaveTransaction` and `afterSaveTransaction`, and it applies to every read they make — a model repository (`UserProfile.db.findById(session, id, transaction: saveContext.transaction)`), `dw.db`, or the framework's own profile reads, which take the transaction as a named argument:
+
+```dart
+beforeSaveTransaction: (session, saveContext) async {
+  final author = await dw.currentUserProfile(session, transaction: saveContext.transaction);
+  ...
+},
+```
+
+A read that omits it runs on its own connection: in production it works, merely blind to the uncommitted rows around it — which is what makes the omission easy to miss. **The bill arrives in the test.** Under `serverpod_test` with database rollbacks enabled, which is the default, the proxy sees a call arriving outside the active transaction, calls it concurrent, and throws `Concurrent database calls outside an already active transaction are not supported when database rollbacks are enabled`. So the config still runs in production and can no longer be driven through `save()` by an integration test at all.
+
+**And half of these reads should not happen.** When the hook only needs to know *who* the caller is — stamping an author, an owner, a `createdBy` — `session.signedInUserProfileId` is synchronous, costs no query, and sidesteps the question entirely. Reach for the profile row only when you need something on it (a role, a balance, a consent flag).
+
 **If the rule depends on the current state of the row itself** (roles, consent flags, balance, a deleted marker) — turn on `lockInitialModelForUpdate: true`. Then on an **update** the initial model is re-read under `FOR UPDATE` inside the transaction, and steps 1–2 are evaluated against it: a parallel save of the same row waits and gets re-validated against what was actually committed, instead of passing on a stale pre-state. The flag is optional (defaults to `false`, the cycle is unchanged) and has no effect on insert — there is nothing to lock yet.
 
 **To make other users see the change** — `broadcastTo` in the config: a callback over the context that returns the list of channels all the models touched by the save fly into. On the subscribers' side they are routed by type into any `dw.repo.modelList<T>()`, and the list redraws itself — nothing has to be written in Flutter (the app is subscribed to the public channel at the root).
@@ -210,7 +223,8 @@ Parameters: `allowDelete` `(session, model) => bool` (without it → `notConfigu
 ```dart
 final userProfileDeleteConfig = DwDeleteConfig<UserProfile>(
   allowDelete: (session, model) async => model.balance <= 0,
-  afterDelete: (session, model) async => session.db.find<BalanceEvent>(
+  afterDelete: (session, model) async => BalanceEvent.db.find(
+    session,
     where: (t) => t.userProfileId.equals(model.id),
   ),
 );
@@ -223,6 +237,27 @@ final userProfileDeleteConfig = DwDeleteConfig<UserProfile>(
 - **Workflow** (session-aware: external APIs, orchestration) → `/app`.
 - **Transactional/money flows** → Event models (`BalanceEvent`) instead of updating a field directly: safety from races, an audit trail, one place for the rules.
 - Wrap all updates in responses in `DwModelWrapper`.
+
+### An operation that spans several models goes through `dw.db`
+
+In `/app` you will hit work where the model is a **type parameter**, not a name: a data migration, a background cleanup, an export, a purge. Serverpod generates a repository per model and none of a common type, so there is nothing typed to call — and its generic `session.db.find<T>()` / `insertRow<T>` / `updateRow<T>` are marked `@internal`. Use `dw.db(session)` instead, which wraps the five that matter:
+
+```dart
+Future<int> purgeStale<T extends TableRow>(Session session, Expression stale) async {
+  final db = dw.db(session);
+  final rows = await db.find<T>(where: stale);
+  for (final row in rows) {
+    await db.deleteRow<T>(row);
+  }
+  return rows.length;
+}
+// find<T>, insertRow<T>, updateRow<T>, deleteRow<T>, count<T> — each takes an
+// optional `transaction`, and inside a hook that is not optional (see above).
+```
+
+**`// ignore_for_file: invalid_use_of_internal_member` in application code means a Serverpod upgrade can break your build silently** — you have reached into another package's private surface, and nothing warns you when it moves. If you catch yourself writing that line, or writing a three-line adapter per model whose bodies differ only in the model's name, `dw.db` is the answer.
+
+For **one known model**, keep using that model's own repository (`ClubSession.db.findById(...)`) — typed, public, and more readable. `dw.db` is not a replacement for it.
 
 ## A custom endpoint — the last resort
 

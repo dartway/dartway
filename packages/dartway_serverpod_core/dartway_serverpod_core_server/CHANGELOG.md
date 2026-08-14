@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.7.0
+
+Two additions, both about server code an application could not write — or could not test — until now.
+
+- **`dw.getUserProfile`, `dw.getUserProfileByIdentifier` and `dw.currentUserProfile` take an optional
+  `Transaction`.** Without one the read runs on its own connection, so a CRUD hook that reads the
+  caller's profile — `beforeSaveTransaction`, `afterSaveTransaction`, anything inside the save
+  transaction — was asking the database a question from outside the transaction it was running in.
+
+  In production that is a second query with a slightly stale answer. Under `serverpod_test` it is
+  fatal: with database rollbacks enabled, which is the default, the proxy sees a call arriving
+  without the active transaction, treats it as concurrent, and throws `Concurrent database calls
+  outside an already active transaction are not supported when database rollbacks are enabled`. So
+  **any CRUD config whose hooks read the caller's profile** — nearly every config where the server
+  stamps the author itself — could not be driven through `save()` in an integration test at all.
+  Found twice, in different configs of different projects.
+
+  Pass `saveContext.transaction` from inside a hook. Purely additive: existing calls keep compiling
+  and keep their behaviour. Half of these cases need no query in the first place — when only the
+  caller's id is wanted, `session.signedInUserProfileId` is synchronous and free.
+
+- **`dw.db(session)` — generic, model-agnostic database access.** Five operations: `find<T>`,
+  `insertRow<T>`, `updateRow<T>`, `deleteRow<T>`, `count<T>`, each taking an optional `Transaction`.
+
+  Serverpod generates a repository per model and gives no repository of a common type, and its
+  generic `session.db.find<T>()` / `insertRow<T>` / `updateRow<T>` are marked `@internal` — the core
+  has been calling them behind `// ignore_for_file: invalid_use_of_internal_member` in seven files.
+  An application with an operation spanning several models (a data migration, a background cleanup,
+  an export) had the choice of repeating that ignore or writing a three-line adapter per model whose
+  bodies differ only in the model's name. The exposure is now concentrated in one file inside the
+  core instead of being copied into every application: when Serverpod changes those methods one file
+  needs fixing rather than N applications, and that same file is the seam a replacement for the ORM
+  would be fitted into.
+
+  For a single known model keep using that model's own repository — typed, public, and more
+  readable. `dw.db` is for the cases where the model is a type parameter.
+
 ## 0.6.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.6.0 is the

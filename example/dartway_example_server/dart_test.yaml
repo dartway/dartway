@@ -1,9 +1,12 @@
 tags:
   integration: {}
 
-# The integration suite runs against one real database with `RollbackDatabase.disabled` —
-# the only way to observe things that must actually commit: a race between two
-# concurrent sign-ins, or a password hash upgraded during a login.
+# The integration suite runs against one real database, and most of its files ask for
+# `RollbackDatabase.disabled` — the only way to observe things that must actually
+# commit: a race between two concurrent sign-ins, or a password hash upgraded during
+# a login. (`dw_db_test` and `dw_core_profile_transaction_test` are the exceptions and
+# keep the default rollback; the second one exists precisely to prove that a config
+# reading the caller's profile survives it.)
 #
 # That makes the files stateful neighbours rather than isolated units: each wipes
 # the auth tables around itself, so run in parallel they wipe each other's rows

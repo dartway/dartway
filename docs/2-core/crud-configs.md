@@ -161,6 +161,32 @@ transaction and `allowSave` / `validateSave` are evaluated against what was actu
 is opt-in so the default lifecycle is unchanged, and it does nothing on insert — there is no row to
 lock yet.
 
+**Every read inside the transaction carries `saveContext.transaction`** — that is the two
+in-transaction hooks, and every call they make. A model repository takes it as a named argument, so
+does `dw.db(session)` (see
+[working with a model you only know as a type](../4-server/generic-database-access.md)), and so do
+the framework's profile reads:
+
+```dart
+beforeSaveTransaction: (session, saveContext) async {
+  final author = await dw.currentUserProfile(session, transaction: saveContext.transaction);
+  ...
+},
+```
+
+Omitting it runs the read on its own connection. In production that works — it is merely blind to
+the uncommitted rows around it, which is what makes the omission easy to miss. The bill arrives in
+the test: under `serverpod_test` with database rollbacks enabled, which is the default, the proxy
+sees a call arriving outside the active transaction, calls it concurrent, and throws `Concurrent
+database calls outside an already active transaction are not supported when database rollbacks are
+enabled`. The config keeps working in production and can no longer be driven through `save()` by an
+integration test at all. `example/` pins this in
+`test/integration/dw_core_profile_transaction_test.dart`.
+
+Half of these reads need not happen at all: when the hook only needs to know *who* the caller is,
+`session.signedInUserProfileId` is synchronous and costs nothing. Read the profile row when you need
+something on it — a role, a balance, a consent flag.
+
 **What comes back.** A successful save returns the persisted model plus `updatedModels`:
 `beforeUpdates` + the saved row + `afterUpdates`. The client applies that list to every open list
 and single-model provider, which is why the caller's own screens refresh without a refetch. Getting
