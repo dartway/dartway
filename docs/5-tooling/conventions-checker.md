@@ -117,6 +117,7 @@ commit over a 210-line file is a check people disable.
 | `forbiddenAssetPath` | warning | A raw `assets/...` path outside `ui_kit/` |
 | `fileLong` | info | Over 200 lines |
 | `fileTooLong` | warning | Over 350 lines |
+| `generatedCodeUnformatted` | warning | The server's `lib/src/generated/` or the client's `lib/src/protocol/` differs from `dart format` |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius`, `Theme.of(context)`, `context.theme`,
 `context.textTheme`, `context.colorScheme`. The long spelling is in the list on purpose: the rule
@@ -180,6 +181,38 @@ the check exists at all — `app/admin/` is a perfectly ordinary group as far as
 concerned, which is how the admin panel spent a release outside the checks that were written for
 it. The pass covers the server package too (`lib/src/`), and `--dir` skips it, the same way it
 skips `ui_kit/`.
+
+## Why `generatedCodeUnformatted` is a warning that names a command
+
+Two programs write the generated code and they disagree about how it should look. `serverpod
+generate` formats its output with the `dart_style` bundled with the Serverpod CLI; the code already
+in the repository was formatted by the `dart format` of the project's SDK. Nothing reconciles them,
+so the difference shows up as a generation run that rewrites files the change never went near.
+Making one field nullable is two lines of schema and, without a format pass, a diff of 29 files and
+about 1900 lines — on review that reads as a rewritten protocol, and the two lines that matter
+cannot be found inside it.
+
+The fix is a `dart format` over both generated trees, and it has to be the **last** of the three
+steps: `create-migration` regenerates in order to diff the schema, so a pass placed between it and
+`generate` is silently thrown away. That is what turns a forgotten step into a loop — generate,
+format, generate, format again — and it is why the sequence is written down as a sequence in
+[models.md](../2-core/models.md#the-workflow-and-where-it-usually-goes-wrong).
+
+The check insists on both trees, including the one that came back clean. Formatting only the half
+you were looking at does not avoid the diff; it defers it to whoever next runs `dart format`
+honestly. One project kept its server tree formatted and left the client raw, and the next person to
+format both added 33 unrelated files to an unrelated pull request.
+
+**Warning, not error, and deliberately.** This is the one check whose verdict depends on the tool
+running it: the comparison is against the `dart_style` of the SDK in use, so a red result can mean
+"your SDK is newer than the one that formatted this" rather than "you skipped a step". Failing a
+build on that would be the fastest way to teach a team to filter this check out — the same argument
+as `SizedBox(width: double.infinity)` below, arrived at from the other direction. What earns the
+check its place instead is the message: it names the files, the exact command with both paths
+written out, and the Dart version it judged against, so that someone who did not write the code and
+does not know why it went red can still fix it or recognise the version skew.
+
+Like the layout pass, it judges the server and client packages, so `--dir` skips it.
 
 ## Why 200 and 350
 

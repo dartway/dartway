@@ -7,8 +7,10 @@ description: >-
   in the domain), 1-1/1-N/N-N relations via relation(name=...) (bidirectional — the same name on both
   sides), onDelete=Cascade, indexes/unique, default= (and why it makes copyWith the only way to
   rebuild a stored model), enum models (serialized: byName). Workflow:
-  edit YAML → serverpod generate → create-migration → DwCrudConfig + registration in crudConfigurations
-  → migrations at startup. Use when creating or changing models, fields, relations, enums and the DB schema.
+  edit YAML → serverpod generate → create-migration → dart format over the generated paths (in that
+  order: create-migration regenerates, and the generator's dart_style is not the project's) →
+  DwCrudConfig + registration in crudConfigurations → migrations at startup. Use when creating or
+  changing models, fields, relations, enums and the DB schema.
 ---
 
 # DartWay — models (Serverpod, server)
@@ -112,10 +114,37 @@ values:
 1. Edit/add a `.spy.yaml` in `lib/src/models/<domain>/`.
 2. `dart run serverpod generate` — updates the generated code + `__CLIENT_PKG__`.
 3. `dart run serverpod create-migration` (`--force` only in early MVP, if the old migrations can be overwritten).
-4. Set up `DwCrudConfig` in `/crud` (see `dartway-crud-config`) and **register it in `crudConfigurations`** at `DwCore.init` — otherwise the API returns `notConfigured`.
-5. Logic: `/domain` (pure) or `/app` (session-aware).
-6. Migrations are applied at startup (`--apply-migrations`) or via `dart run serverpod migrate`.
-7. Tests (unit tests for the config and Event models).
+4. `dart format lib/src/generated ../__CLIENT_PKG__/lib/src/protocol` — **the order of 2–4 is fixed, see below.**
+5. Set up `DwCrudConfig` in `/crud` (see `dartway-crud-config`) and **register it in `crudConfigurations`** at `DwCore.init` — otherwise the API returns `notConfigured`.
+6. Logic: `/domain` (pure) or `/app` (session-aware).
+7. Migrations are applied at startup (`--apply-migrations`) or via `dart run serverpod migrate`.
+8. Tests (unit tests for the config and Event models).
+
+### Why formatting is a step, and why it is the last one
+
+**The generator does not format its output the way the project does.** `serverpod generate` runs the
+`dart_style` bundled with the Serverpod CLI; the code in the repository was written by the
+`dart format` of the project's SDK. The two disagree about things like whether a trailing comma
+keeps an argument list split — so the moment you generate, files nobody touched come back rewritten.
+Making one field nullable is a two-line change to the schema and, without step 4, a diff of **29
+files and ~1900 lines**. On review that reads as "rewrote the whole protocol", and the two lines that
+matter are unfindable inside it.
+
+**`create-migration` regenerates too.** It is not a separate tool reading what step 2 left behind —
+it re-runs the generation to diff the schema, and rewrites the same files with the same formatter.
+Format between steps 2 and 3 and step 3 quietly undoes it. That is the second half of the trap, and
+it is what turns the mistake into a loop: generate → format → generate → format again.
+
+Hence: **generate, migrate, and only then format** — one pass, in that order, every time.
+
+**Both packages, always.** The server's `lib/src/generated/` and the client's `lib/src/protocol/`
+are one artefact written by one command, and they are held to one rule: formatted. Formatting only
+the half you were looking at is worse than formatting neither — the next person to run `dart format`
+over both picks up your other half as their diff. One project had exactly that: a server tree kept
+formatted, a client tree left raw, and the first honest `dart format` added 33 unrelated files to
+someone else's pull request.
+
+`dartway check` verifies this (`generatedCodeUnformatted`) — see `dartway-finish`.
 
 ## Model checklist
 
@@ -125,5 +154,6 @@ values:
 - [ ] Existing rows are rebuilt with `copyWith`, not by listing the fields in the constructor — `default=` and nullable make those arguments optional, so a forgotten field is a silent default (`dartway-clean-code` §1.10).
 - [ ] Relations are explicit; bidirectional ones use the same `relation(name=...)` on both sides; fields relating to the user carry the word `Profile`.
 - [ ] Transactional/money logic goes through an Event model, not a direct field update.
-- [ ] After editing: `serverpod generate` → `create-migration`; the new model is added to `crudConfigurations` with a `DwCrudConfig`.
+- [ ] After editing: `serverpod generate` → `create-migration` → `dart format` over both generated paths; the new model is added to `crudConfigurations` with a `DwCrudConfig`.
+- [ ] After generation `git diff --stat` shows only the models the task touched — if it lists files the change has nothing to do with, the formatting step was skipped or ran before `create-migration`.
 - [ ] Enum — `serialized: byName`.

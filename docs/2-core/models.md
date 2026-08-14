@@ -184,9 +184,30 @@ delete cannot ([crud-configs.md](crud-configs.md#deleting)).
 
 ```bash
 serverpod generate           # models, table classes, client package
-serverpod create-migration   # a migration from the schema diff
+serverpod create-migration   # a migration from the schema diff — regenerates as well
+dart format lib/src/generated ../my_app_client/lib/src/protocol
 dart bin/main.dart --apply-migrations
 ```
+
+The third line is part of the sequence, not a tidy-up, and it has to be the third line. The
+generator formats what it writes with the `dart_style` bundled with the Serverpod CLI, while the
+code already in the repository was formatted by the `dart format` of the project's SDK. The two
+disagree — over trailing commas and line splitting — so a generation run comes back having rewritten
+files the change never went near. Making one field nullable is two lines of schema and, without the
+format pass, a diff of 29 files and about 1900 lines: on review that reads as a rewritten protocol,
+and the two lines that matter cannot be found inside it.
+
+Why it goes after `create-migration` rather than straight after `generate`: `create-migration` is not
+a separate tool reading what generation left behind — it regenerates in order to diff the schema,
+and rewrites the same files with the same formatter. Format in between and the migration step undoes
+it, which is how this turns from a missing step into a loop.
+
+Format **both** paths, always. The server's `lib/src/generated/` and the client's
+`lib/src/protocol/` are one artefact written by one command; a repository that keeps one of them
+formatted and the other raw simply defers the diff to whoever next runs `dart format` honestly —
+in one project that was 33 unrelated files landing in someone else's pull request. `dartway check`
+holds the rule (`generatedCodeUnformatted`), and `git diff --stat` after generating is the quick
+version: it should name the models you touched and nothing else.
 
 Then write the `DwCrudConfig` in `lib/src/crud/` and **register it in `crudConfigurations`** at
 `DwCore.init`. A generated model with no registered config is invisible to the API: every call

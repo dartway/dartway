@@ -107,11 +107,19 @@ Generate the code and the migration:
 cd my_app/my_app_server
 serverpod generate
 serverpod create-migration
+dart format lib/src/generated ../my_app_client/lib/src/protocol
 dart bin/main.dart --apply-migrations --role maintenance
 ```
 
 `serverpod generate` writes Dart into `lib/src/generated/` **and** into `my_app_client`. Neither is
 edited by hand.
+
+The `dart format` line belongs to the sequence, in that position. The generator formats its output
+with its own bundled `dart_style`, which is not the `dart format` of your SDK, so without it every
+generation rewrites files your change never touched — one nullable field can arrive as a 1900-line
+diff. And it comes *after* `create-migration`, because that command regenerates to diff the schema
+and would throw the formatting away. Both paths together, every time; the details are in
+[models.md](../2-core/models.md#the-workflow-and-where-it-usually-goes-wrong).
 
 ## 4. Configure CRUD — instead of writing endpoints
 

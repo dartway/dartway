@@ -84,7 +84,30 @@ enum DwCheckType {
   /// closed list (`dwFlutterZones` / `dwFlutterLayers` / `dwServerAreas`), and
   /// it is closed because it had been declared in three places that drifted
   /// apart: an undeclared folder is where the next divergence starts.
-  invalidTopLevelLayout;
+  invalidTopLevelLayout,
+
+  /// Generated code committed unformatted — the server's `lib/src/generated/`
+  /// or the client's `lib/src/protocol/` differs from what `dart format`
+  /// writes.
+  ///
+  /// `serverpod generate` formats its output with the `dart_style` bundled
+  /// with the Serverpod CLI, which is not the `dart format` of the project's
+  /// SDK. Leave the difference in place and every later generation rewrites
+  /// files nobody touched: making one field nullable has arrived at review as
+  /// 29 files and 1900 changed lines, with the two real lines unfindable
+  /// inside it. The rule is therefore "both generated trees are committed
+  /// formatted" — both, because formatting one of them only moves the diff to
+  /// whoever next formats the other, which in one project meant 33 unrelated
+  /// files landing in someone else's pull request.
+  ///
+  /// A **warning**, not an error, and deliberately so: the comparison is
+  /// against the `dart_style` of whichever SDK ran the check, so a red result
+  /// can mean "your SDK is newer than the one that formatted this" rather than
+  /// "you skipped a step". Failing the build on that would make this the check
+  /// people pass `--type` around to avoid. Hence the finding names the exact
+  /// command and paths instead — the fix has to be runnable by someone who did
+  /// not write the code and does not know why it went red.
+  generatedCodeUnformatted;
 
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
@@ -92,6 +115,7 @@ enum DwCheckType {
     DwCheckType.featureSpecMissing ||
     DwCheckType.forbiddenAssetPath ||
     DwCheckType.unusedFeatureFile ||
+    DwCheckType.generatedCodeUnformatted ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

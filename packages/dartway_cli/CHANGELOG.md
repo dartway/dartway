@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.0
+
+- **`dartway check` now verifies that the generated code is committed formatted — `generatedCodeUnformatted`.**
+  `serverpod generate` writes its output through the `dart_style` bundled with the Serverpod CLI,
+  which is not the `dart format` of the project's SDK, and nothing reconciles the two. Left alone,
+  the difference means every generation run rewrites files the change never went near: making one
+  field nullable produced a diff of 29 files and about 1900 lines, in which the two lines that
+  mattered could not be found. The check runs `dart format --output=none --set-exit-if-changed` over
+  the server's `lib/src/generated/` and the client's `lib/src/protocol/`, and it insists on **both**
+  — a repository that keeps one of them formatted and leaves the other raw has not avoided the diff,
+  it has handed it to whoever next formats the second, which in one project meant 33 unrelated files
+  arriving in someone else's pull request.
+
+  It is a **warning**, not an error, and that is a decision rather than a softening: the comparison is
+  against the `dart_style` of whichever SDK ran the check, so a red result can mean "your SDK is newer
+  than the one that formatted this" rather than "you skipped a step". A check that fails the build on
+  that is a check people learn to filter out. So the finding names the files, the exact `dart format`
+  command with both paths spelled out, and the Dart version it judged against — it has to be
+  actionable by someone who did not write the code and does not know why it went red.
+
+  The step this holds is documented alongside it, because its position is not the obvious one: the
+  format pass goes **after** `create-migration`, not after `generate`. `create-migration` regenerates
+  in order to diff the schema, so a pass placed between the two is silently undone — which turns a
+  missing step into a loop of generate → format → generate → format again.
+
 ## 0.5.1
 
 - **`quickstart` no longer tells the agent to run a seed, because the skeleton no longer ships one.**
