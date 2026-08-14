@@ -255,5 +255,6 @@ Four places where the config is not the whole answer, and all four are ordinary 
   decide what is worth showing, never what is allowed. Anything they hide must be unreachable
   server-side as well, or it is only hidden from honest users.
 - **Field-level secrets.** `accessFilter` selects rows, not columns. A column no client may ever see
-  — a verification code, an internal hash — is `scope=serverOnly`, which keeps it out of the
-  generated client class entirely ([models.md](models.md#scopes-fields-the-client-must-never-see)).
+  — a verification code, an internal hash — is `scope=serverOnly`: it is kept out of the generated
+  client class, never put on the wire, and not blanked when that client saves the row back
+  ([models.md](models.md#scopes-fields-the-client-must-never-see)).

@@ -1,5 +1,7 @@
 import 'package:serverpod/serverpod.dart';
 
+import 'dw_protocol_json.dart';
+
 class DwModelWrapper implements SerializableModel, ProtocolSerialization {
   static SerializationManagerServer get _protocol =>
       Serverpod.instance.serializationManager;
@@ -44,6 +46,9 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     return DwModelWrapper(object: object);
   }
 
+  /// The whole row, `serverOnly` fields included. Server-side only: caches,
+  /// logs, and the hop to another server instance through Redis. Never what a
+  /// client is handed — that is [toJsonForProtocol].
   @override
   toJson() {
     return {
@@ -57,7 +62,7 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
   Map<String, dynamic> toJsonForProtocol() {
     return {
       'className': className,
-      'data': object.toJson(),
+      'data': dwJsonForProtocol(object),
       'isDeleted': isDeleted,
     };
   }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.8.0 is the
+server side making `scope=serverOnly` hold in both directions — such a field was being sent to
+clients, and a client save was blanking it. See the changelog of `dartway_serverpod_core_server`;
+if your models use `scope=serverOnly`, read it.
+
 ## 0.7.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.7.0 is the

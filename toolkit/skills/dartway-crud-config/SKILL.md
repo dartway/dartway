@@ -139,6 +139,28 @@ A read that omits it runs on its own connection: in production it works, merely 
 
 **If the rule depends on the current state of the row itself** (roles, consent flags, balance, a deleted marker) — turn on `lockInitialModelForUpdate: true`. Then on an **update** the initial model is re-read under `FOR UPDATE` inside the transaction, and steps 1–2 are evaluated against it: a parallel save of the same row waits and gets re-validated against what was actually committed, instead of passing on a stale pre-state. The flag is optional (defaults to `false`, the cycle is unchanged) and has no effect on insert — there is nothing to lock yet.
 
+**A `scope=serverOnly` field is held in both directions, and there is nothing to configure for it.** Such a field is absent from the generated **client** class entirely, and the framework honours that on both legs of the round trip:
+
+- it is **never sent** — stripped out of every CRUD response, every realtime broadcast and the sign-in payload;
+- it is **never blanked by a client save** — the field cannot be in the JSON a client sends, so the deserialised model carries `null` there, and an update writing the whole row would erase the column. It is left out of the `UPDATE` instead, and the database keeps its value.
+
+So `scope=serverOnly` is the right tool for anything the server owns and the client must not read: an internal hash, a computed score, a verification secret, a moderation note.
+
+The second rule is narrow on purpose — it skips the column **only** when the incoming value is `null` and the stored row has one. A hook that *computes* a `serverOnly` value writes it like any other field:
+
+```dart
+beforeSaveTransaction: (session, saveContext) async {
+  saveContext.currentModel = saveContext.currentModel.copyWith(
+    internalScore: await recomputeScore(session, saveContext),
+  );
+  return null;
+},
+```
+
+The one case that needs an opt-out is a hook meaning to **clear** a `serverOnly` field back to `null`: set `allowServerOnlyOverwrite: true` on the config, and accept that an ordinary client save will then blank the column too.
+
+One residual behaviour worth knowing: the model is not re-read from the database after the write, so from `afterSaveTransaction` onwards a `serverOnly` field on `currentModel` still holds what the client sent — `null` — even though the stored row kept its value. A hook that needs the stored value reads `saveContext.initialModel`.
+
 **To make other users see the change** — `broadcastTo` in the config: a callback over the context that returns the list of channels all the models touched by the save fly into. On the subscribers' side they are routed by type into any `dw.repo.modelList<T>()`, and the list redraws itself — nothing has to be written in Flutter (the app is subscribed to the public channel at the root).
 
 ```dart

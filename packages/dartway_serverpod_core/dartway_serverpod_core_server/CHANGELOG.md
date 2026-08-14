@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.8.0
+
+**`scope=serverOnly` did not hold, in either direction. Worth upgrading now rather than at your
+convenience** — the outbound half is a data leak that is live in every application on 0.7.0 and
+earlier, and neither half reported anything while it was happening.
+
+- **Fixed: `serverOnly` fields were sent to clients.** Serverpod asks a model for
+  `toJsonForProtocol()` — the map without the `serverOnly` fields — for everything it sends a
+  client, but only for the objects it reaches by walking the result. The core's own envelopes
+  flatten their contents by hand before Serverpod ever sees them, and all three called `toJson()`
+  inside: `DwApiResponse` (which additionally did not declare `ProtocolSerialization` at all, so it
+  was never asked), `DwModelWrapper`, and `DwAuthData`.
+
+  So every CRUD response, every realtime broadcast and the sign-in response carried the full row.
+  **Invisible from the application, which is why it survived:** the generated client class has no
+  field for a `serverOnly` column, its `fromJson` drops the key on arrival, and every screen looks
+  correct — while the value sits in the response body on the wire.
+
+  What was travelling in this repository's own models: `DwAuthRequest.verificationHash`, and the
+  `testVerificationCode` that example and template put on `UserProfile` — a fixed sign-in code, so
+  the leak handed over a working login. **Check your own models for `scope=serverOnly` and treat
+  anything you find as disclosed to every client that received such a row**; rotate it if it is a
+  secret. Serialisation now goes through one place, and a regression test stands on the generator's
+  own output.
+
+- **Fixed: a client save blanked `serverOnly` columns.** A `serverOnly` field does not exist on the
+  client class, so it is never in the JSON a client sends; the server's `fromJson` read the missing
+  key as `null`, and the update wrote the whole row — including the column the client could not have
+  said anything about. No error, `isOk` in the response, the value silently gone.
+
+  Such a column is now left out of the `UPDATE` when the incoming value is `null` and the stored row
+  has one, so the database keeps what it had. The rule is deliberately narrow: a
+  `beforeSaveTransaction` hook that *computes* a `serverOnly` value still writes it normally.
+
+- **Added: `DwSaveConfig.allowServerOnlyOverwrite`**, default `false`. The one case the narrow rule
+  costs is a hook that means to clear a `serverOnly` field back to `null`; turn this on for that
+  config, and accept that an ordinary client save will then blank the column too.
+
+  Note what the hooks see afterwards: the model is not rebuilt from the database, so from
+  `afterSaveTransaction` onwards a `serverOnly` field on `currentModel` still holds what the client
+  sent. A hook that needs the stored value reads `saveContext.initialModel`.
+
 ## 0.7.0
 
 Two additions, both about server code an application could not write — or could not test — until now.

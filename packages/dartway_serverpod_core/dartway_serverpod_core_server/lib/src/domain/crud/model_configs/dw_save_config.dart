@@ -45,6 +45,7 @@ class DwSaveConfig<T extends TableRow> {
     this.afterSaveTransform,
     this.afterSaveSideEffects,
     this.lockInitialModelForUpdate = false,
+    this.allowServerOnlyOverwrite = false,
     this.broadcastTo,
   });
 
@@ -109,6 +110,34 @@ class DwSaveConfig<T extends TableRow> {
   /// row to lock yet — which is why those still validate before their
   /// transaction.
   final bool lockInitialModelForUpdate;
+
+  /// Lets a save write `null` over a `scope=serverOnly` column that currently
+  /// holds a value. Off by default, and the default is the one you want.
+  ///
+  /// A `serverOnly` field does not exist on the client class at all, so it is
+  /// never in the JSON a client sends, and the server's `fromJson` reads the
+  /// missing key as `null`. An update writes the whole row, so without this
+  /// gate every client save would blank the column — no error, `isOk` in the
+  /// response, the value simply gone. Left off, such a column is dropped from
+  /// the `UPDATE` and the database keeps what it had.
+  ///
+  /// The exclusion is deliberately narrow: it applies only when the incoming
+  /// model has `null` where the stored row has a value. A
+  /// [beforeSaveTransaction] hook that *computes* a `serverOnly` value and
+  /// assigns it writes that value normally — which is the whole point of
+  /// computing it — because the incoming model is no longer null there.
+  ///
+  /// That leaves exactly one case this costs you: a hook that means to clear a
+  /// `serverOnly` field back to `null`. Turn this on for that config, and
+  /// accept that an ordinary client save will then blank the column too.
+  ///
+  /// **What the hooks see afterwards.** The model is not rebuilt from the
+  /// database after the write, so from [afterSaveTransaction] onwards a
+  /// `serverOnly` field on `currentModel` still holds what the client sent —
+  /// `null` — even though the stored row kept its value. Nothing is lost to the
+  /// caller, who cannot see the field either way. A hook that needs the stored
+  /// value reads `saveContext.initialModel`.
+  final bool allowServerOnlyOverwrite;
 
   /// The channels everything this save changed is broadcast to — so that one
   /// user's change lands on the other users' screens without a refresh.
@@ -278,6 +307,7 @@ class DwSaveConfig<T extends TableRow> {
           )
         : await session.db.updateRow<T>(
             saveContext.currentModel,
+            columns: _columnsToWrite(saveContext),
             transaction: transaction,
           );
 
@@ -286,6 +316,79 @@ class DwSaveConfig<T extends TableRow> {
       final error = await afterSaveTransaction!(session, saveContext);
       if (error != null) throw _DwSaveRejection(error);
     }
+  }
+
+  /// The columns this update may write, or `null` for "all of them" — which is
+  /// what [Database.updateRow] means by an absent list, and what every save
+  /// that has nothing to protect returns.
+  ///
+  /// Guards the `serverOnly` columns described on [allowServerOnlyOverwrite]:
+  /// one whose incoming value is `null` while the stored row has a value is
+  /// left out of the `UPDATE`, so the database keeps what it had.
+  ///
+  /// **How a `serverOnly` field is recognised without reflection.** The
+  /// generator writes two maps for every model — `toJson` carries them,
+  /// `toJsonForProtocol` does not — so the difference between the key sets is
+  /// the answer, and it costs two map builds.
+  ///
+  /// **The difference is taken on [DwSaveContext.initialModel], the row as it
+  /// is in the database, and that is not interchangeable with taking it on the
+  /// type.** Both maps write a key under `if (value != null)`, so a nullable
+  /// `serverOnly` column that is null in *this row* is missing from both and
+  /// registers as no difference at all. That makes "this type has no
+  /// `serverOnly` fields" a property of the row, never of the class — which is
+  /// why the result must not be cached per type. A cached negative would turn
+  /// one such row into a permanent hole for every other row of the same model.
+  ///
+  /// The length comparison is the cheap gate that keeps the rest rare:
+  /// `toJsonForProtocol` is by construction a subset of `toJson`, so equal
+  /// sizes mean equal key sets and there is nothing to protect. Two map builds
+  /// against the `findById`, the transaction and the `UPDATE` around them are
+  /// microseconds against milliseconds.
+  List<Column>? _columnsToWrite(DwSaveContext<T> saveContext) {
+    if (allowServerOnlyOverwrite) return null;
+
+    final initialModel = saveContext.initialModel;
+    // Inserts never get here — there is no stored row to protect.
+    if (initialModel == null || initialModel is! ProtocolSerialization) {
+      return null;
+    }
+
+    final stored = initialModel.toJson();
+    final wire = (initialModel as ProtocolSerialization).toJsonForProtocol();
+    if (stored is! Map<String, dynamic> || wire is! Map<String, dynamic>) {
+      return null;
+    }
+    if (stored.length == wire.length) return null;
+
+    final incoming = saveContext.currentModel.toJson();
+    if (incoming is! Map<String, dynamic>) return null;
+
+    // A key the wire form drops, holding a value in the database, and absent
+    // from what arrived. Both maps omit a null under `if (value != null)`, so
+    // "absent from `incoming`" and "explicitly null" are the same thing here —
+    // and they should be, since the client cannot express either one.
+    final atRisk = {
+      for (final key in stored.keys)
+        if (!wire.containsKey(key) && incoming[key] == null) key,
+    };
+    if (atRisk.isEmpty) return null;
+
+    // Keyed by `fieldName`: it is the name the JSON uses, and it is not always
+    // the name of the column (`Column.fieldName` falls back to `columnName`
+    // only when the model does not remap it).
+    //
+    // Built from `managedColumns` rather than `columns` because that is what
+    // `updateRow` writes when handed no list — starting anywhere else would
+    // change more than the one thing this method is for.
+    final managedColumns = saveContext.currentModel.table.managedColumns;
+    final columns = managedColumns
+        .where((column) => !atRisk.contains(column.fieldName))
+        .toList();
+
+    // Everything at risk turned out not to be a column — a `!persist` field,
+    // say. Nothing to exclude, so hand back the default.
+    return columns.length == managedColumns.length ? null : columns;
   }
 
   /// Everything after the transaction commits — shared by both paths.

@@ -18,8 +18,11 @@ fields:
   # admin (full access). Enforced by CRUD config access filters.
   role: UserRole, default=client
 
-  # Rotatable test/reviewer OTP code. serverOnly: NEVER serialized to the client,
-  # so a regular client cannot read test codes. Real users leave it null and get
-  # a random code (secure-by-default); the admin sets/rotates it via a dedicated
-  # admin endpoint, and the users that have it set are the Studio demo personas.
+  # Rotatable test/reviewer OTP code. serverOnly, which the framework holds in
+  # both directions: the value is never serialized to the client, so a regular
+  # client cannot read test codes, and a client saving this profile back does not
+  # blank the column — it is left out of the UPDATE and the stored code survives.
+  # Real users leave it null and get a random code (secure-by-default); the admin
+  # sets/rotates it via a dedicated admin endpoint, and the users that have it
+  # set are the Studio demo personas.
   testVerificationCode: String?, scope=serverOnly
