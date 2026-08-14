@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0
+
+- **`frameworkRefsDiverged` (warning): the framework arriving in halves.** An app that consumes
+  DartWay by git states `ref: master` on every package, which reads as "all of it from master" and is
+  not what the lock does — a git dependency is pinned to a commit when it is *added*, and stays there
+  until something upgrades it by name. Add the core in March and the push module in May and the
+  project runs two framework releases against each other, with no version number anywhere to make the
+  gap visible, because a git dependency shows none. The check groups the `dartway_*` git entries of
+  every `pubspec.lock` in the project by repository and reports a repository resolved to more than one
+  commit, naming the packages, their commits and the directories to run `dart pub upgrade` in.
+  Different repositories are never compared, and hosted packages are left alone: semver already
+  answers this question for them. A warning rather than an error — the state is wrong but the code is
+  not, and what fixes it is a command rather than an edit.
+
 ## 0.6.0
 
 - **`dartway check` now verifies that the generated code is committed formatted — `generatedCodeUnformatted`.**

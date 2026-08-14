@@ -40,7 +40,8 @@ The monorepo exists so that its parts evolve together. A change to the **public 
 2. `template/` — compiles (this is what every new project receives; a rotted template is a broken `dartway create`, and you will hear about it from a stranger);
 3. the affected skills in `toolkit/skills/` (a skill that has fallen behind the API is worse than a missing one — the agent confidently writes code that does not work);
 4. `docs/` — the affected pages;
-5. the package's `CHANGELOG.md`.
+5. the package's `CHANGELOG.md`;
+6. **the carets on that package in `example/` and `template/`, whenever the change bumps its version.** A minor bump of a `0.x` package puts it outside its own caret — `^0.6.0` means `>=0.6.0 <0.7.0`, so a package at `0.7.1` no longer satisfies the constraint the skeleton states for it. Nothing tells you: both trees carry a `dependency_overrides` block pointing at the local packages, and **for an overridden package pub does not check constraints at all** — the unsatisfiable line resolves quietly for as long as the block is there. `dartway create` then strips the block on the way out (deliberately — those paths do not exist in someone's project), and the constraint is finally read for the first time in a stranger's tree: either the resolution fails outright, or it succeeds against an older minor than the skeleton was written against. This is not hypothetical — it is how `dartway_studio_bridge` and `dartway_cli` sat one minor behind their own carets on master while five sibling packages were kept in step.
 
 **The promotion ritual for `stable` now includes the template:** analyze/tests green + **example and template both build** + `dartway create` from a fresh clone produces a project that runs + `framework-finish` reporting no drift.
 

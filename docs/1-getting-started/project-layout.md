@@ -221,6 +221,20 @@ inside it — is stripped, so the framework dependencies resolve from pub.dev li
 toolkit lands in `.claude/`, with a default `settings.json` if the project has none, and
 `dartway_notes.md` at the root.
 
+Worth knowing if you ever put such a block back — inside the monorepo, or in your own project while
+debugging a framework package. An override does more than redirect one dependency: **for the package
+it names, pub stops checking constraints altogether.** Not "prefers the override" — the caret is
+never evaluated, so a line that no published version could satisfy resolves in silence for as long
+as the block is there. That is the same property [plugins](../3-flutter/plugins.md) warns against
+using as a way to consume the framework, seen from its other side: the override is not only global
+to the resolution, it also hides whether the constraints underneath it still say anything true. The
+first tree to find out is one without the block — a new project, or CI.
+
+So after adding a framework package to a project, resolve it once for real: run
+`dart pub upgrade <the dartway packages>` in each package that gained one, and check that they came
+out on a single commit. `dartway check` reports it when they did not — see
+[the conventions checker](../5-tooling/conventions-checker.md).
+
 ## Where to go next
 
 - [Quick start](quick-start.md) — bring it up, then add a model of your own.

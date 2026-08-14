@@ -107,7 +107,13 @@ enum DwCheckType {
   /// people pass `--type` around to avoid. Hence the finding names the exact
   /// command and paths instead — the fix has to be runnable by someone who did
   /// not write the code and does not know why it went red.
-  generatedCodeUnformatted;
+  generatedCodeUnformatted,
+
+  /// The project's `dartway_*` git dependencies are locked to more than one
+  /// commit of the framework. Nothing else says so: `ref: master` is written
+  /// once per package and reads as "from master", while the lock pins each one
+  /// at whatever master was when *that* package was added.
+  frameworkRefsDiverged;
 
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
@@ -116,6 +122,7 @@ enum DwCheckType {
     DwCheckType.forbiddenAssetPath ||
     DwCheckType.unusedFeatureFile ||
     DwCheckType.generatedCodeUnformatted ||
+    DwCheckType.frameworkRefsDiverged ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
+import '../checker/dw_framework_lock.dart';
 import '../checker/dw_generated_format.dart';
 import '../checker/dw_layout.dart';
 import '../project_layout.dart';
@@ -87,6 +88,14 @@ class CheckCommand extends Command<int> {
       errorCount += DwGeneratedFormatInspector(
         serverPackageDir: layout?.serverPackageDir,
         clientPackageDir: layout?.clientPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
+
+      // Judges the project rather than any one package, so it is skipped by
+      // `--dir` for the same reason the layout check is.
+      errorCount += DwFrameworkLockInspector(
+        projectRoot: layout?.root ?? flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();
