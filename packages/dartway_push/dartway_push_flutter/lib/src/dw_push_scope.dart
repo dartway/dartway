@@ -18,8 +18,10 @@ import 'dw_push.dart';
 /// DwPushScope(push: dw.plugins.push, child: MaterialApp.router(...))
 /// ```
 ///
-/// The plugin is passed in rather than looked up: `dw` belongs to the app, and
-/// a package that reached for it would be assuming which app it is in.
+/// The plugin is passed in rather than looked up because *which* plugin this is
+/// is something only the app knows. Who is signed in is not passed in: a
+/// DartWay app has exactly one session, and [DwPush] resolved it when the core
+/// initialized it.
 class DwPushScope extends ConsumerStatefulWidget {
   const DwPushScope({super.key, required this.push, required this.child});
 
@@ -36,10 +38,6 @@ class _DwPushScopeState extends ConsumerState<DwPushScope> {
   @override
   void initState() {
     super.initState();
-    final recipientIdProvider = widget.push.config.recipientIdProvider;
-    if (recipientIdProvider != null) {
-      widget.push.setRecipient(ref.read(recipientIdProvider));
-    }
     unawaited(_start());
   }
 
@@ -73,12 +71,12 @@ class _DwPushScopeState extends ConsumerState<DwPushScope> {
 
   @override
   Widget build(BuildContext context) {
-    final recipientIdProvider = widget.push.config.recipientIdProvider;
+    // Read *and* subscribe in one line: the first build hands over whoever is
+    // already signed in, every later one whoever it changed to. Handing over
+    // the same person twice costs nothing — `setRecipient` returns on it.
+    final recipientIdProvider = widget.push.recipientIdProvider;
     if (recipientIdProvider != null) {
-      ref.listen<int?>(
-        recipientIdProvider,
-        (_, recipientId) => widget.push.setRecipient(recipientId),
-      );
+      widget.push.setRecipient(ref.watch(recipientIdProvider));
     }
     return widget.child;
   }

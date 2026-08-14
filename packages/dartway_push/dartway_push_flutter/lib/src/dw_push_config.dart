@@ -28,12 +28,25 @@ final class DwPushConfig {
   /// and gets exactly that; an app that only knows FCM declares one.
   final List<DwPushClientProvider> providers;
 
-  /// Who the token belongs to, watched for changes.
+  /// Overrides who the token belongs to. Leave it null.
   ///
-  /// Typically `dw.userProfileProvider.select((profile) => profile?.id)`. A
-  /// listenable rather than a value because both halves of the pair — token and
-  /// user — arrive on their own schedule. Leave it null and drive it yourself
-  /// with `dw.plugins.push.setRecipient(...)`.
+  /// Left null, the plugin follows the DartWay session — the same session the
+  /// app's calls are authenticated with, and therefore the same one the server
+  /// takes the real recipient from when the token arrives. The two sides agree
+  /// by construction, not by the app keeping them aligned.
+  ///
+  /// Nothing here is sent anywhere: a registration carries a token and a
+  /// provider, never an id. The recipient is local bookkeeping — whether there
+  /// is anybody to register a token for, whether this exact registration has
+  /// already been made, and whether a sign-out invalidated it.
+  ///
+  /// Set it only when the app authenticates through an `AuthenticationKeyManager`
+  /// of its own, leaving DartWay's own session permanently empty. What you pass
+  /// then **must** mirror the identity those calls are authenticated as. A provider
+  /// that drifts from it redirects no notification whatsoever — it only
+  /// desynchronizes this device's "already registered" bookkeeping from what
+  /// the server recorded, and the symptom is push going quiet after an account
+  /// switch.
   final ProviderListenable<int?>? recipientIdProvider;
 
   /// The user opened a notification. This is where an app routes.
