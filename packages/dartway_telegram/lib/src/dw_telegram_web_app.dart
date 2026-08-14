@@ -47,8 +47,11 @@ abstract class DwTelegramWebApp implements DwPlugin {
 
   /// Announces the app to Telegram and applies the config. Called by the app
   /// core during bootstrap; safe outside Telegram, where it does nothing.
+  ///
+  /// The bridge asks Telegram for everything it knows and needs nothing from
+  /// [core] — the argument is the plugin contract, not a hint that it does.
   @override
-  Future<void> init();
+  Future<void> init(DwFlutter core);
 
   /// Whether the app really is running inside a Telegram Mini App — `false` on
   /// mobile, on desktop, and on plain web opened in a browser.

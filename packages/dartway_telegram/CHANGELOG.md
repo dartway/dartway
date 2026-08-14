@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+Follows `dartway_flutter` 0.5.0, where `DwPlugin.init()` gained the core as an argument:
+`DwTelegramWebApp.init(DwFlutter core)`. The bridge asks Telegram for everything it knows and needs
+nothing from the core — the parameter is the plugin contract, and behaviour is unchanged. Breaking
+only for a consumer that implements `DwTelegramWebApp` itself.
+
 ## 0.1.1
 
 Moves to `dartway_flutter` 0.2.0 (breaking `DwFeatureSpec`), so the two resolve together.

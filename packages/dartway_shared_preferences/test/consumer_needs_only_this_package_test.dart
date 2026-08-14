@@ -15,7 +15,6 @@
 
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 enum _Theme { system, dark }
 
@@ -39,11 +38,14 @@ late final DwMappedPrefProvider<_Theme> themeProvider = _prefs
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('a consumer declares both providers importing only this package', () async {
-    SharedPreferences.setMockInitialValues({});
+  test('a consumer declares both providers importing only this package', () {
     _prefs = DwSharedPreferences();
-    await _prefs.init();
 
+    // Not initialized on purpose. `init` takes the core the plugin was plugged
+    // into, and constructing one would put `dartway_flutter` in the import list
+    // this file exists to keep short. Nothing here reads a provider, so nothing
+    // needs the storage behind it.
+    //
     // Reading them is enough: the assertion this file makes is that the two
     // declarations above compile at all.
     expect(darkModeProvider, isNotNull);

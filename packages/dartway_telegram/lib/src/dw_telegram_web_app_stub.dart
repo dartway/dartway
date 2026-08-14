@@ -1,3 +1,4 @@
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:flutter/widgets.dart';
 
 import 'dw_telegram_platform.dart';
@@ -13,7 +14,7 @@ class DwTelegramWebAppImpl extends DwTelegramWebApp {
   final DwTelegramWebAppConfig config;
 
   @override
-  Future<void> init() async {}
+  Future<void> init(DwFlutter core) async {}
 
   @override
   bool get isRunningInTelegram => false;

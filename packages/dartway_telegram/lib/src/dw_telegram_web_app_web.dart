@@ -1,3 +1,4 @@
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:flutter/widgets.dart';
 import 'package:telegram_web_app/telegram_web_app.dart';
 
@@ -36,7 +37,7 @@ class DwTelegramWebAppImpl extends DwTelegramWebApp {
   }
 
   @override
-  Future<void> init() async {
+  Future<void> init(DwFlutter core) async {
     if (!isRunningInTelegram) return;
 
     // The WebApp object can exist before Telegram has handed over the viewport,

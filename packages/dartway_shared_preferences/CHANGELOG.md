@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+Follows `dartway_flutter` 0.5.0, where `DwPlugin.init()` gained the core as an argument:
+`DwSharedPreferences.init(DwFlutter core)`. Local storage needs nothing from the core — the parameter
+is the plugin contract, and behaviour is unchanged. An app that declares the plugin and reads
+`dw.plugins.prefs` never sees the difference.
+
 ## 0.2.0
 
 - **`DwPrefProvider<T>` and `DwMappedPrefProvider<T>` — the plugin names its own return types**, so a

@@ -1,3 +1,5 @@
+import '../dw_flutter.dart';
+
 /// An integration plugged into the app core at bootstrap.
 ///
 /// The framework knows what a plugin *is* — never what any particular one
@@ -17,11 +19,25 @@
 ///   DwTelegramWebApp get telegram => of<DwTelegramWebApp>();
 /// }
 /// ```
+///
+/// [init] hands the plugin the core it was plugged into, because until that
+/// moment there is nothing for it to reach: the ambient `dw` is the app's own
+/// `late final` variable, and a plugin is constructed as an argument to the
+/// constructor that assigns it. Reading `dw` from inside a `plugins: [...]`
+/// list compiles and throws `LateInitializationError` at startup.
+///
+/// The argument is a [DwFlutter]. An app built on the data layer passes a
+/// `DwCore`, which is one — a plugin that needs the data layer names it and
+/// casts, and thereby says out loud that it does not work on the plain
+/// toolbox.
 abstract class DwPlugin {
   const DwPlugin();
 
-  /// Runs once during `dw.init()`, in the order the plugins were declared.
-  Future<void> init();
+  /// Runs once during `dw.init()`, in declaration order, with the core this
+  /// plugin was plugged into. A plugin is built *before* `dw` exists — that is
+  /// what `plugins:` being a constructor argument means — so this is the first
+  /// moment it may look at anything.
+  Future<void> init(DwFlutter core);
 }
 
 /// The plugins a project has connected, reached as `dw.plugins`.
@@ -47,10 +63,11 @@ class DwPlugins {
     );
   }
 
-  /// Initializes every plugin once, in declaration order. Called by `dw.init()`.
-  Future<void> initAll() async {
+  /// Initializes every plugin once, in declaration order, handing each the
+  /// [core] it was declared on. Called by `dw.init()`, which passes itself.
+  Future<void> initAll(DwFlutter core) async {
     for (final plugin in _plugins) {
-      await plugin.init();
+      await plugin.init(core);
     }
   }
 }

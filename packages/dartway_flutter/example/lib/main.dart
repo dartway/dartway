@@ -56,7 +56,7 @@ class _ClockPlugin extends DwPlugin {
   late final DateTime startedAt;
 
   @override
-  Future<void> init() async => startedAt = DateTime.now();
+  Future<void> init(DwFlutter core) async => startedAt = DateTime.now();
 }
 
 class _ExampleApp extends StatelessWidget {

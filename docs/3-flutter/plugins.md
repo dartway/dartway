@@ -8,7 +8,7 @@ including the ones that will never open Telegram.
 DartWay does not do that. The framework knows what a **plugin** is; it never knows what any
 particular one *does*. `dartway_flutter` contains no mention of Telegram or of `shared_preferences` —
 only [`DwPlugin`](https://github.com/dartway/dartway/blob/master/packages/dartway_flutter/lib/src/core/logic/dw_plugin.dart),
-an interface with a single `init()`.
+an interface with a single `init(core)`.
 
 The consequences are the whole point:
 
@@ -77,7 +77,7 @@ that is perfectly fine.
 
 ## When a plugin is initialized
 
-`dw.init()` runs `init()` on every declared plugin, awaited, in declaration order — and a project
+`dw.init()` runs `init(core)` on every declared plugin, awaited, in declaration order — and a project
 built by `dartway create` already calls it from the bootstrapper:
 
 ```dart
@@ -96,6 +96,50 @@ screen rather than half-booting the app.
 Declare a plugin and forget it, and the failure is loud and immediate: `dw.plugins.of<T>()` throws a
 `StateError` naming the type that was never registered. It cannot silently return null.
 
+### `init` is handed the core, and that is not a convenience
+
+A plugin cannot read `dw` while it is being declared. Look at where the declaration sits:
+
+```dart
+late final DwCore<Client, UserProfile> dw;   // the app's own variable
+
+dw = DwCore<Client, UserProfile>(
+  plugins: [MyPlugin()],                     // built as an argument to the constructor
+);                                           // that assigns dw — dw is not assigned yet
+```
+
+`plugins:` is a constructor parameter, so every plugin is constructed *before* the variable it will
+be reached through exists. Anything that touches `dw` inside that list throws
+`LateInitializationError` before the first frame — and the analyzer says nothing, because `late
+final` is exactly the promise that it will be there by the time anyone reads it. The framework does
+not export the singleton either, so there is no back door: `dw` is the app's variable, not ours.
+
+Hence the argument. `init` is the first moment the core exists, and it arrives rather than being
+looked up:
+
+```dart
+class MyPlugin extends DwPlugin {
+  ProviderListenable<int?>? _userId;
+
+  @override
+  Future<void> init(DwFlutter core) async {
+    // A plugin that needs the data layer names DwCore and casts. The cast is the
+    // honest part: it says out loud that this plugin does not work on the plain
+    // Flutter toolbox, and fails at startup rather than at the first read.
+    final dwCore = core as DwCore<Client, UserProfile>;
+    _userId = dwCore.userProfileProvider.select((profile) => profile?.id);
+  }
+}
+```
+
+The parameter is a `DwFlutter` because that is what declares `plugins:`. An app on the data layer
+passes a `DwCore`, which *is* a `DwFlutter` — so a plugin that needs nothing from the core (most of
+them) ignores the argument and works on both.
+
+What a plugin must **not** do is keep the core and read it during `init` for something the app has not
+finished setting up. Session state is the usual example: at `init` time nobody is signed in yet.
+Capture the provider, watch it from the widget tree, and react — do not read a value.
+
 ## Distribution: pub.dev, and nothing else
 
 **Plugins ship on pub.dev, versioned independently of the core.** Not as a git ref, not as a path
@@ -112,7 +156,7 @@ machine, and they cost more than they save:
   consume it;
 - a git ref pins a moving branch, so two checkouts of the same app can build different code.
 
-Each plugin states its compatibility with a caret on the framework — `dartway_flutter: ^0.4.0`. So a
+Each plugin states its compatibility with a caret on the framework — `dartway_flutter: ^0.5.0`. So a
 breaking release of `dartway_flutter` is followed by a release of each plugin, and pub refuses the
 combinations that were never tested instead of failing at runtime.
 
@@ -145,8 +189,9 @@ A plugin is one class and one extension, in your own package:
 ```dart
 class MyAnalytics extends DwPlugin {
   @override
-  Future<void> init() async {
-    // runs during dw.init(), before the first frame
+  Future<void> init(DwFlutter core) async {
+    // runs during dw.init(), before the first frame, with the core it was
+    // plugged into — ignore the argument if you have no use for it
   }
 
   void track(String event) {/* ... */}

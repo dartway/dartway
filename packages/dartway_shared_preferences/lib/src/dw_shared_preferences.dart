@@ -59,7 +59,7 @@ class DwSharedPreferences extends DwPlugin {
   late final SharedPreferences raw;
 
   @override
-  Future<void> init() async {
+  Future<void> init(DwFlutter core) async {
     raw = await SharedPreferences.getInstance();
   }
 

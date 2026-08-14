@@ -3,14 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _RecordingPlugin extends DwPlugin {
   bool initialized = false;
+  DwFlutter? core;
 
   @override
-  Future<void> init() async => initialized = true;
+  Future<void> init(DwFlutter core) async {
+    this.core = core;
+    initialized = true;
+  }
 }
 
 class _UndeclaredPlugin extends DwPlugin {
   @override
-  Future<void> init() async {}
+  Future<void> init(DwFlutter core) async {}
 }
 
 /// A plugin the app declares through its interface while the object it actually
@@ -21,7 +25,7 @@ abstract class _Bridge extends DwPlugin {}
 
 class _BridgeWebImpl extends _Bridge {
   @override
-  Future<void> init() async {}
+  Future<void> init(DwFlutter core) async {}
 }
 
 void main() {
@@ -62,6 +66,17 @@ void main() {
       await dwInstance.init();
 
       expect(recording.initialized, isTrue);
+    });
+
+    // The whole reason `init` takes an argument: a plugin is constructed as an
+    // argument to the constructor that assigns `dw`, so reading the ambient
+    // instance from inside `plugins: [...]` throws LateInitializationError.
+    // `init` is the first moment the core exists, and it is handed over rather
+    // than looked up.
+    test('a plugin is handed the core it was plugged into', () async {
+      await dwInstance.init();
+
+      expect(recording.core, same(dwInstance));
     });
   });
 }
