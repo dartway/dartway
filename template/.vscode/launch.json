@@ -10,14 +10,6 @@
       "args": ["--apply-migrations"]
     },
     {
-      "name": "Seed dev data",
-      "type": "dart",
-      "request": "launch",
-      "cwd": "dartway_starter_server",
-      "program": "bin/seed_dev.dart",
-      "args": ["--mode", "development"]
-    },
-    {
       "name": "Flutter (web)",
       "type": "dart",
       "request": "launch",

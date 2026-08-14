@@ -18,8 +18,11 @@ fields:
   # access filters. Add your own roles as your domain needs them.
   role: UserRole, default=user
 
-  # Rotatable test/reviewer OTP code. serverOnly: NEVER serialized to the client,
-  # so a regular client cannot read test codes. Real users leave it null and get
-  # a random code (secure-by-default); the admin sets/rotates it via a dedicated
-  # admin endpoint, and the users that have it set are the Studio demo personas.
+  # Fixed test/reviewer OTP code. serverOnly: NEVER serialized to the client, so
+  # a regular client cannot read test codes. Real users leave it null and get a
+  # random code (secure-by-default); a profile that has one set signs in with it
+  # in any run mode — which is what a store reviewer and a Studio demo persona
+  # need. Nothing in the skeleton writes this field: set it, and rotate it, from
+  # wherever the project decides to (an admin screen is a fair place, and one it
+  # would have to build).
   testVerificationCode: String?, scope=serverOnly

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dev/test_error_button.dart';
-import 'package:dartway_example_flutter/core/dev/test_notification_button.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
@@ -17,7 +16,6 @@ class ScheduleAppBar extends ConsumerWidget implements PreferredSizeWidget {
       ),
       actions: const [
         ConnectionStatusIndicator(),
-        TestNotificationButton(),
         TestErrorButton(),
       ],
     );

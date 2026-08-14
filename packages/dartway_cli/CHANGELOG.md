@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1
+
+- **`quickstart` no longer tells the agent to run a seed, because the skeleton no longer ships one.**
+  The first administrator is now declared per environment — `bootstrapAdminIdentifier` in
+  `config/passwords.yaml`, which the brief instructs the agent to *ask the human for* rather than
+  invent, since whoever receives the one-time code on that identifier becomes the admin. The step it
+  replaces was development-only by construction, so staging and production were left with an `UPDATE`
+  typed by hand: an operation nobody can read back and nobody can repeat when a new environment goes
+  up. Everything else the seed did was already reachable without it — a plain user registers in half
+  a minute against the OTP printed in the console, and the app name is set on the admin panel's
+  settings screen, which is a better first run than a row put there in advance because it shows the
+  write path and the live update.
+
 ## 0.5.0
 
 - **`deploy check` now reads `compose.override.yml`, which nothing did before.** The override is the

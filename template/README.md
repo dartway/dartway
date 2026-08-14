@@ -13,8 +13,8 @@ up. `dartway quickstart` prints everything it needs to know — the order of the
 steps, the ports, the verification, how to hand you the sign-in — and
 `dartway doctor` says whether this machine is ready for any of it.
 
-Or press **F5** in VS Code — launch **Server**, then **Seed dev data**, then
-**Flutter (web)** (configured in `.vscode/launch.json`).
+Or press **F5** in VS Code — launch **Server**, then **Flutter (web)**
+(configured in `.vscode/launch.json`).
 
 Or do it by hand, from the terminal:
 
@@ -24,7 +24,6 @@ cd dartway_starter_server
 dart pub get
 docker compose up -d                               # Postgres
 dart bin/main.dart --apply-migrations --role maintenance   # apply the schema
-dart bin/seed_dev.dart --mode development           # seed an admin + a user
 dart bin/main.dart                                  # run the server
 ```
 
@@ -35,8 +34,16 @@ flutter pub get
 flutter run
 ```
 
-Sign in as the seeded user **79990000003** — the one-time code is printed in the
-server console. (The admin is **79990000001**.)
+The database starts empty: register from the app with any phone number, and the
+one-time code is printed in the server console — in development nothing is sent
+over SMS.
+
+**To reach the admin panel**, put your own identifier in
+`bootstrapAdminIdentifier` in `dartway_starter_server/config/passwords.yaml`
+before starting the server. The role is granted by an admin, so the first one is
+declared per environment instead of coming from nowhere; the server prints what
+it did on boot, and says so when the key is empty. Register with that same
+identifier and you are in.
 
 ## Build a feature
 
