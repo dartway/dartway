@@ -16,6 +16,13 @@ export const studioBridgeProtocol = {
    * See the Dart package for the history of versions 1-3.
    * v4: `studioConnect` presents a short-lived `accessToken` — signed by
    * Studio, issued for the app's own origin — instead of a shared secret.
+   *
+   * **Adding a message type is not a schema change and must not bump this.**
+   * The version is checked strictly on decode, so a bump silences every build
+   * already in the field, in both directions, the moment it ships. A new type
+   * costs nothing instead: an old side drops the envelope it does not
+   * recognise and carries on, which is how `connectRefused` arrived inside v4.
+   * Bump only when the *meaning* of an existing message changes.
    */
   version: 4,
 
@@ -33,6 +40,13 @@ export const studioBridgeProtocol = {
   featuresChanged: 'featuresChanged',
   localeChanged: 'localeChanged',
   inspectPointResult: 'inspectPointResult',
+
+  /**
+   * The refusal of a handshake: the app heard `studioConnect`, understood the
+   * token it carried, and would not accept it. Added *inside* version 4 — see
+   * `version` for why adding a type is not a schema change.
+   */
+  connectRefused: 'connectRefused',
 
   // Studio → app.
   studioConnect: 'studioConnect',

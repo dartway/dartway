@@ -161,6 +161,12 @@ package, a public key can only check signatures and never make them, and it is
 the same for every project. There is nothing to copy out of Studio, store, or
 rotate.
 
+A token that parses as a signed Studio token and then fails the check gets a
+`connectRefused` back, so Studio can say "the signature was refused" instead of
+"not connected". Anything that is not a token — nothing presented, a guess,
+noise — is met with silence as before: a stranger who guessed the preview's URL
+does not learn that there is a bridge on this page.
+
 A build that names no origin (`appOrigin` left out) accepts any connection.
 That is deliberate — it is what makes `npm run dev` previewable with no keys at
 all — and it is why a deployed build should always name its address.

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../access/studio_bridge_token.dart';
 import '../models/studio_feature_info.dart';
 import '../models/studio_project_manifest.dart';
 import '../models/studio_session_state.dart';
@@ -127,12 +128,19 @@ class StudioBridgeHost {
 
   void _onMessage(StudioBridgeMessage message) {
     if (message case StudioConnectMessage(:final accessToken)) {
-      // Answer the handshake only if the token is accepted; on refusal stay
-      // silent — the app keeps running, Studio shows "not connected".
       _validateAccessToken(accessToken).then((accepted) {
-        if (!accepted) return;
-        _connected = true;
-        _sendManifest();
+        if (accepted) {
+          _connected = true;
+          _sendManifest();
+          return;
+        }
+        // A refusal is answered only when the token was one — see
+        // [looksLikeStudioBridgeToken] and [ConnectRefusedMessage]. Anything
+        // else (nothing presented, a guess, noise) is met with silence, as it
+        // always was: the app keeps running and the sender learns nothing.
+        if (looksLikeStudioBridgeToken(accessToken)) {
+          _channel.send(const ConnectRefusedMessage());
+        }
       });
       return;
     }

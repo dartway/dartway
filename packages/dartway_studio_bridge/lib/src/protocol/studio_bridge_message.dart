@@ -43,6 +43,7 @@ sealed class StudioBridgeMessage {
             const {};
     return switch (decoded[StudioBridgeProtocol.typeKey]) {
       StudioBridgeProtocol.appReady => const AppReadyMessage(),
+      StudioBridgeProtocol.connectRefused => const ConnectRefusedMessage(),
       StudioBridgeProtocol.manifest => ManifestMessage.fromPayload(payload),
       StudioBridgeProtocol.routeChanged =>
         RouteChangedMessage.fromPayload(payload),

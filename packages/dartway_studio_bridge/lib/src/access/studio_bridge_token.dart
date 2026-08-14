@@ -96,6 +96,39 @@ Future<bool> verifyStudioBridgeToken(
   );
 }
 
+/// Whether [accessToken] is *shaped* like a token Studio signs — two base64url
+/// segments, the first of which decodes to a JSON object carrying an `origin`
+/// string and an integer `exp`. Nothing here is checked against a key, an
+/// origin or a clock: a forged token passes this and is still refused by
+/// [verifyStudioBridgeToken].
+///
+/// It exists to separate two refusals that are otherwise one. A token that
+/// parses came from something that knows the format — in practice, from Studio
+/// — so refusing it is worth *saying* (`ConnectRefusedMessage`): whoever sent
+/// it can be told their signature is stale rather than left to guess whether
+/// the bridge is there at all. Anything that does not parse is met with
+/// silence, so a stranger who guessed the preview's URL learns nothing.
+///
+/// A stranger who bothers to construct a well-formed token does learn that this
+/// page carries a bridge. That is the price of the diagnosis, it is bounded —
+/// nothing else crosses the bridge without a valid signature — and it was
+/// chosen deliberately over leaving a misconfigured Studio with no way to tell
+/// "the app has no bridge" from "the app rejected my key".
+bool looksLikeStudioBridgeToken(String accessToken) {
+  final segments = accessToken.split(_tokenSegmentSeparator);
+  if (segments.length != 2 || segments.any((s) => s.isEmpty)) return false;
+  try {
+    final claims =
+        jsonDecode(utf8.decode(_decodeSegment(segments.first))) as Object?;
+    _decodeSegment(segments.last);
+    return claims is Map<String, dynamic> &&
+        claims['origin'] is String &&
+        claims['exp'] is int;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// The access-token check an app hands to `StudioBridgeHost.attach`: accept a
 /// connecting Studio only when it presents a token issued for [appOrigin] —
 /// this app's own public address — and signed by Studio's key.

@@ -21,6 +21,29 @@ export interface AppReadyMessage {
 }
 
 /**
+ * The handshake was heard and refused — the token presented in
+ * `studioConnect` parsed as a signed Studio token and did not pass the app's
+ * check (expired, or signed by another key).
+ *
+ * It carries no reason. Which of the two it was is Studio's to work out from
+ * the token it issued itself, and an app that spelled it out would be telling
+ * whoever asked how to get closer.
+ *
+ * **Only a token that parses gets an answer.** An empty, absent or garbled
+ * token is still met with silence, so a stranger who guessed the preview's URL
+ * does not learn that there is a bridge here at all.
+ *
+ * **This type was added without bumping the protocol version, on purpose**
+ * (see `studioBridgeProtocol.version`). An app built before it exists simply
+ * never sends it, and a probe reads that as "no answer" — exactly what it read
+ * before this message existed. Do not bump the version to "fix" this: that
+ * would cut off every build in the field in both directions.
+ */
+export interface ConnectRefusedMessage {
+  type: typeof studioBridgeProtocol.connectRefused;
+}
+
+/**
  * The handshake response — the full manifest plus the current route, session,
  * features and locale, so Studio renders correctly right away.
  */
@@ -135,6 +158,7 @@ export interface InspectPointRequestMessage {
 
 export type StudioBridgeMessage =
   | AppReadyMessage
+  | ConnectRefusedMessage
   | ManifestMessage
   | RouteChangedMessage
   | SessionChangedMessage
@@ -156,6 +180,7 @@ export type StudioBridgeMessage =
 function payloadToJson(message: StudioBridgeMessage): Record<string, unknown> {
   switch (message.type) {
     case studioBridgeProtocol.appReady:
+    case studioBridgeProtocol.connectRefused:
     case studioBridgeProtocol.signOutRequest:
       return {};
     case studioBridgeProtocol.manifest:
@@ -232,6 +257,8 @@ export function decodeStudioBridgeMessage(data: unknown): StudioBridgeMessage | 
   switch (envelope[studioBridgeProtocol.typeKey]) {
     case studioBridgeProtocol.appReady:
       return { type: studioBridgeProtocol.appReady };
+    case studioBridgeProtocol.connectRefused:
+      return { type: studioBridgeProtocol.connectRefused };
     case studioBridgeProtocol.manifest:
       return {
         type: studioBridgeProtocol.manifest,

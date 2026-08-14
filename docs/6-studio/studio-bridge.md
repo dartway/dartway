@@ -37,6 +37,14 @@ The open `dartway_studio_bridge` package is the only integration surface:
   a page that embedded the build without presenting anything can neither drive
   it nor read its feature passports.
 
+  **A refusal is answered, once it is a refusal of something.** If the token
+  presented parses as a signed Studio token and then fails the check — expired,
+  or signed by another key — the app replies `connectRefused`. Anything else (an
+  empty token, a guess, noise) is met with silence as before, so a stranger who
+  guessed the preview's URL does not learn there is a bridge here at all. The
+  distinction is the whole value: "this build carries no bridge" and "your
+  signature is stale" are two different repairs and used to look identical.
+
   Your build holds no secret and copies nothing out of Studio: the public half
   of the pair ships inside the bridge package, and a public key can only check
   signatures, never make them. The build names one thing — where it answers:
@@ -66,6 +74,33 @@ The open `dartway_studio_bridge` package is the only integration surface:
   its own logical size, so the app converts. A feature is matched on the area
   it actually paints into: something scaled down, scrolled out of its viewport
   or clipped away does not answer for a point where the user sees nothing.
+
+## Asking whether an app has a bridge at all
+
+Studio has a second reason to talk to an app: not to preview it, but to find out
+whether it answers. `probeStudioBridge(appUrl: …)` performs exactly one
+handshake and returns one of three things:
+
+```dart
+switch (await probeStudioBridge(appUrl: url, accessToken: myTokenSupplier)) {
+  StudioHandshakeResult.accepted => 'connected',
+  StudioHandshakeResult.rejected => 'the signature was refused',
+  StudioHandshakeResult.silent   => 'no answer',
+}
+```
+
+The frame is created and removed inside the call — nothing to render, nothing to
+know about. That matters because the preview's own `StudioFrameController` hands
+out a *platform view*: its iframe is not in the document until the embedder lays
+it out, and a detached iframe never fetches its `src`, so no layout means no
+load means no handshake. Asking this question through the preview therefore cost
+a 1×1 frame parked on screen for the lifetime of the app.
+
+`silent` covers several causes at once — no bridge in the build, a page that
+never loaded, a deployment that forbids being framed, an older app refusing in
+silence. Cross-origin they are one silence and cannot be separated from here:
+check that the URL serves a page, and that it permits `frame-ancestors`, as
+steps of their own before the probe.
 
 See the package [README](../packages/dartway_studio_bridge/README.md) for the
 full API, and `example/dartway_example_flutter/lib/core/studio/` for the reference

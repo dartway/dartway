@@ -24,6 +24,7 @@ export {
   decodeStudioBridgeMessage,
   encodeStudioBridgeMessage,
   type AppReadyMessage,
+  type ConnectRefusedMessage,
   type FeaturesChangedMessage,
   type InspectPointRequestMessage,
   type InspectPointResultMessage,
@@ -40,6 +41,7 @@ export {
 } from './protocol/messages.ts';
 
 export {
+  looksLikeStudioBridgeToken,
   studioSignedAccessValidator,
   studioSigningPublicKey,
   verifyStudioBridgeToken,

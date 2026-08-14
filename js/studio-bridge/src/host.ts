@@ -12,7 +12,7 @@ import {
 } from './models.ts';
 import { studioBridgeProtocol } from './protocol/protocol.ts';
 import type { StudioBridgeMessage } from './protocol/messages.ts';
-import { studioSignedAccessValidator } from './access/token.ts';
+import { looksLikeStudioBridgeToken, studioSignedAccessValidator } from './access/token.ts';
 import { createStudioHostChannel, type StudioMessageChannel } from './transport.ts';
 
 export interface StudioBridgeConfig {
@@ -172,10 +172,19 @@ class StudioBridgeHostImpl implements StudioBridgeHost {
 
   #onMessage(message: StudioBridgeMessage): void {
     if (message.type === studioBridgeProtocol.studioConnect) {
-      // Answer the handshake only if the token is accepted; on refusal stay
-      // silent — the app keeps running, Studio shows "not connected".
-      void this.#validateAccessToken(message.accessToken).then((accepted) => {
-        if (!accepted || this.#detached) return;
+      const { accessToken } = message;
+      void this.#validateAccessToken(accessToken).then((accepted) => {
+        if (this.#detached) return;
+        if (!accepted) {
+          // A refusal is answered only when the token was one — see
+          // `looksLikeStudioBridgeToken` and `ConnectRefusedMessage`. Anything
+          // else (nothing presented, a guess, noise) is met with silence, as it
+          // always was: the app keeps running and the sender learns nothing.
+          if (looksLikeStudioBridgeToken(accessToken)) {
+            this.#channel.send({ type: studioBridgeProtocol.connectRefused });
+          }
+          return;
+        }
         this.#connected = true;
         this.#channel.send({
           type: studioBridgeProtocol.manifest,

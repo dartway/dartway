@@ -8,6 +8,31 @@ class AppReadyMessage extends StudioBridgeMessage {
   String get type => StudioBridgeProtocol.appReady;
 }
 
+/// App → Studio: the handshake was heard and refused — the token presented in
+/// [StudioConnectMessage] parsed as a signed Studio token and did not pass the
+/// app's check (expired, or signed by another key).
+///
+/// It carries no reason. Which of the two it was is Studio's to work out from
+/// the token it issued itself, and an app that spelled it out would be telling
+/// whoever asked how to get closer.
+///
+/// **Only a token that parses gets an answer.** An empty, absent or garbled
+/// token is still met with silence, so a stranger who guessed the preview's URL
+/// does not learn that there is a bridge here at all.
+///
+/// **This type was added without bumping the protocol version, on purpose**
+/// (see [StudioBridgeProtocol.version]). An app built before it exists simply
+/// never sends it, and a probe reads that as "no answer" — exactly what it read
+/// before this message existed. Newer apps hand back a diagnosis instead. Do
+/// not bump the version to "fix" this: that would cut off every build in the
+/// field in both directions, which is the opposite of what this buys.
+class ConnectRefusedMessage extends StudioBridgeMessage {
+  const ConnectRefusedMessage();
+
+  @override
+  String get type => StudioBridgeProtocol.connectRefused;
+}
+
 /// App → Studio: the handshake response — the full manifest plus the current
 /// route, session and locale so Studio renders correctly right away.
 class ManifestMessage extends StudioBridgeMessage {

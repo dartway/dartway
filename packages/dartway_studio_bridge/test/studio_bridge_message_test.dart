@@ -16,6 +16,13 @@ void main() {
       expect(_roundTrip(const AppReadyMessage()), isA<AppReadyMessage>());
     });
 
+    test('connectRefused', () {
+      expect(
+        _roundTrip(const ConnectRefusedMessage()),
+        isA<ConnectRefusedMessage>(),
+      );
+    });
+
     test('studioConnect carries the access token', () {
       final decoded =
           _roundTrip(const StudioConnectMessage(accessToken: 'abc'));
@@ -207,6 +214,32 @@ void main() {
       const AppReadyMessage().encode(),
       contains('"${StudioBridgeProtocol.envelopeKey}":'
           '${StudioBridgeProtocol.version}'),
+    );
+  });
+
+  test('connectRefused goes on the wire exactly as the JS package writes it',
+      () {
+    // The literal below is the same string, character for character, as the
+    // golden in `js/studio-bridge/test/protocol.test.ts`. The two
+    // implementations share no schema — only this — and an app on either of
+    // them talks to a Studio that was never told which it is.
+    expect(
+      const ConnectRefusedMessage().encode(),
+      '{"dartwayStudioBridge":4,"type":"connectRefused","payload":{}}',
+    );
+  });
+
+  test('an old build that never heard of connectRefused just drops it', () {
+    // The reason the protocol version stayed at 4: an unknown *type* falls
+    // through to null here, exactly as it would on a build that predates this
+    // message — whereas an unknown *version* would drop every message, in both
+    // directions, for every build in the field.
+    expect(
+      StudioBridgeMessage.tryDecode(
+        '{"dartwayStudioBridge":${StudioBridgeProtocol.version},'
+        '"type":"somethingAddedLater","payload":{}}',
+      ),
+      isNull,
     );
   });
 }

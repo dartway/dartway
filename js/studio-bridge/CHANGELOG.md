@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.0
+
+**A refused handshake now gets an answer instead of silence.** The app sends
+`connectRefused` when the token it was shown parses as a signed Studio token and
+fails the check — expired, or signed by another key. Until now a refusal and a
+build with no bridge in it looked identical from the other side: an empty frame.
+They are two entirely different repairs, and whoever is connecting a project had
+no way to tell which one they were looking at.
+
+**Only a token that parses gets answered.** An empty, absent or garbled token is
+still met with silence (`looksLikeStudioBridgeToken`, exported for anyone who
+wants the same distinction), so a stranger who guessed the preview URL does not
+learn that there is a bridge on this page. Studio signs correctly by
+construction, so a refusal it can read means "your signature is stale or your
+key is wrong". A build in the zero-config local-dev mode (`appOrigin` left out)
+accepts everyone and therefore refuses nobody.
+
+**The protocol version stays 4.** It is checked strictly on decode, so bumping
+it would silence every build in the field in *both* directions the moment it
+shipped. A new message type is additive instead: a Studio that has never heard
+of `connectRefused` drops the envelope and behaves exactly as it did before.
+The golden wire string for it is in `test/protocol.test.ts`, character for
+character identical to the one in the Dart package's tests.
+
+Ships alongside `dartway_studio_bridge` 0.8.0, which adds the same message and
+the same refusal rule, plus a Studio-side one-shot probe that reads it.
+
 ## 0.1.0
 
 First release: the app side of the Studio bridge for JavaScript apps, speaking

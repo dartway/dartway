@@ -156,6 +156,42 @@ function reportOnce(reason: string, error?: unknown): void {
 
 const reported = new Set<string>();
 
+/**
+ * Whether `accessToken` is *shaped* like a token Studio signs — two base64url
+ * segments, the first of which decodes to a JSON object carrying an `origin`
+ * string and an integer `exp`. Nothing here is checked against a key, an origin
+ * or a clock: a forged token passes this and is still refused by
+ * {@link verifyStudioBridgeToken}.
+ *
+ * It exists to separate two refusals that are otherwise one. A token that
+ * parses came from something that knows the format — in practice, from Studio —
+ * so refusing it is worth *saying* (`connectRefused`): whoever sent it can be
+ * told their signature is stale rather than left to guess whether the bridge is
+ * there at all. Anything that does not parse is met with silence, so a stranger
+ * who guessed the preview's URL learns nothing.
+ *
+ * A stranger who bothers to construct a well-formed token does learn that this
+ * page carries a bridge. That is the price of the diagnosis, it is bounded —
+ * nothing else crosses the bridge without a valid signature — and it was chosen
+ * deliberately over leaving a misconfigured Studio with no way to tell "the app
+ * has no bridge" from "the app rejected my key".
+ */
+export function looksLikeStudioBridgeToken(accessToken: string): boolean {
+  const segments = accessToken.split(tokenSegmentSeparator);
+  if (segments.length !== 2 || segments.some((segment) => segment === '')) return false;
+  try {
+    const claims: unknown = JSON.parse(
+      new TextDecoder().decode(decodeSegment(segments[0] as string)),
+    );
+    decodeSegment(segments[1] as string);
+    if (typeof claims !== 'object' || claims === null || Array.isArray(claims)) return false;
+    const { origin, exp } = claims as Record<string, unknown>;
+    return typeof origin === 'string' && typeof exp === 'number' && Number.isInteger(exp);
+  } catch {
+    return false;
+  }
+}
+
 export interface StudioSignedAccessOptions {
   /**
    * Exists for tests and for the day an app has to trust a Studio running on

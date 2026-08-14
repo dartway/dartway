@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,6 +72,19 @@ const _manifest = StudioProjectManifest(
 /// than about signatures — those have a file of their own.
 Future<bool> _acceptsOnly(String accessToken) async => accessToken == 'good';
 
+/// Shaped exactly like a token Studio signs — two base64url segments, the first
+/// carrying an `origin` and an `exp` — and signed by nobody. Refusing it is
+/// what a stale or foreign signature looks like from the host's side.
+String _wellFormedToken() {
+  final payload = base64Url
+      .encode(utf8.encode(jsonEncode({
+        'origin': 'https://app.example.com',
+        'exp': 1765540000,
+      })))
+      .replaceAll('=', '');
+  return '$payload.${base64Url.encode(List.filled(64, 7)).replaceAll('=', '')}';
+}
+
 void main() {
   late _FakeStudio studio;
   late _RecordingDelegate delegate;
@@ -127,13 +141,51 @@ void main() {
     expect(host.isConnected, isTrue);
   });
 
-  test('a refused token is answered with silence', () async {
-    final host = attach();
-    studio.say(const StudioConnectMessage(accessToken: 'forged'));
-    await pumpEventQueue();
+  group('a refused token', () {
+    test('gets no manifest, whatever it looked like', () async {
+      final host = attach();
+      studio.say(const StudioConnectMessage(accessToken: 'forged'));
+      studio.say(StudioConnectMessage(accessToken: _wellFormedToken()));
+      await pumpEventQueue();
 
-    expect(studio.of<ManifestMessage>(), isEmpty);
-    expect(host.isConnected, isFalse);
+      expect(studio.of<ManifestMessage>(), isEmpty);
+      expect(host.isConnected, isFalse);
+    });
+
+    test('is told so when it was a token — Studio signs correctly, so a '
+        'refusal it can read means its signature is stale', () async {
+      attach();
+      studio.say(StudioConnectMessage(accessToken: _wellFormedToken()));
+      await pumpEventQueue();
+
+      expect(studio.of<ConnectRefusedMessage>(), hasLength(1));
+    });
+
+    test('is met with silence when it was not — a stranger who guessed the '
+        'URL does not learn that there is a bridge here', () async {
+      attach();
+      studio.say(const StudioConnectMessage(accessToken: 'forged'));
+      studio.say(const StudioConnectMessage(accessToken: ''));
+      // Two segments, and neither of them a token.
+      studio.say(const StudioConnectMessage(accessToken: 'not.atoken'));
+      // Shaped right, but claiming nothing: no origin, no expiry.
+      studio.say(const StudioConnectMessage(accessToken: 'e30.AAAA'));
+      await pumpEventQueue();
+
+      expect(studio.heard, [isA<AppReadyMessage>()]);
+    });
+
+    test('does not open the gate by being answered', () async {
+      final host = attach();
+      studio.say(StudioConnectMessage(accessToken: _wellFormedToken()));
+      await pumpEventQueue();
+
+      studio.say(const NavigateRequestMessage('/admin'));
+      await pumpEventQueue();
+
+      expect(delegate.done, isEmpty);
+      expect(host.isConnected, isFalse);
+    });
   });
 
   group('the gate covers every command, not just the manifest', () {
