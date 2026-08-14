@@ -64,6 +64,41 @@ ref.read(darkModeProvider.notifier).update(true);
 compiles but throws `UnsupportedError` on the first write; reach for `mappedProvider` (enums, custom
 types) or `raw` instead.
 
+## Per-entity values — the family form
+
+When the key depends on an entity — a sort order per project, a collapsed flag per section, a draft
+per chat — `keyFor` builds the key from an argument:
+
+```dart
+final DwPrefProviderFamily<String, int> projectSortProvider =
+    dw.plugins.prefs.providerFamily<String, int>(
+      keyFor: (projectId) => 'project.$projectId.sort',
+      defaultValue: 'name',
+    );
+
+// in a widget
+final sort = ref.watch(projectSortProvider(project.id));
+ref.read(projectSortProvider(project.id).notifier).update('createdAt');
+```
+
+`mappedProviderFamily(keyFor:, mapFrom:, mapTo:)` is the same for enums and custom types, exactly as
+`mappedProvider` is to `provider`.
+
+**A family is the safe way to do per-entity state, not merely the short one.** Calling `provider`
+once per id is the thing "define each provider once" forbids: every call builds a *new* provider, and
+two providers over one key never see each other's writes. A family is declared once and riverpod
+keeps a single provider per argument value — so `family(id)` read in one widget and `family(id)` read
+in another are the same state. Declare the *family* as the top-level `final`; calling it with an
+argument inside `build` is the intended use.
+
+The argument must be a value riverpod can compare: a `String`, an `int`, or any type with `==` and
+`hashCode` (a record, if you need several fields). Keys are namespaced by hand — `keyFor` returns the
+whole key, so a prefix naming the feature that owns it costs one string.
+
+Reaching for `raw` and a store of your own instead is the trade to avoid: two functions have no
+subscribers, so the value ends up living in one widget's `State` and every other reader on the screen
+has to be handed it through a constructor. `raw` is for a genuine one-off read.
+
 ## Why a plugin
 
 `dw.` is the framework's closed core; `dw.plugins.` is what a project plugs in. Preferences live

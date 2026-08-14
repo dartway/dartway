@@ -229,6 +229,46 @@ final workspaceStateProvider =
 (`scoped_providers_should_specify_dependencies`) which cannot help you here: it only reasons about
 providers written with code generation, and DartWay writes them by hand.
 
+## State that is not server data
+
+"How this list is sorted", "is this panel collapsed", "which tab was open" is state too, and it never
+goes near `dw.repo`. Two questions place it, in this order.
+
+**Does it survive a restart?** No — an ordinary `Notifier`, in memory like anything else. Yes — the
+[`dartway_shared_preferences`](plugins.md) plugin, `dw.plugins.prefs`. It hands back a riverpod
+provider, so persisting a value costs no reactivity: the same `ref.watch`, and every reader on the
+screen sees one value.
+
+**Does it belong to an entity?** No, it is one setting for the whole app — a constant key:
+
+```dart
+final darkModeProvider =
+    dw.plugins.prefs.provider<bool>(key: 'darkMode', defaultValue: false);
+```
+
+Yes, there is one per project, per chat, per section — the family form, where `keyFor` builds the key
+from the argument:
+
+```dart
+final projectSortProvider = dw.plugins.prefs.providerFamily<String, int>(
+  keyFor: (projectId) => 'project.$projectId.sort',
+  defaultValue: 'name',
+);
+
+final sort = ref.watch(projectSortProvider(project.id));
+ref.read(projectSortProvider(project.id).notifier).update('createdAt');
+```
+
+The family is what makes this safe, not just short. `provider` takes a constant key and must be
+declared once, like any riverpod provider: call it per id and each call builds a *new* provider, so
+two of them over one key never see each other's writes. A family is declared once and riverpod keeps
+one provider per argument value, which is exactly the guarantee the loop cannot give.
+
+`mappedProvider`/`mappedProviderFamily` are the same pair for enums and custom types, stored as a
+`String`. `dw.plugins.prefs.raw` is the underlying store, for a genuine one-off imperative read — a
+store class of your own built on it has no subscribers, and the state ends up trapped in one widget's
+`State`.
+
 ## Writing
 
 ```dart

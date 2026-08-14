@@ -35,10 +35,28 @@ late final DwMappedPrefProvider<_Theme> themeProvider = _prefs
       mapTo: (theme) => theme.name,
     );
 
+/// The family typedefs carry the same burden and then some: they alias
+/// `NotifierProviderFamily`, which is not even exported from
+/// `flutter_riverpod.dart` — it lives in `flutter_riverpod/misc.dart`. A
+/// consumer who had to spell the type out would need an import they have no way
+/// to guess at.
+late final DwPrefProviderFamily<String, int> projectSortProvider = _prefs
+    .providerFamily<String, int>(
+      keyFor: (projectId) => 'project.$projectId.sort',
+      defaultValue: 'name',
+    );
+
+late final DwMappedPrefProviderFamily<_Theme, String> sectionThemeProvider =
+    _prefs.mappedProviderFamily<_Theme, String>(
+      keyFor: (section) => 'section.$section.theme',
+      mapFrom: (stored) => _Theme.values.asNameMap()[stored ?? ''] ?? _Theme.system,
+      mapTo: (theme) => theme.name,
+    );
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('a consumer declares both providers importing only this package', () {
+  test('a consumer declares every provider importing only this package', () {
     _prefs = DwSharedPreferences();
 
     // Not initialized on purpose. `init` takes the core the plugin was plugged
@@ -50,5 +68,7 @@ void main() {
     // declarations above compile at all.
     expect(darkModeProvider, isNotNull);
     expect(themeProvider, isNotNull);
+    expect(projectSortProvider, isNotNull);
+    expect(sectionThemeProvider, isNotNull);
   });
 }
