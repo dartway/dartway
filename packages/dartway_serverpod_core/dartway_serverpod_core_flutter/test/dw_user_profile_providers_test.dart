@@ -32,6 +32,32 @@ void main() {
     });
   });
 
+  group('signedInUserId', () {
+    test('follows the session in and out', () {
+      final providers = DwUserProfileProviders<_FakeProfile>(_session);
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(providers.signedInUserId), isNull);
+
+      container.read(_session.notifier).signIn(_FakeProfile(4));
+      expect(container.read(providers.signedInUserId), 4);
+
+      container.read(_session.notifier).signOut();
+      expect(container.read(providers.signedInUserId), isNull);
+    });
+
+    test('is null when the app runs without an auth key manager', () {
+      // The case the old `ref.watchSignedInUserId` crashed on: no session
+      // provider to `!` into, and nobody signed in is a legal state.
+      final providers = DwUserProfileProviders<_FakeProfile>(null);
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(providers.signedInUserId), isNull);
+    });
+  });
+
   group('requireUserProfile', () {
     test('throws with a message pointing at the scope when signed out', () {
       final providers = DwUserProfileProviders<_FakeProfile>(_session);

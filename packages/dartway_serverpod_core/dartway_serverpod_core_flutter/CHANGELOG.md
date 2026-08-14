@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.0
+
+**Breaking: the `ref.watchSignedInUserId` / `ref.readSignedInUserId` extensions are gone, replaced by
+`dw.signedInUserIdProvider`.**
+
+```dart
+ref.watchSignedInUserId  ->  ref.watch(dw.signedInUserIdProvider)
+ref.readSignedInUserId   ->  ref.read(dw.signedInUserIdProvider)
+```
+
+They dated from before there was a `dw` to hang anything on, and they carried the cost of that: both
+getters read `dw.sessionProvider!`, and `sessionProvider` is legitimately `null` when the app runs
+without a `DwAuthenticationKeyManager`. Such an app got a null check operator error out of a package
+it does not own — for a state the core already treats as ordinary, the same one `dw.userProfileProvider`
+answers with `null` (see 0.4.0). The new provider answers `null` there too.
+
+Form, as much as the crash: the profile is read through providers on the core instance
+(`dw.userProfileProvider`, `dw.requireUserProfileProvider`) while the id went through an extension on
+`Ref` — two ways to reach neighbouring facts about one session. There is one way now, and being a
+provider it composes: `.select`, `ProviderContainer` in a test, an override in a scope.
+
 ## 0.5.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.5.0 is the

@@ -4,7 +4,6 @@ export 'package:dartway_flutter/dartway_flutter.dart';
 export 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 export 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 
-export 'src/app/session/dw_session_extensions.dart';
 export 'src/app/session/dw_user_async_scope.dart';
 export 'src/app/session/service/dw_authentification_key_manager.dart';
 export 'src/app/socket/domain/dw_socket_status.dart';

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.6.0 is the
+Flutter side replacing the `ref.watchSignedInUserId` extensions with `dw.signedInUserIdProvider` —
+see the changelog of `dartway_serverpod_core_flutter`.
+
 ## 0.5.0
 
 - **`sendUpdates` and `sendUpdatesToUser` take `global`, so an update can leave the process that
