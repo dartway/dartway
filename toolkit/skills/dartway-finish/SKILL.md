@@ -128,6 +128,44 @@ managed files cannot be fixed here — they are overwritten on update (see `CLAU
   where, what is wrong, what it leads to — an option may be named, not written up.
 - **Then list the `open` entries of both** in the report, one line each. A reminder, not a gate: the
   task is finished either way, but the entries stop being invisible.
+- **A workaround over a `dartway_*` API is written down twice** — the entry in `dartway_notes.md`,
+  and a `TODO(dartway, checked: <ref>)` marker on the code itself (see `CLAUDE.md`, "Notes back to
+  the framework"). The journal says what should change upstream; the marker says what to re-check
+  here once it has. Wrote the entry and left the code bare — add the marker now.
+
+### A.7 Workarounds whose framework has moved
+
+A marker records the framework version its workaround was last confirmed against. This step compares
+that version with the one the project actually resolves, and **stays silent unless they differ**.
+
+The conditionality is the point. "Re-verify every workaround before every commit" is expensive,
+which means it gets skipped, which means it is not a check at all — while a workaround's answer can
+only have changed when the framework under it changed. Ask then, and the question is worth reading.
+
+1. **Collect** the `TODO(dartway, checked: X)` markers in the files this diff touches. Not
+   project-wide: what the task did not open is not this task's business, and the whole-project sweep
+   belongs to `/dartway-checkup`.
+2. **Resolve** the version the project is actually on, from the `pubspec.lock` of the package the
+   marked file belongs to: `resolved-ref` for a git dependency (`source: git`), `version` for a
+   hosted one. Take the entry of the `dartway_*` package the workaround sits on top of — the core,
+   the Flutter toolbox and the plugins move independently, so the wrong entry answers a different
+   question.
+3. **Compare.** Equal — say nothing at all, not even "checked, still current". Different — one line
+   in the report (Phase B, item 7).
+
+Compare git refs by prefix: the lock file holds all 40 characters and a marker usually holds seven,
+so test whether the longer starts with the shorter. A `version` comparison is exact.
+
+**What that line asks for is a decision, not an edit.** Three outcomes, and only the first is a
+one-token change:
+
+- the workaround is still needed → refresh `checked:` to the resolved version;
+- the framework now does this → delete the workaround, and close the `dartway_notes.md` entry with it;
+- the framework now does this **differently** → the case the whole mechanism exists for. A workaround
+  that duplicates the framework only wastes code; one that contradicts it breaks the app, and it
+  breaks it in exactly the edge case the framework had thought about — throwing where the framework
+  degrades softly, failing closed where it fails open. Read what actually changed upstream before
+  choosing.
 
 ---
 
@@ -143,6 +181,11 @@ Produce a structured report in the chat:
 6. **📓 Journals** — the `open` entries of both, one line each. From `dartway_notes.md`: what it is
    and where in the monorepo it lands. From `dev_notes.md`: what this project is carrying. Nothing to
    apply here — the first list is what to take to the framework, the second is what to schedule.
+7. **🔖 Workarounds** — only the markers A.7 found diverged, one line each: `file:line`, what is
+   worked around, `checked:` versus the resolved version. **Omit the whole item when nothing
+   diverged** — this section appears when the framework has moved under a workaround, and a report
+   that prints it every time teaches the reader to skip it. Mark it for the author to decide: which
+   of A.7's three outcomes applies is answered by reading the framework, not by this skill.
 
 For every item give a **concrete proposed edit**, ready to apply. Mark anything debatable/architectural as "for the author to decide" — do not propose an automatic fix.
 

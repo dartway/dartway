@@ -136,6 +136,34 @@ entry nobody can act on without re-deriving it is the same as no entry.
 `dartway-finish` shows what is still open at the end of a task, so the journal gets carried over
 rather than accumulated.
 
+### A workaround over a `dartway_*` API also leaves a marker in the code
+
+The journal entry records that the workaround exists. It does not record whether it is still needed
+— and that is the half which goes wrong, because the framework moves while the project's code does
+not. The day the fix lands upstream nothing here changes: the workaround keeps running, now
+duplicating the framework, and nobody is looking. It is not a cosmetic duplicate either. A real one
+threw where the framework had chosen to degrade softly, so the app crashed on an offline start; the
+project had been pinned to a commit that already carried the fix for weeks, and it was caught by eye.
+
+So the code carries a marker naming the framework version the workaround was last confirmed against:
+
+```dart
+// TODO(dartway, checked: 518ae6d): <what we work around, what should appear upstream>
+```
+
+- **`checked:`** — the version of the framework this workaround was last verified against:
+  the resolved git ref for a git dependency, the version number for a pub one. A short ref is fine.
+- **The sentence** — what the app is doing instead, and what would have to exist upstream for the
+  workaround to go. Without it the next reader cannot tell whether the framework has answered the
+  problem or merely moved past it, and re-deriving that costs more than writing it did.
+
+The marker and the `dartway_notes.md` entry are two halves of one record: the journal says what
+should change in the monorepo, the marker says what to re-check here once it has. Write both.
+
+`dartway-finish` compares `checked:` against the version resolved in `pubspec.lock` and raises the
+marker **only when the two have diverged** — the question is asked exactly when its answer can have
+changed, instead of on every task until it stops being read.
+
 ## Migrations: a project that lives by an older version of a law
 
 A law is written for a clean start ("a zone holds only features"), and says nothing to a project that

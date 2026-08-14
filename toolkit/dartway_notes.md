@@ -44,6 +44,9 @@ gets translated to English there — the toolkit ships to other people.
 - **The problem:** what the API lacks, or what it forces the app to write around it
 - **The proposal:** how it should look from the calling code
 - **Worked around here by:** what this project did meanwhile, so the workaround can be removed later
+- **Marked in the code as:** the `// TODO(dartway, checked: <ref>)` the workaround carries. This
+  entry says what should change upstream; the marker says what to re-check here once it has, and
+  `dartway-finish` raises it when the resolved framework version stops matching `checked:`
 
 -->
 
