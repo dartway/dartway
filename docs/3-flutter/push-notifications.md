@@ -28,7 +28,6 @@ dw = DwCore<Client, UserProfile>(
     DwPush(
       config: DwPushConfig(
         providers: [DwRuStorePush(), DwFirebasePush(webVapidKey: kVapidKey)],
-        recipientIdProvider: dw.userProfileProvider.select((p) => p?.id),
         onOpened: (opened) => appRouter.go(routeFor(opened.data)),
       ),
     ),
@@ -88,6 +87,25 @@ The token and the signed-in user arrive independently and in either order, so th
 plugin sends the pair whenever both exist, once, and re-sends when either
 changes. Registration goes through the push module's CRUD action; an app on
 somebody else's backend passes `registerToken:` instead.
+
+**Who the token belongs to is not something you configure.** The plugin takes
+`dw.signedInUserIdProvider` at `init`, and that is not a convenience: the
+registration carries a token and a provider, never an id, so the recipient the
+server writes down is the one it derives from the authenticated call. The
+session is that same identity — the two sides therefore agree by construction,
+and there is no second source to keep in step.
+
+On the client the id is local bookkeeping only: whether there is anybody to
+register a token for, whether this exact registration has already been made, and
+whether a sign-out invalidated it. Which is why an app that supplied its own is
+not redirecting notifications — it is only desynchronizing that bookkeeping from
+what the server recorded, and the symptom shows up as push going quiet after an
+account switch.
+
+`DwPushConfig.recipientIdProvider` remains for the one app whose DartWay session
+is permanently empty because it authenticates through an
+`AuthenticationKeyManager` of its own. What it passes must mirror the identity
+its calls are authenticated as.
 
 **Call `dw.plugins.push.revokeToken()` before signing out**, while the session is
 still valid. Afterwards there is nobody to authenticate the call, and the device

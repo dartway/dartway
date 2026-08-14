@@ -1,4 +1,8 @@
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -152,33 +156,85 @@ void main() {
   });
 
   group('DwPush token registration', () {
-    test('registers once the app says who is signed in', () async {
+    testWidgets('registers once the session says who is signed in',
+        (tester) async {
       final registrations = <(String, String)>[];
       final firebase = _FakeProvider(id: DwPushProviderIds.fcm);
       final push = _push(
         providers: [firebase],
+        recipientIdProvider: _signedInUserIdProvider,
         registerToken: ({required token, required provider}) async {
           registrations.add((token, provider));
           return true;
         },
       );
+      await push.init(_core());
 
-      await push.attach();
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: DwPushScope(push: push, child: const SizedBox()),
+        ),
+      );
+      await tester.pump();
+
       expect(registrations, isEmpty, reason: 'nobody is signed in yet');
 
-      push.setRecipient(42);
-      await Future<void>.delayed(Duration.zero);
+      container.read(_signedInUserIdProvider.notifier).signIn(42);
+      await tester.pump();
+      await tester.pump();
 
       expect(registrations, [('token-fcm', DwPushProviderIds.fcm)]);
+
+      // The scope hands the recipient over on every build; a rebuild for some
+      // unrelated reason must not become a second registration.
+      tester.element(find.byType(DwPushScope)).markNeedsBuild();
+      await tester.pump();
+      await tester.pump();
+
+      expect(registrations, hasLength(1));
+    });
+
+    test('has nobody to follow on a core without the data layer', () async {
+      // `dw.signedInUserIdProvider` arrives with DwCore; the plain toolbox has
+      // no session of any kind. Rather than guess, the plugin stays in manual
+      // mode — the app supplies a provider or no token is ever registered.
+      final push = _push(providers: [_FakeProvider(id: DwPushProviderIds.fcm)]);
+
+      await push.init(_core());
+
+      expect(push.recipientIdProvider, isNull);
     });
   });
 }
+
+/// Stands in for the app's session — the provider `DwPush` resolves out of the
+/// core, driven here by hand so the whole path from a changed value to a
+/// registration runs for real.
+class _SignedInUserId extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void signIn(int? userId) => state = userId;
+}
+
+final _signedInUserIdProvider = NotifierProvider<_SignedInUserId, int?>(
+  _SignedInUserId.new,
+);
+
+/// One core for the whole file: `DwFlutter`'s constructor claims the process-wide
+/// `dw` singleton and throws on a second instance.
+DwFlutter _core() => _instance ??= DwFlutter(config: const DwConfig());
+DwFlutter? _instance;
 
 DwPush _push({
   required List<DwPushClientProvider> providers,
   void Function(DwPushOpened opened)? onOpened,
   Future<bool> Function()? isEnabled,
   bool requestPermissionOnAttach = true,
+  ProviderListenable<int?>? recipientIdProvider,
   Future<bool> Function({required String token, required String provider})?
   registerToken,
 }) => DwPush(
@@ -187,6 +243,7 @@ DwPush _push({
     onOpened: onOpened,
     isEnabled: isEnabled,
     requestPermissionOnAttach: requestPermissionOnAttach,
+    recipientIdProvider: recipientIdProvider,
     registerToken:
         registerToken ?? ({required token, required provider}) async => true,
   ),

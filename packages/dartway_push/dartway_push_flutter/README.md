@@ -24,7 +24,6 @@ dw = DwCore<Client, UserProfile>(
     DwPush(
       config: DwPushConfig(
         providers: [DwRuStorePush(), DwFirebasePush()],
-        recipientIdProvider: dw.userProfileProvider.select((p) => p?.id),
         onOpened: (opened) => appRouter.go(routeFor(opened.data)),
       ),
     ),
@@ -33,6 +32,12 @@ dw = DwCore<Client, UserProfile>(
 ```
 
 Then wrap the app: `DwPushScope(push: dw.plugins.push, child: MaterialApp.router(...))`.
+
+**Who the token belongs to is not configured.** The plugin takes
+`dw.signedInUserIdProvider` — the same session your calls are authenticated with, and the one the
+server takes the recipient from when the token arrives, so the two sides agree by construction.
+`recipientIdProvider` exists for the app that authenticates through an `AuthenticationKeyManager` of
+its own; what it passes then must mirror the identity those calls are authenticated as.
 
 **Declaration order is the policy.** The first transport that both builds for this platform and
 answers for itself on this device wins — so the pair above means RuStore on Android, FCM on iOS and

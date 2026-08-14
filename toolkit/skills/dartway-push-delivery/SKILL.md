@@ -269,7 +269,6 @@ plugins: [
   DwPush(
     config: DwPushConfig(
       providers: [DwRuStorePush(), DwFirebasePush(webVapidKey: kVapidKey)],
-      recipientIdProvider: dw.userProfileProvider.select((p) => p?.id),
       onOpened: (opened) => appRouter.go(routeFor(opened.data)),
     ),
   ),
@@ -280,6 +279,18 @@ Then wrap the app: `DwPushScope(push: dw.plugins.push, child: ...)`.
 
 Rules that matter:
 
+- **do not configure who the token belongs to.** The plugin takes
+  `dw.signedInUserIdProvider` at `init`, which is the same identity the server
+  derives the real recipient from — a registration carries a token and a
+  provider, never an id. On the client the id is local bookkeeping only (is
+  there anybody to register for, has this exact registration been made, did a
+  sign-out invalidate it), so a second source redirects nothing and only puts
+  that bookkeeping out of step with the server; the symptom is push going quiet
+  after an account switch. `recipientIdProvider` is for an app that
+  authenticates through an `AuthenticationKeyManager` of its own, and what it
+  passes must mirror the identity its calls are authenticated as. **Never write
+  `dw.<anything>` inside the `plugins:` list** — `dw` is being assigned by that
+  very constructor and throws `LateInitializationError` before the first frame;
 - **declaration order is the policy** — the first transport that builds for the
   platform and is available on the device wins. No platform switch in app code;
 - the plugin **never navigates**. `onOpened` fires once per tap, after a frame,
@@ -312,6 +323,8 @@ user. The module deliberately keeps no "who is admin" concept.
   transport refused the target itself, never on timeout/429/5xx;
 - token registration goes through `tokenRegistrationConfig()`, not through an
   endpoint of the app's own, and never takes the recipient from the request;
+- the app half passes no `recipientIdProvider`, and the `plugins:` list mentions
+  `dw` nowhere;
 - raw token/credentials/provider body never logged;
 - deduplication key stable and unique; `expiresAt` always set;
 - worker scheduled via `DwRecurringFutureCall`; several instances safe;

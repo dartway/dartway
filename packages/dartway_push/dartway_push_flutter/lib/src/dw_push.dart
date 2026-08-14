@@ -4,6 +4,7 @@ import 'package:dartway_push_client/dartway_push_client.dart';
 // Re-exports dartway_flutter (DwPlugin, DwPlugins) along with the data layer.
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/misc.dart';
 
 import 'dw_push_config.dart';
 import 'dw_push_notification.dart';
@@ -25,6 +26,9 @@ import 'logic/dw_push_token_sync.dart';
 ///   plugins: [DwPush(config: DwPushConfig(providers: [DwFirebasePush()]))],
 /// );
 /// ```
+///
+/// Who the token belongs to is not configured: the plugin follows the DartWay
+/// session, which is the one the server reads the recipient out of anyway.
 class DwPush extends DwPlugin {
   DwPush({required this.config});
 
@@ -38,6 +42,7 @@ class DwPush extends DwPlugin {
   );
 
   DwPushClientProvider? _provider;
+  ProviderListenable<int?>? _recipientIdProvider;
   int? _recipientId;
   bool _isAttached = false;
   bool _isAttaching = false;
@@ -50,13 +55,32 @@ class DwPush extends DwPlugin {
   /// The transport actually in use, or null while push is off or unavailable.
   DwPushClientProvider? get provider => _provider;
 
-  /// Nothing happens here. Transports are started by [DwPushScope], because a
-  /// permission prompt before the first frame is a prompt with no app behind
-  /// it, and a notification tap has nowhere to go until the tree is up.
+  /// Works out whose device this is, and nothing else. Transports are started
+  /// by [DwPushScope], because a permission prompt before the first frame is a
+  /// prompt with no app behind it, and a notification tap has nowhere to go
+  /// until the tree is up.
   @override
-  Future<void> init(DwFlutter core) async {}
+  Future<void> init(DwFlutter core) async {
+    _recipientIdProvider = config.recipientIdProvider ?? _fromSession(core);
+  }
+
+  /// The signed-in user of the DartWay session — the same one the server reads
+  /// the real recipient out of, so the two sides cannot disagree.
+  ///
+  /// Null on the plain toolbox: `dw.signedInUserIdProvider` arrives with the
+  /// data layer, and naming [DwCore] here says out loud that push wants it. A
+  /// core whose client authenticates through a key manager of its own does have
+  /// the provider, and it answers null there — nobody to register a token for,
+  /// which is the same standstill and needs no branch of its own.
+  ProviderListenable<int?>? _fromSession(DwFlutter core) =>
+      core is DwCore ? core.signedInUserIdProvider : null;
 
   // --- Driven by DwPushScope -------------------------------------------------
+
+  /// Who [DwPushScope] follows: the app's override when it gave one, DartWay's
+  /// own session otherwise. Null until [init] has run.
+  @internal
+  ProviderListenable<int?>? get recipientIdProvider => _recipientIdProvider;
 
   Future<void> attach() async {
     if (_isAttached || _isAttaching) return;
@@ -116,7 +140,9 @@ class DwPush extends DwPlugin {
     await provider?.detach();
   }
 
-  /// Who the token belongs to now. Null while signed out.
+  /// Who the token belongs to now. Null while signed out. Pushed in by
+  /// [DwPushScope] on every build, which is why repeats leave here immediately.
+  @internal
   void setRecipient(int? recipientId) {
     if (_recipientId == recipientId) return;
     if (recipientId == null) {
