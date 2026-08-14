@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1
+
+**`dwBuildListAsync` builds its skeleton only when it is showing one.** The placeholder list — and
+the assert that a placeholder is obtainable at all — used to be computed before `dwBuildAsync` was
+even asked which branch to render, so `dw.getDefaultModel<T>()` ran on the data and error frames
+too. In an app that is invisible, because `DefaultModels.initRepository()` runs at startup. In a
+widget test it is a wall: a screen handed a ready `AsyncData<List<X>>([])`, with no loading state
+anywhere in the test, still died on `UnimplementedError: Default Objects Repository doesn't contain
+a model of type X` — a message naming neither the screen nor the test.
+
+Both builders now delegate to one implementation that takes the placeholder as a factory and calls
+it inside the loading branch, where the single-value `dwBuildAsync` already computed its own. The
+public API is unchanged; a widget test of a list screen no longer has to stand up the default-model
+registry unless it is genuinely testing the loading state.
+
 ## 0.5.0
 
 **A plugin is handed the core it was plugged into.** `DwPlugin.init()` now takes one:
