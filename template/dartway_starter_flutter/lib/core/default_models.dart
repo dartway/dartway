@@ -1,3 +1,12 @@
+// The one place a model is legitimately built field by field with an id in
+// hand. `model_rebuild_by_constructor` reads an id as "this row already exists,
+// rebuild it with copyWith", and here there is no row and nothing to copy from:
+// `mockModelId` is a synthetic constant, and the instance is invented from
+// nothing to give the skeleton a shape. Every other id passed to a model
+// constructor in your app is the rule's case, not this one.
+//
+// ignore_for_file: model_rebuild_by_constructor
+
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
 

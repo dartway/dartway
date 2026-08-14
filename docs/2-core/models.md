@@ -52,6 +52,43 @@ framework's own `DwAuthRequest`.
 If a form needs a half-filled state, that is a *form* model on the Flutter side, not a loosened
 domain model. Loosen the schema for the form and every consumer of the model pays for it forever.
 
+## An existing row is rebuilt with `copyWith`, never field by field
+
+This one follows from the section above, and it is the most expensive consequence of it. A field with
+`default=`, and any nullable field, becomes an **optional argument** of the generated constructor. So
+a method that rebuilds a model by naming its fields keeps compiling when the model grows a field —
+and quietly writes that field's default into every row it touches.
+
+```dart
+// ❌ add `priority` to the model and this silently resets it on every save
+repository.save(FeatureRequest(
+  id: request.id,
+  title: request.title,
+  status: RequestStatus.approved,
+));
+
+// ✅ a field nobody mentioned keeps its value, whatever the model grows next
+repository.save(request.copyWith(status: RequestStatus.approved));
+```
+
+One project reset a `priority` field to its default on every single edit of the record it belonged
+to — for months, on the field its backlog was sorted by. Nothing could see it: the code compiled, the
+tests passed, the review read fine. The method even carried a doc comment asking for the opposite;
+the field had been added by a different task that never opened that file.
+
+**Nothing is lost by the rule.** The one argument for rebuilding by hand — *"`copyWith` reads null as
+'not passed', and I need to clear a nullable field"* — is not true of the generated one. It takes
+`Object? field = _Undefined` and tests `field is T? ? field : this.field`, so:
+
+```dart
+request.copyWith(assigneeProfileId: null);   // cleared
+request.copyWith(status: RequestStatus.approved);  // assignee untouched
+```
+
+`model_rebuild_by_constructor` ([`dartway_lints`](../5-tooling/conventions-checker.md), warning) says
+this in the editor: a model constructor passed a non-null `id:` is a rebuild, because a row being
+created has no id yet — it comes back from the database.
+
 ## Relations: `?` means "not loaded", the FK means "required"
 
 The one exception to the nullable rule. On a relation field, `?` says the object **may not have been

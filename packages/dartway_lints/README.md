@@ -37,13 +37,37 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
   them by hand. A value that must differ per subtree is a family key or a
   constructor argument.
 
+- **model_rebuild_by_constructor** (warning) — a Serverpod model constructor
+  called with a non-null `id:`. A row being created never passes one (the id
+  comes back from the database), so the call is rebuilding a row that already
+  exists — and rebuilding is `copyWith`'s job.
+
+  Serverpod makes a field with `default=`, and any nullable field, an *optional*
+  argument. A method that rebuilds a model by naming its fields therefore keeps
+  compiling when the model grows a field, and quietly writes the default into
+  it. One real project reset a `priority` field on every edit of the record for
+  months; the compiler, the tests and the review all saw nothing. The method
+  even carried a doc comment asking for the opposite — the field was added by a
+  task that never opened that file.
+
+  Nothing is lost by the ban. The one reason to rebuild by hand — "`copyWith`
+  cannot clear a nullable field" — is not true of the generated one: it takes
+  `Object? field = _Undefined` and tests `field is T? ? field : this.field`, so
+  passing `null` clears and omitting keeps. Matched through `SerializableModel`
+  rather than `TableRow`, because the client half of a generated model — the
+  half an application is written against — implements only the former.
+  Serverpod's own output (`lib/src/protocol/`, `lib/src/generated/`) is left
+  alone. The one legitimate hand-built instance in a DartWay app is the mock in
+  `core/default_models.dart`, and the template ships it with an `// ignore_for_file:`.
+
 ## Testing
 
 `example/` is the rules' test suite: files under `lib/app/` carry
 `// expect_lint: <rule>` above every line that must be reported, and the files
 that must stay silent — `lib/ui_kit/` writing styles freely, a feature importing
-its neighbour one `../` away, `test/` building its own `ProviderScope` — are
-there to catch an over-eager rule.
+its neighbour one `../` away, `test/` building its own `ProviderScope`,
+`lib/src/protocol/` rebuilding a model field by field the way the generator
+does — are there to catch an over-eager rule.
 
 ```bash
 cd example && dart run custom_lint   # fails on a missed or an unexpected lint
@@ -60,7 +84,7 @@ unit test of its logic would still have passed.
 # pubspec.yaml
 dev_dependencies:
   custom_lint: ^0.8.0
-  dartway_lints: ^0.2.0
+  dartway_lints: ^0.3.0
 ```
 
 ```yaml

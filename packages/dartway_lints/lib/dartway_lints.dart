@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart' hide LintCode;
 import 'package:analyzer/error/listener.dart';
 import 'package:custom_lint_builder/custom_lint_builder.dart';
@@ -11,6 +12,7 @@ class _DartwayLintsPlugin extends PluginBase {
     ForbiddenUiStyleUsageRule(),
     DeepRelativeImportRule(),
     ForbiddenProviderScopeRule(),
+    ModelRebuildByConstructorRule(),
   ];
 }
 
@@ -25,6 +27,20 @@ bool _isGeneratedFile(String path) {
   return normalized.endsWith('.g.dart') ||
       normalized.endsWith('.freezed.dart') ||
       normalized.endsWith('.gen.dart');
+}
+
+/// Where `serverpod generate` writes its models: `lib/src/protocol/` in a
+/// client package, `lib/src/generated/` in a server one. Not covered by
+/// [_isGeneratedFile] — serverpod names its output after the model, not after
+/// the generator, so there is no suffix to recognise.
+///
+/// Recognised by the two-segment tail rather than by `protocol` alone: a
+/// hand-written `lib/protocol/` of one's own is somebody's code, and the point
+/// of this check is that nobody wrote what it skips.
+bool _isServerpodGeneratedFile(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  return normalized.contains('/lib/src/protocol/') ||
+      normalized.contains('/lib/src/generated/');
 }
 
 /// The theme getters the app's `ui_kit/` defines on `BuildContext`. Reaching
@@ -154,6 +170,102 @@ class ForbiddenProviderScopeRule extends DartLintRule {
         reporter.atNode(node.constructorName, code);
       }
     });
+  }
+}
+
+/// DartWay convention: a stored Serverpod model is rebuilt with `copyWith`, and
+/// the generated constructor is for creating a row that does not exist yet.
+///
+/// The mistake it catches is silent by construction. Serverpod makes a field
+/// with `default=` (and any nullable field) an **optional** argument, so a
+/// method that rebuilds a model by naming its fields —
+/// `StudioIssue(id: …, title: …, …)` — keeps compiling when a field is added to
+/// the model, and quietly substitutes the default for it. In a real project a
+/// `priority` field was reset to `medium` on every single edit of the record it
+/// belonged to; nothing in the compiler, the tests or the review could see it.
+///
+/// A doc comment does not close this. The method carried an honest "anything
+/// added here too" note above it, and the field was added by another task that
+/// never opened the file. A rule living in a comment at the far end of the
+/// system is not a rule.
+///
+/// The signal is a non-null `id:`. A row being created never passes one — the
+/// id comes back from the database — so a call that does pass one is rebuilding
+/// something that already exists, and `copyWith` is what rebuilds it. Nothing
+/// is lost by the ban: `copyWith` can clear a nullable field too, because the
+/// generated one takes `Object? field = _Undefined` and tests
+/// `field is T? ? field : this.field`, which tells "not passed" apart from
+/// "passed null".
+///
+/// Matched through `SerializableModel` rather than through `TableRow`: on the
+/// server a model implements both, but the **client** half of the same
+/// generated model implements only `SerializableModel` — and the client half is
+/// the one an application writes its code against, the one package where these
+/// lints actually run. A `TableRow` check would be dead in exactly the place
+/// the rule is for.
+class ModelRebuildByConstructorRule extends DartLintRule {
+  const ModelRebuildByConstructorRule() : super(code: _code);
+
+  static const _code = LintCode(
+    name: 'model_rebuild_by_constructor',
+    problemMessage:
+        'This rebuilds a stored model by listing its fields: a passed id means '
+        'the row already exists. A field with default= or a nullable field is '
+        'an optional argument, so the next one added to the model is not a '
+        'compile error here — it is a silent default.',
+    correctionMessage:
+        'Rebuild it with copyWith. Clearing a nullable field works too: pass '
+        'null, and the sentinel tells that apart from not passing it.',
+    errorSeverity: DiagnosticSeverity.WARNING,
+  );
+
+  @override
+  void run(
+    CustomLintResolver resolver,
+    DiagnosticReporter reporter,
+    CustomLintContext context,
+  ) {
+    final path = resolver.path;
+
+    if (_isGeneratedFile(path) || _isServerpodGeneratedFile(path)) return;
+
+    context.registry.addInstanceCreationExpression((node) {
+      final idArgument = _idArgument(node.argumentList);
+      if (idArgument == null) return;
+
+      // `id: null` is a row saying out loud that it does not exist yet — the
+      // one shape of a field-by-field call that is not a rebuild.
+      if (idArgument.expression is NullLiteral) return;
+
+      if (!_isSerializableModel(node.staticType)) return;
+
+      reporter.atNode(node.constructorName, code);
+    });
+  }
+
+  static NamedExpression? _idArgument(ArgumentList argumentList) {
+    for (final argument in argumentList.arguments) {
+      if (argument is NamedExpression && argument.name.label.name == 'id') {
+        return argument;
+      }
+    }
+    return null;
+  }
+
+  /// Asks the type rather than the name: `id:` is a common argument, and only
+  /// on a Serverpod model does it mean a database row.
+  static bool _isSerializableModel(DartType? type) {
+    if (type is! InterfaceType) return false;
+
+    for (final supertype in type.allSupertypes) {
+      final element = supertype.element;
+
+      if (element.name == 'SerializableModel' &&
+          element.library.uri.toString().startsWith('package:serverpod')) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
