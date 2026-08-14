@@ -1,5 +1,7 @@
 import 'package:serverpod/serverpod.dart';
 
+import 'dw_protocol_json.dart';
+
 class DwAuthData implements SerializableModel, ProtocolSerialization {
   static SerializationManagerServer get _protocol =>
       Serverpod.instance.serializationManager;
@@ -27,6 +29,8 @@ class DwAuthData implements SerializableModel, ProtocolSerialization {
     );
   }
 
+  /// The whole profile row, `serverOnly` fields included — server-side use
+  /// only. What the client gets on sign-in is [toJsonForProtocol].
   @override
   toJson() {
     return {
@@ -43,7 +47,7 @@ class DwAuthData implements SerializableModel, ProtocolSerialization {
       'className': className,
       'key': key,
       'keyId': keyId,
-      'data': userProfile.toJson(),
+      'data': dwJsonForProtocol(userProfile),
     };
   }
 

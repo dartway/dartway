@@ -161,6 +161,24 @@ transaction and `allowSave` / `validateSave` are evaluated against what was actu
 is opt-in so the default lifecycle is unchanged, and it does nothing on insert — there is no row to
 lock yet.
 
+**A `scope=serverOnly` column is not overwritten by a client save, and there is nothing to switch on
+for that.** Such a field does not exist on the client class, so it is never in the JSON a client
+sends, and the model the server deserialises carries `null` there — an update writing the whole row
+would blank the column, with no error and an `isOk` response. It is left out of the `UPDATE`
+instead, and the database keeps its value. (The outbound half is held too: the value is never sent
+to a client in the first place — see
+[fields the client must never see](models.md#scopes-fields-the-client-must-never-see).)
+
+The rule is narrow on purpose: the column is skipped **only** when the incoming value is `null` and
+the stored row has one. A `beforeSaveTransaction` hook that *computes* a `serverOnly` value assigns
+it, and it is written like any other field. The one case that needs an opt-out is a hook meaning to
+**clear** such a field back to `null` — `allowServerOnlyOverwrite: true`, which then also lets an
+ordinary client save blank the column.
+
+The model is not re-read from the database after the write, so from `afterSaveTransaction` onwards a
+`serverOnly` field on `currentModel` still holds what the client sent, even though the stored row
+kept its value. A hook that needs the stored one reads `saveContext.initialModel`.
+
 **Every read inside the transaction carries `saveContext.transaction`** — that is the two
 in-transaction hooks, and every call they make. A model repository takes it as a named argument, so
 does `dw.db(session)` (see

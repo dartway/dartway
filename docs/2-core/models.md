@@ -156,10 +156,23 @@ testVerificationCode: String?, scope=serverOnly
 password: String?, !persist
 ```
 
-`scope=serverOnly` keeps the field out of the generated **client** class entirely — it is not
-withheld at runtime, it does not exist there, so no accidental read is possible. `!persist` is the
-opposite direction: the field travels over the wire but is never written to a column, which is how
-`DwAuthRequest` carries a password to the server without it ever landing in the database.
+`scope=serverOnly` keeps the field out of the generated **client** class entirely — it does not exist
+there, so no accidental read is possible. The framework holds that promise in both directions:
+
+- **The value is never sent.** It is stripped from every CRUD response, every realtime broadcast and
+  the sign-in payload. Worth stating explicitly, because the absent client field alone would not
+  achieve it: a client that has no field for a key simply drops the key while reading, and the value
+  would still have crossed the network.
+- **The value is never blanked by a client save.** Since the field cannot be in the JSON a client
+  sends, the model the server deserialises carries `null` there — and an update writing the whole row
+  would erase the column. It is left out of the `UPDATE` instead, and the database keeps what it had.
+  A server-side hook that *computes* the value still writes it normally; the one case needing an
+  opt-out is a hook meaning to clear the field back to `null`, which is
+  `DwSaveConfig.allowServerOnlyOverwrite` ([crud-configs.md](crud-configs.md)).
+
+`!persist` is the opposite direction: the field travels over the wire but is never written to a
+column, which is how `DwAuthRequest` carries a password to the server without it ever landing in the
+database.
 
 ## Base and Event models
 

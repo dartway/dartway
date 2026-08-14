@@ -1,8 +1,19 @@
 import 'package:serverpod/serverpod.dart';
 
 import 'dw_model_wrapper.dart';
+import 'dw_protocol_json.dart';
 
-class DwApiResponse<T> implements SerializableModel {
+/// The envelope every CRUD call answers with.
+///
+/// Implements [ProtocolSerialization] deliberately, and it is the link that
+/// makes the rest of the chain reachable. This envelope flattens its own
+/// contents — the value and the updated models are turned into maps here, by
+/// hand — so by the time Serverpod's encoder walks the result there are no
+/// model objects left in it to recognise. Whatever choice is made *here* is the
+/// final one for everything nested; a `toJson` on this level publishes the
+/// `serverOnly` columns of every model inside, no matter how carefully the
+/// wrappers below it serialise themselves.
+class DwApiResponse<T> implements SerializableModel, ProtocolSerialization {
   static SerializationManagerServer get _protocol =>
       Serverpod.instance.serializationManager;
 
@@ -64,23 +75,35 @@ class DwApiResponse<T> implements SerializableModel {
     );
   }
 
+  /// Everything the envelope carries, `serverOnly` fields included. For
+  /// server-side use; [toJsonForProtocol] is what reaches a client.
   @override
-  toJson() {
+  toJson() => _json(forProtocol: false);
+
+  @override
+  Map<String, dynamic> toJsonForProtocol() => _json(forProtocol: true);
+
+  Map<String, dynamic> _json({required bool forProtocol}) {
     return {
       'isOk': isOk,
-      'value': _serializeValue(value),
+      'value': _serializeValue(value, forProtocol: forProtocol),
       if (warning != null) 'warning': warning,
       if (error != null) 'error': error,
       if (updatedModels != null)
-        'updatedModels': updatedModels?.toJson(valueToJson: (v) => v.toJson()),
+        'updatedModels': [
+          for (final model in updatedModels!)
+            forProtocol ? model.toJsonForProtocol() : model.toJson(),
+        ],
     };
   }
 
-  static dynamic _serializeValue(dynamic value) {
+  static dynamic _serializeValue(dynamic value, {required bool forProtocol}) {
     if (value is SerializableModel) {
-      return value.toJson();
+      return forProtocol ? dwJsonForProtocol(value) : value.toJson();
     } else if (value is List) {
-      return value.map((e) => _serializeValue(e)).toList();
+      return value
+          .map((e) => _serializeValue(e, forProtocol: forProtocol))
+          .toList();
     }
     return value;
   }
