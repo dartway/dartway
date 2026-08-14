@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/misc.dart';
 
 import '../domain/dw_session_state_model.dart';
 
-/// The profile pair `DwCore` hands out as `dw.userProfileProvider` and
-/// `dw.requireUserProfileProvider`.
+/// The session-derived providers `DwCore` hands out as `dw.userProfileProvider`,
+/// `dw.requireUserProfileProvider` and `dw.signedInUserIdProvider`.
 ///
 /// Held apart from `DwCore` because all these providers need from a session is
 /// something listenable carrying a [DwSessionStateModel] — which lets them be
@@ -27,6 +27,12 @@ class DwUserProfileProviders<UserProfileClass extends SerializableModel> {
           sessionProvider.select((state) => state.signedInUserProfile),
         );
       });
+
+  late final Provider<int?> signedInUserId = Provider<int?>((ref) {
+    final sessionProvider = _sessionProvider;
+    if (sessionProvider == null) return null;
+    return ref.watch(sessionProvider.select((state) => state.signedInUserId));
+  });
 
   late final Provider<UserProfileClass> requireUserProfile =
       Provider<UserProfileClass>((ref) {

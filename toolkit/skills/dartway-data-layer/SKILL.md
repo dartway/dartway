@@ -283,6 +283,12 @@ Reach for the provider directly in two cases: the user may be signed out, or you
 final name = ref.watch(dw.requireUserProfileProvider.select((p) => p.firstName));
 ```
 
+Need only the id — for a filter, a channel key, an ownership check? `dw.signedInUserIdProvider` → `int?`, `null` while signed out. Don't reach through the profile for it, and don't read `dw.sessionProvider!` by hand:
+
+```dart
+final userId = ref.watch(dw.signedInUserIdProvider);
+```
+
 ## 7. Sign-out — through `sessionProvider`
 
 **Why:** ending a session is a centralized dartway-session operation, not a hand-written state reset.
@@ -391,7 +397,7 @@ Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size an
 - [ ] Narrowing by query — `backendFilter`; local filtering you do yourself with `.where` in the widget (the framework doesn't provide it).
 - [ ] Actions from the UI — `dw.action((context) async {...})`, not a raw `onPressed`/`() async {}`.
 - [ ] Notifications — `dw.notify.success/warning/error/info`, not `SnackBar`/`ScaffoldMessenger`.
-- [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`. Signed out is a legal answer, or you want `.select` — `dw.userProfileProvider` / `dw.requireUserProfileProvider`.
+- [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`. Signed out is a legal answer, or you want `.select` — `dw.userProfileProvider` / `dw.requireUserProfileProvider`. Only the id — `dw.signedInUserIdProvider`.
 - [ ] Sign-out — `ref.read(dw.sessionProvider!.notifier).signOut()`.
 - [ ] Must **another** user see the update? `dw.repo.modelList` doesn't do that by itself — `broadcastTo` in the config (public), a channel with the group id (group), `sendUpdatesToUser` (private).
 - [ ] Putting `broadcastTo` with a public channel — have you answered "any user is entitled to read this row"? If not — a narrower channel or `sendUpdatesToUser`.

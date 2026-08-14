@@ -86,6 +86,14 @@ getters over `requireUserProfileProvider`, because Dart has no generic getters a
 cannot name your model in an extension on `Ref`. They are shorthand, not the source: delete the file
 and the providers still work.
 
+When the id is all you need — a filter, a channel key, an ownership check — there is a third provider
+beside them, and no reason to pull the whole profile out to reach `.id`:
+
+```dart
+// int? — null while signed out, and null in an app running without a DartWay session
+ref.watch(dw.signedInUserIdProvider)
+```
+
 ## Rendering a list
 
 An `AsyncValue` has three branches, and writing `when(loading:, error:, data:)` in every feature is

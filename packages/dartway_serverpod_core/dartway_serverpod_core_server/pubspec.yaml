@@ -1,6 +1,6 @@
 name: dartway_serverpod_core_server
 description: "Server side of the DartWay core, a Serverpod module: model-driven CRUD with realtime, declarative access and validation configs, phone auth, cloud storage and Telegram alerts."
-version: 0.5.0
+version: 0.6.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -14,7 +14,7 @@ environment:
 dependencies:
   serverpod: ^3.4.11
 
-  dartway_serverpod_core_shared: ^0.5.0
+  dartway_serverpod_core_shared: ^0.6.0
 
   collection: ^1.19.1
   crypto: ^3.0.6

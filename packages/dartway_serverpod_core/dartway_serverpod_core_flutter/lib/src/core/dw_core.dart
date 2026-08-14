@@ -58,6 +58,16 @@ class DwCore<
   Provider<UserProfileClass> get requireUserProfileProvider =>
       _userProfileProviders.requireUserProfile;
 
+  /// The signed-in user id, or `null` while signed out — and `null` as well when
+  /// the app runs without a DartWay session at all (its client carries a key
+  /// manager of its own).
+  ///
+  /// Read it where the id is all you need — a filter, a channel key, an
+  /// ownership check — instead of pulling the whole profile out of
+  /// [userProfileProvider] to reach `.id`.
+  Provider<int?> get signedInUserIdProvider =>
+      _userProfileProviders.signedInUserId;
+
   late final dartway.Caller endpointCaller;
 
   final int? Function(UserProfileClass? user) getUserId;
