@@ -67,6 +67,8 @@ dw.repo.setupRepository(
 
 The skeleton is drawn from your own widget built on that instance — that's why it resembles the future content rather than a generic shimmer. Without registration the very first `dwBuildListAsync` fails at runtime: `Default Objects Repository doesn't contain a model of type X`.
 
+**The placeholder is built in the loading state only**, so a widget test of a list screen that hands the builder a ready `AsyncData` does not have to stand up the default models — if a test does need them, that test is really exercising the loading state.
+
 ## 3. Filtering — `backendFilter` (server) + `.where` (client)
 
 **Why:** to narrow a list with a query to the DB — through `backendFilter`. Local filtering of already loaded data the framework deliberately **does not provide**: it is a trivial `.where`, do it yourself in the widget, don't look for a "framework" way.

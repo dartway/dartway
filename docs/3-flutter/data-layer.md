@@ -137,9 +137,14 @@ speak. So:
   model of type X` while building the skeleton — during `build`, so it is a red screen, not an
   error state.
 
-`dwBuildListAsync` asserts up front that a placeholder is obtainable, but the assert only checks
-that `DwConfig.defaultModelGetter` is wired at all (the app passes `dwGetDefault`), not that your
+`dwBuildListAsync` asserts that a placeholder is obtainable, but the assert only checks that
+`DwConfig.defaultModelGetter` is wired at all (the app passes `dwGetDefault`), not that your
 particular model is registered. A new model means a new `setupRepository` call, always.
+
+Both the assert and the placeholder itself belong to the loading branch and run nowhere else — a
+widget test that hands the builder a ready `AsyncData` never touches the registry, and so does not
+have to stand it up. A list test that *does* fail on a missing placeholder is a test of the loading
+state, whether or not it was written as one.
 
 ## Narrowing the list: `backendFilter`
 
