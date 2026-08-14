@@ -28,10 +28,6 @@ class ChatMessageList extends ConsumerWidget implements DwFeature {
       'Clients never receive staff messages — the access filter is the '
           'enforcement, not the UI.',
     ],
-    implementationNotes: [
-      'A realtime chat is ~40 lines of DwCrudConfig, secure-by-default: '
-          'the staff-only access filter means the data never reaches a client.',
-    ],
   );
 
   @override

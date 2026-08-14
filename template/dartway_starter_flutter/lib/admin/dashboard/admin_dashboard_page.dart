@@ -20,8 +20,8 @@ class AdminDashboardPage extends StatelessWidget implements DwFeature {
         'The landing screen of the panel: how big the system is right now.',
     behaviors: ['A line under the counters explains that they are live.'],
     implementationNotes: [
-      'The counters themselves are admin/live-counters; this screen is their '
-          'frame, and the place to put analytics when you have any.',
+      'Analytics belongs here when there is any — this screen is the frame, '
+          'and the counters are their own feature (admin/live-counters).',
     ],
   );
 

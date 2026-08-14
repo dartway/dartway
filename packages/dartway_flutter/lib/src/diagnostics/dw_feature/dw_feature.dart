@@ -44,11 +44,20 @@ class DwFeatureSpec {
   /// phrased as an observable action belongs in [behaviors] instead.
   final List<String> requirements;
 
-  /// Decisions a reader would otherwise re-open: why the preview image in the
-  /// row and the full one in the list, why the height lives in the kit.
+  /// What the code cannot say about itself: why it is done this way, a trap
+  /// invisible from the outside, a decision someone would otherwise re-open.
   ///
   /// Written for the team, not for the client — Studio shows it on the
   /// technical side, away from the product panel.
+  ///
+  /// The name invites a wider reading than it should, so it comes with a test:
+  /// *would this still be worth reading after the feature is rewritten?* A
+  /// reason survives ("the list is not cached: it changes more often than it is
+  /// read"); a trap survives ("the server sends the date in UTC, the screen
+  /// shows it local"). A map of the code does not — "the list comes from
+  /// `dw.repo.modelList` and is drawn by a `ListView`" is what the file already
+  /// says, and unlike the file it starts lying the moment someone moves the
+  /// widget. Nothing checks it: not the compiler, not `dartway check`.
   final List<String> implementationNotes;
 
   /// What is wrong here and worth taking into work: a setting nothing reads,

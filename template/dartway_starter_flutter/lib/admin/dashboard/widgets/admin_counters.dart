@@ -27,8 +27,8 @@ class AdminCounters extends ConsumerWidget implements DwFeature {
           'enforce it, not this widget.',
     ],
     implementationNotes: [
-      'Plain watchModelList calls: the same realtime CRUD the client app '
-          'uses, with no separate admin API.',
+      'No separate admin API: the panel reads through the same CRUD the '
+          'client app does, so an access rule is written once.',
     ],
   );
 

@@ -13,8 +13,8 @@ class SchedulePage extends ConsumerWidget implements DwFeature {
     id: 'schedule/page',
     title: 'Schedule screen',
     implementationNotes: [
-      'A composition and nothing else: the app bar plus ScheduleSessionList, '
-          'which carries the feature itself — see schedule/session-list.',
+      'This screen carries no feature of its own — schedule/session-list '
+          'does, and that is the passport worth reading.',
     ],
   );
 

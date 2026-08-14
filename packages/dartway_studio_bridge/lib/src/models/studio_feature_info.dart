@@ -36,7 +36,12 @@ class StudioFeatureInfo {
   /// What it must honour, imposed from outside the feature.
   final List<String> requirements;
 
-  /// Decisions the team should not have to re-open. Technical side only.
+  /// What the code cannot say about itself: reasons, traps, decisions the team
+  /// should not have to re-open. Technical side only.
+  ///
+  /// The test the app side applies when filling this in — *would it still be
+  /// worth reading after the feature is rewritten?* — keeps out descriptions of
+  /// how the code is put together, which go stale silently.
   final List<String> implementationNotes;
 
   /// What is wrong in the feature and worth taking into work. Studio filters

@@ -35,8 +35,6 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
       'A member sees only their own bookings on the cards.',
     ],
     implementationNotes: [
-      'ref.watch(dw.repo.modelList<ClubSession>()) with a backend filter: '
-          'realtime sync, pagination and loading states come with it.',
       'Live to your own writes only. Another member booking the last seat '
           'shows on the next fetch — pushing it to everyone needs a named '
           'channel, which this screen deliberately does not set up.',

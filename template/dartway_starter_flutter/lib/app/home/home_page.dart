@@ -31,10 +31,6 @@ class HomePage extends ConsumerWidget implements DwFeature {
       'The app name comes from the database, not from a constant.',
       'Changing it in the admin panel updates this screen with no reload.',
     ],
-    implementationNotes: [
-      'A watchModelList over AppSetting — the same realtime read any other '
-          'screen uses.',
-    ],
   );
 
   @override

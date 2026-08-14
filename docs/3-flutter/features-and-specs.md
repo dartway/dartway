@@ -70,8 +70,8 @@ class MyBookingsPage extends ConsumerWidget implements DwFeature {
           'decision is the server access filter, not this screen.',
     ],
     implementationNotes: [
-      'Two watches, joined locally: the bookings themselves and the reviews, '
-          'intersected by bookingId.',
+      'A review count on the booking model would remove the second read; it is '
+          'kept separate to show the local join is cheap.',
     ],
   );
 ```
@@ -95,7 +95,7 @@ from `dartway check`. A feature whose entry point is an extension or a function
 | `purpose` | why the user needs it — optional |
 | `behaviors` | verifiable statements about what it observably does |
 | `requirements` | what it must honour, imposed from outside |
-| `implementationNotes` | decisions a reader would otherwise re-open |
+| `implementationNotes` | what the code cannot say about itself — reasons, traps, decisions |
 | `knownIssues` | what is wrong here and worth taking into work |
 
 **`id` is a contract.** Studio passports, feedback and tracker items refer to the feature by it, and
@@ -113,6 +113,20 @@ turned back into prose and stops being worth reading.
 
 **`requirements` is what is imposed from outside** — signed-in users only, no price before
 confirmation, works offline. If you can phrase it as an observable action, it is a behavior.
+
+**`implementationNotes` is what the code cannot say about itself** — why it is done this way, a trap
+invisible from the outside, a decision someone would otherwise re-open. The name invites a wider
+reading than it should, so it comes with a test: **would this still be worth reading after the
+feature is rewritten?**
+
+- A reason survives — *"the list is not cached: it changes more often than it is read."*
+- A trap survives — *"the server sends the date in UTC, the screen shows it local."*
+- A map of the code does not — *"the list comes from `dw.repo.modelList` and is drawn by a
+  `ListView`."* That is what the code already says, and unlike the code it starts lying the moment
+  someone moves the widget. Nothing checks it: not the compiler, not `dartway check`.
+
+Which is the whole point of the field. Everything a reader can get by opening the file belongs in
+the file; this list is for what they would otherwise have to re-derive — or get wrong.
 
 A side effect worth knowing about: writing behaviors as verifiable statements is how you discover
 things nobody claimed. Phrasing them for the events block on a home screen is what surfaced that the
