@@ -38,7 +38,7 @@ dependencies:
   # packages belong to the app, not to the framework.
   device_frame: ^1.4.0
 
-  dartway_flutter: ^0.4.0
+  dartway_flutter: ^0.5.0
 
   dartway_router: ^1.1.1
 

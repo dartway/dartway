@@ -4,6 +4,17 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // One DwFlutter per test process — the singleton forbids re-creation. It is
+  // built up here because `init` takes a core now, so even the group that only
+  // checks the stub is inert needs one to hand over.
+  final pluggedIn = DwTelegramWebApp.create(
+    config: const DwTelegramWebAppConfig(requestFullScreen: true),
+  );
+  final dwInstance = DwFlutter(
+    config: const DwConfig(),
+    plugins: [pluggedIn],
+  );
+
   group('DwTelegramPlatform.fromRaw', () {
     test('maps the clients Telegram reports today', () {
       expect(DwTelegramPlatform.fromRaw('ios'), DwTelegramPlatform.ios);
@@ -35,26 +46,16 @@ void main() {
     });
 
     test('init is a no-op, so an app can declare it on every platform', () {
-      expect(telegram.init(), completes);
+      expect(telegram.init(dwInstance), completes);
     });
   });
 
   group('as a plugin', () {
-    final telegram = DwTelegramWebApp.create(
-      config: const DwTelegramWebAppConfig(requestFullScreen: true),
-    );
-
-    // One DwFlutter per test process — the singleton forbids re-creation.
-    final dwInstance = DwFlutter(
-      config: const DwConfig(),
-      plugins: [telegram],
-    );
-
     test('is reachable as dw.plugins.telegram', () {
       // The bridge the app declares is an interface; the object it gets is a
       // platform impl. `dw.plugins.telegram` has to resolve the former to the latter —
       // this is the whole contract behind the extension.
-      expect(dwInstance.plugins.telegram, same(telegram));
+      expect(dwInstance.plugins.telegram, same(pluggedIn));
     });
 
     test('the framework initializes it with the app core', () {

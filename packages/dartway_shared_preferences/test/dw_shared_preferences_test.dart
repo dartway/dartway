@@ -1,3 +1,4 @@
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,10 +12,15 @@ void main() {
   late DwSharedPreferences prefs;
   late ProviderContainer container;
 
+  // `init` takes the core the plugin was plugged into, so a test that inits the
+  // plugin by hand needs one to hand over. Built once — one DwFlutter per test
+  // process — and reused: local storage reads nothing out of it.
+  final dwInstance = DwFlutter(config: const DwConfig());
+
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     prefs = DwSharedPreferences();
-    await prefs.init();
+    await prefs.init(dwInstance);
     container = ProviderContainer();
     addTearDown(container.dispose);
   });

@@ -54,7 +54,7 @@ class DwPush extends DwPlugin {
   /// permission prompt before the first frame is a prompt with no app behind
   /// it, and a notification tap has nowhere to go until the tree is up.
   @override
-  Future<void> init() async {}
+  Future<void> init(DwFlutter core) async {}
 
   // --- Driven by DwPushScope -------------------------------------------------
 

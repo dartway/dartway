@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.0
+
+**A plugin is handed the core it was plugged into.** `DwPlugin.init()` now takes one:
+`Future<void> init(DwFlutter core)`. Until now it took nothing, and a plugin had no legal way to
+reach the framework it was part of.
+
+The gap was not theoretical. A plugin is constructed *as an argument* to the constructor that
+assigns `dw` — that is what `plugins:` being a constructor parameter means — while the app declares
+`late final DwCore<Client, UserProfile> dw`. So anything a plugin needs from the core has to be
+passed in at declaration time, and the ambient instance is not assigned yet. Writing the obvious
+thing inside the list:
+
+```dart
+plugins: [DwPush(config: DwPushConfig(
+  recipientIdProvider: dw.userProfileProvider.select((p) => p?.id),  // throws at startup
+))],
+```
+
+compiles silently and fails with `LateInitializationError` before the first frame. `dw` is also not
+exported by the framework — neither `dartway_flutter` nor `dartway_serverpod_core_flutter` hands the
+singleton out — so there was no version of that line that worked, only versions that looked like they
+might. `dartway_push_flutter`'s own README shipped one.
+
+`init` is the first moment the core exists, so that is where it arrives. The argument is a
+`DwFlutter`; an app on the data layer passes a `DwCore`, which is one — a plugin that needs the data
+layer names it and casts, and thereby says out loud that it does not work on the plain toolbox.
+
+**Breaking, mechanically.** Every `DwPlugin` implementation adds the parameter; nothing else about a
+plugin changes, and a plugin with no use for the core ignores it. `DwPlugins.initAll()` takes the core
+too, and `dw.init()` passes itself.
 
 ## 0.4.0
 

@@ -28,7 +28,7 @@ class DwFlutter {
   final errorContext = DwErrorContext();
 
   Future<void> init() async {
-    await plugins.initAll();
+    await plugins.initAll(this);
   }
 
   /// Reports an error through the framework pipeline: captures the app-state
