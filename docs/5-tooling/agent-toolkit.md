@@ -94,7 +94,7 @@ The lifecycle of a task runs left to right: `dartway-requirements` → `dartway-
 implementation with the layer skills → `dartway-finish`.
 
 **`dartway-run`** — bring the project up locally and confirm it is alive: dependencies, Postgres
-in Docker, migrations, seeding, server, app. Knows the order that matters, the real ports, where
+in Docker, migrations, the first administrator, server, app. Knows the order that matters, the real ports, where
 the sign-in code is printed, and how to read the failures people actually hit.
 
 **`dartway-requirements`** — read-only analysis before a task: what the project already has on the

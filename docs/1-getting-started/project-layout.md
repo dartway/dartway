@@ -14,7 +14,7 @@ my_app/
   my_app_client/     generated protocol + API client — never edited by hand
   my_app_flutter/    the app — features, UI kit, navigation
   .claude/           the agent toolkit (installed, then committed)
-  .vscode/           Server / Seed dev data / Flutter (web) launch configs
+  .vscode/           Server / Flutter (web) launch configs
   .github/           a Claude PR-review workflow (delete it to turn review off)
 ```
 
@@ -49,7 +49,6 @@ recognises it by the `*_shared` directory suffix if you add it.
 ```
 my_app_server/
   bin/main.dart          the server entry point
-  bin/seed_dev.dart      dev-only seed: one user per role
   config/                development / staging / production / test + passwords.yaml
   migrations/            generated schema migrations
   lib/server.dart        the package's public surface
@@ -59,16 +58,27 @@ my_app_server/
     crud/                one DwCrudConfig per model — the feature's whole behaviour
     dartway/             DwCore.init and the session role helpers
     domain/              pure rules over models — no Session, no IO, no DB
-    app/                 session-aware workflows that span models
-    endpoints/           hand-written Serverpod endpoints, for the things CRUD is not
+    app/                 session-aware workflows — bootstrap_admin.dart lives here
+    endpoints/           hand-written Serverpod endpoints, for the things CRUD is not — absent
+                         until you need one
     web/                 server-rendered pages, if you want any
   test/                  DartWay's auth and password integration suites, against a real DB
 ```
 
 `domain/` and `app/` are the one boundary worth holding on the server — pure rules against
-session-aware side effects — and the skeleton ships neither, because until such code exists the
-folder is empty. They are declared, so creating one is not an invention; anything *else* under
-`lib/src/` is.
+session-aware side effects. `domain/` ships empty, because until such code exists the folder is
+nothing; `app/` ships with the one workflow every project needs before it has a domain at all —
+`bootstrap_admin.dart`, which brings the identifier declared in `bootstrapAdminIdentifier` to the
+state "the profile exists and it is an admin" on every boot. The admin role is granted by an admin,
+so the first one is declared per environment; that is also the answer for staging and production,
+where the alternative is an `UPDATE` typed by hand that nobody can read back or repeat. Both folders
+are declared, so creating one is not an invention; anything *else* under `lib/src/` is.
+
+`endpoints/` is not there at all, and that is the point rather than an omission: the skeleton
+reaches its whole surface — auth, profiles, roles, settings, an admin panel — through CRUD configs,
+without one hand-written endpoint, and `serverpod generate` is perfectly happy with no endpoints to
+generate. Create the folder for the things CRUD genuinely is not — uploads, webhooks, a third
+party's callback — and treat it as the last resort it is.
 
 **Models are YAML, not Dart.** `lib/src/models/note/note.spy.yaml` declares a class, its table and
 its fields; `serverpod generate` turns it into Dart in `lib/src/generated/` **and** in the client

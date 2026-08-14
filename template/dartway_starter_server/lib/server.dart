@@ -8,6 +8,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:dartway_starter_server/src/web/routes/root.dart';
 import 'package:serverpod/serverpod.dart';
 
+import 'src/app/bootstrap_admin.dart';
 import 'src/dartway/dartway_core.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
@@ -35,6 +36,10 @@ void run(List<String> args) async {
   initDartwayCore(passwords: pod.server.passwords);
 
   await pod.start();
+
+  // The first administrator cannot be granted the role by another admin, so it
+  // is declared in this environment's configuration instead.
+  await bootstrapAdmin(pod);
 
   // Recurring jobs are armed after the server is up. The cleanup is a
   // safety net under `dw.auth.revokeAuthKeys`: an auth key never expires

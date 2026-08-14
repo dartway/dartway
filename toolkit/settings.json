@@ -8,7 +8,6 @@
       "Bash(dart test:*)",
       "Bash(dart run:*)",
       "Bash(dart bin/main.dart:*)",
-      "Bash(dart bin/seed_dev.dart:*)",
       "Bash(flutter pub get:*)",
       "Bash(flutter analyze:*)",
       "Bash(flutter test:*)",

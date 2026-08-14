@@ -12,14 +12,17 @@ Eighteen seconds later you have three packages — `my_app_server`, `my_app_clie
 cd my_app/my_app_server
 docker compose up -d                       # Postgres
 dart bin/main.dart --apply-migrations      # schema
-dart bin/seed_dev.dart --mode development  # one user per role
+dart bin/main.dart                         # the server
 
 # in another terminal
 cd ../my_app_flutter
 flutter run
 ```
 
-Sign in with `79990000003`; the one-time code is printed to the server console.
+Register from the app with your own phone number; the one-time code is printed to the server
+console. Put that same number in `bootstrapAdminIdentifier` in `config/passwords.yaml` before
+starting the server and the account is the admin — the role is granted by an admin, so the first
+one is declared per environment.
 
 What you get is a **skeleton, not somebody's product**: phone auth, a `UserProfile` with roles,
 navigation with zone guards, an admin panel, a UI kit as source you own — and no domain models,

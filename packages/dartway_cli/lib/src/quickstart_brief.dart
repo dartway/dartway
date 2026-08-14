@@ -63,7 +63,7 @@ The order is not arbitrary; each line explains why it comes where it does.
     dart pub get
     docker compose up -d
     dart bin/main.dart --apply-migrations --role maintenance
-    dart bin/seed_dev.dart --mode development
+    # set bootstrapAdminIdentifier in config/passwords.yaml — see below
     dart bin/main.dart
 
 - **`docker compose up -d`** starts Postgres for development (host port 8090), a separate
@@ -76,8 +76,13 @@ The order is not arbitrary; each line explains why it comes where it does.
 - **`--role maintenance` is what makes the migration step finish.** Without it the process
   applies the schema and then keeps serving, and you wait forever for a command that will
   never return.
-- **Seeding comes after migrating.** The seed writes rows; before the schema exists there
-  are no tables to write to.
+- **Ask the human to put the phone number they want to be the admin** into
+  `bootstrapAdminIdentifier`, under `development:` in `config/passwords.yaml`, before the last
+  line. Ask rather than choose, and never invent a value: whoever can *receive* the one-time
+  code on that number becomes the administrator, so it is theirs to pick — and that file is
+  one you must not read (see the end of this brief). Left empty, the server still starts and
+  says on boot that the admin panel is out of reach, so this postpones the admin panel rather
+  than blocking anything.
 - **The last line is a long-running process.** Start it in the background. Waiting for it to
   exit will hang you until the session is killed.
 
@@ -102,14 +107,17 @@ code, not this exact command line.
 
 ## 5. Hand over the sign-in
 
-The seed prints the seeded phone numbers: `79990000003` is a plain user, `79990000001` an
-admin. **The one-time code is printed in the server console** — read the real one out of the
-server output and pass it on. Nothing is sent over SMS in development, and telling the human
-to "enter anything" is wrong: the code is checked.
+The database starts empty — there is no account until someone registers. Tell the human to
+register in the app with the number you put in `bootstrapAdminIdentifier`; the server logs on
+boot whether it created or promoted that administrator, or that the key is unset, so read that
+line and report it. **The one-time code is printed in the server console** — read the real one
+out of the server output and pass it on. Nothing is sent over SMS in development, and telling
+the human to "enter anything" is wrong: the code is checked.
 
-A good first thing to show: sign in as the admin, change the app name in the admin panel,
-and watch the home screen of a second window update without a reload. That is the whole
-stack — Postgres, a CRUD config, a typed live list, a widget — proving itself.
+A good first thing to show: sign in as the admin, set the app name in the admin panel — it
+starts empty, which is a legitimate state and not a missing step — and watch the home screen
+of a second window update without a reload. That is the whole stack — Postgres, a CRUD config,
+a typed live list, a widget — proving itself, the write end included.
 
 ## 6. What the project expects from you next
 

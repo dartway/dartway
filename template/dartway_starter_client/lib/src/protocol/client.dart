@@ -10,36 +10,20 @@
 // ignore_for_file: invalid_use_of_internal_member
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'dart:async' as _i2;
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart'
-    as _i3;
-import 'protocol.dart' as _i4;
-
-/// {@category Endpoint}
-class EndpointDevelopment extends _i1.EndpointRef {
-  EndpointDevelopment(_i1.EndpointCaller caller) : super(caller);
-
-  @override
-  String get name => 'development';
-
-  _i2.Future<void> testNotification({required String notificationText}) =>
-      caller.callServerEndpoint<void>(
-        'development',
-        'testNotification',
-        {'notificationText': notificationText},
-      );
-}
+    as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _i2;
+import 'protocol.dart' as _i3;
 
 class Modules {
   Modules(Client client) {
-    dartway_serverpod_core = _i3.Caller(client);
+    dartway_serverpod_core = _i1.Caller(client);
   }
 
-  late final _i3.Caller dartway_serverpod_core;
+  late final _i1.Caller dartway_serverpod_core;
 }
 
-class Client extends _i1.ServerpodClientShared {
+class Client extends _i2.ServerpodClientShared {
   Client(
     String host, {
     dynamic securityContext,
@@ -50,16 +34,16 @@ class Client extends _i1.ServerpodClientShared {
     Duration? streamingConnectionTimeout,
     Duration? connectionTimeout,
     Function(
-      _i1.MethodCallContext,
+      _i2.MethodCallContext,
       Object,
       StackTrace,
     )?
     onFailedCall,
-    Function(_i1.MethodCallContext)? onSucceededCall,
+    Function(_i2.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i4.Protocol(),
+         _i3.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
@@ -68,21 +52,16 @@ class Client extends _i1.ServerpodClientShared {
          disconnectStreamsOnLostInternetConnection:
              disconnectStreamsOnLostInternetConnection,
        ) {
-    development = EndpointDevelopment(this);
     modules = Modules(this);
   }
-
-  late final EndpointDevelopment development;
 
   late final Modules modules;
 
   @override
-  Map<String, _i1.EndpointRef> get endpointRefLookup => {
-    'development': development,
-  };
+  Map<String, _i2.EndpointRef> get endpointRefLookup => {};
 
   @override
-  Map<String, _i1.ModuleEndpointCaller> get moduleLookup => {
+  Map<String, _i2.ModuleEndpointCaller> get moduleLookup => {
     'dartway_serverpod_core': modules.dartway_serverpod_core,
   };
 }

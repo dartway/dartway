@@ -45,14 +45,18 @@ Three packages — `my_app_server`, `my_app_client` (generated, never edited by 
 `my_app_flutter` — a git repository with an initial commit, and an agent toolkit in `.claude/`.
 
 The assistant should end by reporting **facts**: the migrations it applied, `200` from
-`http://localhost:8080/`, and the phone number to sign in with — `79990000003` for a plain user,
-`79990000001` for an admin. **The one-time code is printed in the server console**, and the real one
-is what you should be handed; nothing goes over SMS in development, and "enter anything" is wrong,
-because the code is checked.
+`http://localhost:8080/`, and what to do to sign in. The database starts empty — you register from
+the app with your own phone number, and **the one-time code is printed in the server console**. That
+real code is what you should be handed; nothing goes over SMS in development, and "enter anything"
+is wrong, because the code is checked.
 
-A good first thing to try: sign in as the admin, change the app name in the admin panel, and watch
-the home screen in a second window update without a reload. Postgres → CRUD config → typed live
-list → widget, proving itself on the first screen.
+To be the admin, the same number goes into `bootstrapAdminIdentifier` in
+`my_app_server/config/passwords.yaml` before the server starts. The admin role is granted by an
+admin, so the first one is declared per environment instead of shipped as a default.
+
+A good first thing to try: sign in as the admin, set the app name in the admin panel — it starts
+empty — and watch the home screen in a second window update without a reload. Postgres → CRUD
+config → typed live list → widget, proving itself on the first screen.
 
 ## From there on
 

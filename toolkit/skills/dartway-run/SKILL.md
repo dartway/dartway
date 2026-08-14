@@ -2,8 +2,8 @@
 name: dartway-run
 description: >-
   Bring a DartWay project up locally and confirm it is alive (DartWay projects):
-  dependencies, Postgres in docker, migrations, seeding test users, the server, the app.
-  Knows the order of the steps (seeding before migrations does not work), the real ports
+  dependencies, Postgres in docker, migrations, the first administrator, the server, the app.
+  Knows the order of the steps (migrations before anything writes rows), the real ports
   (API 8080, development DB 8090, test DB 9090, object storage 8100 and its console 8101),
   where to find the sign-in code (printed in the server console) and how to fix the typical
   failures: docker not running, port already taken, schema drifted, model changed without
@@ -45,7 +45,7 @@ docker compose up -d                                       # ~5 s
 # wait until the DB is ready, do not sleep blindly:
 #   docker exec <postgres-container> pg_isready -U postgres
 dart bin/main.dart --apply-migrations --role maintenance    # ~18 s
-dart bin/seed_dev.dart --mode development                   # ~9 s
+# set bootstrapAdminIdentifier in config/passwords.yaml (see below)
 dart bin/main.dart                                          # the server, does not exit
 ```
 
@@ -57,8 +57,8 @@ flutter run
 
 **Why exactly this way:**
 
-- **Seeding after migrations.** The seed writes into tables — before the schema is applied they do not exist and it will fail.
-- **Migrations after `docker compose up`** and **after the DB is ready.** A container that is "Started"
+- **The first administrator is declared, not seeded.** The database comes up empty and anyone can register from the app, but the admin role is granted by an admin — so the first one is named in `config/passwords.yaml` under `bootstrapAdminIdentifier`, and `bootstrapAdmin` in `lib/src/app/` brings that identifier to "profile exists, role is admin" on every boot. **Ask the user to fill that key in before the server starts, and never invent a value** — whoever receives the one-time code on that identifier becomes the administrator, so it is theirs to choose. You cannot do it for them: reading `config/passwords.yaml` is denied in this project's settings, and that denial is the point. Say which key, which run-mode block, and what the value means. Left empty the server starts anyway and says on boot that the admin panel is out of reach — so this never blocks bringing the project up, it only postpones the admin panel.
+- **Migrations before anything writes rows**, and **after `docker compose up`** and **after the DB is ready.** A container that is "Started"
   ≠ Postgres accepting connections; there are seconds between them, and a migration in that window fails
   with connection refused. Wait for `pg_isready`, not for a `sleep`.
 - **Storage comes up with the same `docker compose up`.** Alongside Postgres it brings up `minio` (S3 for uploads) and a one-shot `minio_init`, which creates the bucket and opens it for reading — without that, uploaded images will not open by link.
@@ -71,10 +71,13 @@ flutter run
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/     # expect 200
 ```
 
-The server prints the applied migrations and the seeding result. The seed reports who to sign in as:
-the admin's phone and a regular user's phone. **The one-time sign-in code is printed in the server
-console** — find it there and pass it to the user; do not invent a code and do not suggest
-"enter anything".
+The server prints the applied migrations and one line about the administrator — created, promoted,
+or "no administrator is declared". Read that line and report which of the three it was.
+
+The database is empty on a fresh clone, so the user registers in the app rather than signing in to
+something that already exists. **The one-time code is printed in the server console** — find it
+there and pass it on; do not invent a code and do not suggest "enter anything". Registering with the
+identifier from `bootstrapAdminIdentifier` yields the admin; any other number yields a regular user.
 
 ## Typical failures and what to do
 
@@ -88,7 +91,8 @@ console** — find it there and pass it to the user; do not invent a code and do
 | Upload fails with "Cloud storage is not configured" | No `dwCloudStorage*` keys for this run mode | Add them to `config/passwords.yaml` (in development they point at the `minio` service) |
 | `Missing password for "database"` on a fresh clone | `config/passwords.yaml` is not in Git and never was — `dartway create` wrote it on the machine the project was created on | `cp __SERVER_PKG__/config/passwords.yaml.example __SERVER_PKG__/config/passwords.yaml`. The example carries working development values; ask a teammate only for keys a deployed environment needs |
 | `Address already in use` on 8080 | The server is already running in another terminal | Do not start a second one; check `curl localhost:8080` |
-| A migration does not apply, complaining about a schema mismatch | The DB survived a model change | For local development the simplest fix is to recreate it: `docker compose down -v` (**deletes the data**) → `up -d` → migrations → seed. Ask for confirmation before destroying the volume |
+| A migration does not apply, complaining about a schema mismatch | The DB survived a model change | For local development the simplest fix is to recreate it: `docker compose down -v` (**deletes the data**) → `up -d` → migrations → restart the server. Ask for confirmation before destroying the volume. Registered accounts go with the volume; the administrator comes back on the next boot, everyone else registers again |
+| The admin panel is not in the navigation after signing in | The account is a regular user | `bootstrapAdminIdentifier` is unset, or it does not match the identifier that registered. The comparison is case-insensitive but otherwise exact — no country-code guessing. Fix the key and restart the server: the promotion happens on boot |
 | The client does not see a new model field | Generation was not run after editing `.spy.yaml` | `serverpod generate`, then `serverpod create-migration`, then apply the migrations |
 | Strange generation/protocol errors | The `serverpod_cli` version drifted from the `serverpod` pin in the project's pubspec | Compare `dart pub global list` with the version in `__SERVER_PKG__/pubspec.yaml`; the generator must match the runtime |
 | `Default Objects Repository doesn't contain a model of type X` | The new model has no registered default instance | Add `dw.repo.setupRepository(defaultModel: X(...))` in `__FLUTTER_PKG__/lib/core/default_models.dart` |
