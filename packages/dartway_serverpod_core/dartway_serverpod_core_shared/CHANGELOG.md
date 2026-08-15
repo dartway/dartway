@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.9.0 is the
+server side making a failed side effect audible: `afterSaveTransform` is now `Future<String?>` and
+can reject a save (breaking, one `return null;` per hook), a throw in `afterSaveSideEffects` is
+reported to `DwAlerts` instead of vanishing, and a verification code that could not be sent comes
+back as an error rather than a silent success. See the changelog of `dartway_serverpod_core_server`.
+
 ## 0.8.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.8.0 is the

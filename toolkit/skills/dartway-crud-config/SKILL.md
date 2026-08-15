@@ -118,9 +118,34 @@ Execution order and signatures:
 1. `allowSave` → `Future<bool>` — permissions, **required**
 2. `validateSave` → `Future<String?>` — the error text or null
 3. **the transaction opens:** `beforeSaveTransaction` → `Future<String?>` → insert/update → `afterSaveTransaction` → `Future<String?>`
-4. outside the transaction: `afterSaveTransform` → `Future<void>` (enrichment), then `afterSaveSideEffects` → `Future<void>` (non-blocking)
+4. outside the transaction: `afterSaveTransform` → `Future<String?>` (awaited, can reject), then `afterSaveSideEffects` → `Future<void>` (non-blocking)
 
 **Both in-transaction hooks return `String?` — just like `validateSave`.** Returned text → the save is rejected, the transaction is rolled back, the text reaches the client; returned `null` → we move on. This is precisely how you reject on a rule that is only visible inside the transaction.
+
+**Nobody waits for `afterSaveSideEffects`, so nothing it does can reach the caller — its failure included.** By the time it throws, the response has been built and says `isOk`. The framework reports the throw to `DwAlerts`, so the operator hears it, and that is the whole of its audience. **Anything the user has to be told about goes in the awaited hook**, `afterSaveTransform`: it returns `String?` like the rejecting hooks above, and its text becomes the error in the response.
+
+The question is who needs to know, not when the work happens. A push notification nobody misses if it is late → `afterSaveSideEffects`. A verification code, a payment handed to a provider, an invitation the whole feature is about → `afterSaveTransform`, and the caller waits for it.
+
+One consequence to write into the hook: `afterSaveTransform` runs **after** the commit, so rejecting there does not undo the write. The row stays saved and only the response says no. Write the hook so that a retry is harmless, and say in the error text that retrying is what to do.
+
+```dart
+afterSaveTransform: (session, saveContext) async {
+  try {
+    await sendInvitationEmail(session, saveContext.currentModel);
+  } catch (exception, stackTrace) {
+    // The operator gets the provider's actual complaint, the user gets a
+    // sentence they can act on. Do not hand the provider's message to the
+    // client — it names your delivery configuration.
+    dw.alerts.reportError(
+      'Failed to send the invitation',
+      exception: exception,
+      stackTrace: stackTrace,
+    );
+    return 'Could not send the invitation. Please try again.';
+  }
+  return null;
+},
+```
 
 **Why this and not `validateSave`:** steps 1–2 run BEFORE the transaction, so a rule guarding a shared counter (seats, stock, limits) is evaluated there — two parallel saves would both get a "yes". Check such a rule in `beforeSaveTransaction`, taking a **row lock** in the same transaction: `findById(..., transaction:, lockMode: LockMode.forUpdate)` — a single call both locks the row (`SELECT ... FOR UPDATE`) and returns it. `validateSave` checks the model, `beforeSaveTransaction` checks the world around it.
 

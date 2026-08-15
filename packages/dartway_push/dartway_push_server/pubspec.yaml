@@ -11,7 +11,7 @@ environment:
 dependencies:
   serverpod: ^3.4.11
 
-  dartway_serverpod_core_server: ^0.8.0
+  dartway_serverpod_core_server: ^0.9.0
 
   collection: ^1.19.1
   crypto: ^3.0.6
