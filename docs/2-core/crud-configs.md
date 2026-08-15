@@ -98,7 +98,7 @@ The order, exactly as `DwSaveConfig.save` runs it:
 | 3 | `beforeSaveTransaction` | `Future<String?>` | **inside** the transaction |
 | 4 | *insert / update* | — | inside the transaction |
 | 5 | `afterSaveTransaction` | `Future<String?>` | inside the transaction |
-| 6 | `afterSaveTransform` | `Future<void>` | after commit |
+| 6 | `afterSaveTransform` | `Future<String?>` | after commit |
 | 7 | `afterSaveSideEffects` | `Future<void>` | after commit, not awaited |
 
 All seven share one signature — `(Session session, DwSaveContext<T> saveContext)`. There is no
@@ -107,10 +107,28 @@ All seven share one signature — `(Session session, DwSaveContext<T> saveContex
 extra models the client should refresh.
 
 **Rejecting.** `allowSave` returning anything but `true` produces `DwApiResponse.forbidden()` — the
-fixed text `Not enough permissions`. The three `String?` hooks reject by returning the message,
-which reaches the user verbatim; returning `null` lets the save proceed. Rejection from inside the
+fixed text `Not enough permissions`. The four `String?` hooks reject by returning the message, which
+reaches the user verbatim; returning `null` lets the save proceed. Rejection from inside the
 transaction rolls it back, including from `afterSaveTransaction` — a rule discovered after the write
 still undoes it.
+
+`afterSaveTransform` is the exception, and the one place where rejecting and undoing come apart: it
+runs after the commit, so its message reaches the caller while **the row stays written**. That is
+the intended trade — deleting a committed row to report a failed email is worse — and it is why a
+hook there should be written so that a retry is harmless. Rejecting there does stop what follows:
+step 7 does not run and `broadcastTo` sends nothing, since announcing a change to other screens
+while answering the caller with an error would be the less coherent of the two.
+
+**Steps 6 and 7 differ by audience, not by timing.** Both run after the commit; only step 6 is
+awaited, and only step 6 can answer. Nothing that happens in `afterSaveSideEffects` can reach the
+caller, its failure included: by the time it throws, the response has been built and says `isOk`.
+The throw is reported to `DwAlerts` with the model's name and the stack trace, so the operator hears
+it — and that is the whole of its audience.
+
+So the question to ask is who needs to know. A push notification nobody misses if it is late →
+step 7. A verification code, a payment handed to a provider, anything whose failure changes what the
+user should do next → step 6, where the failure comes back as an error. The price is real and worth
+naming: step 6 makes the caller wait for whatever it calls out to.
 
 **Why three rejection points and not one.** Steps 1–2 run *before* the transaction opens, against
 the database as it was a moment ago. A rule that guards a shared count — seats left, stock on hand,

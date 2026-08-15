@@ -8,7 +8,9 @@ description: >-
   widget-returning methods, no ref.invalidate, no GlobalKey tree lookups, no
   outer padding/margin inside a widget, no private widget classes in public
   feature files, a Serverpod model rebuilt with copyWith and never by listing
-  its fields; plus SOLID, KISS, DRY, YAGNI, Law of Demeter, composition over
+  its fields, no default for a setting whose value belongs to the environment
+  (sender address, provider key, admin identifier);
+  plus SOLID, KISS, DRY, YAGNI, Law of Demeter, composition over
   inheritance, separation of concerns, fail-fast, tell-don't-ask, single source
   of truth, and tests for complex features / non-trivial bugfixes.
 ---
@@ -443,6 +445,40 @@ or an `if`/`else if` chain over the same values gives you nothing.
 
 ---
 
+## 1.11 A setting whose value belongs to the environment has no default
+
+Sender address, provider key, webhook URL, bucket name, the identifier of the first administrator —
+these are not preferences with a sensible starting point. Each one is a **credential of this
+deployment**, and the only correct value is the one this deployment was given.
+
+Give such a setting a default and an unfilled key stops being an error. It becomes quiet work with
+somebody else's credentials: mail leaves from an address the project does not own, a webhook posts
+to a stranger's endpoint, and nothing anywhere says so. The failure is not that it breaks — it is
+that it *works*, plausibly, pointing at the wrong place.
+
+```dart
+// ❌ the project that forgets to configure this sends mail as someone else
+final senderAddress = passwords['senderAddress'] ?? 'noreply@example.com';
+
+// ✅ unset is unset, and it says so where it is read
+final senderAddress = passwords['senderAddress'] ??
+    (throw StateError('senderAddress missing in passwords'));
+```
+
+Empty and an explicit error beats a plausible foreign value. Read the setting at the point of use
+and fail there, or check it on boot — either is fine; what is not fine is a fallback that hides the
+gap.
+
+The framework's own template follows this: `bootstrapAdminIdentifier` is deliberately left without
+a default. A default administrator in a public template would mean every project that forgot to
+change it has an administrator whose channel a stranger controls.
+
+Preferences with a genuine neutral value — a page size, a timeout, a retry count — are not this
+rule. The test is whether the value is *about this deployment*. If a wrong value would point the
+system at somebody else, there is no default to give.
+
+---
+
 # Part 2. Clean code principles
 
 Well-known principles. Here — how they look in Dart/Flutter and what to avoid.
@@ -692,6 +728,7 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
 - [ ] **No** private widget classes (`_Foo`) in public feature files.
 - [ ] **A Serverpod model is rebuilt with `copyWith`**, never by listing its fields in the constructor — a field with `default=` or a nullable one is optional, so a forgotten one is a silent default, not an error. Clearing a nullable field is `copyWith(field: null)` (§1.10). An unavoidable enumeration is driven by `Enum.values` or an exhaustive `switch`, not written out by hand.
+- [ ] **A setting whose value belongs to the environment has no default** — sender address, provider key, webhook URL, admin identifier. An unfilled key must be an error, not quiet work with somebody else's credentials (§1.11).
 - [ ] **A building block** — a widget with no product behaviour to describe — lives in `lib/shared/` with a doc comment, not in a zone with an empty `DwFeatureSpec`.
 - [ ] **Imports:** own internals and sibling features are relative and no deeper than two `../`; `core`/`data`/`domain`/`shared`/`ui_kit`/another zone are `package:` (§1.2a).
 - [ ] **The provider is the first thing in its file** (or lives in the feature's root file), not appended after the notifier that implements it.

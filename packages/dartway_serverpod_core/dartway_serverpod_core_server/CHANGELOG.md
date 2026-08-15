@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.9.0
+
+**The sign-in response now waits for your SMS or mail provider, and reports it when the provider
+says no.** Until now the verification code was sent from a hook nobody awaited: the response was
+already built and said `isOk`, so a failed delivery reached neither the user nor the operator. The
+screen said "code sent" and no code was sent. If your delivery is flaky, applications that were
+quietly succeeding will start showing errors — that is the point of the change, not a side effect
+of it, and the failures were always happening.
+
+- **Breaking: `afterSaveTransform` returns `Future<String?>` instead of `Future<void>`.** A non-null
+  string rejects the save and becomes the error text in the response, exactly as with `validateSave`
+  and `beforeSaveTransaction`. Migration is one line per hook: add `return null;` at the end.
+
+  ```dart
+  // before
+  afterSaveTransform: (session, ctx) async {
+    ctx.currentModel = await enrich(session, ctx.currentModel);
+  },
+
+  // after
+  afterSaveTransform: (session, ctx) async {
+    ctx.currentModel = await enrich(session, ctx.currentModel);
+    return null;
+  },
+  ```
+
+  The analyzer catches every site (`body_might_complete_normally_nullable`), so nothing migrates
+  silently.
+
+  **A rejection here does not undo the write** — the transaction committed two steps earlier, so
+  the row stays saved and only the response says no. Undoing it would mean deleting a committed
+  row to report a failed email, which is worse. Write the hook so that a retry is harmless. A
+  rejection does stop what follows: `afterSaveSideEffects` does not run and `broadcastTo` sends
+  nothing.
+
+- **The hook's contract is stated honestly now.** It was documented as "enrich the model, outside
+  the transaction", which is what sent the verification code to `afterSaveSideEffects`, where it
+  could not be heard. It is the place for **any expected work after the write that the caller is
+  entitled to hear about** — enrichment, a payment handed to a provider, a code sent. The name is
+  unchanged: `docs/DESIGN.md` asks for one way to do a thing, and a second post-commit hook would
+  have been the second way.
+
+- **Fixed: a failure in `afterSaveSideEffects` reached nobody.** Its contract is unchanged — still
+  not awaited, still unable to fail the save — but a throw is now reported to `DwAlerts` with the
+  model's name and the stack trace instead of vanishing into the zone's error handler. Same fix for
+  `DwDtoActionConfig.afterSaveSideEffects`, which had the identical hole.
+
+  So the two hooks now differ by audience rather than by timing: what the user must be told goes in
+  `afterSaveTransform`, what only the operator needs goes in `afterSaveSideEffects`.
+
+- **The built-in auth request config sends the verification code from `afterSaveTransform`.** A
+  delivery failure comes back as "Could not send the verification code. Please try again." while
+  the provider's actual complaint — unverified sender domain, expired key, rejected recipient —
+  goes to the operator through `DwAlerts`. The two are deliberately separate: the sign-in endpoint
+  answers anonymous callers, and the provider's message names the delivery configuration.
+
+  The auth request row survives a failed delivery. That is harmless: the retry issues a fresh code,
+  and the abandoned request expires on its own.
+
 ## 0.8.0
 
 **`scope=serverOnly` did not hold, in either direction. Worth upgrading now rather than at your

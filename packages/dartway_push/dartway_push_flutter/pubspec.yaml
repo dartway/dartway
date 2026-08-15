@@ -22,7 +22,7 @@ dependencies:
   # app half talks to the server half through the generated protocol, not
   # through an endpoint of its own.
   dartway_push_client: ^0.2.0
-  dartway_serverpod_core_flutter: ^0.8.0
+  dartway_serverpod_core_flutter: ^0.9.0
 
   flutter_riverpod: ^3.0.0
 

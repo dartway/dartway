@@ -72,6 +72,7 @@ void main() {
             },
             afterSaveTransform: (session, context) async {
               callbackOrder.add('transform');
+              return null;
             },
           ).save(session, stored.copyWith(settingValue: 'updated'));
 
@@ -322,6 +323,79 @@ void main() {
           expect(response.error, 'Database error during save');
           expect(response.error, isNot(contains('app_setting_key_unique_idx')));
           expect(response.error, isNot(contains(conflictingKey)));
+        },
+      );
+
+      test(
+        'a rejecting afterSaveTransform answers with its text and leaves the '
+        'row written',
+        () async {
+          final session = sessionBuilder.build();
+          final stored = await AppSetting.db.insertRow(
+            session,
+            AppSetting(
+              settingKey: '${_testKeyPrefix}transform_rejects',
+              settingValue: 'initial',
+            ),
+          );
+
+          var sideEffectsRan = false;
+
+          final response = await DwSaveConfig<AppSetting>(
+            allowSave: (session, context) async => true,
+            afterSaveTransform: (session, context) async =>
+                'Could not notify the provider. Please try again.',
+            afterSaveSideEffects: (session, context) async =>
+                sideEffectsRan = true,
+          ).save(session, stored.copyWith(settingValue: 'updated'));
+
+          expect(response.isOk, isFalse);
+          expect(
+            response.error,
+            'Could not notify the provider. Please try again.',
+          );
+          // A rejection stops what follows — documented on the hook.
+          expect(sideEffectsRan, isFalse);
+          // The hook runs after the commit, so rejecting cannot undo the write.
+          // Documented on `afterSaveTransform`, and pinned here.
+          expect(
+            (await AppSetting.db.findById(session, stored.id!))?.settingValue,
+            'updated',
+          );
+        },
+      );
+
+      test(
+        'a throwing afterSaveSideEffects neither fails the save nor escapes',
+        () async {
+          final session = sessionBuilder.build();
+          final threw = Completer<void>();
+
+          final response = await DwSaveConfig<AppSetting>(
+            allowSave: (session, context) async => true,
+            afterSaveSideEffects: (session, context) async {
+              threw.complete();
+              throw StateError('the mail provider refused the sender address');
+            },
+          ).save(
+            session,
+            AppSetting(
+              settingKey: '${_testKeyPrefix}side_effect_throws',
+              settingValue: 'inserted',
+            ),
+          );
+
+          // Nobody waits for the hook, so its failure must not touch the
+          // response — the contract is unchanged.
+          expect(response.isOk, isTrue);
+          await threw.future;
+
+          // And it must not escape either: unawaited, the throw used to reach
+          // the zone's error handler, which in this suite means an unhandled
+          // async error failing whichever test happened to be running. The
+          // failure goes to DwAlerts now, so letting the microtask queue drain
+          // here has to stay quiet.
+          await Future<void>.delayed(const Duration(milliseconds: 50));
         },
       );
     },

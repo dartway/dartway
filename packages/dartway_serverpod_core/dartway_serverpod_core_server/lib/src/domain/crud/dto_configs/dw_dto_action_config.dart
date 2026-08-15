@@ -29,6 +29,14 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
   )
   actionProcessing;
 
+  /// Side effects once the action's transaction has committed. Runs
+  /// **outside** it, non-blocking.
+  ///
+  /// **Nobody waits for this hook, so nothing it does can reach the caller —
+  /// including its failure.** The response has already been built and says
+  /// `isOk`. A throw is reported to [DwAlerts] with the DTO's name and the
+  /// stack trace, which reaches the operator and nobody else. Anything the
+  /// caller must be told about belongs in [actionProcessing].
   final Future<void> Function(
     Session session,
     DTO dto,
@@ -60,7 +68,7 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
 
     // --- afterSideEffects (outside the transaction, non-blocking) ---
     if (afterSaveSideEffects != null) {
-      unawaited(afterSaveSideEffects!(session, dto, updatedModels));
+      unawaited(_runSideEffects(session, dto, updatedModels));
     }
 
     return DwApiResponse(
@@ -68,5 +76,27 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
       value: DwModelWrapper(object: dto),
       updatedModels: updatedModels,
     );
+  }
+
+  /// Runs [afterSaveSideEffects] with nobody waiting for it, and makes sure a
+  /// failure still lands somewhere — unawaited, it would otherwise go to the
+  /// zone's error handler and reach neither the caller nor the operator.
+  ///
+  /// The call is made inside the try, so a hook that throws before its first
+  /// suspension point is caught too.
+  Future<void> _runSideEffects(
+    Session session,
+    DTO dto,
+    List<DwModelWrapper> updatedModels,
+  ) async {
+    try {
+      await afterSaveSideEffects!(session, dto, updatedModels);
+    } catch (exception, stackTrace) {
+      dw.alerts.reportError(
+        'Side effect failed after the ${DTO.toString()} action',
+        exception: exception,
+        stackTrace: stackTrace,
+      );
+    }
   }
 }

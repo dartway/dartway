@@ -127,14 +127,41 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
     afterSaveTransaction:
         (Session session, DwSaveContext<DwAuthRequest> saveContext) async =>
             null,
-    afterSaveSideEffects: (session, saveContext) async {
-      if (saveContext.extras[verificationCodeKey] != null) {
+    // Awaited on purpose, and this is the hook the caller hears about. The
+    // sign-in screen's whole answer is "a code is on its way", so a delivery
+    // that failed has to travel back with the response — from
+    // `afterSaveSideEffects` nobody was waiting for it, and the user was shown
+    // "code sent" for a code that was never sent. The price is that the
+    // sign-in response now waits for the SMS or mail provider.
+    //
+    // The request row stays saved either way: the transaction committed before
+    // this runs. That is fine here — the user retries, the retry issues a new
+    // code, and the abandoned request expires on its own.
+    afterSaveTransform: (session, saveContext) async {
+      final verificationCode = saveContext.extras[verificationCodeKey];
+      if (verificationCode == null) return null;
+
+      try {
         await dw.auth!.config.sendVerificationCodeMethod?.call(
           session,
           verificationRequest: saveContext.currentModel,
-          verificationCode: saveContext.extras[verificationCodeKey] as String,
+          verificationCode: verificationCode as String,
         );
+      } catch (exception, stackTrace) {
+        // Split audience: the operator gets the provider's actual complaint —
+        // an unverified sender domain, an expired key, a rejected recipient —
+        // and the user gets a sentence they can act on. Handing the provider's
+        // message to the client would leak the delivery configuration to an
+        // endpoint that is open to anonymous callers.
+        dw.alerts.reportError(
+          'Failed to send the verification code for '
+          '${saveContext.currentModel.userIdentifier}',
+          exception: exception,
+          stackTrace: stackTrace,
+        );
+        return 'Could not send the verification code. Please try again.';
       }
+      return null;
     },
   ),
 );

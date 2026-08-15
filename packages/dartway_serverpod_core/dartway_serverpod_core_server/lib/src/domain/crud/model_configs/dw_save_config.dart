@@ -15,8 +15,10 @@ import '../../../private/dw_singleton.dart';
 /// 3. [beforeSaveTransaction] — prepare the model (inside the transaction)
 /// 4. insert/update           — the write itself
 /// 5. [afterSaveTransaction]  — further database work (inside the transaction)
-/// 6. [afterSaveTransform]    — enrich the model, outside the transaction
-/// 7. [afterSaveSideEffects]  — notifications, async tasks, outside as well
+/// 6. [afterSaveTransform]    — expected work after the write, outside the
+///                              transaction; the caller waits for it
+/// 7. [afterSaveSideEffects]  — notifications, async tasks, outside as well;
+///                              the caller does not wait for it
 ///
 /// Carries a rejection out of the transaction callback: throwing is the only
 /// way to roll a Serverpod transaction back. Private on purpose — it never
@@ -84,13 +86,49 @@ class DwSaveConfig<T extends TableRow> {
   final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
   afterSaveTransaction;
 
-  /// Enriches the saved model before it is returned. Runs **outside** the
-  /// transaction and may be slow.
-  final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
+  /// The work that is expected to happen once the model is written, and that
+  /// the caller is entitled to hear about: enriching the model before it is
+  /// returned, and equally any step whose failure the caller must be told of —
+  /// sending a verification code, handing a payment to a provider, calling out
+  /// to a system the answer depends on. Runs **outside** the transaction, is
+  /// awaited, and may be slow.
+  ///
+  /// Return the error text to turn the save into an error response, or null to
+  /// let it through — the same contract as [validateSave] and
+  /// [beforeSaveTransaction]. Throwing also reaches the caller, as the generic
+  /// "unexpected error" message; returning the text is how the caller gets one
+  /// worth showing.
+  ///
+  /// **A rejection here does not undo the write.** The transaction committed
+  /// two steps ago, so the row stays saved and only the response says no. That
+  /// is the intended trade: the alternative — deleting a committed row to
+  /// report a failed email — is worse. Write the hook so that the caller
+  /// retrying is harmless, and say in the error text that retrying is what
+  /// they should do.
+  ///
+  /// **A rejection stops the two steps that follow**: [afterSaveSideEffects]
+  /// does not run and [broadcastTo] sends nothing. Announcing a change to
+  /// other users' screens while answering the caller with an error would be
+  /// the less coherent of the two, and the row is still there for the next
+  /// read.
+  ///
+  /// Anything the caller need not wait for belongs in [afterSaveSideEffects]
+  /// instead — a slow step here is a slow response.
+  final Future<String?> Function(Session session, DwSaveContext<T> saveContext)?
   afterSaveTransform;
 
   /// Side effects: notifications, async tasks, anything the caller need not
   /// wait for. Runs **outside** the transaction, non-blocking.
+  ///
+  /// **Nobody waits for this hook, so nothing it does can reach the caller —
+  /// including its failure.** A throw here does not fail the save: the response
+  /// has already been built and says `isOk`. The failure is reported to
+  /// [DwAlerts] with the model's name and the stack trace, so it reaches the
+  /// operator, and that is the whole of its audience.
+  ///
+  /// Which makes the choice between the two hooks a question about the user,
+  /// not about timing: anything they must be told went wrong goes in
+  /// [afterSaveTransform], which is awaited and can reject.
   final Future<void> Function(Session session, DwSaveContext<T> saveContext)?
   afterSaveSideEffects;
 
@@ -396,14 +434,20 @@ class DwSaveConfig<T extends TableRow> {
     Session session,
     DwSaveContext<T> saveContext,
   ) async {
-    // --- afterTransform (outside the transaction) ---
+    // --- afterTransform (outside the transaction, awaited) ---
+    // A rejection here cannot roll anything back — the transaction committed
+    // before this method was called — so the row stays written and only the
+    // response says no. See [afterSaveTransform].
     if (afterSaveTransform != null) {
-      await afterSaveTransform!(session, saveContext);
+      final error = await afterSaveTransform!(session, saveContext);
+      if (error != null) {
+        return DwApiResponse(isOk: false, value: null, error: error);
+      }
     }
 
     // --- afterSideEffects (outside the transaction, non-blocking) ---
     if (afterSaveSideEffects != null) {
-      unawaited(afterSaveSideEffects!(session, saveContext));
+      unawaited(_runSideEffects(session, saveContext));
     }
 
     // Collect everything the client should refresh.
@@ -427,6 +471,33 @@ class DwSaveConfig<T extends TableRow> {
       value: DwModelWrapper(object: saveContext.currentModel),
       updatedModels: updatedModels,
     );
+  }
+
+  /// Runs [afterSaveSideEffects] with nobody waiting for it, and makes sure a
+  /// failure still lands somewhere.
+  ///
+  /// Unawaited, an exception thrown in here goes to the zone's error handler
+  /// and no further: the caller already has its `isOk` response and cannot be
+  /// told, and without this the operator was not told either — a misconfigured
+  /// mail sender failed on every save and the only symptom was users not
+  /// receiving anything.
+  ///
+  /// The call is made **inside** the try rather than awaited from outside it,
+  /// so a hook that throws before its first suspension point is caught too;
+  /// handed a future, this would have missed exactly those.
+  Future<void> _runSideEffects(
+    Session session,
+    DwSaveContext<T> saveContext,
+  ) async {
+    try {
+      await afterSaveSideEffects!(session, saveContext);
+    } catch (exception, stackTrace) {
+      dw.alerts.reportError(
+        'Side effect failed after saving ${T.toString()}',
+        exception: exception,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   DwApiResponse<DwModelWrapper> _notFoundResponse(int id) => DwApiResponse(
