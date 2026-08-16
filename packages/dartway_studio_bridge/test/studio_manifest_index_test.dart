@@ -21,6 +21,9 @@ void main() {
           _screen('/schedule', null, 'Schedule'),
           _screen('/schedule/profile', '/schedule', 'Profile'),
           _screen('/schedule/profile/services', '/schedule/profile', 'Services'),
+          _screen('/member/:memberId', '/schedule', 'Member'),
+          _screen('/schedule/day/:date', '/schedule', 'Day'),
+          _screen('/schedule/day/today', '/schedule', 'Today'),
         ],
       ),
       StudioZoneSpec(
@@ -46,6 +49,26 @@ void main() {
 
     test('unknown path with no root spec returns null', () {
       expect(index.specForPath('/nowhere'), isNull);
+    });
+
+    test('an address resolves to the template it is an instance of', () {
+      // The manifest declares a template, the app reports an address. Without
+      // this every parameterized screen resolves to nothing, and silently:
+      // the caller gets null and substitutes something of its own.
+      expect(index.specForPath('/member/7')!.title, 'Member');
+      expect(index.specForPath('/schedule/day/2026-08-16')!.title, 'Day');
+    });
+
+    test('a literal screen wins over a template that also fits', () {
+      // `/schedule/day/today` is a screen of its own, not a parameter value.
+      expect(index.specForPath('/schedule/day/today')!.title, 'Today');
+    });
+
+    test('a template describes one screen, not the subtree under it', () {
+      // `/member/:memberId` has one segment more than the first address and
+      // one less than the second — it must be neither of them.
+      expect(index.specForPath('/member'), isNull);
+      expect(index.specForPath('/member/7/orders'), isNull);
     });
   });
 
