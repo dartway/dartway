@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.1
+
+**A parameterized screen is recognised again.** `StudioManifestIndex.specForPath`
+compared strings, but a manifest declares *templates* (`/public-profile/:userId`)
+while a running app reports *addresses* (`/public-profile/7`) — so every screen
+that takes a parameter resolved to nothing. Silently: the caller got null and
+fell back to whatever it does without a spec, which downstream meant the wrong
+screen title, the wrong navigation chip, and — in Studio — an issue filed against
+an address the project's screen registry had never heard of, refused by
+validation with no hint as to why.
+
+Lookup order is now exact match → template match → deepest non-root prefix. A
+`:segment` matches any one segment, the segment counts must agree (`/a/:id`
+describes one screen, not the subtree under `/a`), and where several templates
+fit, the one with more literal segments wins — `/admin/users` stays a screen of
+its own next to `/admin/:section`.
+
 ## 0.8.0
 
 **The bridge can be asked whether it is there, and it can say no.** Two halves
