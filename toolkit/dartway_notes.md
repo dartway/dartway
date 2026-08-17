@@ -14,6 +14,13 @@ gets translated to English there — the toolkit ships to other people.
 **Status:** `open` — written, waiting to be carried over · `in-progress` — being done in the monorepo
 · `done` — carried over, safe to delete.
 
+**Tracker:** `__NOTES_TRACKER__` — where an entry goes when it leaves this project. A filed entry
+carries `**Issue:** owner/repo#123` **instead of a status**: the tracker holds the state, this file
+holds what an issue cannot — the example from our code, the workaround, the marker beside it. The
+statuses above are for entries not yet filed, and for the whole journal when the tracker is `none`.
+What to restate, translate and check before filing is in `.claude/CLAUDE.md`, "Notes back to the
+framework".
+
 ---
 
 ## Harness — rules, skills, commands

@@ -136,6 +136,43 @@ entry nobody can act on without re-deriving it is the same as no entry.
 `dartway-finish` shows what is still open at the end of a task, so the journal gets carried over
 rather than accumulated.
 
+### Where an entry goes when it leaves this project
+
+**Tracker:** `__NOTES_TRACKER__` — the GitHub repository this project's framework findings are filed
+in as issues. An entry that has been filed records its issue instead of its status:
+
+```markdown
+- **Issue:** owner/repo#123
+```
+
+**The status field then goes away**, and that is the point rather than a shortcut. A status written
+here is a second copy of a state that changes elsewhere, and it rots silently: one project's journal
+listed eleven `open` entries two weeks after every one of them had shipped — including the entry that
+asked for this mechanism. The issue holds the state, the decision and the link to the pull request
+that closed it. The journal holds what an issue must not.
+
+The one value that is not a repository is `none`, and it means this journal is the whole mechanism:
+entries wait here with their statuses, and carrying them over is somebody remembering to. That is the
+state the tracker exists to get out of, so it is chosen deliberately (`dartway setup-ai
+--notes-tracker none`) and never arrived at by default.
+
+That is the other half of the split, and it is what makes filing something other than a copy: **the
+part that names this codebase does not travel.** Paths, class names, what the app did as a
+workaround, where the marker sits — exactly what makes the entry actionable here, and exactly what
+must not appear in a repository other people read.
+
+So before an issue is created:
+
+1. **Restate the entry for a stranger** — the rule that was missing, the API that forced the
+   workaround, put so that it stands without this project's code. If nothing survives that, the
+   entry was never about the framework and belongs in `dev_notes.md`.
+2. **Write it in English** — the tracker is read by people who do not work on this project, so the
+   language the journal itself is kept in does not follow the entry there.
+3. **Search the tracker first.** Three projects meeting one API gap is one issue with three voices,
+   not three issues.
+4. **Show the text and wait for a yes.** This is the only irreversible step the journal has — an
+   issue exists publicly from the moment it is created, and deleting it does not un-index it.
+
 ### A workaround over a `dartway_*` API also leaves a marker in the code
 
 The journal entry records that the workaround exists. It does not record whether it is still needed

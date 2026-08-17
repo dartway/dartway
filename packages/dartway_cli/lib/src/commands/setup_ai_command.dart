@@ -26,6 +26,15 @@ class SetupAiCommand extends Command<int> {
             "English regardless.",
       )
       ..addOption(
+        'notes-tracker',
+        valueHelp: 'owner/repo',
+        defaultsTo: ProjectLayout.defaultNotesTracker,
+        help:
+            'GitHub repository where findings about the framework are filed as '
+            'issues. Pass "${ProjectLayout.noNotesTracker}" to keep the '
+            'journal local instead.',
+      )
+      ..addOption(
         'channel',
         defaultsTo:
             Platform.environment['DARTWAY_BRANCH'] ??
@@ -53,6 +62,7 @@ class SetupAiCommand extends Command<int> {
     final layout = ProjectLayout.detect(projectRoot);
     final baseBranch = argResults!['base-branch'] as String;
     final language = argResults!['language'] as String;
+    final notesTracker = argResults!['notes-tracker'] as String;
 
     stdout.writeln(
       'Packages: server=${layout.serverPackage} '
@@ -62,6 +72,11 @@ class SetupAiCommand extends Command<int> {
     );
     stdout.writeln('Base branch: $baseBranch');
     stdout.writeln('Project language: $language');
+    stdout.writeln(
+      notesTracker == ProjectLayout.noNotesTracker
+          ? 'Notes tracker: none — the journal stays local'
+          : 'Notes tracker: $notesTracker',
+    );
 
     final monorepoDir = await MonorepoSource(
       branch: argResults!['channel'] as String,
@@ -74,6 +89,7 @@ class SetupAiCommand extends Command<int> {
       tokens: layout.toolkitTokens(
         baseBranch: baseBranch,
         language: language,
+        notesTracker: notesTracker,
       ),
     );
 

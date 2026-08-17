@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.8.0
+
+- **`--notes-tracker owner/repo`: the framework journal gets somewhere to go.** `dartway_notes.md`
+  collects what the framework got wrong, and until now that was the end of it — the file is
+  git-ignored and lives on one machine, so an entry travelled only when somebody remembered it. The
+  transport was never the expensive half, though. One project's journal was carried over in full
+  within a fortnight and still advertised eleven `open` findings afterwards, the entry asking for this
+  very mechanism among them: the fixes landed in the monorepo and nothing wrote back. Given a tracker,
+  a filed entry records `**Issue:** owner/repo#123` **instead of a status**, and the state is read
+  from the tracker rather than restated in the file — a state written in two places is a state that
+  goes stale in one of them without a sound, and on GitHub a pull request saying `Fixes #123` closes
+  the loop without anyone's discipline.
+
+  **It defaults to the framework's own tracker, and the default is the point.** Requiring the option
+  would have made every project decide a question it has no particular reason to think about, and the
+  projects that never got around to deciding are precisely the ones whose findings never left the
+  laptop. It is still a repository slug rather than a hardcoded address: a company running DartWay
+  internally may want its developers' findings triaged in its own tracker before any are offered
+  upstream, and that should cost one option rather than an edit in every installed `.claude/`.
+  `--notes-tracker none` opts out entirely, at which point the journal behaves exactly as before and no
+  command reaches the network — a state reached deliberately, never by omission.
+
+  What the installed `CLAUDE.md` now requires before an issue is created is the part that keeps the
+  option honest: the entry restated so it stands without this codebase (paths, class names and the
+  app's workaround are what make it useful locally and unpublishable), English instead of the
+  project's language, a duplicate search — three projects meeting one API gap is one issue with three
+  voices — and an explicit yes, because a public issue is indexed from the moment it exists and
+  deleting it does not undo that. `dartway-finish` reports a filed entry by its issue's real state and
+  offers to file the ones that have none; it never pushes on its own.
+
 ## 0.7.0
 
 - **`frameworkRefsDiverged` (warning): the framework arriving in halves.** An app that consumes

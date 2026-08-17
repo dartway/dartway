@@ -67,11 +67,36 @@ class ProjectLayout {
   String get flutterAppFile =>
       '${flutterPackage.replaceAll(RegExp(r'_flutter$'), '')}_app.dart';
 
+  /// Where a project's findings about the framework go unless it says
+  /// otherwise: the framework's own public tracker.
+  ///
+  /// A default rather than a prompt, because the alternative was tried and it
+  /// is what this whole mechanism exists to fix — a journal nobody had pointed
+  /// anywhere is a journal whose entries stay on one laptop. Opting in would
+  /// have meant every project deciding a question it has no reason to think
+  /// about, and the projects that never decided are precisely the ones whose
+  /// findings were lost.
+  ///
+  /// The literal lives here and not in `toolkit/`: the harness carries the
+  /// token, so an installation that wants a different tracker changes one
+  /// option instead of editing files it does not own.
+  static const defaultNotesTracker = 'dartway/dartway';
+
+  /// The opt-out, and the reason it is a word rather than an empty string.
+  ///
+  /// The token is substituted by plain text replacement into prose that has to
+  /// keep reading correctly either way: "**Tracker:** `` " reads as a bug,
+  /// "**Tracker:** `none`" reads as an answer, and the installed `CLAUDE.md`
+  /// states what `none` means for the journal.
+  static const noNotesTracker = 'none';
+
   Map<String, String> toolkitTokens({
     required String baseBranch,
     String language = 'English',
+    String? notesTracker,
   }) => {
     '__PROJECT_LANGUAGE__': language,
+    '__NOTES_TRACKER__': notesTracker ?? defaultNotesTracker,
     '__SERVER_PKG__': serverPackage,
     '__FLUTTER_PKG__': flutterPackage,
     '__FLUTTER_APP_FILE__': flutterAppFile,

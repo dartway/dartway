@@ -130,6 +130,12 @@ managed files cannot be fixed here — they are overwritten on update (see `CLAU
   where, what is wrong, what it leads to — an option may be named, not written up.
 - **Then list the `open` entries of both** in the report, one line each. A reminder, not a gate: the
   task is finished either way, but the entries stop being invisible.
+- **When `dartway_notes.md` names a tracker other than `none`**, an entry with no issue yet is offered
+  for filing, and one that has an issue is reported by its state rather than by what the file says —
+  `gh issue view` answers that, the file does not. An issue that has closed is the signal to delete
+  the entry, and to re-check the workaround it stood for if there was one. What to strip and restate
+  before filing is in `CLAUDE.md`, "Where an entry goes when it leaves this project"; the step is a
+  proposal like every other one here, never a push that happens on its own.
 - **A workaround over a `dartway_*` API is written down twice** — the entry in `dartway_notes.md`,
   and a `TODO(dartway, checked: <ref>)` marker on the code itself (see `CLAUDE.md`, "Notes back to
   the framework"). The journal says what should change upstream; the marker says what to re-check
@@ -181,8 +187,10 @@ Produce a structured report in the chat:
 4. **📄 Docs** — which feature docs/`CLAUDE.md`/skills are outdated, **with a concrete proposed diff** for the fix.
 5. **🧪 Tests** — which non-trivial parts are uncovered.
 6. **📓 Journals** — the `open` entries of both, one line each. From `dartway_notes.md`: what it is
-   and where in the monorepo it lands. From `dev_notes.md`: what this project is carrying. Nothing to
-   apply here — the first list is what to take to the framework, the second is what to schedule.
+   and where in the monorepo it lands — plus its issue and that issue's current state where a tracker
+   is configured, and an offer to file the ones that have none. From `dev_notes.md`: what this project
+   is carrying. Nothing is applied here — the first list is what to take to the framework, the second
+   is what to schedule.
 7. **🔖 Workarounds** — only the markers A.7 found diverged, one line each: `file:line`, what is
    worked around, `checked:` versus the resolved version. **Omit the whole item when nothing
    diverged** — this section appears when the framework has moved under a workaround, and a report
