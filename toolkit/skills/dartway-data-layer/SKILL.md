@@ -6,6 +6,9 @@ description: >-
   (dw.repo.model/maybeModel/modelList), writes are dw.repo.saveModel/deleteModel
   (no repositories, no manual syncing), lists via dwBuildListAsync(loadingItemsCount:),
   narrowing by query via backendFilter, local filtering you do yourself with .where in the widget,
+  an entity and everything hanging off it read in ONE request (include on the server, DwRelationUpdatesConfig
+  for live child updates — a parent that leaves the server without its include silently blanks the
+  nested lists on every client),
   actions from the UI via dw.action (unified error/loading handling), notifications via dw.notify.* (not SnackBar),
   the profile via ref.watchUserProfile/readUserProfile (getters, not CRUD), sign-out via
   sessionProvider.notifier.signOut(), local screen state that survives a restart via
@@ -73,11 +76,36 @@ The skeleton is drawn from your own widget built on that instance — that's why
 
 **The placeholder is built in the loading state only**, so a widget test of a list screen that hands the builder a ready `AsyncData` does not have to stand up the default models — if a test does need them, that test is really exercising the loading state.
 
-## 3. Filtering — `backendFilter` (server) + `.where` (client)
+## 3. Filtering — count the round trips, not the filters
 
-**Why:** to narrow a list with a query to the DB — through `backendFilter`. Local filtering of already loaded data the framework deliberately **does not provide**: it is a trivial `.where`, do it yourself in the widget, don't look for a "framework" way.
+**Why:** what costs something is **how many times a screen asks the backend**, and a `modelList`
+without a `backendFilter` is not a lapse. Reading a list broadly — whole, even — and picking out
+what you need locally is the **right** answer whenever it saves a request. Local filtering of
+already loaded data the framework deliberately **does not provide**: it is a trivial `.where`, do it
+yourself in the widget, don't look for a "framework" way.
 
-**Server-side filter — `backendFilter:`.** When a list must be narrowed by a query (your own records, the messages of one chat, upcoming sessions). Filters are an enum with `DwBackendFiltersMixin` and its `.equals()`/`.greaterThan()`:
+**Several `modelList` calls with the same config are one request.** `DwModelListStateConfig` is a
+family key with value equality — `backendFilter`, `paginationStrategy`, `apiGroupOverride`,
+`relationUpdatesConfigs`, the custom listener and the sorter all take part in `==`. So two features
+watching the same list are two readers of **one** provider, not two fetches: splitting a screen into
+small features costs nothing on the wire, and merging them "to save a request" saves none. The
+metric to watch is the number of *distinct* configs a zone builds, not the number of `modelList`
+calls in it.
+
+> The one field left out of that equality is `orderByList`. Two lists differing **only** in their
+> order share a provider, and whichever was built first decides the order for both. Order such a
+> list on the client instead.
+
+**`backendFilter` is for a selection that otherwise would not fit or would carry rows that are not
+this user's business** — one client's bookings, one chat's messages, one project's records. Not for
+carving a list you already hold into slices: that is `.where`.
+
+**The choice is one line in the feature's passport**, so the next reader does not re-open it. An
+`implementationNotes` entry of the shape *"Data — `modelList<CommunityEvent>()` with no
+`backendFilter`: the block takes the whole list and shows all of it"* settles the question for good;
+so does *"filtered on the backend — a member must not receive another member's rows at all"*.
+
+**Server-side filter — `backendFilter:`.** Filters are an enum with `DwBackendFiltersMixin` and its `.equals()`/`.greaterThan()`:
 
 ```dart
 enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
@@ -108,6 +136,158 @@ coursesAsync.dwBuildListAsync(
 );
 ```
 
+## 3a. Relations — the graph arrives with the model, it is not assembled on the client
+
+**Why:** an entity and everything hanging off it is **one** read. A screen that fetches the parents,
+then the comments, then the events, then the attachments, and stitches them together by foreign key
+in memory has re-implemented the join the database does for free — and it pays for it four times on
+the wire, in four separate provider lifecycles that can disagree with each other. A production
+screen once opened with **seven** flat `modelList` calls and a hand-written matcher on top of them;
+it now opens with one.
+
+**How the graph gets there — three declarations, none of them in the widget:**
+
+1. the relation is declared in the YAML, bidirectionally — the same `relation(name=…)` on both
+   sides (`dartway-models`). The relation field on the parent is always `?`: `null` there means
+   "not loaded", not "absent";
+2. the CRUD config raises it with `include` (`dartway-crud-config`) — on `DwGetModelListConfig`,
+   and on every `DwGetModelConfig` that returns the same entity;
+3. the children arrive as ordinary fields of the model. The screen reads `ticket.comments`, and
+   `dartway-clean-code` §1.3a decides where the reading-out lives: an extension on the model.
+
+```dart
+// SERVER — the include is a named value, because everything that returns this
+// entity must use the same one (see the warning below)
+final supportTicketInclude = SupportTicket.include(
+  comments: TicketComment.includeList(),
+  events: TicketEvent.includeList(),
+);
+
+final supportTicketCrudConfig = DwCrudConfig<SupportTicket>(
+  table: SupportTicket.t,
+  getListConfig: DwGetModelListConfig(
+    accessFilter: _ticketAccessFilter,
+    include: supportTicketInclude,
+  ),
+  saveConfig: DwSaveConfig<SupportTicket>(
+    allowSave: _allowTicketSave,
+    afterSaveTransform: _reloadTicketGraph,   // re-reads with the include
+  ),
+);
+```
+
+**The depth of the graph is exactly the depth the screen thinks in.** A flat list of children that
+an extension sorts into place on the client is **cheaper** than a second level of nesting: nesting
+a child inside its sibling means the same rows travel twice. A reply is a comment with a
+`parentCommentId` — let it arrive in `comments` and let `repliesOf(comment)` find its owner.
+Go two levels deep only when the second level genuinely holds different rows.
+
+**Live changes to a child do not come as a new graph.** The server publishes the changed child
+**flat**, and the client folds it into its parent by foreign key — `DwRelationUpdatesConfig` in the
+list's config:
+
+```dart
+/// The zone's single query: tickets with everything hanging off them.
+final projectTicketsProvider =
+    Provider.family<AsyncValue<List<SupportTicket>>, int>(
+  (ref, projectId) => ref.watch(
+    dw.repo.modelList<SupportTicket>(
+      customConfig: DwModelListStateConfig<SupportTicket>(
+        backendFilter: AppBackendFilters.projectId.equals(projectId),
+        relationUpdatesConfigs: _ticketRelationUpdates,
+      ),
+    ),
+  ),
+);
+
+/// ⚠️ Declared **once, at the top level** — see the trap below.
+final _ticketRelationUpdates =
+    <DwRelationUpdatesConfig<SupportTicket, SerializableModel>>[
+  DwRelationUpdatesConfig<SupportTicket, TicketComment>(
+    relationKey: 'ticketId',
+    copyWithRelatedModels: (ticket, updates) => ticket.copyWith(
+      comments: updates.mergedInto(ticket.comments, (comment) => comment.id),
+    ),
+  ),
+  DwRelationUpdatesConfig<SupportTicket, TicketEvent>(
+    relationKey: 'ticketId',
+    copyWithRelatedModels: (ticket, updates) => ticket.copyWith(
+      events: updates.mergedInto(ticket.events, (event) => event.id),
+    ),
+  ),
+];
+
+/// Changed rows replace, new ones are appended, deleted ones disappear. Nothing
+/// has to be filtered by parent here — the framework already selected this
+/// parent's updates by `relationKey`.
+extension RelatedModelUpdates on List<DwModelWrapper> {
+  List<Related> mergedInto<Related>(
+    List<Related>? currentItems,
+    int? Function(Related item) idOf,
+  ) {
+    final updatedIds = map((update) => update.modelId).toSet();
+    return [
+      ...?currentItems?.where((item) => !updatedIds.contains(idOf(item))),
+      ...where((update) => !update.isDeleted).map((u) => u.model as Related),
+    ];
+  }
+}
+```
+
+`parentIdsGetter:` is the extra argument for a child that hangs off a **nested** level (a reply
+whose `relationKey` points at a comment, not at the ticket): it tells the framework which ids on the
+parent count as owners.
+
+> **Trap: the list of relation configs is compared by identity.** `DwModelListStateConfig` is a
+> family key, and it compares `relationUpdatesConfigs` as a **list reference**. Built in place — in
+> a provider body, in `build` — it yields a *new* family key on every rebuild: a re-fetch, lost
+> state, an endless redraw. Nothing throws; the app just behaves strangely. Declare the list once,
+> as a top-level `final`, and hand that same instance in.
+
+### ⚠️ A flat parent on the wire erases the graph
+
+**`DwSingleModelState` and `DwModelListState` both *replace* the model with whatever arrives.** So a
+parent that leaves the server **without** its include — the answer to a save, a publication from a
+worker, an `afterUpdates` entry written by a neighbouring config — blanks the nested lists for
+**every** subscriber holding it. The screen then shows a ticket with no conversation and no history
+and **reports no error at all**: on the client a relation that does not exist and a relation that
+was not requested are the same `null`.
+
+This is not hypothetical. One production project caught it in the field and wrote the reason into
+its config as a comment; the next project met it on its very first `include`.
+
+**The rule: a model that has an include leaves the server only with it.** All three exits, not just
+the obvious one:
+
+- the answer to `saveModel` → `afterSaveTransform` re-reads the row with the same include
+  (`currentModel` at that point holds the flat row that was written);
+- anything put into `beforeUpdates`/`afterUpdates`, including by a *child's* config;
+- anything sent over the socket — `broadcastTo`, `sendUpdates`, `sendUpdatesToUser`, from a worker
+  included.
+
+**Children travel flat and need no re-read** — `DwRelationUpdatesConfig` puts them where they
+belong. It is the parent, and only the parent, that has to be reloaded.
+
+Give that reload a name and let everything use it:
+
+```dart
+/// Every ticket leaving the server is read from here — see the rule above.
+Future<SupportTicket?> loadTicketGraph(
+  Session session,
+  int ticketId, {
+  Transaction? transaction,
+}) => SupportTicket.db.findById(
+      session,
+      ticketId,
+      include: supportTicketInclude,
+      transaction: transaction,
+    );
+```
+
+**The review check, and it is countable:** the number of places a parent goes out equals the number
+of calls to that loader. A `DwModelWrapper(object: <parent>)` built straight from a model in hand is
+the bug — wherever it sits, and however innocuous the hook that writes it looks.
+
 ## 4. Actions from the UI — `dw.action`
 
 **Why:** a single wrapper for user actions (taps, submits): automatic loading state, error handling (with a report to alerting — see `label`), confirmations. The callback receives a `BuildContext`. Don't wrap things in a raw `() async {}`/`onPressed`.
@@ -133,6 +313,20 @@ final deleteAction = dw.action<bool>(
 
 > The real name is **`DwUiAction`** (46+ usages). There is no `DwCallback` in the project.
 > Declining the confirm dialog cancels the action entirely (no notifications, no follow-up). A custom dialog is `DwConfig.confirmDialogBuilder`. Action errors automatically reach alerting with context (route, screen features, `label`) — see the framework's error-reporting doc.
+
+**`dw.action` says what to write an action with; where it lives is `dartway-clean-code` §1.9b —
+in the widget that owns the button.** Not a callback handed down from a parent, and not a screen-wide
+`busy` flag: `DwActionBuilder` computes busy per button already.
+
+> **The honest limitation, and it is a compromise, not a design.** A widget test cannot observe a
+> write. `dw.repo.saveModel` reaches the static `DwRepository.saveModel`, which calls
+> `dw.endpointCaller`, and that is a `late final` set in `DwCore.init` — there is no seam to fake.
+> While the write hung on a callback from above, a test could at least assert what arrived in the
+> callback; a feature that saves for itself gives a test nothing to hold. **So do not keep a
+> callback alive as a test seam** — that trade buys a weaker screen for a weaker test. What covers
+> the write is an integration test over the CRUD config on the server, where the rule being
+> protected actually lives; the widget test covers what the screen *shows*. When this bites, say so
+> — a repository fake is a framework request, not something to work around in an app.
 
 ## 4a. Derived state — a provider, not assembly in the widget
 
@@ -198,6 +392,28 @@ screen watches anyway. A local copy of server truth is a second source that can 
 **Don't introduce shims over the framework API.** `ref.saveModel(...)` forwarding the call to
 `dw.repo.saveModel(...)` adds nothing but hides the real API: on a production project 82 calls lived on such a
 pass-through, and half the team didn't know what they were calling.
+
+**One provider answers one question — it does not serve one screen.** The rule above is easy to
+honour and still get backwards: a provider that assembles *everything the screen will need* passes
+every test in this section (it is a provider, it holds a pure function, nothing is stitched in
+`build`) and yet puts the screen straight back into prop-drilling. Once the top has decided
+everything, the widgets below it have nothing left to ask, and every value reaches them as a
+constructor argument.
+
+The symptoms, in order of how reliably they give it away:
+
+- **the name.** `<Screen>Snapshot`, `<Screen>State`, `<Screen>ViewModel` — named after a place in
+  the UI rather than after a question. A provider named for what it answers cannot grow this way:
+  nothing else fits under `openTaskCountProvider`;
+- **the audience.** Fields that fewer than half of the consumers read. A seventeen-field object
+  serving six widgets is six providers that have not been written yet;
+- **the arity.** Derived from a **single** model — not a provider at all. That is an extension on
+  the model (`dartway-clean-code` §1.3a): `ticket.openComments`, `ticket.canBeClosed`. It needs no
+  container, no family key and no lifecycle, and it is reachable from the model through the dot at
+  any depth of the tree.
+
+A provider earns its existence when the answer draws on **several sources** (§4a above) or has to
+be cached across rebuilds. Everything a widget could have asked for itself, it asks for itself.
 
 ### Overriding a provider in a test
 
@@ -447,8 +663,11 @@ Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size an
 - [ ] Data — only `dw.repo`: reads are the `dw.repo.model/maybeModel/modelList` providers under `ref.watch/read/refresh`; writes are `dw.repo.saveModel/deleteModel`. No `ref.watchModel`, no `DwRepository.`, no repositories, no manual `Future`s, no direct client.
 - [ ] Create and Update — one `saveModel` (not two different methods).
 - [ ] `AsyncValue` lists — through `dwBuildListAsync(loadingItemsCount:)`, not a scattering of `when`.
-- [ ] Narrowing by query — `backendFilter`; local filtering you do yourself with `.where` in the widget (the framework doesn't provide it).
-- [ ] Actions from the UI — `dw.action((context) async {...})`, not a raw `onPressed`/`() async {}`.
+- [ ] Narrowing by query — `backendFilter`; local filtering you do yourself with `.where` in the widget (the framework doesn't provide it). The count that matters is **distinct configs**, not `modelList` calls: reading broadly and picking locally is right when it saves a request (§3).
+- [ ] An entity and what hangs off it — **one** read: relations declared in the YAML, raised with `include`, folded live by `DwRelationUpdatesConfig`, and that config list is a top-level `final` (§3a). No stitching flat lists by foreign key in the widget.
+- [ ] Does a parent with an `include` leave the server anywhere **without** it — a save response, an `afterUpdates`, a socket send? That silently blanks the nested lists on every client (§3a).
+- [ ] Actions from the UI — `dw.action((context) async {...})`, not a raw `onPressed`/`() async {}`, and written **in the widget that owns the button** (`dartway-clean-code` §1.9b).
+- [ ] A provider answers **one question**, not one screen — no `<Screen>Snapshot`; derived from a single model is an extension on that model (§4a).
 - [ ] Notifications — `dw.notify.success/warning/error/info`, not `SnackBar`/`ScaffoldMessenger`.
 - [ ] Local screen state — survives a restart? `dw.plugins.prefs`, not a store over `raw`. Belongs to an entity? `providerFamily(keyFor:)`, not `provider` per id.
 - [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`. Signed out is a legal answer, or you want `.select` — `dw.userProfileProvider` / `dw.requireUserProfileProvider`. Only the id — `dw.signedInUserIdProvider`.

@@ -7,7 +7,11 @@ description: >-
   responsibility, not by line count), never pass BuildContext or WidgetRef as params, no _buildXxx()
   widget-returning methods, no ref.invalidate, no GlobalKey tree lookups, no
   outer padding/margin inside a widget, no private widget classes in public
-  feature files, a Serverpod model rebuilt with copyWith and never by listing
+  feature files (and the one allowed kind has no State and no callbacks),
+  a feature's constructor is its address (a model or an id) and not data its parent
+  computed, the action written in the widget that owns the button and never handed
+  down as a callback (no screen-wide busy flag),
+  a Serverpod model rebuilt with copyWith and never by listing
   its fields, no default for a setting whose value belongs to the environment
   (sender address, provider key, admin identifier);
   plus SOLID, KISS, DRY, YAGNI, Law of Demeter, composition over
@@ -346,7 +350,25 @@ then the size is declared in the kit and visible from the constructor name, not 
 // ✅ message_bubble.dart -> class MessageBubble; date_separator.dart -> class DateSeparator
 ```
 
-**Exception — a trivial presentational helper used once in the very same file** (e.g. `_CounterTile` inside `admin_counters.dart`): it has no value for reuse or a separate test, moving it into a public file is pure noise. Such a private class is allowed. The criterion: a feature entity you'll want to reuse/test → a public file; a local layout detail of a single screen → may stay private next to it.
+**Exception — a slice of layout extracted so `build` stops growing**, used once in the very same
+file (e.g. `_CounterTile` inside `admin_counters.dart`). It has no value for reuse or a separate
+test, and moving it into a public file is pure noise.
+
+**The exception is bounded by two facts about the class, not by how trivial it looks.** "Trivial" is
+judged by whoever has just written the thing, and it stretches: a 95-line class with its own `State`,
+its own `TextEditingController` and its own rule about what may not be submitted has been let
+through under this exception in a live project. It was unreachable from a test and unreachable from
+the widget next door that needed the same behaviour. So:
+
+- **a private widget class has no `State`.** State is behaviour, behaviour gets tested, and what
+  gets tested has a name and a file. `_Foo extends StatefulWidget` inside a feature file is the rule
+  being broken, whatever its length;
+- **a private widget class takes no callbacks.** A callback parameter means something is being
+  threaded through it from the parent — so it is not a detail of this file's layout, it is a piece
+  of the feature that was left unnamed (see §1.9b: the widget that owns the button owns the action).
+
+What is left over is a `StatelessWidget` with no callbacks, which is honestly trivial and can be
+recognised as such without taste.
 
 ## 1.9 Don't create a pass-through widget: if it decides nothing, inline the kit widget
 
@@ -374,6 +396,96 @@ class CourseLockedStubCard extends StatelessWidget {
 The sign that gives a pass-through away at the door: its only import is `ui_kit.dart` — it knows nothing about the domain, so it has nothing to decide.
 
 **If such a widget really is needed by many** (the same wrapper in five places) — that is no reason to breed a pass-through in the feature, it is a reason to add a **constructor in the kit** (`ChatCardContainer.bottomSheetSurface`): the meaning moves to where the look lives.
+
+## 1.9a A feature's constructor is its address, not its data
+
+**Why:** nothing in this contract says what a widget may accept, and that gap is wide enough to
+drive a React app through it. A feature taking fifteen parameters — four ready-made lists, a couple
+of maps and six callbacks — passes naming, passes file length (the file was 182 lines), passes
+`_buildXxx`, passes every rule above. And it can only ever be placed inside the one parent that
+knows how to assemble its arguments.
+
+**A feature is handed what names its subject** — a model, or an identifier of one. Everything else
+it asks for itself: the same `dw.repo` provider its parent watched (§3 of `dartway-data-layer` —
+identical configs are one request, so asking again costs nothing), an extension on the model it was
+already given, its own local state.
+
+**The question is not "how many parameters" but "could this widget have got it itself?"**
+
+| In the signature | Could it? | Verdict |
+|---|---|---|
+| A list the parent computed off a model the child also receives | yes — an extension on that model | remove |
+| A `Map<int, List<Something>>` assembled at the top of the screen and passed down four levels | yes — each level asks for its own | remove |
+| A flag derived from a model already passed (`hasOpenWork`, `isEditable`) | yes — a getter on the model | remove |
+| The model itself, its parent, an id | no | keep |
+| One callback for a decision only the parent can make (§1.9b) | no | keep |
+
+**The count is a symptom, not the rule.** Three parameters of which two are derived from the first
+are worse than five independent ones — the two derived ones are a claim that the child cannot be
+trusted to read its own subject.
+
+```dart
+// ❌ fifteen parameters: four lists, a type, a project, a busy flag, seven callbacks —
+//    placeable nowhere except inside the parent that assembles them
+TicketWorkCard(
+  task: task, questions: questions, corrections: corrections,
+  ticketType: ticket.ticketType, project: project, taskRuns: runs,
+  actions: availableActions, working: busy,
+  onRun: ..., onAccept: ..., onRework: ..., onCancel: ...,
+  onAnswer: ..., onDismiss: ..., onRetry: ...,
+);
+
+// ✅ three: everything else follows from the ticket, which arrived as one graph
+TicketWorkCard(ticket: ticket, task: task, project: project);
+```
+
+## 1.9b The action lives where the button is
+
+**Why:** `dw.action` is described as the thing you write an action *with*, and nowhere as *where* it
+lives — so handing a callback downwards is nobody's violation. In a live feature the cancelling of
+one question travelled from the button to `dw.repo.saveModel` through **six** hand-offs, and every
+one of them was a parameter on a widget that otherwise had no reason to know about saving.
+
+**A widget with a button does the thing the button promises.** `dw.action` wraps the call right
+there, in the widget the user pressed:
+
+```dart
+// ❌ the button is here, the write is five levels up: every widget in between
+//    carries onSubmit/onDismiss it does nothing with
+class TicketAnswerField extends StatelessWidget {
+  const TicketAnswerField({
+    required this.question,
+    required this.onSubmit,
+    required this.onDismiss,
+    super.key,
+  });
+}
+
+// ✅ the widget saves what it collected — nobody above it has to know it exists
+class TicketAnswerField extends ConsumerWidget {
+  const TicketAnswerField({required this.question, super.key});
+  // in build: DwActionBuilder(
+  //   action: dw.action((_) => question.answerWith(controller.text)),
+  //   builder: (context, onPressed, busy) => ...,   // busy is this button's own
+  // )
+}
+```
+
+**A callback is legitimate when the parent decides something the child cannot know** — where to go
+after success, whether the dialog closes, which route to leave on. There is normally **one** such
+callback on a feature, not six:
+
+```dart
+/// The one callback that arrives from above, and it earns its place: moving the
+/// stage carries the ticket into another column, so the card has to close —
+/// and only the card knows it is a card.
+final VoidCallback onMoved;
+```
+
+**There is no screen-wide `busy` flag.** `DwActionBuilder` computes busy for each button separately,
+under that button. A flag held at the top does not merely duplicate it — it lies: in a live app,
+pressing "accept" on one row greyed out "run" on every other row on the screen. If you find yourself
+adding `working: busy` to a constructor, the action is in the wrong place.
 
 ## 1.10 A Serverpod model is rebuilt with `copyWith` only
 
@@ -719,6 +831,8 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No functions outside classes** — factory/method/extension; the only exceptions are `@riverpod` entry points and `main()` (§1.3a).
 - [ ] **No widget in a variable used once** (§1.4a) and **no commented-out code** (§1.4b).
 - [ ] **No pass-through widgets** — a class that only forwards its own parameters into a kit widget and knows nothing about the domain (`ui_kit.dart` its only import) is not created: inline the kit widget, and turn a repeating wrapper into a kit constructor (§1.9).
+- [ ] **A feature's constructor is its address** — a model or an id, not lists/maps/flags its parent computed for it. For every parameter: could the widget have got this itself? (§1.9a).
+- [ ] **The action is written in the widget that owns the button** (`dw.action` right there), not handed down as a callback; a callback stays only for a decision the parent alone can make. **No screen-wide `busy`** — `DwActionBuilder` counts it per button (§1.9b).
 - [ ] **No** `BuildContext`/`WidgetRef` in the parameters of services and functions — and **no `extension on BuildContext` that opens the app's own screens**: showing a feature is a static method on that feature's widget (§1.3).
 - [ ] **No** `_buildXxx()` methods returning a widget — those are separate widget classes (§1.4).
 - [ ] **No** private widget methods that transform the domain — those are extensions in the feature's `logic/` (§1.3c).
@@ -726,7 +840,7 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** `GlobalKey` for looking widgets up in the tree.
 - [ ] **No** outer `padding`/`margin` inside a widget — the parent sets the padding (§1.7). When refactoring someone else's widget the outer padding moves to the caller instead of being "kept as it was".
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
-- [ ] **No** private widget classes (`_Foo`) in public feature files.
+- [ ] **No** private widget classes (`_Foo`) in public feature files. The one exception is a slice of layout — so **no `State` and no callbacks** on a private widget class (§1.8).
 - [ ] **A Serverpod model is rebuilt with `copyWith`**, never by listing its fields in the constructor — a field with `default=` or a nullable one is optional, so a forgotten one is a silent default, not an error. Clearing a nullable field is `copyWith(field: null)` (§1.10). An unavoidable enumeration is driven by `Enum.values` or an exhaustive `switch`, not written out by hand.
 - [ ] **A setting whose value belongs to the environment has no default** — sender address, provider key, webhook URL, admin identifier. An unfilled key must be an error, not quiet work with somebody else's credentials (§1.11).
 - [ ] **A building block** — a widget with no product behaviour to describe — lives in `lib/shared/` with a doc comment, not in a zone with an empty `DwFeatureSpec`.

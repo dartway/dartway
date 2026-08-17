@@ -38,7 +38,12 @@ Run the detectors **over the changed files only** (not over the whole repo). For
 - `ref.invalidate(...)` used for refreshing.
 - `GlobalKey().currentState/currentContext` used to look things up in the tree.
 - Outer `padding`/`margin` at the top level of a widget's `build`.
-- A private widget class (`class _Foo extends ...Widget`) **with value for reuse/testing** inside a feature's public file (a trivial local helper for a single screen is fine, see `dartway-clean-code` 1.8).
+- A private widget class (`class _Foo extends ...Widget`) inside a feature's public file that **has a `State` or takes a callback** — a slice of layout with neither is fine (`dartway-clean-code` §1.8).
+- A feature's constructor carrying **data its parent computed**: ready-made lists, a `Map`, a flag derivable from a model already passed, or more than one callback. The question per parameter is "could the widget have got this itself?" (§1.9a), and the check on the whole is "can I construct it from identifiers and models alone?" (`dartway-feature-scaffold`).
+- An action handed **downwards** as a callback instead of being written with `dw.action` in the widget that owns the button; a screen-wide `busy` flag duplicating `DwActionBuilder` (§1.9b).
+- A file in a feature's `widgets/` that imports the client package to switch over a model, pick a label, or fire an action — that is a feature standing in the wrong place (`dartway-feature-scaffold`, "Groups").
+- A provider named after a screen (`<Screen>Snapshot`/`State`/`ViewModel`) whose fields fewer than half its consumers read; anything derived from a **single** model belongs on that model as an extension (`dartway-data-layer` §4a).
+- Several `modelList` calls of related types stitched together by foreign key in the widget — the graph arrives with the model (`dartway-data-layer` §3a).
 - Naming shorter than 2 words; the forbidden `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
 - Specials (`dartway-data-layer`): `SnackBar`/`ScaffoldMessenger` instead of `dw.notify.*`; `watchModel<UserProfile>()` instead of `ref.watchUserProfile`; a raw `onPressed`/`() async {}` instead of `dw.action`; raw `Color`/`TextStyle`/`BorderRadius`/`context.theme` in features instead of the UI Kit; `router.go()`/string routes instead of enum routes and context extensions (`dartway-navigation`).
 - Feature isolation: importing a non-entry-point file of another feature.
@@ -51,6 +56,7 @@ Run the detectors **over the changed files only** (not over the whole repo). For
 - A model without a `DwCrudConfig`, or not registered in `crudConfigurations`.
 - A direct field update (e.g. `balance`) instead of an Event model in transactional/money logic.
 - Swallowed errors in config callbacks; nullable "for the UI's sake" in `.spy.yaml`.
+- A model with an `include` leaving the server **without** it — a save response with no `afterSaveTransform` re-read, a `DwModelWrapper(object: parent)` written straight into `afterUpdates`, a worker's `sendUpdates` with the flat row. The client replaces its copy wholesale, so the nested lists are blanked on every device with no error anywhere (`dartway-data-layer` §3a). Countable: places the parent goes out vs calls to the loader that carries the include.
 
 ### A.3 Checking the description (it lives in the code)
 
@@ -74,7 +80,9 @@ Check separately, by eye, the things that only break at runtime:
   including `disabled`: when adding or removing such a parameter, check how the widget looks disabled
   and while the action is running.
 - **Provider family keys.** A family keyed by an object compared by identity silently
-  creates a new provider on every build.
+  creates a new provider on every build. The framework's own key has the same edge: a
+  `DwModelListStateConfig` compares `relationUpdatesConfigs` **by list reference**, so that list must be a
+  top-level `final` and not assembled in place (`dartway-data-layer` §3a).
 
 ### A.3b Tests are part of the refactoring surface
 
