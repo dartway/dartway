@@ -8,6 +8,13 @@ an existing one, two read your code back to you, and one deploys the server.
 dart pub global activate dartway_cli
 ```
 
+**The complete, current option list of any command is `dartway help <command>`** — and for the nested
+ones, `dartway help deploy secret push`. That output is generated from the parser, so it cannot drift
+from the code; `dartway --help` on its own lists commands only, which is what sends people looking for
+a reference that does not need to exist. This page therefore does not restate every flag. It names the
+ones whose *meaning* is not obvious from a one-line help string — what they protect, and what happens
+if you reach for them without knowing.
+
 Or straight from the monorepo, pinned to the verified channel:
 
 ```bash
@@ -201,6 +208,7 @@ What it checks, and why those checks exist, is a page of its own:
 ## `dartway deploy` — the server, without a folder of shell scripts
 
 ```bash
+dartway deploy setup --env staging          # once per server, and again for a template change
 dartway deploy check --env staging
 dartway deploy run --env staging
 dartway deploy secret push --env production
@@ -212,6 +220,24 @@ adds only what Serverpod has no concept of: the host, the login, the repository 
 certificate contact, and the domain serving the Flutter build. The CLI **reads** the Serverpod file;
 it never rewrites it. That is the whole reason the pair stays honest — there is no second copy of a
 domain to drift.
+
+`setup` is what turns a bare server into one this project can be deployed to, and it is the only
+subcommand that writes infrastructure: base packages and Docker, the unprivileged deployment user, the
+secret store with the random-string credentials generated in place, the repository checkout, the
+rendered `docker-compose.yml` and `nginx.conf`, the `.env` Compose reads, the firewall, and a
+one-day self-signed certificate so Nginx can start at all — the real one cannot be issued until Nginx
+is answering the challenge, and the first `run` replaces it.
+
+**Idempotent throughout, and that is a feature rather than a disclaimer:** every step either finds
+what it needs or creates it, and none replaces a value that already exists, so re-running it against a
+live server is the supported way to pick up a change to the rendered templates. Two things stop it
+rather than proceeding. A private repository over SSH needs a key the server owns — generated *on* the
+server, so the private half never exists anywhere else — and setup halts with the public half printed,
+asking for it to be registered as a **read-only** deploy key: the server only ever fetches, and a
+writable key turns access to the box into access to the repository. And if the server already carries a
+data volume under a different name than the rendered configuration would use, it refuses outright
+instead of starting the stack — Compose would otherwise create an empty database beside the real one
+and serve it, which looks like a successful deploy of an application that has lost everything.
 
 `check` changes nothing and answers whether a deployment would work. Thirteen assertions on the
 working copy, seven over the network — including that every `publicHost` resolves to the deployment
@@ -245,10 +271,30 @@ every push turns a routine change into an infrastructure one.
 
 `secret` moves credentials between the maintainer's `passwords.yaml` and a server, one environment
 at a time: `push` sends `shared` plus that environment, `pull` brings back what the server has and
-the file lacks, `list` shows names only. Values travel on stdin, never as arguments, so they appear
-in neither shell history nor a remote process list. Two guards refuse a push that would lose
-information — one for keys the server has and the file does not, one for values the file would
-blank. Both are overridable, neither is silent.
+the file lacks, `list` shows names only. `set` stores one value, `put-file` uploads a whole file — a
+service-account JSON and the like — and `init` creates the store and fills in the keys that are just
+random strings, which `setup` has already done by the time you would think to run it. Values travel on
+stdin, never as arguments, so they appear in neither shell history nor a remote process list. Two
+guards refuse a push that would lose information — one for keys the server has and the file does not,
+one for values the file would blank. Both are overridable by the flags below, neither is silent.
+
+Every subcommand takes `--env <environment>` and refuses to guess when it is missing — it answers with
+the environments `deploy/config.yaml` actually declares. All of them also accept `--as <login>` and
+`--identity <key>` for the SSH connection, defaulting to `ssh_user` from the config and to your agent.
+The rest are the flags worth knowing before you need them:
+
+| Subcommand | Flag | What it is for |
+|---|---|---|
+| `setup` | `--dry-run` | Print the rendered `docker-compose.yml` and `nginx.conf`, and what would be uploaded beside them, without touching the server. The way to review a template change |
+| `check` | `--local` | Skip DNS and the server; assert over the working copy only. The form that needs no SSH key and no host yet — the thirteen working-copy assertions still run, the seven network ones report as skipped |
+| `run` | `--dry-run` | Print the plan and change nothing |
+| `run` | `--skip-git-update` | Deploy what is already checked out on the server, without fetching. For a rebuild of the same commit — and the flag to suspect when a deploy "did not pick up" a push |
+| `secret push` | `--dry-run` | Report what would be sent, send nothing |
+| `secret push` | `--prune` | Allow dropping keys the server has and `passwords.yaml` does not. Off by default: the usual cause of that difference is a local file that is behind, not a server holding junk |
+| `secret push` | `--allow-emptying` | Allow replacing a value the server has with an empty one. Off by default, for the same reason from the other direction |
+| `secret pull` | `--dry-run` | Report what would change locally, write nothing |
+| `secret set` | `--section` | Which `passwords.yaml` section to write to. Defaults to the environment; `shared` is for values common to every run mode |
+| `secret put-file` | `--name` | Name to store the file under, if not its basename |
 
 | Key in `deploy/config.yaml` | When you need it |
 |---|---|
