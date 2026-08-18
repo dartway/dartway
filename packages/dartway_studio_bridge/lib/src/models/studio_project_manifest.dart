@@ -37,11 +37,11 @@ class StudioProjectManifest {
   final List<String> supportedLocales;
 
   Map<String, dynamic> toJson() => {
-        'projectName': projectName,
-        'zones': [for (final zone in zones) zone.toJson()],
-        'features': [for (final feature in features) feature.toJson()],
-        'supportedLocales': supportedLocales,
-      };
+    'projectName': projectName,
+    'zones': [for (final zone in zones) zone.toJson()],
+    'features': [for (final feature in features) feature.toJson()],
+    'supportedLocales': supportedLocales,
+  };
 
   factory StudioProjectManifest.fromJson(Map<String, dynamic> json) =>
       StudioProjectManifest(
@@ -52,7 +52,8 @@ class StudioProjectManifest {
               if (item is Map<String, dynamic>) StudioZoneSpec.fromJson(item),
         ],
         features: StudioFeatureInfo.listFromJson(json['features']),
-        supportedLocales:
-            StudioScreenSpec.stringListFromJson(json['supportedLocales']),
+        supportedLocales: StudioScreenSpec.stringListFromJson(
+          json['supportedLocales'],
+        ),
       );
 }

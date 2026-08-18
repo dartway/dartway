@@ -250,110 +250,54 @@ class DwWebServerLogUpdateTable extends _i1.UpdateTable<DwWebServerLogTable> {
   DwWebServerLogUpdateTable(super.table);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 
-  _i1.ColumnValue<String, String> method(String value) => _i1.ColumnValue(
-    table.method,
-    value,
-  );
+  _i1.ColumnValue<String, String> method(String value) =>
+      _i1.ColumnValue(table.method, value);
 
-  _i1.ColumnValue<String, String> url(String value) => _i1.ColumnValue(
-    table.url,
-    value,
-  );
+  _i1.ColumnValue<String, String> url(String value) =>
+      _i1.ColumnValue(table.url, value);
 
-  _i1.ColumnValue<String, String> headers(String? value) => _i1.ColumnValue(
-    table.headers,
-    value,
-  );
+  _i1.ColumnValue<String, String> headers(String? value) =>
+      _i1.ColumnValue(table.headers, value);
 
-  _i1.ColumnValue<String, String> body(String? value) => _i1.ColumnValue(
-    table.body,
-    value,
-  );
+  _i1.ColumnValue<String, String> body(String? value) =>
+      _i1.ColumnValue(table.body, value);
 
-  _i1.ColumnValue<int, int> statusCode(int? value) => _i1.ColumnValue(
-    table.statusCode,
-    value,
-  );
+  _i1.ColumnValue<int, int> statusCode(int? value) =>
+      _i1.ColumnValue(table.statusCode, value);
 
-  _i1.ColumnValue<String, String> status(String? value) => _i1.ColumnValue(
-    table.status,
-    value,
-  );
+  _i1.ColumnValue<String, String> status(String? value) =>
+      _i1.ColumnValue(table.status, value);
 
-  _i1.ColumnValue<String, String> error(String? value) => _i1.ColumnValue(
-    table.error,
-    value,
-  );
+  _i1.ColumnValue<String, String> error(String? value) =>
+      _i1.ColumnValue(table.error, value);
 
-  _i1.ColumnValue<int, int> durationMs(int? value) => _i1.ColumnValue(
-    table.durationMs,
-    value,
-  );
+  _i1.ColumnValue<int, int> durationMs(int? value) =>
+      _i1.ColumnValue(table.durationMs, value);
 
-  _i1.ColumnValue<String, String> handler(String? value) => _i1.ColumnValue(
-    table.handler,
-    value,
-  );
+  _i1.ColumnValue<String, String> handler(String? value) =>
+      _i1.ColumnValue(table.handler, value);
 
-  _i1.ColumnValue<String, String> ip(String? value) => _i1.ColumnValue(
-    table.ip,
-    value,
-  );
+  _i1.ColumnValue<String, String> ip(String? value) =>
+      _i1.ColumnValue(table.ip, value);
 }
 
 class DwWebServerLogTable extends _i1.Table<int?> {
   DwWebServerLogTable({super.tableRelation})
     : super(tableName: 'dw_web_server_log') {
     updateTable = DwWebServerLogUpdateTable(this);
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
-    method = _i1.ColumnString(
-      'method',
-      this,
-    );
-    url = _i1.ColumnString(
-      'url',
-      this,
-    );
-    headers = _i1.ColumnString(
-      'headers',
-      this,
-    );
-    body = _i1.ColumnString(
-      'body',
-      this,
-    );
-    statusCode = _i1.ColumnInt(
-      'statusCode',
-      this,
-    );
-    status = _i1.ColumnString(
-      'status',
-      this,
-    );
-    error = _i1.ColumnString(
-      'error',
-      this,
-    );
-    durationMs = _i1.ColumnInt(
-      'durationMs',
-      this,
-    );
-    handler = _i1.ColumnString(
-      'handler',
-      this,
-    );
-    ip = _i1.ColumnString(
-      'ip',
-      this,
-    );
+    createdAt = _i1.ColumnDateTime('createdAt', this);
+    method = _i1.ColumnString('method', this);
+    url = _i1.ColumnString('url', this);
+    headers = _i1.ColumnString('headers', this);
+    body = _i1.ColumnString('body', this);
+    statusCode = _i1.ColumnInt('statusCode', this);
+    status = _i1.ColumnString('status', this);
+    error = _i1.ColumnString('error', this);
+    durationMs = _i1.ColumnInt('durationMs', this);
+    handler = _i1.ColumnString('handler', this);
+    ip = _i1.ColumnString('ip', this);
   }
 
   late final DwWebServerLogUpdateTable updateTable;
@@ -564,10 +508,7 @@ class DwWebServerLogRepository {
     DwWebServerLog row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<DwWebServerLog>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<DwWebServerLog>(row, transaction: transaction);
   }
 
   /// Updates all [DwWebServerLog]s in the list and returns the updated rows. If
@@ -652,10 +593,7 @@ class DwWebServerLogRepository {
     List<DwWebServerLog> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<DwWebServerLog>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<DwWebServerLog>(rows, transaction: transaction);
   }
 
   /// Deletes a single [DwWebServerLog].
@@ -664,10 +602,7 @@ class DwWebServerLogRepository {
     DwWebServerLog row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<DwWebServerLog>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<DwWebServerLog>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

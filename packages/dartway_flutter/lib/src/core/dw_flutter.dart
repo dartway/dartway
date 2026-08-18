@@ -41,15 +41,16 @@ class DwFlutter {
     DwErrorSource source = DwErrorSource.manual,
     String? actionLabel,
     String? failedCall,
-  }) =>
-      dispatchReport(DwErrorReport(
-        error: error,
-        stackTrace: stackTrace,
-        source: source,
-        actionLabel: actionLabel,
-        failedCall: failedCall,
-        context: errorContext.capture(appVersion: _config.appVersion),
-      ));
+  }) => dispatchReport(
+    DwErrorReport(
+      error: error,
+      stackTrace: stackTrace,
+      source: source,
+      actionLabel: actionLabel,
+      failedCall: failedCall,
+      context: errorContext.capture(appVersion: _config.appVersion),
+    ),
+  );
 
   /// Dispatch point for every reported error. The base implementation runs the
   /// configured [DwConfig.onErrorReport] hook, or logs via `debugPrint` when
@@ -68,10 +69,7 @@ class DwFlutter {
   /// Shows a confirmation for [confirmation]: the app-supplied
   /// [DwConfig.confirmDialogBuilder] when set, the built-in [DwConfirmDialog]
   /// otherwise. Used by `DwUiAction(confirmation: ...)`.
-  Future<bool?> confirm(
-    BuildContext context,
-    DwUiConfirmation confirmation,
-  ) =>
+  Future<bool?> confirm(BuildContext context, DwUiConfirmation confirmation) =>
       (_config.confirmDialogBuilder ?? DwConfirmDialog.show)(
         context,
         confirmation,

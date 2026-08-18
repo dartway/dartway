@@ -76,7 +76,10 @@ void main() {
       gitEntry('dartway_flutter', resolvedRef: 'abcdef1${'0' * 33}'),
     ]);
     writeLock('my_server', [
-      gitEntry('dartway_serverpod_core_server', resolvedRef: '9876543${'0' * 33}'),
+      gitEntry(
+        'dartway_serverpod_core_server',
+        resolvedRef: '9876543${'0' * 33}',
+      ),
     ]);
 
     final reported = findings();
@@ -158,9 +161,9 @@ void main() {
   test('a lock file that does not parse is nobody\'s finding', () {
     final dir = Directory(p.join(sandbox.path, 'my_flutter'))
       ..createSync(recursive: true);
-    File(p.join(dir.path, 'pubspec.lock')).writeAsStringSync(
-      'packages:\n  broken: [unclosed\n',
-    );
+    File(
+      p.join(dir.path, 'pubspec.lock'),
+    ).writeAsStringSync('packages:\n  broken: [unclosed\n');
 
     expect(findings, returnsNormally);
     expect(findings(), isEmpty);

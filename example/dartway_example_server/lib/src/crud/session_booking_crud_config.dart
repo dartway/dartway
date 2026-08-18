@@ -31,8 +31,10 @@ final sessionBookingCrudConfig = DwCrudConfig<SessionBooking>(
         session.isUser(saveContext.currentModel.clientProfileId),
     validateSave: (session, saveContext) async {
       final booking = saveContext.currentModel;
-      final clubSession =
-          await ClubSession.db.findById(session, booking.clubSessionId);
+      final clubSession = await ClubSession.db.findById(
+        session,
+        booking.clubSessionId,
+      );
       if (clubSession == null) {
         return 'Session not found';
       }

@@ -186,48 +186,27 @@ class _SessionReviewImpl extends SessionReview {
 class SessionReviewUpdateTable extends _i1.UpdateTable<SessionReviewTable> {
   SessionReviewUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> bookingId(int value) => _i1.ColumnValue(
-    table.bookingId,
-    value,
-  );
+  _i1.ColumnValue<int, int> bookingId(int value) =>
+      _i1.ColumnValue(table.bookingId, value);
 
-  _i1.ColumnValue<int, int> rating(int value) => _i1.ColumnValue(
-    table.rating,
-    value,
-  );
+  _i1.ColumnValue<int, int> rating(int value) =>
+      _i1.ColumnValue(table.rating, value);
 
-  _i1.ColumnValue<String, String> reviewText(String? value) => _i1.ColumnValue(
-    table.reviewText,
-    value,
-  );
+  _i1.ColumnValue<String, String> reviewText(String? value) =>
+      _i1.ColumnValue(table.reviewText, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 }
 
 class SessionReviewTable extends _i1.Table<int?> {
   SessionReviewTable({super.tableRelation})
     : super(tableName: 'session_review') {
     updateTable = SessionReviewUpdateTable(this);
-    bookingId = _i1.ColumnInt(
-      'bookingId',
-      this,
-    );
-    rating = _i1.ColumnInt(
-      'rating',
-      this,
-    );
-    reviewText = _i1.ColumnString(
-      'reviewText',
-      this,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
+    bookingId = _i1.ColumnInt('bookingId', this);
+    rating = _i1.ColumnInt('rating', this);
+    reviewText = _i1.ColumnString('reviewText', this);
+    createdAt = _i1.ColumnDateTime('createdAt', this);
   }
 
   late final SessionReviewUpdateTable updateTable;
@@ -452,10 +431,7 @@ class SessionReviewRepository {
     SessionReview row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<SessionReview>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<SessionReview>(row, transaction: transaction);
   }
 
   /// Updates all [SessionReview]s in the list and returns the updated rows. If
@@ -540,10 +516,7 @@ class SessionReviewRepository {
     List<SessionReview> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<SessionReview>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<SessionReview>(rows, transaction: transaction);
   }
 
   /// Deletes a single [SessionReview].
@@ -552,10 +525,7 @@ class SessionReviewRepository {
     SessionReview row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<SessionReview>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<SessionReview>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

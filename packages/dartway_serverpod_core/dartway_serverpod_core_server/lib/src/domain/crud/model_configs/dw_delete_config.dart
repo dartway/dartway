@@ -5,8 +5,11 @@ import 'package:serverpod/serverpod.dart';
 
 class DwDeleteConfig<T extends TableRow> {
   const DwDeleteConfig({
-    this.allowAnonymous = false,this.allowDelete, this.afterDelete, this.broadcastTo});
-
+    this.allowAnonymous = false,
+    this.allowDelete,
+    this.afterDelete,
+    this.broadcastTo,
+  });
 
   /// Whether a caller who is not signed in may reach this operation.
   ///

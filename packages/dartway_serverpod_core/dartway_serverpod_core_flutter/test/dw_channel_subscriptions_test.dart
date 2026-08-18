@@ -223,10 +223,7 @@ void main() {
         'dwPublicUpdates',
         'chat:12',
       ]);
-      expect(channelSubscriptions.liveChannels, [
-        'dwPublicUpdates',
-        'chat:12',
-      ]);
+      expect(channelSubscriptions.liveChannels, ['dwPublicUpdates', 'chat:12']);
     });
 
     test('closes the streams it replaces', () async {

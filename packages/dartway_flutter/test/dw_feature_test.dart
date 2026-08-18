@@ -51,22 +51,24 @@ DwFeatureSpec _spec(String id) =>
     DwFeatureSpec(id: id, title: id, behaviors: const ['does a thing']);
 
 void main() {
-  testWidgets('DwFeature.scanMounted collects mounted features, deduped by id',
-      (tester) async {
-    await tester.pumpWidget(
-      Column(
-        children: [
-          _FeatureBox(_spec('a')),
-          _FeatureBox(_spec('b')),
-          _FeatureBox(_spec('a')), // duplicate id — collapses to one
-        ],
-      ),
-    );
+  testWidgets(
+    'DwFeature.scanMounted collects mounted features, deduped by id',
+    (tester) async {
+      await tester.pumpWidget(
+        Column(
+          children: [
+            _FeatureBox(_spec('a')),
+            _FeatureBox(_spec('b')),
+            _FeatureBox(_spec('a')), // duplicate id — collapses to one
+          ],
+        ),
+      );
 
-    final ids = DwFeature.scanMounted().map((f) => f.id).toList();
-    expect(ids.toSet(), {'a', 'b'});
-    expect(ids.length, 2);
-  });
+      final ids = DwFeature.scanMounted().map((f) => f.id).toList();
+      expect(ids.toSet(), {'a', 'b'});
+      expect(ids.length, 2);
+    },
+  );
 
   // Deduplication is per id, not per subtree, and the walk never stops at a
   // feature it has already seen. It matters for a list of near-identical cards:
@@ -92,8 +94,9 @@ void main() {
     expect(ids.length, 2);
   });
 
-  testWidgets('DwFeature.scanMounted is empty with no DwFeature widgets',
-      (tester) async {
+  testWidgets('DwFeature.scanMounted is empty with no DwFeature widgets', (
+    tester,
+  ) async {
     await tester.pumpWidget(const SizedBox.shrink());
     expect(DwFeature.scanMounted(), isEmpty);
   });
@@ -102,17 +105,15 @@ void main() {
   // alive behind an IndexedStack, or a route under a pushed one, leaves those
   // subtrees mounted — and reporting them would claim every screen hosts the
   // whole app.
-  testWidgets('DwFeature.scanMounted skips unselected IndexedStack children',
-      (tester) async {
+  testWidgets('DwFeature.scanMounted skips unselected IndexedStack children', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       Directionality(
         textDirection: TextDirection.ltr,
         child: IndexedStack(
           index: 1,
-          children: [
-            _FeatureBox(_spec('behind')),
-            _FeatureBox(_spec('shown')),
-          ],
+          children: [_FeatureBox(_spec('behind')), _FeatureBox(_spec('shown'))],
         ),
       ),
     );
@@ -120,8 +121,9 @@ void main() {
     expect(DwFeature.scanMounted().map((f) => f.id), ['shown']);
   });
 
-  testWidgets('DwFeature.scanMounted skips an offstage subtree',
-      (tester) async {
+  testWidgets('DwFeature.scanMounted skips an offstage subtree', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       Column(
         children: [
@@ -134,8 +136,9 @@ void main() {
     expect(DwFeature.scanMounted().map((f) => f.id), ['shown']);
   });
 
-  testWidgets('DwFeature.scanMounted skips a disabled TickerMode subtree',
-      (tester) async {
+  testWidgets('DwFeature.scanMounted skips a disabled TickerMode subtree', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       Column(
         children: [
@@ -165,18 +168,16 @@ void main() {
       );
 
       Offset centerOf(String id) => tester.getCenter(
-            find.byWidgetPredicate(
-              (widget) => widget is _SizedFeature && widget.spec.id == id,
-            ),
-          );
+        find.byWidgetPredicate(
+          (widget) => widget is _SizedFeature && widget.spec.id == id,
+        ),
+      );
 
       expect(DwFeature.hitTest(centerOf('left'))?.id, 'left');
       expect(DwFeature.hitTest(centerOf('right'))?.id, 'right');
     });
 
-    testWidgets('is null over a point nothing declared covers', (
-      tester,
-    ) async {
+    testWidgets('is null over a point nothing declared covers', (tester) async {
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
@@ -190,27 +191,26 @@ void main() {
     // A card and a "more actions" row it may or may not build can both cover
     // the same point — the tap landed on whichever is actually drawn there,
     // and that is the nested one.
-    testWidgets(
-      'returns the innermost feature when nested features overlap',
-      (tester) async {
-        await tester.pumpWidget(
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: _SizedFeature(
-              _spec('ad/card'),
-              child: _SizedFeature(_spec('ad/card/more-actions')),
-            ),
+    testWidgets('returns the innermost feature when nested features overlap', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: _SizedFeature(
+            _spec('ad/card'),
+            child: _SizedFeature(_spec('ad/card/more-actions')),
           ),
-        );
+        ),
+      );
 
-        final center = tester.getCenter(
-          find.byWidgetPredicate(
-            (widget) => widget is _SizedFeature && widget.spec.id == 'ad/card',
-          ),
-        );
-        expect(DwFeature.hitTest(center)?.id, 'ad/card/more-actions');
-      },
-    );
+      final center = tester.getCenter(
+        find.byWidgetPredicate(
+          (widget) => widget is _SizedFeature && widget.spec.id == 'ad/card',
+        ),
+      );
+      expect(DwFeature.hitTest(center)?.id, 'ad/card/more-actions');
+    });
 
     // hitTest bypasses Flutter's own hit-testing (it checks render bounds
     // directly), so it must repeat the offstage/invisible/disabled-ticker
@@ -229,8 +229,9 @@ void main() {
     // A scaled subtree draws smaller than it lays out. Matching on the
     // unscaled size would claim the empty space next to it — the case a
     // zoomable canvas or a running page transition puts on screen.
-    testWidgets('matches the scaled area, not the laid-out one',
-        (tester) async {
+    testWidgets('matches the scaled area, not the laid-out one', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
@@ -253,8 +254,9 @@ void main() {
     // A list item scrolled past the edge of its viewport keeps its layout
     // position and paints nothing. Being deeper in the tree it would win the
     // last-match-wins rule, so it has to be cut by the viewport's clip.
-    testWidgets('skips a feature clipped away by a scroll viewport',
-        (tester) async {
+    testWidgets('skips a feature clipped away by a scroll viewport', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,

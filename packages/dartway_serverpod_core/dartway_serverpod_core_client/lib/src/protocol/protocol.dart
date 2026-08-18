@@ -70,15 +70,13 @@ class Protocol extends _i1.SerializationManager {
   }
 
   @override
-  T deserialize<T>(
-    dynamic data, [
-    Type? t,
-  ]) {
+  T deserialize<T>(dynamic data, [Type? t]) {
     t ??= T;
 
     if (data is Map<String, dynamic>) {
-      final manualDeserialization =
-          _i21.DwApiResponse.manualDeserialization<T>(data);
+      final manualDeserialization = _i21.DwApiResponse.manualDeserialization<T>(
+        data,
+      );
       if (manualDeserialization != null) {
         return manualDeserialization;
       }

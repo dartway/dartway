@@ -49,10 +49,7 @@ void main() {
 
     test('touches nothing when push is disabled for this build', () async {
       final firebase = _FakeProvider(id: DwPushProviderIds.fcm);
-      final push = _push(
-        providers: [firebase],
-        isEnabled: () async => false,
-      );
+      final push = _push(providers: [firebase], isEnabled: () async => false);
 
       await push.attach();
 
@@ -85,45 +82,49 @@ void main() {
       expect(firebase.permissionRequests, 1);
     });
 
-    test('keeps listening after a refusal, so a later yes still works',
-        () async {
-      final firebase = _FakeProvider(
-        id: DwPushProviderIds.fcm,
-        permission: DwPushPermission.denied,
-      );
-      final push = _push(providers: [firebase]);
+    test(
+      'keeps listening after a refusal, so a later yes still works',
+      () async {
+        final firebase = _FakeProvider(
+          id: DwPushProviderIds.fcm,
+          permission: DwPushPermission.denied,
+        );
+        final push = _push(providers: [firebase]);
 
-      await push.attach();
+        await push.attach();
 
-      expect(firebase.attached, isTrue);
-      expect(push.token.value, isNull);
+        expect(firebase.attached, isTrue);
+        expect(push.token.value, isNull);
 
-      firebase.permission = DwPushPermission.granted;
-      await push.requestPermission();
+        firebase.permission = DwPushPermission.granted;
+        await push.requestPermission();
 
-      expect(push.token.value, 'token-fcm');
-    });
+        expect(push.token.value, 'token-fcm');
+      },
+    );
   });
 
   group('DwPush notification taps', () {
-    test('holds the notification that started the app until it can be routed',
-        () async {
-      final opened = <DwPushOpened>[];
-      final firebase = _FakeProvider(
-        id: DwPushProviderIds.fcm,
-        initialPayload: {'type': 'new_post', 'post_id': '12'},
-      );
-      final push = _push(providers: [firebase], onOpened: opened.add);
+    test(
+      'holds the notification that started the app until it can be routed',
+      () async {
+        final opened = <DwPushOpened>[];
+        final firebase = _FakeProvider(
+          id: DwPushProviderIds.fcm,
+          initialPayload: {'type': 'new_post', 'post_id': '12'},
+        );
+        final push = _push(providers: [firebase], onOpened: opened.add);
 
-      await push.attach();
-      expect(opened, isEmpty, reason: 'nothing can route it yet');
+        await push.attach();
+        expect(opened, isEmpty, reason: 'nothing can route it yet');
 
-      push.markReadyForOpens((action) => action());
+        push.markReadyForOpens((action) => action());
 
-      expect(opened, hasLength(1));
-      expect(opened.single.source, DwPushOpenSource.coldStart);
-      expect(opened.single.data['post_id'], '12');
-    });
+        expect(opened, hasLength(1));
+        expect(opened.single.source, DwPushOpenSource.coldStart);
+        expect(opened.single.data['post_id'], '12');
+      },
+    );
 
     test('delivers a buffered tap exactly once', () async {
       final opened = <DwPushOpened>[];
@@ -156,8 +157,9 @@ void main() {
   });
 
   group('DwPush token registration', () {
-    testWidgets('registers once the session says who is signed in',
-        (tester) async {
+    testWidgets('registers once the session says who is signed in', (
+      tester,
+    ) async {
       final registrations = <(String, String)>[];
       final firebase = _FakeProvider(id: DwPushProviderIds.fcm);
       final push = _push(

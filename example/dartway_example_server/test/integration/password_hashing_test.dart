@@ -65,28 +65,43 @@ void main() {
       tearDown(() async => _wipeTables(session));
 
       test('the old password signs them in', () async {
-        await _seedHash(session, userId, _LegacySha256Verifier.hashOf(_password));
+        await _seedHash(
+          session,
+          userId,
+          _LegacySha256Verifier.hashOf(_password),
+        );
 
         final request = await _signIn(session, _password);
 
         expect(request.status, DwAuthRequestStatus.verified);
       });
 
-      test('signing in rewrites the hash in bcrypt — once, and for good', () async {
-        await _seedHash(session, userId, _LegacySha256Verifier.hashOf(_password));
+      test(
+        'signing in rewrites the hash in bcrypt — once, and for good',
+        () async {
+          await _seedHash(
+            session,
+            userId,
+            _LegacySha256Verifier.hashOf(_password),
+          );
 
-        await _signIn(session, _password);
+          await _signIn(session, _password);
 
-        // The plaintext exists only during a sign-in, so this is the only moment
-        // the hash could be migrated at all.
-        final stored = await _storedHash(session, userId);
-        expect(stored, startsWith(r'$2'), reason: 'the hash should now be bcrypt');
+          // The plaintext exists only during a sign-in, so this is the only moment
+          // the hash could be migrated at all.
+          final stored = await _storedHash(session, userId);
+          expect(
+            stored,
+            startsWith(r'$2'),
+            reason: 'the hash should now be bcrypt',
+          );
 
-        // And the upgraded row is readable by the active hasher: the second
-        // sign-in never touches the legacy path.
-        final again = await _signIn(session, _password);
-        expect(again.status, DwAuthRequestStatus.verified);
-      });
+          // And the upgraded row is readable by the active hasher: the second
+          // sign-in never touches the legacy path.
+          final again = await _signIn(session, _password);
+          expect(again.status, DwAuthRequestStatus.verified);
+        },
+      );
 
       test('a wrong password is rejected and the hash is left alone', () async {
         final legacyHash = _LegacySha256Verifier.hashOf(_password);
@@ -99,30 +114,40 @@ void main() {
         expect(await _storedHash(session, userId), legacyHash);
       });
 
-      test('a hash nobody can read fails the login instead of crashing it', () async {
-        // The format of some third system, never registered as a verifier. Before
-        // the strategies existed this reached BCrypt.checkpw and threw, turning a
-        // failed login into a 500.
-        await _seedHash(session, userId, 'argon2id\$v=19\$m=65536,t=3,p=4\$deadbeef');
+      test(
+        'a hash nobody can read fails the login instead of crashing it',
+        () async {
+          // The format of some third system, never registered as a verifier. Before
+          // the strategies existed this reached BCrypt.checkpw and threw, turning a
+          // failed login into a 500.
+          await _seedHash(
+            session,
+            userId,
+            'argon2id\$v=19\$m=65536,t=3,p=4\$deadbeef',
+          );
 
-        final request = await _signIn(session, _password);
+          final request = await _signIn(session, _password);
 
-        expect(request.status, DwAuthRequestStatus.failed);
-        expect(request.failReason, DwAuthFailReason.invalidPassword);
-      });
+          expect(request.status, DwAuthRequestStatus.failed);
+          expect(request.failReason, DwAuthFailReason.invalidPassword);
+        },
+      );
 
-      test('a bcrypt password still works — the default path is untouched', () async {
-        await dw.auth!.setUserPassword(
-          session,
-          userId: userId,
-          newPassword: _password,
-        );
+      test(
+        'a bcrypt password still works — the default path is untouched',
+        () async {
+          await dw.auth!.setUserPassword(
+            session,
+            userId: userId,
+            newPassword: _password,
+          );
 
-        final request = await _signIn(session, _password);
+          final request = await _signIn(session, _password);
 
-        expect(request.status, DwAuthRequestStatus.verified);
-        expect(await _storedHash(session, userId), startsWith(r'$2'));
-      });
+          expect(request.status, DwAuthRequestStatus.verified);
+          expect(await _storedHash(session, userId), startsWith(r'$2'));
+        },
+      );
     },
     runMode: 'test',
     applyMigrations: true,
@@ -138,11 +163,7 @@ void main() {
 
 /// Seeds a hash the way a migration does: import what you cannot reverse.
 Future<void> _seedHash(Session session, int userId, String hash) =>
-    dw.auth!.setUserPassword(
-      session,
-      userId: userId,
-      newPasswordHash: hash,
-    );
+    dw.auth!.setUserPassword(session, userId: userId, newPasswordHash: hash);
 
 Future<String> _storedHash(Session session, int userId) async {
   final row = await DwUserPassword.db.findFirstRow(
@@ -174,10 +195,7 @@ Future<T> _save<T extends TableRow>(Session session, T model) async {
 
   final saveConfig =
       (dw.getCrudConfig(className) ??
-              dw.getCrudConfig(
-                className,
-                api: DwCoreConst.dartwayInternalApi,
-              ))
+              dw.getCrudConfig(className, api: DwCoreConst.dartwayInternalApi))
           ?.saveConfig;
 
   if (saveConfig == null) {
@@ -194,7 +212,10 @@ Future<T> _save<T extends TableRow>(Session session, T model) async {
 }
 
 Future<void> _wipeTables(Session session) async {
-  await DwUserPassword.db.deleteWhere(session, where: (t) => Constant.bool(true));
+  await DwUserPassword.db.deleteWhere(
+    session,
+    where: (t) => Constant.bool(true),
+  );
   await DwAuthKey.db.deleteWhere(session, where: (t) => Constant.bool(true));
   await UserProfile.db.deleteWhere(session, where: (t) => Constant.bool(true));
 }

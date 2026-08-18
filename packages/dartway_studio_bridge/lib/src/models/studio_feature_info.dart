@@ -52,15 +52,15 @@ class StudioFeatureInfo {
   bool get hasKnownIssues => knownIssues.isNotEmpty;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        if (purpose != null) 'purpose': purpose,
-        if (behaviors.isNotEmpty) 'behaviors': behaviors,
-        if (requirements.isNotEmpty) 'requirements': requirements,
-        if (implementationNotes.isNotEmpty)
-          'implementationNotes': implementationNotes,
-        if (knownIssues.isNotEmpty) 'knownIssues': knownIssues,
-      };
+    'id': id,
+    'title': title,
+    if (purpose != null) 'purpose': purpose,
+    if (behaviors.isNotEmpty) 'behaviors': behaviors,
+    if (requirements.isNotEmpty) 'requirements': requirements,
+    if (implementationNotes.isNotEmpty)
+      'implementationNotes': implementationNotes,
+    if (knownIssues.isNotEmpty) 'knownIssues': knownIssues,
+  };
 
   /// Parsing stays lenient: an app built against an older bridge sends neither
   /// the new lists nor `purpose`, and an app built against a newer one may send
@@ -77,15 +77,15 @@ class StudioFeatureInfo {
       );
 
   static List<StudioFeatureInfo> listFromJson(Object? json) => [
-        if (json is List)
-          for (final item in json)
-            if (item is Map<String, dynamic>) StudioFeatureInfo.fromJson(item),
-      ];
+    if (json is List)
+      for (final item in json)
+        if (item is Map<String, dynamic>) StudioFeatureInfo.fromJson(item),
+  ];
 
   /// Lenient string-list parsing, shared with the other spec models.
   static List<String> stringListFromJson(Object? json) => [
-        if (json is List)
-          for (final item in json)
-            if (item is String) item,
-      ];
+    if (json is List)
+      for (final item in json)
+        if (item is String) item,
+  ];
 }

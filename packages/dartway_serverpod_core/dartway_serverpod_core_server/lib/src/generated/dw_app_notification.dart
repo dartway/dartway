@@ -205,77 +205,39 @@ class DwAppNotificationUpdateTable
     extends _i1.UpdateTable<DwAppNotificationTable> {
   DwAppNotificationUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> toUserId(int value) => _i1.ColumnValue(
-    table.toUserId,
-    value,
-  );
+  _i1.ColumnValue<int, int> toUserId(int value) =>
+      _i1.ColumnValue(table.toUserId, value);
 
-  _i1.ColumnValue<String, String> identifier(String? value) => _i1.ColumnValue(
-    table.identifier,
-    value,
-  );
+  _i1.ColumnValue<String, String> identifier(String? value) =>
+      _i1.ColumnValue(table.identifier, value);
 
   _i1.ColumnValue<DateTime, DateTime> timestamp(DateTime value) =>
-      _i1.ColumnValue(
-        table.timestamp,
-        value,
-      );
+      _i1.ColumnValue(table.timestamp, value);
 
-  _i1.ColumnValue<String, String> title(String value) => _i1.ColumnValue(
-    table.title,
-    value,
-  );
+  _i1.ColumnValue<String, String> title(String value) =>
+      _i1.ColumnValue(table.title, value);
 
-  _i1.ColumnValue<String, String> body(String? value) => _i1.ColumnValue(
-    table.body,
-    value,
-  );
+  _i1.ColumnValue<String, String> body(String? value) =>
+      _i1.ColumnValue(table.body, value);
 
-  _i1.ColumnValue<String, String> goToPath(String? value) => _i1.ColumnValue(
-    table.goToPath,
-    value,
-  );
+  _i1.ColumnValue<String, String> goToPath(String? value) =>
+      _i1.ColumnValue(table.goToPath, value);
 
-  _i1.ColumnValue<bool, bool> isRead(bool value) => _i1.ColumnValue(
-    table.isRead,
-    value,
-  );
+  _i1.ColumnValue<bool, bool> isRead(bool value) =>
+      _i1.ColumnValue(table.isRead, value);
 }
 
 class DwAppNotificationTable extends _i1.Table<int?> {
   DwAppNotificationTable({super.tableRelation})
     : super(tableName: 'dw_app_notification') {
     updateTable = DwAppNotificationUpdateTable(this);
-    toUserId = _i1.ColumnInt(
-      'toUserId',
-      this,
-    );
-    identifier = _i1.ColumnString(
-      'identifier',
-      this,
-    );
-    timestamp = _i1.ColumnDateTime(
-      'timestamp',
-      this,
-      hasDefault: true,
-    );
-    title = _i1.ColumnString(
-      'title',
-      this,
-    );
-    body = _i1.ColumnString(
-      'body',
-      this,
-    );
-    goToPath = _i1.ColumnString(
-      'goToPath',
-      this,
-    );
-    isRead = _i1.ColumnBool(
-      'isRead',
-      this,
-      hasDefault: true,
-    );
+    toUserId = _i1.ColumnInt('toUserId', this);
+    identifier = _i1.ColumnString('identifier', this);
+    timestamp = _i1.ColumnDateTime('timestamp', this, hasDefault: true);
+    title = _i1.ColumnString('title', this);
+    body = _i1.ColumnString('body', this);
+    goToPath = _i1.ColumnString('goToPath', this);
+    isRead = _i1.ColumnBool('isRead', this, hasDefault: true);
   }
 
   late final DwAppNotificationUpdateTable updateTable;
@@ -564,10 +526,7 @@ class DwAppNotificationRepository {
     List<DwAppNotification> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<DwAppNotification>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<DwAppNotification>(rows, transaction: transaction);
   }
 
   /// Deletes a single [DwAppNotification].

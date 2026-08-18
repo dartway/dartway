@@ -21,10 +21,7 @@ abstract class DwChannelClosed
         _i1.SerializableException,
         _i1.SerializableModel,
         _i1.ProtocolSerialization {
-  DwChannelClosed._({
-    required this.channel,
-    required this.reason,
-  });
+  DwChannelClosed._({required this.channel, required this.reason});
 
   factory DwChannelClosed({
     required String channel,
@@ -79,10 +76,7 @@ class _DwChannelClosedImpl extends DwChannelClosed {
   _DwChannelClosedImpl({
     required String channel,
     required _i2.DwChannelClosedReason reason,
-  }) : super._(
-         channel: channel,
-         reason: reason,
-       );
+  }) : super._(channel: channel, reason: reason);
 
   /// Returns a shallow copy of this [DwChannelClosed]
   /// with some or all fields replaced by the given arguments.

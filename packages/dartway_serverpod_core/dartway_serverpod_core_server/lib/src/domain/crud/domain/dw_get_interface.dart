@@ -1,9 +1,7 @@
 import 'package:serverpod/serverpod.dart';
 
 abstract class DwGetConfigInterface<T extends TableRow> {
-  final Future<Expression?> Function(
-    Session session,
-  )? accessFilter;
+  final Future<Expression?> Function(Session session)? accessFilter;
   final Include? include;
   final List<Order>? defaultOrderByList;
 

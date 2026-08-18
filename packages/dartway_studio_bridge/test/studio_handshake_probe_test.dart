@@ -90,8 +90,10 @@ void main() {
       final silentApp = _FakeApp();
       StudioHandshakeResult? result;
       unawaited(
-        runStudioHandshake(silentApp, timeout: const Duration(seconds: 10))
-            .then((value) => result = value),
+        runStudioHandshake(
+          silentApp,
+          timeout: const Duration(seconds: 10),
+        ).then((value) => result = value),
       );
 
       async.elapse(const Duration(seconds: 9));

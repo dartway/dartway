@@ -77,22 +77,25 @@ void main() {
     expect(keyManager.removeCalls, 1);
   });
 
-  test('keeps the cached profile when validation fails on connection', () async {
-    final cached = _FakeProfile(1);
-    final keyManager = _FakeKeyManager((1, cached));
-    final service = _buildService(
-      keyManager: keyManager,
-      fetchUserProfile: (_) async =>
-          throw TimeoutException('Future not completed'),
-    );
+  test(
+    'keeps the cached profile when validation fails on connection',
+    () async {
+      final cached = _FakeProfile(1);
+      final keyManager = _FakeKeyManager((1, cached));
+      final service = _buildService(
+        keyManager: keyManager,
+        fetchUserProfile: (_) async =>
+            throw TimeoutException('Future not completed'),
+      );
 
-    await service.initialize(); // must NOT throw
+      await service.initialize(); // must NOT throw
 
-    expect(service.currentUserProfile, same(cached));
-    expect(service.currentUserId, 1);
-    expect(keyManager.removeCalls, 0);
-    await service.initialize(); // already initialized → no-op
-  });
+      expect(service.currentUserProfile, same(cached));
+      expect(service.currentUserId, 1);
+      expect(keyManager.removeCalls, 0);
+      await service.initialize(); // already initialized → no-op
+    },
+  );
 
   test('rethrows when there is no cached profile', () async {
     final service = _buildService(
@@ -164,7 +167,8 @@ class _FakeKeyManager extends DwAuthenticationKeyManager {
   SerializableModel? storedProfile;
 
   @override
-  Future<(int?, T?)> loadLocalUserProfile<T extends SerializableModel>() async =>
+  Future<(int?, T?)>
+  loadLocalUserProfile<T extends SerializableModel>() async =>
       (_result.$1, _result.$2 as T?);
 
   @override

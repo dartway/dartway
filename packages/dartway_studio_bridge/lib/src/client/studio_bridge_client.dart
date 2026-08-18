@@ -21,8 +21,8 @@ class StudioBridgeClient {
     required StudioMessageChannel channel,
     StudioAccessTokenSupplier? accessToken,
     this.connectRetryInterval = const Duration(seconds: 2),
-  })  : _channel = channel,
-        _accessToken = accessToken ?? _noAccessToken;
+  }) : _channel = channel,
+       _accessToken = accessToken ?? _noAccessToken;
 
   static String _noAccessToken() => '';
 
@@ -88,20 +88,22 @@ class StudioBridgeClient {
         _connected = false;
         unawaited(_sendConnect());
       case ManifestMessage(
-          :final manifest,
-          :final currentPath,
-          :final session,
-          :final features,
-          :final currentLocale,
-        ):
+        :final manifest,
+        :final currentPath,
+        :final session,
+        :final features,
+        :final currentLocale,
+      ):
         _connected = true;
-        _events.add(StudioProjectConnected(
-          manifest: manifest,
-          currentPath: currentPath,
-          session: session,
-          features: features,
-          currentLocale: currentLocale,
-        ));
+        _events.add(
+          StudioProjectConnected(
+            manifest: manifest,
+            currentPath: currentPath,
+            session: session,
+            features: features,
+            currentLocale: currentLocale,
+          ),
+        );
       case RouteChangedMessage(:final path, :final routeName):
         _events.add(StudioProjectRouteChanged(path, routeName: routeName));
       case SessionChangedMessage(:final session):
@@ -127,14 +129,10 @@ class StudioBridgeClient {
   /// Ask the app to sign in with the given test credentials (from Studio's
   /// project config) through its regular auth flow. [secret] is whatever the
   /// app's auth expects: a test verification code, or a password.
-  void requestSignIn({
-    required String identifier,
-    required String secret,
-  }) =>
-      _channel.send(SignInRequestMessage(
-        identifier: identifier,
-        secret: secret,
-      ));
+  void requestSignIn({required String identifier, required String secret}) =>
+      _channel.send(
+        SignInRequestMessage(identifier: identifier, secret: secret),
+      );
 
   void requestSignOut() => _channel.send(const SignOutRequestMessage());
 
@@ -166,10 +164,13 @@ class StudioBridgeClient {
         verticalFraction: verticalFraction,
       ),
     );
-    return pending.future.timeout(timeout, onTimeout: () {
-      _pendingInspects.remove(requestId);
-      return null;
-    });
+    return pending.future.timeout(
+      timeout,
+      onTimeout: () {
+        _pendingInspects.remove(requestId);
+        return null;
+      },
+    );
   }
 
   void dispose() {

@@ -88,10 +88,7 @@ Future<bool> verifyStudioBridgeToken(
     ascii.encode(payloadSegment),
     signature: Signature(
       signature,
-      publicKey: SimplePublicKey(
-        publicKeyBytes,
-        type: KeyPairType.ed25519,
-      ),
+      publicKey: SimplePublicKey(publicKeyBytes, type: KeyPairType.ed25519),
     ),
   );
 }

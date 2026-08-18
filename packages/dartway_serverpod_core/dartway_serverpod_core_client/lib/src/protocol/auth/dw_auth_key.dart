@@ -14,12 +14,7 @@ import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
 /// Provides a method of access for a user to authenticate with the server.
 abstract class DwAuthKey implements _i1.SerializableModel {
-  DwAuthKey._({
-    this.id,
-    required this.userId,
-    required this.hash,
-    this.key,
-  });
+  DwAuthKey._({this.id, required this.userId, required this.hash, this.key});
 
   factory DwAuthKey({
     int? id,
@@ -54,12 +49,7 @@ abstract class DwAuthKey implements _i1.SerializableModel {
   /// Returns a shallow copy of this [DwAuthKey]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  DwAuthKey copyWith({
-    int? id,
-    int? userId,
-    String? hash,
-    String? key,
-  });
+  DwAuthKey copyWith({int? id, int? userId, String? hash, String? key});
   @override
   Map<String, dynamic> toJson() {
     return {
@@ -85,12 +75,7 @@ class _DwAuthKeyImpl extends DwAuthKey {
     required int userId,
     required String hash,
     String? key,
-  }) : super._(
-         id: id,
-         userId: userId,
-         hash: hash,
-         key: key,
-       );
+  }) : super._(id: id, userId: userId, hash: hash, key: key);
 
   /// Returns a shallow copy of this [DwAuthKey]
   /// with some or all fields replaced by the given arguments.

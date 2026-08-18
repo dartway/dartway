@@ -19,9 +19,7 @@ class DwAuthData implements SerializableModel, ProtocolSerialization {
 
   String get dwMappingClassname => className.split('.').last;
 
-  factory DwAuthData.fromJson(
-    Map<String, dynamic> jsonSerialization,
-  ) {
+  factory DwAuthData.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwAuthData(
       key: jsonSerialization['key'],
       keyId: jsonSerialization['keyId'],
@@ -51,11 +49,7 @@ class DwAuthData implements SerializableModel, ProtocolSerialization {
     };
   }
 
-  DwAuthData copyWith({
-    TableRow? userProfile,
-    String? key,
-    int? keyId,
-  }) {
+  DwAuthData copyWith({TableRow? userProfile, String? key, int? keyId}) {
     return DwAuthData(
       key: key ?? this.key,
       keyId: keyId ?? this.keyId,

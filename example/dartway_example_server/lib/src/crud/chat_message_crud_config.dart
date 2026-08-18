@@ -21,8 +21,8 @@ final chatMessageCrudConfig = DwCrudConfig<ChatMessage>(
         session.isUser(saveContext.currentModel.authorProfileId),
     validateSave: (session, saveContext) async =>
         saveContext.currentModel.messageText.trim().isEmpty
-            ? 'Message cannot be empty'
-            : null,
+        ? 'Message cannot be empty'
+        : null,
     beforeSaveTransaction: (session, saveContext) async {
       if (saveContext.isInsert) {
         saveContext.currentModel = saveContext.currentModel.copyWith(

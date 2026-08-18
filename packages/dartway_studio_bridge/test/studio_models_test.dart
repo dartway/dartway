@@ -47,14 +47,15 @@ void main() {
         access: StudioZoneAccess.signedOut,
         screens: [],
       );
-      expect(StudioZoneSpec.fromJson(zone.toJson()).access,
-          StudioZoneAccess.signedOut);
+      expect(
+        StudioZoneSpec.fromJson(zone.toJson()).access,
+        StudioZoneAccess.signedOut,
+      );
       expect(
         StudioZoneSpec.fromJson(const {'rootPath': '/x'}).access,
         StudioZoneAccess.any,
       );
     });
-
   });
 
   group('StudioSessionState', () {
@@ -114,7 +115,9 @@ void main() {
     });
 
     test('features and supportedLocales default to empty', () {
-      final decoded = StudioProjectManifest.fromJson(const {'projectName': 'x'});
+      final decoded = StudioProjectManifest.fromJson(const {
+        'projectName': 'x',
+      });
       expect(decoded.features, isEmpty);
       expect(decoded.supportedLocales, isEmpty);
     });

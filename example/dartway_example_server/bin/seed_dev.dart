@@ -44,10 +44,18 @@ Future<void> main(List<String> args) async {
 }
 
 Future<void> _seed(Session session) async {
-  final admin = await _ensureProfile(session, _adminPhone, 'Alex',
-      role: UserRole.admin);
-  final coach = await _ensureProfile(session, _coachPhone, 'Maria',
-      role: UserRole.staff);
+  final admin = await _ensureProfile(
+    session,
+    _adminPhone,
+    'Alex',
+    role: UserRole.admin,
+  );
+  final coach = await _ensureProfile(
+    session,
+    _coachPhone,
+    'Maria',
+    role: UserRole.staff,
+  );
   await _ensureProfile(session, _clientPhone, 'Ivan', role: UserRole.client);
 
   final services = <ClubService>[];
@@ -56,9 +64,11 @@ Future<void> _seed(Session session) async {
     ('Yoga class', 'Morning yoga for everyone', 90, 1100, 8),
     ('Personal training', 'One-on-one with a coach', 60, 2500, 1),
   ]) {
-    var service = (await ClubService.db.find(session,
-            where: (t) => t.title.equals(title), limit: 1))
-        .firstOrNull;
+    var service = (await ClubService.db.find(
+      session,
+      where: (t) => t.title.equals(title),
+      limit: 1,
+    )).firstOrNull;
     service ??= await ClubService.db.insertRow(
       session,
       ClubService(
@@ -74,10 +84,12 @@ Future<void> _seed(Session session) async {
     final startHour = 9 + services.length * 2;
     for (var day = 1; day <= 7; day++) {
       final now = DateTime.now();
-      final startsAt =
-          DateTime(now.year, now.month, now.day, startHour).add(
-        Duration(days: day),
-      );
+      final startsAt = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        startHour,
+      ).add(Duration(days: day));
       final existing = await ClubSession.db.count(
         session,
         where: (t) =>
@@ -112,7 +124,8 @@ Future<void> _seed(Session session) async {
       NewsPost(
         authorProfileId: admin.id!,
         title: 'Welcome to DartWay Fitness!',
-        text: 'Our new app is live: browse the schedule, book sessions '
+        text:
+            'Our new app is live: browse the schedule, book sessions '
             'and follow club news right here.',
         createdAt: DateTime.now(),
       ),
@@ -139,9 +152,11 @@ Future<UserProfile> _ensureProfile(
   // Seeded users are the Studio demo personas, so they carry a fixed test code.
   String? testVerificationCode = '000000',
 }) async {
-  final existing = (await UserProfile.db.find(session,
-          where: (t) => t.userIdentifier.equals(phone), limit: 1))
-      .firstOrNull;
+  final existing = (await UserProfile.db.find(
+    session,
+    where: (t) => t.userIdentifier.equals(phone),
+    limit: 1,
+  )).firstOrNull;
   if (existing != null) {
     if (existing.testVerificationCode != testVerificationCode) {
       existing.testVerificationCode = testVerificationCode;

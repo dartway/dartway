@@ -48,10 +48,7 @@ class NavigateRequestMessage extends StudioBridgeMessage {
 /// personas are a platform concern) — the app itself ships no test users and
 /// no special sign-in path; it uses them exactly like user-typed ones.
 class SignInRequestMessage extends StudioBridgeMessage {
-  const SignInRequestMessage({
-    required this.identifier,
-    required this.secret,
-  });
+  const SignInRequestMessage({required this.identifier, required this.secret});
 
   /// The user identifier in the form the app's auth expects (phone, email).
   final String identifier;
@@ -65,9 +62,9 @@ class SignInRequestMessage extends StudioBridgeMessage {
 
   @override
   Map<String, dynamic> payloadToJson() => {
-        'identifier': identifier,
-        'secret': secret,
-      };
+    'identifier': identifier,
+    'secret': secret,
+  };
 
   factory SignInRequestMessage.fromPayload(Map<String, dynamic> payload) =>
       SignInRequestMessage(
@@ -132,19 +129,17 @@ class InspectPointRequestMessage extends StudioBridgeMessage {
 
   @override
   Map<String, dynamic> payloadToJson() => {
-        'requestId': requestId,
-        'horizontalFraction': horizontalFraction,
-        'verticalFraction': verticalFraction,
-      };
+    'requestId': requestId,
+    'horizontalFraction': horizontalFraction,
+    'verticalFraction': verticalFraction,
+  };
 
   factory InspectPointRequestMessage.fromPayload(
     Map<String, dynamic> payload,
-  ) =>
-      InspectPointRequestMessage(
-        requestId: payload['requestId'] as String? ?? '',
-        horizontalFraction:
-            (payload['horizontalFraction'] as num?)?.toDouble() ?? 0,
-        verticalFraction:
-            (payload['verticalFraction'] as num?)?.toDouble() ?? 0,
-      );
+  ) => InspectPointRequestMessage(
+    requestId: payload['requestId'] as String? ?? '',
+    horizontalFraction:
+        (payload['horizontalFraction'] as num?)?.toDouble() ?? 0,
+    verticalFraction: (payload['verticalFraction'] as num?)?.toDouble() ?? 0,
+  );
 }

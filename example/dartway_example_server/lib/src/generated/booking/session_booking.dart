@@ -215,51 +215,28 @@ class _SessionBookingImpl extends SessionBooking {
 class SessionBookingUpdateTable extends _i1.UpdateTable<SessionBookingTable> {
   SessionBookingUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> clubSessionId(int value) => _i1.ColumnValue(
-    table.clubSessionId,
-    value,
-  );
+  _i1.ColumnValue<int, int> clubSessionId(int value) =>
+      _i1.ColumnValue(table.clubSessionId, value);
 
-  _i1.ColumnValue<int, int> clientProfileId(int value) => _i1.ColumnValue(
-    table.clientProfileId,
-    value,
-  );
+  _i1.ColumnValue<int, int> clientProfileId(int value) =>
+      _i1.ColumnValue(table.clientProfileId, value);
 
   _i1.ColumnValue<_i4.BookingStatus, _i4.BookingStatus> status(
     _i4.BookingStatus value,
-  ) => _i1.ColumnValue(
-    table.status,
-    value,
-  );
+  ) => _i1.ColumnValue(table.status, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 }
 
 class SessionBookingTable extends _i1.Table<int?> {
   SessionBookingTable({super.tableRelation})
     : super(tableName: 'session_booking') {
     updateTable = SessionBookingUpdateTable(this);
-    clubSessionId = _i1.ColumnInt(
-      'clubSessionId',
-      this,
-    );
-    clientProfileId = _i1.ColumnInt(
-      'clientProfileId',
-      this,
-    );
-    status = _i1.ColumnEnum(
-      'status',
-      this,
-      _i1.EnumSerialization.byName,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
+    clubSessionId = _i1.ColumnInt('clubSessionId', this);
+    clientProfileId = _i1.ColumnInt('clientProfileId', this);
+    status = _i1.ColumnEnum('status', this, _i1.EnumSerialization.byName);
+    createdAt = _i1.ColumnDateTime('createdAt', this);
   }
 
   late final SessionBookingUpdateTable updateTable;
@@ -511,10 +488,7 @@ class SessionBookingRepository {
     SessionBooking row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<SessionBooking>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<SessionBooking>(row, transaction: transaction);
   }
 
   /// Updates all [SessionBooking]s in the list and returns the updated rows. If
@@ -599,10 +573,7 @@ class SessionBookingRepository {
     List<SessionBooking> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<SessionBooking>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<SessionBooking>(rows, transaction: transaction);
   }
 
   /// Deletes a single [SessionBooking].
@@ -611,10 +582,7 @@ class SessionBookingRepository {
     SessionBooking row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<SessionBooking>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<SessionBooking>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

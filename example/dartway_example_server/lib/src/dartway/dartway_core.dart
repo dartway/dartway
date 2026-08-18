@@ -120,32 +120,30 @@ void initDartwayCore({
       // (UserProfile.testVerificationCode, serverOnly — never sent to clients);
       // everyone else gets a fresh random code. Works in any run mode, so store
       // reviewers can sign in, while real users are never handed a fixed code.
-      generateVerificationCodeMethod: (
-        session, {
-        required DwAuthRequest verificationRequest,
-      }) async {
-        final profile = await UserProfile.db.findFirstRow(
-          session,
-          where: (t) =>
-              t.userIdentifier.equals(verificationRequest.userIdentifier),
-        );
-        return profile?.testVerificationCode ?? _randomVerificationCode();
-      },
+      generateVerificationCodeMethod:
+          (session, {required DwAuthRequest verificationRequest}) async {
+            final profile = await UserProfile.db.findFirstRow(
+              session,
+              where: (t) =>
+                  t.userIdentifier.equals(verificationRequest.userIdentifier),
+            );
+            return profile?.testVerificationCode ?? _randomVerificationCode();
+          },
       // Dev: log the code to the server console instead of sending an SMS.
       // Wire a real SMS/email sender here for production.
-      sendVerificationCodeMethod: (
-        session, {
-        required DwAuthRequest verificationRequest,
-        required String verificationCode,
-      }) async {
-        session.log(
-          'Verification code for ${verificationRequest.userIdentifier}: '
-          '$verificationCode',
-        );
-      },
+      sendVerificationCodeMethod:
+          (
+            session, {
+            required DwAuthRequest verificationRequest,
+            required String verificationCode,
+          }) async {
+            session.log(
+              'Verification code for ${verificationRequest.userIdentifier}: '
+              '$verificationCode',
+            );
+          },
     ),
   );
-
 }
 
 /// Builds the optional push delivery engine from provider credentials.
@@ -156,7 +154,9 @@ void initDartwayCore({
 DwPush? _buildDwPush(Map<String, String> passwords) {
   final fcmConfig = DwFcmPushProviderConfig.fromPasswords(passwords);
   final ruStoreConfig = DwRuStorePushProviderConfig.fromPasswords(passwords);
-  final fcm = fcmConfig.isConfigured ? DwFcmPushProvider(config: fcmConfig) : null;
+  final fcm = fcmConfig.isConfigured
+      ? DwFcmPushProvider(config: fcmConfig)
+      : null;
   final ruStore = ruStoreConfig.isConfigured
       ? DwRuStorePushProvider(config: ruStoreConfig)
       : null;

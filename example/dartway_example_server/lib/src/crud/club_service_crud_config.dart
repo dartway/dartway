@@ -6,9 +6,7 @@ import 'package:dartway_example_server/src/generated/protocol.dart';
 /// Anyone signed in can browse services; only the admin manages them.
 final clubServiceCrudConfig = DwCrudConfig<ClubService>(
   table: ClubService.t,
-  getListConfig: DwGetModelListConfig(
-    accessFilter: (session) async => null,
-  ),
+  getListConfig: DwGetModelListConfig(accessFilter: (session) async => null),
   saveConfig: DwSaveConfig<ClubService>(
     allowSave: (session, saveContext) async => session.isClubAdmin,
     validateSave: (session, saveContext) async {

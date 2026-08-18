@@ -36,10 +36,7 @@ void initDartwayCore({
     // reachable at all — access is granted, never forgotten away.
     // Your domain models go below; see `example/` in the DartWay monorepo for a
     // full application built this way.
-    crudConfigurations: [
-      userProfileCrudConfig,
-      appSettingCrudConfig,
-    ],
+    crudConfigurations: [userProfileCrudConfig, appSettingCrudConfig],
     dtoConfigurations: [],
     // One entry per realtime channel the app names itself. A channel that is
     // not declared here cannot be subscribed to — a channel name arrives from
@@ -72,29 +69,28 @@ void initDartwayCore({
       // (UserProfile.testVerificationCode, serverOnly — never sent to clients);
       // everyone else gets a fresh random code. Works in any run mode, so store
       // reviewers can sign in, while real users are never handed a fixed code.
-      generateVerificationCodeMethod: (
-        session, {
-        required DwAuthRequest verificationRequest,
-      }) async {
-        final profile = await UserProfile.db.findFirstRow(
-          session,
-          where: (t) =>
-              t.userIdentifier.equals(verificationRequest.userIdentifier),
-        );
-        return profile?.testVerificationCode ?? _randomVerificationCode();
-      },
+      generateVerificationCodeMethod:
+          (session, {required DwAuthRequest verificationRequest}) async {
+            final profile = await UserProfile.db.findFirstRow(
+              session,
+              where: (t) =>
+                  t.userIdentifier.equals(verificationRequest.userIdentifier),
+            );
+            return profile?.testVerificationCode ?? _randomVerificationCode();
+          },
       // Dev: log the code to the server console instead of sending an SMS.
       // Wire a real SMS/email sender here for production.
-      sendVerificationCodeMethod: (
-        session, {
-        required DwAuthRequest verificationRequest,
-        required String verificationCode,
-      }) async {
-        session.log(
-          'Verification code for ${verificationRequest.userIdentifier}: '
-          '$verificationCode',
-        );
-      },
+      sendVerificationCodeMethod:
+          (
+            session, {
+            required DwAuthRequest verificationRequest,
+            required String verificationCode,
+          }) async {
+            session.log(
+              'Verification code for ${verificationRequest.userIdentifier}: '
+              '$verificationCode',
+            );
+          },
     ),
   );
 }

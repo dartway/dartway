@@ -17,10 +17,10 @@ sealed class StudioBridgeMessage {
   Map<String, dynamic> payloadToJson() => const {};
 
   String encode() => jsonEncode({
-        StudioBridgeProtocol.envelopeKey: StudioBridgeProtocol.version,
-        StudioBridgeProtocol.typeKey: type,
-        StudioBridgeProtocol.payloadKey: payloadToJson(),
-      });
+    StudioBridgeProtocol.envelopeKey: StudioBridgeProtocol.version,
+    StudioBridgeProtocol.typeKey: type,
+    StudioBridgeProtocol.payloadKey: payloadToJson(),
+  });
 
   /// Parses raw postMessage data; null for anything that is not a valid
   /// message of the supported protocol version (foreign messages are common
@@ -40,30 +40,36 @@ sealed class StudioBridgeMessage {
     }
     final payload =
         decoded[StudioBridgeProtocol.payloadKey] as Map<String, dynamic>? ??
-            const {};
+        const {};
     return switch (decoded[StudioBridgeProtocol.typeKey]) {
       StudioBridgeProtocol.appReady => const AppReadyMessage(),
       StudioBridgeProtocol.connectRefused => const ConnectRefusedMessage(),
       StudioBridgeProtocol.manifest => ManifestMessage.fromPayload(payload),
-      StudioBridgeProtocol.routeChanged =>
-        RouteChangedMessage.fromPayload(payload),
-      StudioBridgeProtocol.sessionChanged =>
-        SessionChangedMessage.fromPayload(payload),
+      StudioBridgeProtocol.routeChanged => RouteChangedMessage.fromPayload(
+        payload,
+      ),
+      StudioBridgeProtocol.sessionChanged => SessionChangedMessage.fromPayload(
+        payload,
+      ),
       StudioBridgeProtocol.featuresChanged =>
         FeaturesChangedMessage.fromPayload(payload),
-      StudioBridgeProtocol.localeChanged =>
-        LocaleChangedMessage.fromPayload(payload),
+      StudioBridgeProtocol.localeChanged => LocaleChangedMessage.fromPayload(
+        payload,
+      ),
       StudioBridgeProtocol.inspectPointResult =>
         InspectPointResultMessage.fromPayload(payload),
-      StudioBridgeProtocol.studioConnect =>
-        StudioConnectMessage.fromPayload(payload),
+      StudioBridgeProtocol.studioConnect => StudioConnectMessage.fromPayload(
+        payload,
+      ),
       StudioBridgeProtocol.navigateRequest =>
         NavigateRequestMessage.fromPayload(payload),
-      StudioBridgeProtocol.signInRequest =>
-        SignInRequestMessage.fromPayload(payload),
+      StudioBridgeProtocol.signInRequest => SignInRequestMessage.fromPayload(
+        payload,
+      ),
       StudioBridgeProtocol.signOutRequest => const SignOutRequestMessage(),
-      StudioBridgeProtocol.localeRequest =>
-        LocaleRequestMessage.fromPayload(payload),
+      StudioBridgeProtocol.localeRequest => LocaleRequestMessage.fromPayload(
+        payload,
+      ),
       StudioBridgeProtocol.inspectPointRequest =>
         InspectPointRequestMessage.fromPayload(payload),
       _ => null,

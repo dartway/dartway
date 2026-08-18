@@ -33,10 +33,11 @@ abstract interface class StudioBridgeHostDelegate {
 /// The point arrives as fractions of the app's own viewport (see
 /// [InspectPointRequestMessage]) — convert with the app's own logical
 /// viewport size, not any size Studio thinks the frame is.
-typedef StudioInspectPoint = FutureOr<StudioFeatureInfo?> Function(
-  double horizontalFraction,
-  double verticalFraction,
-);
+typedef StudioInspectPoint =
+    FutureOr<StudioFeatureInfo?> Function(
+      double horizontalFraction,
+      double verticalFraction,
+    );
 
 /// The app-side end of the Studio bridge: announces the app, answers the
 /// handshake with the manifest, reports route/session changes and dispatches
@@ -157,16 +158,12 @@ class StudioBridgeHost {
       case LocaleRequestMessage(:final locale):
         _delegate.onLocaleRequest(locale);
       case InspectPointRequestMessage(
-          :final requestId,
-          :final horizontalFraction,
-          :final verticalFraction,
-        ):
+        :final requestId,
+        :final horizontalFraction,
+        :final verticalFraction,
+      ):
         unawaited(
-          _answerInspectPoint(
-            requestId,
-            horizontalFraction,
-            verticalFraction,
-          ),
+          _answerInspectPoint(requestId, horizontalFraction, verticalFraction),
         );
       default:
         break; // App → Studio messages echoed back are ignored.
@@ -188,25 +185,29 @@ class StudioBridgeHost {
     try {
       feature = await _inspectPoint(horizontalFraction, verticalFraction);
     } catch (error, stackTrace) {
-      FlutterError.reportError(FlutterErrorDetails(
-        exception: error,
-        stack: stackTrace,
-        library: 'dartway_studio_bridge',
-        context: ErrorDescription('answering a Studio inspect-point request'),
-      ));
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'dartway_studio_bridge',
+          context: ErrorDescription('answering a Studio inspect-point request'),
+        ),
+      );
     }
     _channel.send(
       InspectPointResultMessage(requestId: requestId, feature: feature),
     );
   }
 
-  void _sendManifest() => _channel.send(ManifestMessage(
-        manifest: _manifest,
-        currentPath: _currentPath(),
-        session: _currentSession(),
-        features: _currentFeatures(),
-        currentLocale: _currentLocale(),
-      ));
+  void _sendManifest() => _channel.send(
+    ManifestMessage(
+      manifest: _manifest,
+      currentPath: _currentPath(),
+      session: _currentSession(),
+      features: _currentFeatures(),
+      currentLocale: _currentLocale(),
+    ),
+  );
 
   /// The reports below are dropped until a Studio has been let in. Nothing is
   /// lost by that: whoever connects is handed the whole state in the handshake

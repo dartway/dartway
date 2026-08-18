@@ -111,7 +111,8 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     Session session, {
     required DwAuthRequest authRequest,
     required UserProfileClass? userProfile,
-  })? preAuthValidation;
+  })?
+  preAuthValidation;
 
   /// Final application-owned authorization check immediately before an auth key
   /// is inserted.
@@ -126,7 +127,8 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     Session session, {
     required int userId,
     required Transaction transaction,
-  })? preAuthKeyIssuance;
+  })?
+  preAuthKeyIssuance;
 
   /// Validates an external auth provider's credential (e.g. an Apple identity
   /// token) carried on a non-email [DwAuthRequest]. Return `null` when the
@@ -138,27 +140,31 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
   final Future<DwAuthFailReason?> Function(
     Session session, {
     required DwAuthRequest authRequest,
-  })? verifyExternalCredential;
+  })?
+  verifyExternalCredential;
 
   /// Callback for triggering actions when a user signs in.
   final Future<void> Function(
     Session session, {
     required int userId,
     required bool isFirstSignIn,
-  })? onSignInTrigger;
+  })?
+  onSignInTrigger;
 
   /// Callback for generating a verification code.
   final Future<String> Function(
     Session session, {
     required DwAuthRequest verificationRequest,
-  })? generateVerificationCodeMethod;
+  })?
+  generateVerificationCodeMethod;
 
   /// Callback for sending validation message.
   final Future<void> Function(
     Session session, {
     required DwAuthRequest verificationRequest,
     required String verificationCode,
-  })? sendVerificationCodeMethod;
+  })?
+  sendVerificationCodeMethod;
 
   // static DwAuthConfig _config = DwAuthConfig(
   //   secretHashKey: 'DwHashSecret',

@@ -282,13 +282,12 @@ class DwSaveConfig<T extends TableRow> {
           return;
         }
 
-        final context =
-            DwSaveContext<T>(
-              currentUserId: session.signedInUserProfileId,
-              isInsert: false,
-              initialModel: initialModel,
-              currentModel: model,
-            )..transaction = transaction;
+        final context = DwSaveContext<T>(
+          currentUserId: session.signedInUserProfileId,
+          isInsert: false,
+          initialModel: initialModel,
+          currentModel: model,
+        )..transaction = transaction;
         saveContext = context;
 
         // --- allowSave (under the lock) ---

@@ -15,17 +15,15 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
           .map((object) => DwModelWrapper(object: object!))
           .toList();
 
-  DwModelWrapper({
-    required this.object,
-  })  : className = _protocol.getClassNameForObject(object) ?? 'unknown',
-        modelId = object is TableRow ? object.id : null,
-        isDeleted = false;
+  DwModelWrapper({required this.object})
+    : className = _protocol.getClassNameForObject(object) ?? 'unknown',
+      modelId = object is TableRow ? object.id : null,
+      isDeleted = false;
 
-  DwModelWrapper.deleted({
-    required this.object,
-  })  : className = _protocol.getClassNameForObject(object) ?? 'unknown',
-        modelId = object is TableRow ? object.id : null,
-        isDeleted = true;
+  DwModelWrapper.deleted({required this.object})
+    : className = _protocol.getClassNameForObject(object) ?? 'unknown',
+      modelId = object is TableRow ? object.id : null,
+      isDeleted = true;
 
   final String className;
   final int? modelId;
@@ -35,9 +33,7 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
 
   String get dwMappingClassname => className.split('.').last;
 
-  factory DwModelWrapper.fromJson(
-    Map<String, dynamic> jsonSerialization,
-  ) {
+  factory DwModelWrapper.fromJson(Map<String, dynamic> jsonSerialization) {
     final object = _protocol.deserializeByClassName(jsonSerialization);
     final deleted = jsonSerialization['isDeleted'] as bool? ?? false;
     if (deleted) {
@@ -74,10 +70,7 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     required this.isDeleted,
   });
 
-  DwModelWrapper copyWith({
-    SerializableModel? object,
-    bool? isDeleted,
-  }) {
+  DwModelWrapper copyWith({SerializableModel? object, bool? isDeleted}) {
     final newObject = object ?? this.object;
     return DwModelWrapper._internal(
       object: newObject,

@@ -26,7 +26,8 @@ class DwConfig {
   final Future<bool?> Function(
     BuildContext context,
     DwUiConfirmation confirmation,
-  )? confirmDialogBuilder;
+  )?
+  confirmDialogBuilder;
 
   /// Returns a placeholder instance of any model `T` for skeleton loading
   /// states — the data layer wires this to its mock-model registry. When unset,

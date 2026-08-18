@@ -1,10 +1,7 @@
 import 'dart:io';
 
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart'
-    show
-        DwOrphanedAuthKeyCleanup,
-        DwRecurringJobs,
-        dwAuthenticationHandler;
+    show DwOrphanedAuthKeyCleanup, DwRecurringJobs, dwAuthenticationHandler;
 import 'package:dartway_example_server/src/web/routes/root.dart';
 import 'package:serverpod/serverpod.dart';
 

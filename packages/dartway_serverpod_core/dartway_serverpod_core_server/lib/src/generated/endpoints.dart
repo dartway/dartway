@@ -28,17 +28,9 @@ class Endpoints extends _i1.EndpointDispatch {
   void initializeEndpoints(_i1.Server server) {
     var endpoints = <String, _i1.Endpoint>{
       'dwCrud': _i2.DwCrudEndpoint()
-        ..initialize(
-          server,
-          'dwCrud',
-          'dartway_serverpod_core',
-        ),
+        ..initialize(server, 'dwCrud', 'dartway_serverpod_core'),
       'dwUpload': _i3.DwUploadEndpoint()
-        ..initialize(
-          server,
-          'dwUpload',
-          'dartway_serverpod_core',
-        ),
+        ..initialize(server, 'dwUpload', 'dartway_serverpod_core'),
     };
     connectors['dwCrud'] = _i1.EndpointConnector(
       name: 'dwCrud',
@@ -63,11 +55,8 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getOne(
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getOne(
                 session,
                 className: params['className'],
                 filter: params['filter'],
@@ -93,11 +82,8 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getCount(
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getCount(
                 session,
                 className: params['className'],
                 filter: params['filter'],
@@ -138,11 +124,8 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getAll(
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).getAll(
                 session,
                 className: params['className'],
                 filter: params['filter'],
@@ -166,11 +149,8 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).saveModel(
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).saveModel(
                 session,
                 wrappedModel: params['wrappedModel'],
                 apiGroup: params['apiGroup'],
@@ -195,11 +175,8 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: true,
             ),
           },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['dwCrud'] as _i2.DwCrudEndpoint).delete(
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['dwCrud'] as _i2.DwCrudEndpoint).delete(
                 session,
                 className: params['className'],
                 modelId: params['modelId'],
@@ -223,10 +200,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 Map<String, dynamic> params,
                 Map<String, Stream> streamParams,
               ) => (endpoints['dwCrud'] as _i2.DwCrudEndpoint)
-                  .subscribeOnUpdates(
-                    session,
-                    channel: params['channel'],
-                  ),
+                  .subscribeOnUpdates(session, channel: params['channel']),
         ),
       },
     );
@@ -243,15 +217,9 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: false,
             ),
           },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['dwUpload'] as _i3.DwUploadEndpoint)
-                  .getUploadDescription(
-                    session,
-                    path: params['path'],
-                  ),
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['dwUpload'] as _i3.DwUploadEndpoint)
+                  .getUploadDescription(session, path: params['path']),
         ),
         'verifyUpload': _i1.MethodConnector(
           name: 'verifyUpload',
@@ -262,15 +230,11 @@ class Endpoints extends _i1.EndpointDispatch {
               nullable: false,
             ),
           },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async =>
-                  (endpoints['dwUpload'] as _i3.DwUploadEndpoint).verifyUpload(
-                    session,
-                    path: params['path'],
-                  ),
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['dwUpload'] as _i3.DwUploadEndpoint).verifyUpload(
+                session,
+                path: params['path'],
+              ),
         ),
       },
     );

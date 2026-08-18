@@ -64,40 +64,41 @@ void main() {
           UserProfile? byId;
           UserProfile? byIdentifier;
 
-          final response = await DwSaveConfig<AppSetting>(
-            allowSave: (session, saveContext) async => true,
-            beforeSaveTransaction: (session, saveContext) async {
-              final transaction = saveContext.transaction;
-              current = await dw.currentUserProfile(
-                session,
-                transaction: transaction,
+          final response =
+              await DwSaveConfig<AppSetting>(
+                allowSave: (session, saveContext) async => true,
+                beforeSaveTransaction: (session, saveContext) async {
+                  final transaction = saveContext.transaction;
+                  current = await dw.currentUserProfile(
+                    session,
+                    transaction: transaction,
+                  );
+                  byId = await dw.getUserProfile(
+                    session,
+                    saveContext.currentUserId!,
+                    transaction: transaction,
+                  );
+                  byIdentifier = await dw.getUserProfileByIdentifier(
+                    session,
+                    _identifier,
+                    transaction: transaction,
+                  );
+                  return null;
+                },
+                // The same read after the write, still inside the transaction: the
+                // second hook is where an audit row or a counter would be updated,
+                // and it hits the same wall.
+                afterSaveTransaction: (session, saveContext) async {
+                  final seen = await dw.currentUserProfile(
+                    session,
+                    transaction: saveContext.transaction,
+                  );
+                  return seen == null ? 'The author vanished mid-save' : null;
+                },
+              ).save(
+                authored,
+                AppSetting(settingKey: _settingKey, settingValue: 'stamped'),
               );
-              byId = await dw.getUserProfile(
-                session,
-                saveContext.currentUserId!,
-                transaction: transaction,
-              );
-              byIdentifier = await dw.getUserProfileByIdentifier(
-                session,
-                _identifier,
-                transaction: transaction,
-              );
-              return null;
-            },
-            // The same read after the write, still inside the transaction: the
-            // second hook is where an audit row or a counter would be updated,
-            // and it hits the same wall.
-            afterSaveTransaction: (session, saveContext) async {
-              final seen = await dw.currentUserProfile(
-                session,
-                transaction: saveContext.transaction,
-              );
-              return seen == null ? 'The author vanished mid-save' : null;
-            },
-          ).save(
-            authored,
-            AppSetting(settingKey: _settingKey, settingValue: 'stamped'),
-          );
 
           expect(response.isOk, isTrue, reason: response.error);
           expect(current?.id, author.id);
@@ -110,36 +111,39 @@ void main() {
         'a hook sees a profile the same transaction has not committed yet',
         () async {
           final session = sessionBuilder.build();
-          final settled = await DwSaveConfig<AppSetting>(
-            allowSave: (session, saveContext) async => true,
-            beforeSaveTransaction: (session, saveContext) async {
-              // Written inside the save transaction and invisible to anything
-              // reading around it — which is the other half of why the reads
-              // take a transaction, and the half that also bites in production.
-              final latecomer = await UserProfile.db.insertRow(
-                session,
-                UserProfile(
-                  userIdentifier: _latecomerIdentifier,
-                  phone: _latecomerIdentifier,
-                  firstName: 'Latecomer',
-                  role: UserRole.client,
-                  agreedForMarketingCommunications: false,
-                  conditionsAcceptedAt: DateTime.now().toUtc(),
-                ),
-                transaction: saveContext.transaction,
-              );
+          final settled =
+              await DwSaveConfig<AppSetting>(
+                allowSave: (session, saveContext) async => true,
+                beforeSaveTransaction: (session, saveContext) async {
+                  // Written inside the save transaction and invisible to anything
+                  // reading around it — which is the other half of why the reads
+                  // take a transaction, and the half that also bites in production.
+                  final latecomer = await UserProfile.db.insertRow(
+                    session,
+                    UserProfile(
+                      userIdentifier: _latecomerIdentifier,
+                      phone: _latecomerIdentifier,
+                      firstName: 'Latecomer',
+                      role: UserRole.client,
+                      agreedForMarketingCommunications: false,
+                      conditionsAcceptedAt: DateTime.now().toUtc(),
+                    ),
+                    transaction: saveContext.transaction,
+                  );
 
-              final read = await dw.getUserProfile(
+                  final read = await dw.getUserProfile(
+                    session,
+                    latecomer.id!,
+                    transaction: saveContext.transaction,
+                  );
+                  return read == null
+                      ? 'Uncommitted profile not visible'
+                      : null;
+                },
+              ).save(
                 session,
-                latecomer.id!,
-                transaction: saveContext.transaction,
+                AppSetting(settingKey: _latecomerKey, settingValue: 'stamped'),
               );
-              return read == null ? 'Uncommitted profile not visible' : null;
-            },
-          ).save(
-            session,
-            AppSetting(settingKey: _latecomerKey, settingValue: 'stamped'),
-          );
 
           expect(settled.isOk, isTrue, reason: settled.error);
         },

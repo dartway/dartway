@@ -151,14 +151,11 @@ abstract final class DwDevicePushTokenStore {
     if (!DwDevicePushTokenPolicy.isValid(normalizedToken)) return;
 
     await _lockToken(session, normalizedToken, transaction: transaction);
-    final ownedRows =
-        (await findByNormalizedValue(
-              session,
-              normalizedToken,
-              transaction: transaction,
-            ))
-            .where((row) => row.recipientId == recipientId)
-            .toList(growable: false);
+    final ownedRows = (await findByNormalizedValue(
+      session,
+      normalizedToken,
+      transaction: transaction,
+    )).where((row) => row.recipientId == recipientId).toList(growable: false);
     if (ownedRows.isEmpty) return;
     await DwDevicePushToken.db.delete(
       session,

@@ -14,21 +14,20 @@ import 'package:web/web.dart' as web;
 /// Returns an unsubscribe function: the listener sits on `serviceWorker`, which
 /// outlives any widget, so whoever attached it has to detach it.
 void Function() listenWebPushOpen(void Function(String link) onPushOpened) {
-  final listener =
-      (web.MessageEvent event) {
-        final message = event.data;
-        if (message == null || !message.isA<JSObject>()) return;
+  final listener = (web.MessageEvent event) {
+    final message = event.data;
+    if (message == null || !message.isA<JSObject>()) return;
 
-        final data = message as JSObject;
-        final type = data.getProperty<JSString?>('type'.toJS)?.toDart;
-        if (type != 'dw-push-open') return;
+    final data = message as JSObject;
+    final type = data.getProperty<JSString?>('type'.toJS)?.toDart;
+    if (type != 'dw-push-open') return;
 
-        final link = data.getProperty<JSString?>('link'.toJS)?.toDart;
-        if (link == null || link.isEmpty) return;
+    final link = data.getProperty<JSString?>('link'.toJS)?.toDart;
+    if (link == null || link.isEmpty) return;
 
-        debugPrint('DwPush: the service worker asked to open $link');
-        onPushOpened(link);
-      }.toJS;
+    debugPrint('DwPush: the service worker asked to open $link');
+    onPushOpened(link);
+  }.toJS;
 
   web.window.navigator.serviceWorker.addEventListener('message', listener);
 

@@ -15,12 +15,7 @@ import 'package:serverpod/serverpod.dart' as _i1;
 /// Provides a method of access for a user to authenticate with the server.
 abstract class DwAuthKey
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
-  DwAuthKey._({
-    this.id,
-    required this.userId,
-    required this.hash,
-    this.key,
-  });
+  DwAuthKey._({this.id, required this.userId, required this.hash, this.key});
 
   factory DwAuthKey({
     int? id,
@@ -60,12 +55,7 @@ abstract class DwAuthKey
   /// Returns a shallow copy of this [DwAuthKey]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  DwAuthKey copyWith({
-    int? id,
-    int? userId,
-    String? hash,
-    String? key,
-  });
+  DwAuthKey copyWith({int? id, int? userId, String? hash, String? key});
   @override
   Map<String, dynamic> toJson() {
     return {
@@ -126,12 +116,7 @@ class _DwAuthKeyImpl extends DwAuthKey {
     required int userId,
     required String hash,
     String? key,
-  }) : super._(
-         id: id,
-         userId: userId,
-         hash: hash,
-         key: key,
-       );
+  }) : super._(id: id, userId: userId, hash: hash, key: key);
 
   /// Returns a shallow copy of this [DwAuthKey]
   /// with some or all fields replaced by the given arguments.
@@ -155,28 +140,18 @@ class _DwAuthKeyImpl extends DwAuthKey {
 class DwAuthKeyUpdateTable extends _i1.UpdateTable<DwAuthKeyTable> {
   DwAuthKeyUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> userId(int value) => _i1.ColumnValue(
-    table.userId,
-    value,
-  );
+  _i1.ColumnValue<int, int> userId(int value) =>
+      _i1.ColumnValue(table.userId, value);
 
-  _i1.ColumnValue<String, String> hash(String value) => _i1.ColumnValue(
-    table.hash,
-    value,
-  );
+  _i1.ColumnValue<String, String> hash(String value) =>
+      _i1.ColumnValue(table.hash, value);
 }
 
 class DwAuthKeyTable extends _i1.Table<int?> {
   DwAuthKeyTable({super.tableRelation}) : super(tableName: 'dw_auth_key') {
     updateTable = DwAuthKeyUpdateTable(this);
-    userId = _i1.ColumnInt(
-      'userId',
-      this,
-    );
-    hash = _i1.ColumnString(
-      'hash',
-      this,
-    );
+    userId = _i1.ColumnInt('userId', this);
+    hash = _i1.ColumnString('hash', this);
   }
 
   late final DwAuthKeyUpdateTable updateTable;
@@ -188,11 +163,7 @@ class DwAuthKeyTable extends _i1.Table<int?> {
   late final _i1.ColumnString hash;
 
   @override
-  List<_i1.Column> get columns => [
-    id,
-    userId,
-    hash,
-  ];
+  List<_i1.Column> get columns => [id, userId, hash];
 }
 
 class DwAuthKeyInclude extends _i1.IncludeObject {
@@ -362,10 +333,7 @@ class DwAuthKeyRepository {
     DwAuthKey row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<DwAuthKey>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<DwAuthKey>(row, transaction: transaction);
   }
 
   /// Updates all [DwAuthKey]s in the list and returns the updated rows. If
@@ -450,10 +418,7 @@ class DwAuthKeyRepository {
     List<DwAuthKey> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<DwAuthKey>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<DwAuthKey>(rows, transaction: transaction);
   }
 
   /// Deletes a single [DwAuthKey].
@@ -462,10 +427,7 @@ class DwAuthKeyRepository {
     DwAuthKey row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<DwAuthKey>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<DwAuthKey>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

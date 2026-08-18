@@ -681,9 +681,7 @@ WHERE "id" = @deliveryId
     DwPushTransportResult result,
   ) {
     const equality = SetEquality<String>();
-    final expected = attempt.targets
-        .map((target) => target.token)
-        .toSet();
+    final expected = attempt.targets.map((target) => target.token).toSet();
     final actual = result.results.map((item) => item.target).toSet();
     if (!equality.equals(expected, actual)) {
       throw StateError(

@@ -21,8 +21,9 @@ class DwTelegramService {
     Function(String message)? reportErrorFunction,
   }) async {
     try {
-      final safeMessage =
-          escapeMessage ? _prepareMessage(message) : _truncate(message);
+      final safeMessage = escapeMessage
+          ? _prepareMessage(message)
+          : _truncate(message);
 
       final url = Uri.parse("https://api.telegram.org/bot$token/sendMessage");
 

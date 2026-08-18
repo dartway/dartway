@@ -31,7 +31,8 @@ late final DwPrefProvider<bool> darkModeProvider = _prefs.provider<bool>(
 late final DwMappedPrefProvider<_Theme> themeProvider = _prefs
     .mappedProvider<_Theme>(
       key: 'theme',
-      mapFrom: (stored) => _Theme.values.asNameMap()[stored ?? ''] ?? _Theme.system,
+      mapFrom: (stored) =>
+          _Theme.values.asNameMap()[stored ?? ''] ?? _Theme.system,
       mapTo: (theme) => theme.name,
     );
 
@@ -49,7 +50,8 @@ late final DwPrefProviderFamily<String, int> projectSortProvider = _prefs
 late final DwMappedPrefProviderFamily<_Theme, String> sectionThemeProvider =
     _prefs.mappedProviderFamily<_Theme, String>(
       keyFor: (section) => 'section.$section.theme',
-      mapFrom: (stored) => _Theme.values.asNameMap()[stored ?? ''] ?? _Theme.system,
+      mapFrom: (stored) =>
+          _Theme.values.asNameMap()[stored ?? ''] ?? _Theme.system,
       mapTo: (theme) => theme.name,
     );
 

@@ -59,12 +59,12 @@ class ManifestMessage extends StudioBridgeMessage {
 
   @override
   Map<String, dynamic> payloadToJson() => {
-        'manifest': manifest.toJson(),
-        'currentPath': currentPath,
-        'session': session.toJson(),
-        'features': [for (final f in features) f.toJson()],
-        'currentLocale': currentLocale,
-      };
+    'manifest': manifest.toJson(),
+    'currentPath': currentPath,
+    'session': session.toJson(),
+    'features': [for (final f in features) f.toJson()],
+    'currentLocale': currentLocale,
+  };
 
   factory ManifestMessage.fromPayload(Map<String, dynamic> payload) =>
       ManifestMessage(
@@ -96,9 +96,9 @@ class RouteChangedMessage extends StudioBridgeMessage {
 
   @override
   Map<String, dynamic> payloadToJson() => {
-        'path': path,
-        if (routeName != null) 'routeName': routeName,
-      };
+    'path': path,
+    if (routeName != null) 'routeName': routeName,
+  };
 
   factory RouteChangedMessage.fromPayload(Map<String, dynamic> payload) =>
       RouteChangedMessage(
@@ -120,9 +120,9 @@ class FeaturesChangedMessage extends StudioBridgeMessage {
 
   @override
   Map<String, dynamic> payloadToJson() => {
-        'path': path,
-        'features': [for (final f in features) f.toJson()],
-      };
+    'path': path,
+    'features': [for (final f in features) f.toJson()],
+  };
 
   factory FeaturesChangedMessage.fromPayload(Map<String, dynamic> payload) =>
       FeaturesChangedMessage(
@@ -187,13 +187,11 @@ class InspectPointResultMessage extends StudioBridgeMessage {
 
   @override
   Map<String, dynamic> payloadToJson() => {
-        'requestId': requestId,
-        if (feature != null) 'feature': feature!.toJson(),
-      };
+    'requestId': requestId,
+    if (feature != null) 'feature': feature!.toJson(),
+  };
 
-  factory InspectPointResultMessage.fromPayload(
-    Map<String, dynamic> payload,
-  ) =>
+  factory InspectPointResultMessage.fromPayload(Map<String, dynamic> payload) =>
       InspectPointResultMessage(
         requestId: payload['requestId'] as String? ?? '',
         feature: switch (payload['feature']) {

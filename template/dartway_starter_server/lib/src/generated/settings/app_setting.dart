@@ -14,11 +14,7 @@ import 'package:serverpod/serverpod.dart' as _i1;
 
 abstract class AppSetting
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
-  AppSetting._({
-    this.id,
-    required this.settingKey,
-    required this.settingValue,
-  });
+  AppSetting._({this.id, required this.settingKey, required this.settingValue});
 
   factory AppSetting({
     int? id,
@@ -51,11 +47,7 @@ abstract class AppSetting
   /// Returns a shallow copy of this [AppSetting]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  AppSetting copyWith({
-    int? id,
-    String? settingKey,
-    String? settingValue,
-  });
+  AppSetting copyWith({int? id, String? settingKey, String? settingValue});
   @override
   Map<String, dynamic> toJson() {
     return {
@@ -113,11 +105,7 @@ class _AppSettingImpl extends AppSetting {
     int? id,
     required String settingKey,
     required String settingValue,
-  }) : super._(
-         id: id,
-         settingKey: settingKey,
-         settingValue: settingValue,
-       );
+  }) : super._(id: id, settingKey: settingKey, settingValue: settingValue);
 
   /// Returns a shallow copy of this [AppSetting]
   /// with some or all fields replaced by the given arguments.
@@ -139,28 +127,18 @@ class _AppSettingImpl extends AppSetting {
 class AppSettingUpdateTable extends _i1.UpdateTable<AppSettingTable> {
   AppSettingUpdateTable(super.table);
 
-  _i1.ColumnValue<String, String> settingKey(String value) => _i1.ColumnValue(
-    table.settingKey,
-    value,
-  );
+  _i1.ColumnValue<String, String> settingKey(String value) =>
+      _i1.ColumnValue(table.settingKey, value);
 
-  _i1.ColumnValue<String, String> settingValue(String value) => _i1.ColumnValue(
-    table.settingValue,
-    value,
-  );
+  _i1.ColumnValue<String, String> settingValue(String value) =>
+      _i1.ColumnValue(table.settingValue, value);
 }
 
 class AppSettingTable extends _i1.Table<int?> {
   AppSettingTable({super.tableRelation}) : super(tableName: 'app_setting') {
     updateTable = AppSettingUpdateTable(this);
-    settingKey = _i1.ColumnString(
-      'settingKey',
-      this,
-    );
-    settingValue = _i1.ColumnString(
-      'settingValue',
-      this,
-    );
+    settingKey = _i1.ColumnString('settingKey', this);
+    settingValue = _i1.ColumnString('settingValue', this);
   }
 
   late final AppSettingUpdateTable updateTable;
@@ -170,11 +148,7 @@ class AppSettingTable extends _i1.Table<int?> {
   late final _i1.ColumnString settingValue;
 
   @override
-  List<_i1.Column> get columns => [
-    id,
-    settingKey,
-    settingValue,
-  ];
+  List<_i1.Column> get columns => [id, settingKey, settingValue];
 }
 
 class AppSettingInclude extends _i1.IncludeObject {
@@ -344,10 +318,7 @@ class AppSettingRepository {
     AppSetting row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<AppSetting>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<AppSetting>(row, transaction: transaction);
   }
 
   /// Updates all [AppSetting]s in the list and returns the updated rows. If
@@ -432,10 +403,7 @@ class AppSettingRepository {
     List<AppSetting> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<AppSetting>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<AppSetting>(rows, transaction: transaction);
   }
 
   /// Deletes a single [AppSetting].
@@ -444,10 +412,7 @@ class AppSettingRepository {
     AppSetting row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<AppSetting>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<AppSetting>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

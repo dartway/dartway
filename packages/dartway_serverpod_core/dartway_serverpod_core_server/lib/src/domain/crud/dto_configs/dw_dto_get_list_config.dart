@@ -20,7 +20,6 @@ class DwDtoGetListConfig<DTO extends SerializableModel, Model extends TableRow>
     required this.transformModelFunction,
   });
 
-
   /// Whether a caller who is not signed in may reach this operation.
   ///
   /// Defaults to `false`: a CRUD endpoint is reachable without a session, so
@@ -52,10 +51,7 @@ class DwDtoGetListConfig<DTO extends SerializableModel, Model extends TableRow>
     int? offset,
   }) async {
     final resultItems = await session.db.find<Model>(
-      where: await getWhereExpression(
-        session,
-        whereClause: whereClause,
-      ),
+      where: await getWhereExpression(session, whereClause: whereClause),
       include: include,
       orderByList: orderByList ?? defaultOrderByList,
       limit: limit,

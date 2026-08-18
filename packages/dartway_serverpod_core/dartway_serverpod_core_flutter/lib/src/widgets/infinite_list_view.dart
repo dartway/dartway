@@ -52,10 +52,9 @@ class _State<Entity> extends ConsumerState<InfiniteListView<Entity>> {
           isFirstLoadTriggered = true;
         }
 
-        final displayItems =
-            widget.groupBy != null
-                ? widget.groupBy!(ref, items) // grouped
-                : items; // flat
+        final displayItems = widget.groupBy != null
+            ? widget.groupBy!(ref, items) // grouped
+            : items; // flat
 
         Widget itemBuilder(BuildContext context, int index) {
           final item = displayItems[index];
@@ -103,19 +102,18 @@ class _State<Entity> extends ConsumerState<InfiniteListView<Entity>> {
             }
             return false;
           },
-          child:
-              displayItems.isEmpty
-                  ? widget.emptyListPlaceHolder
-                  : widget.separatorBuilder != null
-                  ? ListView.separated(
-                    itemCount: displayItems.length,
-                    itemBuilder: itemBuilder,
-                    separatorBuilder: widget.separatorBuilder!,
-                  )
-                  : ListView.builder(
-                    itemCount: displayItems.length,
-                    itemBuilder: itemBuilder,
-                  ),
+          child: displayItems.isEmpty
+              ? widget.emptyListPlaceHolder
+              : widget.separatorBuilder != null
+              ? ListView.separated(
+                  itemCount: displayItems.length,
+                  itemBuilder: itemBuilder,
+                  separatorBuilder: widget.separatorBuilder!,
+                )
+              : ListView.builder(
+                  itemCount: displayItems.length,
+                  itemBuilder: itemBuilder,
+                ),
         );
       },
     );

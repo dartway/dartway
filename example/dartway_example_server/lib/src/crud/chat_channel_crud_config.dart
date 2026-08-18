@@ -7,14 +7,12 @@ import 'package:dartway_example_server/src/generated/protocol.dart';
 /// access filter line, not scattered UI checks.
 final chatChannelCrudConfig = DwCrudConfig<ChatChannel>(
   table: ChatChannel.t,
-  getListConfig: DwGetModelListConfig(
-    accessFilter: staffOnlyAccessFilter,
-  ),
+  getListConfig: DwGetModelListConfig(accessFilter: staffOnlyAccessFilter),
   saveConfig: DwSaveConfig<ChatChannel>(
     allowSave: (session, saveContext) async => session.isClubAdmin,
     validateSave: (session, saveContext) async =>
         saveContext.currentModel.title.trim().isEmpty
-            ? 'Title is required'
-            : null,
+        ? 'Title is required'
+        : null,
   ),
 );

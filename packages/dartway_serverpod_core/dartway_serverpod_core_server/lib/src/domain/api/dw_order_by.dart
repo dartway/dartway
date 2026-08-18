@@ -1,10 +1,7 @@
 import 'package:serverpod/serverpod.dart';
 
 class DwOrderBy implements SerializableModel {
-  const DwOrderBy._({
-    required this.fieldName,
-    required this.orderDescending,
-  });
+  const DwOrderBy._({required this.fieldName, required this.orderDescending});
 
   final String? fieldName;
   final bool orderDescending;
@@ -18,10 +15,7 @@ class DwOrderBy implements SerializableModel {
 
   @override
   toJson() {
-    return {
-      'fieldName': fieldName,
-      'orderDescending': orderDescending,
-    };
+    return {'fieldName': fieldName, 'orderDescending': orderDescending};
   }
 
   @override
@@ -36,20 +30,13 @@ class DwOrderBy implements SerializableModel {
   }
 
   @override
-  int get hashCode => Object.hash(
-        runtimeType,
-        fieldName,
-        orderDescending,
-      );
+  int get hashCode => Object.hash(runtimeType, fieldName, orderDescending);
 
   Order prepareOrderBy(Table table) {
     final column = table.columns.firstWhere(
       (col) => col.columnName == fieldName,
     );
 
-    return Order(
-      column: column,
-      orderDescending: orderDescending,
-    );
+    return Order(column: column, orderDescending: orderDescending);
   }
 }

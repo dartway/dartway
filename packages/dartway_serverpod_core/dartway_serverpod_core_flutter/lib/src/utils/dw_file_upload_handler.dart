@@ -13,13 +13,13 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
 class DwFileUploadHandler {
-  static String Function(XFile file) defaultUploadNameTemplate =
-      (XFile file) => DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now());
+  static String Function(XFile file) defaultUploadNameTemplate = (XFile file) =>
+      DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now());
 
   // The PlatformFile counterpart: it carries an extension but no usable name
-  static String Function(PlatformFile file) defaultPlatformUploadNameTemplate =
-      (PlatformFile file) =>
-          '${DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now())}${file.extension != null ? '.${file.extension!.toLowerCase()}' : ''}';
+  static String Function(PlatformFile file)
+  defaultPlatformUploadNameTemplate = (PlatformFile file) =>
+      '${DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now())}${file.extension != null ? '.${file.extension!.toLowerCase()}' : ''}';
 
   // -----------------------------
   //  EXISTING IMAGE UPLOAD LOGIC
@@ -64,10 +64,9 @@ class DwFileUploadHandler {
 
     final bytesToUpload = jpegBytes ?? originalBytes;
 
-    final uploadPath =
-        path == null
-            ? defaultUploadNameTemplate(xFile)
-            : '$path/${defaultUploadNameTemplate(xFile)}';
+    final uploadPath = path == null
+        ? defaultUploadNameTemplate(xFile)
+        : '$path/${defaultUploadNameTemplate(xFile)}';
 
     return uploadBytesToServer(bytes: bytesToUpload, path: uploadPath);
   }
@@ -104,10 +103,9 @@ class DwFileUploadHandler {
 
     final bytesToUpload = bytes;
 
-    final uploadPath =
-        path == null
-            ? defaultPlatformUploadNameTemplate(platformFile)
-            : '$path/${defaultPlatformUploadNameTemplate(platformFile)}';
+    final uploadPath = path == null
+        ? defaultPlatformUploadNameTemplate(platformFile)
+        : '$path/${defaultPlatformUploadNameTemplate(platformFile)}';
 
     return uploadBytesToServer(bytes: bytesToUpload, path: uploadPath);
   }

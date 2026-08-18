@@ -242,11 +242,13 @@ void main() {
       expect(await validator(validToken), isFalse);
     });
 
-    test('a build with no origin named accepts any connection (local dev)',
-        () async {
-      final validator = studioSignedAccessValidator('');
-      expect(await validator(''), isTrue);
-      expect(await validator('anything at all'), isTrue);
-    });
+    test(
+      'a build with no origin named accepts any connection (local dev)',
+      () async {
+        final validator = studioSignedAccessValidator('');
+        expect(await validator(''), isTrue);
+        expect(await validator('anything at all'), isTrue);
+      },
+    );
   });
 }

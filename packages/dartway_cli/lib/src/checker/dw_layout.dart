@@ -118,10 +118,7 @@ class DwLayoutInspector {
     );
 
     for (final zone in dwFlutterZones.followedBy(const ['shared'])) {
-      _checkNoNestedTopLevelName(
-        Directory(p.join(libDir.path, zone)),
-        libDir,
-      );
+      _checkNoNestedTopLevelName(Directory(p.join(libDir.path, zone)), libDir);
     }
   }
 
@@ -208,9 +205,7 @@ class DwLayoutInspector {
       final allowed = isFolder ? allowedFolders : allowedFiles;
       if (allowed.contains(name)) continue;
 
-      _findings.add(
-        '$label/$name is not part of the declared layout — $hint',
-      );
+      _findings.add('$label/$name is not part of the declared layout — $hint');
     }
 
     for (final required in requiredEntries) {

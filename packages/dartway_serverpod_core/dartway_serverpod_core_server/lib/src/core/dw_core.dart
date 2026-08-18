@@ -159,9 +159,7 @@ class DwCore<UserProfileClass extends TableRow> {
       // The two the framework names itself. `userUpdates$id` was the sharpest
       // edge of all: the name is a number away from every other user's, so it
       // was readable by anyone signed in, not just by its owner.
-      const DwChannelConfig.owner(
-        prefix: DwCoreConst.userUpdatesChannelPrefix,
-      ),
+      const DwChannelConfig.owner(prefix: DwCoreConst.userUpdatesChannelPrefix),
       const DwChannelConfig.public(prefix: DwCoreConst.publicUpdatesChannel),
       ...channelConfigurations,
     ]);

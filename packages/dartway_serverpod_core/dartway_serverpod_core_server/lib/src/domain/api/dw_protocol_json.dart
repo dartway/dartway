@@ -22,7 +22,7 @@ import 'package:serverpod/serverpod.dart';
 ///
 /// No fallback to `toJson` once [ProtocolSerialization] is on the model: a
 /// fallback is how the leak comes back.
-dynamic dwJsonForProtocol(SerializableModel model) => model
-        is ProtocolSerialization
+dynamic dwJsonForProtocol(SerializableModel model) =>
+    model is ProtocolSerialization
     ? (model as ProtocolSerialization).toJsonForProtocol()
     : model.toJson();

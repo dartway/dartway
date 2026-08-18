@@ -7,9 +7,7 @@ final userProfileCrudConfig = DwCrudConfig<UserProfile>(
   table: UserProfile.t,
   // Only the admin lists all profiles (the admin users table). Everyone else
   // sees nothing here — secure-by-default via adminOnlyAccessFilter.
-  getListConfig: DwGetModelListConfig(
-    accessFilter: adminOnlyAccessFilter,
-  ),
+  getListConfig: DwGetModelListConfig(accessFilter: adminOnlyAccessFilter),
   saveConfig: DwSaveConfig<UserProfile>(
     // A signed-in user saves only their own profile; the admin saves anyone's.
     allowSave: (session, saveContext) async =>

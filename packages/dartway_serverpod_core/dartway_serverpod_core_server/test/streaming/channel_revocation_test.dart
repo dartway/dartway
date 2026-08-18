@@ -141,9 +141,8 @@ void main() {
       for (final channel in [channelName, 'orders42', 'dwPublicUpdates'])
         openChannelStream<SerializableModel>(session, channel).listen(
           (_) {},
-          onError: (error) => endedChannels.add(
-            (error as DwChannelClosed).channel,
-          ),
+          onError: (error) =>
+              endedChannels.add((error as DwChannelClosed).channel),
         ),
     ];
 

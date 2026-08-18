@@ -48,7 +48,8 @@ List<DwUnusedFeatureFile> findUnusedFeatureFiles(DwFeatureNode feature) {
     for (final file in [entry, ...internalFiles]) file.path: _strip(file),
   };
   final declarations = {
-    for (final file in internalFiles) file.path: _declaredNames(contents[file.path]!),
+    for (final file in internalFiles)
+      file.path: _declaredNames(contents[file.path]!),
   };
 
   final dead = <String>{};
@@ -154,9 +155,9 @@ Set<String> _declaredNames(String source) {
   return names;
 }
 
-bool _mentions(String source, String name) =>
-    RegExp('(?<![A-Za-z0-9_\$])${RegExp.escape(name)}(?![A-Za-z0-9_])')
-        .hasMatch(source);
+bool _mentions(String source, String name) => RegExp(
+  '(?<![A-Za-z0-9_\$])${RegExp.escape(name)}(?![A-Za-z0-9_])',
+).hasMatch(source);
 
 /// Every feature under [nodes], the nested ones included.
 Iterable<DwFeatureNode> featuresIn(List<DwFeatureNode> nodes) sync* {

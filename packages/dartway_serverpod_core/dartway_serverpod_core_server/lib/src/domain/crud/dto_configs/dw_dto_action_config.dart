@@ -13,7 +13,6 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
     this.afterSaveSideEffects,
   });
 
-
   /// Whether a caller who is not signed in may reach this operation.
   ///
   /// Defaults to `false`: a CRUD endpoint is reachable without a session, so

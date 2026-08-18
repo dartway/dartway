@@ -251,109 +251,58 @@ class UserProfileUpdateTable extends _i1.UpdateTable<UserProfileTable> {
   UserProfileUpdateTable(super.table);
 
   _i1.ColumnValue<String, String> userIdentifier(String value) =>
-      _i1.ColumnValue(
-        table.userIdentifier,
-        value,
-      );
+      _i1.ColumnValue(table.userIdentifier, value);
 
-  _i1.ColumnValue<String, String> phone(String value) => _i1.ColumnValue(
-    table.phone,
-    value,
-  );
+  _i1.ColumnValue<String, String> phone(String value) =>
+      _i1.ColumnValue(table.phone, value);
 
   _i1.ColumnValue<bool, bool> agreedForMarketingCommunications(bool value) =>
-      _i1.ColumnValue(
-        table.agreedForMarketingCommunications,
-        value,
-      );
+      _i1.ColumnValue(table.agreedForMarketingCommunications, value);
 
   _i1.ColumnValue<DateTime, DateTime> conditionsAcceptedAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.conditionsAcceptedAt,
-        value,
-      );
+      _i1.ColumnValue(table.conditionsAcceptedAt, value);
 
-  _i1.ColumnValue<String, String> firstName(String value) => _i1.ColumnValue(
-    table.firstName,
-    value,
-  );
+  _i1.ColumnValue<String, String> firstName(String value) =>
+      _i1.ColumnValue(table.firstName, value);
 
-  _i1.ColumnValue<String, String> lastName(String? value) => _i1.ColumnValue(
-    table.lastName,
-    value,
-  );
+  _i1.ColumnValue<String, String> lastName(String? value) =>
+      _i1.ColumnValue(table.lastName, value);
 
-  _i1.ColumnValue<String, String> imageUrl(String? value) => _i1.ColumnValue(
-    table.imageUrl,
-    value,
-  );
+  _i1.ColumnValue<String, String> imageUrl(String? value) =>
+      _i1.ColumnValue(table.imageUrl, value);
 
   _i1.ColumnValue<_i3.UserGender, _i3.UserGender> gender(
     _i3.UserGender? value,
-  ) => _i1.ColumnValue(
-    table.gender,
-    value,
-  );
+  ) => _i1.ColumnValue(table.gender, value);
 
   _i1.ColumnValue<_i2.UserRole, _i2.UserRole> role(_i2.UserRole value) =>
-      _i1.ColumnValue(
-        table.role,
-        value,
-      );
+      _i1.ColumnValue(table.role, value);
 
   _i1.ColumnValue<String, String> testVerificationCode(String? value) =>
-      _i1.ColumnValue(
-        table.testVerificationCode,
-        value,
-      );
+      _i1.ColumnValue(table.testVerificationCode, value);
 }
 
 class UserProfileTable extends _i1.Table<int?> {
   UserProfileTable({super.tableRelation}) : super(tableName: 'user_profile') {
     updateTable = UserProfileUpdateTable(this);
-    userIdentifier = _i1.ColumnString(
-      'userIdentifier',
-      this,
-    );
-    phone = _i1.ColumnString(
-      'phone',
-      this,
-    );
+    userIdentifier = _i1.ColumnString('userIdentifier', this);
+    phone = _i1.ColumnString('phone', this);
     agreedForMarketingCommunications = _i1.ColumnBool(
       'agreedForMarketingCommunications',
       this,
     );
-    conditionsAcceptedAt = _i1.ColumnDateTime(
-      'conditionsAcceptedAt',
-      this,
-    );
-    firstName = _i1.ColumnString(
-      'firstName',
-      this,
-    );
-    lastName = _i1.ColumnString(
-      'lastName',
-      this,
-    );
-    imageUrl = _i1.ColumnString(
-      'imageUrl',
-      this,
-    );
-    gender = _i1.ColumnEnum(
-      'gender',
-      this,
-      _i1.EnumSerialization.byName,
-    );
+    conditionsAcceptedAt = _i1.ColumnDateTime('conditionsAcceptedAt', this);
+    firstName = _i1.ColumnString('firstName', this);
+    lastName = _i1.ColumnString('lastName', this);
+    imageUrl = _i1.ColumnString('imageUrl', this);
+    gender = _i1.ColumnEnum('gender', this, _i1.EnumSerialization.byName);
     role = _i1.ColumnEnum(
       'role',
       this,
       _i1.EnumSerialization.byName,
       hasDefault: true,
     );
-    testVerificationCode = _i1.ColumnString(
-      'testVerificationCode',
-      this,
-    );
+    testVerificationCode = _i1.ColumnString('testVerificationCode', this);
   }
 
   late final UserProfileUpdateTable updateTable;
@@ -561,10 +510,7 @@ class UserProfileRepository {
     UserProfile row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<UserProfile>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<UserProfile>(row, transaction: transaction);
   }
 
   /// Updates all [UserProfile]s in the list and returns the updated rows. If
@@ -649,10 +595,7 @@ class UserProfileRepository {
     List<UserProfile> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<UserProfile>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<UserProfile>(rows, transaction: transaction);
   }
 
   /// Deletes a single [UserProfile].
@@ -661,10 +604,7 @@ class UserProfileRepository {
     UserProfile row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<UserProfile>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<UserProfile>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

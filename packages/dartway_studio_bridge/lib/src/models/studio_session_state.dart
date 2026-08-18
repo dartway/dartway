@@ -25,11 +25,11 @@ class StudioSessionState {
   final bool isBusy;
 
   Map<String, dynamic> toJson() => {
-        'isSignedIn': isSignedIn,
-        if (userIdentifier != null) 'userIdentifier': userIdentifier,
-        if (displayLabel != null) 'displayLabel': displayLabel,
-        'isBusy': isBusy,
-      };
+    'isSignedIn': isSignedIn,
+    if (userIdentifier != null) 'userIdentifier': userIdentifier,
+    if (displayLabel != null) 'displayLabel': displayLabel,
+    'isBusy': isBusy,
+  };
 
   factory StudioSessionState.fromJson(Map<String, dynamic> json) =>
       StudioSessionState(

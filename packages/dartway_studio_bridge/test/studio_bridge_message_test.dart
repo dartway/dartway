@@ -6,10 +6,7 @@ StudioBridgeMessage? _roundTrip(StudioBridgeMessage message) =>
     StudioBridgeMessage.tryDecode(message.encode());
 
 void main() {
-  const manifest = StudioProjectManifest(
-    projectName: 'Demo',
-    zones: [],
-  );
+  const manifest = StudioProjectManifest(projectName: 'Demo', zones: []);
 
   group('round-trip every message type', () {
     test('appReady', () {
@@ -24,23 +21,27 @@ void main() {
     });
 
     test('studioConnect carries the access token', () {
-      final decoded =
-          _roundTrip(const StudioConnectMessage(accessToken: 'abc'));
+      final decoded = _roundTrip(
+        const StudioConnectMessage(accessToken: 'abc'),
+      );
       expect((decoded as StudioConnectMessage).accessToken, 'abc');
       // A connect with no token at all decodes to an empty one — which only a
       // build in its zero-config local-dev mode accepts.
       expect(
         (StudioBridgeMessage.tryDecode(
-          '{"dartwayStudioBridge":4,"type":"studioConnect","payload":{}}',
-        ) as StudioConnectMessage)
+                  '{"dartwayStudioBridge":4,"type":"studioConnect","payload":{}}',
+                )
+                as StudioConnectMessage)
             .accessToken,
         '',
       );
     });
 
     test('signOutRequest', () {
-      expect(_roundTrip(const SignOutRequestMessage()),
-          isA<SignOutRequestMessage>());
+      expect(
+        _roundTrip(const SignOutRequestMessage()),
+        isA<SignOutRequestMessage>(),
+      );
     });
 
     test('navigateRequest carries the path', () {
@@ -49,10 +50,9 @@ void main() {
     });
 
     test('signInRequest carries the credentials', () {
-      final decoded = _roundTrip(const SignInRequestMessage(
-        identifier: '79990000002',
-        secret: '123456',
-      ));
+      final decoded = _roundTrip(
+        const SignInRequestMessage(identifier: '79990000002', secret: '123456'),
+      );
       final msg = decoded as SignInRequestMessage;
       expect(msg.identifier, '79990000002');
       expect(msg.secret, '123456');
@@ -126,8 +126,9 @@ void main() {
     });
 
     test('inspectPointResult carries null when nothing was found there', () {
-      final decoded =
-          _roundTrip(const InspectPointResultMessage(requestId: 'inspect-7'));
+      final decoded = _roundTrip(
+        const InspectPointResultMessage(requestId: 'inspect-7'),
+      );
       final result = decoded as InspectPointResultMessage;
       expect(result.requestId, 'inspect-7');
       expect(result.feature, isNull);
@@ -180,13 +181,15 @@ void main() {
       expect(StudioBridgeMessage.tryDecode('{"type":"appReady"}'), isNull);
       expect(
         StudioBridgeMessage.tryDecode(
-            '{"dartwayStudioBridge":999,"type":"appReady"}'),
+          '{"dartwayStudioBridge":999,"type":"appReady"}',
+        ),
         isNull,
       );
       // v1 (bilingual passports) is a different schema — must be ignored.
       expect(
         StudioBridgeMessage.tryDecode(
-            '{"dartwayStudioBridge":1,"type":"appReady"}'),
+          '{"dartwayStudioBridge":1,"type":"appReady"}',
+        ),
         isNull,
       );
     });
@@ -194,8 +197,9 @@ void main() {
     test('unknown message type', () {
       expect(
         StudioBridgeMessage.tryDecode(
-            '{"dartwayStudioBridge":${StudioBridgeProtocol.version},'
-            '"type":"bogus","payload":{}}'),
+          '{"dartwayStudioBridge":${StudioBridgeProtocol.version},'
+          '"type":"bogus","payload":{}}',
+        ),
         isNull,
       );
     });
@@ -212,22 +216,26 @@ void main() {
   test('encoded envelope carries the protocol version', () {
     expect(
       const AppReadyMessage().encode(),
-      contains('"${StudioBridgeProtocol.envelopeKey}":'
-          '${StudioBridgeProtocol.version}'),
+      contains(
+        '"${StudioBridgeProtocol.envelopeKey}":'
+        '${StudioBridgeProtocol.version}',
+      ),
     );
   });
 
-  test('connectRefused goes on the wire exactly as the JS package writes it',
-      () {
-    // The literal below is the same string, character for character, as the
-    // golden in `js/studio-bridge/test/protocol.test.ts`. The two
-    // implementations share no schema — only this — and an app on either of
-    // them talks to a Studio that was never told which it is.
-    expect(
-      const ConnectRefusedMessage().encode(),
-      '{"dartwayStudioBridge":4,"type":"connectRefused","payload":{}}',
-    );
-  });
+  test(
+    'connectRefused goes on the wire exactly as the JS package writes it',
+    () {
+      // The literal below is the same string, character for character, as the
+      // golden in `js/studio-bridge/test/protocol.test.ts`. The two
+      // implementations share no schema — only this — and an app on either of
+      // them talks to a Studio that was never told which it is.
+      expect(
+        const ConnectRefusedMessage().encode(),
+        '{"dartwayStudioBridge":4,"type":"connectRefused","payload":{}}',
+      );
+    },
+  );
 
   test('an old build that never heard of connectRefused just drops it', () {
     // The reason the protocol version stayed at 4: an unknown *type* falls

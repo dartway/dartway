@@ -58,14 +58,17 @@ void main() {
         expect(sent, 1);
       });
 
-      test('one that throws turns the sign-in into an error response', () async {
-        _sendVerificationCode = (code) async =>
-            throw StateError('550 sender address is not verified');
+      test(
+        'one that throws turns the sign-in into an error response',
+        () async {
+          _sendVerificationCode = (code) async =>
+              throw StateError('550 sender address is not verified');
 
-        final response = await _openLoginRequest(session);
+          final response = await _openLoginRequest(session);
 
-        expect(response.isOk, isFalse);
-      });
+          expect(response.isOk, isFalse);
+        },
+      );
 
       test('the failure message is one a sign-in screen can show', () async {
         _sendVerificationCode = (code) async =>
@@ -175,10 +178,7 @@ Future<DwApiResponse<DwModelWrapper>> _openLoginRequest(Session session) async {
   // The auth models live under DartWay's internal API, not the app's default.
   final saveConfig =
       (_dw.getCrudConfig(className) ??
-              _dw.getCrudConfig(
-                className,
-                api: DwCoreConst.dartwayInternalApi,
-              ))
+              _dw.getCrudConfig(className, api: DwCoreConst.dartwayInternalApi))
           ?.saveConfig;
 
   if (saveConfig == null) {
