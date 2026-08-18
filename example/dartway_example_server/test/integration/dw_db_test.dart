@@ -25,77 +25,91 @@ void main() {
         );
       });
 
-      test('the five operations round-trip a row of an unknown model', () async {
-        final session = sessionBuilder.build();
+      test(
+        'the five operations round-trip a row of an unknown model',
+        () async {
+          final session = sessionBuilder.build();
 
-        final inserted = await dw
-            .db(session)
-            .insertRow<AppSetting>(
-              AppSetting(settingKey: _settingKey, settingValue: 'initial'),
-            );
-        expect(inserted.id, isNotNull);
-
-        final updated = await dw
-            .db(session)
-            .updateRow<AppSetting>(inserted.copyWith(settingValue: 'updated'));
-        expect(updated.settingValue, 'updated');
-
-        final found = await dw
-            .db(session)
-            .find<AppSetting>(
-              where: AppSetting.t.settingKey.equals(_settingKey),
-            );
-        expect(found.single.settingValue, 'updated');
-
-        expect(
-          await dw
+          final inserted = await dw
               .db(session)
-              .count<AppSetting>(
+              .insertRow<AppSetting>(
+                AppSetting(settingKey: _settingKey, settingValue: 'initial'),
+              );
+          expect(inserted.id, isNotNull);
+
+          final updated = await dw
+              .db(session)
+              .updateRow<AppSetting>(
+                inserted.copyWith(settingValue: 'updated'),
+              );
+          expect(updated.settingValue, 'updated');
+
+          final found = await dw
+              .db(session)
+              .find<AppSetting>(
                 where: AppSetting.t.settingKey.equals(_settingKey),
-              ),
-          1,
-        );
+              );
+          expect(found.single.settingValue, 'updated');
 
-        await dw.db(session).deleteRow<AppSetting>(updated);
-        expect(
+          expect(
+            await dw
+                .db(session)
+                .count<AppSetting>(
+                  where: AppSetting.t.settingKey.equals(_settingKey),
+                ),
+            1,
+          );
+
+          await dw.db(session).deleteRow<AppSetting>(updated);
+          expect(
+            await dw
+                .db(session)
+                .count<AppSetting>(
+                  where: AppSetting.t.settingKey.equals(_settingKey),
+                ),
+            0,
+          );
+        },
+      );
+
+      test(
+        'a caller that does not know the model still gets its rows',
+        () async {
+          final session = sessionBuilder.build();
           await dw
               .db(session)
-              .count<AppSetting>(
-                where: AppSetting.t.settingKey.equals(_settingKey),
-              ),
-          0,
-        );
-      });
-
-      test('a caller that does not know the model still gets its rows', () async {
-        final session = sessionBuilder.build();
-        await dw
-            .db(session)
-            .insertRow<AppSetting>(
-              AppSetting(settingKey: '${_sweepPrefix}a', settingValue: 'stale'),
-            );
-        await dw
-            .db(session)
-            .insertRow<AppSetting>(
-              AppSetting(settingKey: '${_sweepPrefix}b', settingValue: 'stale'),
-            );
-
-        expect(
-          await _sweep<AppSetting>(
-            session,
-            where: AppSetting.t.settingValue.equals('stale'),
-          ),
-          2,
-        );
-        expect(
+              .insertRow<AppSetting>(
+                AppSetting(
+                  settingKey: '${_sweepPrefix}a',
+                  settingValue: 'stale',
+                ),
+              );
           await dw
               .db(session)
-              .count<AppSetting>(
-                where: AppSetting.t.settingValue.equals('stale'),
-              ),
-          0,
-        );
-      });
+              .insertRow<AppSetting>(
+                AppSetting(
+                  settingKey: '${_sweepPrefix}b',
+                  settingValue: 'stale',
+                ),
+              );
+
+          expect(
+            await _sweep<AppSetting>(
+              session,
+              where: AppSetting.t.settingValue.equals('stale'),
+            ),
+            2,
+          );
+          expect(
+            await dw
+                .db(session)
+                .count<AppSetting>(
+                  where: AppSetting.t.settingValue.equals('stale'),
+                ),
+            0,
+          );
+        },
+      );
 
       test('every operation can be pinned to an open transaction', () async {
         final session = sessionBuilder.build();

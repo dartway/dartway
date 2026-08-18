@@ -30,39 +30,41 @@ extension on _FakeChannel {
 
 void main() {
   group('StudioBridgeClient.inspectPoint', () {
-    test('sends the fractional point and resolves with the app\'s answer',
-        () async {
-      final channel = _FakeChannel();
-      final client = StudioBridgeClient(channel: channel)..start();
+    test(
+      'sends the fractional point and resolves with the app\'s answer',
+      () async {
+        final channel = _FakeChannel();
+        final client = StudioBridgeClient(channel: channel)..start();
 
-      final result = client.inspectPoint(0.25, 0.5);
-      expect(
-        channel.sent,
-        contains(
-          isA<InspectPointRequestMessage>()
-              .having(
-                (message) => message.horizontalFraction,
-                'horizontalFraction',
-                0.25,
-              )
-              .having(
-                (message) => message.verticalFraction,
-                'verticalFraction',
-                0.5,
-              ),
-        ),
-      );
+        final result = client.inspectPoint(0.25, 0.5);
+        expect(
+          channel.sent,
+          contains(
+            isA<InspectPointRequestMessage>()
+                .having(
+                  (message) => message.horizontalFraction,
+                  'horizontalFraction',
+                  0.25,
+                )
+                .having(
+                  (message) => message.verticalFraction,
+                  'verticalFraction',
+                  0.5,
+                ),
+          ),
+        );
 
-      channel.emit(
-        InspectPointResultMessage(
-          requestId: channel.inspectRequests.single.requestId,
-          feature: const StudioFeatureInfo(id: 'ad/card', title: 'Ad card'),
-        ),
-      );
+        channel.emit(
+          InspectPointResultMessage(
+            requestId: channel.inspectRequests.single.requestId,
+            feature: const StudioFeatureInfo(id: 'ad/card', title: 'Ad card'),
+          ),
+        );
 
-      expect((await result)?.id, 'ad/card');
-      client.dispose();
-    });
+        expect((await result)?.id, 'ad/card');
+        client.dispose();
+      },
+    );
 
     test('resolves with null when the app never answers', () async {
       final channel = _FakeChannel();

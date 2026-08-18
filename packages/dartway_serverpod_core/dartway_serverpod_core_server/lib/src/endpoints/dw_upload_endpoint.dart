@@ -32,9 +32,7 @@ class DwUploadEndpoint extends Endpoint {
     Session session, {
     required String path,
   }) async {
-    final t = await _storage.createMultipartUploadDescription(
-      objectPath: path,
-    );
+    final t = await _storage.createMultipartUploadDescription(objectPath: path);
 
     // final t11 = jsonDecode(t);
 

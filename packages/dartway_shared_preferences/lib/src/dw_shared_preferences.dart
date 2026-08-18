@@ -26,8 +26,7 @@ extension DwPrefsAccess on DwPlugins {
 typedef DwPrefProvider<T> = NotifierProvider<PrefNotifier<T>, T>;
 
 /// What [DwSharedPreferences.mappedProvider] returns — see [DwPrefProvider].
-typedef DwMappedPrefProvider<T> =
-    NotifierProvider<MappedPrefNotifier<T>, T>;
+typedef DwMappedPrefProvider<T> = NotifierProvider<MappedPrefNotifier<T>, T>;
 
 /// What [DwSharedPreferences.providerFamily] returns — see [DwPrefProvider] for
 /// why the plugin names its own return types. Call it with an [Arg] to get a

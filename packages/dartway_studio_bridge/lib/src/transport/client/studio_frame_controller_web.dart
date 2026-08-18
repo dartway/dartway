@@ -13,7 +13,7 @@ StudioFrameController createStudioFrameController({required String appUrl}) =>
 
 class _StudioFrameControllerWeb implements StudioFrameController {
   _StudioFrameControllerWeb(String appUrl)
-      : viewType = 'dartway-studio-frame-${_instanceCounter++}' {
+    : viewType = 'dartway-studio-frame-${_instanceCounter++}' {
     _frame = web.document.createElement('iframe') as web.HTMLIFrameElement
       ..src = appUrl;
     _frame.style

@@ -23,28 +23,28 @@ class DwBackendFilter implements SerializableModel {
   final bool negate;
 
   DwBackendFilter.andPrototype({required this.children, this.negate = false})
-      : type = DwBackendFilterType.and,
-        fieldName = null,
-        valueClassName = 'List',
-        fieldValue = null;
+    : type = DwBackendFilterType.and,
+      fieldName = null,
+      valueClassName = 'List',
+      fieldValue = null;
 
   DwBackendFilter.orPrototype({required this.children, this.negate = false})
-      : type = DwBackendFilterType.or,
-        fieldName = null,
-        valueClassName = 'List',
-        fieldValue = null;
+    : type = DwBackendFilterType.or,
+      fieldName = null,
+      valueClassName = 'List',
+      fieldValue = null;
 
   DwBackendFilter.equalsPrototype({
     required this.fieldName,
     this.negate = false,
-  })  : type = DwBackendFilterType.equals,
-        valueClassName =
-            Serverpod.instance.serializationManager.getClassNameForObject(
-                  null,
-                ) ??
-                'unknown',
-        fieldValue = null,
-        children = null;
+  }) : type = DwBackendFilterType.equals,
+       valueClassName =
+           Serverpod.instance.serializationManager.getClassNameForObject(
+             null,
+           ) ??
+           'unknown',
+       fieldValue = null,
+       children = null;
 
   factory DwBackendFilter.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwBackendFilter._(
@@ -60,8 +60,8 @@ class DwBackendFilter implements SerializableModel {
       children: jsonSerialization['children'] == null
           ? null
           : (jsonSerialization['children'] as List)
-              .map((e) => DwBackendFilter.fromJson(e as Map<String, dynamic>))
-              .toList(),
+                .map((e) => DwBackendFilter.fromJson(e as Map<String, dynamic>))
+                .toList(),
       negate: jsonSerialization['negate'] as bool,
     );
   }
@@ -97,23 +97,23 @@ class DwBackendFilter implements SerializableModel {
 
   @override
   int get hashCode => Object.hash(
-        runtimeType,
-        type,
-        valueClassName,
-        fieldName,
-        fieldValue,
-        _listEquality.hash(children),
-        negate,
-      );
+    runtimeType,
+    type,
+    valueClassName,
+    fieldName,
+    fieldValue,
+    _listEquality.hash(children),
+    negate,
+  );
 
   Map<String, dynamic> get attributeMap => {
-        '${negate ? 'not ' : ''}${type.name}': switch (type) {
-          DwBackendFilterType.and || DwBackendFilterType.or => [
-              if (children != null) ...children!.map((e) => e.attributeMap),
-            ],
-          _ => fieldName,
-        },
-      };
+    '${negate ? 'not ' : ''}${type.name}': switch (type) {
+      DwBackendFilterType.and || DwBackendFilterType.or => [
+        if (children != null) ...children!.map((e) => e.attributeMap),
+      ],
+      _ => fieldName,
+    },
+  };
 
   Expression prepareWhere(Table table, {bool outerNegate = false}) {
     bool shouldNegate = negate != outerNegate;
@@ -293,8 +293,7 @@ class DwBackendFilter implements SerializableModel {
       return switch (type) {
         DwBackendFilterType.equals => negate ? column.notEquals : column.equals,
         _ => throw Exception('Unsupported filter type'),
-      }
-          .call(fieldValue);
+      }.call(fieldValue);
     }
     throw Exception('Unsupported filter type');
   }

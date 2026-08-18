@@ -19,7 +19,7 @@ class DwGetModelConfig<T extends TableRow> extends DwGetConfigInterface<T> {
   final DwBackendFilter filterPrototype;
 
   final Future<T?> Function(Session session, DwBackendFilter filter)?
-      createIfMissing;
+  createIfMissing;
 
   Future<T?> _getObject(
     Session session,

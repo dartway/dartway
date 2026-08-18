@@ -108,13 +108,14 @@ class AttachmentHandler {
   final settings = const AttachmentSettings();
 }
 ''',
-      'logic/attachment_settings.dart': 'class AttachmentSettings { const AttachmentSettings(); }',
+      'logic/attachment_settings.dart':
+          'class AttachmentSettings { const AttachmentSettings(); }',
     });
 
-    expect(
-      unusedNames(feature)..sort(),
-      ['attachment_handler.dart', 'attachment_settings.dart'],
-    );
+    expect(unusedNames(feature)..sort(), [
+      'attachment_handler.dart',
+      'attachment_settings.dart',
+    ]);
   });
 
   test('a name that only appears in a comment or a string is not a use', () {

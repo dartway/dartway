@@ -257,11 +257,7 @@ class DwPush extends DwPlugin {
     required String provider,
   }) async {
     await const DwRepo().saveModel(
-      DwPushTokenRegistration(
-        token: token,
-        provider: provider,
-        revoke: false,
-      ),
+      DwPushTokenRegistration(token: token, provider: provider, revoke: false),
     );
     return true;
   }

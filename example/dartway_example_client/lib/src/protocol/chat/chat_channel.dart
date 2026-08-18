@@ -13,11 +13,7 @@
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
 abstract class ChatChannel implements _i1.SerializableModel {
-  ChatChannel._({
-    this.id,
-    required this.title,
-    required this.createdAt,
-  });
+  ChatChannel._({this.id, required this.title, required this.createdAt});
 
   factory ChatChannel({
     int? id,
@@ -47,11 +43,7 @@ abstract class ChatChannel implements _i1.SerializableModel {
   /// Returns a shallow copy of this [ChatChannel]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  ChatChannel copyWith({
-    int? id,
-    String? title,
-    DateTime? createdAt,
-  });
+  ChatChannel copyWith({int? id, String? title, DateTime? createdAt});
   @override
   Map<String, dynamic> toJson() {
     return {
@@ -75,11 +67,7 @@ class _ChatChannelImpl extends ChatChannel {
     int? id,
     required String title,
     required DateTime createdAt,
-  }) : super._(
-         id: id,
-         title: title,
-         createdAt: createdAt,
-       );
+  }) : super._(id: id, title: title, createdAt: createdAt);
 
   /// Returns a shallow copy of this [ChatChannel]
   /// with some or all fields replaced by the given arguments.

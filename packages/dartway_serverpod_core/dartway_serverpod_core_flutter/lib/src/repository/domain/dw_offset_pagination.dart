@@ -12,10 +12,7 @@ class DwOffsetPagination implements DwPaginationStrategy {
 
   @override
   DwPaginationParams buildParams() {
-    return DwPaginationParams(
-      offset: _nextPage * pageSize,
-      limit: pageSize,
-    );
+    return DwPaginationParams(offset: _nextPage * pageSize, limit: pageSize);
   }
 
   @override

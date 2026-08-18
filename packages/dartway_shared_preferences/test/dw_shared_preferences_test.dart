@@ -25,31 +25,40 @@ void main() {
     addTearDown(container.dispose);
   });
 
-  test('provider returns the default, then reflects and persists an update',
-      () async {
-    final darkMode = prefs.provider<bool>(key: 'darkMode', defaultValue: false);
+  test(
+    'provider returns the default, then reflects and persists an update',
+    () async {
+      final darkMode = prefs.provider<bool>(
+        key: 'darkMode',
+        defaultValue: false,
+      );
 
-    expect(container.read(darkMode), isFalse);
+      expect(container.read(darkMode), isFalse);
 
-    await container.read(darkMode.notifier).update(true);
+      await container.read(darkMode.notifier).update(true);
 
-    expect(container.read(darkMode), isTrue);
-    expect(prefs.raw.getBool('darkMode'), isTrue);
-  });
+      expect(container.read(darkMode), isTrue);
+      expect(prefs.raw.getBool('darkMode'), isTrue);
+    },
+  );
 
-  test('provider throws UnsupportedError for a type SharedPreferences cannot store',
-      () async {
-    final when =
-        prefs.provider<DateTime>(key: 'when', defaultValue: DateTime(2020));
+  test(
+    'provider throws UnsupportedError for a type SharedPreferences cannot store',
+    () async {
+      final when = prefs.provider<DateTime>(
+        key: 'when',
+        defaultValue: DateTime(2020),
+      );
 
-    // Reading the default is fine; only the write hits the type dispatch.
-    expect(container.read(when), DateTime(2020));
+      // Reading the default is fine; only the write hits the type dispatch.
+      expect(container.read(when), DateTime(2020));
 
-    await expectLater(
-      container.read(when.notifier).update(DateTime(2021)),
-      throwsA(isA<UnsupportedError>()),
-    );
-  });
+      await expectLater(
+        container.read(when.notifier).update(DateTime(2021)),
+        throwsA(isA<UnsupportedError>()),
+      );
+    },
+  );
 
   test('mappedProvider round-trips a custom type through a String', () async {
     final theme = prefs.mappedProvider<_Theme>(
@@ -83,24 +92,29 @@ void main() {
       expect(prefs.raw.getString('project.2.sort'), isNull);
     });
 
-    test('the same argument resolves to one provider, shared by every reader',
-        () async {
-      final sort = prefs.providerFamily<String, int>(
-        keyFor: (projectId) => 'project.$projectId.sort',
-        defaultValue: 'name',
-      );
+    test(
+      'the same argument resolves to one provider, shared by every reader',
+      () async {
+        final sort = prefs.providerFamily<String, int>(
+          keyFor: (projectId) => 'project.$projectId.sort',
+          defaultValue: 'name',
+        );
 
-      // Two separate calls with the same argument. Riverpod compares family
-      // providers by (family, argument), so the container holds one state
-      // behind both — the guarantee a loop over `provider` cannot give.
-      expect(sort(7), sort(7));
-      expect(container.read(sort(7).notifier), same(container.read(sort(7).notifier)));
+        // Two separate calls with the same argument. Riverpod compares family
+        // providers by (family, argument), so the container holds one state
+        // behind both — the guarantee a loop over `provider` cannot give.
+        expect(sort(7), sort(7));
+        expect(
+          container.read(sort(7).notifier),
+          same(container.read(sort(7).notifier)),
+        );
 
-      await container.read(sort(7).notifier).update('createdAt');
+        await container.read(sort(7).notifier).update('createdAt');
 
-      // A second reader that resolved the family independently sees the write.
-      expect(container.read(sort(7)), 'createdAt');
-    });
+        // A second reader that resolved the family independently sees the write.
+        expect(container.read(sort(7)), 'createdAt');
+      },
+    );
 
     test('reads a value already in storage instead of the default', () async {
       SharedPreferences.setMockInitialValues({'project.3.sort': 'createdAt'});
@@ -134,23 +148,25 @@ void main() {
       expect(prefs.raw.getString('section.reports.theme'), isNull);
     });
 
-    test('the same argument resolves to one provider, shared by every reader',
-        () async {
-      final theme = prefs.mappedProviderFamily<_Theme, String>(
-        keyFor: (section) => 'section.$section.theme',
-        mapFrom: (raw) => _Theme.values.byName(raw ?? 'system'),
-        mapTo: (mode) => mode.name,
-      );
+    test(
+      'the same argument resolves to one provider, shared by every reader',
+      () async {
+        final theme = prefs.mappedProviderFamily<_Theme, String>(
+          keyFor: (section) => 'section.$section.theme',
+          mapFrom: (raw) => _Theme.values.byName(raw ?? 'system'),
+          mapTo: (mode) => mode.name,
+        );
 
-      expect(theme('billing'), theme('billing'));
-      expect(
-        container.read(theme('billing').notifier),
-        same(container.read(theme('billing').notifier)),
-      );
+        expect(theme('billing'), theme('billing'));
+        expect(
+          container.read(theme('billing').notifier),
+          same(container.read(theme('billing').notifier)),
+        );
 
-      await container.read(theme('billing').notifier).update(_Theme.dark);
+        await container.read(theme('billing').notifier).update(_Theme.dark);
 
-      expect(container.read(theme('billing')), _Theme.dark);
-    });
+        expect(container.read(theme('billing')), _Theme.dark);
+      },
+    );
   });
 }

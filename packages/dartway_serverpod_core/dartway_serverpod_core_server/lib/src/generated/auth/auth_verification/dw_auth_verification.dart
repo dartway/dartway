@@ -212,52 +212,32 @@ class DwAuthVerificationUpdateTable
     extends _i1.UpdateTable<DwAuthVerificationTable> {
   DwAuthVerificationUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> dwAuthRequestId(int value) => _i1.ColumnValue(
-    table.dwAuthRequestId,
-    value,
-  );
+  _i1.ColumnValue<int, int> dwAuthRequestId(int value) =>
+      _i1.ColumnValue(table.dwAuthRequestId, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 
   _i1.ColumnValue<_i3.DwAuthFailReason, _i3.DwAuthFailReason> failReason(
     _i3.DwAuthFailReason? value,
-  ) => _i1.ColumnValue(
-    table.failReason,
-    value,
-  );
+  ) => _i1.ColumnValue(table.failReason, value);
 
-  _i1.ColumnValue<String, String> accessToken(String? value) => _i1.ColumnValue(
-    table.accessToken,
-    value,
-  );
+  _i1.ColumnValue<String, String> accessToken(String? value) =>
+      _i1.ColumnValue(table.accessToken, value);
 }
 
 class DwAuthVerificationTable extends _i1.Table<int?> {
   DwAuthVerificationTable({super.tableRelation})
     : super(tableName: 'dw_auth_verification') {
     updateTable = DwAuthVerificationUpdateTable(this);
-    dwAuthRequestId = _i1.ColumnInt(
-      'dwAuthRequestId',
-      this,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-      hasDefault: true,
-    );
+    dwAuthRequestId = _i1.ColumnInt('dwAuthRequestId', this);
+    createdAt = _i1.ColumnDateTime('createdAt', this, hasDefault: true);
     failReason = _i1.ColumnEnum(
       'failReason',
       this,
       _i1.EnumSerialization.byName,
     );
-    accessToken = _i1.ColumnString(
-      'accessToken',
-      this,
-    );
+    accessToken = _i1.ColumnString('accessToken', this);
   }
 
   late final DwAuthVerificationUpdateTable updateTable;

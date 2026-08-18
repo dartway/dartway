@@ -13,17 +13,18 @@ import 'logic/studio_session_state_provider.dart';
 /// features are discovered from mounted [DwFeature] widgets and mapped onto
 /// the bridge wire model.
 StudioFeatureInfo _toWireModel(DwFeatureSpec feature) => StudioFeatureInfo(
-      id: feature.id,
-      title: feature.title,
-      purpose: feature.purpose,
-      behaviors: feature.behaviors,
-      requirements: feature.requirements,
-      implementationNotes: feature.implementationNotes,
-      knownIssues: feature.knownIssues,
-    );
+  id: feature.id,
+  title: feature.title,
+  purpose: feature.purpose,
+  behaviors: feature.behaviors,
+  requirements: feature.requirements,
+  implementationNotes: feature.implementationNotes,
+  knownIssues: feature.knownIssues,
+);
 
-List<StudioFeatureInfo> _mountedFeatureInfos() =>
-    [for (final feature in DwFeature.scanMounted()) _toWireModel(feature)];
+List<StudioFeatureInfo> _mountedFeatureInfos() => [
+  for (final feature in DwFeature.scanMounted()) _toWireModel(feature),
+];
 
 /// Answers Studio's "pencil" tap-to-inspect flow: the point arrives as
 /// fractions of this app's own logical viewport, converted here (not by

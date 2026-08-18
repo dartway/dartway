@@ -15,8 +15,10 @@ final sessionReviewCrudConfig = DwCrudConfig<SessionReview>(
   ),
   saveConfig: DwSaveConfig<SessionReview>(
     allowSave: (session, saveContext) async {
-      final booking = await SessionBooking.db
-          .findById(session, saveContext.currentModel.bookingId);
+      final booking = await SessionBooking.db.findById(
+        session,
+        saveContext.currentModel.bookingId,
+      );
       return session.isUser(booking?.clientProfileId ?? -1);
     },
     validateSave: (session, saveContext) async {
@@ -24,8 +26,10 @@ final sessionReviewCrudConfig = DwCrudConfig<SessionReview>(
       if (review.rating < 1 || review.rating > 5) {
         return 'Rating must be between 1 and 5';
       }
-      final booking =
-          await SessionBooking.db.findById(session, review.bookingId);
+      final booking = await SessionBooking.db.findById(
+        session,
+        review.bookingId,
+      );
       if (booking?.status != BookingStatus.attended) {
         return 'You can only review a session you attended';
       }

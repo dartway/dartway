@@ -34,21 +34,22 @@ class StudioZoneSpec {
   final List<StudioScreenSpec> screens;
 
   Map<String, dynamic> toJson() => {
-        'label': label,
-        'rootPath': rootPath,
-        'access': access.name,
-        'screens': [for (final screen in screens) screen.toJson()],
-      };
+    'label': label,
+    'rootPath': rootPath,
+    'access': access.name,
+    'screens': [for (final screen in screens) screen.toJson()],
+  };
 
   factory StudioZoneSpec.fromJson(Map<String, dynamic> json) => StudioZoneSpec(
-        label: json['label'] as String? ?? '',
-        rootPath: json['rootPath'] as String? ?? '/',
-        access: StudioZoneAccess.values.asNameMap()[json['access']] ??
-            StudioZoneAccess.any,
-        screens: [
-          if (json['screens'] is List)
-            for (final item in json['screens'] as List)
-              if (item is Map<String, dynamic>) StudioScreenSpec.fromJson(item),
-        ],
-      );
+    label: json['label'] as String? ?? '',
+    rootPath: json['rootPath'] as String? ?? '/',
+    access:
+        StudioZoneAccess.values.asNameMap()[json['access']] ??
+        StudioZoneAccess.any,
+    screens: [
+      if (json['screens'] is List)
+        for (final item in json['screens'] as List)
+          if (item is Map<String, dynamic>) StudioScreenSpec.fromJson(item),
+    ],
+  );
 }

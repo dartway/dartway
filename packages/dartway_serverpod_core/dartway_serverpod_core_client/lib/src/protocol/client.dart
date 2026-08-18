@@ -36,12 +36,9 @@ class EndpointDwCrud extends _i1.EndpointRef {
       caller.callStreamingServerEndpoint<
         _i2.Stream<_i1.SerializableModel>,
         _i1.SerializableModel
-      >(
-        'dartway_serverpod_core.dwCrud',
-        'subscribeOnUpdates',
-        {'channel': channel},
-        {},
-      );
+      >('dartway_serverpod_core.dwCrud', 'subscribeOnUpdates', {
+        'channel': channel,
+      }, {});
 
   _i2.Future<_i3.DwApiResponse<_i4.DwModelWrapper>> getOne({
     required String className,
@@ -50,11 +47,7 @@ class EndpointDwCrud extends _i1.EndpointRef {
   }) => caller.callServerEndpoint<_i3.DwApiResponse<_i4.DwModelWrapper>>(
     'dartway_serverpod_core.dwCrud',
     'getOne',
-    {
-      'className': className,
-      'filter': filter,
-      'apiGroup': apiGroup,
-    },
+    {'className': className, 'filter': filter, 'apiGroup': apiGroup},
   );
 
   _i2.Future<_i3.DwApiResponse<int>> getCount({
@@ -64,11 +57,7 @@ class EndpointDwCrud extends _i1.EndpointRef {
   }) => caller.callServerEndpoint<_i3.DwApiResponse<int>>(
     'dartway_serverpod_core.dwCrud',
     'getCount',
-    {
-      'className': className,
-      'filter': filter,
-      'apiGroup': apiGroup,
-    },
+    {'className': className, 'filter': filter, 'apiGroup': apiGroup},
   );
 
   _i2.Future<_i3.DwApiResponse<List<_i4.DwModelWrapper>>> getAll({
@@ -97,10 +86,7 @@ class EndpointDwCrud extends _i1.EndpointRef {
   }) => caller.callServerEndpoint<_i3.DwApiResponse<_i4.DwModelWrapper>>(
     'dartway_serverpod_core.dwCrud',
     'saveModel',
-    {
-      'wrappedModel': wrappedModel,
-      'apiGroup': apiGroup,
-    },
+    {'wrappedModel': wrappedModel, 'apiGroup': apiGroup},
   );
 
   _i2.Future<_i3.DwApiResponse<bool>> delete({
@@ -110,11 +96,7 @@ class EndpointDwCrud extends _i1.EndpointRef {
   }) => caller.callServerEndpoint<_i3.DwApiResponse<bool>>(
     'dartway_serverpod_core.dwCrud',
     'delete',
-    {
-      'className': className,
-      'modelId': modelId,
-      'apiGroup': apiGroup,
-    },
+    {'className': className, 'modelId': modelId, 'apiGroup': apiGroup},
   );
 }
 

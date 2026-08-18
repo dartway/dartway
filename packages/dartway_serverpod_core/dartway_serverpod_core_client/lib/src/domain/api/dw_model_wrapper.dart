@@ -7,17 +7,18 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
   }
 
   DwModelWrapper.wrap({required this.model})
-      : modelId = null,
-        this.foreignKeys = {},
-        className =
-            DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
-                'unknown',
-        isDeleted = false,
-        jsonSerialization = {
-          'className':
-              DwCoreServerpodClient.protocol.getClassNameForObject(model),
-          'data': model.toJson(),
-        };
+    : modelId = null,
+      this.foreignKeys = {},
+      className =
+          DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
+          'unknown',
+      isDeleted = false,
+      jsonSerialization = {
+        'className': DwCoreServerpodClient.protocol.getClassNameForObject(
+          model,
+        ),
+        'data': model.toJson(),
+      };
 
   DwModelWrapper._({
     required this.model,
@@ -26,8 +27,8 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
     required this.isDeleted,
     required this.jsonSerialization,
   }) : className =
-            DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
-                'unknown';
+           DwCoreServerpodClient.protocol.getClassNameForObject(model) ??
+           'unknown';
 
   final String className;
   final SerializableModel model;
@@ -40,9 +41,7 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
 
   String get nitMappingClassname => className.split('.').last;
 
-  factory DwModelWrapper.fromJson(
-    Map<String, dynamic> jsonSerialization,
-  ) {
+  factory DwModelWrapper.fromJson(Map<String, dynamic> jsonSerialization) {
     final foreignKeys = <String, int>{};
 
     for (var key in (jsonSerialization['data'] as Map<String, dynamic>).keys) {
@@ -93,8 +92,9 @@ class DwModelWrapper implements SerializableModel, ProtocolSerialization {
       isDeleted: isDeleted,
       jsonSerialization: model != null
           ? {
-              'className':
-                  DwCoreServerpodClient.protocol.getClassNameForObject(newModel),
+              'className': DwCoreServerpodClient.protocol.getClassNameForObject(
+                newModel,
+              ),
               'data': newModel.toJson(),
             }
           : jsonSerialization,

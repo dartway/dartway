@@ -137,7 +137,8 @@ class DwRepo {
   Future<int> count<T extends SerializableModel>({
     DwBackendFilter? filter,
     String? apiGroupOverride,
-  }) => DwRepository.count<T>(filter: filter, apiGroupOverride: apiGroupOverride);
+  }) =>
+      DwRepository.count<T>(filter: filter, apiGroupOverride: apiGroupOverride);
 
   /// Applies a **custom** (non-CRUD) endpoint's [DwApiResponse] to the repo:
   /// returns its value (throwing on error) and, unless [updateListeners] is

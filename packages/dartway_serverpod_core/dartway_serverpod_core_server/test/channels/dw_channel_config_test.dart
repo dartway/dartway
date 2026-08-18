@@ -118,7 +118,8 @@ void main() {
       expect(
         predicateRan,
         isFalse,
-        reason: 'allowAnonymous is false, so the predicate never has to '
+        reason:
+            'allowAnonymous is false, so the predicate never has to '
             'remember it might be called without a user',
       );
     });

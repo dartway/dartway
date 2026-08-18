@@ -14,43 +14,43 @@ mixin DwBackendFiltersMixin<T> on Enum {
 
   DwBackendFilter<T> greaterThan(T value, {bool negate = false}) =>
       (T != int && T != double && T != DateTime)
-          ? throw UnsupportedError(comparisonFiltersTypeErrorText)
-          : DwBackendFilter<T>.value(
-            type: DwBackendFilterType.greaterThan,
-            fieldName: name,
-            fieldValue: value,
-            negate: negate,
-          );
+      ? throw UnsupportedError(comparisonFiltersTypeErrorText)
+      : DwBackendFilter<T>.value(
+          type: DwBackendFilterType.greaterThan,
+          fieldName: name,
+          fieldValue: value,
+          negate: negate,
+        );
 
   DwBackendFilter<T> greaterThanOrEquals(T value, {bool negate = false}) =>
       (T != int && T != double && T != DateTime)
-          ? throw UnsupportedError(comparisonFiltersTypeErrorText)
-          : DwBackendFilter<T>.value(
-            type: DwBackendFilterType.greaterThanOrEquals,
-            fieldName: name,
-            fieldValue: value,
-            negate: negate,
-          );
+      ? throw UnsupportedError(comparisonFiltersTypeErrorText)
+      : DwBackendFilter<T>.value(
+          type: DwBackendFilterType.greaterThanOrEquals,
+          fieldName: name,
+          fieldValue: value,
+          negate: negate,
+        );
 
   DwBackendFilter<T> lessThan(T value, {bool negate = false}) =>
       (T != int && T != double && T != DateTime)
-          ? throw UnsupportedError(comparisonFiltersTypeErrorText)
-          : DwBackendFilter<T>.value(
-            type: DwBackendFilterType.lessThan,
-            fieldName: name,
-            fieldValue: value,
-            negate: negate,
-          );
+      ? throw UnsupportedError(comparisonFiltersTypeErrorText)
+      : DwBackendFilter<T>.value(
+          type: DwBackendFilterType.lessThan,
+          fieldName: name,
+          fieldValue: value,
+          negate: negate,
+        );
 
   DwBackendFilter<T> lessThanOrEquals(T value, {bool negate = false}) =>
       (T != int && T != double && T != DateTime)
-          ? throw UnsupportedError(comparisonFiltersTypeErrorText)
-          : DwBackendFilter<T>.value(
-            type: DwBackendFilterType.lessThanOrEquals,
-            fieldName: name,
-            fieldValue: value,
-            negate: negate,
-          );
+      ? throw UnsupportedError(comparisonFiltersTypeErrorText)
+      : DwBackendFilter<T>.value(
+          type: DwBackendFilterType.lessThanOrEquals,
+          fieldName: name,
+          fieldValue: value,
+          negate: negate,
+        );
 
   DwBackendFilter<String> like(String value, {bool negate = false}) =>
       DwBackendFilter.value(

@@ -77,10 +77,11 @@ Future<bool> _acceptsOnly(String accessToken) async => accessToken == 'good';
 /// what a stale or foreign signature looks like from the host's side.
 String _wellFormedToken() {
   final payload = base64Url
-      .encode(utf8.encode(jsonEncode({
-        'origin': 'https://app.example.com',
-        'exp': 1765540000,
-      })))
+      .encode(
+        utf8.encode(
+          jsonEncode({'origin': 'https://app.example.com', 'exp': 1765540000}),
+        ),
+      )
       .replaceAll('=', '');
   return '$payload.${base64Url.encode(List.filled(64, 7)).replaceAll('=', '')}';
 }
@@ -189,22 +190,26 @@ void main() {
   });
 
   group('the gate covers every command, not just the manifest', () {
-    test('an embedding page that presented nothing cannot drive the app',
-        () async {
-      final host = attach();
+    test(
+      'an embedding page that presented nothing cannot drive the app',
+      () async {
+        final host = attach();
 
-      studio.say(const NavigateRequestMessage('/admin'));
-      studio.say(const SignInRequestMessage(
-        identifier: '79990000002',
-        secret: '123456',
-      ));
-      studio.say(const SignOutRequestMessage());
-      studio.say(const LocaleRequestMessage('en'));
-      await pumpEventQueue();
+        studio.say(const NavigateRequestMessage('/admin'));
+        studio.say(
+          const SignInRequestMessage(
+            identifier: '79990000002',
+            secret: '123456',
+          ),
+        );
+        studio.say(const SignOutRequestMessage());
+        studio.say(const LocaleRequestMessage('en'));
+        await pumpEventQueue();
 
-      expect(delegate.done, isEmpty);
-      expect(host.isConnected, isFalse);
-    });
+        expect(delegate.done, isEmpty);
+        expect(host.isConnected, isFalse);
+      },
+    );
 
     test('nor read what is declared on the screen', () async {
       attach(
@@ -212,27 +217,31 @@ void main() {
             const StudioFeatureInfo(id: 'schedule/list', title: 'List'),
       );
 
-      studio.say(const InspectPointRequestMessage(
-        requestId: 'inspect-1',
-        horizontalFraction: 0.5,
-        verticalFraction: 0.5,
-      ));
+      studio.say(
+        const InspectPointRequestMessage(
+          requestId: 'inspect-1',
+          horizontalFraction: 0.5,
+          verticalFraction: 0.5,
+        ),
+      );
       await pumpEventQueue();
 
       expect(studio.of<InspectPointResultMessage>(), isEmpty);
     });
 
-    test('a refused Studio stays refused for the commands that follow',
-        () async {
-      attach();
-      studio.say(const StudioConnectMessage(accessToken: 'forged'));
-      await pumpEventQueue();
+    test(
+      'a refused Studio stays refused for the commands that follow',
+      () async {
+        attach();
+        studio.say(const StudioConnectMessage(accessToken: 'forged'));
+        await pumpEventQueue();
 
-      studio.say(const NavigateRequestMessage('/admin'));
-      await pumpEventQueue();
+        studio.say(const NavigateRequestMessage('/admin'));
+        await pumpEventQueue();
 
-      expect(delegate.done, isEmpty);
-    });
+        expect(delegate.done, isEmpty);
+      },
+    );
 
     test('and every command lands once it has been let in', () async {
       attach(
@@ -242,17 +251,18 @@ void main() {
       await connect();
 
       studio.say(const NavigateRequestMessage('/admin'));
-      studio.say(const SignInRequestMessage(
-        identifier: '79990000002',
-        secret: '123456',
-      ));
+      studio.say(
+        const SignInRequestMessage(identifier: '79990000002', secret: '123456'),
+      );
       studio.say(const SignOutRequestMessage());
       studio.say(const LocaleRequestMessage('en'));
-      studio.say(const InspectPointRequestMessage(
-        requestId: 'inspect-1',
-        horizontalFraction: 0.5,
-        verticalFraction: 0.5,
-      ));
+      studio.say(
+        const InspectPointRequestMessage(
+          requestId: 'inspect-1',
+          horizontalFraction: 0.5,
+          verticalFraction: 0.5,
+        ),
+      );
       await pumpEventQueue();
 
       expect(delegate.done, [
@@ -298,11 +308,15 @@ void main() {
       ]);
 
       expect(studio.of<RouteChangedMessage>().single.routeName, 'adDetail');
-      expect(studio.of<SessionChangedMessage>().single.session.isSignedIn,
-          isFalse);
+      expect(
+        studio.of<SessionChangedMessage>().single.session.isSignedIn,
+        isFalse,
+      );
       expect(studio.of<LocaleChangedMessage>().single.locale, 'en');
-      expect(studio.of<FeaturesChangedMessage>().single.features.single.id,
-          'schedule/list');
+      expect(
+        studio.of<FeaturesChangedMessage>().single.features.single.id,
+        'schedule/list',
+      );
     });
   });
 

@@ -12,10 +12,7 @@ class DwCursorPagination implements DwPaginationStrategy {
 
   @override
   DwPaginationParams buildParams() {
-    return DwPaginationParams(
-      beforeId: _oldestId,
-      limit: limit,
-    );
+    return DwPaginationParams(beforeId: _oldestId, limit: limit);
   }
 
   @override

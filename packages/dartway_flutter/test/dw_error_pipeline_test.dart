@@ -8,8 +8,7 @@ class _FeatureBox extends StatelessWidget implements DwFeature {
   final String id;
 
   @override
-  DwFeatureSpec get dwFeature =>
-      DwFeatureSpec(id: id, title: id);
+  DwFeatureSpec get dwFeature => DwFeatureSpec(id: id, title: id);
 
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
@@ -20,10 +19,7 @@ void main() {
 
   // One DwFlutter per test process — the singleton forbids re-creation.
   final dwInstance = DwFlutter(
-    config: DwConfig(
-      appVersion: '1.2.3',
-      onErrorReport: reports.add,
-    ),
+    config: DwConfig(appVersion: '1.2.3', onErrorReport: reports.add),
   );
 
   setUp(() {
@@ -32,18 +28,21 @@ void main() {
   });
 
   group('error pipeline', () {
-    testWidgets('DwUiAction failure produces a full DwErrorReport',
-        (tester) async {
+    testWidgets('DwUiAction failure produces a full DwErrorReport', (
+      tester,
+    ) async {
       late BuildContext capturedContext;
       await tester.pumpWidget(
         MaterialApp(
           home: Column(
             children: [
               const _FeatureBox('feature-a'),
-              Builder(builder: (context) {
-                capturedContext = context;
-                return const SizedBox.shrink();
-              }),
+              Builder(
+                builder: (context) {
+                  capturedContext = context;
+                  return const SizedBox.shrink();
+                },
+              ),
             ],
           ),
         ),
@@ -66,8 +65,9 @@ void main() {
       expect(report.context.appVersion, '1.2.3');
     });
 
-    testWidgets('action label falls back to the notification text',
-        (tester) async {
+    testWidgets('action label falls back to the notification text', (
+      tester,
+    ) async {
       await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
       final context = tester.element(find.byType(SizedBox));
 

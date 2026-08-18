@@ -51,10 +51,7 @@ class FutureCalls extends _i1.FutureCallDispatch<_FutureCallRef> {
   }
 
   @override
-  void initialize(
-    _i1.FutureCallManager futureCallManager,
-    String serverId,
-  ) {
+  void initialize(_i1.FutureCallManager futureCallManager, String serverId) {
     var registeredFutureCalls = <String, _i1.FutureCall>{
       'DwOrphanedAuthKeyCleanupRunFutureCall':
           DwOrphanedAuthKeyCleanupRunFutureCall(),
@@ -69,39 +66,29 @@ class FutureCalls extends _i1.FutureCallDispatch<_FutureCallRef> {
   }
 
   @override
-  _FutureCallRef callAtTime(
-    DateTime time, {
-    String? identifier,
-  }) {
-    return _FutureCallRef(
-      (name, object) {
-        return _effectiveFutureCallManager.scheduleFutureCall(
-          name,
-          object,
-          time,
-          _effectiveServerId,
-          identifier,
-        );
-      },
-    );
+  _FutureCallRef callAtTime(DateTime time, {String? identifier}) {
+    return _FutureCallRef((name, object) {
+      return _effectiveFutureCallManager.scheduleFutureCall(
+        name,
+        object,
+        time,
+        _effectiveServerId,
+        identifier,
+      );
+    });
   }
 
   @override
-  _FutureCallRef callWithDelay(
-    Duration delay, {
-    String? identifier,
-  }) {
-    return _FutureCallRef(
-      (name, object) {
-        return _effectiveFutureCallManager.scheduleFutureCall(
-          name,
-          object,
-          DateTime.now().toUtc().add(delay),
-          _effectiveServerId,
-          identifier,
-        );
-      },
-    );
+  _FutureCallRef callWithDelay(Duration delay, {String? identifier}) {
+    return _FutureCallRef((name, object) {
+      return _effectiveFutureCallManager.scheduleFutureCall(
+        name,
+        object,
+        DateTime.now().toUtc().add(delay),
+        _effectiveServerId,
+        identifier,
+      );
+    });
   }
 
   @override
@@ -125,10 +112,7 @@ class _DwOrphanedAuthKeyCleanupFutureCallDispatcher {
   final _InvokeFutureCall _invokeFutureCall;
 
   Future<void> run() {
-    return _invokeFutureCall(
-      'DwOrphanedAuthKeyCleanupRunFutureCall',
-      null,
-    );
+    return _invokeFutureCall('DwOrphanedAuthKeyCleanupRunFutureCall', null);
   }
 
   Future<void> invoke(_i1.SerializableModel? object) {
@@ -156,9 +140,6 @@ class DwOrphanedAuthKeyCleanupInvokeFutureCall
     _i1.Session session,
     _i1.SerializableModel? object,
   ) async {
-    await _i3.DwOrphanedAuthKeyCleanup().invoke(
-      session,
-      object,
-    );
+    await _i3.DwOrphanedAuthKeyCleanup().invoke(session, object);
   }
 }

@@ -56,16 +56,25 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
       final post = saveContext.currentModel;
       await dwPushDispatcher?.sendToEveryone(
         session,
-        page: (session, {required afterId, required limit, required transaction}) async {
-          final profiles = await UserProfile.db.find(
-            session,
-            where: afterId == null ? null : (table) => table.id > afterId,
-            orderBy: (table) => table.id,
-            limit: limit,
-            transaction: transaction,
-          );
-          return profiles.map((profile) => profile.id).whereType<int>().toList();
-        },
+        page:
+            (
+              session, {
+              required afterId,
+              required limit,
+              required transaction,
+            }) async {
+              final profiles = await UserProfile.db.find(
+                session,
+                where: afterId == null ? null : (table) => table.id > afterId,
+                orderBy: (table) => table.id,
+                limit: limit,
+                transaction: transaction,
+              );
+              return profiles
+                  .map((profile) => profile.id)
+                  .whereType<int>()
+                  .toList();
+            },
         category: ExamplePushCategories.newsPost,
         title: post.title,
         body: post.text,

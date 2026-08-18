@@ -10,17 +10,17 @@ void main() {
   final pluggedIn = DwTelegramWebApp.create(
     config: const DwTelegramWebAppConfig(requestFullScreen: true),
   );
-  final dwInstance = DwFlutter(
-    config: const DwConfig(),
-    plugins: [pluggedIn],
-  );
+  final dwInstance = DwFlutter(config: const DwConfig(), plugins: [pluggedIn]);
 
   group('DwTelegramPlatform.fromRaw', () {
     test('maps the clients Telegram reports today', () {
       expect(DwTelegramPlatform.fromRaw('ios'), DwTelegramPlatform.ios);
       expect(DwTelegramPlatform.fromRaw('android'), DwTelegramPlatform.android);
       expect(DwTelegramPlatform.fromRaw('macos'), DwTelegramPlatform.macos);
-      expect(DwTelegramPlatform.fromRaw('tdesktop'), DwTelegramPlatform.desktop);
+      expect(
+        DwTelegramPlatform.fromRaw('tdesktop'),
+        DwTelegramPlatform.desktop,
+      );
       expect(DwTelegramPlatform.fromRaw('weba'), DwTelegramPlatform.web);
     });
 

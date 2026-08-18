@@ -16,9 +16,32 @@ abstract final class DwDevicePushTokenPolicy {
   /// canonical form. Kept as explicit code points (not a string literal of
   /// invisible characters) so the set is readable and reviewable.
   static const List<int> _canonicalTrimCodePointList = [
-    0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x0020, 0x0085, 0x00A0, 0x1680,
-    0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008,
-    0x2009, 0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF,
+    0x0009,
+    0x000A,
+    0x000B,
+    0x000C,
+    0x000D,
+    0x0020,
+    0x0085,
+    0x00A0,
+    0x1680,
+    0x2000,
+    0x2001,
+    0x2002,
+    0x2003,
+    0x2004,
+    0x2005,
+    0x2006,
+    0x2007,
+    0x2008,
+    0x2009,
+    0x200A,
+    0x2028,
+    0x2029,
+    0x202F,
+    0x205F,
+    0x3000,
+    0xFEFF,
   ];
 
   /// The same trim set as an SQL `U&'...'` literal, for `BTRIM` inside the
@@ -28,8 +51,8 @@ abstract final class DwDevicePushTokenPolicy {
       r"\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A"
       r"\2028\2029\202F\205F\3000\FEFF'";
 
-  static final Set<int> _canonicalTrimCodePoints =
-      _canonicalTrimCodePointList.toSet();
+  static final Set<int> _canonicalTrimCodePoints = _canonicalTrimCodePointList
+      .toSet();
 
   static String normalize(String token) {
     var start = 0;

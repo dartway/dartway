@@ -14,11 +14,7 @@ import 'package:serverpod/serverpod.dart' as _i1;
 
 abstract class ChatChannel
     implements _i1.TableRow<int?>, _i1.ProtocolSerialization {
-  ChatChannel._({
-    this.id,
-    required this.title,
-    required this.createdAt,
-  });
+  ChatChannel._({this.id, required this.title, required this.createdAt});
 
   factory ChatChannel({
     int? id,
@@ -53,11 +49,7 @@ abstract class ChatChannel
   /// Returns a shallow copy of this [ChatChannel]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  ChatChannel copyWith({
-    int? id,
-    String? title,
-    DateTime? createdAt,
-  });
+  ChatChannel copyWith({int? id, String? title, DateTime? createdAt});
   @override
   Map<String, dynamic> toJson() {
     return {
@@ -115,11 +107,7 @@ class _ChatChannelImpl extends ChatChannel {
     int? id,
     required String title,
     required DateTime createdAt,
-  }) : super._(
-         id: id,
-         title: title,
-         createdAt: createdAt,
-       );
+  }) : super._(id: id, title: title, createdAt: createdAt);
 
   /// Returns a shallow copy of this [ChatChannel]
   /// with some or all fields replaced by the given arguments.
@@ -141,29 +129,18 @@ class _ChatChannelImpl extends ChatChannel {
 class ChatChannelUpdateTable extends _i1.UpdateTable<ChatChannelTable> {
   ChatChannelUpdateTable(super.table);
 
-  _i1.ColumnValue<String, String> title(String value) => _i1.ColumnValue(
-    table.title,
-    value,
-  );
+  _i1.ColumnValue<String, String> title(String value) =>
+      _i1.ColumnValue(table.title, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 }
 
 class ChatChannelTable extends _i1.Table<int?> {
   ChatChannelTable({super.tableRelation}) : super(tableName: 'chat_channel') {
     updateTable = ChatChannelUpdateTable(this);
-    title = _i1.ColumnString(
-      'title',
-      this,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
+    title = _i1.ColumnString('title', this);
+    createdAt = _i1.ColumnDateTime('createdAt', this);
   }
 
   late final ChatChannelUpdateTable updateTable;
@@ -173,11 +150,7 @@ class ChatChannelTable extends _i1.Table<int?> {
   late final _i1.ColumnDateTime createdAt;
 
   @override
-  List<_i1.Column> get columns => [
-    id,
-    title,
-    createdAt,
-  ];
+  List<_i1.Column> get columns => [id, title, createdAt];
 }
 
 class ChatChannelInclude extends _i1.IncludeObject {
@@ -347,10 +320,7 @@ class ChatChannelRepository {
     ChatChannel row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<ChatChannel>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<ChatChannel>(row, transaction: transaction);
   }
 
   /// Updates all [ChatChannel]s in the list and returns the updated rows. If
@@ -435,10 +405,7 @@ class ChatChannelRepository {
     List<ChatChannel> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<ChatChannel>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<ChatChannel>(rows, transaction: transaction);
   }
 
   /// Deletes a single [ChatChannel].
@@ -447,10 +414,7 @@ class ChatChannelRepository {
     ChatChannel row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<ChatChannel>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<ChatChannel>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

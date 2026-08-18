@@ -14,9 +14,9 @@ abstract final class DwAlertFormatter {
 
   /// Escapes MarkdownV2 reserved characters in a VALUE (not in the template).
   static String escapeMarkdownV2(String value) => value.replaceAllMapped(
-        RegExp(r'([_*\[\]()~`>#+\-=|{}.!\\])'),
-        (m) => '\\${m.group(1)}',
-      );
+    RegExp(r'([_*\[\]()~`>#+\-=|{}.!\\])'),
+    (m) => '\\${m.group(1)}',
+  );
 
   /// Inside a MarkdownV2 code block only backticks and backslashes need care.
   static String _escapeCodeBlock(String value) =>
@@ -67,8 +67,11 @@ abstract final class DwAlertFormatter {
 
     // The stack gets whatever budget the fixed sections left over.
     final stackBudget = telegramMessageLimit - fixed.length - 2;
-    final stackBlock =
-        _formatStack(stack, maxLines: stackTraceMaxLines, budget: stackBudget);
+    final stackBlock = _formatStack(
+      stack,
+      maxLines: stackTraceMaxLines,
+      budget: stackBudget,
+    );
     return stackBlock == null ? fixed : '$fixed\n\n$stackBlock';
   }
 
@@ -105,8 +108,9 @@ abstract final class DwAlertFormatter {
     required int budget,
   }) {
     final allLines = stack.split('\n');
-    final shownCount =
-        maxLines == null ? allLines.length : maxLines.clamp(0, allLines.length);
+    final shownCount = maxLines == null
+        ? allLines.length
+        : maxLines.clamp(0, allLines.length);
     if (shownCount == 0 || budget < 60) return null;
 
     final headerSuffix = maxLines != null && allLines.length > maxLines

@@ -6,10 +6,10 @@ import 'studio_zone_spec.dart';
 /// route path and build breadcrumb labels from the parent chain.
 class StudioManifestIndex {
   StudioManifestIndex(this.manifest)
-      : _byPath = {
-          for (final zone in manifest.zones)
-            for (final screen in zone.screens) screen.path: screen,
-        };
+    : _byPath = {
+        for (final zone in manifest.zones)
+          for (final screen in zone.screens) screen.path: screen,
+      };
 
   final StudioProjectManifest manifest;
   final Map<String, StudioScreenSpec> _byPath;
@@ -92,9 +92,9 @@ class StudioManifestIndex {
       path.split('/').where((segment) => segment.isNotEmpty).toList();
 
   StudioZoneSpec zoneOf(StudioScreenSpec spec) => manifest.zones.firstWhere(
-        (zone) => zone.screens.contains(spec),
-        orElse: () => manifest.zones.first,
-      );
+    (zone) => zone.screens.contains(spec),
+    orElse: () => manifest.zones.first,
+  );
 
   /// Breadcrumb-style label built from the parent chain, e.g.
   /// `Profile › Services`. Zone roots keep their own title.

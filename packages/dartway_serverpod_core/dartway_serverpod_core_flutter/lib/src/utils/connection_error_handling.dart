@@ -12,7 +12,8 @@ import '../private/dw_singleton.dart';
 /// Builds a `Client.onFailedCall` handler: connection-level failures go to
 /// [onConnectionError] (default: silently ignored — no alert), everything else
 /// to [onUnexpectedError] (the app's alert/report sink).
-void Function(MethodCallContext, Object, StackTrace) dwConnectionAwareOnFailedCall({
+void Function(MethodCallContext, Object, StackTrace)
+dwConnectionAwareOnFailedCall({
   void Function(MethodCallContext ctx, Object error)? onConnectionError,
   required void Function(MethodCallContext ctx, Object error, StackTrace st)
   onUnexpectedError,
@@ -33,16 +34,15 @@ void Function(MethodCallContext, Object, StackTrace) dwConnectionAwareOnFailedCa
 /// Pass it when constructing the Client (`onFailedCall` is final there).
 void Function(MethodCallContext, Object, StackTrace) dwReportingOnFailedCall({
   void Function(MethodCallContext ctx, Object error)? onConnectionError,
-}) =>
-    dwConnectionAwareOnFailedCall(
-      onConnectionError: onConnectionError,
-      onUnexpectedError: (ctx, error, stackTrace) => dw.handleError(
-        error,
-        stackTrace,
-        source: DwErrorSource.failedCall,
-        failedCall: '${ctx.endpointName}.${ctx.methodName}',
-      ),
-    );
+}) => dwConnectionAwareOnFailedCall(
+  onConnectionError: onConnectionError,
+  onUnexpectedError: (ctx, error, stackTrace) => dw.handleError(
+    error,
+    stackTrace,
+    source: DwErrorSource.failedCall,
+    failedCall: '${ctx.endpointName}.${ctx.methodName}',
+  ),
+);
 
 /// Builds a zone-level error handler with the same routing, but without a
 /// [MethodCallContext]: connection-level → [onConnectionError]

@@ -92,9 +92,9 @@ class DwAuthenticationKeyManager implements ClientAuthKeyProvider {
         DwCoreServerpodClient.protocol.deserialize<UserProfileClass>(json),
       );
     } catch (e) {
-      final jsonString = await _storage.getString(
-        '${_userProfilePrefsKey}_$runMode',
-      ).catchError((_) => null);
+      final jsonString = await _storage
+          .getString('${_userProfilePrefsKey}_$runMode')
+          .catchError((_) => null);
       final userId = _tryExtractUserIdFromJson(jsonString);
       return (userId, null);
     }

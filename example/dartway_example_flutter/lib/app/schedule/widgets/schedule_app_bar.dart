@@ -14,10 +14,7 @@ class ScheduleAppBar extends ConsumerWidget implements PreferredSizeWidget {
       title: AppText.title(
         context.l10n.helloUser(ref.watchUserProfile.firstName),
       ),
-      actions: const [
-        ConnectionStatusIndicator(),
-        TestErrorButton(),
-      ],
+      actions: const [ConnectionStatusIndicator(), TestErrorButton()],
     );
   }
 

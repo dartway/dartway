@@ -127,10 +127,7 @@ abstract class ClubSession
     _i2.ClubServiceInclude? service,
     _i3.UserProfileInclude? coachProfile,
   }) {
-    return ClubSessionInclude._(
-      service: service,
-      coachProfile: coachProfile,
-    );
+    return ClubSessionInclude._(service: service, coachProfile: coachProfile);
   }
 
   static ClubSessionIncludeList includeList({
@@ -210,47 +207,26 @@ class _ClubSessionImpl extends ClubSession {
 class ClubSessionUpdateTable extends _i1.UpdateTable<ClubSessionTable> {
   ClubSessionUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> serviceId(int value) => _i1.ColumnValue(
-    table.serviceId,
-    value,
-  );
+  _i1.ColumnValue<int, int> serviceId(int value) =>
+      _i1.ColumnValue(table.serviceId, value);
 
-  _i1.ColumnValue<int, int> coachProfileId(int value) => _i1.ColumnValue(
-    table.coachProfileId,
-    value,
-  );
+  _i1.ColumnValue<int, int> coachProfileId(int value) =>
+      _i1.ColumnValue(table.coachProfileId, value);
 
   _i1.ColumnValue<DateTime, DateTime> startsAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.startsAt,
-        value,
-      );
+      _i1.ColumnValue(table.startsAt, value);
 
-  _i1.ColumnValue<int, int> capacity(int value) => _i1.ColumnValue(
-    table.capacity,
-    value,
-  );
+  _i1.ColumnValue<int, int> capacity(int value) =>
+      _i1.ColumnValue(table.capacity, value);
 }
 
 class ClubSessionTable extends _i1.Table<int?> {
   ClubSessionTable({super.tableRelation}) : super(tableName: 'club_session') {
     updateTable = ClubSessionUpdateTable(this);
-    serviceId = _i1.ColumnInt(
-      'serviceId',
-      this,
-    );
-    coachProfileId = _i1.ColumnInt(
-      'coachProfileId',
-      this,
-    );
-    startsAt = _i1.ColumnDateTime(
-      'startsAt',
-      this,
-    );
-    capacity = _i1.ColumnInt(
-      'capacity',
-      this,
-    );
+    serviceId = _i1.ColumnInt('serviceId', this);
+    coachProfileId = _i1.ColumnInt('coachProfileId', this);
+    startsAt = _i1.ColumnDateTime('startsAt', this);
+    capacity = _i1.ColumnInt('capacity', this);
   }
 
   late final ClubSessionUpdateTable updateTable;
@@ -502,10 +478,7 @@ class ClubSessionRepository {
     ClubSession row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<ClubSession>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<ClubSession>(row, transaction: transaction);
   }
 
   /// Updates all [ClubSession]s in the list and returns the updated rows. If
@@ -590,10 +563,7 @@ class ClubSessionRepository {
     List<ClubSession> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<ClubSession>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<ClubSession>(rows, transaction: transaction);
   }
 
   /// Deletes a single [ClubSession].
@@ -602,10 +572,7 @@ class ClubSessionRepository {
     ClubSession row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<ClubSession>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<ClubSession>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

@@ -25,33 +25,31 @@ class DwApiResponse<T> implements SerializableModel, ProtocolSerialization {
     this.updatedModels,
   });
 
-  const DwApiResponse.notConfigured({
-    required String? source,
-  })  : isOk = false,
-        value = null,
-        error =
-            'Action not configured on server ${source != null ? ' ($source)' : ''}',
-        warning = null,
-        updatedModels = null;
+  const DwApiResponse.notConfigured({required String? source})
+    : isOk = false,
+      value = null,
+      error =
+          'Action not configured on server ${source != null ? ' ($source)' : ''}',
+      warning = null,
+      updatedModels = null;
 
   const DwApiResponse.forbidden()
-      : isOk = false,
-        value = null,
-        error = 'Not enough permissions',
-        warning = null,
-        updatedModels = null;
+    : isOk = false,
+      value = null,
+      error = 'Not enough permissions',
+      warning = null,
+      updatedModels = null;
 
   /// The caller is not signed in and the config did not opt into anonymous
   /// access. Distinct from [DwApiResponse.forbidden]: there the caller is
   /// known and lacks permission, here there is no caller at all — the client
   /// can act on that by sending the user to the login screen.
   const DwApiResponse.notAuthenticated({String? source})
-      : isOk = false,
-        value = null,
-        error =
-            'Authentication required${source != null ? ' ($source)' : ''}',
-        warning = null,
-        updatedModels = null;
+    : isOk = false,
+      value = null,
+      error = 'Authentication required${source != null ? ' ($source)' : ''}',
+      warning = null,
+      updatedModels = null;
 
   final bool isOk;
   final T? value;
@@ -59,9 +57,7 @@ class DwApiResponse<T> implements SerializableModel, ProtocolSerialization {
   final String? error;
   final List<DwModelWrapper>? updatedModels;
 
-  factory DwApiResponse.fromJson(
-    Map<String, dynamic> jsonSerialization,
-  ) {
+  factory DwApiResponse.fromJson(Map<String, dynamic> jsonSerialization) {
     return DwApiResponse(
       isOk: jsonSerialization['isOk'] as bool,
       value: _protocol.deserialize<T>(jsonSerialization['value']),
@@ -70,8 +66,8 @@ class DwApiResponse<T> implements SerializableModel, ProtocolSerialization {
       updatedModels: jsonSerialization['updatedModels'] == null
           ? null
           : (jsonSerialization['updatedModels'] as List)
-              .map((e) => _protocol.deserialize<DwModelWrapper>(e))
-              .toList(),
+                .map((e) => _protocol.deserialize<DwModelWrapper>(e))
+                .toList(),
     );
   }
 

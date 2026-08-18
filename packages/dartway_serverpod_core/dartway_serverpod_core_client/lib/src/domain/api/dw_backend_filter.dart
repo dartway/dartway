@@ -23,14 +23,14 @@ class DwBackendFilter<T> implements SerializableModel {
   final bool negate;
 
   const DwBackendFilter.and(this.children, {this.negate = false})
-      : fieldName = null,
-        type = DwBackendFilterType.and,
-        fieldValue = null;
+    : fieldName = null,
+      type = DwBackendFilterType.and,
+      fieldValue = null;
 
   const DwBackendFilter.or(this.children, {this.negate = false})
-      : fieldName = null,
-        type = DwBackendFilterType.or,
-        fieldValue = null;
+    : fieldName = null,
+      type = DwBackendFilterType.or,
+      fieldValue = null;
 
   const DwBackendFilter.value({
     required this.type,
@@ -47,8 +47,8 @@ class DwBackendFilter<T> implements SerializableModel {
       children: jsonSerialization['children'] == null
           ? null
           : (jsonSerialization['children'] as List)
-              .map((e) => DwBackendFilter.fromJson(e as Map<String, dynamic>))
-              .toList(),
+                .map((e) => DwBackendFilter.fromJson(e as Map<String, dynamic>))
+                .toList(),
       negate: jsonSerialization['negate'] as bool,
       // child: jsonSerialization['child'] == null
       //     ? null
@@ -71,21 +71,18 @@ class DwBackendFilter<T> implements SerializableModel {
 
       // Collect the children, carrying the negation down
       final expressions = children!.map(
-        (child) => child.filterUpdate(
-          jsonSerialization,
-          outerNegate: shouldNegate,
-        ),
+        (child) =>
+            child.filterUpdate(jsonSerialization, outerNegate: shouldNegate),
       );
 
       // OR when the filter says so, or when a negated AND turns into one
-      return expressions.reduce((a, b) =>
-          shouldNegate != (type == DwBackendFilterType.or) ? a || b : a && b);
+      return expressions.reduce(
+        (a, b) =>
+            shouldNegate != (type == DwBackendFilterType.or) ? a || b : a && b,
+      );
     }
 
-    return _valueExpression(
-      jsonSerialization,
-      negate: shouldNegate,
-    );
+    return _valueExpression(jsonSerialization, negate: shouldNegate);
   }
 
   bool _isType<T1, T2>(Type t) => t == T1 || t == T2;
@@ -102,8 +99,9 @@ class DwBackendFilter<T> implements SerializableModel {
         'explicit generic, e.g. DwBackendFilter<int>().',
       );
     }
-    final modelValue = DwCoreServerpodClient.protocol
-        .deserialize<T?>(jsonSerialization['data'][fieldName]);
+    final modelValue = DwCoreServerpodClient.protocol.deserialize<T?>(
+      jsonSerialization['data'][fieldName],
+    );
 
     if (type == DwBackendFilterType.equals) {
       return negate != (modelValue == fieldValue);
@@ -112,64 +110,81 @@ class DwBackendFilter<T> implements SerializableModel {
     if (_isNullableType(int)) {
       return negate !=
           switch (type) {
-            DwBackendFilterType.greaterThan => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as int) > (fieldValue as int))),
-            DwBackendFilterType.greaterThanOrEquals => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as int) >= (fieldValue as int))),
-            DwBackendFilterType.lessThan => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as int) < (fieldValue as int))),
-            DwBackendFilterType.lessThanOrEquals => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as int) <= (fieldValue as int))),
+            DwBackendFilterType.greaterThan =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as int) > (fieldValue as int))),
+            DwBackendFilterType.greaterThanOrEquals =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as int) >= (fieldValue as int))),
+            DwBackendFilterType.lessThan =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as int) < (fieldValue as int))),
+            DwBackendFilterType.lessThanOrEquals =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as int) <= (fieldValue as int))),
             _ => throw Exception('Unsupported filter type'),
           };
     } else if (_isNullableType(double)) {
       return negate !=
           switch (type) {
-            DwBackendFilterType.greaterThan => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as double) > (fieldValue as double))),
-            DwBackendFilterType.greaterThanOrEquals => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as double) >= (fieldValue as double))),
-            DwBackendFilterType.lessThan => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as double) < (fieldValue as double))),
-            DwBackendFilterType.lessThanOrEquals => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as double) <= (fieldValue as double))),
+            DwBackendFilterType.greaterThan =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as double) > (fieldValue as double))),
+            DwBackendFilterType.greaterThanOrEquals =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as double) >= (fieldValue as double))),
+            DwBackendFilterType.lessThan =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as double) < (fieldValue as double))),
+            DwBackendFilterType.lessThanOrEquals =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as double) <= (fieldValue as double))),
             _ => throw Exception('Unsupported filter type'),
           };
     } else if (_isNullableType(DateTime)) {
       return negate !=
           switch (type) {
-            DwBackendFilterType.greaterThan => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as DateTime)
-                        .isAfter((fieldValue as DateTime)))),
-            DwBackendFilterType.greaterThanOrEquals => fieldValue == null ||
-                (modelValue != null &&
-                    !(modelValue as DateTime)
-                        .isBefore((fieldValue as DateTime))),
-            DwBackendFilterType.lessThan => fieldValue == null ||
-                (modelValue != null &&
-                    ((modelValue as DateTime)
-                        .isBefore((fieldValue as DateTime)))),
-            DwBackendFilterType.lessThanOrEquals => fieldValue == null ||
-                (modelValue != null &&
-                    !(modelValue as DateTime)
-                        .isAfter((fieldValue as DateTime))),
+            DwBackendFilterType.greaterThan =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as DateTime).isAfter(
+                        (fieldValue as DateTime),
+                      ))),
+            DwBackendFilterType.greaterThanOrEquals =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      !(modelValue as DateTime).isBefore(
+                        (fieldValue as DateTime),
+                      )),
+            DwBackendFilterType.lessThan =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      ((modelValue as DateTime).isBefore(
+                        (fieldValue as DateTime),
+                      ))),
+            DwBackendFilterType.lessThanOrEquals =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      !(modelValue as DateTime).isAfter(
+                        (fieldValue as DateTime),
+                      )),
             _ => throw Exception('Unsupported filter type'),
           };
     } else if (_isNullableType(String)) {
       return negate !=
           switch (type) {
-            DwBackendFilterType.ilike => fieldValue == null ||
-                (modelValue != null &&
-                    _ilikeMatch(modelValue as String, fieldValue as String)),
+            DwBackendFilterType.ilike =>
+              fieldValue == null ||
+                  (modelValue != null &&
+                      _ilikeMatch(modelValue as String, fieldValue as String)),
             _ => throw Exception('Unsupported filter type'),
           };
     }
@@ -179,9 +194,9 @@ class DwBackendFilter<T> implements SerializableModel {
 
   bool _ilikeMatch(String value, String pattern) {
     // Escape the RegExp specials, but keep SQL's % and _ as placeholders
-    String escaped = RegExp.escape(pattern)
-        .replaceAll('%', '<<<PERCENT>>>')
-        .replaceAll('_', '<<<UNDERSCORE>>>');
+    String escaped = RegExp.escape(
+      pattern,
+    ).replaceAll('%', '<<<PERCENT>>>').replaceAll('_', '<<<UNDERSCORE>>>');
 
     // Turn the SQL wildcards into RegExp ones
     String regexPattern = escaped
@@ -189,8 +204,11 @@ class DwBackendFilter<T> implements SerializableModel {
         .replaceAll('<<<UNDERSCORE>>>', '.'); // _ → .
 
     // Anchor both ends: ILIKE matches the whole value, not a substring
-    RegExp regex =
-        RegExp('^$regexPattern\$', caseSensitive: false, dotAll: true);
+    RegExp regex = RegExp(
+      '^$regexPattern\$',
+      caseSensitive: false,
+      dotAll: true,
+    );
 
     return regex.hasMatch(value);
   }
@@ -224,11 +242,11 @@ class DwBackendFilter<T> implements SerializableModel {
 
   @override
   int get hashCode => Object.hash(
-        runtimeType,
-        type,
-        fieldName,
-        fieldValue,
-        _listEquality.hash(children),
-        negate,
-      );
+    runtimeType,
+    type,
+    fieldName,
+    fieldValue,
+    _listEquality.hash(children),
+    negate,
+  );
 }

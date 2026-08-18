@@ -37,17 +37,20 @@ void main() {
       expect(connection, isNull);
     });
 
-    test('connection error with no onConnectionError is silently swallowed', () {
-      var unexpectedCalled = false;
+    test(
+      'connection error with no onConnectionError is silently swallowed',
+      () {
+        var unexpectedCalled = false;
 
-      final handler = dwConnectionAwareErrorHandler(
-        onUnexpectedError: (_, _) => unexpectedCalled = true,
-      );
+        final handler = dwConnectionAwareErrorHandler(
+          onUnexpectedError: (_, _) => unexpectedCalled = true,
+        );
 
-      // Must not throw and must not reach onUnexpectedError.
-      handler(Exception('Failed to fetch'), StackTrace.empty);
+        // Must not throw and must not reach onUnexpectedError.
+        handler(Exception('Failed to fetch'), StackTrace.empty);
 
-      expect(unexpectedCalled, isFalse);
-    });
+        expect(unexpectedCalled, isFalse);
+      },
+    );
   });
 }

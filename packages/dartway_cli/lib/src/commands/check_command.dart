@@ -65,8 +65,7 @@ class CheckCommand extends Command<int> {
         : DwCheckSeverity.values.byName(levelArg);
 
     final layout = _detectLayout();
-    final flutterPackageDir =
-        layout?.flutterPackageDir ?? Directory.current;
+    final flutterPackageDir = layout?.flutterPackageDir ?? Directory.current;
     stdout.writeln('Checking ${flutterPackageDir.path} ...');
 
     var errorCount = 0;

@@ -38,8 +38,9 @@ class _StudioProbeFrameWeb implements StudioProbeFrame {
       ..pointerEvents = 'none'
       ..zIndex = '-1';
     _container.appendChild(_frame);
-    (web.document.body ?? web.document.documentElement!)
-        .appendChild(_container);
+    (web.document.body ?? web.document.documentElement!).appendChild(
+      _container,
+    );
 
     _channel = StudioClientWebChannel(_frame, Uri.parse(appUrl).origin);
   }

@@ -6,20 +6,23 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('DwPushTokenSync', () {
-    test('waits until there is both a token and somebody to attach it to', () async {
-      final registrar = _RecordingRegistrar();
-      final sync = DwPushTokenSync(register: registrar.call);
+    test(
+      'waits until there is both a token and somebody to attach it to',
+      () async {
+        final registrar = _RecordingRegistrar();
+        final sync = DwPushTokenSync(register: registrar.call);
 
-      await sync.sync(recipientId: 7);
-      expect(registrar.calls, isEmpty, reason: 'no token yet');
+        await sync.sync(recipientId: 7);
+        expect(registrar.calls, isEmpty, reason: 'no token yet');
 
-      sync.onToken(token: 'token-a', provider: DwPushProviderIds.fcm);
-      await sync.sync(recipientId: null);
-      expect(registrar.calls, isEmpty, reason: 'nobody signed in');
+        sync.onToken(token: 'token-a', provider: DwPushProviderIds.fcm);
+        await sync.sync(recipientId: null);
+        expect(registrar.calls, isEmpty, reason: 'nobody signed in');
 
-      await sync.sync(recipientId: 7);
-      expect(registrar.calls, [('token-a', DwPushProviderIds.fcm)]);
-    });
+        await sync.sync(recipientId: 7);
+        expect(registrar.calls, [('token-a', DwPushProviderIds.fcm)]);
+      },
+    );
 
     test('sends the same token to the same user only once', () async {
       final registrar = _RecordingRegistrar();

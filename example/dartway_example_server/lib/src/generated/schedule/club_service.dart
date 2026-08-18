@@ -175,55 +175,30 @@ class _ClubServiceImpl extends ClubService {
 class ClubServiceUpdateTable extends _i1.UpdateTable<ClubServiceTable> {
   ClubServiceUpdateTable(super.table);
 
-  _i1.ColumnValue<String, String> title(String value) => _i1.ColumnValue(
-    table.title,
-    value,
-  );
+  _i1.ColumnValue<String, String> title(String value) =>
+      _i1.ColumnValue(table.title, value);
 
-  _i1.ColumnValue<String, String> description(String value) => _i1.ColumnValue(
-    table.description,
-    value,
-  );
+  _i1.ColumnValue<String, String> description(String value) =>
+      _i1.ColumnValue(table.description, value);
 
-  _i1.ColumnValue<int, int> durationMinutes(int value) => _i1.ColumnValue(
-    table.durationMinutes,
-    value,
-  );
+  _i1.ColumnValue<int, int> durationMinutes(int value) =>
+      _i1.ColumnValue(table.durationMinutes, value);
 
-  _i1.ColumnValue<int, int> price(int value) => _i1.ColumnValue(
-    table.price,
-    value,
-  );
+  _i1.ColumnValue<int, int> price(int value) =>
+      _i1.ColumnValue(table.price, value);
 
-  _i1.ColumnValue<String, String> imageUrl(String? value) => _i1.ColumnValue(
-    table.imageUrl,
-    value,
-  );
+  _i1.ColumnValue<String, String> imageUrl(String? value) =>
+      _i1.ColumnValue(table.imageUrl, value);
 }
 
 class ClubServiceTable extends _i1.Table<int?> {
   ClubServiceTable({super.tableRelation}) : super(tableName: 'club_service') {
     updateTable = ClubServiceUpdateTable(this);
-    title = _i1.ColumnString(
-      'title',
-      this,
-    );
-    description = _i1.ColumnString(
-      'description',
-      this,
-    );
-    durationMinutes = _i1.ColumnInt(
-      'durationMinutes',
-      this,
-    );
-    price = _i1.ColumnInt(
-      'price',
-      this,
-    );
-    imageUrl = _i1.ColumnString(
-      'imageUrl',
-      this,
-    );
+    title = _i1.ColumnString('title', this);
+    description = _i1.ColumnString('description', this);
+    durationMinutes = _i1.ColumnInt('durationMinutes', this);
+    price = _i1.ColumnInt('price', this);
+    imageUrl = _i1.ColumnString('imageUrl', this);
   }
 
   late final ClubServiceUpdateTable updateTable;
@@ -416,10 +391,7 @@ class ClubServiceRepository {
     ClubService row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<ClubService>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<ClubService>(row, transaction: transaction);
   }
 
   /// Updates all [ClubService]s in the list and returns the updated rows. If
@@ -504,10 +476,7 @@ class ClubServiceRepository {
     List<ClubService> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<ClubService>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<ClubService>(rows, transaction: transaction);
   }
 
   /// Deletes a single [ClubService].
@@ -516,10 +485,7 @@ class ClubServiceRepository {
     ClubService row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<ClubService>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<ClubService>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

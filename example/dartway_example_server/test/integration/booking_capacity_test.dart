@@ -114,7 +114,11 @@ void main() {
           expect(response.isOk, isTrue);
         }
 
-        final overflow = await _bookRaw(session, clubSession, clients[_capacity]);
+        final overflow = await _bookRaw(
+          session,
+          clubSession,
+          clients[_capacity],
+        );
 
         expect(overflow.isOk, isFalse);
         expect(overflow.error, 'No spots left for this session');
@@ -198,7 +202,10 @@ Future<List<UserProfile>> _seedClients(Session session, int count) async {
 }
 
 Future<void> _wipeTables(Session session) async {
-  await SessionBooking.db.deleteWhere(session, where: (t) => Constant.bool(true));
+  await SessionBooking.db.deleteWhere(
+    session,
+    where: (t) => Constant.bool(true),
+  );
   await ClubSession.db.deleteWhere(session, where: (t) => Constant.bool(true));
   await UserProfile.db.deleteWhere(session, where: (t) => Constant.bool(true));
 }

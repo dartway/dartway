@@ -87,7 +87,10 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(() => container.read(providers.requireUserProfile), throwsA(anything));
+      expect(
+        () => container.read(providers.requireUserProfile),
+        throwsA(anything),
+      );
 
       container.read(_session.notifier).signIn(_FakeProfile(7));
 

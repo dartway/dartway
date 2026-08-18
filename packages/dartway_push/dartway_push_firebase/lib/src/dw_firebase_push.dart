@@ -99,12 +99,11 @@ class DwFirebasePush extends DwPushClientProvider {
 
     _subscriptions.add(
       FirebaseMessaging.onMessageOpenedApp.listen(
-        (message) => callbacks.onOpened(
-          _dataOf(message),
-          DwPushOpenSource.background,
+        (message) =>
+            callbacks.onOpened(_dataOf(message), DwPushOpenSource.background),
+        onError: (Object error) => debugPrint(
+          'DwFirebasePush: opening from background failed: $error',
         ),
-        onError: (Object error) =>
-            debugPrint('DwFirebasePush: opening from background failed: $error'),
       ),
     );
 
@@ -184,10 +183,11 @@ class DwFirebasePush extends DwPushClientProvider {
   Map<String, String> _dataOf(RemoteMessage message) =>
       message.data.map((key, value) => MapEntry(key, value.toString()));
 
-  DwPushPermission _permissionOf(AuthorizationStatus status) => switch (status) {
-    AuthorizationStatus.authorized ||
-    AuthorizationStatus.provisional => DwPushPermission.granted,
-    AuthorizationStatus.denied => DwPushPermission.denied,
-    AuthorizationStatus.notDetermined => DwPushPermission.notDetermined,
-  };
+  DwPushPermission _permissionOf(AuthorizationStatus status) =>
+      switch (status) {
+        AuthorizationStatus.authorized ||
+        AuthorizationStatus.provisional => DwPushPermission.granted,
+        AuthorizationStatus.denied => DwPushPermission.denied,
+        AuthorizationStatus.notDetermined => DwPushPermission.notDetermined,
+      };
 }

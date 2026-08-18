@@ -33,12 +33,7 @@ class Client extends _i2.ServerpodClientShared {
     super.authenticationKeyManager,
     Duration? streamingConnectionTimeout,
     Duration? connectionTimeout,
-    Function(
-      _i2.MethodCallContext,
-      Object,
-      StackTrace,
-    )?
-    onFailedCall,
+    Function(_i2.MethodCallContext, Object, StackTrace)? onFailedCall,
     Function(_i2.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(

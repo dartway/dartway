@@ -188,9 +188,7 @@ class DwCrudEndpoint extends Endpoint {
           return DwApiResponse.notConfigured(source: 'saveModel $className');
         }
         if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
-          return DwApiResponse.notAuthenticated(
-            source: 'saveModel $className',
-          );
+          return DwApiResponse.notAuthenticated(source: 'saveModel $className');
         }
         return await caller.save(session, model);
       } else {
@@ -200,9 +198,7 @@ class DwCrudEndpoint extends Endpoint {
           return DwApiResponse.notConfigured(source: 'saveModel $className');
         }
         if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
-          return DwApiResponse.notAuthenticated(
-            source: 'saveModel $className',
-          );
+          return DwApiResponse.notAuthenticated(source: 'saveModel $className');
         }
         return await caller.save(session, model);
       }

@@ -167,49 +167,27 @@ class _DwUserPasswordImpl extends DwUserPassword {
 class DwUserPasswordUpdateTable extends _i1.UpdateTable<DwUserPasswordTable> {
   DwUserPasswordUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> userId(int value) => _i1.ColumnValue(
-    table.userId,
-    value,
-  );
+  _i1.ColumnValue<int, int> userId(int value) =>
+      _i1.ColumnValue(table.userId, value);
 
-  _i1.ColumnValue<String, String> passwordHash(String value) => _i1.ColumnValue(
-    table.passwordHash,
-    value,
-  );
+  _i1.ColumnValue<String, String> passwordHash(String value) =>
+      _i1.ColumnValue(table.passwordHash, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 
   _i1.ColumnValue<DateTime, DateTime> updatedAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.updatedAt,
-        value,
-      );
+      _i1.ColumnValue(table.updatedAt, value);
 }
 
 class DwUserPasswordTable extends _i1.Table<int?> {
   DwUserPasswordTable({super.tableRelation})
     : super(tableName: 'dw_user_password') {
     updateTable = DwUserPasswordUpdateTable(this);
-    userId = _i1.ColumnInt(
-      'userId',
-      this,
-    );
-    passwordHash = _i1.ColumnString(
-      'passwordHash',
-      this,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
-    updatedAt = _i1.ColumnDateTime(
-      'updatedAt',
-      this,
-    );
+    userId = _i1.ColumnInt('userId', this);
+    passwordHash = _i1.ColumnString('passwordHash', this);
+    createdAt = _i1.ColumnDateTime('createdAt', this);
+    updatedAt = _i1.ColumnDateTime('updatedAt', this);
   }
 
   late final DwUserPasswordUpdateTable updateTable;
@@ -399,10 +377,7 @@ class DwUserPasswordRepository {
     DwUserPassword row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<DwUserPassword>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<DwUserPassword>(row, transaction: transaction);
   }
 
   /// Updates all [DwUserPassword]s in the list and returns the updated rows. If
@@ -487,10 +462,7 @@ class DwUserPasswordRepository {
     List<DwUserPassword> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<DwUserPassword>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<DwUserPassword>(rows, transaction: transaction);
   }
 
   /// Deletes a single [DwUserPassword].
@@ -499,10 +471,7 @@ class DwUserPasswordRepository {
     DwUserPassword row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<DwUserPassword>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<DwUserPassword>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

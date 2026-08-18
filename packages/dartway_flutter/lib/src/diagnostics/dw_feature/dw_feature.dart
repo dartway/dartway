@@ -202,9 +202,11 @@ abstract interface class DwFeature {
     );
 
     var child = renderObject as RenderObject;
-    for (var ancestor = child.parent;
-        ancestor != null;
-        child = ancestor, ancestor = ancestor.parent) {
+    for (
+      var ancestor = child.parent;
+      ancestor != null;
+      child = ancestor, ancestor = ancestor.parent
+    ) {
       final clip = ancestor.describeApproximatePaintClip(child);
       if (clip == null) continue;
       rect = rect.intersect(

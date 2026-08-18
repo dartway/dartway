@@ -80,6 +80,9 @@ final class DwPushConfig {
   /// The default goes through the module's own CRUD action, which is what an
   /// app on `dartway_push_server` wants. Override it when the backend is
   /// somebody else's, or while migrating off an endpoint of your own.
-  final Future<bool> Function({required String token, required String provider})?
+  final Future<bool> Function({
+    required String token,
+    required String provider,
+  })?
   registerToken;
 }

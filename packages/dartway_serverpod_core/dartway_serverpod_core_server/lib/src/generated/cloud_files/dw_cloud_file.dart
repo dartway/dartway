@@ -215,84 +215,42 @@ class _DwCloudFileImpl extends DwCloudFile {
 class DwCloudFileUpdateTable extends _i1.UpdateTable<DwCloudFileTable> {
   DwCloudFileUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> createdBy(int? value) => _i1.ColumnValue(
-    table.createdBy,
-    value,
-  );
+  _i1.ColumnValue<int, int> createdBy(int? value) =>
+      _i1.ColumnValue(table.createdBy, value);
 
-  _i1.ColumnValue<String, String> bucket(String value) => _i1.ColumnValue(
-    table.bucket,
-    value,
-  );
+  _i1.ColumnValue<String, String> bucket(String value) =>
+      _i1.ColumnValue(table.bucket, value);
 
-  _i1.ColumnValue<String, String> path(String value) => _i1.ColumnValue(
-    table.path,
-    value,
-  );
+  _i1.ColumnValue<String, String> path(String value) =>
+      _i1.ColumnValue(table.path, value);
 
-  _i1.ColumnValue<String, String> publicUrl(String value) => _i1.ColumnValue(
-    table.publicUrl,
-    value,
-  );
+  _i1.ColumnValue<String, String> publicUrl(String value) =>
+      _i1.ColumnValue(table.publicUrl, value);
 
-  _i1.ColumnValue<int, int> size(int? value) => _i1.ColumnValue(
-    table.size,
-    value,
-  );
+  _i1.ColumnValue<int, int> size(int? value) =>
+      _i1.ColumnValue(table.size, value);
 
-  _i1.ColumnValue<String, String> mimeType(String? value) => _i1.ColumnValue(
-    table.mimeType,
-    value,
-  );
+  _i1.ColumnValue<String, String> mimeType(String? value) =>
+      _i1.ColumnValue(table.mimeType, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 
   _i1.ColumnValue<DateTime, DateTime> verifiedAt(DateTime? value) =>
-      _i1.ColumnValue(
-        table.verifiedAt,
-        value,
-      );
+      _i1.ColumnValue(table.verifiedAt, value);
 }
 
 class DwCloudFileTable extends _i1.Table<int?> {
   DwCloudFileTable({super.tableRelation}) : super(tableName: 'dw_cloud_file') {
     updateTable = DwCloudFileUpdateTable(this);
-    createdBy = _i1.ColumnInt(
-      'createdBy',
-      this,
-    );
-    bucket = _i1.ColumnString(
-      'bucket',
-      this,
-    );
-    path = _i1.ColumnString(
-      'path',
-      this,
-    );
-    publicUrl = _i1.ColumnString(
-      'publicUrl',
-      this,
-    );
-    size = _i1.ColumnInt(
-      'size',
-      this,
-    );
-    mimeType = _i1.ColumnString(
-      'mimeType',
-      this,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
-    verifiedAt = _i1.ColumnDateTime(
-      'verifiedAt',
-      this,
-    );
+    createdBy = _i1.ColumnInt('createdBy', this);
+    bucket = _i1.ColumnString('bucket', this);
+    path = _i1.ColumnString('path', this);
+    publicUrl = _i1.ColumnString('publicUrl', this);
+    size = _i1.ColumnInt('size', this);
+    mimeType = _i1.ColumnString('mimeType', this);
+    createdAt = _i1.ColumnDateTime('createdAt', this);
+    verifiedAt = _i1.ColumnDateTime('verifiedAt', this);
   }
 
   late final DwCloudFileUpdateTable updateTable;
@@ -494,10 +452,7 @@ class DwCloudFileRepository {
     DwCloudFile row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<DwCloudFile>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<DwCloudFile>(row, transaction: transaction);
   }
 
   /// Updates all [DwCloudFile]s in the list and returns the updated rows. If
@@ -582,10 +537,7 @@ class DwCloudFileRepository {
     List<DwCloudFile> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<DwCloudFile>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<DwCloudFile>(rows, transaction: transaction);
   }
 
   /// Deletes a single [DwCloudFile].
@@ -594,10 +546,7 @@ class DwCloudFileRepository {
     DwCloudFile row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<DwCloudFile>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<DwCloudFile>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

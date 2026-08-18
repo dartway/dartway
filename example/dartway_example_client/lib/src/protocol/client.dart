@@ -37,12 +37,7 @@ class Client extends _i3.ServerpodClientShared {
     super.authenticationKeyManager,
     Duration? streamingConnectionTimeout,
     Duration? connectionTimeout,
-    Function(
-      _i3.MethodCallContext,
-      Object,
-      StackTrace,
-    )?
-    onFailedCall,
+    Function(_i3.MethodCallContext, Object, StackTrace)? onFailedCall,
     Function(_i3.MethodCallContext)? onSucceededCall,
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(

@@ -13,11 +13,7 @@
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
 abstract class AppSetting implements _i1.SerializableModel {
-  AppSetting._({
-    this.id,
-    required this.settingKey,
-    required this.settingValue,
-  });
+  AppSetting._({this.id, required this.settingKey, required this.settingValue});
 
   factory AppSetting({
     int? id,
@@ -45,11 +41,7 @@ abstract class AppSetting implements _i1.SerializableModel {
   /// Returns a shallow copy of this [AppSetting]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
-  AppSetting copyWith({
-    int? id,
-    String? settingKey,
-    String? settingValue,
-  });
+  AppSetting copyWith({int? id, String? settingKey, String? settingValue});
   @override
   Map<String, dynamic> toJson() {
     return {
@@ -73,11 +65,7 @@ class _AppSettingImpl extends AppSetting {
     int? id,
     required String settingKey,
     required String settingValue,
-  }) : super._(
-         id: id,
-         settingKey: settingKey,
-         settingValue: settingValue,
-       );
+  }) : super._(id: id, settingKey: settingKey, settingValue: settingValue);
 
   /// Returns a shallow copy of this [AppSetting]
   /// with some or all fields replaced by the given arguments.

@@ -29,9 +29,9 @@ void main() {
   List<String> findingsFor(List<String> entries, {String name = 'my_flutter'}) {
     final packageDir = Directory(p.join(sandbox.path, name))
       ..createSync(recursive: true);
-    File(p.join(packageDir.path, 'pubspec.yaml')).writeAsStringSync(
-      'name: $name\n',
-    );
+    File(
+      p.join(packageDir.path, 'pubspec.yaml'),
+    ).writeAsStringSync('name: $name\n');
 
     for (final entry in entries) {
       final path = p.join(packageDir.path, 'lib', entry);
@@ -87,9 +87,7 @@ void main() {
 
   test('the wiring file carries the project name, and is required', () {
     expect(
-      findingsFor(
-        declaredLayout.where((e) => e != 'my_app.dart').toList(),
-      ),
+      findingsFor(declaredLayout.where((e) => e != 'my_app.dart').toList()),
       contains(contains('my_app.dart')),
     );
   });
@@ -97,7 +95,10 @@ void main() {
   test('a zone nested inside a zone is reported — `app/admin/`', () {
     final findings = findingsFor([...declaredLayout, 'app/admin/']);
     expect(findings, hasLength(1));
-    expect(findings.single, allOf(contains('lib/app/admin'), contains('/admin')));
+    expect(
+      findings.single,
+      allOf(contains('lib/app/admin'), contains('/admin')),
+    );
   });
 
   test('a nested zone is found at any depth', () {

@@ -72,9 +72,10 @@ void main() {
             verification.failReason,
             DwAuthFailReason.invalidVerificationCode,
           );
-          expect(await _statusOf(session, request), isNot(
-            DwAuthRequestStatus.failed,
-          ));
+          expect(
+            await _statusOf(session, request),
+            isNot(DwAuthRequestStatus.failed),
+          );
         });
 
         test(
@@ -87,7 +88,10 @@ void main() {
               await _verify(session, request, _wrongCode);
             }
 
-            expect(await _statusOf(session, request), DwAuthRequestStatus.failed);
+            expect(
+              await _statusOf(session, request),
+              DwAuthRequestStatus.failed,
+            );
 
             final afterBurn = await _verify(session, request, _knownCode);
             expect(afterBurn.failReason, DwAuthFailReason.tooManyAttempts);
@@ -95,40 +99,41 @@ void main() {
           },
         );
 
-        test(
-          'parallel guesses cannot outrun the attempt limit',
-          () async {
-            final request = await _openLoginRequest(session);
+        test('parallel guesses cannot outrun the attempt limit', () async {
+          final request = await _openLoginRequest(session);
 
-            // The regression this guards: the limit used to be a read-then-write
-            // decision (count previous attempts, compare, proceed). Fired in
-            // parallel under READ COMMITTED, every attempt read "0 previous" and
-            // every attempt got to guess — the brute-force protection came off
-            // with a bit of concurrency. Twenty guesses at once must still buy
-            // no more than the configured five.
-            //
-            // What matters is how many actually got to *check the code*: an
-            // attempt that could not take the lock is refused outright
-            // (rateLimited) and learns nothing.
-            final verifications = await Future.wait([
-              for (var i = 0; i < 20; i++) _verify(session, request, _wrongCode),
-            ]);
+          // The regression this guards: the limit used to be a read-then-write
+          // decision (count previous attempts, compare, proceed). Fired in
+          // parallel under READ COMMITTED, every attempt read "0 previous" and
+          // every attempt got to guess — the brute-force protection came off
+          // with a bit of concurrency. Twenty guesses at once must still buy
+          // no more than the configured five.
+          //
+          // What matters is how many actually got to *check the code*: an
+          // attempt that could not take the lock is refused outright
+          // (rateLimited) and learns nothing.
+          final verifications = await Future.wait([
+            for (var i = 0; i < 20; i++) _verify(session, request, _wrongCode),
+          ]);
 
-            final guessesEvaluated = verifications
-                .where(
-                  (v) => v.failReason == DwAuthFailReason.invalidVerificationCode,
-                )
-                .length;
+          final guessesEvaluated = verifications
+              .where(
+                (v) => v.failReason == DwAuthFailReason.invalidVerificationCode,
+              )
+              .length;
 
-            expect(guessesEvaluated, lessThanOrEqualTo(_maxVerificationAttempts));
-          },
-        );
+          expect(guessesEvaluated, lessThanOrEqualTo(_maxVerificationAttempts));
+        });
       });
 
       group('access token', () {
         test('is single use', () async {
           final request = await _openLoginRequest(session);
-          final token = (await _verify(session, request, _knownCode)).accessToken!;
+          final token = (await _verify(
+            session,
+            request,
+            _knownCode,
+          )).accessToken!;
 
           final first = await _redeem(session, token);
           expect(first.status, DwAuthRequestStatus.verified);
@@ -138,28 +143,28 @@ void main() {
           expect(second.failReason, DwAuthFailReason.invalidAccessToken);
         });
 
-        test(
-          'two parallel redemptions sign in exactly once',
-          () async {
-            final request = await _openLoginRequest(session);
-            final token =
-                (await _verify(session, request, _knownCode)).accessToken!;
+        test('two parallel redemptions sign in exactly once', () async {
+          final request = await _openLoginRequest(session);
+          final token = (await _verify(
+            session,
+            request,
+            _knownCode,
+          )).accessToken!;
 
-            // Same regression, sharper stakes: both redemptions used to read
-            // `verified` and both were signed in, so a "single-use" token handed
-            // out two sessions.
-            final results = await Future.wait([
-              _redeem(session, token),
-              _redeem(session, token),
-            ]);
+          // Same regression, sharper stakes: both redemptions used to read
+          // `verified` and both were signed in, so a "single-use" token handed
+          // out two sessions.
+          final results = await Future.wait([
+            _redeem(session, token),
+            _redeem(session, token),
+          ]);
 
-            final signedIn = results
-                .where((r) => r.status == DwAuthRequestStatus.verified)
-                .length;
+          final signedIn = results
+              .where((r) => r.status == DwAuthRequestStatus.verified)
+              .length;
 
-            expect(signedIn, 1);
-          },
-        );
+          expect(signedIn, 1);
+        });
       });
 
       group('request rate limit', () {
@@ -212,10 +217,7 @@ Future<T> _save<T extends TableRow>(Session session, T model) async {
   // default one — the same lookup the CRUD endpoint performs.
   final saveConfig =
       (dw.getCrudConfig(className) ??
-              dw.getCrudConfig(
-                className,
-                api: DwCoreConst.dartwayInternalApi,
-              ))
+              dw.getCrudConfig(className, api: DwCoreConst.dartwayInternalApi))
           ?.saveConfig;
 
   if (saveConfig == null) {
@@ -277,8 +279,14 @@ Future<DwAuthRequestStatus> _statusOf(
 }
 
 Future<void> _wipeAuthTables(Session session) async {
-  await DwAuthVerification.db.deleteWhere(session, where: (t) => Constant.bool(true));
-  await DwAuthRequest.db.deleteWhere(session, where: (t) => Constant.bool(true));
+  await DwAuthVerification.db.deleteWhere(
+    session,
+    where: (t) => Constant.bool(true),
+  );
+  await DwAuthRequest.db.deleteWhere(
+    session,
+    where: (t) => Constant.bool(true),
+  );
   await DwAuthKey.db.deleteWhere(session, where: (t) => Constant.bool(true));
   await UserProfile.db.deleteWhere(session, where: (t) => Constant.bool(true));
 }

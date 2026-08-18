@@ -6,14 +6,12 @@ import 'package:dartway_example_server/src/generated/protocol.dart';
 /// Everyone reads settings; only the admin writes, nobody deletes.
 final appSettingCrudConfig = DwCrudConfig<AppSetting>(
   table: AppSetting.t,
-  getListConfig: DwGetModelListConfig(
-    accessFilter: (session) async => null,
-  ),
+  getListConfig: DwGetModelListConfig(accessFilter: (session) async => null),
   saveConfig: DwSaveConfig<AppSetting>(
     allowSave: (session, saveContext) async => session.isClubAdmin,
     validateSave: (session, saveContext) async =>
         saveContext.currentModel.settingKey.trim().isEmpty
-            ? 'Setting key is required'
-            : null,
+        ? 'Setting key is required'
+        : null,
   ),
 );

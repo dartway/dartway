@@ -371,19 +371,22 @@ void main() {
           final session = sessionBuilder.build();
           final threw = Completer<void>();
 
-          final response = await DwSaveConfig<AppSetting>(
-            allowSave: (session, context) async => true,
-            afterSaveSideEffects: (session, context) async {
-              threw.complete();
-              throw StateError('the mail provider refused the sender address');
-            },
-          ).save(
-            session,
-            AppSetting(
-              settingKey: '${_testKeyPrefix}side_effect_throws',
-              settingValue: 'inserted',
-            ),
-          );
+          final response =
+              await DwSaveConfig<AppSetting>(
+                allowSave: (session, context) async => true,
+                afterSaveSideEffects: (session, context) async {
+                  threw.complete();
+                  throw StateError(
+                    'the mail provider refused the sender address',
+                  );
+                },
+              ).save(
+                session,
+                AppSetting(
+                  settingKey: '${_testKeyPrefix}side_effect_throws',
+                  settingValue: 'inserted',
+                ),
+              );
 
           // Nobody waits for the hook, so its failure must not touch the
           // response — the contract is unchanged.

@@ -51,10 +51,7 @@ void main() {
       // no log, nothing. The button was simply dead. Since the guard can now sit
       // under any widget, drifting out of the Form is easy — so it must be loud,
       // and loud *before* the first tap that would have done nothing.
-      await _pump(
-        tester,
-        child: _button(testDw.action((_) async {})),
-      );
+      await _pump(tester, child: _button(testDw.action((_) async {})));
 
       expect(tester.takeException(), isAssertionError);
     });

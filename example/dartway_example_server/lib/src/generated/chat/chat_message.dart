@@ -127,10 +127,7 @@ abstract class ChatMessage
     _i2.ChatChannelInclude? channel,
     _i3.UserProfileInclude? authorProfile,
   }) {
-    return ChatMessageInclude._(
-      channel: channel,
-      authorProfile: authorProfile,
-    );
+    return ChatMessageInclude._(channel: channel, authorProfile: authorProfile);
   }
 
   static ChatMessageIncludeList includeList({
@@ -210,47 +207,26 @@ class _ChatMessageImpl extends ChatMessage {
 class ChatMessageUpdateTable extends _i1.UpdateTable<ChatMessageTable> {
   ChatMessageUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> channelId(int value) => _i1.ColumnValue(
-    table.channelId,
-    value,
-  );
+  _i1.ColumnValue<int, int> channelId(int value) =>
+      _i1.ColumnValue(table.channelId, value);
 
-  _i1.ColumnValue<int, int> authorProfileId(int value) => _i1.ColumnValue(
-    table.authorProfileId,
-    value,
-  );
+  _i1.ColumnValue<int, int> authorProfileId(int value) =>
+      _i1.ColumnValue(table.authorProfileId, value);
 
-  _i1.ColumnValue<String, String> messageText(String value) => _i1.ColumnValue(
-    table.messageText,
-    value,
-  );
+  _i1.ColumnValue<String, String> messageText(String value) =>
+      _i1.ColumnValue(table.messageText, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 }
 
 class ChatMessageTable extends _i1.Table<int?> {
   ChatMessageTable({super.tableRelation}) : super(tableName: 'chat_message') {
     updateTable = ChatMessageUpdateTable(this);
-    channelId = _i1.ColumnInt(
-      'channelId',
-      this,
-    );
-    authorProfileId = _i1.ColumnInt(
-      'authorProfileId',
-      this,
-    );
-    messageText = _i1.ColumnString(
-      'messageText',
-      this,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
+    channelId = _i1.ColumnInt('channelId', this);
+    authorProfileId = _i1.ColumnInt('authorProfileId', this);
+    messageText = _i1.ColumnString('messageText', this);
+    createdAt = _i1.ColumnDateTime('createdAt', this);
   }
 
   late final ChatMessageUpdateTable updateTable;
@@ -502,10 +478,7 @@ class ChatMessageRepository {
     ChatMessage row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<ChatMessage>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<ChatMessage>(row, transaction: transaction);
   }
 
   /// Updates all [ChatMessage]s in the list and returns the updated rows. If
@@ -590,10 +563,7 @@ class ChatMessageRepository {
     List<ChatMessage> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<ChatMessage>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<ChatMessage>(rows, transaction: transaction);
   }
 
   /// Deletes a single [ChatMessage].
@@ -602,10 +572,7 @@ class ChatMessageRepository {
     ChatMessage row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<ChatMessage>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<ChatMessage>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

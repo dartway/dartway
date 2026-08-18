@@ -2,12 +2,7 @@ import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 StudioScreenSpec _screen(String path, String? parent, String title) =>
-    StudioScreenSpec(
-      path: path,
-      parentPath: parent,
-      title: title,
-      purpose: '',
-    );
+    StudioScreenSpec(path: path, parentPath: parent, title: title, purpose: '');
 
 void main() {
   final manifest = StudioProjectManifest(
@@ -20,7 +15,11 @@ void main() {
         screens: [
           _screen('/schedule', null, 'Schedule'),
           _screen('/schedule/profile', '/schedule', 'Profile'),
-          _screen('/schedule/profile/services', '/schedule/profile', 'Services'),
+          _screen(
+            '/schedule/profile/services',
+            '/schedule/profile',
+            'Services',
+          ),
           _screen('/member/:memberId', '/schedule', 'Member'),
           _screen('/schedule/day/:date', '/schedule', 'Day'),
           _screen('/schedule/day/today', '/schedule', 'Today'),
@@ -43,8 +42,10 @@ void main() {
 
     test('deepest non-root prefix for nested location', () {
       // No exact spec for the edit sub-route → deepest declared prefix wins.
-      expect(index.specForPath('/schedule/profile/edit')!.path,
-          '/schedule/profile');
+      expect(
+        index.specForPath('/schedule/profile/edit')!.path,
+        '/schedule/profile',
+      );
     });
 
     test('unknown path with no root spec returns null', () {

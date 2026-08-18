@@ -8,14 +8,18 @@ void main() {
   group('escapeMarkdownV2', () {
     test('escapes every reserved character and backslash', () {
       expect(
-        DwAlertFormatter.escapeMarkdownV2(r'a_b*c[d](e)~f`g>h#i+j-k=l|m{n}o.p!\'),
+        DwAlertFormatter.escapeMarkdownV2(
+          r'a_b*c[d](e)~f`g>h#i+j-k=l|m{n}o.p!\',
+        ),
         r'a\_b\*c\[d\]\(e\)\~f\`g\>h\#i\+j\-k\=l\|m\{n\}o\.p\!\\',
       );
     });
 
     test('leaves plain text untouched', () {
-      expect(DwAlertFormatter.escapeMarkdownV2('plain text 123'),
-          'plain text 123');
+      expect(
+        DwAlertFormatter.escapeMarkdownV2('plain text 123'),
+        'plain text 123',
+      );
     });
   });
 
@@ -108,8 +112,10 @@ void main() {
         stackTraceMaxLines: null,
       );
 
-      expect(message.length,
-          lessThanOrEqualTo(DwAlertFormatter.telegramMessageLimit));
+      expect(
+        message.length,
+        lessThanOrEqualTo(DwAlertFormatter.telegramMessageLimit),
+      );
       // if a code block opened, it must be closed
       expect('```'.allMatches(message).length, anyOf(0, 2));
     });

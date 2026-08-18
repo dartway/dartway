@@ -187,47 +187,26 @@ class _NewsPostImpl extends NewsPost {
 class NewsPostUpdateTable extends _i1.UpdateTable<NewsPostTable> {
   NewsPostUpdateTable(super.table);
 
-  _i1.ColumnValue<int, int> authorProfileId(int value) => _i1.ColumnValue(
-    table.authorProfileId,
-    value,
-  );
+  _i1.ColumnValue<int, int> authorProfileId(int value) =>
+      _i1.ColumnValue(table.authorProfileId, value);
 
-  _i1.ColumnValue<String, String> title(String value) => _i1.ColumnValue(
-    table.title,
-    value,
-  );
+  _i1.ColumnValue<String, String> title(String value) =>
+      _i1.ColumnValue(table.title, value);
 
-  _i1.ColumnValue<String, String> text(String value) => _i1.ColumnValue(
-    table.text,
-    value,
-  );
+  _i1.ColumnValue<String, String> text(String value) =>
+      _i1.ColumnValue(table.text, value);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(
-        table.createdAt,
-        value,
-      );
+      _i1.ColumnValue(table.createdAt, value);
 }
 
 class NewsPostTable extends _i1.Table<int?> {
   NewsPostTable({super.tableRelation}) : super(tableName: 'news_post') {
     updateTable = NewsPostUpdateTable(this);
-    authorProfileId = _i1.ColumnInt(
-      'authorProfileId',
-      this,
-    );
-    title = _i1.ColumnString(
-      'title',
-      this,
-    );
-    text = _i1.ColumnString(
-      'text',
-      this,
-    );
-    createdAt = _i1.ColumnDateTime(
-      'createdAt',
-      this,
-    );
+    authorProfileId = _i1.ColumnInt('authorProfileId', this);
+    title = _i1.ColumnString('title', this);
+    text = _i1.ColumnString('text', this);
+    createdAt = _i1.ColumnDateTime('createdAt', this);
   }
 
   late final NewsPostUpdateTable updateTable;
@@ -256,13 +235,7 @@ class NewsPostTable extends _i1.Table<int?> {
   }
 
   @override
-  List<_i1.Column> get columns => [
-    id,
-    authorProfileId,
-    title,
-    text,
-    createdAt,
-  ];
+  List<_i1.Column> get columns => [id, authorProfileId, title, text, createdAt];
 
   @override
   _i1.Table? getRelationTable(String relationField) {
@@ -452,10 +425,7 @@ class NewsPostRepository {
     NewsPost row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<NewsPost>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.insertRow<NewsPost>(row, transaction: transaction);
   }
 
   /// Updates all [NewsPost]s in the list and returns the updated rows. If
@@ -540,10 +510,7 @@ class NewsPostRepository {
     List<NewsPost> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<NewsPost>(
-      rows,
-      transaction: transaction,
-    );
+    return session.db.delete<NewsPost>(rows, transaction: transaction);
   }
 
   /// Deletes a single [NewsPost].
@@ -552,10 +519,7 @@ class NewsPostRepository {
     NewsPost row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<NewsPost>(
-      row,
-      transaction: transaction,
-    );
+    return session.db.deleteRow<NewsPost>(row, transaction: transaction);
   }
 
   /// Deletes all rows matching the [where] expression.

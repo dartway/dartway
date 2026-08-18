@@ -30,12 +30,12 @@ class StudioScreenSpec {
   final List<String> discussionQuestions;
 
   Map<String, dynamic> toJson() => {
-        'path': path,
-        if (parentPath != null) 'parentPath': parentPath,
-        'title': title,
-        'purpose': purpose,
-        'discussionQuestions': discussionQuestions,
-      };
+    'path': path,
+    if (parentPath != null) 'parentPath': parentPath,
+    'title': title,
+    'purpose': purpose,
+    'discussionQuestions': discussionQuestions,
+  };
 
   factory StudioScreenSpec.fromJson(Map<String, dynamic> json) =>
       StudioScreenSpec(
@@ -48,8 +48,8 @@ class StudioScreenSpec {
 
   /// Lenient string-list parsing shared by the spec models.
   static List<String> stringListFromJson(Object? json) => [
-        if (json is List)
-          for (final item in json)
-            if (item is String) item,
-      ];
+    if (json is List)
+      for (final item in json)
+        if (item is String) item,
+  ];
 }
