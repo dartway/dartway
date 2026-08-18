@@ -218,8 +218,8 @@ Copying is not all it does. Every occurrence of `dartway_starter` becomes your p
 `DartwayStarter` becomes its PascalCase form, in file names and in file contents alike. Each
 package's `dependency_overrides` block — which points at the monorepo checkout and only makes sense
 inside it — is stripped, so the framework dependencies resolve from pub.dev like any other. The
-toolkit lands in `.claude/`, with a default `settings.json` if the project has none, and
-`dartway_notes.md` at the root.
+toolkit lands in `.claude/`, with a default `settings.json` if the project has none, and the two
+journals — `dartway_notes.md` and `dev_notes.md` — at the root.
 
 Worth knowing if you ever put such a block back — inside the monorepo, or in your own project while
 debugging a framework package. An override does more than redirect one dependency: **for the package

@@ -38,6 +38,15 @@ class CreateCommand extends Command<int> {
             "Language the new project writes its own texts in (feature specs, "
             "doc comments, dartway_notes.md).",
       )
+      ..addOption(
+        'notes-tracker',
+        valueHelp: 'owner/repo',
+        defaultsTo: ProjectLayout.defaultNotesTracker,
+        help:
+            'GitHub repository where findings about the framework are filed as '
+            'issues. Pass "${ProjectLayout.noNotesTracker}" to keep the '
+            'journal local instead.',
+      )
       ..addFlag(
         'git',
         defaultsTo: true,
@@ -103,6 +112,7 @@ class CreateCommand extends Command<int> {
       tokens: layout.toolkitTokens(
         baseBranch: 'master',
         language: argResults!['language'] as String,
+        notesTracker: argResults!['notes-tracker'] as String,
       ),
     );
 

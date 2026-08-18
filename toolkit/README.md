@@ -25,6 +25,7 @@ The skills are **generic**: project-specific values are extracted into placehold
 | `__SERVER_PKG__` / `__CLIENT_PKG__` / `__FLUTTER_PKG__` / `__SHARED_PKG__` | the Dart package names | auto-detected by `*_server`/`*_client`/`*_flutter`/`*_shared` |
 | `__BASE_BRANCH__` | the base branch | a parameter of the installer run |
 | `__PROJECT_LANGUAGE__` | the language the project writes its own texts in | `--language`, default English |
+| `__NOTES_TRACKER__` | the GitHub repository framework findings are filed in as issues | `--notes-tracker`, the framework's own tracker by default; `none` opts out |
 
 `settings.json` is installed as `.claude/settings.json` **only when the project has none**, and is never overwritten afterwards — a project adds its own permissions to it, and losing those on an update would cost more than a stale default. It pre-approves this stack's build commands (`dart pub get`, `docker compose up`, `serverpod generate`, the test runners) so that bringing a fresh project up is not a queue of permission prompts, and it denies reading `config/passwords.yaml` — turning a rule the skills merely state into one the harness enforces. Nothing destructive is on the allow list: `docker compose down`, commits and pushes still ask.
 

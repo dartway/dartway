@@ -77,6 +77,28 @@ that can be fixed in the installed copy, and all of it is worth keeping: the rul
 proven wrong by real code. The journal is where such findings wait to be carried into the monorepo,
 and `dartway-finish` lists the open ones at the end of a task so they do not just accumulate.
 
+Waiting in a file is as far as an entry gets on its own, so the journal is pointed at a tracker from
+the start — the framework's own, unless `dartway setup-ai --notes-tracker owner/repo` names another or
+`--notes-tracker none` keeps the whole thing local. A filed entry records its issue **instead of its
+status**, and the state is read from the tracker. Keeping a status in both places is what this exists
+to prevent: one project's journal advertised eleven open findings a fortnight after all eleven had
+shipped, the entry asking for this mechanism among them, because the fixes landed in the monorepo and
+nothing wrote back to the laptop.
+
+**The default is deliberate, and it is the whole lesson of that journal.** Nothing about it was hard
+to carry over — it was carried over in full, quickly. What failed is that the file had no other end,
+so a project that never decided where its findings should go was a project whose findings stayed put.
+Making that decision a precondition would have reproduced the failure in every project that skipped
+it.
+
+The half that does **not** travel is the reason filing is not a copy. An entry earns its keep here by
+naming this codebase — the file and line, the class, the workaround the app wrote, the marker beside
+it — and that is precisely what cannot go into a repository other people read. So `CLAUDE.md` asks
+for four things before an issue exists: the finding restated so it stands without this project's
+code (if nothing survives that, it was never about the framework), English rather than the project's
+language, a search of the tracker first because three projects meeting one API gap is one issue, and
+an explicit yes — creating a public issue is the only step in the journal that cannot be taken back.
+
 One kind of finding needs a second half, in the code. A workaround over a `dartway_*` API is written
 down as an entry *and* marked where it lives — `// TODO(dartway, checked: 518ae6d): …`, naming the
 framework version it was last confirmed against. The reason is that the entry alone answers the
