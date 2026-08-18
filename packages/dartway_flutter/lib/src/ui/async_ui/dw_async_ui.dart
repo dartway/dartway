@@ -12,6 +12,7 @@ extension DwAsyncValueX<T> on AsyncValue<T> {
   Widget dwBuildAsync({
     required Widget Function(T value) childBuilder,
     Widget errorWidget = const SizedBox.shrink(),
+    Widget Function(Object error, StackTrace stackTrace)? errorBuilder,
     T? loadingValue,
     Widget? loadingWidget,
     bool skipLoadingOnReload = false,
@@ -23,6 +24,7 @@ extension DwAsyncValueX<T> on AsyncValue<T> {
       this,
       childBuilder: childBuilder,
       errorWidget: errorWidget,
+      errorBuilder: errorBuilder,
       loadingValueBuilder: placeholder == null ? null : () => placeholder,
       loadingWidget: loadingWidget,
       skipLoadingOnReload: skipLoadingOnReload,
@@ -40,6 +42,7 @@ extension DwAsyncValueListX<T> on AsyncValue<List<T>> {
     T? loadingItem,
     Widget? loadingWidget,
     Widget errorWidget = const SizedBox.shrink(),
+    Widget Function(Object error, StackTrace stackTrace)? errorBuilder,
     bool skipLoadingOnReload = false,
     bool skipLoadingOnRefresh = true,
   }) {
@@ -47,6 +50,7 @@ extension DwAsyncValueListX<T> on AsyncValue<List<T>> {
       this,
       childBuilder: childBuilder,
       errorWidget: errorWidget,
+      errorBuilder: errorBuilder,
       // A factory, not a value: the placeholder list — and the assert that it
       // can be built at all — must not run on the data and error branches. A
       // widget test of a list screen would otherwise need the app's model
@@ -79,6 +83,7 @@ Widget _dwBuildAsync<T>(
   AsyncValue<T> value, {
   required Widget Function(T value) childBuilder,
   required Widget errorWidget,
+  required Widget Function(Object error, StackTrace stackTrace)? errorBuilder,
   required T Function()? loadingValueBuilder,
   required Widget? loadingWidget,
   required bool skipLoadingOnReload,
@@ -90,7 +95,7 @@ Widget _dwBuildAsync<T>(
     data: (data) => childBuilder(data),
     error: (error, stackTrace) {
       dw.handleError(error, stackTrace, source: DwErrorSource.asyncBuild);
-      return errorWidget;
+      return errorBuilder?.call(error, stackTrace) ?? errorWidget;
     },
     loading: () {
       if (loadingWidget != null) return loadingWidget;

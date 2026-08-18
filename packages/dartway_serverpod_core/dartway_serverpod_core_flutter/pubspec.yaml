@@ -23,6 +23,7 @@ dependencies:
   dartway_serverpod_core_shared: ^0.9.0
 
   collection: ^1.19.1
+  crypto: ^3.0.6
   flutter_riverpod: ^3.0.0
 
   heif_converter: '>=1.0.0 <2.0.0'

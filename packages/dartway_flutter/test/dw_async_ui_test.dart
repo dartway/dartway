@@ -33,7 +33,13 @@ Widget _host(Widget child) => ProviderScope(
 
 void main() {
   // One DwFlutter per test process — the singleton forbids re-creation.
-  DwFlutter(config: DwConfig(defaultModelGetter: _defaultModelGetter));
+  final errorReports = <DwErrorReport>[];
+  DwFlutter(
+    config: DwConfig(
+      defaultModelGetter: _defaultModelGetter,
+      onErrorReport: errorReports.add,
+    ),
+  );
 
   group('dwBuildListAsync builds its placeholder lazily', () {
     testWidgets('data renders without reaching the placeholder registry', (
@@ -154,6 +160,29 @@ void main() {
       );
 
       expect(find.text('spinner'), findsOneWidget);
+    });
+
+    testWidgets('error builder receives the original async failure', (
+      tester,
+    ) async {
+      errorReports.clear();
+      final failure = StateError('offline snapshot unavailable');
+      final asyncValue = AsyncValue<int>.error(failure, StackTrace.current);
+
+      await tester.pumpWidget(
+        _host(
+          asyncValue.dwBuildAsync(
+            childBuilder: (value) => Text('$value'),
+            errorBuilder: (error, _) => Text('handled: $error'),
+          ),
+        ),
+      );
+
+      expect(
+        find.text('handled: Bad state: offline snapshot unavailable'),
+        findsOneWidget,
+      );
+      expect(errorReports.single.error, same(failure));
     });
   });
 }

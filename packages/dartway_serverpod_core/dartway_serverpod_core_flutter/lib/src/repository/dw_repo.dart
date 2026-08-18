@@ -2,6 +2,11 @@ import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'domain/dw_model_list_state_config.dart';
+import 'domain/dw_pagination_params.dart';
+import 'domain/dw_repo_query_key.dart';
+import 'domain/dw_repo_read_delegate.dart';
+import 'domain/dw_repo_read_strategy.dart';
+import 'domain/dw_repo_write_delegate.dart';
 import 'domain/dw_single_model_state_config.dart';
 import 'dw_repository.dart';
 import 'states/dw_model_list_state.dart';
@@ -23,6 +28,23 @@ import 'states/dw_single_model_state.dart';
 class DwRepo {
   const DwRepo();
 
+  /// Optional snapshot persistence registered during app bootstrap.
+  /// Registration alone does not cache reads: each list or single config must
+  /// explicitly select [DwRepoReadStrategy.networkFirstWithSnapshot].
+  DwRepoReadDelegate? get readDelegate => DwRepository.readDelegate;
+
+  set readDelegate(DwRepoReadDelegate? delegate) {
+    DwRepository.readDelegate = delegate;
+  }
+
+  /// Optional durable offline write persistence registered during app
+  /// bootstrap. Leaving it unset keeps every `dw.repo` write network-only.
+  DwRepoWriteDelegate? get writeDelegate => DwRepository.writeDelegate;
+
+  set writeDelegate(DwRepoWriteDelegate? delegate) {
+    DwRepository.writeDelegate = delegate;
+  }
+
   // --- Reads (providers) -----------------------------------------------------
 
   /// Reactive single model that must be present — `AsyncValue<T>`; resolves to a
@@ -36,12 +58,14 @@ class DwRepo {
     DwBackendFilter? filter,
     String? apiGroupOverride,
     T? initialModel,
+    DwRepoReadStrategy readStrategy = DwRepoReadStrategy.networkOnly,
   }) => DwRepository.throwingSingleModelProvider<T>()(
     DwSingleModelStateConfig<T>(
       id: id,
       filter: filter,
       apiGroupOverride: apiGroupOverride,
       initialModel: initialModel,
+      readStrategy: readStrategy,
     ),
   );
 
@@ -52,12 +76,14 @@ class DwRepo {
     DwBackendFilter? filter,
     String? apiGroupOverride,
     T? initialModel,
+    DwRepoReadStrategy readStrategy = DwRepoReadStrategy.networkOnly,
   }) => DwRepository.singleModelProvider<T>()(
     DwSingleModelStateConfig<T>(
       id: id,
       filter: filter,
       apiGroupOverride: apiGroupOverride,
       initialModel: initialModel,
+      readStrategy: readStrategy,
     ),
   );
 
@@ -70,6 +96,37 @@ class DwRepo {
     customConfig ?? DwModelListStateConfig<T>(backendFilter: backendFilter),
   );
 
+  /// Exact storage key used by the default reactive single-model read.
+  DwRepoQueryKey<T> modelQueryKey<T extends SerializableModel>({
+    int? id,
+    DwBackendFilter? filter,
+    String? apiGroupOverride,
+  }) => DwSingleModelStateConfig<T>(
+    id: id,
+    filter: filter,
+    apiGroupOverride: apiGroupOverride,
+  ).queryKey;
+
+  /// Exact storage key used by an unpaginated reactive model-list read.
+  DwRepoQueryKey<T> unpaginatedModelListQueryKey<T extends SerializableModel>({
+    DwBackendFilter? backendFilter,
+    List<DwOrderBy>? orderByList,
+    String? apiGroupOverride,
+  }) {
+    final config = DwModelListStateConfig<T>(
+      backendFilter: backendFilter,
+      orderByList: orderByList,
+      apiGroupOverride: apiGroupOverride,
+    );
+    final requestFilter = DwBackendFilter.and(<DwBackendFilter>[
+      if (backendFilter != null) backendFilter,
+    ]);
+    return config.queryKeyFor(
+      const DwPaginationParams(),
+      requestFilter: requestFilter,
+    );
+  }
+
   // --- Writes ----------------------------------------------------------------
 
   /// Creates or updates [model]; returns the persisted model.
@@ -77,6 +134,15 @@ class DwRepo {
     T model, {
     String? apiGroupOverride,
   }) => DwRepository.saveModel<T>(model, apiGroupOverride: apiGroupOverride);
+
+  /// Saves through the normal repository pipeline and also exposes the exact
+  /// CRUD response for workflows that atomically consume related updates.
+  Future<DwApiResponse<DwModelWrapper>> saveModelResponse<
+    T extends SerializableModel
+  >(T model, {String? apiGroupOverride}) => DwRepository.saveModelResponse<T>(
+    model,
+    apiGroupOverride: apiGroupOverride,
+  );
 
   /// Deletes [model]; returns `true` when nothing remains on the server.
   Future<bool> deleteModel<T extends SerializableModel>(
@@ -125,12 +191,14 @@ class DwRepo {
     int? limit,
     int? offset,
     String? apiGroupOverride,
+    DwRepoReadStrategy readStrategy = DwRepoReadStrategy.networkOnly,
   }) => DwRepository.fetchList<T>(
     filter: filter,
     orderByList: orderByList,
     limit: limit,
     offset: offset,
     apiGroupOverride: apiGroupOverride,
+    readStrategy: readStrategy,
   );
 
   /// One-shot server-side count of [T] rows matching [filter].

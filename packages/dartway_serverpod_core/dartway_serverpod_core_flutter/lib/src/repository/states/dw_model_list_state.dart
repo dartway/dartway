@@ -11,8 +11,12 @@ class DwModelListState<Model extends SerializableModel>
     extends AsyncNotifier<List<Model>> {
   late DwPaginationStrategy _paginationStrategy;
   DwModelListStateConfig<Model> config;
+  DwRepoReadOrigin? _lastReadOrigin;
 
   DwModelListState(this.config);
+
+  /// The source of the latest page read, for stale-data diagnostics.
+  DwRepoReadOrigin? get lastReadOrigin => _lastReadOrigin;
 
   @override
   Future<List<Model>> build() async {
@@ -96,17 +100,23 @@ class DwModelListState<Model extends SerializableModel>
         ),
     ]);
 
-    final response = await dw.endpointCaller.dwCrud.getAll(
-      className: DwRepository.typeName<Model>(),
-      filter: filter,
-      orderByList: config.orderByList,
-      limit: params.limit,
-      offset: params.offset,
-    );
+    final className = DwRepository.typeName<Model>();
+    final readResult =
+        await DwRepository.executeRead<Model, List<DwModelWrapper>>(
+          queryKey: config.queryKeyFor(params, requestFilter: filter),
+          readStrategy: config.readStrategy,
+          onlineRequest: () => dw.endpointCaller.dwCrud.getAll(
+            className: className,
+            filter: filter,
+            orderByList: config.orderByList,
+            limit: params.limit,
+            offset: params.offset,
+            apiGroup: config.apiGroupOverride,
+          ),
+        );
 
-    final result = DwRepository.processApiResponse(response);
-
-    final data = result ?? [];
+    _lastReadOrigin = readResult.origin;
+    final data = readResult.value ?? <DwModelWrapper>[];
 
     _paginationStrategy.onPageLoaded(data);
 
