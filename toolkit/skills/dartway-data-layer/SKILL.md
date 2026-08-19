@@ -72,6 +72,8 @@ dw.repo.setupRepository(
 );
 ```
 
+This is the one model construction in your app that names an id without rebuilding a row: `mockModelId` is a sentinel and the instance is invented from nothing, which `model_rebuild_by_constructor` knows — the file needs no `// ignore_for_file:`.
+
 The skeleton is drawn from your own widget built on that instance — that's why it resembles the future content rather than a generic shimmer. Without registration the very first `dwBuildListAsync` fails at runtime: `Default Objects Repository doesn't contain a model of type X`.
 
 **The placeholder is built in the loading state only**, so a widget test of a list screen that hands the builder a ready `AsyncData` does not have to stand up the default models — if a test does need them, that test is really exercising the loading state.

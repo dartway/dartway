@@ -189,13 +189,22 @@ class ForbiddenProviderScopeRule extends DartLintRule {
 /// never opened the file. A rule living in a comment at the far end of the
 /// system is not a rule.
 ///
-/// The signal is a non-null `id:`. A row being created never passes one — the
-/// id comes back from the database — so a call that does pass one is rebuilding
+/// The signal is a real `id:`. A row being created never passes one — the id
+/// comes back from the database — so a call that does pass one is rebuilding
 /// something that already exists, and `copyWith` is what rebuilds it. Nothing
 /// is lost by the ban: `copyWith` can clear a nullable field too, because the
 /// generated one takes `Object? field = _Undefined` and tests
 /// `field is T? ? field : this.field`, which tells "not passed" apart from
 /// "passed null".
+///
+/// Two ids are not real, and neither is a rebuild: `null`, which says out loud
+/// that the row does not exist yet, and `dw.repo.mockModelId`, the sentinel a
+/// skeleton default carries. The second one is why the exemption exists at all
+/// — `setupRepository(defaultModel:)` is the framework's own API, and every
+/// project registers one default per model, so without it the rule reported a
+/// warning per model in the one file where it had nothing to say. A rule that
+/// is guaranteed to be loud where it must be silent teaches people to scroll
+/// past its output.
 ///
 /// Matched through `SerializableModel` rather than through `TableRow`: on the
 /// server a model implements both, but the **client** half of the same
@@ -209,13 +218,15 @@ class ModelRebuildByConstructorRule extends DartLintRule {
   static const _code = LintCode(
     name: 'model_rebuild_by_constructor',
     problemMessage:
-        'This rebuilds a stored model by listing its fields: a passed id means '
-        'the row already exists. A field with default= or a nullable field is '
-        'an optional argument, so the next one added to the model is not a '
+        'A stored row is a model with a real id, and this rebuilds one by '
+        'listing its fields. A field with default= or a nullable field is an '
+        'optional argument, so the next one added to the model is not a '
         'compile error here — it is a silent default.',
     correctionMessage:
         'Rebuild it with copyWith. Clearing a nullable field works too: pass '
-        'null, and the sentinel tells that apart from not passing it.',
+        'null, and the sentinel tells that apart from not passing it. A '
+        'skeleton default is not a row — build it with '
+        'id: dw.repo.mockModelId.',
     errorSeverity: DiagnosticSeverity.WARNING,
   );
 
@@ -237,11 +248,46 @@ class ModelRebuildByConstructorRule extends DartLintRule {
       // one shape of a field-by-field call that is not a rebuild.
       if (idArgument.expression is NullLiteral) return;
 
+      // The skeleton default: an id that is the sentinel is not an id.
+      if (_isMockModelId(idArgument.expression)) return;
+
       if (!_isSerializableModel(node.staticType)) return;
 
       reporter.atNode(node.constructorName, code);
     });
   }
+
+  /// The sentinel a skeleton default carries in place of an id, spelled
+  /// `dw.repo.mockModelId` in application code (`DwRepository.mockModelId` is
+  /// the static it delegates to, and lives inside the framework).
+  static const _mockModelIdName = 'mockModelId';
+
+  /// Matched by name rather than by resolved element, for the same reason
+  /// `forbidden_provider_scope` matches `ProviderScope` by name: an unresolved
+  /// reference would make the rule fire, and firing is the failure mode being
+  /// fixed here. The trade — a variable of one's own called `mockModelId`
+  /// silences the rule for that one call — costs nothing next to a warning on
+  /// every model of every project that uses `setupRepository`.
+  ///
+  /// Deliberately not widened to "any construction passed as the
+  /// `defaultModel:` argument of `setupRepository`". The sentinel travels with
+  /// the value — through a helper that builds the instance, through a list of
+  /// defaults registered in a loop — while the argument position only catches
+  /// the call written inline; and a *real* id handed to `setupRepository` is a
+  /// stored row pinned as a skeleton, which is worth seeing rather than
+  /// silencing.
+  static bool _isMockModelId(Expression expression) =>
+      _tailName(expression) == _mockModelIdName;
+
+  /// The last identifier of a reference, whatever shape it arrives in:
+  /// `mockModelId`, `DwRepository.mockModelId` (a prefixed identifier),
+  /// `dw.repo.mockModelId` (a property access on a prefixed identifier).
+  static String? _tailName(Expression expression) => switch (expression) {
+    SimpleIdentifier(:final name) => name,
+    PrefixedIdentifier(:final identifier) => identifier.name,
+    PropertyAccess(:final propertyName) => propertyName.name,
+    _ => null,
+  };
 
   static NamedExpression? _idArgument(ArgumentList argumentList) {
     for (final argument in argumentList.arguments) {
