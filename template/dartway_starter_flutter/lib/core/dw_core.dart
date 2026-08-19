@@ -32,7 +32,14 @@ bool _coreInitialized = false;
 /// router needs a booted core even when it knows nothing about the session.
 /// Without the guard, the second test file in a run would meet a
 /// `LateInitializationError` on an already-initialized field.
-void initExampleDwCore({required String backendUrl}) {
+///
+/// The app passes [backendUrl]; a widget test passes [transport] instead and no
+/// Serverpod client is built at all. That is not an optimisation: a client
+/// brings a connectivity monitor and an auth key manager with it, both of which
+/// reach for platform channels a widget test has no business answering. Without
+/// a key manager there is no session either, so a test that needs a signed-in
+/// profile overrides `dw.requireUserProfileProvider` in its own `ProviderScope`.
+void initExampleDwCore({String? backendUrl, DwServerTransport? transport}) {
   if (_coreInitialized) return;
   _coreInitialized = true;
 
@@ -42,19 +49,8 @@ void initExampleDwCore({required String backendUrl}) {
       // Shown in error reports next to the platform and user.
       appVersion: exampleAppVersion,
     ),
-    client:
-        Client(
-            backendUrl,
-            // Connection-level failures (timeout/offline) → a toast, not an alert;
-            // everything else enters the dw error pipeline with `endpoint.method`
-            // attached and is alerted out of the box with the app context.
-            onFailedCall: dwReportingOnFailedCall(
-              onConnectionError: (_, _) =>
-                  dw.notify.error(appL10n.networkErrorTryAgain),
-            ),
-          )
-          ..connectivityMonitor = FlutterConnectivityMonitor()
-          ..authKeyProvider = DwAuthenticationKeyManager(),
+    client: backendUrl == null ? null : _buildClient(backendUrl),
+    transport: transport,
     // No telegram config here: locally the alerts degrade to logging. To see
     // the full formatted alert in the console use
     // `DwAlerts.init(logErrors: true, logFunction: debugPrint)`.
@@ -64,3 +60,17 @@ void initExampleDwCore({required String backendUrl}) {
         debugPrint('[app] realtime status → $status'),
   );
 }
+
+Client _buildClient(String backendUrl) =>
+    Client(
+        backendUrl,
+        // Connection-level failures (timeout/offline) → a toast, not an alert;
+        // everything else enters the dw error pipeline with `endpoint.method`
+        // attached and is alerted out of the box with the app context.
+        onFailedCall: dwReportingOnFailedCall(
+          onConnectionError: (_, _) =>
+              dw.notify.error(appL10n.networkErrorTryAgain),
+        ),
+      )
+      ..connectivityMonitor = FlutterConnectivityMonitor()
+      ..authKeyProvider = DwAuthenticationKeyManager();

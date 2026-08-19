@@ -108,6 +108,14 @@ is verified through the public kit widget. A test of a private composition → a
 
 ### A.4 Checking the tests
 - Non-trivial logic/money/"downgrade" rollbacks or a bugfix **without a test** → flag it (`dartway-clean-code` Part 3). We do not demand tests for cosmetics.
+- **Ask whether the test sits at the layer the behaviour lives at** (`dartway-testing`). The common
+  miss is not an absent test but a misplaced one: an access rule from a `DwCrudConfig` "covered" by a
+  widget test that only proves the button is hidden — the UI hiding it is not the rule, and the rule
+  is what breaks. That belongs in an integration test on the server; the widget test then covers what
+  it can, which is that the button sends the right model.
+- **Do not ask for a coverage number and do not report one.** The question is whether the thing that
+  would break is covered, at the layer where it lives — a percentage is met by covering what was
+  never at risk.
 
 ### A.5 Automated checks
 - **`dartway check` in the Flutter package is mandatory.** It checks what neither the analyzer nor the lints see: the structure of features and groups, the boundaries (importing another feature's internals at any depth), styles bypassing the kit, missing feature specs, dead code inside a feature (`unusedFeatureFile` — a widget or helper its own feature stopped using; nobody outside may import it, so nothing else can see it is gone), references to non-existent assets. The report is per-feature, with an A–D grade — look at the features the task touched, not just at the overall counter.

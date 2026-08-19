@@ -11,6 +11,13 @@ and deciding something the app did not.
 Added for the data layer, which now asks this way whether the app declared a local store for
 `dw.repo` — see `dartway_serverpod_core_flutter` 0.10.0.
 
+**The ambient-core errors say what is missing.** `Dw is not initialized` now names the core the app
+failed to build and adds the part that costs people an afternoon: a widget test needs one too,
+because a feature reaches `dw` while *building* — `dw.action(...)` is constructed in `build` — so
+the subtree does not render without it, and the failure surfaces later as a finder that found
+nothing. `Dw already initialized` says why an app's core initializer has to be idempotent: one core
+per process, so a second test file booting it must be a no-op rather than an error.
+
 ## 0.5.1
 
 **`dwBuildListAsync` builds its skeleton only when it is showing one.** The placeholder list — and

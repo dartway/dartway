@@ -4,6 +4,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../checker/dw_check_type.dart';
+import '../checker/dw_crud_coverage.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_framework_lock.dart';
 import '../checker/dw_generated_format.dart';
@@ -95,6 +96,14 @@ class CheckCommand extends Command<int> {
       // `--dir` for the same reason the layout check is.
       errorCount += DwFrameworkLockInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
+
+      // Reads the server's models, configs and tests together — which is the
+      // only way to see what is missing between them.
+      errorCount += DwCrudCoverageInspector(
+        serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();

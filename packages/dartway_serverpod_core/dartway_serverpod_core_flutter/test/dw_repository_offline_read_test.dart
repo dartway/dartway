@@ -2,20 +2,26 @@ import 'dart:async';
 
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
+import 'package:dartway_serverpod_core_flutter/testing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  late _OfflineReadClient client;
+  late DwRecordingServerTransport transport;
   late _TestLocalStore store;
   late _OfflineLocalReads localReads;
 
   setUpAll(() {
-    client = _OfflineReadClient();
+    // Its own manager rather than the `classNames` shorthand: these tests read
+    // snapshots back out of local storage, which rebuilds a response from
+    // stored JSON and so needs real deserialization, not only naming.
+    transport = DwRecordingServerTransport(
+      serializationManager: _OfflineReadProtocol(),
+    );
     store = _TestLocalStore();
-    DwCore<_OfflineReadClient, _OfflineReadModel>(
+    DwCore<ServerpodClientShared, _OfflineReadModel>(
       config: const DwConfig(),
-      client: client,
+      transport: transport,
       dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
       getUserId: (_) => null,
       plugins: [store],
@@ -24,7 +30,11 @@ void main() {
   });
 
   setUp(() {
-    client.listResponse = null;
+    // A connection that is simply down, which is what most cases here need;
+    // the one test about a served list replaces it.
+    transport.reset();
+    transport.answerGetAll = (_) async => throw TimeoutException('offline');
+    transport.answerGetOne = (_) async => throw TimeoutException('offline');
     localReads = _OfflineLocalReads();
     store.reads = localReads;
   });
@@ -106,7 +116,7 @@ void main() {
   test('imperative list reads do not publish updated models', () async {
     final receivedUpdates = <List<DwModelWrapper>>[];
     final update = DwModelWrapper.wrap(model: _OfflineReadModel());
-    client.listResponse = DwApiResponse<List<DwModelWrapper>>(
+    transport.answerGetAll = (_) async => DwApiResponse<List<DwModelWrapper>>(
       isOk: true,
       value: const <DwModelWrapper>[],
       updatedModels: <DwModelWrapper>[update],
@@ -128,43 +138,9 @@ class _OfflineReadModel implements SerializableModel {
   Map<String, dynamic> toJson() => <String, dynamic>{};
 }
 
-class _OfflineReadClient extends ServerpodClientShared {
-  _OfflineReadClient()
-    : super(
-        'http://localhost:8080',
-        _OfflineReadProtocol(),
-        streamingConnectionTimeout: null,
-        connectionTimeout: null,
-      ) {
-    _caller = Caller(this);
-  }
-
-  late final Caller _caller;
-
-  @override
-  Map<String, ModuleEndpointCaller> get moduleLookup =>
-      <String, ModuleEndpointCaller>{'dartway_serverpod_core': _caller};
-
-  @override
-  Map<String, EndpointRef> get endpointRefLookup => <String, EndpointRef>{};
-
-  /// What the backend answers a list read with. `null` — the default — is a
-  /// connection that is simply down, which is what most cases here need.
-  DwApiResponse<List<DwModelWrapper>>? listResponse;
-
-  @override
-  Future<T> callServerEndpoint<T>(
-    String endpoint,
-    String method,
-    Map<String, dynamic> args, {
-    bool authenticated = true,
-  }) async {
-    final response = listResponse;
-    if (response != null && method == 'getAll') return response as T;
-    throw TimeoutException('offline');
-  }
-}
-
+/// Deserializes what the local snapshot stored, and names the test model on the
+/// way out. The naming half is what `classNames` would have given; the
+/// deserializing half is why this test spells it out.
 class _OfflineReadProtocol extends SerializationManager {
   @override
   T deserialize<T>(dynamic value, [Type? type]) {

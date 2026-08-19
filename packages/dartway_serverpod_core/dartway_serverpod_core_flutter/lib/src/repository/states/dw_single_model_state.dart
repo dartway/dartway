@@ -34,7 +34,7 @@ class DwSingleModelState<Model extends SerializableModel>
         : await DwRepository.executeRead<Model, DwModelWrapper>(
             queryKey: config.queryKey,
             readStrategy: config.readStrategy,
-            onlineRequest: () => dw.endpointCaller.dwCrud.getOne(
+            onlineRequest: () => dw.serverTransport.getOne(
               className: DwRepository.typeName<Model>(),
               filter: config.backendFilter,
               apiGroup: config.apiGroupOverride,
@@ -68,7 +68,7 @@ class DwSingleModelState<Model extends SerializableModel>
     final readResult = await DwRepository.executeRead<Model, DwModelWrapper>(
       queryKey: config.queryKey,
       readStrategy: config.readStrategy,
-      onlineRequest: () => dw.endpointCaller.dwCrud.getOne(
+      onlineRequest: () => dw.serverTransport.getOne(
         className: DwRepository.typeName<Model>(),
         filter: config.backendFilter,
         apiGroup: config.apiGroupOverride,

@@ -242,7 +242,7 @@ class DwRepository {
   }) => _executeWrite<DwModelWrapper, Model>(
     capturePreparedWrite: () =>
         _capturePreparedSaveWrite(model: model, apiGroup: apiGroupOverride),
-    onlineRequest: () => dw.endpointCaller.dwCrud.saveModel(
+    onlineRequest: () => dw.serverTransport.saveModel(
       wrappedModel: DwModelWrapper.wrap(model: model),
       apiGroup: apiGroupOverride,
     ),
@@ -257,7 +257,7 @@ class DwRepository {
   }) => _executeWrite<DwModelWrapper, DwApiResponse<DwModelWrapper>>(
     capturePreparedWrite: () =>
         _capturePreparedSaveWrite(model: model, apiGroup: apiGroupOverride),
-    onlineRequest: () => dw.endpointCaller.dwCrud.saveModel(
+    onlineRequest: () => dw.serverTransport.saveModel(
       wrappedModel: DwModelWrapper.wrap(model: model),
       apiGroup: apiGroupOverride,
     ),
@@ -282,7 +282,7 @@ class DwRepository {
         modelId: modelId,
         apiGroup: apiGroupOverride,
       ),
-      onlineRequest: () => dw.endpointCaller.dwCrud.delete(
+      onlineRequest: () => dw.serverTransport.delete(
         className: DwModelWrapper.getClassNameForObject(model),
         modelId: modelId,
         apiGroup: apiGroupOverride,
@@ -394,7 +394,7 @@ class DwRepository {
         },
       ),
       readStrategy: readStrategy,
-      onlineRequest: () => dw.endpointCaller.dwCrud.getAll(
+      onlineRequest: () => dw.serverTransport.getAll(
         className: className,
         filter: filter,
         orderByList: orderByList,
@@ -805,7 +805,7 @@ class DwRepository {
     DwBackendFilter? filter,
     String? apiGroupOverride,
   }) async {
-    final response = await dw.endpointCaller.dwCrud.getCount(
+    final response = await dw.serverTransport.getCount(
       className: typeName<Model>(),
       filter: filter,
       apiGroup: apiGroupOverride,

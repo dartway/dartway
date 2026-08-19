@@ -1,8 +1,5 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
-import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart'
-    as dartway;
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +17,27 @@ class DwCore<
   UserProfileClass extends SerializableModel
 >
     extends DwFlutter {
-  final ServerpodClientClass client;
+  final ServerpodClientClass? _client;
+
+  /// This app's own generated Serverpod client — for the endpoints the app
+  /// declared itself. DartWay's own CRUD does not travel through it; that is
+  /// [serverTransport].
+  ///
+  /// Throws when the core was built without one, which only happens in a test
+  /// that passed a `transport` instead. An application always has a client, so
+  /// this stays non-nullable and `dw.client` needs no `!`.
+  ServerpodClientClass get client {
+    final client = _client;
+    if (client == null) {
+      throw StateError(
+        'DwCore was built without a Serverpod client.\n'
+        'Only a test does that (it passed transport: instead). Application '
+        'code reaching dw.client means the core was built the wrong way.',
+      );
+    }
+    return client;
+  }
+
   final DwAlerts dwAlerts;
   late final DwSessionService<UserProfileClass>? sessionService;
   late final DwSocketService? socketService;
@@ -68,7 +85,15 @@ class DwCore<
   Provider<int?> get signedInUserIdProvider =>
       _userProfileProviders.signedInUserId;
 
-  late final dartway.Caller endpointCaller;
+  /// The wire `dw.repo` speaks — the single path every CRUD call, realtime
+  /// subscription and upload takes to the server.
+  ///
+  /// An app reads and writes through `dw.repo` and never needs this. Reach for
+  /// it in the two cases the repository cannot cover: a test substitutes it
+  /// (`DwRecordingServerTransport` from
+  /// `package:dartway_serverpod_core_flutter/testing.dart`), and a dev stand
+  /// exercises a DartWay endpoint deliberately.
+  final DwServerTransport serverTransport;
 
   final int? Function(UserProfileClass? user) getUserId;
 
@@ -78,32 +103,46 @@ class DwCore<
   /// never reach the global error handler.
   final void Function(DwSocketStatus status)? onSocketStatusChanged;
 
+  static ServerpodClientShared _requireClient(ServerpodClientShared? client) {
+    if (client == null) {
+      throw ArgumentError(
+        'DwCore has no way to reach the server.\n'
+        'Pass client: <your generated Client>, or — from a test — '
+        'transport: DwRecordingServerTransport(...).',
+      );
+    }
+    return client;
+  }
+
+  /// Builds the core.
+  ///
+  /// [client] is this app's generated Serverpod client, and is what an
+  /// application always passes: the DartWay CRUD transport is derived from it.
+  /// [transport] replaces that derivation — pass it *instead of* [client] in a
+  /// test, so nothing has to stand up a Serverpod client to see a widget draw
+  /// or a save leave. Exactly one of the two is required; when both are given
+  /// [transport] wins and [client] stays reachable as `dw.client`.
   DwCore({
     required super.config,
-    required this.client,
+    ServerpodClientClass? client,
+    DwServerTransport? transport,
     required this.dwAlerts,
     required this.getUserId,
     super.plugins,
     this.onSocketStatusChanged,
-  }) {
+  }) : _client = client,
+       // In the initializer list, so a core with neither is refused *before*
+       // the superclass claims the ambient `dw` — a half-built core registered
+       // as the one and only is worse than the error that produced it.
+       serverTransport =
+           transport ?? DwServerpodTransport(_requireClient(client)) {
     setDwInstance(this);
 
-    DwCoreServerpodClient.protocol = client.serializationManager;
+    DwCoreServerpodClient.protocol = serverTransport.serializationManager;
 
-    final dartwayCaller = client.moduleLookup.values.firstWhereOrNull(
-      (e) => e is dartway.Caller,
-    );
-
-    if (dartwayCaller == null) {
-      throw Exception(
-        'DartWay Core module not found. '
-        'Add dartway_serverpod_core module to the client.',
-      );
-    }
-    endpointCaller = dartwayCaller as dartway.Caller;
     socketService = DwSocketService(
       openChannelStream: (channel) =>
-          endpointCaller.dwCrud.subscribeOnUpdates(channel: channel),
+          serverTransport.subscribeOnUpdates(channel: channel),
       reportError: handleError,
       onStatusChanged: onSocketStatusChanged,
       // The server ended this app's subscriptions because the account is no
@@ -114,7 +153,7 @@ class DwCore<
           unawaited(sessionService?.invalidateSession() ?? Future.value()),
     );
 
-    final keyProvider = client.authKeyProvider;
+    final keyProvider = _client?.authKeyProvider;
 
     if (keyProvider is DwAuthenticationKeyManager) {
       int? socketUserId;
@@ -129,7 +168,7 @@ class DwCore<
         // filters by the authenticated user, so an empty answer means the
         // stored key no longer identifies this user — see [DwSessionService].
         fetchUserProfile: (userId) async {
-          final response = await endpointCaller.dwCrud.getOne(
+          final response = await serverTransport.getOne(
             className: DwRepository.typeName<UserProfileClass>(),
             filter: DwBackendFilter<int>.value(
               type: DwBackendFilterType.equals,
@@ -146,7 +185,7 @@ class DwCore<
           return wrapper?.model as UserProfileClass?;
         },
         deleteAuthKey: (authKeyId) async {
-          await endpointCaller.dwCrud.delete(
+          await serverTransport.delete(
             className: 'DwAuthKey',
             modelId: authKeyId,
             apiGroup: DwCoreConst.dartwayInternalApi,

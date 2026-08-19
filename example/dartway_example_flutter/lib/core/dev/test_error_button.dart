@@ -29,8 +29,10 @@ class TestErrorButton extends ConsumerWidget {
             )(context);
           case 'call':
             // A server call that fails on the backend → onFailedCall path
-            // with `endpoint.method` attached.
-            dw.endpointCaller.dwCrud.getOne(
+            // with `endpoint.method` attached. Straight down the transport,
+            // deliberately: dw.repo would be the way to actually read
+            // something, and there is nothing here to read.
+            dw.serverTransport.getOne(
               className: 'NoSuchModel',
               filter: const DwBackendFilter<int>.value(
                 type: DwBackendFilterType.equals,

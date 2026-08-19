@@ -2,6 +2,31 @@
 
 ## 0.8.0
 
+- **`dartway check` reads the server now, and names three things a project is missing.** Every one
+  of them fails *closed*: the code compiles, the server starts, the migration applies, and the app
+  quietly cannot do something.
+
+  `crudConfigMissing` (warning) — a model with a table and no `DwCrudConfig`. Generic CRUD is secure
+  by default, so an unconfigured model answers `notConfigured` to every read and write; the list is
+  simply empty forever. A warning and not an error because the absence has a second, legitimate
+  reading — a table the server owns alone — which the check cannot tell apart and you can.
+
+  `crudConfigUnregistered` (error) — a config that exists and is not in the `crudConfigurations`
+  list. The same failure with no second reading, and the one that hides best: the file is there, it
+  has the access rules in it, it reviews as finished, and the API answers exactly as if it had never
+  been written. Nothing else in the toolchain has an opinion — it compiles, and a config is a value
+  nobody is obliged to use.
+
+  `crudRuleUntested` (warning) — a config carrying hand-written save or delete logic that no test in
+  the server package names. The rule runs inside a request and reads the database to decide, so no
+  widget test can reach it; one proving the admin-only button is hidden proves only that.
+
+  **None of the three counts anything** — each finding names one model and one thing to do. Two
+  things the checker could have guessed at are deliberately absent for that reason: a Flutter
+  feature's tests are not countable without becoming a coverage percentage, and an *Event model* is a
+  domain reading with no marker in the YAML (a rule keyed off an `*Event` suffix would miss the one
+  called `BalanceEntry` and fire on a lookup table).
+
 - **The deploy templates now ship the configuration that serves a Flutter web build, and it caches
   by what is actually hashed.** Nothing was shipped before, so every project wrote its own, and what
   they wrote applied the rule everybody knows — "fingerprinted assets are immutable, cache them for

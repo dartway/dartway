@@ -31,7 +31,7 @@ worse than a missing one — the agent writes non-working code with full confide
 ```
 .claude/
   CLAUDE.md                    # the methodology, always in the agent's context
-  skills/dartway-*/SKILL.md    # 12 skills, loaded by relevance to the task
+  skills/dartway-*/SKILL.md    # 13 skills, loaded by relevance to the task
   commands/commit.md
   commands/dartway-checkup.md
 ```
@@ -158,6 +158,13 @@ raw styles inside features.
 **`dartway-push-delivery`** — server-side push through the optional `dartway_push_server` module:
 the engine, recipient resolution, FCM/RuStore transports, idempotent enqueue, retries, campaign
 progress. Opt-in — an app that does not depend on it has no push tables.
+
+**`dartway-testing`** — where a test goes and how to write it: a rule from a `DwCrudConfig` is an
+integration test on the server against a live database, plain logic is a unit test, and a feature is
+a widget test with the core booted and the server standing in as a recording transport. A DartWay
+feature saves for itself and hands no callback out, so the technique is not guessable — and the
+skeleton ships a worked example of each layer in its `test/` folder. Also what is deliberately not
+tested, and why there are no coverage thresholds.
 
 **`dartway-finish`** — the definition of done before a commit or PR: audits the diff against the
 contract, checks the feature's description for drift and the test coverage, then shows suggestions

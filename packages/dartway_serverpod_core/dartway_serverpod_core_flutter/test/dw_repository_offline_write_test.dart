@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
+import 'package:dartway_serverpod_core_flutter/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  late _OfflineWriteClient client;
+  late DwRecordingServerTransport transport;
   late _TestLocalStore store;
   late _RecordingLocalWrites localWrites;
 
@@ -13,11 +14,16 @@ void main() {
   // no setter to swap it with, which is the point of declaring it here. Each
   // test gets a fresh recorder inside the same plugin instead.
   setUpAll(() {
-    client = _OfflineWriteClient();
+    transport = DwRecordingServerTransport(
+      classNames: <Type, String>{
+        _OfflineWriteModel: 'OfflineWriteModel',
+        _OtherWriteModel: 'OtherWriteModel',
+      },
+    );
     store = _TestLocalStore();
-    DwCore<_OfflineWriteClient, _OfflineWriteModel>(
+    DwCore<ServerpodClientShared, _OfflineWriteModel>(
       config: const DwConfig(),
-      client: client,
+      transport: transport,
       dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
       getUserId: (_) => null,
       plugins: [store],
@@ -28,7 +34,7 @@ void main() {
   });
 
   setUp(() {
-    client.reset();
+    transport.reset();
     localWrites = _RecordingLocalWrites();
     store.writes = localWrites;
   });
@@ -48,7 +54,7 @@ void main() {
       localWrites.optInSaves = false;
       final savedModel = const _OfflineWriteModel(id: 91, title: 'server');
       final savedWrapper = DwModelWrapper.wrap(model: savedModel);
-      client.saveHandler = (_) async => DwApiResponse<DwModelWrapper>(
+      transport.answerSave = (_) async => DwApiResponse<DwModelWrapper>(
         isOk: true,
         value: savedWrapper,
         updatedModels: <DwModelWrapper>[savedWrapper],
@@ -69,7 +75,7 @@ void main() {
       expect(result.title, 'server');
       expect(localWrites.enqueuedMutations, isEmpty);
       expect(receivedUpdates, hasLength(1));
-      expect(client.saveApiGroups, ['learning']);
+      expect(transport.saves.map((save) => save.apiGroup), ['learning']);
     },
   );
 
@@ -84,7 +90,7 @@ void main() {
       final relatedWrapper = DwModelWrapper.wrap(
         model: const _OfflineWriteModel(id: 93, title: 'related response'),
       );
-      client.saveHandler = (_) async => DwApiResponse<DwModelWrapper>(
+      transport.answerSave = (_) async => DwApiResponse<DwModelWrapper>(
         isOk: true,
         value: savedWrapper,
         updatedModels: <DwModelWrapper>[relatedWrapper],
@@ -106,13 +112,13 @@ void main() {
       expect(receivedUpdates, [
         <DwModelWrapper>[relatedWrapper],
       ]);
-      expect(client.saveApiGroups, ['learning']);
+      expect(transport.saves.map((save) => save.apiGroup), ['learning']);
     },
   );
 
   test('online delete success returns true and does not enqueue', () async {
     localWrites.optInDeletes = false;
-    client.deleteHandler = (_) async =>
+    transport.answerDelete = (_) async =>
         const DwApiResponse<bool>(isOk: true, value: true);
 
     final result = await const DwRepo().deleteModel(
@@ -122,8 +128,8 @@ void main() {
 
     expect(result, isTrue);
     expect(localWrites.enqueuedMutations, isEmpty);
-    expect(client.deletedModelIds, [17]);
-    expect(client.deleteApiGroups, ['learning']);
+    expect(transport.deletes.map((d) => d.modelId), [17]);
+    expect(transport.deletes.map((d) => d.apiGroup), ['learning']);
   });
 
   test(
@@ -150,7 +156,7 @@ void main() {
       ];
 
       for (final failingResponse in failingResponses) {
-        client.saveHandler = (_) => failingResponse;
+        transport.answerSave = (_) => failingResponse;
 
         await expectLater(
           const DwRepo().saveModel(const _OfflineWriteModel(title: 'draft')),
@@ -167,7 +173,7 @@ void main() {
       final failure = TimeoutException('offline');
       final originalStackTrace = StackTrace.current;
       localWrites.optInSaves = false;
-      client.saveHandler = (_) => Future<DwApiResponse<DwModelWrapper>>.error(
+      transport.answerSave = (_) => Future<DwApiResponse<DwModelWrapper>>.error(
         failure,
         originalStackTrace,
       );
@@ -191,7 +197,7 @@ void main() {
     () async {
       final failure = TimeoutException('offline');
       store.writes = null;
-      client.deleteHandler = (_) async => throw failure;
+      transport.answerDelete = (_) async => throw failure;
 
       await expectLater(
         const DwRepo().deleteModel(const _OfflineWriteModel(id: 31)),
@@ -204,8 +210,7 @@ void main() {
     'connection failure queues an opted-in save once and returns the optimistic model',
     () async {
       localWrites.saveMetadata = <String, dynamic>{'source': 'draft'};
-      client.saveHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerSave = (_) async => throw TimeoutException('offline');
       localWrites.optimisticSaveResponse = DwApiResponse<DwModelWrapper>(
         isOk: true,
         value: DwModelWrapper.wrap(
@@ -232,7 +237,8 @@ void main() {
           model: const _OfflineWriteModel(id: 801, title: 'offline'),
         ),
       );
-      client.saveHandler = (_) async => throw TimeoutException('lost response');
+      transport.answerSave = (_) async =>
+          throw TimeoutException('lost response');
 
       final result = await const DwRepo().saveModel(
         const _OfflineWriteModel(title: 'draft'),
@@ -240,7 +246,7 @@ void main() {
 
       expect(result.id, 801);
       expect(
-        client.saveCallCount,
+        transport.saves.length,
         1,
         reason:
             'Opting a write into local storage must not reroute how it is '
@@ -250,33 +256,29 @@ void main() {
     },
   );
 
-  test(
-    'an opted-in save that succeeds online is never queued',
-    () async {
-      client.saveHandler = (_) async => DwApiResponse<DwModelWrapper>(
-        isOk: true,
-        value: DwModelWrapper.wrap(
-          model: const _OfflineWriteModel(id: 802, title: 'server'),
-        ),
-      );
+  test('an opted-in save that succeeds online is never queued', () async {
+    transport.answerSave = (_) async => DwApiResponse<DwModelWrapper>(
+      isOk: true,
+      value: DwModelWrapper.wrap(
+        model: const _OfflineWriteModel(id: 802, title: 'server'),
+      ),
+    );
 
-      final result = await const DwRepo().saveModel(
-        const _OfflineWriteModel(title: 'draft'),
-      );
+    final result = await const DwRepo().saveModel(
+      const _OfflineWriteModel(title: 'draft'),
+    );
 
-      expect(result.id, 802);
-      expect(result.title, 'server');
-      expect(client.saveCallCount, 1);
-      expect(localWrites.enqueuedMutations, isEmpty);
-    },
-  );
+    expect(result.id, 802);
+    expect(result.title, 'server');
+    expect(transport.saves.length, 1);
+    expect(localWrites.enqueuedMutations, isEmpty);
+  });
 
   test(
     'connection failure queues an opted-in delete once and returns true',
     () async {
       localWrites.deleteMetadata = <String, dynamic>{'reason': 'archive'};
-      client.deleteHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerDelete = (_) async => throw TimeoutException('offline');
 
       final result = await const DwRepo().deleteModel(
         const _OfflineWriteModel(id: 33, title: 'server'),
@@ -297,8 +299,7 @@ void main() {
       'reason': 'offline-sync',
       'nested': <String, dynamic>{'attempt': 1},
     };
-    client.saveHandler = (_) async =>
-        throw TimeoutException('offline');
+    transport.answerSave = (_) async => throw TimeoutException('offline');
     localWrites.optimisticSaveResponse = DwApiResponse<DwModelWrapper>(
       isOk: true,
       value: DwModelWrapper.wrap(
@@ -338,7 +339,7 @@ void main() {
     );
 
     expect(result, isTrue);
-    expect(client.deletedModelIds, isEmpty);
+    expect(transport.deletes.map((d) => d.modelId), isEmpty);
     expect(localWrites.enqueuedMutations, isEmpty);
   });
 
@@ -347,7 +348,7 @@ void main() {
     () async {
       final receivedUpdates = <List<DwModelWrapper>>[];
       final requestStarted = Completer<void>();
-      client.saveHandler = (_) async {
+      transport.answerSave = (_) async {
         requestStarted.complete();
         throw TimeoutException('offline');
       };
@@ -378,8 +379,7 @@ void main() {
       final allowEnqueue = Completer<void>();
       localWrites.enqueueReached = enqueueReached;
       localWrites.allowEnqueue = allowEnqueue;
-      client.saveHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerSave = (_) async => throw TimeoutException('offline');
       DwRepository.addUpdatesListener<_OfflineWriteModel>(receivedUpdates.add);
       addTearDown(
         () => DwRepository.removeUpdatesListener<_OfflineWriteModel>(
@@ -404,8 +404,7 @@ void main() {
     'surfaces enqueue failure instead of reporting offline success',
     () async {
       localWrites.enqueueFailure = StateError('disk full');
-      client.saveHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerSave = (_) async => throw TimeoutException('offline');
 
       await expectLater(
         const DwRepo().saveModel(const _OfflineWriteModel(title: 'draft')),
@@ -423,13 +422,12 @@ void main() {
   test(
     'healthy online success ignores a malformed fallback save plan',
     () async {
-      client.saveHandler = (_) async =>
-          DwApiResponse<DwModelWrapper>(
-            isOk: true,
-            value: DwModelWrapper.wrap(
-              model: const _OfflineWriteModel(id: 902, title: 'server'),
-            ),
-          );
+      transport.answerSave = (_) async => DwApiResponse<DwModelWrapper>(
+        isOk: true,
+        value: DwModelWrapper.wrap(
+          model: const _OfflineWriteModel(id: 902, title: 'server'),
+        ),
+      );
       localWrites.optimisticSaveResponse = DwApiResponse<DwModelWrapper>(
         isOk: true,
         value: DwModelWrapper.wrap(
@@ -447,7 +445,7 @@ void main() {
 
       expect(result.id, 902);
       expect(localWrites.enqueuedMutations, isEmpty);
-      expect(client.saveCallCount, 1);
+      expect(transport.saves.length, 1);
     },
   );
 
@@ -455,8 +453,7 @@ void main() {
     'rejects a malformed fallback save plan after transport failure and before enqueue',
     () async {
       final receivedUpdates = <List<DwModelWrapper>>[];
-      client.saveHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerSave = (_) async => throw TimeoutException('offline');
       localWrites.optimisticSaveResponse = DwApiResponse<DwModelWrapper>(
         isOk: true,
         value: DwModelWrapper.wrap(
@@ -482,20 +479,20 @@ void main() {
 
       expect(receivedUpdates, isEmpty);
       expect(localWrites.enqueuedMutations, isEmpty);
-      expect(client.saveCallCount, 1);
+      expect(transport.saves.length, 1);
     },
   );
 
   test(
     'rejects malformed optimistic save and delete result shapes before enqueue',
     () async {
-      client.saveHandler = (_) async =>
-          throw TimeoutException('offline');
-      client.deleteHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerSave = (_) async => throw TimeoutException('offline');
+      transport.answerDelete = (_) async => throw TimeoutException('offline');
 
-      localWrites.optimisticSaveResponse =
-          const DwApiResponse<DwModelWrapper>(isOk: true, value: null);
+      localWrites.optimisticSaveResponse = const DwApiResponse<DwModelWrapper>(
+        isOk: true,
+        value: null,
+      );
       await expectLater(
         const DwRepo().saveModel(const _OfflineWriteModel(title: 'draft')),
         throwsA(isA<StateError>()),
@@ -866,8 +863,7 @@ void main() {
   test(
     'generated mutation ids are 128-bit hex tokens and stay unique across many writes',
     () async {
-      client.saveHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerSave = (_) async => throw TimeoutException('offline');
       final mutationIds = <String>{};
 
       for (var index = 0; index < 40; index++) {
@@ -895,8 +891,7 @@ void main() {
     'rejects listener-unsafe optimistic updatedModels instead of publishing them',
     () async {
       final receivedUpdates = <List<DwModelWrapper>>[];
-      client.saveHandler = (_) async =>
-          throw TimeoutException('offline');
+      transport.answerSave = (_) async => throw TimeoutException('offline');
       localWrites.optimisticSaveResponse = DwApiResponse<DwModelWrapper>(
         isOk: true,
         value: DwModelWrapper.wrap(
@@ -922,8 +917,8 @@ void main() {
 
       expect(receivedUpdates, isEmpty);
       expect(localWrites.enqueuedMutations, isEmpty);
-      expect(client.saveApiGroups, [null]);
-      expect(client.saveCallCount, 1);
+      expect(transport.saves.map((save) => save.apiGroup), [null]);
+      expect(transport.saves.length, 1);
     },
   );
 }
@@ -947,90 +942,9 @@ class _OtherWriteModel implements SerializableModel {
   Map<String, dynamic> toJson() => <String, dynamic>{'id': id};
 }
 
-class _OfflineWriteProtocol extends SerializationManager {
-  @override
-  String? getClassNameForObject(Object? value) => switch (value) {
-    _OfflineWriteModel() => 'OfflineWriteModel',
-    _OtherWriteModel() => 'OtherWriteModel',
-    _ => super.getClassNameForObject(value),
-  };
-}
-
-class _OfflineWriteClient extends ServerpodClientShared {
-  _OfflineWriteClient()
-    : super(
-        'http://localhost:8080',
-        _OfflineWriteProtocol(),
-        streamingConnectionTimeout: null,
-        connectionTimeout: null,
-      ) {
-    _caller = Caller(this);
-  }
-
-  late final Caller _caller;
-  Future<Object?> Function(Map<String, dynamic> args)? saveHandler;
-  Future<Object?> Function(Map<String, dynamic> args)? deleteHandler;
-  final saveApiGroups = <String?>[];
-  final deleteApiGroups = <String?>[];
-  final deletedModelIds = <int>[];
-  var saveCallCount = 0;
-  var deleteCallCount = 0;
-
-  void reset() {
-    saveHandler = null;
-    deleteHandler = null;
-    saveApiGroups.clear();
-    deleteApiGroups.clear();
-    deletedModelIds.clear();
-    saveCallCount = 0;
-    deleteCallCount = 0;
-  }
-
-  @override
-  Map<String, ModuleEndpointCaller> get moduleLookup =>
-      <String, ModuleEndpointCaller>{'dartway_serverpod_core': _caller};
-
-  @override
-  Map<String, EndpointRef> get endpointRefLookup => <String, EndpointRef>{};
-
-  @override
-  Future<T> callServerEndpoint<T>(
-    String endpoint,
-    String method,
-    Map<String, dynamic> args, {
-    bool authenticated = true,
-  }) async {
-    if (endpoint != 'dartway_serverpod_core.dwCrud') {
-      throw StateError('Unexpected endpoint request: $endpoint.$method');
-    }
-    if (method == 'saveModel') {
-      saveCallCount++;
-      saveApiGroups.add(args['apiGroup'] as String?);
-      return await (saveHandler?.call(args) ??
-              Future<Object?>.error(
-                StateError('Missing save test handler for $method'),
-              ))
-          as T;
-    }
-    if (method == 'delete') {
-      deleteCallCount++;
-      deleteApiGroups.add(args['apiGroup'] as String?);
-      deletedModelIds.add(args['modelId'] as int);
-      return await (deleteHandler?.call(args) ??
-              Future<Object?>.error(
-                StateError('Missing delete test handler for $method'),
-              ))
-          as T;
-    }
-    throw StateError('Unexpected endpoint request: $endpoint.$method');
-  }
-}
-
 class _RecordingLocalWrites implements DwRepoLocalWrites {
   DwRepoScope _currentScope = DwRepoScope('first-user');
-  late DwRepoBinding _currentBinding = DwRepoBinding(
-    scope: _currentScope,
-  );
+  late DwRepoBinding _currentBinding = DwRepoBinding(scope: _currentScope);
 
   final enqueuedMutations = <DwRepoMutation>[];
   bool optInSaves = true;

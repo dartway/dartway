@@ -10,6 +10,8 @@ export 'src/app/socket/domain/dw_socket_status.dart';
 export 'src/app/socket/dw_channel_subscription_widget.dart';
 export 'src/app/socket/service/streaming_error_classifier.dart';
 export 'src/core/dw_core.dart';
+export 'src/transport/dw_server_transport.dart';
+export 'src/transport/dw_serverpod_transport.dart';
 export 'src/utils/connection_error_handling.dart';
 export 'src/repository/domain/dw_backend_filters_mixin.dart';
 export 'src/repository/domain/dw_cursor_pagination.dart';
