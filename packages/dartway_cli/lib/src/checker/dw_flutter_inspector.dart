@@ -84,6 +84,14 @@ class DwFlutterInspector {
   /// the rule *said* is the thing worth asserting.
   Set<DwCheckType> get findingTypes => _stats.keys.toSet();
 
+  /// What this run actually said, in order. Exposed for the tests alongside
+  /// [findingTypes]: a diagnostic that names no destination leaves the author
+  /// to find the intended shape by moving files until the rule stops firing,
+  /// and that half of a check is only assertable on its text.
+  List<String> get findingMessages => [
+    for (final finding in _findings) finding.message,
+  ];
+
   late final String _packageName = _readPackageName();
 
   String get _libPath => p.join(packageDir.path, 'lib');
@@ -249,7 +257,10 @@ class DwFlutterInspector {
           '${_libRelative(unused.file.path)} is referenced by nothing in '
           '$owner (${unused.declaredNames.join(', ')}) — nobody outside the '
           'feature may import it, so this is dead code the compiler cannot '
-          'see',
+          'see. Delete it, or move it to where its caller can reach it: a '
+          'building block with no story of its own to lib/shared/, wiring '
+          'several features share to lib/core/, a platform trio '
+          '(x.dart + x_stub.dart + x_web.dart) to lib/core/platform/',
           owner,
         );
       }
@@ -505,6 +516,9 @@ class DwFlutterInspector {
 
   void _checkUiKitTextConstants(String rel, String content) {
     final lines = content.split('\n');
+    var insideFallbackList = false;
+
+    outer:
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i].trim();
 
@@ -513,34 +527,90 @@ class DwFlutterInspector {
       // flagging them taught authors to write worse documentation.
       if (line.startsWith('//') || line.startsWith('*')) continue;
 
-      final match = RegExp('''["']([^"']{3,})["']''').firstMatch(line);
-      if (match == null) continue;
+      final openedFallbackList = insideFallbackList;
+      insideFallbackList = _fontFallbackListContinues(line, insideFallbackList);
 
-      final value = match.group(1);
-      // Skip paths, translations, interpolations, date formats and the like.
-      final isException =
-          value == null ||
-          value.contains(RegExp(r'\.svg$|\.png$|\.dart$|\.json$')) ||
-          value.startsWith('../') ||
-          value.startsWith(r'$') ||
-          value.startsWith(r'r$') ||
-          value.contains('i18n') ||
-          value.contains('.tr') ||
-          value.contains('assets') ||
-          value.contains('path') ||
-          value.contains('svg') ||
-          value.contains('AppText.') ||
-          RegExp(r'^[dMyHms.:/\-\s]+$').hasMatch(value);
+      for (final match in _uiKitTextLiteral.allMatches(line)) {
+        // A typeface is not a label: nobody reads `'monospace'`, it is never
+        // translated, and the kit is exactly where a font belongs — so there
+        // is nowhere the rule could ask for it to be moved. Only the literals
+        // in that position are exempt; a real label on the same line is still
+        // a label that leaked into the kit.
+        if (_isFontFamilyLiteral(line, match.start, openedFallbackList)) {
+          continue;
+        }
 
-      if (!isException) {
-        _add(
-          DwCheckType.uiKitContainsText,
-          '$rel contains text constant: "$value" (line ${i + 1})',
-          'ui_kit',
-        );
+        final value = match.group(1);
+        // Skip paths, translations, interpolations, date formats and the like.
+        final isException =
+            value == null ||
+            value.contains(RegExp(r'\.svg$|\.png$|\.dart$|\.json$')) ||
+            value.startsWith('../') ||
+            value.startsWith(r'$') ||
+            value.startsWith(r'r$') ||
+            value.contains('i18n') ||
+            value.contains('.tr') ||
+            value.contains('assets') ||
+            value.contains('path') ||
+            value.contains('svg') ||
+            value.contains('AppText.') ||
+            RegExp(r'^[dMyHms.:/\-\s]+$').hasMatch(value);
+
+        if (!isException) {
+          _add(
+            DwCheckType.uiKitContainsText,
+            '$rel contains text constant: "$value" (line ${i + 1})',
+            'ui_kit',
+          );
+          break outer;
+        }
+
+        // Only the first literal of a line is judged — the rest of the line is
+        // the same expression, and one finding per file is the report anyway.
         break;
       }
     }
+  }
+
+  /// Whether the literal starting at [start] names a typeface: it either sits
+  /// directly in the `fontFamily` argument, or inside a `fontFamilyFallback`
+  /// list — one that opened earlier on this line, or on an earlier one
+  /// ([insideFallbackList]).
+  bool _isFontFamilyLiteral(String line, int start, bool insideFallbackList) {
+    if (insideFallbackList) {
+      // The list came from an earlier line, so there is no `[` on this one to
+      // measure against — the exemption ends at the `]` instead. Without that
+      // column a line closing the list carries the exemption over everything
+      // written after it, and a label sharing that line stops being reported.
+      final closes = _maskLiterals(line).indexOf(']');
+      return closes < 0 || start < closes;
+    }
+    final before = line.substring(0, start);
+    return _fontFamilyArgument.hasMatch(before) ||
+        _fontFamilyFallbackOpen.hasMatch(before);
+  }
+
+  /// [line] with every string literal blanked out, so a bracket written
+  /// inside one is not read as code. Each literal is replaced by as many
+  /// characters as it had: the exemption is measured in columns, and a mask
+  /// that shortened the line would move them.
+  static String _maskLiterals(String line) => line.replaceAllMapped(
+    _uiKitTextLiteral,
+    (match) => '_' * match.group(0)!.length,
+  );
+
+  /// Whether a `fontFamilyFallback: [...]` list is still open after [line].
+  /// `dart format` breaks a long fallback list across lines, so the exemption
+  /// has to survive the line ends.
+  bool _fontFallbackListContinues(String line, bool wasOpen) {
+    final code = _maskLiterals(line);
+    if (wasOpen) return !code.contains(']');
+
+    final at = code.indexOf('fontFamilyFallback');
+    if (at < 0) return false;
+
+    final tail = code.substring(at);
+    return tail.contains('[') && !tail.contains(']');
   }
 
   // ------------------------------------------------------------------ report
@@ -670,3 +740,15 @@ class _DwGrade {
   final String letter;
   final String badge;
 }
+
+/// A quoted run of at least three characters — what the kit rule reads as a
+/// candidate text constant.
+final _uiKitTextLiteral = RegExp('''["']([^"']{3,})["']''');
+
+/// `fontFamily: 'monospace'` — the literal sits directly in that argument.
+final _fontFamilyArgument = RegExp(r'\bfontFamily\s*:\s*(?:const\s+)?$');
+
+/// A literal inside a `fontFamilyFallback: [...]` list opened on the same line.
+final _fontFamilyFallbackOpen = RegExp(
+  r'\bfontFamilyFallback\s*:[^\]]*\[[^\]]*$',
+);

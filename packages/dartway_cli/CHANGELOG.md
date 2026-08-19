@@ -69,6 +69,38 @@
   deleting it does not undo that. `dartway-finish` reports a filed entry by its issue's real state and
   offers to file the ones that have none; it never pushes on its own.
 
+- **`unusedFeatureFile` reads declarations it used to miss, and follows the one link it used to
+  cut.** Two false positives, one bill: the only way to a green check was to rewrite working code.
+  The symbol index covered classes, enums and top-level variables — and, because the variable
+  pattern was not anchored to column 0, every `final blob = …` *inside a function body* as well.
+  Functions and getters themselves it did not read at all, so a file whose only public member was a
+  top-level function was judged on the names of its own locals, which appear nowhere else by
+  definition, and reported as dead while the function was called from the next file over. Functions
+  and getters are indexed now, and a top-level variable has to start at column 0 to be one.
+
+  The second is a conditional-import trio — `foo.dart` forwarding to `foo_stub.dart` /
+  `foo_web.dart`. It is one symbol in three files: the forwarder declares nothing at all, and each
+  half is a platform the other build never compiles, so read one file at a time none of them has a
+  visible caller. The three now answer as one unit — alive when anything outside the trio uses any
+  of their names, and reported *in full* otherwise, the forwarder included, which is the half the
+  check used to leave standing.
+
+- **The `unusedFeatureFile` finding now names where the file should go instead.** "Dead code" is
+  half an answer: a file its own feature stopped using is often a file somebody else needs, and the
+  message said nothing about where that somebody may reach it from. The intended shape was learned
+  by moving the file until the rule stopped firing — which, for a platform trio, meant discovering
+  `lib/core/platform/` by elimination. The message now names all three homes: `lib/shared/` for a
+  building block with no story of its own, `lib/core/` for wiring several features share, and
+  `lib/core/platform/` for a platform trio.
+
+- **`uiKitContainsText` no longer reads a font family as a label.** `fontFamily: 'monospace'` and
+  the names inside `fontFamilyFallback` are typeface identifiers the platform's font matcher reads
+  and nobody else does: never translated, and with nowhere to be moved to, because the kit is
+  exactly where fonts belong. The finding named a line with no fix behind it. String literals in
+  those two positions are exempt now — including a fallback list `dart format` broke across several
+  lines — and the exemption is positional rather than per line, so a real label sharing the line
+  with a font family is still found, and still the one the message quotes.
+
 ## 0.7.0
 
 - **`frameworkRefsDiverged` (warning): the framework arriving in halves.** An app that consumes
