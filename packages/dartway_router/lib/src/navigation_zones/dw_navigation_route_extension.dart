@@ -66,10 +66,25 @@ extension DwNavigationRouteExtension on DwNavigationRoute {
 
   /// Checks if this route is currently active in the navigation stack.
   ///
-  /// Returns `true` if the current location matches this route's [fullPath]
-  /// exactly, or if the current location starts with this route's full path
-  /// followed by a '/'. This allows detection of active routes even when
-  /// nested child routes are active.
+  /// Returns `true` when the current location is this route's own address, or
+  /// an address nested under it — a parent route stays active while one of its
+  /// children is on screen, which is what keeps a navigation item highlighted
+  /// on a nested page.
+  ///
+  /// Path parameters are resolved before the comparison: [fullPath] is a
+  /// template (`/project/:projectId/issues`) while the location is a concrete
+  /// address (`/project/7/issues`), so every `:param` segment is compared
+  /// against [GoRouterState.pathParameters] instead of being matched
+  /// literally. A parameter the current location does not carry leaves the
+  /// route inactive — its value is unknown, so this route cannot be the open
+  /// one.
+  ///
+  /// The comparison runs per path segment, so a route is never active merely
+  /// because its path is a string prefix of the location: `/news` is not
+  /// active at `/newsletter`.
+  ///
+  /// A zone root with an empty path (`/`) is active at its own address only,
+  /// never as the ancestor of every route in its zone.
   ///
   /// Example:
   /// ```dart
@@ -81,7 +96,25 @@ extension DwNavigationRouteExtension on DwNavigationRoute {
   /// This is useful for highlighting active items in navigation menus or
   /// bottom navigation bars.
   bool isActive(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
-    return location == fullPath || location.startsWith('$fullPath/');
+    final state = GoRouterState.of(context);
+    final location = state.uri.pathSegments;
+    final template = fullPath
+        .split('/')
+        .where((segment) => segment.isNotEmpty)
+        .toList();
+
+    if (template.isEmpty) return location.isEmpty;
+    if (template.length > location.length) return false;
+
+    for (var i = 0; i < template.length; i++) {
+      final segment = template[i];
+      final expected = segment.startsWith(':')
+          ? state.pathParameters[segment.substring(1)]
+          : segment;
+
+      if (expected != location[i]) return false;
+    }
+
+    return true;
   }
 }

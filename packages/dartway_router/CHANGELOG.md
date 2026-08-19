@@ -1,3 +1,22 @@
+## 1.1.2 - 2026-08-19
+
+### Fixed
+
+`isActive` no longer answers `false` for the route that is open.
+
+The check compared the router **template** against the current **address**, so
+a route with a parameterized segment anywhere in its chain never matched:
+`/project/:projectId/issues` was compared with `/project/7/issues` and the
+method answered "not active" without a warning — a navigation item simply
+never lit up. Path parameters are now taken from
+`GoRouterState.pathParameters` and the comparison runs per path segment.
+
+The semantics around it are unchanged: a route stays active while a descendant
+of it is open (a parent tab keeps its highlight on a nested page), a route is
+not active merely because its path is a string prefix of the location (`/news`
+at `/newsletter`), and a zone root with an empty path is active at its own
+address only.
+
 ## 1.1.1 - 2026-07-12
 
 ### Fixed
