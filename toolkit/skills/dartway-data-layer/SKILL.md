@@ -320,49 +320,19 @@ final deleteAction = dw.action<bool>(
 in the widget that owns the button.** Not a callback handed down from a parent, and not a screen-wide
 `busy` flag: `DwActionBuilder` computes busy per button already.
 
-> **What a widget test over a self-writing feature covers, and where its seam is.** A feature that
-> saves for itself gives a test no callback to assert on. That seam went with the parameter, and
-> bringing it back is the wrong trade: **do not keep a callback alive as a test seam** — it buys a
-> weaker screen for a weaker test.
+> **A feature that saves for itself gives a test no callback to assert on** — and **do not keep one
+> alive as a test seam**, it buys a weaker screen for a weaker test. The seam is one level down: the
+> transport handed to `DwCore`, which a test replaces with `DwRecordingServerTransport` from
+> `package:dartway_serverpod_core_flutter/testing.dart`. Two consequences worth knowing while you
+> write the widget, before you write any test:
 >
-> The seam is one level down, and it is the same one the framework uses on itself: **the transport
-> handed to `DwCore`**. Pass `transport: DwRecordingServerTransport(serializationManager:
-> app.Protocol())` from `package:dartway_serverpod_core_flutter/testing.dart` **instead of**
-> `client:`, and nothing in the process has to stand up a Serverpod client for a widget to render.
-> The protocol is the project's own generated one, imported prefixed because the core declares a
-> `Protocol` too — it is the only thing that names the models right, since a generated model is an
-> abstract class whose `runtimeType` reads `_NewsPostImpl`.
+> - the feature reaches `dw` **while building**, not on the tap — `dw.action(...)` is constructed in
+>   `build` — so a widget test needs a booted core even when it never interacts with anything;
+> - **the offline store is not that seam** and is documented not to be. A write always leaves by the
+>   transport first; `dw.repo.localWrites` is reached only after the connection refuses it.
 >
-> It keeps every save and delete that left (`transport.saves`, `transport.deletes`) and answers
-> reads from what the test prepared (`answerGetAll`, `answerGetOne`, `answerGetCount`); a read
-> nobody prepared throws `DwUnpreparedServerCall` naming the call and the field that would answer
-> it, while a save needs no setup — the default echoes the model back, because the assertion is
-> about what *left*. What that gets you is "the button reached `saveModel` with this model", which
-> is what a widget test should assert. What covers the **rule** is still an integration test over
-> the CRUD config on the server, where the rule lives.
->
-> Boot the core from `setUpAll` through **the app's own initializer**, given an optional `transport`
-> parameter, and build no Serverpod client when it is set — a client brings a connectivity monitor
-> and an auth key manager, both of which reach for platform channels. Without a key manager there is
-> no session, so a test that needs a signed-in user overrides `dw.requireUserProfileProvider` in its
-> own `ProviderScope`.
->
-> Two traps about time, not about the transport: `pumpAndSettle` does not drain the toast a
-> successful `onSuccessNotification` leaves behind (pump `DwUiNotification.defaultDuration` after
-> the tap), and a read you made fail is **retried** by Riverpod with a backoff — assert the shape of
-> what was asked, never the number of attempts.
->
-> **The offline store is not that seam, and is documented not to be.** A write always goes to the
-> network first; `dw.repo.localWrites` is reached only after the call fails with a connection error.
-> Reaching for it to watch a save would force every save to declare itself queued, which is a lie
-> about intent.
->
-> One thing to know before writing the test at all: the feature reaches `dw` **while building**, not
-> on the tap — `dw.action(...)` is constructed in `build`. So the core has to be up for the widget
-> to render, even in a test that never interacts. Without it the subtree does not build and the test
-> fails later at a finder ("found 0 widgets"), with the real cause in a separate exception block
-> above. Boot it from `setUpAll` through the app's own initializer, and keep that initializer
-> idempotent so no test file has to know whether another one booted the core first.
+> **How to actually write it — the harness, the prepared reads, the signed-in user, and the two
+> timing traps — is `dartway-testing`.** The skeleton ships a worked example in `test/`.
 
 ## 4a. Derived state — a provider, not assembly in the widget
 

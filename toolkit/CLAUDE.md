@@ -113,6 +113,8 @@ An ADR records **the alternatives that were rejected, and why**. That is the one
 
 For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/dartway-clean-code/SKILL.md` (the team's hard rules + SOLID/KISS/DRY/YAGNI + tests for the complex stuff). This is a style contract — check against it while writing, refactoring and reviewing.
 
+**Clean-code Part 3 decides what deserves a test; `dartway-testing` decides where it goes and how to write it** — a rule from a CRUD config is an integration test on the server, plain logic is a unit test, and a feature is a widget test with the core booted and the server standing in as a recording transport. A feature saves for itself and hands no callback out, so the technique is not guessable; the skeleton ships a worked example of each in `test/`.
+
 **Finishing a task (Law 6):** when a feature/task is done, run `dartway-finish` before the commit/PR. It audits the diff against the contract, checks the feature's documentation for drift and the test coverage, and **shows suggestions and applies only what was confirmed**.
 
 ## Notes back to the framework (`dartway_notes.md`)
@@ -260,7 +262,7 @@ Live migrations (delete an entry once no project is on the old shape):
 
 ## Skills and commands
 
-- Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-finish` — loaded by relevance to the task.
+- Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-testing`, `dartway-finish` — loaded by relevance to the task.
 - Commands (`.claude/commands/`): `/dartway-checkup` — the state of the project and what to take into work next (whole project by default, a path narrows it); `/commit` — a commit in the project's CI format.
 
 **Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + reconciling the specs and doc comments with the code + tests before the PR).
