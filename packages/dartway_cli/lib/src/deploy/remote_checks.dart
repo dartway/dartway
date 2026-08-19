@@ -1,9 +1,13 @@
 import 'dart:io';
 
+import 'package:yaml/yaml.dart';
+
 import '../checker/dw_check_type.dart';
+import 'compose_files.dart';
 import 'deploy_check.dart';
 import 'master_passwords_file.dart';
 import 'secret_store.dart';
+import 'templates.dart';
 
 /// Checks that need the network: DNS, and the server itself over SSH.
 const List<DwDeployCheck> dwRemoteDeployChecks = [
@@ -48,7 +52,7 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
   ),
   DwDeployCheck(
     id: 'secret-files',
-    title: 'Declared secret files are delivered',
+    title: 'Declared secret files reach the application',
     stage: DwDeployCheckStage.remote,
     severity: DwCheckSeverity.error,
     requiresSsh: true,
@@ -208,37 +212,142 @@ Future<DwDeployVerdict> _checkRuntimeSecrets(DwDeployContext context) async {
   );
 }
 
+/// Whether a declared file is where the application will look for it.
+///
+/// "Is it on the server?" is the question this check used to ask, and it is
+/// not the one the deploy dies on. A file can be delivered to the runtime
+/// store, reported present, and still be invisible from inside the container —
+/// which is a green check standing directly in front of a red deploy, and
+/// worse than no check at all, because people read it.
+///
+/// So the answer comes from the configuration Compose itself will run: the
+/// rendered file on the server merged with the project's override, asked for
+/// on the server, with the file's own path in it. A bind mount of a file that
+/// exists is visibility; there is nothing further to establish.
+///
+/// It stops short of running a container. `docker compose run` builds the
+/// image when it is absent, which would turn a check into a ten-minute build,
+/// and probing the container that happens to be up answers about the *previous*
+/// deploy rather than the one about to happen.
 Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
-  final patterns = context.target.requiredSecretFiles;
-  if (patterns.isEmpty) {
+  final declared = context.target.requiredSecretFiles;
+  if (declared.isEmpty) {
     return const DwDeployVerdict.pass('none declared');
   }
 
-  final directory = context.target.runtimeConfigDir;
-  final result = await context.ssh!.runAs(
-    context.target.deployUser,
-    "ls -1 '$directory' 2>/dev/null || true",
-  );
-  final entries = result.stdout
-      .split('\n')
-      .map((line) => line.trim())
-      .where((line) => line.isNotEmpty)
+  final store = DwSecretStore(ssh: context.ssh!, target: context.target);
+
+  // A mount names one path on each side, and the store is flat. An entry that
+  // is a pattern or a path can be delivered but never mounted, so it is a
+  // failure here rather than a surprise on the server.
+  final unmountable = declared
+      .where(
+        (name) =>
+            name.contains('*') || name.contains('?') || name.contains('/'),
+      )
       .toList();
-
-  final missing = patterns.where((pattern) {
-    final expression = RegExp(
-      '^${pattern.split('*').map(RegExp.escape).join('.*')}\$',
+  if (unmountable.isNotEmpty) {
+    return DwDeployVerdict.fail(
+      'not file names: ${unmountable.join(', ')}',
+      fix:
+          'Each requires.files entry names one file in the runtime store, and '
+          'that file is mounted into the container under the same name. '
+          'Name it exactly, the way "dartway deploy secret put-file" stored it.',
     );
-    return !entries.any(expression.hasMatch);
-  }).toList();
+  }
 
-  if (missing.isEmpty) {
-    return DwDeployVerdict.pass('${patterns.length} file(s) present');
+  final delivered = (await store.listFiles()).toSet();
+  final undelivered = declared
+      .where((name) => !delivered.contains(name))
+      .toList();
+  if (undelivered.isNotEmpty) {
+    return DwDeployVerdict.fail(
+      'missing in ${store.directory}: ${undelivered.join(', ')}',
+      fix: 'Deliver them with "dartway deploy secret put-file".',
+    );
+  }
+
+  final configuration = await context.ssh!.runAs(
+    context.target.deployUser,
+    DwComposeFiles.commandIn(context.target.appDir, 'config --no-interpolate'),
+  );
+  if (!configuration.ok) {
+    return DwDeployVerdict.fail(
+      'cannot read the compose configuration in ${context.target.appDir}: '
+      '${configuration.firstLine}',
+      fix:
+          'The deploy runs whatever this command prints, so until it answers, '
+          'nothing can be said about what the container will see. A server '
+          'with no rendered ${DwComposeFiles.rendered} needs '
+          '"dartway deploy setup --env ${context.target.environment}"; '
+          'otherwise the fault is in ${DwComposeFiles.projectOverride}, which '
+          'Compose merges over it.',
+    );
+  }
+
+  final Map<String, String> mounts;
+  try {
+    mounts = _backendMounts(configuration.stdout);
+  } on YamlException catch (error) {
+    return DwDeployVerdict.fail(
+      'the compose configuration is unreadable: ${error.message}',
+      fix:
+          'Report this: "docker compose config" produced something unexpected.',
+    );
+  }
+
+  final unmounted = declared
+      .where((name) => !mounts.containsKey('${store.directory}/$name'))
+      .toList();
+  if (unmounted.isEmpty) {
+    final where = declared
+        .map((name) => '$name -> ${mounts['${store.directory}/$name']}')
+        .join(', ');
+    return DwDeployVerdict.pass('${declared.length} file(s) mounted: $where');
   }
   return DwDeployVerdict.fail(
-    'missing in $directory: ${missing.join(', ')}',
-    fix: 'Deliver them with "dartway deploy secret put-file".',
+    'delivered but not mounted into the backend: ${unmounted.join(', ')}',
+    fix:
+        'The file is on the server and the container cannot see it, which is '
+        'the shape of a deploy that passes every check and then dies applying '
+        'migrations. The rendered ${DwComposeFiles.rendered} on the server '
+        'predates the mount — re-render it with "dartway deploy setup --env '
+        '${context.target.environment}", which is idempotent and safe on a '
+        'live server. Each declared file is then mounted read-only at '
+        '$dwContainerConfigDir/<name>.',
   );
+}
+
+/// Bind-mount sources of the backend service, mapped to where they land inside
+/// the container, as Compose itself resolves them.
+///
+/// Both spellings are accepted: `docker compose config` normalises volumes to
+/// the long form, but a short `source:target:ro` string from an older Compose
+/// must not read as "nothing is mounted".
+Map<String, String> _backendMounts(String configuration) {
+  final document = loadYaml(configuration);
+  final services = document is YamlMap ? document['services'] : null;
+  final backend = services is YamlMap ? services['backend'] : null;
+  final volumes = backend is YamlMap ? backend['volumes'] : null;
+  final mounts = <String, String>{};
+  if (volumes is! YamlList) {
+    return mounts;
+  }
+  for (final entry in volumes) {
+    if (entry is YamlMap) {
+      final source = entry['source'];
+      final target = entry['target'];
+      if (source != null && target != null) {
+        mounts[source.toString()] = target.toString();
+      }
+    } else if (entry is String) {
+      final parts = entry.split(':');
+      if (parts.length >= 2) {
+        mounts[parts[0]] = parts[1];
+      }
+    }
+  }
+  return mounts;
 }
 
 /// Compares key names only. A routine check has no business moving secret

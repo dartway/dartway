@@ -121,6 +121,11 @@ Future<int> runDeploy(Command<int> command, ArgResults results) async {
         stdout.writeln('  now at ${revision.firstLine}');
       }
     }
+    // Says nothing on a server that has nothing to retire, which is every
+    // server after the first deploy that did.
+    if (step.id == 'retire-override-copy' && result.stdout.trim().isNotEmpty) {
+      stdout.writeln('  ${result.stdout.trim()}');
+    }
   }
 
   stdout.writeln('\nServices');

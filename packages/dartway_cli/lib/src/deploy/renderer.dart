@@ -49,7 +49,39 @@ class DwInfraRenderer {
     // after the API host, which is the one guaranteed to exist.
     DwTemplateToken.certName: serverpod.apiServer.publicHost ?? '',
     DwTemplateToken.registryPrefix: _registryPrefix,
+    DwTemplateToken.secretFileMounts: secretFileMounts,
   };
+
+  /// One read-only mount per file declared under `requires.files`.
+  ///
+  /// Appended to the `passwords.yaml` line rather than given a line of its
+  /// own, so a deployment declaring no files renders exactly the compose file
+  /// it rendered before.
+  String get secretFileMounts {
+    const indent = '\n      - ';
+    return [
+      for (final name in target.requiredSecretFiles)
+        '$indent${target.runtimeConfigDir}/${_mountable(name)}'
+            ':$dwContainerConfigDir/$name:ro',
+    ].join();
+  }
+
+  /// A declared file is mounted by name, so the name has to be one.
+  ///
+  /// The store is flat — `secret put-file` writes a basename into it — and a
+  /// bind mount names one path on each side. A pattern would render a mount
+  /// Docker takes literally, creating a directory called `*.json` inside the
+  /// container: the same silent failure one step further along.
+  String _mountable(String name) {
+    if (name.contains('*') || name.contains('?') || name.contains('/')) {
+      throw StateError(
+        'requires.files entry "$name" is not a file name. Each entry names one '
+        'file in the runtime store, and that file is what gets mounted into '
+        'the container; a pattern or a path cannot be.',
+      );
+    }
+    return name;
+  }
 
   /// Replaces every token and refuses to return text that still holds one.
   ///

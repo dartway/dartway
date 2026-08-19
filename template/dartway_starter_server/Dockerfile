@@ -21,8 +21,10 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 COPY --from=build /server /app/server
-# The Serverpod configuration is source, not something the deploy renders; only
-# passwords.yaml is mounted over this directory at runtime.
+# The Serverpod configuration is source, not something the deploy renders. What
+# arrives over this directory at runtime comes from the server's secret store:
+# passwords.yaml, and every file named under `requires.files` in
+# deploy/config.yaml, each mounted read-only under its own name.
 COPY --from=build /workspace/dartway_starter_server/config/ /app/config/
 COPY --from=build /workspace/dartway_starter_server/web/ /app/web/
 COPY --from=build /workspace/dartway_starter_server/migrations/ /app/migrations/

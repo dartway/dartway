@@ -24,10 +24,19 @@ enum DwTemplateToken {
   webServerDomain,
   webAppDomain,
   certName,
-  registryPrefix;
+  registryPrefix,
+  secretFileMounts;
 
   String get placeholder => '__${name.toUpperCase()}__';
 }
+
+/// Where the server image keeps its configuration, and therefore where the
+/// runtime store's files are mounted.
+///
+/// The image works from `/app` and reads its configuration from `/app/config`,
+/// so a file mounted here is reached as `config/<name>` by the application
+/// without a path having to be configured anywhere.
+const String dwContainerConfigDir = '/app/config';
 
 /// The compose file every DartWay deployment starts from.
 ///
@@ -75,8 +84,12 @@ services:
       - "__APIPORT__"
       - "__INSIGHTSPORT__"
       - "__WEBSERVERPORT__"
+    # Every file declared under `requires.files` in deploy/config.yaml is
+    # mounted here beside passwords.yaml. Delivering one to the server is only
+    # half of it: a file the container cannot see is a file the application
+    # does not have.
     volumes:
-      - __RUNTIMECONFIGDIR__/passwords.yaml:/app/config/passwords.yaml:ro
+      - __RUNTIMECONFIGDIR__/passwords.yaml:/app/config/passwords.yaml:ro__SECRETFILEMOUNTS__
     depends_on:
       postgres:
         condition: service_healthy
