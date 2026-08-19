@@ -50,6 +50,19 @@ Run the `framework-finish` skill before committing framework changes — it look
 ## Standards
 
 - **Versioning:** semver. The four `dartway_serverpod_core_*` packages move in lockstep (one version across all four). Every other package is versioned independently.
+
+  **A version is the number of the next release, not a count of pull requests.** It moves once per release cycle per package, and whether *this* PR is the one that moves it has a mechanical answer — compare the package's `version:` on `master` with the same line on `stable`, which is where releases are cut from:
+
+  ```bash
+  git show origin/stable:packages/<pkg>/pubspec.yaml | grep -m1 '^version:'
+  ```
+
+  - **the two are equal** → this change moves it, by whatever semver says the change is;
+  - **master is already ahead** → the pending release carries a bump already. Leave `version:` alone, leave the carets alone, and add your entry to that version's section in the `CHANGELOG.md` rather than opening a new one.
+
+  **What is already pending sets the floor, not the answer.** A pending `0.8.1` in front of a breaking change becomes `0.9.0` — under a `0.x` major a minor is what a major is elsewhere, so the escalation is the one case where a version moves twice in a cycle.
+
+  Without this, twenty fixes in a week are twenty minors: the number stops meaning anything the `CHANGELOG` does not say better, and each step drags the caret updates in `example/` and `template/` along with it (see the synchronisation law, point 6) — twenty chances to get that wrong in exchange for nothing.
 - **Workspace hygiene:** inside the monorepo, dependencies between packages resolve through the workspace (the root `pubspec.yaml`), **not** through git references to `dartway.git`.
 - **The Serverpod version is `3.4.11`, and all generated code was produced by that same CLI version.** Before you generate (`serverpod generate` / `create-migration`), confirm that `dart pub global list` reports **exactly** that version: the CLI writes generated code for its own version, and a CLI that has drifted from the runtime produces silent bugs. Constraints: **framework packages use a caret** (`^3.4.11`) so they stay compatible with whatever serverpod patch an application has (an exact pin in a library makes it uninstallable next to someone else's patch); **`template/` uses an exact pin** so a new project starts on a combination known to match the generator. Build reproducibility across the monorepo is held by the committed `pubspec.lock`, not by narrowing constraints. Bumping serverpod means regenerating in **four** places (the core, the push module, example, template), verifying the protocol patch, and regenerating the aggregated migrations for example and template.
 - **Language: everything that can end up in front of people is written in English.** One test decides it: **would an outsider see this by opening GitHub?** If yes, English — no exceptions, and regardless of whom it is addressed to.
