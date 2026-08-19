@@ -189,6 +189,39 @@ A read that omits it runs on its own connection: in production it works, merely 
 
 So `scope=serverOnly` is the right tool for anything the server owns and the client must not read: an internal hash, a computed score, a verification secret, a moderation note.
 
+### Returning a value the row does not hold
+
+`scope=serverOnly` says "the server keeps this and never sends it". The opposite need is just as ordinary — **the server sends this and never stores it**: a freshly issued access key, a one-time code, a receipt computed during the write. A save can answer with it, entirely through CRUD, and the pattern is three pieces that say nothing on their own:
+
+1. **`!persist` on the field** — a place on the model with no column behind it;
+2. **`saveContext.extras`** — carries the value from the hook that produced it to the hook that answers;
+3. **assignment to `saveContext.currentModel` in `afterSaveTransform`** — the response is built from that object, after the commit.
+
+```dart
+// device_registration.spy.yaml
+//   deviceId: String
+//   accessKey: String?, !persist        ← sent, never stored
+
+beforeSaveTransaction: (session, saveContext) async {
+  final key = generateAccessKey();
+  await storeKeyHash(session, key, transaction: saveContext.transaction);
+  saveContext.extras['accessKey'] = key;   // the hash is written, the key is not
+  return null;
+},
+afterSaveTransform: (session, saveContext) async {
+  saveContext.currentModel = saveContext.currentModel.copyWith(
+    accessKey: saveContext.extras['accessKey'] as String,
+  );
+  return null;
+},
+```
+
+**Assign it in `afterSaveTransform`, not earlier.** A value merely left on the model before the transaction reaches the caller only for as long as the framework does not re-read the row after writing. It does not today — but that is somebody else's internal detail, and a feature built on it breaks on a change nobody will connect to it. The hook is where the response is assembled, so that is where the answer is decided.
+
+> ⚠️ **What you assign is also what gets broadcast.** The response and `broadcastTo` are built from the **same** object: `updatedModels` carries `DwModelWrapper(object: saveContext.currentModel)`, and every channel this config broadcasts to receives it. A one-time code assigned this way reaches every subscriber of that channel, not only the caller who earned it. So a save that issues a secret **must not broadcast** — and if the model genuinely needs live updates elsewhere, the secret is not travelling this way; it wants `scope=serverOnly` plus a read of its own.
+
+**Why this is worth spelling out.** Each piece is documented somewhere and none of them announces the pattern, so the reasoning that actually happens is: *the response is the row · the value is not in the row · therefore CRUD cannot do this · therefore a custom endpoint.* Only the third step is wrong, and it looks like arithmetic. The bill is not the exception spent for nothing: a write outside `dw.repo` leaves every list over that model stale, so the app reaches for `ref.invalidate`, which the clean-code contract forbids — and the damage surfaces three layers from its cause, looking like the framework's fault.
+
 The second rule is narrow on purpose — it skips the column **only** when the incoming value is `null` and the stored row has one. A hook that *computes* a `serverOnly` value writes it like any other field:
 
 ```dart
@@ -339,6 +372,17 @@ For **one known model**, keep using that model's own repository (`ClubSession.db
 ## A custom endpoint — the last resort
 
 Only when it does not fit into CRUD (file upload/download — often still shaped as a `FileUploadRequest` model, webhooks, heavy async processing). Document it as an exception.
+
+**Before concluding that it does not fit, check the rungs that are easy to miss** — each of these has been re-implemented as an endpoint by somebody who did not know it was there:
+
+| The need | Where it already lives |
+|---|---|
+| The response must carry a value the row does not hold | `!persist` + `extras` + `afterSaveTransform` — "Returning a value the row does not hold" above |
+| The operation is a write that is not one model | `DwDtoActionConfig` |
+| The answer is a projection over rows rather than the rows | `DwDtoGetListConfig` |
+| The response must carry the model's relations | `afterSaveTransform` re-reading with the same `include` |
+
+One class of operation genuinely has no rung, and it is worth naming so the search stops: an operation whose **answer comes from outside the database** — probing an external service under credentials the client must not hold, verifying that a connection works, resolving something from a third party. It reads nothing, writes nothing, and its result must not be stored, because a stored answer to "is this working right now" goes stale in silence. `DwDtoGetListConfig` cannot carry it (the projection is synchronous, and its only argument becomes a SQL `WHERE`), and `DwDtoActionConfig` holds a database connection open across the network call. That one is an endpoint, deliberately — not because you failed to find the rung.
 
 ## Workflow and tests
 

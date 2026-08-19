@@ -228,6 +228,16 @@ something on it — a role, a balance, a consent flag.
 and single-model provider, which is why the caller's own screens refresh without a refetch. Getting
 the change onto *other* users' screens is `broadcastTo` — see [realtime.md](realtime.md).
 
+**A response may carry what the row does not.** A freshly issued key, a one-time code, a receipt
+computed during the write: give the field `!persist` so it has a place on the model and no column
+behind it, carry the value between hooks in `saveContext.extras`, and assign it to
+`saveContext.currentModel` in `afterSaveTransform` — the response is built from that object, after
+the commit. Assign it there rather than earlier: a value merely left on the model survives only
+while the framework does not re-read the row, which is an internal detail to depend on. Mind that
+the response and `broadcastTo` are built from the same object, so anything assigned this way reaches
+every subscriber of the channels this config broadcasts to — a save that issues a secret must not
+broadcast.
+
 **Database errors never reach the client verbatim.** A `DatabaseException` is reported through
 `dw.alerts` in full and answered with the flat text `Database error during save`. A raw exception
 carries table and constraint names, and a unique-violation would tell the caller whether a value
