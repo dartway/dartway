@@ -24,6 +24,7 @@ final class DwOfflineAccessStore implements DwOfflineRepositoryReadPolicy {
   }
 
   static const int _recordSchemaVersion = 1;
+  static const int _unboundedExpiryEpochMs = 253402300799999;
 
   final DwOfflineDatabase _database;
   final DwOfflineManifestVerifier _manifestVerifier;
@@ -74,7 +75,7 @@ final class DwOfflineAccessStore implements DwOfflineRepositoryReadPolicy {
             trustedAtEpochMs: nowEpochMs,
             expiresAtEpochMs:
                 lease.validUntilUtc?.millisecondsSinceEpoch ??
-                0x7fffffffffffffff,
+                _unboundedExpiryEpochMs,
           ),
         );
   }
