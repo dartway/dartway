@@ -12,6 +12,30 @@ app that kept the JSON in `passwords.yaml` moves it with
 `deploy/config.yaml`; nothing else in the wiring changes. The plain constructor
 still takes the JSON directly, for an app that obtains it some other way.
 
+- **What a project inherits from this module is now pinned by a test.** The
+  module's `migrations/` folder looks alarming: its first migration creates a
+  whole schema — `serverpod_log`, `dw_auth_key` and the rest — rather than only
+  the tables the module owns, which reads like a module that can be installed
+  into an empty database and nowhere else. That shape is what
+  `serverpod create-migration` writes for any module, the core module included;
+  it folds every dependency module into `migration.sql` and `definition.sql` and
+  offers no way to ask it not to. Those two files are also never applied to
+  anything: Serverpod 3.4.11 builds its migration manager from the *project*
+  directory and migrates one module, the project. A module's chain is read once,
+  by `create-migration` in the project, and only `definition_project.json` of the
+  module's latest version — which is why the tables reach a live database as an
+  ordinary `CREATE TABLE` inside the project's own migration.
+
+  So the file that decides the module's effect on somebody's database is that
+  one, and it is now asserted to list exactly the eight `dw_*` tables the module
+  owns, each attributed to `dartway_push`, with the registry checked against the
+  version directories on disk. The bootstrap-shaped SQL is inert; this file
+  quietly growing a table the module does not own would not be.
+
+  The push delivery documentation gained a section on adding the module to a
+  database that already has data: the three commands it takes, and the repair
+  migration that gets a database out of a collision without dropping tables.
+
 - **A service-account JSON is not a password, and steering it into one was our
   doing.** The comment that shipped with push described `fcmServiceAccountJson`
   as "the whole service-account JSON … on one line", and `fromPasswords` was the

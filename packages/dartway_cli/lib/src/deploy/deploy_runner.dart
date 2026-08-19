@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'compose_files.dart';
 import 'deploy_target.dart';
+import 'migration_report.dart';
 import 'serverpod_config.dart';
 import 'ssh_runner.dart';
 
@@ -14,11 +15,27 @@ class DwDeployStep {
     required this.id,
     required this.title,
     required this.run,
+    this.showOutput = false,
+    this.verdict,
   });
 
   final String id;
   final String title;
   final Future<DwSshResult> Function() run;
+
+  /// Whether the step's output belongs in the log even when it succeeded.
+  ///
+  /// Off for most steps — a deploy that reprints every `docker compose` line is
+  /// a deploy nobody reads. On where the output *is* the result and the exit
+  /// code is not.
+  final bool showOutput;
+
+  /// A second opinion on a step that exited 0: why it must fail anyway, or null
+  /// when it is genuinely fine.
+  ///
+  /// An exit code is a claim about the process, not about the work. Where the
+  /// two can disagree, the step says which text settles it.
+  final String? Function(DwSshResult result)? verdict;
 }
 
 /// Deploys an already-provisioned server: update the checkout, rebuild, apply
@@ -82,6 +99,9 @@ class DwDeployRunner {
   /// `</dev/null` is not decoration: without it `compose run -T` consumes the
   /// rest of the surrounding script from stdin and the following commands
   /// silently never run.
+  ///
+  /// Whether this did anything is read out of the output, not out of the exit
+  /// code — see [DwMigrationReport].
   Future<DwSshResult> applyMigrations() {
     final entrypoint = target.serverEntrypoint;
     final override = entrypoint == null ? '' : "--entrypoint '$entrypoint' ";
@@ -124,6 +144,13 @@ class DwDeployRunner {
       id: 'migrate',
       title: 'Apply database migrations',
       run: applyMigrations,
+      // The container's own account of what it did is the only account there
+      // is: it exits 0 either way. Printing it unconditionally is half of that
+      // — the other half is refusing to continue when it says the schema did
+      // not move.
+      showOutput: true,
+      verdict: (result) =>
+          DwMigrationReport.read('${result.stdout}\n${result.stderr}').failure,
     ),
     DwDeployStep(id: 'up', title: 'Start services', run: up),
     DwDeployStep(
