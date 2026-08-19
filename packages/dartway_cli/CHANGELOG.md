@@ -2,6 +2,41 @@
 
 ## 0.8.0
 
+- **A file declared in `requires.files` is now mounted into the container, and `deploy check` asks
+  whether the application can see it.** The mechanism was wired halfway: `secret put-file` delivered
+  the file, `check` confirmed it was on the server, and the rendered compose file mounted exactly one
+  thing — `passwords.yaml`. Twenty-one checks passed and the deploy died applying migrations, because
+  the application could not find a file that was demonstrably on the machine. Every declared file is
+  now mounted read-only at `/app/config/<name>` beside `passwords.yaml`, so the application reads it
+  as `config/<name>`. An entry has to be a file name: a pattern is refused at render time rather than
+  turned into a mount Docker takes literally and satisfies with a directory called `*.json`.
+
+  The check changed with it, because the wrong question is the more expensive half. It used to ask
+  "is the file on the server?" while the deploy dies on "can the application see it?", and a check
+  that is green where the deploy is red is worse than no check — people read it and stop looking. It
+  now asks the server for the configuration Compose will actually run (`docker compose config`, the
+  rendered file merged with the project's override) and looks for the file's own path among the
+  backend's mounts. It deliberately stops short of starting a container: `compose run` builds the
+  image when it is absent, which would turn a check into a ten-minute build, and probing the
+  container that happens to be up answers about the previous deploy rather than the one about to
+  happen.
+
+- **`run` no longer deploys a setup-time copy of the project's compose override.** `setup` used to
+  copy `deploy/compose.override.yml` to `docker-compose.override.yml` next to the rendered file — the
+  name Compose loads on its own — so that no later call had to remember a `-f` flag. There is nobody
+  to forget it: every Compose invocation is built by the CLI in one place. The price was a second
+  copy that a deploy silently preferred over the committed one, so a merged change to the override
+  did nothing while the run printed the very commit that made it and the checkout on the server
+  visibly held the new file. Compose is now given `-f docker-compose.yml -f deploy/compose.override.yml`,
+  and the checkout — refreshed by the `git reset --hard` a deploy already performs — is the only copy.
+
+  **A server that already has the copy gets it retired**, by `setup` and by `run` alike, since a
+  leftover would otherwise be merged into every deploy forever and be harder to see than before. It
+  is renamed to `docker-compose.override.yml.retired` rather than deleted: the file is normally a
+  stale copy of a committed one and worth nothing, but a server may carry a hand edit made while
+  debugging, and losing that silently would be its own bug. The step is idempotent and says nothing
+  on a server that never had the copy.
+
 - The comment the deploy template writes into a project's `docker-compose.yml` — the one
   explaining why `$$` is spelled that way — was in Russian, and it shipped into every
   generated file. It is in English now.

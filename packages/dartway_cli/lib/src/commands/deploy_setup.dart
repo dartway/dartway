@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 
+import '../deploy/compose_files.dart';
 import '../deploy/deploy_target.dart';
 import '../deploy/renderer.dart';
 import '../deploy/secret_store.dart';
@@ -69,7 +70,10 @@ Future<int> runSetup(Command<int> command, ArgResults results) async {
     stdout.writeln(
       override == null
           ? 'No deploy/compose.override.yml.'
-          : 'Would upload deploy/compose.override.yml.',
+          : 'deploy/compose.override.yml is merged straight from the '
+                'checkout — every Compose call names it, so nothing is '
+                'uploaded and a committed change to it takes effect on the '
+                'next run.',
     );
     final snippets = renderer.nginxSnippets;
     stdout.writeln(
@@ -290,21 +294,18 @@ chmod 600 '${target.appDir}/.env'
     return 1;
   }
 
-  final override = renderer.composeOverride;
-  if (override != null) {
-    if (!await step(
-      'Compose override',
-      // Written under the name Compose loads on its own next to
-      // docker-compose.yml, so every later `docker compose` call picks it up
-      // without a -f flag to remember.
-      () => ssh.runAsWithInput(
-        target.deployUser,
-        "cat > '${target.appDir}/docker-compose.override.yml'",
-        override.readAsStringSync(),
-      ),
-    )) {
-      return 1;
-    }
+  // The project's override is not copied anywhere. Every Compose call names
+  // deploy/compose.override.yml inside the checkout, which the deploy's
+  // `git reset --hard` refreshes. A copy taken here would freeze the file as
+  // it was on the day setup last ran — and Compose would prefer it.
+  if (!await step(
+    'Retire the setup-time compose override copy',
+    () => ssh.runAs(
+      target.deployUser,
+      DwComposeFiles.retireLegacyCopyIn(target.appDir),
+    ),
+  )) {
+    return 1;
   }
 
   for (final entry in renderer.nginxSnippets.entries) {
@@ -346,11 +347,12 @@ fi
     () => ssh.runAs(target.deployUser, '''
 set -e
 cd '${target.appDir}'
-if docker compose run --rm -T --entrypoint sh certbot -c \\
+${DwComposeFiles.selectFiles}
+if ${DwComposeFiles.invoke} run --rm -T --entrypoint sh certbot -c \\
   "test -f /etc/letsencrypt/live/$certName/fullchain.pem" </dev/null; then
   exit 0
 fi
-docker compose run --rm -T --entrypoint sh certbot -c "
+${DwComposeFiles.invoke} run --rm -T --entrypoint sh certbot -c "
   mkdir -p /etc/letsencrypt/live/$certName
   openssl req -x509 -nodes -newkey rsa:2048 -days 1 \\
     -keyout /etc/letsencrypt/live/$certName/privkey.pem \\

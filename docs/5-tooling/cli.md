@@ -287,14 +287,25 @@ the API address a second time, and nothing compares the two copies — the image
 successfully against yesterday's API, which is the failure mode with no error message. A warning
 rather than an error, because only the build block reintroduces the duplicate.
 
-`run` updates the checkout, rebuilds, applies migrations and restarts, then polls every public URL.
-It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders infrastructure on
-every push turns a routine change into an infrastructure one.
+The override is **never copied to the server**. Every Compose call the CLI issues names it explicitly
+— `docker compose -f docker-compose.yml -f deploy/compose.override.yml …` — so the file being merged
+is the one in the checkout, which `git reset --hard` refreshes on every deploy. It used to be copied
+to `docker-compose.override.yml` beside the rendered file, the name Compose loads on its own, on the
+grounds that nothing then has to remember the flag; but there is nobody to forget it, since every
+invocation is built in one place, and the price was a second copy that a deploy silently preferred
+over the committed one for as long as `setup` was not re-run. A server carrying that copy has it
+moved to `docker-compose.override.yml.retired` on the next `setup` or `run` — renamed rather than
+deleted, in case somebody edited it on the box while debugging.
+
+`run` retires that copy, updates the checkout, rebuilds, applies migrations and restarts, then polls
+every public URL. It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders
+infrastructure on every push turns a routine change into an infrastructure one.
 
 `secret` moves credentials between the maintainer's `passwords.yaml` and a server, one environment
 at a time: `push` sends `shared` plus that environment, `pull` brings back what the server has and
 the file lacks, `list` shows names only. `set` stores one value, `put-file` uploads a whole file — a
-service-account JSON and the like — and `init` creates the store and fills in the keys that are just
+service-account JSON and the like, which reaches the container only once it is also named under
+`requires.files` — and `init` creates the store and fills in the keys that are just
 random strings, which `setup` has already done by the time you would think to run it. Values travel on
 stdin, never as arguments, so they appear in neither shell history nor a remote process list. Two
 guards refuse a push that would lose information — one for keys the server has and the file does not,
@@ -323,7 +334,8 @@ The rest are the flags worth knowing before you need them:
 | `host`, `ssh_user`, `deploy_user`, `os` | always |
 | `repo`, `branch` | always |
 | `ssl_email`, `web_app_domain` | always |
-| `requires.secrets`, `requires.files` | to have `check` catch a credential nobody delivered |
+| `requires.secrets` | to have `check` catch a credential nobody delivered |
+| `requires.files` | a credential that is a whole file. Each entry is delivered with `secret put-file` and **mounted read-only at `/app/config/<name>`** in the server container, beside `passwords.yaml` — the application reads it as `config/<name>`. `check` asserts the mount, not the delivery: it asks the server for the configuration Compose will actually run and looks for the file in it, because "the file is on the machine" is green exactly where the deploy is red. An entry is a file name, not a pattern or a path — a mount names one path on each side |
 | `registry_mirror` | pulling base images through a mirror |
 | `firewall_ports` | a port beyond SSH, 80 and 443 |
 | `server_entrypoint` | only when the Dockerfile declares `ENTRYPOINT` in shell form — that form ignores the arguments `docker compose run` appends, so migrations would silently start an ordinary server instead. Setting it is also what tells `check` the shell form is deliberate |

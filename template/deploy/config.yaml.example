@@ -40,6 +40,12 @@ staging:
   # Optional. Credentials nobody can generate — an API token, a service account
   # file. Listing them turns "the container starts and immediately dies" into a
   # pre-deploy error.
+  #
+  # `files` are delivered with `dartway deploy secret put-file` and mounted
+  # read-only into the server container at /app/config/<name>, beside
+  # passwords.yaml — so the application reaches one as `config/<name>`. Each
+  # entry is a file name exactly as the store holds it: a pattern or a path
+  # cannot be mounted, and is refused rather than rendered.
   # requires:
   #   secrets:
   #     - firebaseServiceAccountKey

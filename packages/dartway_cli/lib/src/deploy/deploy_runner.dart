@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'compose_files.dart';
 import 'deploy_target.dart';
 import 'serverpod_config.dart';
 import 'ssh_runner.dart';
@@ -41,8 +42,19 @@ class DwDeployRunner {
 
   String get _appDir => target.appDir;
 
+  /// Every Compose call of a deployment goes through here, which is why the
+  /// project's override can be named explicitly instead of copied to the
+  /// server under the name Compose picks up on its own.
   String _compose(String arguments) =>
-      "cd '$_appDir' && docker compose $arguments";
+      DwComposeFiles.commandIn(_appDir, arguments);
+
+  /// Moves aside the automatically loaded override copy older CLIs wrote.
+  ///
+  /// A server that has one merges it into every deploy, silently and forever,
+  /// while the committed override it was copied from goes on being ignored.
+  /// Idempotent, and a no-op on a server that never had the copy.
+  Future<DwSshResult> retireOverrideCopy() =>
+      ssh.runAs(target.deployUser, DwComposeFiles.retireLegacyCopyIn(_appDir));
 
   /// Brings the checkout to the tip of the deployment branch.
   ///
@@ -96,6 +108,11 @@ class DwDeployRunner {
   );
 
   List<DwDeployStep> steps({required bool skipGitUpdate}) => [
+    DwDeployStep(
+      id: 'retire-override-copy',
+      title: 'Retire the setup-time compose override copy',
+      run: retireOverrideCopy,
+    ),
     if (!skipGitUpdate)
       DwDeployStep(
         id: 'update-checkout',
