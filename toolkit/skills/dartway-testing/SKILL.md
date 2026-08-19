@@ -41,30 +41,40 @@ prove that the button sends the right model.
 Access and save rules live in `DwCrudConfig`, run inside a real request, and touch the database.
 Nothing below the server can check them, and a mock of the session would only re-state the code.
 
-The machinery is already in the project: `withServerpod` from the generated
-`test/integration/test_tools/serverpod_test_tools.dart`, which stands up a real Serverpod against a
-test database.
+The skeleton ships one to copy: `test/integration/app_setting_access_test.dart` proves that the
+admin writes a setting, that a signed-in member is refused and nothing reaches the table, and that
+an empty key is rejected even for the admin. The machinery around it — `withServerpod` from the
+generated `test/integration/test_tools/serverpod_test_tools.dart` — stands up a real Serverpod
+against the test database.
 
 ```dart
-withServerpod('appSetting write access', (sessionBuilder, endpoints) {
-  setUpAll(() {
-    DwCore.init<UserProfile>(
-      userProfileTable: UserProfile.t,
-      crudConfigurations: const [appSettingCrudConfig],
-      dtoConfigurations: const [],
-      channelConfigurations: const [],
-      userProfileConstructor: (session, {required registrationRequest}) async =>
-          throw UnsupportedError('outside this suite'),
-      dwAlerts: DwAlerts.init(),
-    );
+withServerpod('Given the app settings CRUD config', (sessionBuilder, endpoints) {
+  setUp(() async {
+    // withServerpod builds its own Serverpod and never calls run, so DartWay
+    // has to be booted here — the config's session.isAdmin resolves the profile
+    // through the core.
+    initDartwayCore(passwords: const {...});
+    // …seed an admin and a member, and build a session for each with
+    // AuthenticationOverride.authenticationInfo('${profile.id!}', {})
   });
 
-  test('a member cannot write a setting an admin can', () async {
-    final session = sessionBuilder.build();
-    // …sign the session in as each role and assert the DwApiResponse
+  test('a signed-in member is refused, and nothing is written', () async {
+    final response = await appSettingCrudConfig.saveConfig!.save(
+      memberSession,
+      AppSetting(settingKey: key, settingValue: 'Not allowed'),
+    );
+
+    expect(response.isOk, isFalse);
+    // …and the table is still empty: a refused save must not reach it
   });
 });
 ```
+
+`DwSaveConfig.save` runs the whole pipeline the endpoint runs — `allowSave` → `validateSave` →
+transaction — so the assertion lands on the project's own rule, not on a re-statement of it.
+
+It needs a live database: `docker compose up -d postgres_test`, then `dart test` from the server
+package.
 
 **Write one when the rule is the point:** a role boundary, an ownership check, a validation that
 rejects, `beforeSaveTransaction` / `afterSaveTransaction` ordering, a filter that must not leak
@@ -218,7 +228,25 @@ frame behind. Use `pumpAndSettle`, not `pump`.
   member is fine as *UI*, but it says nothing about access — write the integration test for the
   rule and let the widget test be about the button.
 
-## 5. No coverage thresholds
+## 5. What the checker asks for, and what it will not
+
+`dartway check` names three gaps on the server, by model, and nothing about Flutter tests:
+
+- **`crudConfigMissing`** (warning) — a table with no `DwCrudConfig`. It answers `notConfigured` to
+  every read and write, so the list is empty forever and nothing says why. If the table really is
+  the server's own, that is what the absence means — write it in a doc comment on the model.
+- **`crudConfigUnregistered`** (error) — the config exists and is not in `crudConfigurations`. There
+  is no second reading of this one.
+- **`crudRuleUntested`** (warning) — a config with hand-written save or delete logic that no test
+  under the server's `test/` names. This is §1 of this skill, made checkable.
+
+A config that only declares a shape — an `accessFilter`, an `include` — is asked for nothing: it has
+no rule to hold.
+
+**It will never ask "does this feature have a test".** That is not a gap with a name, it is a
+percentage, and see below.
+
+## 6. No coverage thresholds
 
 We do not set a percentage and we do not gate anything on one. A threshold is met by writing tests
 for what is easy to cover, which is exactly the code that did not need covering — getters, mappers,

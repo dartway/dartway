@@ -113,7 +113,34 @@ enum DwCheckType {
   /// commit of the framework. Nothing else says so: `ref: master` is written
   /// once per package and reads as "from master", while the lock pins each one
   /// at whatever master was when *that* package was added.
-  frameworkRefsDiverged;
+  frameworkRefsDiverged,
+
+  /// A model with a table and no `DwCrudConfig`. Generic CRUD is secure by
+  /// default, so an unconfigured model answers `notConfigured` to every read
+  /// and write: it migrates, it exists, and the app cannot reach it.
+  ///
+  /// A **warning**, because the absence has a second, legitimate reading — a
+  /// table the server owns alone and no client should see. The check does not
+  /// know which of the two it is looking at; the person reading it does, and
+  /// answering costs one doc comment.
+  crudConfigMissing,
+
+  /// A `DwCrudConfig` that exists and is not in the `crudConfigurations` list
+  /// passed to `DwCore.init`.
+  ///
+  /// The one of this family with no second reading, and the one that hides
+  /// best: the file is there, it reviews as finished, and the API answers
+  /// exactly as if it had never been written.
+  crudConfigUnregistered,
+
+  /// A `DwCrudConfig` carrying hand-written save or delete logic that no test
+  /// in the server package names.
+  ///
+  /// The rule runs inside a request and touches the database, so nothing below
+  /// the server can hold it — a widget test proving the button is hidden proves
+  /// nothing about who may save. A **warning**: a mention of the model is a
+  /// good enough signal to raise the question, not to fail a build on.
+  crudRuleUntested;
 
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
@@ -123,6 +150,8 @@ enum DwCheckType {
     DwCheckType.unusedFeatureFile ||
     DwCheckType.generatedCodeUnformatted ||
     DwCheckType.frameworkRefsDiverged ||
+    DwCheckType.crudConfigMissing ||
+    DwCheckType.crudRuleUntested ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

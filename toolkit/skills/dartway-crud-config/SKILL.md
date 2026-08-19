@@ -32,6 +32,13 @@ final userProfileCrudConfig = DwCrudConfig<UserProfile>(
 
 Don't forget to register the config in `crudConfigurations` at `DwCore.init`. If the config is missing → the API returns `DwApiResponse.notConfigured`.
 
+> **This is the one thing here that fails without a trace**, so `dartway check` guards it: a config
+> written and left out of the list answers exactly as if the file did not exist (`crudConfigUnregistered`,
+> an error), and a model with a table and no config at all is reported too (`crudConfigMissing`, a
+> warning — the absence is also how you say "this table is the server's own", and the checker cannot
+> tell which you meant). A config carrying hand-written save or delete logic that no server test names
+> is `crudRuleUntested`; where that test goes is `dartway-testing`.
+
 ## accessFilter — the heart of secure-by-default
 
 Two separate questions, and until 0.3.0 they were conflated into one:
