@@ -140,6 +140,17 @@ await dwPushDispatcher!.send(
 `sendToEveryone(page: ...)` pages through a whole user base with a callback of
 yours, keeping one message and one deduplication key for the campaign.
 
+**Where the tap should land travels in `data`, under `dwPushLinkDataKey`.** The
+app half reads it back under the same name, and on web the transport hands the
+same value to FCM a second time as `webpush.fcm_options.link` — so a tap opens
+the right screen even in an app whose service worker never got a
+`notificationclick` handler. It is an in-app path (`/chats/12`), not a URL; the
+browser resolves it against the app's own origin.
+
+```dart
+data: {dwPushLinkDataKey: '/chats/$channelId'},
+```
+
 Underneath, enqueue is idempotent on a stable `deduplicationKey`, enforced by a
 unique index as the last guard, so triggering the same logical campaign twice
 does not double-send:

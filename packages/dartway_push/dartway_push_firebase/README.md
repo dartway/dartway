@@ -25,9 +25,13 @@ FCM and nothing more.
 - **`android/app/google-services.json`** and **`ios/Runner/GoogleService-Info.plist`**, plus the
   Google Services Gradle plugin. Standard FlutterFire setup.
 - **Web:** copy `web/firebase-messaging-sw.template.js` from this package to your app's
-  `web/firebase-messaging-sw.js` and fill in the config. Without it a closed tab shows nothing;
-  without its `notificationclick` handler every notification opens the app at its root. Pass
-  `webVapidKey` — the browser issues no token without one.
+  `web/firebase-messaging-sw.js` and fill in the config. Without it a closed tab shows nothing.
+  **Copy it as it stands** — the handler is registered before `firebase.messaging()` and calls
+  `stopImmediatePropagation()` on purpose: the SDK installs its own `notificationclick` listener
+  in that call and stops propagation itself, so a handler placed after it never runs. Without the
+  template a tap still reaches the right screen, through `webpush.fcm_options.link`, but in a new
+  tab instead of the one already open. Pass `webVapidKey` — the browser issues no token without
+  one.
 
 ## Notes that cost an afternoon each
 

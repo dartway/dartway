@@ -34,6 +34,7 @@ void main() {
               },
               'data': {
                 'course_id': '42',
+                'link': '/courses/42',
                 'image_url': 'https://cdn.example.com/banner.png',
               },
               'android': {
@@ -47,6 +48,7 @@ void main() {
               },
               'webpush': {
                 'notification': {'image': 'https://cdn.example.com/banner.png'},
+                'fcm_options': {'link': '/courses/42'},
               },
             },
           });
@@ -91,6 +93,7 @@ void main() {
             },
             'data': {
               'course_id': '42',
+              'link': '/courses/42',
               'image_url': 'https://cdn.example.com/banner.png',
             },
             'android': {
@@ -111,6 +114,7 @@ void main() {
                 'image': 'https://cdn.example.com/banner.png',
                 'icon': '/icons/push.png',
               },
+              'fcm_options': {'link': '/courses/42'},
             },
           },
         });
@@ -139,6 +143,64 @@ void main() {
       );
 
       expect(outcome.status, DwPushProviderStatus.accepted);
+    });
+
+    test(
+      'sends the web click-through link without an image or an icon',
+      () async {
+        final body = await _sentPayload(
+          _request(
+            target: 'device-token',
+            imageUrl: null,
+            data: const {'course_id': '42', dwPushLinkDataKey: '/courses/42'},
+          ),
+        );
+
+        // A link alone has to produce the webpush block: without it the whole
+        // click-through on the web falls back to the `notificationclick`
+        // handler in the service worker, and that event does not arrive in
+        // every browser and OS combination.
+        expect(body, {
+          'message': {
+            'token': 'device-token',
+            'notification': {
+              'title': 'Course unlocked',
+              'body': 'Open the app to continue',
+            },
+            'data': {'course_id': '42', 'link': '/courses/42'},
+            'apns': {
+              'payload': {
+                'aps': {'sound': 'default'},
+              },
+            },
+            'webpush': {
+              'fcm_options': {'link': '/courses/42'},
+            },
+          },
+        });
+      },
+    );
+
+    test('leaves fcm_options out of webpush when there is no link', () async {
+      final body = await _sentPayload(
+        _request(target: 'device-token', data: const {'course_id': '42'}),
+      );
+
+      expect(_message(body)['webpush'], {
+        'notification': {'image': 'https://cdn.example.com/banner.png'},
+      });
+    });
+
+    test('treats a blank link as no link at all', () async {
+      final body = await _sentPayload(
+        _request(
+          target: 'device-token',
+          imageUrl: null,
+          data: const {'course_id': '42', dwPushLinkDataKey: '   '},
+        ),
+      );
+
+      expect(_message(body).containsKey('webpush'), isFalse);
     });
 
     test(
@@ -534,7 +596,43 @@ DwFcmPushProvider _providerResponding({
   );
 }
 
-DwPushProviderRequest _request({required String target}) {
+/// Sends [request] through a provider that answers 200 and returns the FCM
+/// message body it composed.
+Future<Map<String, Object?>> _sentPayload(
+  DwPushProviderRequest request, {
+  DwFcmPushProviderConfig? config,
+}) async {
+  late final Map<String, Object?> sentBody;
+  final provider = DwFcmPushProvider(
+    config:
+        config ??
+        DwFcmPushProviderConfig(
+          projectId: 'demo-project',
+          serviceAccountJson: '{}',
+        ),
+    httpClient: _FakePushHttpClient((httpRequest) async {
+      sentBody = jsonDecode(httpRequest.body) as Map<String, Object?>;
+      return const _FakePushHttpResponse(statusCode: 200, body: '{}');
+    }),
+    accessTokenProvider: () async => 'ya29.test-access-token',
+  );
+
+  final outcome = await provider.send(_FakeSession(), request);
+  expect(outcome.status, DwPushProviderStatus.accepted);
+  return sentBody;
+}
+
+Map<String, Object?> _message(Map<String, Object?> body) =>
+    body['message']! as Map<String, Object?>;
+
+DwPushProviderRequest _request({
+  required String target,
+  String? imageUrl = 'https://cdn.example.com/banner.png',
+  Map<String, String> data = const {
+    'course_id': '42',
+    dwPushLinkDataKey: '/courses/42',
+  },
+}) {
   return DwPushProviderRequest(
     target: target,
     payload: DwPushPayload(
@@ -542,8 +640,8 @@ DwPushProviderRequest _request({required String target}) {
       category: 'news',
       title: 'Course unlocked',
       body: 'Open the app to continue',
-      imageUrl: 'https://cdn.example.com/banner.png',
-      data: {'course_id': '42'},
+      imageUrl: imageUrl,
+      data: data,
       expiresAt: DateTime.utc(2026, 7, 21, 12),
     ),
   );

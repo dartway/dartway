@@ -306,6 +306,23 @@ Rules that matter:
   config files, the web service worker (template in the firebase package), and
   the RuStore `project_id`/icon meta-data in the Android manifest.
 
+**On web the tap has two paths, and they are not equivalent.** The server sets
+`webpush.fcm_options.link` from the payload's `link` key, so a tap opens the
+right screen even in an app with no service worker of its own — that is the
+fallback, and it costs a fresh tab every time. The template's
+`notificationclick` handler is the path worth having: it focuses a tab that is
+already open and hands the path to the router. It takes the click by being
+registered **before** `firebase.messaging()` and calling
+`stopImmediatePropagation()`, because the SDK installs a listener of its own in
+there and stops propagation the same way — a handler placed after it never runs,
+on any browser, with nothing in the console. Copy the template as it stands and
+do not reorder those two blocks.
+
+**Check the tap on a device rather than from a metric.** `delivered` means FCM
+accepted the request. It says nothing about whether anything was shown, and less
+about where the tap went; the distance between "accepted" and "opened the right
+screen" is where this section comes from.
+
 ## Authorization
 
 The module ships no endpoints and no gating; the one thing it does ship — the

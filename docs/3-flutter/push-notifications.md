@@ -121,6 +121,20 @@ worker (there is a template in `dartway_push_firebase`), and the RuStore
 `project_id` and notification icon in the Android manifest. Each package's README
 lists its own.
 
+### The tap, on web
+
+Two independent paths carry it. The server puts the in-app path into
+`webpush.fcm_options.link`, so a tap opens the right screen even with no service
+worker of yours — in a new tab, every time. The template's `notificationclick`
+handler is the one worth having: it focuses a tab that is already open and hands
+the path to the router.
+
+The template takes the click by registering before `firebase.messaging()` and
+calling `stopImmediatePropagation()`, because the SDK installs a handler of its
+own in there and stops propagation the same way. Swapping those two lines costs
+the in-app path and reports nothing: the tap keeps working through the fallback,
+in a new tab, and no error is raised anywhere.
+
 ## See also
 
 - [Plugins](plugins.md) — how `dw.plugins.<name>` works, and why the accessor

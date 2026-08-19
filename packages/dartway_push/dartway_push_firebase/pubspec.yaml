@@ -1,6 +1,6 @@
 name: dartway_push_firebase
 description: "Firebase Cloud Messaging transport for DartWay push: tokens, permissions and notification taps on Android, iOS and web, behind the dw.plugins.push contract."
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

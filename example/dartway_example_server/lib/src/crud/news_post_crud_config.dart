@@ -1,3 +1,4 @@
+import 'package:dartway_push_server/dartway_push_server.dart';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:serverpod/serverpod.dart';
 import 'package:dartway_example_server/src/dartway/dartway_core.dart';
@@ -78,7 +79,12 @@ final newsPostCrudConfig = DwCrudConfig<NewsPost>(
         category: ExamplePushCategories.newsPost,
         title: post.title,
         body: post.text,
-        data: {'news_post_id': '${post.id}'},
+        // Where the tap lands. `dwPushLinkDataKey` is read back by the app
+        // half under the same name, and on web the transport hands it to FCM a
+        // second time as `webpush.fcm_options.link` — so the notification
+        // opens the news screen even in a browser whose service worker never
+        // took the click.
+        data: {dwPushLinkDataKey: '/news', 'news_post_id': '${post.id}'},
         // Stable, so publishing the same post twice — a retried request, a
         // double tap — does not notify the club twice.
         deduplicationKey: 'news_post:${post.id}',

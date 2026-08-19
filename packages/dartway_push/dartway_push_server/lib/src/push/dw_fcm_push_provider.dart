@@ -61,11 +61,14 @@ final class DwFcmPushProviderConfig {
   final Duration requestTimeout;
 
   bool get isConfigured => projectId != null && serviceAccountJson != null;
+}
 
-  static String? _trimToNull(String? value) {
-    final normalized = value?.trim();
-    return normalized == null || normalized.isEmpty ? null : normalized;
-  }
+/// A blank string is an absent one everywhere in this file: an empty icon, an
+/// empty project id or an empty link are all "not set", and none of them may
+/// reach the payload as `""`.
+String? _trimToNull(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
 }
 
 /// Firebase Cloud Messaging HTTP v1 provider.
@@ -171,6 +174,12 @@ final class DwFcmPushProvider implements DwPushProvider {
     final androidIcon = config.androidIcon;
     final androidColor = config.androidColor;
     final webpushIcon = config.webpushIcon;
+    // The same path the app half reads out of `data`, handed to FCM a second
+    // time. On the web this is what makes the browser navigate on its own, so
+    // that click-through no longer depends solely on a `notificationclick`
+    // handler in the service worker — an event that does not arrive in every
+    // browser and OS combination.
+    final link = _trimToNull(request.data[dwPushLinkDataKey]);
 
     return {
       'message': {
@@ -198,12 +207,14 @@ final class DwFcmPushProvider implements DwPushProvider {
           },
           if (imageUrl != null) 'fcm_options': {'image': imageUrl},
         },
-        if (imageUrl != null || webpushIcon != null)
+        if (imageUrl != null || webpushIcon != null || link != null)
           'webpush': {
-            'notification': {
-              'image': ?imageUrl,
-              'icon': ?webpushIcon,
-            },
+            if (imageUrl != null || webpushIcon != null)
+              'notification': {
+                'image': ?imageUrl,
+                'icon': ?webpushIcon,
+              },
+            if (link != null) 'fcm_options': {'link': link},
           },
       },
     };
