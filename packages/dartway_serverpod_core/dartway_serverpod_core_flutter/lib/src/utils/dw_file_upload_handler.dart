@@ -128,8 +128,9 @@ class DwFileUploadHandler {
   }) async {
     final byteData = ByteData.view(bytes.buffer);
 
-    var uploadDescription = await dw.endpointCaller.dwUpload
-        .getUploadDescription(path: path);
+    var uploadDescription = await dw.serverTransport.getUploadDescription(
+      path: path,
+    );
 
     if (uploadDescription == null) {
       throw Exception("Failed to get upload description for path: $path");
@@ -140,7 +141,7 @@ class DwFileUploadHandler {
 
     await uploader.uploadByteData(byteData);
 
-    var dwMedia = await dw.endpointCaller.dwUpload.verifyUpload(path: path);
+    var dwMedia = await dw.serverTransport.verifyUpload(path: path);
 
     if (dwMedia == null) {
       throw Exception("Failed to verify uploaded file with path: $path");

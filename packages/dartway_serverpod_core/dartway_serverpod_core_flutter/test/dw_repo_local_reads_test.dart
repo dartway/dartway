@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
+import 'package:dartway_serverpod_core_flutter/testing.dart';
 import 'package:dartway_serverpod_core_client/src/protocol/protocol.dart'
     as generated;
 import 'package:flutter_test/flutter_test.dart';
@@ -21,9 +22,14 @@ void main() {
 
   setUpAll(() {
     store = _TestLocalStore();
-    DwCore<_ReadsClient, DwAuthKey>(
+    DwCore<ServerpodClientShared, DwAuthKey>(
       config: const DwConfig(),
-      client: _ReadsClient(),
+      // The reads here supply their own online request, so the transport is
+      // never asked anything — it exists so the core is constructible, and
+      // that no longer costs a Serverpod client.
+      transport: DwRecordingServerTransport(
+        serializationManager: generated.Protocol(),
+      ),
       dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
       getUserId: (_) => null,
       plugins: [store],
@@ -55,10 +61,7 @@ void main() {
       expect(result.value, 42);
       expect(result.origin, DwRepoReadOrigin.network);
       expect(localReads.storedSnapshots, hasLength(1));
-      expect(
-        localReads.storedSnapshots.single.scope,
-        localReads.currentScope,
-      );
+      expect(localReads.storedSnapshots.single.scope, localReads.currentScope);
       expect(
         localReads.storedSnapshots.single.schemaVersion,
         DwRepoReadSnapshot.currentSchemaVersion,
@@ -557,36 +560,33 @@ void main() {
     },
   );
 
-  test(
-    'does not commit an online snapshot after its store changes',
-    () async {
-      final storeReached = Completer<void>();
-      final allowStoreCommit = Completer<void>();
-      final originalDelegate = localReads;
-      final replacementReads = _RecordingLocalReads();
-      localReads.storeReached = storeReached;
-      localReads.allowStoreCommit = allowStoreCommit;
+  test('does not commit an online snapshot after its store changes', () async {
+    final storeReached = Completer<void>();
+    final allowStoreCommit = Completer<void>();
+    final originalDelegate = localReads;
+    final replacementReads = _RecordingLocalReads();
+    localReads.storeReached = storeReached;
+    localReads.allowStoreCommit = allowStoreCommit;
 
-      final read = DwRepository.executeRead<Object, int>(
-        queryKey: queryKey,
-        readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
-        onlineRequest: () async =>
-            const DwApiResponse<int>(isOk: true, value: 42),
-      );
-      await storeReached.future;
-      store.reads = replacementReads;
-      allowStoreCommit.complete();
+    final read = DwRepository.executeRead<Object, int>(
+      queryKey: queryKey,
+      readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
+      onlineRequest: () async =>
+          const DwApiResponse<int>(isOk: true, value: 42),
+    );
+    await storeReached.future;
+    store.reads = replacementReads;
+    allowStoreCommit.complete();
 
-      await expectLater(read, throwsA(isA<StateError>()));
-      // The core refuses the response and never hands the value to the caller.
-      // Whether the outgoing store physically wrote the row is the store's own
-      // commit-time condition to hold, not something the core can undo from
-      // here — the store's own transaction exists for exactly that, and the
-      // conformance suite is where an implementation is held to it.
-      expect(replacementReads.storedSnapshots, isEmpty);
-      expect(originalDelegate.loadedQueryKeys, isEmpty);
-    },
-  );
+    await expectLater(read, throwsA(isA<StateError>()));
+    // The core refuses the response and never hands the value to the caller.
+    // Whether the outgoing store physically wrote the row is the store's own
+    // commit-time condition to hold, not something the core can undo from
+    // here — the store's own transaction exists for exactly that, and the
+    // conformance suite is where an implementation is held to it.
+    expect(replacementReads.storedSnapshots, isEmpty);
+    expect(originalDelegate.loadedQueryKeys, isEmpty);
+  });
 
   test(
     'does not commit an online snapshot after same-scope logout-login ABA in store',
@@ -715,9 +715,7 @@ void main() {
 
 class _RecordingLocalReads implements DwRepoLocalReads {
   DwRepoScope _currentScope = DwRepoScope('first-user');
-  late DwRepoBinding _currentBinding = DwRepoBinding(
-    scope: _currentScope,
-  );
+  late DwRepoBinding _currentBinding = DwRepoBinding(scope: _currentScope);
   final storedSnapshots = <DwRepoReadSnapshot>[];
   final loadedQueryKeys = <DwRepoQueryKey<Object>>[];
   DwRepoReadSnapshot? availableSnapshot;
@@ -785,7 +783,8 @@ class _RecordingReadTx implements DwRepoLocalReadTx {
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) async {
-    if (_store.storeResult != DwRepoReadSnapshotStoreResult.stored) return false;
+    if (_store.storeResult != DwRepoReadSnapshotStoreResult.stored)
+      return false;
     staged.add(snapshot);
     return true;
   }
@@ -849,35 +848,4 @@ class _TestLocalStore extends DwRepoLocalStorePlugin {
 
   @override
   Future<void> init(DwFlutter core) async {}
-}
-
-/// The reads here supply their own online request, so the client only has to
-/// exist for the core to be constructible.
-class _ReadsClient extends ServerpodClientShared {
-  _ReadsClient()
-    : super(
-        'http://localhost:8080',
-        generated.Protocol(),
-        streamingConnectionTimeout: null,
-        connectionTimeout: null,
-      ) {
-    _caller = Caller(this);
-  }
-
-  late final Caller _caller;
-
-  @override
-  Map<String, ModuleEndpointCaller> get moduleLookup =>
-      <String, ModuleEndpointCaller>{'dartway_serverpod_core': _caller};
-
-  @override
-  Map<String, EndpointRef> get endpointRefLookup => <String, EndpointRef>{};
-
-  @override
-  Future<T> callServerEndpoint<T>(
-    String endpoint,
-    String method,
-    Map<String, dynamic> args, {
-    bool authenticated = true,
-  }) async => throw StateError('No test here reaches the network.');
 }

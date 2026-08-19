@@ -325,12 +325,17 @@ in the widget that owns the button.** Not a callback handed down from a parent, 
 > bringing it back is the wrong trade: **do not keep a callback alive as a test seam** — it buys a
 > weaker screen for a weaker test.
 >
-> The seam is one level down, and it is the same one the framework uses on itself: **the Serverpod
-> `client` handed to `DwCore`**. `dw.endpointCaller` is derived from it in the constructor, so a
-> client whose `callServerEndpoint` you override answers for the whole CRUD surface — the core's own
-> write tests count saves exactly that way. What that gets you is "the button reached `saveModel`
-> with this model", which is what a widget test should assert. What covers the **rule** is still an
-> integration test over the CRUD config on the server, where the rule lives.
+> The seam is one level down, and it is the same one the framework uses on itself: **the transport
+> handed to `DwCore`**. Pass `transport: DwRecordingServerTransport(...)` from
+> `package:dartway_serverpod_core_flutter/testing.dart` **instead of** `client:`, and nothing in the
+> process has to stand up a Serverpod client for a widget to render. It keeps every save and delete
+> that left (`transport.saves`, `transport.deletes`) and answers reads from what the test prepared
+> (`answerGetAll`, `answerGetOne`, `answerGetCount`); a read nobody prepared throws
+> `DwUnpreparedServerCall` naming the call and the field that would answer it, while a save needs no
+> setup — the default echoes the model back, because the assertion is about what *left*. What that
+> gets you is "the button reached `saveModel` with this model", which is what a widget test should
+> assert. What covers the **rule** is still an integration test over the CRUD config on the server,
+> where the rule lives.
 >
 > **The offline store is not that seam, and is documented not to be.** A write always goes to the
 > network first; `dw.repo.localWrites` is reached only after the call fails with a connection error.

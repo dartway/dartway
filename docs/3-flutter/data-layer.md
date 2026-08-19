@@ -345,6 +345,63 @@ scroll position and renders the same skeletons.
 equal config share one state; a config rebuilt with a fresh closure (`customUpdatesListener`,
 `updatesSortingMethod`) does not, and silently gets its own. Keep such configs out of `build`.
 
+## Testing a feature that reads and writes for itself
+
+A feature built the way this page describes hands nothing out: it watches its own provider and calls
+`dw.repo.saveModel` in its own action. There is no callback for a test to assert on, and **you should
+not keep one alive as a test seam** — that buys a weaker screen for a weaker test.
+
+The seam is one level down, and it is the same one the framework uses on itself: **the transport the
+core sends everything through**. A test hands `DwCore` its own instead of a Serverpod client:
+
+```dart
+import 'package:dartway_serverpod_core_flutter/testing.dart';
+
+final transport = DwRecordingServerTransport(classNames: {Lesson: 'Lesson'});
+
+setUpAll(() {
+  dw = DwCore<Client, UserProfile>(
+    config: const DwConfig(defaultModelGetter: dwGetDefault),
+    transport: transport,          // instead of client:, not beside it
+    dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
+    getUserId: (profile) => profile?.id,
+  );
+});
+
+testWidgets('the button saves the lesson', (tester) async {
+  transport.answerGetAll = (_) async => lessonsResponse([draft]);
+
+  await tester.pumpWidget(const App());
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Icons.check));
+  await tester.pumpAndSettle();
+
+  expect(transport.saves, hasLength(1));
+  expect((transport.saves.single.model as Lesson).isPublished, isTrue);
+});
+```
+
+Reads must be prepared; writes need not be. A read nobody answered throws `DwUnpreparedServerCall`
+naming the call and the field that would answer it — a test that does not know what its subject
+fetches is the thing being caught. A save answers by echoing the model back, because the assertion
+is about what *left*; set `answerSave` when the response itself matters, such as the id assigned on
+insert.
+
+Two things to know before writing the test at all:
+
+- **The core has to be up for the widget to render**, not only for the tap. `dw.action(...)` is
+  constructed in `build`, so a feature reaches `dw` while building — without a core the subtree does
+  not build and the test fails later at a finder ("found 0 widgets"), with the real cause in a
+  separate exception block above. Boot it from `setUpAll` through the app's own initializer, and keep
+  that initializer idempotent so no test file has to know whether another one got there first.
+- **The offline store is not this seam**, and is documented not to be. A write always leaves by the
+  transport first; `dw.repo.localWrites` is reached only after the connection refuses it. Reaching
+  for it to watch a save would force every save to declare itself queued, which is a lie about
+  intent.
+
+What this covers is "the button reached `saveModel` with this model". What covers the **rule** —
+who may save what — is an integration test over the CRUD config on the server, where the rule lives.
+
 ## Escape hatches
 
 Reach for these only when a provider genuinely does not fit — an imperative flow that owns its own

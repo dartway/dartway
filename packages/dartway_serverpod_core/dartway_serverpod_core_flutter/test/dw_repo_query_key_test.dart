@@ -1,5 +1,6 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
+import 'package:dartway_serverpod_core_flutter/testing.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/domain/dw_pagination_strategy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,9 +16,9 @@ void main() {
 
   setUpAll(() {
     store = _TestLocalStore();
-    _queryKeyCore = DwCore<_EndpointCapturingClient, _QueryLesson>(
+    DwCore<ServerpodClientShared, _QueryLesson>(
       config: const DwConfig(),
-      client: _EndpointCapturingClient(),
+      transport: _transport,
       dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
       getUserId: (_) => null,
       plugins: [store],
@@ -464,7 +465,7 @@ void main() {
   test(
     'modelList sends the key API group to the actual endpoint request',
     () async {
-      final endpointClient = _queryKeyCore.client..reset();
+      _transport.reads.clear();
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final config = DwModelListStateConfig<_QueryLesson>(
@@ -477,7 +478,7 @@ void main() {
       );
 
       expect(localReads.queryKeys.single.apiGroup, 'learning');
-      expect(endpointClient.getAllApiGroup, 'learning');
+      expect(_transport.reads.single.apiGroup, 'learning');
     },
   );
 
@@ -596,54 +597,23 @@ class _QueryKeyProtocol extends SerializationManager {
   };
 }
 
-late final DwCore<_EndpointCapturingClient, _QueryLesson> _queryKeyCore;
+/// Answers the reads these tests trigger, and keeps what was asked for — the
+/// api group a key carries has to be shown reaching the request, not only the
+/// key.
+final _transport =
+    DwRecordingServerTransport(serializationManager: _QueryKeyProtocol())
+      ..answerGetAll = _emptyList
+      ..answerGetOne = _absentModel;
 
-class _EndpointCapturingClient extends ServerpodClientShared {
-  _EndpointCapturingClient()
-    : super(
-        'http://localhost:8080',
-        _QueryKeyProtocol(),
-        streamingConnectionTimeout: null,
-        connectionTimeout: null,
-      ) {
-    _dartwayCaller = Caller(this);
-  }
+Future<DwApiResponse<List<DwModelWrapper>>> _emptyList(
+  DwRecordedRead read,
+) async => const DwApiResponse<List<DwModelWrapper>>(
+  isOk: true,
+  value: <DwModelWrapper>[],
+);
 
-  late final Caller _dartwayCaller;
-  String? getAllApiGroup;
-
-  void reset() {
-    getAllApiGroup = null;
-  }
-
-  @override
-  Map<String, ModuleEndpointCaller> get moduleLookup =>
-      <String, ModuleEndpointCaller>{'dartway_serverpod_core': _dartwayCaller};
-
-  @override
-  Map<String, EndpointRef> get endpointRefLookup => <String, EndpointRef>{};
-
-  @override
-  Future<T> callServerEndpoint<T>(
-    String endpoint,
-    String method,
-    Map<String, dynamic> args, {
-    bool authenticated = true,
-  }) async {
-    if (endpoint == 'dartway_serverpod_core.dwCrud' && method == 'getAll') {
-      getAllApiGroup = args['apiGroup'] as String?;
-      return const DwApiResponse<List<DwModelWrapper>>(
-            isOk: true,
-            value: <DwModelWrapper>[],
-          )
-          as T;
-    }
-    if (endpoint == 'dartway_serverpod_core.dwCrud' && method == 'getOne') {
-      return const DwApiResponse<DwModelWrapper>(isOk: true, value: null) as T;
-    }
-    throw StateError('Unexpected endpoint request: $endpoint.$method');
-  }
-}
+Future<DwApiResponse<DwModelWrapper>> _absentModel(DwRecordedRead read) async =>
+    const DwApiResponse<DwModelWrapper>(isOk: true, value: null);
 
 class _FixedPagination implements DwPaginationStrategy {
   @override

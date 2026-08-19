@@ -2,6 +2,48 @@
 
 ## 0.10.0
 
+**Everything `dw.repo` sends to the server now goes through one narrow port, `DwServerTransport`,
+and a test can hand the core its own.** Eight operations — `getOne`, `getAll`, `getCount`,
+`saveModel`, `delete`, `subscribeOnUpdates`, `getUploadDescription`, `verifyUpload` — are the whole
+dependency the client-side repository has on the generated Serverpod client, and they are now stated
+as a type instead of being reached for through `dw.endpointCaller`.
+
+Two things this buys, in the order they matter:
+
+- **A widget test can watch a feature write.** `package:dartway_serverpod_core_flutter/testing.dart`
+  ships `DwRecordingServerTransport`: it answers reads from what the test prepared, keeps every save
+  and delete that left, and throws `DwUnpreparedServerCall` — naming the call and the field that
+  would answer it — for a read nobody prepared. What it replaces is a subclass of
+  `ServerpodClientShared` implementing `callServerEndpoint(endpoint, method, args)` against
+  string-keyed wire arguments; the four such props inside this package came to ~150 lines and are
+  gone. A save that needs no particular answer needs no setup at all — the default echoes the model
+  back, because the assertion is about what *left*.
+- **Serverpod is replaceable.** `DwServerpodTransport` is now the only place in the Flutter half that
+  knows a generated `Caller` exists.
+
+The local store is still not this seam and is still documented as not being one: a write always
+leaves by the transport first, and `dw.repo.localWrites` is reached only after the connection
+refuses it.
+
+**Breaking: `dw.endpointCaller` is gone; the replacement is `dw.serverTransport`.** An app that
+called DartWay's own CRUD endpoints directly — in practice, only a dev stand deliberately failing a
+call — renames `dw.endpointCaller.dwCrud.getOne(...)` to `dw.serverTransport.getOne(...)` and
+`dw.endpointCaller.dwUpload.verifyUpload(...)` to `dw.serverTransport.verifyUpload(...)`. Everything
+reached through `dw.repo`, `dw.client` and `DwFileUploadHandler` is unchanged.
+
+**`DwCore`'s `client` is now optional, and `transport:` takes its place.** An application passes
+`client:` exactly as before and nothing about it changes — `dw.client` is still non-nullable, so no
+call site grows a `!`. A test passes `transport:` *instead*, and then nothing in the process stands
+up a Serverpod client merely so a widget can render. A core built with neither is refused with an
+`ArgumentError` naming both options, and refused before the ambient `dw` is claimed, so a
+misconfigured core cannot be left registered as the one and only. Reaching `dw.client` on a
+transport-only core throws and says how the core was built.
+
+**The two "not initialized" errors now name the missing step.** `DwCore is not initialized` and
+`Dw is not initialized` used to be bare; they now point at the core the app failed to build, and say
+that a widget test needs one too — a feature reaches `dw` while *building*, not on the tap. Their
+"already initialized" counterparts say why an app's initializer has to be idempotent.
+
 **`dw.repo` can keep a local copy of its reads and writes, and the contract for doing so is new
 public API.** Two optional boundaries — `DwRepoLocalReads` and `DwRepoLocalWrites` — let a store
 outside the core keep repository responses and queue mutations that failed on the connection.

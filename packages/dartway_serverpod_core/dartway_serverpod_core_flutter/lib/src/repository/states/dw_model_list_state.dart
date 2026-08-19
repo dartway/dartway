@@ -105,7 +105,7 @@ class DwModelListState<Model extends SerializableModel>
         await DwRepository.executeRead<Model, List<DwModelWrapper>>(
           queryKey: config.queryKeyFor(params, requestFilter: filter),
           readStrategy: config.readStrategy,
-          onlineRequest: () => dw.endpointCaller.dwCrud.getAll(
+          onlineRequest: () => dw.serverTransport.getAll(
             className: className,
             filter: filter,
             orderByList: config.orderByList,
@@ -122,7 +122,7 @@ class DwModelListState<Model extends SerializableModel>
 
     return data;
 
-    // final result = await dw.endpointCaller.dwCrud
+    // final result = await dw.serverTransport
     //     .getAll(
     //       className: DwRepository.typeName<Model>(),
     //       filter: arg.backendFilter,
