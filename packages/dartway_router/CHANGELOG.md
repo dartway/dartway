@@ -17,6 +17,36 @@ not active merely because its path is a string prefix of the location (`/news`
 at `/newsletter`), and a zone root with an empty path is active at its own
 address only.
 
+### Changed
+
+A duplicate route name now says which zones declare it.
+
+Route names are global: `DwRouter` keeps one registry for the whole app and
+resolves every route by name. An enum, though, gives its values a namespace of
+their own, so two zones each declaring `projects` compile without a word — and
+the failure surfaced far from the declaration, in the first screen that touched
+the router. The check itself was there, but it reported the bare name and left
+both declarations to be found by hand; worse, when the two zones also collided
+on the path (the usual case) the path check ran first, and its message named
+neither the route nor the zone.
+
+The name check now runs ahead of the path check — a shared name is the cause,
+the shared path its symptom — and the failure carries the whole story:
+
+```
+Duplicate route name "projects".
+Declared by:
+  - AppNavigationZone.projects (navigationZones[0])
+  - AdminNavigationZone.projects (navigationZones[1])
+
+Route names are global across navigation zones. DwRouter keeps a single
+registry for the whole app and resolves routes by name, so a name may be
+declared once and only once. ...
+```
+
+Duplicate paths and invalid paths are reported the same way, naming the enum
+value and the position of its zone in `navigationZones`.
+
 ## 1.1.1 - 2026-07-12
 
 ### Fixed

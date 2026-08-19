@@ -134,6 +134,130 @@ enum AuthRoutes implements DwNavigationRoute<TestRouterState> {
   List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
 }
 
+// Two zones that each own a concept called `projects`. Nothing inside either
+// enum objects to it — the collision only exists at the router.
+enum ProjectsZone implements DwNavigationRoute<TestRouterState> {
+  dashboard(DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage())),
+  projects(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: ProfilePage(),
+      parent: dashboard,
+    ),
+  );
+
+  const ProjectsZone(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => '';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+}
+
+// Lives under /admin, so its `projects` builds a different path: the name is
+// the only thing that collides.
+enum AdminProjectsZone implements DwNavigationRoute<TestRouterState> {
+  adminDashboard(DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage())),
+  projects(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: ProfilePage(),
+      parent: adminDashboard,
+    ),
+  );
+
+  const AdminProjectsZone(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => 'admin';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+}
+
+// Sits at the site root as well, so its `projects` collides on the path too.
+enum SecondProjectsZone implements DwNavigationRoute<TestRouterState> {
+  projects(DwNavigationRouteDescriptor.simple(pageWidget: ProfilePage()));
+
+  const SecondProjectsZone(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => '';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+}
+
+// /reports, reached through a route named `reports`.
+enum ReportsZone implements DwNavigationRoute<TestRouterState> {
+  reports(DwNavigationRouteDescriptor.simple(pageWidget: ProfilePage()));
+
+  const ReportsZone(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => '';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+}
+
+// /reports as well, this time as a zone root — same address, different name.
+enum OverviewZone implements DwNavigationRoute<TestRouterState> {
+  overview(DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage()));
+
+  const OverviewZone(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => 'reports';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+}
+
 void main() {
   group('DwRouter', () {
     test('should create router with valid configuration', () {
@@ -174,32 +298,6 @@ void main() {
           contains('navigationZones cannot contain empty zones'),
         )),
       );
-    });
-
-    test('should throw ArgumentError when route paths are duplicated', () {
-      // Note: This test is simplified since enum names are unique by definition
-      // In practice, duplicate paths would come from different route configurations
-      final router = DwRouter<TestRouterState>(
-        navigationZones: [
-          TestRoutes.values,
-        ],
-        pageBuilder: DwPageBuilder.material,
-      );
-
-      expect(router.router, isA<GoRouter>());
-    });
-
-    test('should throw ArgumentError when route names are duplicated', () {
-      // This is harder to test since enum names are unique by definition
-      // But we can test the validation logic exists
-      final router = DwRouter<TestRouterState>(
-        navigationZones: [
-          TestRoutes.values,
-        ],
-        pageBuilder: DwPageBuilder.material,
-      );
-
-      expect(router.router, isA<GoRouter>());
     });
 
     test('should throw ArgumentError when guards are used without routerState',
@@ -319,6 +417,95 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
+      });
+    });
+
+    group('duplicate route names across zones', () {
+      test(
+          'two zones declaring the same name fail when the router is '
+          'assembled, naming the value and both zones', () {
+        expect(
+          () => DwRouter<TestRouterState>(
+            navigationZones: [
+              ProjectsZone.values,
+              AdminProjectsZone.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('Duplicate route name "projects"'),
+                contains('ProjectsZone.projects (navigationZones[0])'),
+                contains('AdminProjectsZone.projects (navigationZones[1])'),
+                contains('Route names are global across navigation zones'),
+              ),
+            ),
+          ),
+        );
+      });
+
+      test('the same name in one zone and a different one in another is fine',
+          () {
+        final router = DwRouter<TestRouterState>(
+          navigationZones: [
+            ProjectsZone.values,
+            ReportsZone.values,
+          ],
+          pageBuilder: DwPageBuilder.material,
+        );
+
+        expect(router.router, isA<GoRouter>());
+        expect(router.navigationZones.length, 2);
+      });
+
+      test('a name collision is reported ahead of the path it also breaks', () {
+        // Both zones sit at the site root, so `projects` collides on the path
+        // as well. The path is the symptom; the message must name the cause.
+        expect(
+          () => DwRouter<TestRouterState>(
+            navigationZones: [
+              ProjectsZone.values,
+              SecondProjectsZone.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('Duplicate route name "projects"'),
+                isNot(contains('Duplicate route path')),
+              ),
+            ),
+          ),
+        );
+      });
+
+      test('a duplicate path names its routes and their zones too', () {
+        expect(
+          () => DwRouter<TestRouterState>(
+            navigationZones: [
+              ReportsZone.values,
+              OverviewZone.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              allOf(
+                contains('Duplicate route path "/reports"'),
+                contains('ReportsZone.reports (navigationZones[0])'),
+                contains('OverviewZone.overview (navigationZones[1])'),
+              ),
+            ),
+          ),
+        );
       });
     });
 
