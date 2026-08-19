@@ -80,12 +80,58 @@ void initDartwayCore({required Map<String, String> passwords}) {
 }
 ```
 
-Default password keys are `fcmProjectId`, `fcmServiceAccountJson`,
-`rustorePushProjectId`, `rustorePushServiceToken`; override them in
-`fromPasswords`. Secrets stay in the app and never reach the queue or logs.
-Include only providers whose `isConfigured == true`; if none are, keep `dwPush`
-null. Icons and colours are the app's choice — pass optional `webpushIcon`,
-`androidIcon`, `androidColor` explicitly.
+### Credentials come from two places, and which one is not a preference
+
+**Short values go in `passwords.yaml`; a credential that is a whole document
+goes in as a file.** Default password keys are `fcmProjectId`,
+`rustorePushProjectId`, `rustorePushServiceToken` — two identifiers and a token,
+each a line long. FCM's service account is a couple of thousand characters of
+JSON and is **not** a password key: it is delivered with
+`dartway deploy secret put-file`, named under `requires.files` in
+`deploy/config.yaml`, and read from `config/fcm-service-account.json` — a
+relative path that resolves to the same file locally and inside the container,
+where the deploy mounts every declared file at `/app/config/<name>` beside
+`passwords.yaml`. `fromPasswords` reads it from there by default;
+`serviceAccountFile:` names a different path.
+
+A document in `passwords.yaml` is a document in the master copy of **every**
+environment's secrets, and it carries a silent failure: the value starts with
+`{`, so unquoted YAML parses it as a flow mapping rather than as a string.
+
+So `passwords.yaml.example` documents the project id and nothing else:
+
+```yaml
+staging:
+  # Push. Naming this key is what declares that this environment sends push —
+  # the server refuses to start when it is set and the credential is missing.
+  # The service account is not a password but a file: deliver it with
+  # `dartway deploy secret put-file fcm-service-account.json`, list it under
+  # requires.files in deploy/config.yaml, and it is read as
+  # config/fcm-service-account.json.
+  fcmProjectId:
+```
+
+### Half-configuration fails at startup, by design
+
+A provider's project id is its **declaration**. Once it is present, everything
+else that provider needs has to be there too, or the config constructor throws
+`DwPushProviderConfigurationException` and the server does not start — naming
+what is missing and where it was looked for. A service account that is not a
+JSON object (a truncated upload, a YAML value that lost its quotes) is refused
+the same way.
+
+Deliberate, because `isConfigured == false` used to be the answer both to "we do
+not send push here" and to "the key never reached this environment": a forgotten
+credential looked exactly like a decision, and was noticed weeks later by
+somebody asking why a notification never arrived.
+
+An environment that genuinely wants no push declares nothing — no project id, no
+file — and `isConfigured` is false without anyone being lied to.
+
+Secrets stay in the app and never reach the queue or logs. Include only
+providers whose `isConfigured == true`; if none are, keep `dwPush` null. Icons
+and colours are the app's choice — pass optional `webpushIcon`, `androidIcon`,
+`androidColor` explicitly.
 
 `DwPushConfig` is deliberately small: `recipientResolver` and `transport` are the
 whole surface most apps write. Every tuning knob lives on an optional
@@ -342,6 +388,8 @@ user. The module deliberately keeps no "who is admin" concept.
   endpoint of the app's own, and never takes the recipient from the request;
 - the app half passes no `recipientIdProvider`, and the `plugins:` list mentions
   `dw` nowhere;
+- the FCM service account is a file under `requires.files`, never a key in
+  `passwords.yaml`; the project id is a password key and declares the intent;
 - raw token/credentials/provider body never logged;
 - deduplication key stable and unique; `expiresAt` always set;
 - worker scheduled via `DwRecurringFutureCall`; several instances safe;

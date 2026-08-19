@@ -244,6 +244,11 @@ server {
     ssl_certificate     /etc/letsencrypt/live/__CERTNAME__/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/__CERTNAME__/privkey.pem;
 
+    # Caching for the web app is decided inside the web image and passed
+    # through from here. Do not add an `expires` in one of these snippets: a
+    # Flutter build reuses every one of its file names, so the rule would
+    # freeze exactly the files that change on every deploy, and the browsers
+    # that took a copy cannot be reached afterwards.
     include /etc/nginx/dartway/app/*.conf;
 
     location / {

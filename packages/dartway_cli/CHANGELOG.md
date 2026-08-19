@@ -2,6 +2,44 @@
 
 ## 0.8.0
 
+- **The deploy templates now ship the configuration that serves a Flutter web build, and it caches
+  by what is actually hashed.** Nothing was shipped before, so every project wrote its own, and what
+  they wrote applied the rule everybody knows — "fingerprinted assets are immutable, cache them for
+  a year" — to a build that fingerprints nothing. `index.html`, `flutter_bootstrap.js`, `flutter.js`,
+  `main.dart.js`, `main.dart.wasm` and every file under `assets/` are named identically in every
+  build, so the immutable rule landed on precisely the files that change on every deploy. A browser
+  that took one under a long `max-age` never asks again: it goes on running the previous build while
+  the server serves the new one. In the reported case the served bundle carried a newer bridge
+  protocol and the browser ran the older one — half a day of diagnosis, and the expensive part was
+  the silence, since every check anyone thought to run said the right thing.
+
+  `<project>_flutter/nginx.conf` is now a file of its own beside the Dockerfile that copies it. It
+  serves everything a build emits with `Cache-Control: no-cache` — the copy is kept and merely has
+  to be confirmed, which with an ETag costs a 304 rather than a download — and keeps the long-lived,
+  immutable rule for names that genuinely carry a content hash.
+
+- **Two new assertions, and they ask different questions.** `web-cache-policy` (local, warning)
+  reads the configuration the web image is built with — the file it copies, or a heredoc written
+  straight into the Dockerfile, so a project that never split it out is judged too — resolves every
+  Flutter entry point through Nginx's own `location` precedence, and reports the ones that would be
+  served for reuse without revalidation. It warns rather than blocks, because reading configuration
+  text can miss an `include` outside the build context or a header a front proxy adds.
+  `web-cache-headers` (remote, error) asks the deployed site over HTTPS, exactly as a browser would,
+  and judges the header it was actually handed; a path answering 404 is not part of that build and
+  says nothing about caching. Neither is satisfied by a file being present — the failure this is
+  about is a server serving the right thing to a browser that will not ask for it.
+
+  Both spell out the half a fix does not cover: a browser already holding a copy taken under
+  `max-age=2592000` stays that way for the rest of the thirty days, and no server-side change
+  reaches it. Hard-reload for whoever you can reach; for the rest, wait the window out or move the
+  app to a URL that was never poisoned.
+
+- `requires.secrets` and `requires.files` are documented as a split by **shape**, not by importance:
+  a short value is a password, a whole document is a file. `config.yaml.example` had been suggesting
+  the opposite — `firebaseServiceAccountKey` under `secrets` — which is how a couple of thousand
+  characters of service-account JSON end up in the master copy of every environment's secrets, where
+  an unquoted leading `{` is read by YAML as a mapping rather than as text.
+
 - **A file declared in `requires.files` is now mounted into the container, and `deploy check` asks
   whether the application can see it.** The mechanism was wired halfway: `secret put-file` delivered
   the file, `check` confirmed it was on the server, and the rendered compose file mounted exactly one

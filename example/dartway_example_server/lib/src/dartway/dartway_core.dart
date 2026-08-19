@@ -151,6 +151,14 @@ void initDartwayCore({
 /// Returns `null` — no engine, no worker — when the example has no FCM or
 /// RuStore credentials, which is the default. Because push is a separate module,
 /// an app that omits the dependency gets none of the `dw_push_*` tables at all.
+///
+/// Credentials arrive from two places, split by shape. `fcmProjectId` and the
+/// RuStore pair are short values and come out of `passwords`; FCM's service
+/// account is a whole JSON document and is read from
+/// `config/fcm-service-account.json`, which the deploy mounts into the
+/// container from the runtime store. Naming a project id is what declares that
+/// an environment sends push at all — declare it with the credential missing
+/// and the server refuses to start rather than going quietly silent.
 DwPush? _buildDwPush(Map<String, String> passwords) {
   final fcmConfig = DwFcmPushProviderConfig.fromPasswords(passwords);
   final ruStoreConfig = DwRuStorePushProviderConfig.fromPasswords(passwords);

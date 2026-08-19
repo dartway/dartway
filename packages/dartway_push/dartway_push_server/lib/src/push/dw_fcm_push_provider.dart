@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
@@ -14,6 +15,22 @@ const _fcmHost = 'fcm.googleapis.com';
 
 typedef DwFcmAccessTokenProvider = Future<String?> Function();
 
+/// Credentials for [DwFcmPushProvider], from a password key and a file.
+///
+/// The two halves of an FCM credential are not the same kind of thing, and
+/// keeping them in one place made a mess of both. The project id is a short
+/// identifier — a password, in the sense `passwords.yaml` means. The service
+/// account is a JSON document a couple of thousand characters long, and a
+/// document in a passwords file is a document in the master copy of every
+/// environment's secrets, with a trap attached: it starts with `{`, so
+/// unquoted YAML reads it as a flow mapping rather than a string and the value
+/// silently is not what was written.
+///
+/// So the document travels as a file — `dartway deploy secret put-file`, named
+/// under `requires.files` in `deploy/config.yaml`, mounted read-only into the
+/// container. [defaultServiceAccountFile] is a relative path on purpose: the
+/// server works from its own package directory locally and from `/app` in the
+/// image, and `config/<name>` is the same file in both.
 final class DwFcmPushProviderConfig {
   DwFcmPushProviderConfig({
     required String? projectId,
@@ -34,24 +51,56 @@ final class DwFcmPushProviderConfig {
         'Must be positive',
       );
     }
+    _assertWholeOrAbsent();
   }
 
+  /// Where the service-account document is read from by default.
+  ///
+  /// Relative, and that is the whole point: it resolves to the same file in a
+  /// local run and inside the container, where the deploy mounts every entry
+  /// of `requires.files` at `/app/config/<name>` beside `passwords.yaml`.
+  static const String defaultServiceAccountFile =
+      'config/fcm-service-account.json';
+
+  /// The shape an app writes: the project id out of `passwords.yaml`, the
+  /// service account out of a file.
+  ///
+  /// The project id doubles as the declaration. An environment that names it
+  /// wants push, and a missing credential is then a fault rather than a
+  /// preference — see [DwPushProviderConfigurationException].
   factory DwFcmPushProviderConfig.fromPasswords(
     Map<String, String> passwords, {
     String projectIdKey = 'fcmProjectId',
-    String serviceAccountJsonKey = 'fcmServiceAccountJson',
+    String serviceAccountFile = defaultServiceAccountFile,
     String? webpushIcon,
     String? androidIcon,
     String? androidColor,
     Duration requestTimeout = const Duration(seconds: 10),
-  }) => DwFcmPushProviderConfig(
-    projectId: passwords[projectIdKey],
-    serviceAccountJson: passwords[serviceAccountJsonKey],
-    webpushIcon: webpushIcon,
-    androidIcon: androidIcon,
-    androidColor: androidColor,
-    requestTimeout: requestTimeout,
-  );
+  }) {
+    final file = File(serviceAccountFile);
+    final projectId = _trimToNull(passwords[projectIdKey]);
+    if (projectId != null && !file.existsSync()) {
+      throw DwPushProviderConfigurationException(
+        'FCM',
+        'the service account was not found at "$serviceAccountFile" (the '
+            'project id came from the "$projectIdKey" password key). Send the '
+            'JSON to the server with "dartway deploy secret put-file", name it '
+            'under requires.files in deploy/config.yaml so the deploy mounts '
+            'it into the container, and keep it out of passwords.yaml — a '
+            'document there is a document in the master copy of every '
+            'environment, and unquoted YAML reads a leading "{" as a mapping '
+            'rather than as text',
+      );
+    }
+    return DwFcmPushProviderConfig(
+      projectId: projectId,
+      serviceAccountJson: file.existsSync() ? file.readAsStringSync() : null,
+      webpushIcon: webpushIcon,
+      androidIcon: androidIcon,
+      androidColor: androidColor,
+      requestTimeout: requestTimeout,
+    );
+  }
 
   final String? projectId;
   final String? serviceAccountJson;
@@ -60,7 +109,51 @@ final class DwFcmPushProviderConfig {
   final String? androidColor;
   final Duration requestTimeout;
 
+  /// Whether this provider has everything it needs.
+  ///
+  /// After construction there is no third state left: a config either has both
+  /// halves or neither, because anything between the two throws.
   bool get isConfigured => projectId != null && serviceAccountJson != null;
+
+  /// Nothing, or everything — never the half that fails at the first send.
+  void _assertWholeOrAbsent() {
+    if (projectId == null && serviceAccountJson == null) {
+      return;
+    }
+    if (projectId == null) {
+      throw const DwPushProviderConfigurationException(
+        'FCM',
+        'no project id was given. It is the key that declares an environment '
+            'wants FCM at all, so a service account without one configures '
+            'nothing',
+      );
+    }
+    if (serviceAccountJson == null) {
+      throw const DwPushProviderConfigurationException(
+        'FCM',
+        'no service account was given. Read it from a file — the default is '
+            '"$defaultServiceAccountFile", delivered by '
+            '"dartway deploy secret put-file"',
+      );
+    }
+    final Object? document;
+    try {
+      document = jsonDecode(serviceAccountJson!);
+    } on FormatException catch (error) {
+      throw DwPushProviderConfigurationException(
+        'FCM',
+        'the service account is not JSON (${error.message}). A truncated '
+            'upload and a YAML value that lost its quotes both look like this',
+      );
+    }
+    if (document is! Map) {
+      throw const DwPushProviderConfigurationException(
+        'FCM',
+        'the service account is valid JSON but not an object. Google issues '
+            'it as a file; send that file through unchanged',
+      );
+    }
+  }
 }
 
 /// A blank string is an absent one everywhere in this file: an empty icon, an

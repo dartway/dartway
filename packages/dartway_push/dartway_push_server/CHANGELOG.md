@@ -1,6 +1,42 @@
 ## 0.3.0
 
-Web click-through no longer rests on the app's service worker alone.
+Web click-through no longer rests on the app's service worker alone, and a
+provider that was asked for and not finished now says so.
+
+**Breaking.** `DwFcmPushProviderConfig.fromPasswords` no longer takes
+`serviceAccountJsonKey`. The service account is read from a **file** —
+`DwFcmPushProviderConfig.defaultServiceAccountFile`, that is
+`config/fcm-service-account.json`, overridable with `serviceAccountFile:`. An
+app that kept the JSON in `passwords.yaml` moves it with
+`dartway deploy secret put-file` and names it under `requires.files` in
+`deploy/config.yaml`; nothing else in the wiring changes. The plain constructor
+still takes the JSON directly, for an app that obtains it some other way.
+
+- **A service-account JSON is not a password, and steering it into one was our
+  doing.** The comment that shipped with push described `fcmServiceAccountJson`
+  as "the whole service-account JSON … on one line", and `fromPasswords` was the
+  only factory the documentation showed — so a couple of thousand characters of
+  JSON went into the master copy of every environment's secrets, with a silent
+  failure attached: the value starts with `{`, so unquoted YAML parses it as a
+  flow mapping rather than as a string. Meanwhile the CLI already had
+  `deploy secret put-file`, whose own help names this case verbatim, and since
+  `dartway_cli` 0.8.0 a file named under `requires.files` is genuinely mounted
+  into the container. `config/<name>` is now the path, and it resolves to the
+  same file locally and in the image.
+
+- **A declared-but-incomplete provider fails at startup instead of going
+  quiet.** `isConfigured` returned `false` on any missing field, which is also
+  the answer for "this environment sends no push" — so a forgotten key and a
+  deliberate decision were indistinguishable from inside a running server, and
+  the difference surfaced weeks later as "why did that notification never
+  arrive?". The project id is now the **declaration**: once `fcmProjectId` or
+  `rustorePushProjectId` is present, everything else that provider needs has to
+  be there too, or the config constructor throws the new
+  `DwPushProviderConfigurationException` — naming what is missing and where it
+  was looked for. A service account that is not a JSON object is refused the
+  same way, so a truncated upload or a value that lost its YAML quotes is caught
+  at boot rather than at the first send. An environment that wants no push
+  declares nothing and is believed.
 
 - **`dwPushLinkDataKey` joins the wire keys.** The in-app path a payload carries
   under `link` is now named on the server as it already was on the app half.

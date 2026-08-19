@@ -69,6 +69,49 @@ dozen numbers you don't understand. The one knob worth knowing is
 `maxConcurrentDeliveries`: each in-flight send holds a database connection for
 the whole provider round-trip, so keep it a small fraction of your Postgres pool.
 
+## Where the credentials come from
+
+**Short values are passwords; a whole document is a file.** `fcmProjectId`,
+`rustorePushProjectId` and `rustorePushServiceToken` are a line each and live in
+`passwords.yaml`, delivered with `dartway deploy secret set`. FCM's service
+account is a couple of thousand characters of JSON and is not a password key at
+all: it goes to the server with `dartway deploy secret put-file`, is named under
+`requires.files` in `deploy/config.yaml`, and is read from
+`config/fcm-service-account.json` — a relative path that means the same file
+locally and inside the container, where the deploy mounts every declared file at
+`/app/config/<name>`.
+
+That is not tidiness. A document in `passwords.yaml` is a document in the master
+copy of **every** environment's secrets, and it has a silent failure attached:
+the value begins with `{`, so unquoted YAML parses it as a flow mapping rather
+than as a string, and what reaches the provider is not what was written.
+
+```yaml
+# <project>_server/config/passwords.yaml.example
+staging:
+  # Naming this key is what declares that this environment sends push. The
+  # credential itself is a file: `dartway deploy secret put-file
+  # fcm-service-account.json`, listed under requires.files in
+  # deploy/config.yaml.
+  fcmProjectId:
+```
+
+## Half-configuration is loud
+
+A provider's project id is its **declaration**. Once it is set, everything else
+that provider needs must be there too, or the config constructor throws
+`DwPushProviderConfigurationException` and the server does not start — naming
+what is missing and where it was looked for. A service account that is not a
+JSON object is refused the same way, so a truncated upload or a YAML value that
+lost its quotes is caught at boot rather than at the first send.
+
+`isConfigured == false` used to be the answer both to "we do not send push here"
+and to "the key never reached this environment". From inside a running server
+those are indistinguishable, and the second is normally discovered weeks later
+by somebody asking why a notification never arrived. An environment that
+genuinely wants no push declares nothing — no project id, no file — and
+`isConfigured` is false without anybody being misled.
+
 ## The domain seam
 
 Two objects carry your domain into the engine, and for most apps neither is much
