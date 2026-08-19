@@ -19,6 +19,21 @@ const dwPushImageUrlDataKey = 'image_url';
 const dwPushTitleDataKey = 'push_title';
 const dwPushBodyDataKey = 'push_body';
 
+/// Where a ready-made in-app path is carried, for the one client that cannot
+/// build its own: on the web a service worker handles the click outside
+/// Flutter, with no router in reach.
+///
+/// Part of the same wire contract — `dartway_push_flutter` declares the literal
+/// too, and both sides pin it against the string.
+///
+/// FCM reads this value a **second** time, out of `webpush.fcm_options.link`,
+/// where `DwFcmPushProvider` copies it. That is deliberate: it gives web
+/// click-through two independent paths to the same destination, because the
+/// `notificationclick` event a service worker relies on does not arrive in
+/// every browser and OS combination — and no test shows it, since delivery is
+/// green either way.
+const dwPushLinkDataKey = 'link';
+
 String dwPushTruncateProviderBody(String body) =>
     body.length > dwPushMaximumProviderBodyLength
     ? '${body.substring(0, dwPushMaximumProviderBodyLength)}...'

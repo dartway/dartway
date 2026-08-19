@@ -14,6 +14,7 @@ export 'src/push/dw_push_provider_utils.dart'
     show
         dwPushBodyDataKey,
         dwPushImageUrlDataKey,
+        dwPushLinkDataKey,
         dwPushSafeExceptionCode,
         dwPushTitleDataKey;
 export 'src/push/dw_push_queue.dart';

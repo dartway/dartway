@@ -1,3 +1,19 @@
+## 0.3.0
+
+Web click-through no longer rests on the app's service worker alone.
+
+- **`dwPushLinkDataKey` joins the wire keys.** The in-app path a payload carries
+  under `link` is now named on the server as it already was on the app half.
+  `DwFcmPushProvider` reads it and sets `webpush.fcm_options.link`, so FCM
+  navigates a tap by itself when the app has no `notificationclick` handler of
+  its own — or has one that never runs.
+- The `webpush` block is no longer skipped for a message that has a link but
+  neither an image nor an icon, and its `notification` is emitted only when it
+  has something to say rather than as an empty object.
+- **The wire keys are pinned on both halves now.** The Flutter side asserted the
+  constants rather than the literals, so a rename there broke nothing — which is
+  the one thing that test exists to prevent.
+
 ## 0.2.0
 
 The half of push that faces the app: a device can now register its token, and

@@ -1,3 +1,12 @@
+## 0.1.1
+
+- **The service worker template's `notificationclick` handler now runs.** It sat
+  after `firebase.messaging()`, and the listener the SDK installs in there stops
+  propagation — so ours never fired, on any browser: a tap opened the app at its
+  root with nothing in the console to say why. It is registered first now and
+  stops the SDK's the same way. 0.1.0 described this behaviour; this is the
+  release that has it.
+
 ## 0.1.0
 
 First release: FCM behind the `DwPushClientProvider` contract.
