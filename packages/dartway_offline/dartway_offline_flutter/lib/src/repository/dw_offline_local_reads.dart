@@ -195,33 +195,43 @@ final class DwOfflineLocalReads implements DwRepoLocalReads {
   }
 
   @override
-  Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoBinding binding,
+  Future<R> keep<R>(Future<R> Function(DwRepoLocalReadTx tx) body) {
+    // Two layers, and both are needed. `_serialize` orders this against
+    // `activateUserScope` / `deactivateUserScope`, so a sign-out cannot land
+    // between the binding check and the row write; the drift transaction makes
+    // the row write itself atomic with whatever else the body did.
+    return _serialize(
+      () => _database.transaction(() => body(_DwOfflineReadTx(this))),
+    );
+  }
+
+  Future<bool> _storeSnapshot<Model>({
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
-  }) {
-    return _serialize(() async {
-      if (!_isCurrent(binding)) return DwRepoReadSnapshotStoreResult.stale;
-      final storageKey = queryKey.toStorageKey();
-      if (!_scopeQueryKeys.contains(storageKey)) {
-        return DwRepoReadSnapshotStoreResult.ignored;
-      }
-      if (snapshot.scope != binding.scope ||
-          snapshot.schemaVersion != DwRepoReadSnapshot.currentSchemaVersion) {
-        throw StateError('Repository snapshot binding does not match.');
-      }
-      await _database
-          .into(_database.dwOfflineSnapshots)
-          .insertOnConflictUpdate(
-            DwOfflineSnapshotsCompanion.insert(
-              userScopeId: binding.scope.storageKey,
-              queryKey: storageKey,
-              envelopeJson: jsonEncode(snapshot.responseJson),
-              capturedAtEpochMs: DateTime.now().toUtc().millisecondsSinceEpoch,
-            ),
-          );
-      return DwRepoReadSnapshotStoreResult.stored;
-    });
+  }) async {
+    final binding = _currentBinding;
+    if (binding == null) {
+      throw StateError('Offline snapshots have no active user scope.');
+    }
+    final storageKey = queryKey.toStorageKey();
+    // Not every read is worth keeping, and this store keeps only the handful a
+    // scope explicitly asked for. Declining is an ordinary answer.
+    if (!_scopeQueryKeys.contains(storageKey)) return false;
+    if (snapshot.scope != binding.scope ||
+        snapshot.schemaVersion != DwRepoReadSnapshot.currentSchemaVersion) {
+      throw StateError('Repository snapshot binding does not match.');
+    }
+    await _database
+        .into(_database.dwOfflineSnapshots)
+        .insertOnConflictUpdate(
+          DwOfflineSnapshotsCompanion.insert(
+            userScopeId: binding.scope.storageKey,
+            queryKey: storageKey,
+            envelopeJson: jsonEncode(snapshot.responseJson),
+            capturedAtEpochMs: DateTime.now().toUtc().millisecondsSinceEpoch,
+          ),
+        );
+    return true;
   }
 
   Future<DwRepoReadSnapshot?> _loadScopeSnapshot(
@@ -434,4 +444,20 @@ final class DwOfflineLocalReads implements DwRepoLocalReads {
     _operationTail = queued.then<void>((_) {}, onError: (_, _) {});
     return queued;
   }
+}
+
+final class _DwOfflineReadTx implements DwRepoLocalReadTx {
+  const _DwOfflineReadTx(this._store);
+
+  final DwOfflineLocalReads _store;
+
+  @override
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async =>
+      binding.isActive && identical(binding, _store._currentBinding);
+
+  @override
+  Future<bool> storeSnapshot<Model>({
+    required DwRepoQueryKey<Model> queryKey,
+    required DwRepoReadSnapshot snapshot,
+  }) => _store._storeSnapshot(queryKey: queryKey, snapshot: snapshot);
 }

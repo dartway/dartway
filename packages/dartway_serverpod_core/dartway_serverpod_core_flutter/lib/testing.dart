@@ -11,4 +11,5 @@
 /// either passes them or does not.
 library;
 
+export 'src/testing/dw_repo_local_reads_conformance.dart';
 export 'src/testing/dw_repo_local_writes_conformance.dart';

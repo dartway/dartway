@@ -41,7 +41,8 @@ void main() {
   test('unselected online queries are not persisted', () async {
     final binding = (await delegate.resolveBinding())!;
 
-    final result = await delegate.storeSnapshotIfCurrent(
+    final result = await _keepIfCurrent(
+      delegate,
       binding: binding,
       queryKey: resourceQuery,
       snapshot: snapshot(binding.scope, 42),
@@ -59,7 +60,8 @@ void main() {
     await delegate.retainScopeQueryStorageKey(progressQuery.toStorageKey());
     final binding = (await delegate.resolveBinding())!;
     expect(
-      await delegate.storeSnapshotIfCurrent(
+      await _keepIfCurrent(
+        delegate,
         binding: binding,
         queryKey: progressQuery,
         snapshot: snapshot(binding.scope, 1),
@@ -284,7 +286,8 @@ void main() {
     );
     await delegate.retainScopeQuery(progressQuery);
     final firstBinding = (await delegate.resolveBinding())!;
-    await delegate.storeSnapshotIfCurrent(
+    await _keepIfCurrent(
+      delegate,
       binding: firstBinding,
       queryKey: progressQuery,
       snapshot: snapshot(firstBinding.scope, 3),
@@ -364,4 +367,23 @@ final class _PackageAccessPolicy implements DwOfflineRepositoryReadPolicy {
   }) async {
     return allowedPackages.contains(packageId);
   }
+}
+
+/// The core's own snapshot-commit body, so these tests exercise the same order
+/// of operations `dw.repo` does rather than a shortcut of their own.
+Future<DwRepoReadSnapshotStoreResult> _keepIfCurrent<Model>(
+  DwOfflineLocalReads localReads, {
+  required DwRepoBinding binding,
+  required DwRepoQueryKey<Model> queryKey,
+  required DwRepoReadSnapshot snapshot,
+}) {
+  return localReads.keep<DwRepoReadSnapshotStoreResult>((tx) async {
+    if (!await tx.isBindingCurrent(binding)) {
+      return DwRepoReadSnapshotStoreResult.stale;
+    }
+    final kept = await tx.storeSnapshot(queryKey: queryKey, snapshot: snapshot);
+    return kept
+        ? DwRepoReadSnapshotStoreResult.stored
+        : DwRepoReadSnapshotStoreResult.ignored;
+  });
 }

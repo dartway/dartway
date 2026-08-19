@@ -581,7 +581,7 @@ void main() {
       // The core refuses the response and never hands the value to the caller.
       // Whether the outgoing store physically wrote the row is the store's own
       // commit-time condition to hold, not something the core can undo from
-      // here — `storeSnapshotIfCurrent` exists for exactly that, and the
+      // here — the store's own transaction exists for exactly that, and the
       // conformance suite is where an implementation is held to it.
       expect(replacementReads.storedSnapshots, isEmpty);
       expect(originalDelegate.loadedQueryKeys, isEmpty);
@@ -758,20 +758,36 @@ class _RecordingLocalReads implements DwRepoLocalReads {
   }
 
   @override
-  Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoBinding binding,
+  Future<R> keep<R>(Future<R> Function(DwRepoLocalReadTx tx) body) async {
+    storeReached?.complete();
+    if (allowStoreCommit != null) await allowStoreCommit!.future;
+    final transaction = _RecordingReadTx(this);
+    final result = await body(transaction);
+    // Committed only once the body returned, the way a rolled-back transaction
+    // leaves nothing behind.
+    storedSnapshots.addAll(transaction.staged);
+    return result;
+  }
+}
+
+class _RecordingReadTx implements DwRepoLocalReadTx {
+  _RecordingReadTx(this._store);
+
+  final _RecordingLocalReads _store;
+  final staged = <DwRepoReadSnapshot>[];
+
+  @override
+  Future<bool> isBindingCurrent(DwRepoBinding binding) =>
+      _store.isBindingCurrent(binding);
+
+  @override
+  Future<bool> storeSnapshot<Model>({
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) async {
-    storeReached?.complete();
-    if (allowStoreCommit != null) await allowStoreCommit!.future;
-    if (!await isBindingCurrent(binding)) {
-      return DwRepoReadSnapshotStoreResult.stale;
-    }
-    if (storeResult == DwRepoReadSnapshotStoreResult.stored) {
-      storedSnapshots.add(snapshot);
-    }
-    return storeResult;
+    if (_store.storeResult != DwRepoReadSnapshotStoreResult.stored) return false;
+    staged.add(snapshot);
+    return true;
   }
 }
 
@@ -799,13 +815,25 @@ class _InvalidScopeReadDelegate implements DwRepoLocalReads {
   }
 
   @override
-  Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoBinding binding,
+  Future<R> keep<R>(Future<R> Function(DwRepoLocalReadTx tx) body) =>
+      body(_InvalidScopeReadTx(this));
+}
+
+class _InvalidScopeReadTx implements DwRepoLocalReadTx {
+  _InvalidScopeReadTx(this._store);
+
+  final _InvalidScopeReadDelegate _store;
+
+  @override
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async => true;
+
+  @override
+  Future<bool> storeSnapshot<Model>({
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) async {
-    storeCalls++;
-    return DwRepoReadSnapshotStoreResult.stored;
+    _store.storeCalls++;
+    return true;
   }
 }
 

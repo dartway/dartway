@@ -20,10 +20,13 @@ dw = DwCore(
 There is no setter. A store assigned after startup outlives the core it was attached to, and the
 failure is quiet — everything keeps working, the writes simply go somewhere that belongs to nobody.
 
-The dangerous half of the write contract is held by the shape of the call: the store opens a
-transaction (`write<R>`) and the core writes the binding check and the enqueue inside it, so an
-implementation cannot separate them. What a signature still cannot state — that the transaction is
-real, that the check reads inside it — is held by a suite the core now ships in
+The dangerous half of both contracts is held by the shape of the call: the store opens a
+transaction (`write<R>` for writes, `keep<R>` for reads) and the core writes the binding check and
+the commit inside it, so an implementation cannot separate them. Getting that wrong costs
+differently on each side — a write committed after a sign-out is replayed on the server as somebody
+else, a read committed after one outlives the purge meant to remove it — but the shape is the same
+and so is the fix. What a signature still cannot state — that the transaction is real, that the
+check reads inside it — is held by two suites the core now ships in
 `package:dartway_serverpod_core_flutter/testing.dart`, which every store is expected to run.
 
 Also new: `DwRepoQueryKey` (the stable identity of a read), `DwRepoScope` / `DwRepoBinding` (an

@@ -9,7 +9,8 @@
   registered, so nothing can stay registered after the core it belongs to is gone. Both halves
   report `null` until the runtime is initialized and again once it is disposed, leaving `dw.repo`
   network-only on the way in and on the way out.
-- The outbox enqueue runs inside a real drift transaction, serialized against scope activation, and
-  the package runs the core's `DwRepoLocalWrites` conformance suite.
+- Both commits — the outbox enqueue and the snapshot keep — run inside a real drift transaction,
+  serialized against scope activation, and the package runs the core's `DwRepoLocalWrites` and
+  `DwRepoLocalReads` conformance suites.
 - Manifest v2 accepts an application-calculated `leaseValidUntilUtc`. The framework verifies the
   signed boundary but carries no application-specific access categories or duration rules.

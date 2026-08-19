@@ -95,24 +95,44 @@ identity of the first attempt.
 
 ## Writing a store: the part the compiler will not check for you
 
-A queued write must not survive the session it was written under. The dangerous window is small and
-real: the connection drops, the write goes to the queue, and the user signs out in exactly that
-moment.
+Nothing a store keeps may survive the session it was kept under. The dangerous window is small and
+real: the response arrives, or the connection drops and the write goes to the queue, and the user
+signs out in exactly that moment. A store that asks "is this session still current?" and *then*
+commits the row will pass its own tests and lose that race, and the damage is not symmetric:
 
-So the enqueue is not a method you implement — it is a transaction you *open*, and the core writes
+- a **write** committed after the sign-out is replayed on the next sign-in — an action taken on the
+  server, attributed to whoever is signed in then;
+- a **read** committed after the sign-out outlives the purge that was supposed to remove it — rows
+  of an ended session, still on the device.
+
+So neither commit is a method you implement. Both are a transaction you *open*, and the core writes
 what happens inside it:
 
 ```dart
+// DwRepoLocalWrites
 @override
 Future<R> write<R>(Future<R> Function(DwRepoLocalWriteTx tx) body) =>
-    database.transaction(() => body(_MyTx(this)));
+    database.transaction(() => body(_MyWriteTx(this)));
+
+// DwRepoLocalReads
+@override
+Future<R> keep<R>(Future<R> Function(DwRepoLocalReadTx tx) body) =>
+    database.transaction(() => body(_MyReadTx(this)));
 ```
 
-The core then does the checking and the queuing inside your transaction, in that order, and an
-implementation cannot separate them because it never sees them apart.
+The core then does the checking and the committing inside your transaction, in that order, and an
+implementation cannot separate them because it never sees them apart. (Two names for one shape
+because one class may implement both contracts, and two `write` methods taking different
+transactions cannot coexist.)
+
+Inside a read transaction you also answer whether the query is worth keeping at all —
+`tx.storeSnapshot(...)` returns `false` for the ones you decline, which is how a store keeps a
+handful of screens offline instead of the whole backend. Declining is an ordinary answer, not a
+failure.
 
 What a signature still cannot state — that the transaction is real, that `isBindingCurrent` reads
-inside it, that a body which throws leaves nothing behind — is stated by tests the core ships:
+inside it, that a body which throws leaves nothing behind — is stated by tests the core ships, one
+suite per contract:
 
 ```dart
 import 'package:dartway_serverpod_core_flutter/testing.dart';
@@ -120,7 +140,11 @@ import 'package:dartway_serverpod_core_flutter/testing.dart';
 void main() {
   dwRepoLocalWritesConformance(
     'MyLocalWrites',
-    createFixture: () async => MyFixture(await openStore()),
+    createFixture: () async => MyWriteFixture(await openStore()),
+  );
+  dwRepoLocalReadsConformance(
+    'MyLocalReads',
+    createFixture: () async => MyReadFixture(await openStore()),
   );
 }
 ```

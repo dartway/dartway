@@ -700,12 +700,25 @@ class _KeyRecordingLocalReads implements DwRepoLocalReads {
   }) async => null;
 
   @override
-  Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoBinding binding,
+  Future<R> keep<R>(Future<R> Function(DwRepoLocalReadTx tx) body) =>
+      body(_KeyRecordingReadTx(this));
+}
+
+class _KeyRecordingReadTx implements DwRepoLocalReadTx {
+  _KeyRecordingReadTx(this._store);
+
+  final _KeyRecordingLocalReads _store;
+
+  @override
+  Future<bool> isBindingCurrent(DwRepoBinding binding) =>
+      _store.isBindingCurrent(binding);
+
+  @override
+  Future<bool> storeSnapshot<Model>({
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) async {
-    queryKeys.add(queryKey as DwRepoQueryKey<Object?>);
-    return DwRepoReadSnapshotStoreResult.stored;
+    _store.queryKeys.add(queryKey as DwRepoQueryKey<Object?>);
+    return true;
   }
 }

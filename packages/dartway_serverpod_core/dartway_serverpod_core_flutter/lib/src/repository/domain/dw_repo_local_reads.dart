@@ -71,14 +71,42 @@ abstract interface class DwRepoLocalReads {
     required DwRepoQueryKey<Model> queryKey,
   });
 
-  /// Atomically writes only while [binding] is current at the commit point.
+  /// Runs [body] inside one durable transaction and returns its result.
   ///
-  /// A persistent store must implement this condition transactionally with the
-  /// row write; a pre-write read of [isBindingCurrent] is not enough. Return
-  /// [DwRepoReadSnapshotStoreResult.stale] without committing when the capability
-  /// changed.
-  Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoBinding binding,
+  /// Keeping a read is a write, and it carries the same danger as any other:
+  /// the response arrives, the core offers it to the store, and the user signs
+  /// out in that exact moment. A snapshot committed after the sign-out survives
+  /// the purge that was supposed to remove it — rows of a session that ended,
+  /// still on the device.
+  ///
+  /// So the store opens the transaction and the core writes what happens
+  /// inside it. The binding check and the row write cannot be separated by an
+  /// implementation, because the implementation never sees them apart.
+  ///
+  /// Named [keep] rather than `write` on purpose: one class may implement both
+  /// this contract and [DwRepoLocalWrites], and two methods of the same name
+  /// taking different transactions cannot coexist.
+  Future<R> keep<R>(Future<R> Function(DwRepoLocalReadTx tx) body);
+}
+
+/// One durable transaction over [DwRepoLocalReads].
+///
+/// The store opens it, the core writes what happens inside. Same shape as
+/// [DwRepoLocalWriteTx], and for the same reason.
+abstract interface class DwRepoLocalReadTx {
+  /// Reads, inside this transaction, whether [binding] is still current.
+  ///
+  /// Must observe the same consistent state the snapshot commits into — a read
+  /// taken outside the transaction defeats the reason this method exists.
+  Future<bool> isBindingCurrent(DwRepoBinding binding);
+
+  /// Keeps [snapshot] under [queryKey], and reports whether it kept it.
+  ///
+  /// `false` is an ordinary answer, not a failure: a store decides for itself
+  /// which of the queries offered to it are worth keeping, and the core turns
+  /// that into [DwRepoReadSnapshotStoreResult.ignored]. Saying no is how a
+  /// store keeps a handful of screens offline instead of the whole backend.
+  Future<bool> storeSnapshot<Model>({
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   });

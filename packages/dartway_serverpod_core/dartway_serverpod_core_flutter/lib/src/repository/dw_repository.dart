@@ -466,19 +466,36 @@ class DwRepository {
     required _DwRepoReadCapture? readBinding,
   }) async {
     if (readBinding == null) return true;
-    if (!await _isCurrentReadBinding(readBinding)) {
-      return false;
-    }
 
-    final result = await readBinding.store.storeSnapshotIfCurrent(
-      binding: readBinding.binding,
-      queryKey: queryKey,
-      snapshot: DwRepoReadSnapshot(
-        schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-        scope: readBinding.scope,
-        responseJson: Map<String, dynamic>.from(response.toJson()),
-      ),
+    final snapshot = DwRepoReadSnapshot(
+      schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
+      scope: readBinding.scope,
+      responseJson: Map<String, dynamic>.from(response.toJson()),
     );
+
+    // The check and the row commit together or not at all. Between them is
+    // where a sign-out would otherwise slip through and leave a snapshot of a
+    // session that has ended sitting on the device, past the purge that was
+    // supposed to take it.
+    final result = await readBinding.store
+        .keep<DwRepoReadSnapshotStoreResult>((tx) async {
+          if (!identical(localReads, readBinding.store)) {
+            return DwRepoReadSnapshotStoreResult.stale;
+          }
+          if (!readBinding.binding.isActive) {
+            return DwRepoReadSnapshotStoreResult.stale;
+          }
+          if (!await tx.isBindingCurrent(readBinding.binding)) {
+            return DwRepoReadSnapshotStoreResult.stale;
+          }
+          final kept = await tx.storeSnapshot(
+            queryKey: queryKey,
+            snapshot: snapshot,
+          );
+          return kept
+              ? DwRepoReadSnapshotStoreResult.stored
+              : DwRepoReadSnapshotStoreResult.ignored;
+        });
     return result != DwRepoReadSnapshotStoreResult.stale;
   }
 

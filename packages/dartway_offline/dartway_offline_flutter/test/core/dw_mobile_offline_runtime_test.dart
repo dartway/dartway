@@ -91,7 +91,8 @@ void main() {
     final binding = (await localReads.resolveBinding())!;
 
     expect(
-      await localReads.storeSnapshotIfCurrent(
+      await _keepIfCurrent(
+        localReads,
         binding: binding,
         queryKey: retainedQuery,
         snapshot: DwRepoReadSnapshot(
@@ -103,7 +104,8 @@ void main() {
       DwRepoReadSnapshotStoreResult.stored,
     );
     expect(
-      await localReads.storeSnapshotIfCurrent(
+      await _keepIfCurrent(
+        localReads,
         binding: binding,
         queryKey: ignoredQuery,
         snapshot: DwRepoReadSnapshot(
@@ -241,4 +243,23 @@ final class _Transport implements DwBackgroundDownloadTransport {
     disposeCalls += 1;
     await _updates.close();
   }
+}
+
+/// The core's own snapshot-commit body, so these tests exercise the same order
+/// of operations `dw.repo` does rather than a shortcut of their own.
+Future<DwRepoReadSnapshotStoreResult> _keepIfCurrent<Model>(
+  DwOfflineLocalReads localReads, {
+  required DwRepoBinding binding,
+  required DwRepoQueryKey<Model> queryKey,
+  required DwRepoReadSnapshot snapshot,
+}) {
+  return localReads.keep<DwRepoReadSnapshotStoreResult>((tx) async {
+    if (!await tx.isBindingCurrent(binding)) {
+      return DwRepoReadSnapshotStoreResult.stale;
+    }
+    final kept = await tx.storeSnapshot(queryKey: queryKey, snapshot: snapshot);
+    return kept
+        ? DwRepoReadSnapshotStoreResult.stored
+        : DwRepoReadSnapshotStoreResult.ignored;
+  });
 }

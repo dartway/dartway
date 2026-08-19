@@ -209,11 +209,24 @@ class _OfflineLocalReads implements DwRepoLocalReads {
   }
 
   @override
-  Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoBinding binding,
+  Future<R> keep<R>(Future<R> Function(DwRepoLocalReadTx tx) body) =>
+      body(_OfflineReadTx(this));
+}
+
+class _OfflineReadTx implements DwRepoLocalReadTx {
+  _OfflineReadTx(this._store);
+
+  final _OfflineLocalReads _store;
+
+  @override
+  Future<bool> isBindingCurrent(DwRepoBinding binding) =>
+      _store.isBindingCurrent(binding);
+
+  @override
+  Future<bool> storeSnapshot<Model>({
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
-  }) async => DwRepoReadSnapshotStoreResult.stored;
+  }) async => true;
 }
 
 /// The application's own plugin, standing in for a real store.
