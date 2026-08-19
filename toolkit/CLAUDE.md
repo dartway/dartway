@@ -170,8 +170,32 @@ So before an issue is created:
    language the journal itself is kept in does not follow the entry there.
 3. **Search the tracker first.** Three projects meeting one API gap is one issue with three voices,
    not three issues.
-4. **Show the text and wait for a yes.** This is the only irreversible step the journal has — an
+4. **Label what it did to you** — the two labels below, and they are part of the text you show.
+5. **Show the text and wait for a yes.** This is the only irreversible step the journal has — an
    issue exists publicly from the moment it is created, and deleting it does not un-index it.
+
+#### The two labels
+
+**`impact:` — what the finding did to this project, not how bad it feels.** The value is remembered,
+not judged: an hour ago you either gave up on something, wrote a workaround, or simply noticed. A
+scale of severities asks for an estimate instead, and an estimate drifts between one session and the
+next until the field means nothing.
+
+| Label | What actually happened |
+|---|---|
+| `impact:blocks` | It could not be worked around. Either the project cannot do what it has to, or the workaround cost more than the feature and the feature was dropped |
+| `impact:workaround` | It was worked around, and the code carries the marker to prove it. The cost is known and dated: the day the fix lands upstream, that code starts duplicating the framework |
+| `impact:friction` | It works, but the API pushes you to write the wrong thing, or the documentation says something untrue. Nobody was blocked and there was nothing to work around |
+
+**`silent` — it breaks with no error attached.** Orthogonal to impact, and it is the label that
+moves a decision: a `friction` that quietly corrupts data outranks a `blocks` that crashes on the
+first run, because the loud one gets fixed the day it appears. It is visible; the other one is
+found by eye, months later, if at all.
+
+**A gap another project has already filed gets a comment, not a second issue** (rule 3 above): your
+impact in one line, and the label rises to the worst voice on the issue if yours is worse. That is
+also the whole of who-met-this — the account that wrote the line is who to talk to when it closes,
+and GitHub records it without being asked. Nothing about your codebase travels with it, by rule 1.
 
 ### A workaround over a `dartway_*` API also leaves a marker in the code
 
