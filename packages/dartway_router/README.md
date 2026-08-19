@@ -674,7 +674,9 @@ Extension on `DwNavigationRoute` providing:
 
 - `routePath` - Route path (relative for child routes)
 - `fullPath` - Full path from root
-- `isActive(context)` - Check if route is currently active
+- `isActive(context)` - Check if route is currently active. Path parameters
+  are resolved against the current location, and a route stays active while
+  one of its child routes is open
 
 ## Examples
 

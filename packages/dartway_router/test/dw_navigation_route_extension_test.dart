@@ -77,7 +77,96 @@ class NestedPage extends StatelessWidget {
 
 // Test params
 enum TestParams<T> with DwNavigationParamsMixin<T> {
-  userId<int>();
+  userId<int>(),
+  projectId<int>();
+}
+
+// A branch with a parameterized ancestor (`/project/:projectId`) plus plain
+// roots, used to check what `isActive` answers at a concrete address.
+enum ParameterizedRoutes implements DwNavigationRoute<TestRouterState> {
+  home(DwNavigationRouteDescriptor.zoneRoot(pageWidget: LabeledPage('home'))),
+  project(
+    DwNavigationRouteDescriptor.parameterized(
+      pageWidget: LabeledPage('project'),
+      parameter: TestParams.projectId,
+      parent: home,
+      extraPathSegment: 'project',
+    ),
+  ),
+  issues(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: LabeledPage('issues'),
+      parent: project,
+    ),
+  ),
+  milestones(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: LabeledPage('milestones'),
+      parent: project,
+    ),
+  ),
+  settings(
+    DwNavigationRouteDescriptor.simple(pageWidget: LabeledPage('settings')),
+  ),
+  notifications(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: LabeledPage('notifications'),
+      parent: settings,
+    ),
+  ),
+  news(DwNavigationRouteDescriptor.simple(pageWidget: LabeledPage('news'))),
+  newsletter(
+    DwNavigationRouteDescriptor.simple(pageWidget: LabeledPage('newsletter')),
+  );
+
+  const ParameterizedRoutes(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => '';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+}
+
+/// A page that renders its own name, so a test can reach its [BuildContext].
+class LabeledPage extends StatelessWidget {
+  const LabeledPage(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(label);
+}
+
+/// Builds the real router over [ParameterizedRoutes], opens [location] and
+/// returns the context of the page labelled [leafLabel].
+///
+/// The router is built by [DwRouter] on purpose: the paths under test are the
+/// ones the framework itself generates from the descriptors.
+Future<BuildContext> pumpRouterAt(
+  WidgetTester tester,
+  String location,
+  String leafLabel,
+) async {
+  final router = DwRouter<TestRouterState>(
+    navigationZones: [ParameterizedRoutes.values],
+    pageBuilder: DwPageBuilder.material,
+    options: DwGoRouterOptions(initialLocation: location),
+  );
+
+  await tester.pumpWidget(MaterialApp.router(routerConfig: router.router));
+  await tester.pumpAndSettle();
+
+  return tester.element(find.text(leafLabel));
 }
 
 void main() {
@@ -215,6 +304,90 @@ void main() {
         // fullPath should be '/extra/nested' which matches the actual route
         expect(TestRoutes.nested.fullPath, '/extra/nested');
         expect(TestRoutes.nested.isActive(context), isTrue);
+      });
+    });
+
+    group('isActive under a parameterized ancestor', () {
+      testWidgets('the open route is active at its concrete address',
+          (tester) async {
+        final context = await pumpRouterAt(
+          tester,
+          '/project/7/issues',
+          'issues',
+        );
+
+        // The route is declared as a template; the location is an address.
+        expect(
+          ParameterizedRoutes.issues.fullPath,
+          '/project/:projectId/issues',
+        );
+        expect(ParameterizedRoutes.issues.isActive(context), isTrue);
+      });
+
+      testWidgets('the parameterized parent stays active under a child',
+          (tester) async {
+        final context = await pumpRouterAt(
+          tester,
+          '/project/7/issues',
+          'issues',
+        );
+
+        expect(ParameterizedRoutes.project.isActive(context), isTrue);
+      });
+
+      testWidgets('a sibling under the same parent is not active',
+          (tester) async {
+        final context = await pumpRouterAt(
+          tester,
+          '/project/7/issues',
+          'issues',
+        );
+
+        expect(ParameterizedRoutes.milestones.isActive(context), isFalse);
+        expect(ParameterizedRoutes.settings.isActive(context), isFalse);
+      });
+
+      testWidgets('a parameterized route is active at its own address',
+          (tester) async {
+        final context = await pumpRouterAt(tester, '/project/7', 'project');
+
+        expect(ParameterizedRoutes.project.isActive(context), isTrue);
+        expect(ParameterizedRoutes.issues.isActive(context), isFalse);
+      });
+    });
+
+    group('isActive without a parameterized ancestor', () {
+      testWidgets('a parent stays active while its child is open',
+          (tester) async {
+        final context = await pumpRouterAt(
+          tester,
+          '/settings/notifications',
+          'notifications',
+        );
+
+        expect(ParameterizedRoutes.notifications.isActive(context), isTrue);
+        expect(ParameterizedRoutes.settings.isActive(context), isTrue);
+        expect(ParameterizedRoutes.news.isActive(context), isFalse);
+      });
+
+      testWidgets('a string prefix of the location is not an active route',
+          (tester) async {
+        final context = await pumpRouterAt(tester, '/newsletter', 'newsletter');
+
+        expect(ParameterizedRoutes.newsletter.isActive(context), isTrue);
+        // '/news' is a string prefix of '/newsletter' but not a path ancestor.
+        expect(ParameterizedRoutes.news.isActive(context), isFalse);
+      });
+
+      testWidgets('the zone root is active at its own address only',
+          (tester) async {
+        final atRoot = await pumpRouterAt(tester, '/', 'home');
+        expect(ParameterizedRoutes.home.isActive(atRoot), isTrue);
+
+        final atSettings = await pumpRouterAt(tester, '/settings', 'settings');
+        // The zone root has an empty path: it is not the ancestor of the zone.
+        expect(ParameterizedRoutes.home.isActive(atSettings), isFalse);
+        expect(ParameterizedRoutes.settings.isActive(atSettings), isTrue);
       });
     });
   });
