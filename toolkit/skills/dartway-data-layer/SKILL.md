@@ -326,16 +326,31 @@ in the widget that owns the button.** Not a callback handed down from a parent, 
 > weaker screen for a weaker test.
 >
 > The seam is one level down, and it is the same one the framework uses on itself: **the transport
-> handed to `DwCore`**. Pass `transport: DwRecordingServerTransport(...)` from
-> `package:dartway_serverpod_core_flutter/testing.dart` **instead of** `client:`, and nothing in the
-> process has to stand up a Serverpod client for a widget to render. It keeps every save and delete
-> that left (`transport.saves`, `transport.deletes`) and answers reads from what the test prepared
-> (`answerGetAll`, `answerGetOne`, `answerGetCount`); a read nobody prepared throws
-> `DwUnpreparedServerCall` naming the call and the field that would answer it, while a save needs no
-> setup — the default echoes the model back, because the assertion is about what *left*. What that
-> gets you is "the button reached `saveModel` with this model", which is what a widget test should
-> assert. What covers the **rule** is still an integration test over the CRUD config on the server,
-> where the rule lives.
+> handed to `DwCore`**. Pass `transport: DwRecordingServerTransport(serializationManager:
+> app.Protocol())` from `package:dartway_serverpod_core_flutter/testing.dart` **instead of**
+> `client:`, and nothing in the process has to stand up a Serverpod client for a widget to render.
+> The protocol is the project's own generated one, imported prefixed because the core declares a
+> `Protocol` too — it is the only thing that names the models right, since a generated model is an
+> abstract class whose `runtimeType` reads `_NewsPostImpl`.
+>
+> It keeps every save and delete that left (`transport.saves`, `transport.deletes`) and answers
+> reads from what the test prepared (`answerGetAll`, `answerGetOne`, `answerGetCount`); a read
+> nobody prepared throws `DwUnpreparedServerCall` naming the call and the field that would answer
+> it, while a save needs no setup — the default echoes the model back, because the assertion is
+> about what *left*. What that gets you is "the button reached `saveModel` with this model", which
+> is what a widget test should assert. What covers the **rule** is still an integration test over
+> the CRUD config on the server, where the rule lives.
+>
+> Boot the core from `setUpAll` through **the app's own initializer**, given an optional `transport`
+> parameter, and build no Serverpod client when it is set — a client brings a connectivity monitor
+> and an auth key manager, both of which reach for platform channels. Without a key manager there is
+> no session, so a test that needs a signed-in user overrides `dw.requireUserProfileProvider` in its
+> own `ProviderScope`.
+>
+> Two traps about time, not about the transport: `pumpAndSettle` does not drain the toast a
+> successful `onSuccessNotification` leaves behind (pump `DwUiNotification.defaultDuration` after
+> the tap), and a read you made fail is **retried** by Riverpod with a backoff — assert the shape of
+> what was asked, never the number of attempts.
 >
 > **The offline store is not that seam, and is documented not to be.** A write always goes to the
 > network first; `dw.repo.localWrites` is reached only after the call fails with a connection error.

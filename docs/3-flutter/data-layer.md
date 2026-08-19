@@ -357,16 +357,20 @@ core sends everything through**. A test hands `DwCore` its own instead of a Serv
 ```dart
 import 'package:dartway_serverpod_core_flutter/testing.dart';
 
-final transport = DwRecordingServerTransport(classNames: {Lesson: 'Lesson'});
+// Your own generated Protocol — the same object the real client carries, and
+// the only thing that names your models correctly. A generated model is an
+// abstract class with a private implementation, so its `runtimeType` reads
+// `_LessonImpl`. Import it prefixed: the DartWay core declares a `Protocol` too.
+final transport = DwRecordingServerTransport(
+  serializationManager: app.Protocol(),
+);
 
-setUpAll(() {
-  dw = DwCore<Client, UserProfile>(
-    config: const DwConfig(defaultModelGetter: dwGetDefault),
-    transport: transport,          // instead of client:, not beside it
-    dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
-    getUserId: (profile) => profile?.id,
-  );
-});
+// Booted through the app's own initializer — the real bootstrap with one thing
+// swapped — so a test never stands a second, subtly different core beside the
+// one the app ships. Give the initializer an optional `transport` and build no
+// Serverpod client when it is set: a client brings a connectivity monitor and an
+// auth key manager, both of which reach for platform channels.
+setUpAll(() => initAppDwCore(transport: transport));
 
 testWidgets('the button saves the lesson', (tester) async {
   transport.answerGetAll = (_) async => lessonsResponse([draft]);
@@ -380,6 +384,10 @@ testWidgets('the button saves the lesson', (tester) async {
   expect((transport.saves.single.model as Lesson).isPublished, isTrue);
 });
 ```
+
+The worked version of all of this is
+[`example/dartway_example_flutter/test/`](https://github.com/dartway/dartway/tree/master/example/dartway_example_flutter/test) —
+the news feature, its read states and its write, with the shared harness in `test/support/`.
 
 Reads must be prepared; writes need not be. A read nobody answered throws `DwUnpreparedServerCall`
 naming the call and the field that would answer it — a test that does not know what its subject
@@ -398,6 +406,19 @@ Two things to know before writing the test at all:
   transport first; `dw.repo.localWrites` is reached only after the connection refuses it. Reaching
   for it to watch a save would force every save to declare itself queued, which is a lie about
   intent.
+
+And two things that surprise every test that meets them, both of which are about time rather than
+about the transport:
+
+- **`pumpAndSettle` does not drain a notification.** A successful
+  `dw.action(onSuccessNotification: ...)` inserts a toast that removes itself on a `Future.delayed`,
+  and settling waits for frames, not for timers. The test then fails on "A Timer is still pending
+  even after the widget tree was disposed" — an error about the toast, in a test about a save. Pump
+  `DwUiNotification.defaultDuration` after the tap, once, in a shared helper.
+- **A failed read is retried.** Riverpod retries a failed provider on its own with a growing
+  backoff, so a read you made fail is attempted many times while the test settles. Assert the shape
+  of what was asked (`transport.reads.map((r) => r.operation)`), not the count — a count pins
+  somebody else's default.
 
 What this covers is "the button reached `saveModel` with this model". What covers the **rule** —
 who may save what — is an integration test over the CRUD config on the server, where the rule lives.

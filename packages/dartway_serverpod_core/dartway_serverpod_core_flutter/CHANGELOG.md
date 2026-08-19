@@ -17,7 +17,10 @@ Two things this buys, in the order they matter:
   `ServerpodClientShared` implementing `callServerEndpoint(endpoint, method, args)` against
   string-keyed wire arguments; the four such props inside this package came to ~150 lines and are
   gone. A save that needs no particular answer needs no setup at all — the default echoes the model
-  back, because the assertion is about what *left*.
+  back, because the assertion is about what *left*. **An application hands it its own generated
+  `Protocol()`** as `serializationManager`; a model it cannot name is refused rather than sent under
+  a name no server knows, because falling back to `runtimeType` would be silently wrong for every
+  generated model (they are abstract classes, so it reads `_NewsPostImpl`).
 - **Serverpod is replaceable.** `DwServerpodTransport` is now the only place in the Flutter half that
   knows a generated `Caller` exists.
 

@@ -136,16 +136,19 @@ class DwUnpreparedServerCall extends Error {
 /// transport it was built with for its whole life, and `DwCore` can be built
 /// only once per process.
 class DwRecordingServerTransport implements DwServerTransport {
-  /// [classNames] maps the models this test uses to the class names they travel
-  /// under — the same names the server's CRUD config knows them by. Without an
-  /// entry a model falls back to its `runtimeType`, which is right often enough
-  /// for a test and wrong for a private class whose Dart name is not the wire
-  /// name.
+  /// **An application passes [serializationManager], and passes its own
+  /// generated `Protocol()`** — the same object its Serverpod client carries.
+  /// It already names every model of the project correctly, and it is the only
+  /// thing that can: a generated model is an abstract class with a private
+  /// implementation, so its `runtimeType` is `_NewsPostImpl` and never the name
+  /// the wire uses. It is also what a test needs to read a model *back* — a
+  /// local snapshot rebuilds its response from stored JSON.
   ///
-  /// [serializationManager] replaces that shorthand outright, for the tests
-  /// that need models read *back* off the wire and not only named on the way
-  /// out — reading a local snapshot is the case, since it rebuilds the response
-  /// from stored JSON. Pass one or the other, not both.
+  /// [classNames] is the shorthand for the other case, a test over models it
+  /// invented itself, which the framework's own tests are full of: it maps each
+  /// one to the name it travels under. Pass one or the other, not both. A model
+  /// covered by neither is refused when it is first named, rather than sent
+  /// under a name no server knows.
   DwRecordingServerTransport({
     Map<Type, String> classNames = const {},
     SerializationManager? serializationManager,
@@ -378,8 +381,19 @@ class _RecordingSerializationManager extends SerializationManager {
   @override
   String? getClassNameForObject(Object? value) {
     if (value == null) return null;
-    return _classNames[value.runtimeType] ??
-        super.getClassNameForObject(value) ??
-        (value is SerializableModel ? '${value.runtimeType}' : null);
+    final declared =
+        _classNames[value.runtimeType] ?? super.getClassNameForObject(value);
+    if (declared != null) return declared;
+    // Falling back to the Dart type name would be silently wrong exactly where
+    // it matters most: a generated Serverpod model is an abstract class with a
+    // private implementation, so `runtimeType` reads `_NewsPostImpl` and the
+    // save would leave under a name no server knows.
+    throw StateError(
+      'DwRecordingServerTransport does not know what ${value.runtimeType} is '
+      'called on the wire.\n'
+      'An app passes its own generated Protocol() as serializationManager — it '
+      'names every model of the project. A test over an invented model adds it '
+      'to classNames: {${value.runtimeType}: \'<TheWireName>\'}.',
+    );
   }
 }
