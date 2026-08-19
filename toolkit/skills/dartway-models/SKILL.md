@@ -112,13 +112,22 @@ values:
 ## Model change workflow
 
 1. Edit/add a `.spy.yaml` in `lib/src/models/<domain>/`.
-2. `dart run serverpod generate` — updates the generated code + `__CLIENT_PKG__`.
-3. `dart run serverpod create-migration` (`--force` only in early MVP, if the old migrations can be overwritten).
+2. `serverpod generate` — updates the generated code + `__CLIENT_PKG__`.
+3. `serverpod create-migration` (`--force` only in early MVP, if the old migrations can be overwritten).
 4. `dart format lib/src/generated ../__CLIENT_PKG__/lib/src/protocol` — **the order of 2–4 is fixed, see below.**
 5. Set up `DwCrudConfig` in `/crud` (see `dartway-crud-config`) and **register it in `crudConfigurations`** at `DwCore.init` — otherwise the API returns `notConfigured`.
 6. Logic: `/domain` (pure) or `/app` (session-aware).
-7. Migrations are applied at startup (`--apply-migrations`) or via `dart run serverpod migrate`.
+7. Migrations are applied at startup (`--apply-migrations`) or via `serverpod migrate`.
 8. Tests (unit tests for the config and Event models).
+
+**`serverpod` is a command, not a `dart run` target.** The `serverpod` package the server depends
+on is the runtime and carries no `bin/serverpod.dart`; the generator is a separate package,
+`serverpod_cli`, activated globally (`dart pub global activate serverpod_cli`). `dart run serverpod
+generate` therefore answers `Could not find bin/serverpod.dart in package serverpod`, which reads
+like a broken project rather than a wrong command. **Its version has to match the `serverpod`
+constraint in `__SERVER_PKG__`** — `dart pub global list` says which one is installed. The CLI
+writes generated code for its own version, bundling its own `dart_style`, so a CLI that has
+drifted from the runtime produces code that compiles and misbehaves.
 
 ### Why formatting is a step, and why it is the last one
 
