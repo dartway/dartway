@@ -10,7 +10,7 @@ import 'dw_repo_local_writes.dart';
 /// ```dart
 /// dw = DwCore(
 ///   config: ..., client: ..., dwAlerts: ..., getUserId: ...,
-///   plugins: [DwOffline(store: MyLocalStore())],
+///   plugins: [DwOfflinePlugin(config: offlineConfig)],
 /// );
 /// ```
 ///

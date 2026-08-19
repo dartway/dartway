@@ -320,15 +320,29 @@ final deleteAction = dw.action<bool>(
 in the widget that owns the button.** Not a callback handed down from a parent, and not a screen-wide
 `busy` flag: `DwActionBuilder` computes busy per button already.
 
-> **The honest limitation, and it is a compromise, not a design.** A widget test cannot observe a
-> write. `dw.repo.saveModel` reaches the static `DwRepository.saveModel`, which calls
-> `dw.endpointCaller`, and that is a `late final` set in `DwCore.init` — there is no seam to fake.
-> While the write hung on a callback from above, a test could at least assert what arrived in the
-> callback; a feature that saves for itself gives a test nothing to hold. **So do not keep a
-> callback alive as a test seam** — that trade buys a weaker screen for a weaker test. What covers
-> the write is an integration test over the CRUD config on the server, where the rule being
-> protected actually lives; the widget test covers what the screen *shows*. When this bites, say so
-> — a repository fake is a framework request, not something to work around in an app.
+> **What a widget test over a self-writing feature covers, and where its seam is.** A feature that
+> saves for itself gives a test no callback to assert on. That seam went with the parameter, and
+> bringing it back is the wrong trade: **do not keep a callback alive as a test seam** — it buys a
+> weaker screen for a weaker test.
+>
+> The seam is one level down, and it is the same one the framework uses on itself: **the Serverpod
+> `client` handed to `DwCore`**. `dw.endpointCaller` is derived from it in the constructor, so a
+> client whose `callServerEndpoint` you override answers for the whole CRUD surface — the core's own
+> write tests count saves exactly that way. What that gets you is "the button reached `saveModel`
+> with this model", which is what a widget test should assert. What covers the **rule** is still an
+> integration test over the CRUD config on the server, where the rule lives.
+>
+> **The offline store is not that seam, and is documented not to be.** A write always goes to the
+> network first; `dw.repo.localWrites` is reached only after the call fails with a connection error.
+> Reaching for it to watch a save would force every save to declare itself queued, which is a lie
+> about intent.
+>
+> One thing to know before writing the test at all: the feature reaches `dw` **while building**, not
+> on the tap — `dw.action(...)` is constructed in `build`. So the core has to be up for the widget
+> to render, even in a test that never interacts. Without it the subtree does not build and the test
+> fails later at a finder ("found 0 widgets"), with the real cause in a separate exception block
+> above. Boot it from `setUpAll` through the app's own initializer, and keep that initializer
+> idempotent so no test file has to know whether another one booted the core first.
 
 ## 4a. Derived state — a provider, not assembly in the widget
 

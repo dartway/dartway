@@ -30,7 +30,7 @@ class DwRepo {
 
   /// The local copy of reads, or `null` when the app declared no store.
   ///
-  /// Declared with the core — `DwCore(plugins: [DwOffline(...)])` — and read
+  /// Declared with the core — `DwCore(plugins: [DwOfflinePlugin(...)])` — and read
   /// here; there is no setter, because a store assigned after startup outlives
   /// the core it belongs to. Registration alone caches nothing: each list or
   /// single config must select [DwRepoReadStrategy.networkFirstWithSnapshot]
