@@ -1,0 +1,19 @@
+name: dartway_offline_shared
+description: "The wire contract of DartWay offline packages: the canonical manifest signing frame and the repository content digest, shared by the signing and the verifying half."
+version: 0.1.0
+repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, offline]
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  crypto: ^3.0.7
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.25.15
