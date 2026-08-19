@@ -4,7 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dartway_offline_flutter/src/access/dw_offline_lease_policy.dart';
-import 'package:dartway_offline_flutter/src/repository/dw_offline_read_delegate.dart';
+import 'package:dartway_offline_flutter/src/repository/dw_offline_local_reads.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_asset_store.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_database.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_media_resolver.dart';

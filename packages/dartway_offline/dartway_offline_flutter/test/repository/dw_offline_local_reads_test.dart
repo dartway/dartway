@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:dartway_offline_flutter/src/access/dw_offline_lease_policy.dart';
-import 'package:dartway_offline_flutter/src/repository/dw_offline_read_delegate.dart';
+import 'package:dartway_offline_flutter/src/repository/dw_offline_local_reads.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_database.dart';
 import 'package:dartway_offline_shared/dartway_offline_shared.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
@@ -15,14 +15,14 @@ void main() {
   late DwOfflineDatabase database;
   late TestSignedManifestFixture manifestFixture;
   late _PackageAccessPolicy accessPolicy;
-  late DwOfflineReadDelegate delegate;
+  late DwOfflineLocalReads delegate;
   late DwRepoQueryKey<Object> resourceQuery;
 
   setUp(() async {
     database = DwOfflineDatabase(NativeDatabase.memory());
     manifestFixture = await TestSignedManifestFixture.create();
     accessPolicy = _PackageAccessPolicy();
-    delegate = DwOfflineReadDelegate(
+    delegate = DwOfflineLocalReads(
       database: database,
       packageAccessPolicy: accessPolicy,
     );

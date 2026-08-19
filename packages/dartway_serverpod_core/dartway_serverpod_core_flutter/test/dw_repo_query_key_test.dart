@@ -1,31 +1,37 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/domain/dw_pagination_strategy.dart';
-import 'package:dartway_serverpod_core_flutter/src/repository/domain/dw_repository_read_executor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // Query keys are observed where they are actually consumed: a local store is
+  // handed the key of every read it is asked to keep, and that is the only
+  // place in the framework a key is anybody's business. Reads here declare
+  // `networkFirstWithSnapshot` because they genuinely are kept — no read is
+  // made to claim something about itself in order to be watched.
+  late _TestLocalStore store;
+  late _KeyRecordingLocalReads localReads;
+
   setUpAll(() {
-    final endpointClient = _EndpointCapturingClient();
+    store = _TestLocalStore();
     _queryKeyCore = DwCore<_EndpointCapturingClient, _QueryLesson>(
       config: const DwConfig(),
-      client: endpointClient,
+      client: _EndpointCapturingClient(),
       dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
       getUserId: (_) => null,
+      plugins: [store],
     );
     DwRepository.setupRepository(defaultModel: _QueryLesson());
   });
 
-  late _CapturingReadExecutor readExecutor;
-
   setUp(() {
-    readExecutor = _CapturingReadExecutor();
-    DwRepository.readExecutor = readExecutor;
+    localReads = _KeyRecordingLocalReads();
+    store.reads = localReads;
   });
 
   tearDown(() {
-    DwRepository.readExecutor = const DwOnlineRepositoryReadExecutor();
+    store.reads = null;
   });
 
   test(
@@ -358,7 +364,7 @@ void main() {
   });
 
   test(
-    'modelList routes its exact paginated request through the read executor',
+    'modelList routes its exact paginated request through to the local store',
     () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
@@ -371,6 +377,7 @@ void main() {
         orderByList: [DwOrderBy(fieldName: 'startsAt', orderDescending: true)],
         apiGroupOverride: 'learning',
         paginationStrategy: _FixedPagination(),
+        readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
       );
 
       await container.read(
@@ -378,7 +385,7 @@ void main() {
       );
 
       final capturedKey =
-          readExecutor.queryKeys.single as DwRepoQueryKey<_QueryLesson>;
+          localReads.queryKeys.single as DwRepoQueryKey<_QueryLesson>;
       expect(capturedKey.canonicalFilters, <String, Object?>{
         'children': <Object?>[
           <String, Object?>{
@@ -408,7 +415,7 @@ void main() {
         'valueClassName': 'null',
       });
 
-      expect(readExecutor.queryKeys, [
+      expect(localReads.queryKeys, [
         DwRepoQueryKey<_QueryLesson>.getAll(
           modelClassName: 'QueryLesson',
           apiGroup: 'learning',
@@ -458,19 +465,18 @@ void main() {
     'modelList sends the key API group to the actual endpoint request',
     () async {
       final endpointClient = _queryKeyCore.client..reset();
-      final executor = _CapturingOnlineReadExecutor();
-      DwRepository.readExecutor = executor;
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final config = DwModelListStateConfig<_QueryLesson>(
         apiGroupOverride: 'learning',
+        readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
       );
 
       await container.read(
         DwRepository.modelListStateProvider<_QueryLesson>()(config).future,
       );
 
-      expect(executor.queryKeys.single.apiGroup, 'learning');
+      expect(localReads.queryKeys.single.apiGroup, 'learning');
       expect(endpointClient.getAllApiGroup, 'learning');
     },
   );
@@ -485,14 +491,21 @@ void main() {
     addTearDown(container.dispose);
 
     await container.read(
-      const DwRepo().modelList<_QueryLesson>(backendFilter: filter).future,
+      const DwRepo()
+          .modelList<_QueryLesson>(
+            customConfig: DwModelListStateConfig<_QueryLesson>(
+              backendFilter: filter,
+              readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
+            ),
+          )
+          .future,
     );
 
     expect(
       const DwRepo().unpaginatedModelListQueryKey<_QueryLesson>(
         backendFilter: filter,
       ),
-      readExecutor.queryKeys.single,
+      localReads.queryKeys.single,
     );
     expect(
       const DwRepo().modelQueryKey<_QueryLesson>(id: 42),
@@ -501,13 +514,14 @@ void main() {
   });
 
   test(
-    'single initial and forced reads route the same key through executor',
+    'single initial and forced reads route the same key to the local store',
     () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       final config = DwSingleModelStateConfig<_QueryLesson>(
         id: 42,
         apiGroupOverride: 'learning',
+        readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
       );
       final provider = DwRepository.singleModelProvider<_QueryLesson>()(config);
 
@@ -525,14 +539,15 @@ void main() {
           'valueClassName': 'int',
         },
       );
-      expect(readExecutor.queryKeys, [expectedKey, expectedKey]);
+      expect(localReads.queryKeys, [expectedKey, expectedKey]);
     },
   );
 
   test(
-    'dw.repo.fetchList routes the imperative request through executor',
+    'dw.repo.fetchList routes the imperative request to the local store',
     () async {
       await const DwRepo().fetchList<_QueryLesson>(
+        readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
         filter: const DwBackendFilter<int>.value(
           type: DwBackendFilterType.equals,
           fieldName: 'authorId',
@@ -544,7 +559,7 @@ void main() {
         apiGroupOverride: 'learning',
       );
 
-      expect(readExecutor.queryKeys, [
+      expect(localReads.queryKeys, [
         DwRepoQueryKey<_QueryLesson>.getAll(
           modelClassName: 'QueryLesson',
           apiGroup: 'learning',
@@ -623,6 +638,9 @@ class _EndpointCapturingClient extends ServerpodClientShared {
           )
           as T;
     }
+    if (endpoint == 'dartway_serverpod_core.dwCrud' && method == 'getOne') {
+      return const DwApiResponse<DwModelWrapper>(isOk: true, value: null) as T;
+    }
     throw StateError('Unexpected endpoint request: $endpoint.$method');
   }
 }
@@ -649,43 +667,45 @@ class _FixedPagination implements DwPaginationStrategy {
   void reset() {}
 }
 
-class _CapturingReadExecutor implements DwRepositoryReadExecutor {
-  final queryKeys = <Object>[];
+/// The application's own plugin, standing in for a real store.
+class _TestLocalStore extends DwRepoLocalStorePlugin {
+  DwRepoLocalReads? reads;
 
   @override
-  Future<Response> execute<Model, Response>({
-    required DwRepoQueryKey<Model> queryKey,
-    required Future<Response> Function() onlineRequest,
-  }) async {
-    queryKeys.add(queryKey);
-    if (Response == DwApiResponse<List<DwModelWrapper>>) {
-      return const DwApiResponse<List<DwModelWrapper>>(
-            isOk: true,
-            value: <DwModelWrapper>[],
-          )
-          as Response;
-    }
-    if (Response == DwApiResponse<DwModelWrapper>) {
-      return const DwApiResponse<DwModelWrapper>(isOk: true, value: null)
-          as Response;
-    }
-    throw StateError('Unexpected read response type $Response');
-  }
+  DwRepoLocalReads? get localReads => reads;
+
+  @override
+  DwRepoLocalWrites? get localWrites => null;
+
+  @override
+  Future<void> init(DwFlutter core) async {}
 }
 
-class _CapturingOnlineReadExecutor implements DwRepositoryReadExecutor {
-  final _onlineExecutor = const DwOnlineRepositoryReadExecutor();
+/// Keeps nothing; records the identity every read is offered under.
+class _KeyRecordingLocalReads implements DwRepoLocalReads {
   final queryKeys = <DwRepoQueryKey<Object?>>[];
+  late final _binding = DwRepoBinding(scope: DwRepoScope('query-key-test'));
 
   @override
-  Future<Response> execute<Model, Response>({
+  Future<DwRepoBinding?> resolveBinding() async => _binding;
+
+  @override
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async =>
+      identical(binding, _binding);
+
+  @override
+  Future<DwRepoReadSnapshot?> loadSnapshot<Model>({
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
-    required Future<Response> Function() onlineRequest,
-  }) {
+  }) async => null;
+
+  @override
+  Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
+    required DwRepoBinding binding,
+    required DwRepoQueryKey<Model> queryKey,
+    required DwRepoReadSnapshot snapshot,
+  }) async {
     queryKeys.add(queryKey as DwRepoQueryKey<Object?>);
-    return _onlineExecutor.execute(
-      queryKey: queryKey,
-      onlineRequest: onlineRequest,
-    );
+    return DwRepoReadSnapshotStoreResult.stored;
   }
 }

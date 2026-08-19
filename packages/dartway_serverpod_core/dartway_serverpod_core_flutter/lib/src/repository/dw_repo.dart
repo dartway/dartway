@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'domain/dw_model_list_state_config.dart';
 import 'domain/dw_pagination_params.dart';
 import 'domain/dw_repo_query_key.dart';
-import 'domain/dw_repo_read_delegate.dart';
+import 'domain/dw_repo_local_reads.dart';
 import 'domain/dw_repo_read_strategy.dart';
-import 'domain/dw_repo_write_delegate.dart';
+import 'domain/dw_repo_local_writes.dart';
 import 'domain/dw_single_model_state_config.dart';
 import 'dw_repository.dart';
 import 'states/dw_model_list_state.dart';
@@ -28,22 +28,22 @@ import 'states/dw_single_model_state.dart';
 class DwRepo {
   const DwRepo();
 
-  /// Optional snapshot persistence registered during app bootstrap.
-  /// Registration alone does not cache reads: each list or single config must
-  /// explicitly select [DwRepoReadStrategy.networkFirstWithSnapshot].
-  DwRepoReadDelegate? get readDelegate => DwRepository.readDelegate;
+  /// The local copy of reads, or `null` when the app declared no store.
+  ///
+  /// Declared with the core — `DwCore(plugins: [DwOffline(...)])` — and read
+  /// here; there is no setter, because a store assigned after startup outlives
+  /// the core it belongs to. Registration alone caches nothing: each list or
+  /// single config must select [DwRepoReadStrategy.networkFirstWithSnapshot]
+  /// for itself.
+  DwRepoLocalReads? get localReads => DwRepository.localReads;
 
-  set readDelegate(DwRepoReadDelegate? delegate) {
-    DwRepository.readDelegate = delegate;
-  }
-
-  /// Optional durable offline write persistence registered during app
-  /// bootstrap. Leaving it unset keeps every `dw.repo` write network-only.
-  DwRepoWriteDelegate? get writeDelegate => DwRepository.writeDelegate;
-
-  set writeDelegate(DwRepoWriteDelegate? delegate) {
-    DwRepository.writeDelegate = delegate;
-  }
+  /// The local copy of writes, or `null` when the app declared no store — in
+  /// which case every `dw.repo` write is network-only.
+  ///
+  /// Note the asymmetry with [localReads]: a read opts in at its config, a
+  /// write opts in inside the store, per operation and model. They are not one
+  /// paired switch.
+  DwRepoLocalWrites? get localWrites => DwRepository.localWrites;
 
   // --- Reads (providers) -----------------------------------------------------
 

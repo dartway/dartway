@@ -1,4 +1,4 @@
-/// An opaque storage namespace resolved by a repository delegate.
+/// An opaque storage namespace resolved by a repository local store.
 ///
 /// The application owns the meaning of this value: it may derive it from an
 /// authenticated account, tenant, or another app-specific boundary. Core never
@@ -31,7 +31,7 @@ class DwRepoScope {
 
 /// An opaque, in-memory capability for one authenticated repository binding.
 ///
-/// A delegate must issue a fresh instance for every scope transition, even when
+/// A store must issue a fresh instance for every scope transition, even when
 /// the persistent [scope.storageKey] is the same (logout/login ABA). It is
 /// deliberately not persisted, so a runtime binding can change without making
 /// valid stored rows unreadable for a later binding under the same scope.

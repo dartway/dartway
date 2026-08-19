@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
-import '../repository/dw_offline_read_delegate.dart';
+import '../repository/dw_offline_local_reads.dart';
 import '../storage/dw_offline_database.dart';
 import 'dw_offline_lease_policy.dart';
 

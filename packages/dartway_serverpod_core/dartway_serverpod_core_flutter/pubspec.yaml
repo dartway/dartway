@@ -16,6 +16,12 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # A real dependency, not a dev one: `package:dartway_serverpod_core_flutter/testing.dart`
+  # ships the conformance suites implementations of these contracts must pass,
+  # and a suite that lives in `test/` cannot be imported from another package.
+  flutter_test:
+    sdk: flutter
+
   serverpod_client: ^3.4.11
 
   dartway_flutter: ^0.5.0
@@ -36,8 +42,6 @@ dependencies:
   file_picker: ^11.0.2
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
   flutter_lints: ^6.0.0
 
 flutter:

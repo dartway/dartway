@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:dartway_offline_flutter/src/network/dw_network_class.dart';
 import 'package:dartway_offline_flutter/src/outbox/dw_offline_outbox.dart';
 import 'package:dartway_offline_flutter/src/outbox/dw_offline_outbox_synchronizer.dart';
-import 'package:dartway_offline_flutter/src/repository/dw_offline_write_delegate.dart';
+import 'package:dartway_offline_flutter/src/repository/dw_offline_local_writes.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_database.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:drift/native.dart';
@@ -11,27 +11,27 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late DwOfflineDatabase database;
-  late DwOfflineWriteDelegate writeDelegate;
+  late DwOfflineLocalWrites localWrites;
   late _NetworkSource networkSource;
 
   setUp(() async {
     database = DwOfflineDatabase(NativeDatabase.memory());
-    writeDelegate = DwOfflineWriteDelegate(
+    localWrites = DwOfflineLocalWrites(
       database: database,
       mutationPlanner: _MutationPlanner(),
     );
-    await writeDelegate.activateUserScope('scope-a');
+    await localWrites.activateUserScope('scope-a');
     networkSource = _NetworkSource();
   });
 
   tearDown(() async {
     await networkSource.dispose();
-    await writeDelegate.deactivateUserScope();
+    await localWrites.deactivateUserScope();
     await database.close();
   });
 
   test('replays the active scope when connectivity returns', () async {
-    await _enqueueMutation(writeDelegate);
+    await _enqueueMutation(localWrites);
     final replayedMutations = <String>[];
     final synchronizer = DwOfflineOutboxSynchronizer(
       outbox: DwOfflineOutbox(database),
@@ -53,7 +53,7 @@ void main() {
   });
 
   test('scope deactivation retains an in-flight acknowledgement', () async {
-    await _enqueueMutation(writeDelegate);
+    await _enqueueMutation(localWrites);
     final replayStarted = Completer<void>();
     final allowReplay = Completer<void>();
     final synchronizer = DwOfflineOutboxSynchronizer(
@@ -97,9 +97,10 @@ void main() {
   });
 }
 
-Future<void> _enqueueMutation(DwOfflineWriteDelegate writeDelegate) async {
-  final binding = (await writeDelegate.resolveBinding())!;
-  await writeDelegate.enqueueMutationIfCurrent(
+Future<void> _enqueueMutation(DwOfflineLocalWrites localWrites) async {
+  final binding = (await localWrites.resolveBinding())!;
+  await _enqueueIfCurrent(
+      localWrites,
     binding: binding,
     mutation: DwRepoMutation.save(
       scope: DwRepoScope('scope-a'),
@@ -142,7 +143,7 @@ final class _MutationPlanner implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<bool>?>
   prepareDeleteMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;
@@ -150,7 +151,7 @@ final class _MutationPlanner implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<DwModelWrapper>?>
   prepareSaveMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;
@@ -161,4 +162,18 @@ final class _MutationPlanner implements DwOfflineMutationPlanner {
         entityType: mutation.entityType,
         entityId: mutation.opaqueMetadata!['offlineTargetId']! as String,
       );
+}
+
+/// The core's own enqueue body, so these tests exercise the same order of
+/// operations `dw.repo` does rather than a shortcut of their own.
+Future<DwRepoEnqueue> _enqueueIfCurrent(
+  DwOfflineLocalWrites localWrites, {
+  required DwRepoBinding binding,
+  required DwRepoMutation mutation,
+}) {
+  return localWrites.write<DwRepoEnqueue>((tx) async {
+    if (!await tx.isBindingCurrent(binding)) return DwRepoEnqueue.stale;
+    await tx.enqueue(mutation);
+    return DwRepoEnqueue.accepted;
+  });
 }

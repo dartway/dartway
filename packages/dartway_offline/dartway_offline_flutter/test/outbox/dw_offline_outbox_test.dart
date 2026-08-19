@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:dartway_offline_flutter/src/outbox/dw_offline_outbox.dart';
-import 'package:dartway_offline_flutter/src/repository/dw_offline_write_delegate.dart';
+import 'package:dartway_offline_flutter/src/repository/dw_offline_local_writes.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_database.dart';
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:drift/native.dart';
@@ -10,30 +10,31 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   late DwOfflineDatabase database;
   late _MutationPlanner mutationPlanner;
-  late DwOfflineWriteDelegate writeDelegate;
+  late DwOfflineLocalWrites localWrites;
   late DwOfflineOutbox outbox;
 
   setUp(() async {
     database = DwOfflineDatabase(NativeDatabase.memory());
     mutationPlanner = _MutationPlanner();
-    writeDelegate = DwOfflineWriteDelegate(
+    localWrites = DwOfflineLocalWrites(
       database: database,
       mutationPlanner: mutationPlanner,
     );
     outbox = DwOfflineOutbox(database);
-    await writeDelegate.activateUserScope('scope-a');
+    await localWrites.activateUserScope('scope-a');
   });
 
   tearDown(() async {
-    await writeDelegate.deactivateUserScope();
+    await localWrites.deactivateUserScope();
     await database.close();
   });
 
   test(
     'enqueue keeps the latest intent and the original queue position',
     () async {
-      final binding = (await writeDelegate.resolveBinding())!;
-      await writeDelegate.enqueueMutationIfCurrent(
+      final binding = (await localWrites.resolveBinding())!;
+      await _enqueueIfCurrent(
+      localWrites,
         binding: binding,
         mutation: mutation(
           mutationId: 'first',
@@ -41,7 +42,8 @@ void main() {
           createdAtUtc: DateTime.utc(2026, 1, 1),
         ),
       );
-      await writeDelegate.enqueueMutationIfCurrent(
+      await _enqueueIfCurrent(
+      localWrites,
         binding: binding,
         mutation: mutation(
           mutationId: 'latest',
@@ -61,16 +63,18 @@ void main() {
   );
 
   test('pending mutation stream restores the latest durable intent', () async {
-    final binding = (await writeDelegate.resolveBinding())!;
+    final binding = (await localWrites.resolveBinding())!;
     final pending = outbox
         .watchPendingMutations('scope-a')
         .firstWhere((mutations) => mutations.isNotEmpty);
 
-    await writeDelegate.enqueueMutationIfCurrent(
+    await _enqueueIfCurrent(
+      localWrites,
       binding: binding,
       mutation: mutation(mutationId: 'first', desiredCompleted: true),
     );
-    await writeDelegate.enqueueMutationIfCurrent(
+    await _enqueueIfCurrent(
+      localWrites,
       binding: binding,
       mutation: mutation(mutationId: 'latest', desiredCompleted: false),
     );
@@ -88,10 +92,11 @@ void main() {
 
   test('mutation outside the application allowlist is rejected', () async {
     mutationPlanner.allowMutations = false;
-    final binding = (await writeDelegate.resolveBinding())!;
+    final binding = (await localWrites.resolveBinding())!;
 
     await expectLater(
-      writeDelegate.enqueueMutationIfCurrent(
+      _enqueueIfCurrent(
+      localWrites,
         binding: binding,
         mutation: mutation(mutationId: 'not-allowed'),
       ),
@@ -103,12 +108,14 @@ void main() {
   test(
     'accepted replay is sequential and removes acknowledged mutations',
     () async {
-      final binding = (await writeDelegate.resolveBinding())!;
-      await writeDelegate.enqueueMutationIfCurrent(
+      final binding = (await localWrites.resolveBinding())!;
+      await _enqueueIfCurrent(
+      localWrites,
         binding: binding,
         mutation: mutation(mutationId: 'first', targetId: 'resource-1'),
       );
-      await writeDelegate.enqueueMutationIfCurrent(
+      await _enqueueIfCurrent(
+      localWrites,
         binding: binding,
         mutation: mutation(mutationId: 'second', targetId: 'resource-2'),
       );
@@ -132,8 +139,9 @@ void main() {
   );
 
   test('device clock rollback cannot reorder later queued mutations', () async {
-    final binding = (await writeDelegate.resolveBinding())!;
-    await writeDelegate.enqueueMutationIfCurrent(
+    final binding = (await localWrites.resolveBinding())!;
+    await _enqueueIfCurrent(
+      localWrites,
       binding: binding,
       mutation: mutation(
         mutationId: 'first',
@@ -141,7 +149,8 @@ void main() {
         createdAtUtc: DateTime.utc(2026, 1, 2),
       ),
     );
-    await writeDelegate.enqueueMutationIfCurrent(
+    await _enqueueIfCurrent(
+      localWrites,
       binding: binding,
       mutation: mutation(
         mutationId: 'second',
@@ -163,12 +172,14 @@ void main() {
   });
 
   test('connection failure keeps the queue and stops later replay', () async {
-    final binding = (await writeDelegate.resolveBinding())!;
-    await writeDelegate.enqueueMutationIfCurrent(
+    final binding = (await localWrites.resolveBinding())!;
+    await _enqueueIfCurrent(
+      localWrites,
       binding: binding,
       mutation: mutation(mutationId: 'first', targetId: 'resource-1'),
     );
-    await writeDelegate.enqueueMutationIfCurrent(
+    await _enqueueIfCurrent(
+      localWrites,
       binding: binding,
       mutation: mutation(mutationId: 'second', targetId: 'resource-2'),
     );
@@ -190,8 +201,9 @@ void main() {
   test(
     'acknowledging an old intent never deletes a newer coalesced intent',
     () async {
-      final binding = (await writeDelegate.resolveBinding())!;
-      await writeDelegate.enqueueMutationIfCurrent(
+      final binding = (await localWrites.resolveBinding())!;
+      await _enqueueIfCurrent(
+      localWrites,
         binding: binding,
         mutation: mutation(mutationId: 'first'),
       );
@@ -207,7 +219,8 @@ void main() {
       );
       await replayStarted.future;
 
-      await writeDelegate.enqueueMutationIfCurrent(
+      await _enqueueIfCurrent(
+      localWrites,
         binding: binding,
         mutation: mutation(mutationId: 'latest', desiredCompleted: false),
       );
@@ -253,7 +266,7 @@ final class _MutationPlanner implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<bool>?>
   prepareDeleteMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;
@@ -261,8 +274,22 @@ final class _MutationPlanner implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<DwModelWrapper>?>
   prepareSaveMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;
+}
+
+/// The core's own enqueue body, so these tests exercise the same order of
+/// operations `dw.repo` does rather than a shortcut of their own.
+Future<DwRepoEnqueue> _enqueueIfCurrent(
+  DwOfflineLocalWrites localWrites, {
+  required DwRepoBinding binding,
+  required DwRepoMutation mutation,
+}) {
+  return localWrites.write<DwRepoEnqueue>((tx) async {
+    if (!await tx.isBindingCurrent(binding)) return DwRepoEnqueue.stale;
+    await tx.enqueue(mutation);
+    return DwRepoEnqueue.accepted;
+  });
 }

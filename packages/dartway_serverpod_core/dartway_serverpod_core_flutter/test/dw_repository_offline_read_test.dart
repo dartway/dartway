@@ -2,31 +2,35 @@ import 'dart:async';
 
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
-import 'package:dartway_serverpod_core_flutter/src/repository/domain/dw_repository_read_executor.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  late _OfflineReadClient client;
+  late _TestLocalStore store;
+  late _OfflineLocalReads localReads;
+
   setUpAll(() {
-    final client = _OfflineReadClient();
+    client = _OfflineReadClient();
+    store = _TestLocalStore();
     DwCore<_OfflineReadClient, _OfflineReadModel>(
       config: const DwConfig(),
       client: client,
       dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
       getUserId: (_) => null,
+      plugins: [store],
     );
     DwRepository.setupRepository(defaultModel: _OfflineReadModel());
   });
 
-  late _OfflineReadDelegate readDelegate;
-
   setUp(() {
-    readDelegate = _OfflineReadDelegate();
-    DwRepository.readDelegate = readDelegate;
+    client.listResponse = null;
+    localReads = _OfflineLocalReads();
+    store.reads = localReads;
   });
 
   tearDown(() {
-    DwRepository.readDelegate = null;
+    store.reads = null;
   });
 
   test('default list config remains network-only', () async {
@@ -42,7 +46,7 @@ void main() {
       ),
       throwsA(isA<TimeoutException>()),
     );
-    expect(readDelegate.snapshotLoadCount, 0);
+    expect(localReads.snapshotLoadCount, 0);
   });
 
   test(
@@ -60,7 +64,7 @@ void main() {
       expect(await container.read(provider.future), isNull);
       expect(
         container.read(provider.notifier).lastReadOrigin,
-        DwRepoReadOrigin.offlineSnapshot,
+        DwRepoReadOrigin.localSnapshot,
       );
 
       expect(
@@ -69,7 +73,7 @@ void main() {
       );
       expect(
         container.read(provider.notifier).lastReadOrigin,
-        DwRepoReadOrigin.offlineSnapshot,
+        DwRepoReadOrigin.localSnapshot,
       );
     },
   );
@@ -86,7 +90,7 @@ void main() {
     expect(await container.read(provider.future), isEmpty);
     expect(
       container.read(provider.notifier).lastReadOrigin,
-      DwRepoReadOrigin.offlineSnapshot,
+      DwRepoReadOrigin.localSnapshot,
     );
   });
 
@@ -102,19 +106,16 @@ void main() {
   test('imperative list reads do not publish updated models', () async {
     final receivedUpdates = <List<DwModelWrapper>>[];
     final update = DwModelWrapper.wrap(model: _OfflineReadModel());
-    DwRepository.readExecutor = _UpdatedModelsReadExecutor(
-      DwApiResponse<List<DwModelWrapper>>(
-        isOk: true,
-        value: const <DwModelWrapper>[],
-        updatedModels: <DwModelWrapper>[update],
-      ),
+    client.listResponse = DwApiResponse<List<DwModelWrapper>>(
+      isOk: true,
+      value: const <DwModelWrapper>[],
+      updatedModels: <DwModelWrapper>[update],
     );
     DwRepository.addUpdatesListener<_OfflineReadModel>(receivedUpdates.add);
     addTearDown(() {
       DwRepository.removeUpdatesListener<_OfflineReadModel>(
         receivedUpdates.add,
       );
-      DwRepository.readExecutor = const DwOnlineRepositoryReadExecutor();
     });
 
     expect(await const DwRepo().fetchList<_OfflineReadModel>(), isEmpty);
@@ -147,13 +148,21 @@ class _OfflineReadClient extends ServerpodClientShared {
   @override
   Map<String, EndpointRef> get endpointRefLookup => <String, EndpointRef>{};
 
+  /// What the backend answers a list read with. `null` — the default — is a
+  /// connection that is simply down, which is what most cases here need.
+  DwApiResponse<List<DwModelWrapper>>? listResponse;
+
   @override
   Future<T> callServerEndpoint<T>(
     String endpoint,
     String method,
     Map<String, dynamic> args, {
     bool authenticated = true,
-  }) async => throw TimeoutException('offline');
+  }) async {
+    final response = listResponse;
+    if (response != null && method == 'getAll') return response as T;
+    throw TimeoutException('offline');
+  }
 }
 
 class _OfflineReadProtocol extends SerializationManager {
@@ -172,21 +181,21 @@ class _OfflineReadProtocol extends SerializationManager {
   };
 }
 
-class _OfflineReadDelegate implements DwRepoReadDelegate {
-  late final _scope = DwRepoReadScope('offline-read-test');
-  late final _binding = DwRepoReadBinding(scope: _scope);
+class _OfflineLocalReads implements DwRepoLocalReads {
+  late final _scope = DwRepoScope('offline-read-test');
+  late final _binding = DwRepoBinding(scope: _scope);
   int snapshotLoadCount = 0;
 
   @override
-  Future<DwRepoReadBinding?> resolveBinding() async => _binding;
+  Future<DwRepoBinding?> resolveBinding() async => _binding;
 
   @override
-  Future<bool> isBindingCurrent(DwRepoReadBinding binding) async =>
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async =>
       identical(binding, _binding);
 
   @override
   Future<DwRepoReadSnapshot?> loadSnapshot<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
   }) async {
     snapshotLoadCount += 1;
@@ -201,20 +210,22 @@ class _OfflineReadDelegate implements DwRepoReadDelegate {
 
   @override
   Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) async => DwRepoReadSnapshotStoreResult.stored;
 }
 
-class _UpdatedModelsReadExecutor implements DwRepositoryReadExecutor {
-  const _UpdatedModelsReadExecutor(this.response);
-
-  final DwApiResponse<List<DwModelWrapper>> response;
+/// The application's own plugin, standing in for a real store.
+class _TestLocalStore extends DwRepoLocalStorePlugin {
+  _OfflineLocalReads? reads;
 
   @override
-  Future<Response> execute<Model, Response>({
-    required DwRepoQueryKey<Model> queryKey,
-    required Future<Response> Function() onlineRequest,
-  }) async => response as Response;
+  DwRepoLocalReads? get localReads => reads;
+
+  @override
+  DwRepoLocalWrites? get localWrites => null;
+
+  @override
+  Future<void> init(DwFlutter core) async {}
 }

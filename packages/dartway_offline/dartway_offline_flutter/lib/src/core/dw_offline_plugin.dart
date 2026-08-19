@@ -1,15 +1,31 @@
-import 'package:dartway_flutter/dartway_flutter.dart';
+import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 
 import 'dw_offline_config.dart';
 import 'dw_offline_user_scope.dart';
 
-/// An optional DartWay plugin that owns offline user-scope lifecycle.
+/// An optional DartWay plugin that owns offline user-scope lifecycle, and the
+/// local store `dw.repo` reads and writes through.
+///
+/// Declared with the core, which is what gives it the core's lifetime:
+///
+/// ```dart
+/// dw = DwCore(
+///   config: ..., client: ..., dwAlerts: ..., getUserId: ...,
+///   plugins: [DwOfflinePlugin(config: offlineConfig)],
+/// );
+/// ```
 ///
 /// Call [activateUserScope] after authenticated startup, [deactivateUserScope]
 /// on sign-out, and [dispose] when the application integration is torn down.
 /// Runtime operations are serialized: an old scope is cleared and purged before
 /// another scope can become observable.
-class DwOfflinePlugin extends DwPlugin {
+///
+/// Being a [DwRepoLocalStorePlugin] is how the repository finds it — there is
+/// nothing to register, and nothing that could stay registered after the core
+/// it belongs to is gone. Both halves report `null` until the runtime is
+/// initialized and again once it is disposed, which leaves `dw.repo`
+/// network-only on the way in and on the way out.
+class DwOfflinePlugin extends DwRepoLocalStorePlugin {
   DwOfflinePlugin({required DwOfflineConfig config}) : _config = config;
 
   final DwOfflineConfig _config;
@@ -24,6 +40,12 @@ class DwOfflinePlugin extends DwPlugin {
 
   /// The protected scope currently eligible for offline operations, if any.
   DwOfflineUserScope? get activeUserScope => _activeUserScope;
+
+  @override
+  DwRepoLocalReads? get localReads => _runtime?.localReads;
+
+  @override
+  DwRepoLocalWrites? get localWrites => _runtime?.localWrites;
 
   @override
   Future<void> init(DwFlutter core) {
@@ -121,4 +143,14 @@ class DwOfflinePlugin extends DwPlugin {
     _operationQueue = queuedOperation.then<void>((_) {}, onError: (_, _) {});
     return queuedOperation;
   }
+}
+
+/// Reaches the offline plugin as `dw.plugins.offline`.
+///
+/// The app talks to it for the things only it knows — the active scope, whether
+/// there are unsaved changes waiting for a connection. Reads and writes need no
+/// mention of it at all: they stay `dw.repo.saveModel(...)` and route
+/// themselves.
+extension DwOfflineAccess on DwPlugins {
+  DwOfflinePlugin get offline => of<DwOfflinePlugin>();
 }

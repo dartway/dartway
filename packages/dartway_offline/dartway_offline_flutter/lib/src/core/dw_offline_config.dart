@@ -1,3 +1,5 @@
+import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+
 import 'dw_offline_user_scope.dart';
 
 /// The target platform relevant to the optional offline runtime.
@@ -9,6 +11,14 @@ enum DwOfflineStatus { uninitialized, available, active, disabled, disposed }
 /// Storage, downloader, and repository lifecycle owned by the offline plugin.
 abstract interface class DwOfflineRuntime {
   Future<void> initialize();
+
+  /// The local copy of repository reads this runtime offers, or `null` while
+  /// it is not running.
+  DwRepoLocalReads? get localReads;
+
+  /// The local copy of repository writes this runtime offers, or `null` while
+  /// it is not running.
+  DwRepoLocalWrites? get localWrites;
 
   /// Makes [userScope] the only scope eligible for offline operations.
   Future<void> activateUserScope(DwOfflineUserScope userScope);

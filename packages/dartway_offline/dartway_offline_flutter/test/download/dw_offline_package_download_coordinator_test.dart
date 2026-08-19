@@ -9,7 +9,7 @@ import 'package:dartway_offline_flutter/src/download/dw_download_job_store.dart'
 import 'package:dartway_offline_flutter/src/download/dw_download_scheduler.dart';
 import 'package:dartway_offline_flutter/src/download/dw_offline_package_download_coordinator.dart';
 import 'package:dartway_offline_flutter/src/network/dw_network_class.dart';
-import 'package:dartway_offline_flutter/src/repository/dw_offline_read_delegate.dart';
+import 'package:dartway_offline_flutter/src/repository/dw_offline_local_reads.dart';
 import 'package:dartway_offline_flutter/src/storage/disk_space_plus_source.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_asset_store.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_database.dart';
@@ -45,11 +45,11 @@ void main() {
       applicationSupportDirectory: supportDirectory,
       database: database,
     );
-    final readDelegate = DwOfflineReadDelegate(
+    final localReads = DwOfflineLocalReads(
       database: database,
       packageAccessPolicy: accessStore,
     );
-    await readDelegate.activateUserScope('scope-a');
+    await localReads.activateUserScope('scope-a');
     final jobStore = DwDownloadJobStore(database);
     transport = _Transport();
     final scheduler = DwDownloadScheduler(
@@ -66,7 +66,7 @@ void main() {
       expectedAudience: 'mobile',
       accessStore: accessStore,
       assetStore: assetStore,
-      readDelegate: readDelegate,
+      localReads: localReads,
       jobStore: jobStore,
       scheduler: scheduler,
     );

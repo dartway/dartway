@@ -10,12 +10,13 @@ import 'package:flutter_riverpod/misc.dart';
 
 import '../private/dw_singleton.dart';
 import 'domain/dw_model_list_state_config.dart';
-import 'domain/dw_repo_read_delegate.dart';
+import 'domain/dw_repo_binding.dart';
+import 'domain/dw_repo_local_reads.dart';
+import 'domain/dw_repo_local_store.dart';
 import 'domain/dw_repo_query_key.dart';
 import 'domain/dw_repo_read_strategy.dart';
 import 'domain/dw_repo_mutation.dart';
-import 'domain/dw_repo_write_delegate.dart';
-import 'domain/dw_repository_read_executor.dart';
+import 'domain/dw_repo_local_writes.dart';
 import 'domain/dw_single_model_state_config.dart';
 import '../app/socket/service/streaming_error_classifier.dart';
 import 'states/dw_model_list_state.dart';
@@ -24,44 +25,51 @@ import 'states/dw_single_model_state.dart';
 class DwRepository {
   static const int mockModelId = 0;
 
-  static DwRepositoryReadExecutor _readExecutor =
-      const DwOnlineRepositoryReadExecutor();
-
-  /// The internal read boundary that future snapshot support extends.
-  static DwRepositoryReadExecutor get readExecutor => _readExecutor;
-
-  static set readExecutor(DwRepositoryReadExecutor executor) {
-    _readExecutor = executor;
-  }
-
-  static DwRepoReadDelegate? _readDelegate;
-  static final _activeReadBindings = <DwRepoReadBinding, int>{};
-
-  /// Optional snapshot persistence for canonical reads. A registered delegate
-  /// is consulted only by configs that explicitly opt into snapshot reads.
-  static DwRepoReadDelegate? get readDelegate => _readDelegate;
-
-  static set readDelegate(DwRepoReadDelegate? delegate) {
-    for (final binding in _activeReadBindings.keys) {
-      binding.invalidate();
-    }
-    _readDelegate = delegate;
-  }
-
-  static DwRepoWriteDelegate? _writeDelegate;
-  static final _activeWriteBindings = <DwRepoWriteBinding, int>{};
+  static final _activeReadBindings = <DwRepoBinding, int>{};
+  static final _activeWriteBindings = <DwRepoBinding, int>{};
   static final _mutationRandom = Random.secure();
 
-  /// Optional durable persistence for canonical writes. A `null` delegate keeps
-  /// every `dw.repo` write network-only.
-  static DwRepoWriteDelegate? get writeDelegate => _writeDelegate;
+  static DwRepoLocalReads? _lastSeenLocalReads;
+  static DwRepoLocalWrites? _lastSeenLocalWrites;
 
-  static set writeDelegate(DwRepoWriteDelegate? delegate) {
-    for (final binding in _activeWriteBindings.keys) {
-      binding.invalidate();
+  /// The local copy of reads declared on the core, or `null` when there is
+  /// none. Registration alone caches nothing: a query is kept only when its
+  /// config asks for [DwRepoReadStrategy.networkFirstWithSnapshot].
+  ///
+  /// Resolved on every use rather than held: the store belongs to the core, so
+  /// a core that goes away takes its store with it. Watching it change is also
+  /// how bindings issued by the previous store are revoked — they can no longer
+  /// commit into a store nobody reaches any more.
+  static DwRepoLocalReads? get localReads {
+    final localReads = _localStore?.localReads;
+    if (!identical(localReads, _lastSeenLocalReads)) {
+      for (final binding in _activeReadBindings.keys) {
+        binding.invalidate();
+      }
+      _lastSeenLocalReads = localReads;
     }
-    _writeDelegate = delegate;
+    return localReads;
   }
+
+  /// The local copy of writes declared on the core, or `null` when there is
+  /// none — in which case every `dw.repo` write stays network-only. Which
+  /// writes are kept is decided inside the store, per operation and model.
+  ///
+  /// Resolved on every use, and a change revokes outstanding bindings, for the
+  /// same reason as [localReads].
+  static DwRepoLocalWrites? get localWrites {
+    final localWrites = _localStore?.localWrites;
+    if (!identical(localWrites, _lastSeenLocalWrites)) {
+      for (final binding in _activeWriteBindings.keys) {
+        binding.invalidate();
+      }
+      _lastSeenLocalWrites = localWrites;
+    }
+    return localWrites;
+  }
+
+  static DwRepoLocalStorePlugin? get _localStore =>
+      dw.plugins.maybeOf<DwRepoLocalStorePlugin>();
 
   static final Map<Type, String> _typeNamesMapping = {};
 
@@ -294,9 +302,11 @@ class DwRepository {
     try {
       DwApiResponse<Value> onlineResponse;
       try {
-        onlineResponse = await (preparedWrite == null
-            ? onlineRequest()
-            : preparedWrite.onlineTransport(preparedWrite.mutation!));
+        // One path out, whether or not this write is kept locally. The store
+        // decides what survives; how a write leaves the device is the core's
+        // business and stays that way, so a later transport port has one owner
+        // to move rather than two to reconcile.
+        onlineResponse = await onlineRequest();
       } catch (error, stackTrace) {
         return _recoverOfflineWrite(
           preparedWrite: preparedWrite,
@@ -333,11 +343,24 @@ class DwRepository {
     }
     preparedWrite.validateOptimisticResponse(preparedWrite.optimisticResponse!);
 
-    final enqueueResult = await preparedWrite.delegate.enqueueMutationIfCurrent(
-      binding: preparedWrite.binding,
-      mutation: preparedWrite.mutation!,
-    );
-    if (enqueueResult != DwRepoMutationEnqueueResult.accepted) {
+    // The check and the enqueue commit together or not at all. Between them
+    // is where a sign-out would otherwise slip through and leave a mutation
+    // queued under a session that no longer exists — replayed, on the next
+    // sign-in, as somebody else.
+    final enqueueResult = await preparedWrite.store.write<DwRepoEnqueue>((
+      tx,
+    ) async {
+      if (!identical(localWrites, preparedWrite.store)) {
+        return DwRepoEnqueue.stale;
+      }
+      if (!preparedWrite.binding.isActive) return DwRepoEnqueue.stale;
+      if (!await tx.isBindingCurrent(preparedWrite.binding)) {
+        return DwRepoEnqueue.stale;
+      }
+      await tx.enqueue(preparedWrite.mutation!);
+      return DwRepoEnqueue.accepted;
+    });
+    if (enqueueResult != DwRepoEnqueue.accepted) {
       throw _writeBindingChangedEnqueueError();
     }
     if (!await _isCurrentWriteBinding(preparedWrite)) {
@@ -385,8 +408,8 @@ class DwRepository {
     return wrappers.map((wrapper) => wrapper.model as Model).toList();
   }
 
-  /// Executes a canonical read through the online executor. The optional
-  /// snapshot delegate participates only when [readStrategy] opts in.
+  /// Executes a canonical read. The local store participates only when
+  /// [readStrategy] opts in.
   /// Transport failures are the only failures eligible for fallback; API and
   /// response-processing failures always surface as-is.
   static Future<DwRepoReadResult<Value>> executeRead<Model, Value>({
@@ -401,10 +424,7 @@ class DwRepository {
     try {
       DwApiResponse<Value> onlineResponse;
       try {
-        onlineResponse = await readExecutor.execute(
-          queryKey: queryKey,
-          onlineRequest: onlineRequest,
-        );
+        onlineResponse = await onlineRequest();
       } catch (error, stackTrace) {
         return _readOfflineSnapshot<Model, Value>(
           queryKey: queryKey,
@@ -443,14 +463,14 @@ class DwRepository {
   static Future<bool> _storeOnlineSnapshot<Model, Value>({
     required DwRepoQueryKey<Model> queryKey,
     required DwApiResponse<Value> response,
-    required _DwRepoReadBinding? readBinding,
+    required _DwRepoReadCapture? readBinding,
   }) async {
     if (readBinding == null) return true;
     if (!await _isCurrentReadBinding(readBinding)) {
       return false;
     }
 
-    final result = await readBinding.delegate.storeSnapshotIfCurrent(
+    final result = await readBinding.store.storeSnapshotIfCurrent(
       binding: readBinding.binding,
       queryKey: queryKey,
       snapshot: DwRepoReadSnapshot(
@@ -464,7 +484,7 @@ class DwRepository {
 
   static Future<DwRepoReadResult<Value>> _readOfflineSnapshot<Model, Value>({
     required DwRepoQueryKey<Model> queryKey,
-    required _DwRepoReadBinding? readBinding,
+    required _DwRepoReadCapture? readBinding,
     required Object originalError,
     required StackTrace originalStackTrace,
     required bool updateListeners,
@@ -473,7 +493,7 @@ class DwRepository {
       Error.throwWithStackTrace(originalError, originalStackTrace);
     }
 
-    final snapshot = await readBinding.delegate.loadSnapshot(
+    final snapshot = await readBinding.store.loadSnapshot(
       binding: readBinding.binding,
       queryKey: queryKey,
     );
@@ -502,7 +522,7 @@ class DwRepository {
     }
     return DwRepoReadResult<Value>(
       value: value,
-      origin: DwRepoReadOrigin.offlineSnapshot,
+      origin: DwRepoReadOrigin.localSnapshot,
     );
   }
 
@@ -524,15 +544,15 @@ class DwRepository {
     'Repository write binding changed before processing optimistic response.',
   );
 
-  static Future<_DwRepoReadBinding?> _captureReadBinding() async {
-    final delegate = readDelegate;
-    if (delegate == null) return null;
+  static Future<_DwRepoReadCapture?> _captureReadBinding() async {
+    final store = localReads;
+    if (store == null) return null;
 
-    final binding = await delegate.resolveBinding();
-    if (binding == null || !identical(readDelegate, delegate)) return null;
-    if (!await delegate.isBindingCurrent(binding)) return null;
+    final binding = await store.resolveBinding();
+    if (binding == null || !identical(localReads, store)) return null;
+    if (!await store.isBindingCurrent(binding)) return null;
     _retainReadBinding(binding);
-    return _DwRepoReadBinding(delegate: delegate, binding: binding);
+    return _DwRepoReadCapture(store: store, binding: binding);
   }
 
   static Future<_DwPreparedWrite<DwModelWrapper>?>
@@ -540,7 +560,7 @@ class DwRepository {
     required Model model,
     String? apiGroup,
   }) => _capturePreparedWrite<DwModelWrapper>(
-    preparePlan: (delegate, binding) => delegate.prepareSaveMutation(
+    preparePlan: (store, binding) => store.prepareSaveMutation(
       binding: binding,
       model: model,
       apiGroup: apiGroup,
@@ -568,7 +588,7 @@ class DwRepository {
     required int modelId,
     String? apiGroup,
   }) => _capturePreparedWrite<bool>(
-    preparePlan: (delegate, binding) => delegate.prepareDeleteMutation(
+    preparePlan: (store, binding) => store.prepareDeleteMutation(
       binding: binding,
       model: model,
       apiGroup: apiGroup,
@@ -592,41 +612,41 @@ class DwRepository {
 
   static Future<_DwPreparedWrite<Value>?> _capturePreparedWrite<Value>({
     required Future<DwRepoWritePlan<Value>?> Function(
-      DwRepoWriteDelegate delegate,
-      DwRepoWriteBinding binding,
+      DwRepoLocalWrites store,
+      DwRepoBinding binding,
     )
     preparePlan,
     required void Function(DwApiResponse<Value> response)
     validateOptimisticResponse,
     required DwRepoMutation Function(
-      DwRepoWriteBinding binding,
+      DwRepoBinding binding,
       Map<String, dynamic>? opaqueMetadata,
       String mutationId,
       DateTime createdAtUtc,
     )
     buildMutation,
   }) async {
-    final delegate = writeDelegate;
-    if (delegate == null) return null;
+    final store = localWrites;
+    if (store == null) return null;
 
-    final binding = await delegate.resolveBinding();
-    if (binding == null || !identical(writeDelegate, delegate)) return null;
-    if (!await delegate.isBindingCurrent(binding)) return null;
+    final binding = await store.resolveBinding();
+    if (binding == null || !identical(localWrites, store)) return null;
+    if (!await store.isBindingCurrent(binding)) return null;
 
     _retainWriteBinding(binding);
     try {
-      final plan = await preparePlan(delegate, binding);
+      final plan = await preparePlan(store, binding);
       if (plan == null) {
         _releaseWriteBinding(binding);
         return null;
       }
-      if (!await _isCurrentWriteBindingParts(delegate, binding)) {
+      if (!await _isCurrentWriteBindingParts(store, binding)) {
         throw _writeBindingChangedDispatchError();
       }
       final mutationId = _newMutationId();
       final createdAtUtc = DateTime.now().toUtc();
       return _DwPreparedWrite<Value>(
-        delegate: delegate,
+        store: store,
         binding: binding,
         mutation: buildMutation(
           binding,
@@ -634,7 +654,6 @@ class DwRepository {
           mutationId,
           createdAtUtc,
         ),
-        onlineTransport: plan.onlineTransport,
         optimisticResponse: plan.optimisticResponse,
         validateOptimisticResponse: validateOptimisticResponse,
       );
@@ -645,34 +664,34 @@ class DwRepository {
   }
 
   static Future<bool> _isCurrentReadBinding(
-    _DwRepoReadBinding readBinding,
+    _DwRepoReadCapture readBinding,
   ) async {
-    final delegate = readDelegate;
-    if (!identical(delegate, readBinding.delegate)) return false;
+    final store = localReads;
+    if (!identical(store, readBinding.store)) return false;
     if (!readBinding.binding.isActive) return false;
-    return delegate!.isBindingCurrent(readBinding.binding);
+    return store!.isBindingCurrent(readBinding.binding);
   }
 
   static Future<bool> _isCurrentWriteBinding<Value>(
     _DwPreparedWrite<Value> preparedWrite,
   ) async {
     return _isCurrentWriteBindingParts(
-      preparedWrite.delegate,
+      preparedWrite.store,
       preparedWrite.binding,
     );
   }
 
   static Future<bool> _isCurrentWriteBindingParts(
-    DwRepoWriteDelegate delegate,
-    DwRepoWriteBinding binding,
+    DwRepoLocalWrites store,
+    DwRepoBinding binding,
   ) async {
-    final currentDelegate = writeDelegate;
-    if (!identical(currentDelegate, delegate)) return false;
+    final currentStore = localWrites;
+    if (!identical(currentStore, store)) return false;
     if (!binding.isActive) return false;
-    return currentDelegate!.isBindingCurrent(binding);
+    return currentStore!.isBindingCurrent(binding);
   }
 
-  static void _retainReadBinding(DwRepoReadBinding binding) {
+  static void _retainReadBinding(DwRepoBinding binding) {
     _activeReadBindings.update(
       binding,
       (count) => count + 1,
@@ -680,7 +699,7 @@ class DwRepository {
     );
   }
 
-  static void _releaseReadBinding(DwRepoReadBinding binding) {
+  static void _releaseReadBinding(DwRepoBinding binding) {
     final count = _activeReadBindings[binding];
     if (count == null || count == 1) {
       _activeReadBindings.remove(binding);
@@ -689,7 +708,7 @@ class DwRepository {
     _activeReadBindings[binding] = count - 1;
   }
 
-  static void _retainWriteBinding(DwRepoWriteBinding binding) {
+  static void _retainWriteBinding(DwRepoBinding binding) {
     _activeWriteBindings.update(
       binding,
       (count) => count + 1,
@@ -697,7 +716,7 @@ class DwRepository {
     );
   }
 
-  static void _releaseWriteBinding(DwRepoWriteBinding binding) {
+  static void _releaseWriteBinding(DwRepoBinding binding) {
     final count = _activeWriteBindings[binding];
     if (count == null || count == 1) {
       _activeWriteBindings.remove(binding);
@@ -805,30 +824,27 @@ class DwRepository {
   }
 }
 
-class _DwRepoReadBinding {
-  const _DwRepoReadBinding({required this.delegate, required this.binding});
+class _DwRepoReadCapture {
+  const _DwRepoReadCapture({required this.store, required this.binding});
 
-  final DwRepoReadDelegate delegate;
-  final DwRepoReadBinding binding;
+  final DwRepoLocalReads store;
+  final DwRepoBinding binding;
 
-  DwRepoReadScope get scope => binding.scope;
+  DwRepoScope get scope => binding.scope;
 }
 
 class _DwPreparedWrite<Value> {
   const _DwPreparedWrite({
-    required this.delegate,
+    required this.store,
     required this.binding,
     required this.mutation,
-    required this.onlineTransport,
     required this.optimisticResponse,
     required this.validateOptimisticResponse,
   });
 
-  final DwRepoWriteDelegate delegate;
-  final DwRepoWriteBinding binding;
+  final DwRepoLocalWrites store;
+  final DwRepoBinding binding;
   final DwRepoMutation? mutation;
-  final Future<DwApiResponse<Value>> Function(DwRepoMutation mutation)
-  onlineTransport;
   final DwApiResponse<Value>? optimisticResponse;
   final void Function(DwApiResponse<Value> response) validateOptimisticResponse;
 }

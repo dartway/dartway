@@ -25,8 +25,8 @@ abstract interface class DwOfflineRepositoryReadPolicy
 }
 
 /// Persists only explicitly selected repository states.
-final class DwOfflineReadDelegate implements DwRepoReadDelegate {
-  DwOfflineReadDelegate({
+final class DwOfflineLocalReads implements DwRepoLocalReads {
+  DwOfflineLocalReads({
     required DwOfflineDatabase database,
     required DwOfflineRepositoryReadPolicy packageAccessPolicy,
   }) : _database = database,
@@ -36,7 +36,7 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
   final DwOfflineRepositoryReadPolicy _packageAccessPolicy;
   final Set<String> _scopeQueryKeys = {};
   Future<void> _operationTail = Future<void>.value();
-  DwRepoReadBinding? _currentBinding;
+  DwRepoBinding? _currentBinding;
 
   Future<void> activateUserScope(String userScopeId) {
     return _serialize(() async {
@@ -44,7 +44,7 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
       if (_currentBinding?.scope == scope) return;
       _currentBinding?.invalidate();
       _scopeQueryKeys.clear();
-      _currentBinding = DwRepoReadBinding(scope: scope);
+      _currentBinding = DwRepoBinding(scope: scope);
     });
   }
 
@@ -173,16 +173,16 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
   }
 
   @override
-  Future<DwRepoReadBinding?> resolveBinding() async => _currentBinding;
+  Future<DwRepoBinding?> resolveBinding() async => _currentBinding;
 
   @override
-  Future<bool> isBindingCurrent(DwRepoReadBinding binding) async {
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async {
     return binding.isActive && identical(binding, _currentBinding);
   }
 
   @override
   Future<DwRepoReadSnapshot?> loadSnapshot<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
   }) {
     return _serialize(() async {
@@ -196,7 +196,7 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
 
   @override
   Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) {
@@ -225,7 +225,7 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
   }
 
   Future<DwRepoReadSnapshot?> _loadScopeSnapshot(
-    DwRepoReadBinding binding,
+    DwRepoBinding binding,
     String queryKey,
   ) async {
     if (!_scopeQueryKeys.contains(queryKey)) return null;
@@ -254,7 +254,7 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
   }
 
   Future<DwRepoReadSnapshot?> _loadPackageSnapshot(
-    DwRepoReadBinding binding,
+    DwRepoBinding binding,
     String queryKey,
   ) async {
     final joined =
@@ -417,7 +417,7 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
     }
   }
 
-  DwRepoReadBinding _requireActiveBinding() {
+  DwRepoBinding _requireActiveBinding() {
     final binding = _currentBinding;
     if (binding == null || !binding.isActive) {
       throw StateError('Activate an offline user scope first.');
@@ -425,7 +425,7 @@ final class DwOfflineReadDelegate implements DwRepoReadDelegate {
     return binding;
   }
 
-  bool _isCurrent(DwRepoReadBinding binding) {
+  bool _isCurrent(DwRepoBinding binding) {
     return binding.isActive && identical(binding, _currentBinding);
   }
 

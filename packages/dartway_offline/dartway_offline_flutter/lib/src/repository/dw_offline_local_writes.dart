@@ -21,14 +21,14 @@ final class DwOfflineMutationTarget {
 abstract interface class DwOfflineMutationPlanner {
   Future<DwRepoWritePlan<DwModelWrapper>?>
   prepareSaveMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   });
 
   Future<DwRepoWritePlan<bool>?>
   prepareDeleteMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   });
@@ -37,8 +37,8 @@ abstract interface class DwOfflineMutationPlanner {
 }
 
 /// Bridges opted-in repository writes to the durable offline outbox.
-final class DwOfflineWriteDelegate implements DwRepoWriteDelegate {
-  DwOfflineWriteDelegate({
+final class DwOfflineLocalWrites implements DwRepoLocalWrites {
+  DwOfflineLocalWrites({
     required DwOfflineDatabase database,
     required DwOfflineMutationPlanner mutationPlanner,
   }) : _database = database,
@@ -47,7 +47,7 @@ final class DwOfflineWriteDelegate implements DwRepoWriteDelegate {
   final DwOfflineDatabase _database;
   final DwOfflineMutationPlanner _mutationPlanner;
   Future<void> _operationTail = Future<void>.value();
-  DwRepoWriteBinding? _currentBinding;
+  DwRepoBinding? _currentBinding;
 
   Future<void> activateUserScope(String userScopeId) {
     return _serialize(() async {
@@ -66,17 +66,17 @@ final class DwOfflineWriteDelegate implements DwRepoWriteDelegate {
   }
 
   @override
-  Future<DwRepoWriteBinding?> resolveBinding() async => _currentBinding;
+  Future<DwRepoBinding?> resolveBinding() async => _currentBinding;
 
   @override
-  Future<bool> isBindingCurrent(DwRepoWriteBinding binding) async {
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async {
     return binding.isActive && identical(binding, _currentBinding);
   }
 
   @override
   Future<DwRepoWritePlan<DwModelWrapper>?>
   prepareSaveMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async {
@@ -91,7 +91,7 @@ final class DwOfflineWriteDelegate implements DwRepoWriteDelegate {
   @override
   Future<DwRepoWritePlan<bool>?>
   prepareDeleteMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async {
@@ -104,37 +104,42 @@ final class DwOfflineWriteDelegate implements DwRepoWriteDelegate {
   }
 
   @override
-  Future<DwRepoMutationEnqueueResult> enqueueMutationIfCurrent({
-    required DwRepoWriteBinding binding,
-    required DwRepoMutation mutation,
-  }) {
-    return _serialize(() async {
-      if (!binding.isActive || !identical(binding, _currentBinding)) {
-        return DwRepoMutationEnqueueResult.stale;
-      }
-      if (mutation.scope != binding.scope) {
-        throw StateError('Offline mutation scope does not match.');
-      }
-      final target = _mutationPlanner.targetFor(mutation);
-      if (target == null) {
-        throw StateError('Repository mutation is not allowed offline.');
-      }
-      final createdAtEpochMs = mutation.createdAtUtc.millisecondsSinceEpoch;
-      await _database.coalesceOutboxIntent(
-        DwOfflineOutboxCompanion.insert(
-          userScopeId: binding.scope.storageKey,
-          mutationId: mutation.mutationId,
-          entityType: target.entityType,
-          entityId: target.entityId,
-          mutationType: mutation.operation.name,
-          idempotencyKey: mutation.idempotencyKey,
-          envelopeJson: jsonEncode(mutation.toJson()),
-          createdAtEpochMs: createdAtEpochMs,
-          updatedAtEpochMs: createdAtEpochMs,
-        ),
-      );
-      return DwRepoMutationEnqueueResult.accepted;
-    });
+  Future<R> write<R>(Future<R> Function(DwRepoLocalWriteTx tx) body) {
+    // Two layers, and both are needed. `_serialize` orders this against
+    // `activateUserScope` / `deactivateUserScope`, so a sign-out cannot land
+    // between the binding check and the row write; the drift transaction makes
+    // the row write itself atomic with whatever else the body did.
+    return _serialize(
+      () => _database.transaction(() => body(_DwOfflineWriteTx(this))),
+    );
+  }
+
+  Future<void> _enqueue(DwRepoMutation mutation) async {
+    final binding = _currentBinding;
+    if (binding == null) {
+      throw StateError('Offline outbox has no active user scope.');
+    }
+    if (mutation.scope != binding.scope) {
+      throw StateError('Offline mutation scope does not match.');
+    }
+    final target = _mutationPlanner.targetFor(mutation);
+    if (target == null) {
+      throw StateError('Repository mutation is not allowed offline.');
+    }
+    final createdAtEpochMs = mutation.createdAtUtc.millisecondsSinceEpoch;
+    await _database.coalesceOutboxIntent(
+      DwOfflineOutboxCompanion.insert(
+        userScopeId: binding.scope.storageKey,
+        mutationId: mutation.mutationId,
+        entityType: target.entityType,
+        entityId: target.entityId,
+        mutationType: mutation.operation.name,
+        idempotencyKey: mutation.idempotencyKey,
+        envelopeJson: jsonEncode(mutation.toJson()),
+        createdAtEpochMs: createdAtEpochMs,
+        updatedAtEpochMs: createdAtEpochMs,
+      ),
+    );
   }
 
   Future<T> _serialize<T>(Future<T> Function() operation) {
@@ -142,4 +147,17 @@ final class DwOfflineWriteDelegate implements DwRepoWriteDelegate {
     _operationTail = queued.then<void>((_) {}, onError: (_, _) {});
     return queued;
   }
+}
+
+final class _DwOfflineWriteTx implements DwRepoLocalWriteTx {
+  const _DwOfflineWriteTx(this._store);
+
+  final DwOfflineLocalWrites _store;
+
+  @override
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async =>
+      binding.isActive && identical(binding, _store._currentBinding);
+
+  @override
+  Future<void> enqueue(DwRepoMutation mutation) => _store._enqueue(mutation);
 }

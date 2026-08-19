@@ -6,7 +6,7 @@ import 'package:drift/drift.dart';
 
 import '../access/dw_offline_access_store.dart';
 import '../access/dw_offline_lease_policy.dart';
-import '../repository/dw_offline_read_delegate.dart';
+import '../repository/dw_offline_local_reads.dart';
 import '../storage/dw_offline_asset_store.dart';
 import '../storage/dw_offline_database.dart';
 import 'dw_download_job_store.dart';
@@ -66,7 +66,7 @@ final class DwOfflinePackageDownloadCoordinator {
     required String expectedAudience,
     required DwOfflineAccessStore accessStore,
     required DwOfflineAssetStore assetStore,
-    required DwOfflineReadDelegate readDelegate,
+    required DwOfflineLocalReads localReads,
     required DwDownloadJobStore jobStore,
     required DwDownloadScheduler scheduler,
   }) : _database = database,
@@ -74,7 +74,7 @@ final class DwOfflinePackageDownloadCoordinator {
        _expectedAudience = expectedAudience,
        _accessStore = accessStore,
        _assetStore = assetStore,
-       _readDelegate = readDelegate,
+       _localReads = localReads,
        _jobStore = jobStore,
        _scheduler = scheduler {
     if (expectedAudience.trim().isEmpty ||
@@ -88,7 +88,7 @@ final class DwOfflinePackageDownloadCoordinator {
   final String _expectedAudience;
   final DwOfflineAccessStore _accessStore;
   final DwOfflineAssetStore _assetStore;
-  final DwOfflineReadDelegate _readDelegate;
+  final DwOfflineLocalReads _localReads;
   final DwDownloadJobStore _jobStore;
   final DwDownloadScheduler _scheduler;
 
@@ -179,7 +179,7 @@ final class DwOfflinePackageDownloadCoordinator {
     );
 
     await _assetStore.beginStagingManifest(verifiedManifest);
-    await _readDelegate.replacePackageSnapshotsStorageKeys(
+    await _localReads.replacePackageSnapshotsStorageKeys(
       verifiedManifest: verifiedManifest,
       snapshotsByStorageKey: {
         for (final snapshot in snapshotList)

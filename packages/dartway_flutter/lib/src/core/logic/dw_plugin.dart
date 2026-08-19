@@ -52,6 +52,30 @@ class DwPlugins {
 
   final List<DwPlugin> _plugins;
 
+  /// The registered plugin of type [T], or `null` when the app connected none.
+  ///
+  /// For a *role* the framework can ask about but must not require — a local
+  /// store for the data layer, say. [of] is for an app reaching for its own
+  /// integration, where absence is a wiring mistake; this is for the framework
+  /// asking whether anybody took a job, where absence is an ordinary answer.
+  ///
+  /// Two plugins claiming one role is not an ordinary answer, and picking the
+  /// first quietly would decide something the app did not: it throws.
+  T? maybeOf<T extends DwPlugin>() {
+    T? claimant;
+    for (final plugin in _plugins) {
+      if (plugin is! T) continue;
+      if (claimant != null) {
+        throw StateError(
+          'Two plugins claim the $T role: $claimant and $plugin. '
+          'Declare exactly one at startup.',
+        );
+      }
+      claimant = plugin;
+    }
+    return claimant;
+  }
+
   /// The registered plugin of type [T]. Throws if none is registered.
   T of<T extends DwPlugin>() {
     for (final plugin in _plugins) {

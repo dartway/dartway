@@ -7,8 +7,8 @@ import 'package:dartway_offline_flutter/src/download/dw_download_asset_publisher
 import 'package:dartway_offline_flutter/src/download/dw_download_job_store.dart';
 import 'package:dartway_offline_flutter/src/download/dw_download_scheduler.dart';
 import 'package:dartway_offline_flutter/src/network/dw_network_class.dart';
-import 'package:dartway_offline_flutter/src/repository/dw_offline_read_delegate.dart';
-import 'package:dartway_offline_flutter/src/repository/dw_offline_write_delegate.dart';
+import 'package:dartway_offline_flutter/src/repository/dw_offline_local_reads.dart';
+import 'package:dartway_offline_flutter/src/repository/dw_offline_local_writes.dart';
 import 'package:dartway_offline_flutter/src/storage/disk_space_plus_source.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_asset_store.dart';
 import 'package:dartway_offline_flutter/src/storage/dw_offline_database.dart';
@@ -20,8 +20,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   late Directory supportDirectory;
   late DwOfflineDatabase database;
-  late DwOfflineReadDelegate readDelegate;
-  late DwOfflineWriteDelegate writeDelegate;
+  late DwOfflineLocalReads localReads;
+  late DwOfflineLocalWrites localWrites;
   late _Transport transport;
   late DwMobileOfflineRuntime runtime;
 
@@ -34,11 +34,11 @@ void main() {
       applicationSupportDirectory: supportDirectory,
       database: database,
     );
-    readDelegate = DwOfflineReadDelegate(
+    localReads = DwOfflineLocalReads(
       database: database,
       packageAccessPolicy: _AllowPackageAccess(),
     );
-    writeDelegate = DwOfflineWriteDelegate(
+    localWrites = DwOfflineLocalWrites(
       database: database,
       mutationPlanner: _NoOfflineMutations(),
     );
@@ -55,29 +55,24 @@ void main() {
       database: database,
       assetStore: assetStore,
       downloadScheduler: scheduler,
-      readDelegate: readDelegate,
-      writeDelegate: writeDelegate,
+      localReads: localReads,
+      localWrites: localWrites,
     );
   });
 
   tearDown(() async {
-    if (const DwRepo().readDelegate == readDelegate ||
-        const DwRepo().writeDelegate == writeDelegate) {
-      await runtime.dispose();
-    }
+    await runtime.dispose();
     await supportDirectory.delete(recursive: true);
-    const DwRepo().readDelegate = null;
-    const DwRepo().writeDelegate = null;
   });
 
-  test('registers delegates and activates one shared user scope', () async {
+  test('offers the local store and activates one shared user scope', () async {
     await runtime.initialize();
     await runtime.activateUserScope(DwOfflineUserScope(userScopeId: 'scope-a'));
 
-    expect(const DwRepo().readDelegate, same(readDelegate));
-    expect(const DwRepo().writeDelegate, same(writeDelegate));
-    expect((await readDelegate.resolveBinding())!.scope.storageKey, 'scope-a');
-    expect((await writeDelegate.resolveBinding())!.scope.storageKey, 'scope-a');
+    expect(runtime.localReads, same(localReads));
+    expect(runtime.localWrites, same(localWrites));
+    expect((await localReads.resolveBinding())!.scope.storageKey, 'scope-a');
+    expect((await localWrites.resolveBinding())!.scope.storageKey, 'scope-a');
     expect(transport.initializeCalls, 1);
   });
 
@@ -93,10 +88,10 @@ void main() {
     );
 
     await runtime.retainScopeQueries({retainedQuery.toStorageKey()});
-    final binding = (await readDelegate.resolveBinding())!;
+    final binding = (await localReads.resolveBinding())!;
 
     expect(
-      await readDelegate.storeSnapshotIfCurrent(
+      await localReads.storeSnapshotIfCurrent(
         binding: binding,
         queryKey: retainedQuery,
         snapshot: DwRepoReadSnapshot(
@@ -108,7 +103,7 @@ void main() {
       DwRepoReadSnapshotStoreResult.stored,
     );
     expect(
-      await readDelegate.storeSnapshotIfCurrent(
+      await localReads.storeSnapshotIfCurrent(
         binding: binding,
         queryKey: ignoredQuery,
         snapshot: DwRepoReadSnapshot(
@@ -140,19 +135,19 @@ void main() {
 
       await runtime.purgeUserScope(scope);
 
-      expect(await readDelegate.resolveBinding(), null);
-      expect(await writeDelegate.resolveBinding(), null);
+      expect(await localReads.resolveBinding(), null);
+      expect(await localWrites.resolveBinding(), null);
       expect(await database.select(database.dwOfflineSnapshots).get(), isEmpty);
     },
   );
 
-  test('dispose detaches delegates and owns scheduler lifecycle', () async {
+  test('dispose stops offering the local store and owns scheduler lifecycle', () async {
     await runtime.initialize();
 
     await runtime.dispose();
 
-    expect(const DwRepo().readDelegate, null);
-    expect(const DwRepo().writeDelegate, null);
+    expect(runtime.localReads, isNull);
+    expect(runtime.localWrites, isNull);
     expect(transport.disposeCalls, 1);
     await expectLater(
       runtime.activateUserScope(DwOfflineUserScope(userScopeId: 'scope-a')),
@@ -181,7 +176,7 @@ final class _NoOfflineMutations implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<bool>?>
   prepareDeleteMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;
@@ -189,7 +184,7 @@ final class _NoOfflineMutations implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<DwModelWrapper>?>
   prepareSaveMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;

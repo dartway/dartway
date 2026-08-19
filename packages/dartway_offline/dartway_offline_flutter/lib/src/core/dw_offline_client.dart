@@ -18,8 +18,8 @@ import '../network/connectivity_network_classifier.dart';
 import '../network/dw_network_class.dart';
 import '../outbox/dw_offline_outbox.dart';
 import '../outbox/dw_offline_outbox_synchronizer.dart';
-import '../repository/dw_offline_read_delegate.dart';
-import '../repository/dw_offline_write_delegate.dart';
+import '../repository/dw_offline_local_reads.dart';
+import '../repository/dw_offline_local_writes.dart';
 import '../storage/disk_space_plus_source.dart';
 import '../storage/dw_offline_asset_store.dart';
 import '../storage/dw_offline_database.dart';
@@ -101,11 +101,11 @@ final class DwOfflineClient implements DwOfflineRuntime {
       applicationSupportDirectory: supportDirectory,
       database: database,
     );
-    final readDelegate = DwOfflineReadDelegate(
+    final localReads = DwOfflineLocalReads(
       database: database,
       packageAccessPolicy: accessStore,
     );
-    final writeDelegate = DwOfflineWriteDelegate(
+    final localWrites = DwOfflineLocalWrites(
       database: database,
       mutationPlanner: mutationPlanner,
     );
@@ -124,8 +124,8 @@ final class DwOfflineClient implements DwOfflineRuntime {
       database: database,
       assetStore: assetStore,
       downloadScheduler: scheduler,
-      readDelegate: readDelegate,
-      writeDelegate: writeDelegate,
+      localReads: localReads,
+      localWrites: localWrites,
     );
     final packageDownloadCoordinator = DwOfflinePackageDownloadCoordinator(
       database: database,
@@ -133,7 +133,7 @@ final class DwOfflineClient implements DwOfflineRuntime {
       expectedAudience: expectedAudience,
       accessStore: accessStore,
       assetStore: assetStore,
-      readDelegate: readDelegate,
+      localReads: localReads,
       jobStore: jobStore,
       scheduler: scheduler,
     );
@@ -168,6 +168,12 @@ final class DwOfflineClient implements DwOfflineRuntime {
     await _runtime.initialize();
     await _outboxSynchronizer.initialize();
   }
+
+  @override
+  DwRepoLocalReads? get localReads => _runtime.localReads;
+
+  @override
+  DwRepoLocalWrites? get localWrites => _runtime.localWrites;
 
   @override
   Future<void> activateUserScope(DwOfflineUserScope userScope) async {

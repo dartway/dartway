@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_offline_flutter/dartway_offline_flutter.dart';
+import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -286,6 +286,12 @@ void main() {
 }
 
 class _RecordingRuntime implements DwOfflineRuntime {
+  @override
+  DwRepoLocalReads? get localReads => null;
+
+  @override
+  DwRepoLocalWrites? get localWrites => null;
+
   int initializeCalls = 0;
   int disposeCalls = 0;
   bool holdPurge = false;

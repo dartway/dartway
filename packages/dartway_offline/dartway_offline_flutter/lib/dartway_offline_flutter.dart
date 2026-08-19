@@ -16,6 +16,6 @@ export 'src/download/dw_download_state.dart'
 export 'src/outbox/dw_offline_outbox.dart'
     show DwOutboxReplayResult, DwOutboxReplayStatus, DwOutboxReplayTransport;
 export 'src/access/dw_offline_lease_policy.dart' show DwTrustedTimeSource;
-export 'src/repository/dw_offline_write_delegate.dart'
+export 'src/repository/dw_offline_local_writes.dart'
     show DwOfflineMutationPlanner, DwOfflineMutationTarget;
 export 'src/storage/dw_offline_media_resolver.dart' show DwOfflineMediaHandle;

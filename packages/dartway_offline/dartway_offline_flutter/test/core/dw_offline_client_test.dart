@@ -20,9 +20,8 @@ void main() {
     );
   });
 
+  // Nothing to unregister: the client offers its store, it never installs one.
   tearDown(() async {
-    const DwRepo().readDelegate = null;
-    const DwRepo().writeDelegate = null;
     await supportDirectory.delete(recursive: true);
   });
 
@@ -49,8 +48,8 @@ void main() {
     ).toStorageKey();
     await client.retainScopeQueries({progressKey});
 
-    expect(const DwRepo().readDelegate, isNotNull);
-    expect(const DwRepo().writeDelegate, isNotNull);
+    expect(client.localReads, isNotNull);
+    expect(client.localWrites, isNotNull);
     expect(transport.initializeCalls, 1);
     expect(await client.watchPendingMutations('scope-a').first, isEmpty);
     await client.synchronizePendingMutations('scope-a');
@@ -61,8 +60,8 @@ void main() {
     );
 
     await client.dispose();
-    expect(const DwRepo().readDelegate, null);
-    expect(const DwRepo().writeDelegate, null);
+    expect(client.localReads, isNull);
+    expect(client.localWrites, isNull);
     expect(transport.disposeCalls, 1);
   });
 
@@ -233,7 +232,7 @@ final class _NoOfflineMutations implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<bool>?>
   prepareDeleteMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;
@@ -241,7 +240,7 @@ final class _NoOfflineMutations implements DwOfflineMutationPlanner {
   @override
   Future<DwRepoWritePlan<DwModelWrapper>?>
   prepareSaveMutation<Model extends SerializableModel>({
-    required DwRepoWriteBinding binding,
+    required DwRepoBinding binding,
     required Model model,
     String? apiGroup,
   }) async => null;

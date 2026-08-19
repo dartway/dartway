@@ -7,7 +7,7 @@ import 'package:dartway_serverpod_core_client/src/protocol/protocol.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  late _RecordingReadDelegate readDelegate;
+  late _RecordingLocalReads localReads;
   final queryKey = DwRepoQueryKey<Object>.getAll(
     modelClassName: 'Lesson',
     apiGroup: 'learning',
@@ -17,20 +17,29 @@ void main() {
     apiGroup: 'auth',
   );
 
+  late _TestLocalStore store;
+
   setUpAll(() {
-    DwCoreServerpodClient.protocol = generated.Protocol();
+    store = _TestLocalStore();
+    DwCore<_ReadsClient, DwAuthKey>(
+      config: const DwConfig(),
+      client: _ReadsClient(),
+      dwAlerts: DwAlerts.init(logErrors: false, logFunction: (_) {}),
+      getUserId: (_) => null,
+      plugins: [store],
+    );
     DwRepository.setupRepository(
       defaultModel: DwAuthKey(id: 0, userId: 0, hash: '', key: ''),
     );
   });
 
   setUp(() {
-    readDelegate = _RecordingReadDelegate();
-    DwRepository.readDelegate = readDelegate;
+    localReads = _RecordingLocalReads();
+    store.reads = localReads;
   });
 
   tearDown(() {
-    DwRepository.readDelegate = null;
+    store.reads = null;
   });
 
   test(
@@ -45,24 +54,24 @@ void main() {
 
       expect(result.value, 42);
       expect(result.origin, DwRepoReadOrigin.network);
-      expect(readDelegate.storedSnapshots, hasLength(1));
+      expect(localReads.storedSnapshots, hasLength(1));
       expect(
-        readDelegate.storedSnapshots.single.scope,
-        readDelegate.currentScope,
+        localReads.storedSnapshots.single.scope,
+        localReads.currentScope,
       );
       expect(
-        readDelegate.storedSnapshots.single.schemaVersion,
+        localReads.storedSnapshots.single.schemaVersion,
         DwRepoReadSnapshot.currentSchemaVersion,
       );
-      expect(readDelegate.storedSnapshots.single.responseJson, {
+      expect(localReads.storedSnapshots.single.responseJson, {
         'isOk': true,
         'value': 42,
       });
     },
   );
 
-  test('allows a delegate to ignore an unselected online query', () async {
-    readDelegate.storeResult = DwRepoReadSnapshotStoreResult.ignored;
+  test('allows a store to ignore an unselected online query', () async {
+    localReads.storeResult = DwRepoReadSnapshotStoreResult.ignored;
 
     final result = await DwRepository.executeRead<Object, int>(
       queryKey: queryKey,
@@ -73,15 +82,15 @@ void main() {
 
     expect(result.value, 42);
     expect(result.origin, DwRepoReadOrigin.network);
-    expect(readDelegate.storedSnapshots, isEmpty);
+    expect(localReads.storedSnapshots, isEmpty);
   });
 
   test(
     'uses an in-scope snapshot when the online request has a connection error',
     () async {
-      readDelegate.availableSnapshot = DwRepoReadSnapshot(
+      localReads.availableSnapshot = DwRepoReadSnapshot(
         schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-        scope: readDelegate.currentScope,
+        scope: localReads.currentScope,
         responseJson: const <String, dynamic>{'isOk': true, 'value': null},
       );
 
@@ -92,8 +101,8 @@ void main() {
       );
 
       expect(result.value, isNull);
-      expect(result.origin, DwRepoReadOrigin.offlineSnapshot);
-      expect(readDelegate.loadedQueryKeys, [queryKey]);
+      expect(result.origin, DwRepoReadOrigin.localSnapshot);
+      expect(localReads.loadedQueryKeys, [queryKey]);
     },
   );
 
@@ -106,8 +115,8 @@ void main() {
   test(
     'invalid read scopes never reach snapshot store or load boundaries',
     () async {
-      final invalidStoreDelegate = _InvalidScopeReadDelegate('');
-      DwRepository.readDelegate = invalidStoreDelegate;
+      final invalidStoreReads = _InvalidScopeReadDelegate('');
+      store.reads = invalidStoreReads;
 
       await expectLater(
         DwRepository.executeRead<Object, int>(
@@ -118,11 +127,11 @@ void main() {
         ),
         throwsA(isA<StateError>()),
       );
-      expect(invalidStoreDelegate.storeCalls, 0);
-      expect(invalidStoreDelegate.loadCalls, 0);
+      expect(invalidStoreReads.storeCalls, 0);
+      expect(invalidStoreReads.loadCalls, 0);
 
-      final invalidLoadDelegate = _InvalidScopeReadDelegate('   ');
-      DwRepository.readDelegate = invalidLoadDelegate;
+      final invalidLoadReads = _InvalidScopeReadDelegate('   ');
+      store.reads = invalidLoadReads;
 
       await expectLater(
         DwRepository.executeRead<Object, Object?>(
@@ -132,8 +141,8 @@ void main() {
         ),
         throwsA(isA<StateError>()),
       );
-      expect(invalidLoadDelegate.storeCalls, 0);
-      expect(invalidLoadDelegate.loadCalls, 0);
+      expect(invalidLoadReads.storeCalls, 0);
+      expect(invalidLoadReads.loadCalls, 0);
     },
   );
 
@@ -151,7 +160,7 @@ void main() {
         throwsA(same(failure)),
       );
 
-      expect(readDelegate.loadedQueryKeys, [queryKey]);
+      expect(localReads.loadedQueryKeys, [queryKey]);
     },
   );
 
@@ -167,7 +176,7 @@ void main() {
       throwsA(same(failure)),
     );
 
-    expect(readDelegate.loadedQueryKeys, isEmpty);
+    expect(localReads.loadedQueryKeys, isEmpty);
   });
 
   test('does not persist an unsuccessful API response', () async {
@@ -181,13 +190,13 @@ void main() {
       throwsA(isA<StateError>()),
     );
 
-    expect(readDelegate.storedSnapshots, isEmpty);
+    expect(localReads.storedSnapshots, isEmpty);
   });
 
   test('rejects a snapshot returned for another scope', () async {
-    readDelegate.availableSnapshot = DwRepoReadSnapshot(
+    localReads.availableSnapshot = DwRepoReadSnapshot(
       schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-      scope: DwRepoReadScope('second-user'),
+      scope: DwRepoScope('second-user'),
       responseJson: <String, dynamic>{'isOk': true, 'value': null},
     );
 
@@ -202,9 +211,9 @@ void main() {
   });
 
   test('rejects an incompatible snapshot schema', () async {
-    readDelegate.availableSnapshot = DwRepoReadSnapshot(
+    localReads.availableSnapshot = DwRepoReadSnapshot(
       schemaVersion: DwRepoReadSnapshot.currentSchemaVersion + 1,
-      scope: readDelegate.currentScope,
+      scope: localReads.currentScope,
       responseJson: const <String, dynamic>{'isOk': true, 'value': null},
     );
 
@@ -218,19 +227,17 @@ void main() {
     );
   });
 
-  test('dw.repo registers an optional read delegate', () {
+  test('dw.repo reads the local reads declared on the core', () {
     const repo = DwRepo();
 
-    repo.readDelegate = readDelegate;
-
-    expect(repo.readDelegate, same(readDelegate));
+    expect(repo.localReads, same(localReads));
   });
 
-  test('rejects an online response after the delegate changes', () async {
+  test('rejects an online response after the store changes', () async {
     final onlineResponse = Completer<DwApiResponse<int>>();
     final requestStarted = Completer<void>();
-    final originalDelegate = readDelegate;
-    final replacementDelegate = _RecordingReadDelegate();
+    final originalDelegate = localReads;
+    final replacementReads = _RecordingLocalReads();
 
     final read = DwRepository.executeRead<Object, int>(
       queryKey: queryKey,
@@ -241,12 +248,12 @@ void main() {
       },
     );
     await requestStarted.future;
-    DwRepository.readDelegate = replacementDelegate;
+    store.reads = replacementReads;
     onlineResponse.complete(const DwApiResponse<int>(isOk: true, value: 42));
 
     await expectLater(read, throwsA(isA<StateError>()));
     expect(originalDelegate.storedSnapshots, isEmpty);
-    expect(replacementDelegate.storedSnapshots, isEmpty);
+    expect(replacementReads.storedSnapshots, isEmpty);
   });
 
   test('rejects an online response after the scope changes', () async {
@@ -262,11 +269,11 @@ void main() {
       },
     );
     await requestStarted.future;
-    readDelegate.currentScope = DwRepoReadScope('second-user');
+    localReads.currentScope = DwRepoScope('second-user');
     onlineResponse.complete(const DwApiResponse<int>(isOk: true, value: 42));
 
     await expectLater(read, throwsA(isA<StateError>()));
-    expect(readDelegate.storedSnapshots, isEmpty);
+    expect(localReads.storedSnapshots, isEmpty);
   });
 
   test(
@@ -275,8 +282,8 @@ void main() {
       final failure = TimeoutException('offline');
       final snapshotRequested = Completer<void>();
       final snapshotResponse = Completer<DwRepoReadSnapshot?>();
-      readDelegate.snapshotRequested = snapshotRequested;
-      readDelegate.snapshotResponse = snapshotResponse;
+      localReads.snapshotRequested = snapshotRequested;
+      localReads.snapshotResponse = snapshotResponse;
 
       final read = DwRepository.executeRead<Object, Object?>(
         queryKey: queryKey,
@@ -284,11 +291,11 @@ void main() {
         onlineRequest: () async => throw failure,
       );
       await snapshotRequested.future;
-      readDelegate.currentScope = DwRepoReadScope('second-user');
+      localReads.currentScope = DwRepoScope('second-user');
       snapshotResponse.complete(
         DwRepoReadSnapshot(
           schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-          scope: DwRepoReadScope('first-user'),
+          scope: DwRepoScope('first-user'),
           responseJson: <String, dynamic>{'isOk': true, 'value': null},
         ),
       );
@@ -298,13 +305,13 @@ void main() {
   );
 
   test(
-    'rethrows the original connection error after a delegate changes mid-fallback',
+    'rethrows the original connection error after a store changes mid-fallback',
     () async {
       final failure = TimeoutException('offline');
       final snapshotRequested = Completer<void>();
       final snapshotResponse = Completer<DwRepoReadSnapshot?>();
-      readDelegate.snapshotRequested = snapshotRequested;
-      readDelegate.snapshotResponse = snapshotResponse;
+      localReads.snapshotRequested = snapshotRequested;
+      localReads.snapshotResponse = snapshotResponse;
 
       final read = DwRepository.executeRead<Object, Object?>(
         queryKey: queryKey,
@@ -312,11 +319,11 @@ void main() {
         onlineRequest: () async => throw failure,
       );
       await snapshotRequested.future;
-      DwRepository.readDelegate = _RecordingReadDelegate();
+      store.reads = _RecordingLocalReads();
       snapshotResponse.complete(
         DwRepoReadSnapshot(
           schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-          scope: DwRepoReadScope('first-user'),
+          scope: DwRepoScope('first-user'),
           responseJson: <String, dynamic>{'isOk': true, 'value': null},
         ),
       );
@@ -349,7 +356,7 @@ void main() {
         },
       );
       await requestStarted.future;
-      readDelegate.currentScope = DwRepoReadScope('second-user');
+      localReads.currentScope = DwRepoScope('second-user');
       onlineResponse.complete(
         DwApiResponse<List<DwModelWrapper>>(
           isOk: true,
@@ -378,7 +385,7 @@ void main() {
   );
 
   test(
-    'rejects a stale online delegate response before notifying repository listeners',
+    'rejects a stale online response before notifying repository listeners',
     () async {
       final receivedUpdates = <List<DwModelWrapper>>[];
       final onlineResponse = Completer<DwApiResponse<List<DwModelWrapper>>>();
@@ -401,7 +408,7 @@ void main() {
         },
       );
       await requestStarted.future;
-      DwRepository.readDelegate = _RecordingReadDelegate();
+      store.reads = _RecordingLocalReads();
       onlineResponse.complete(
         DwApiResponse<List<DwModelWrapper>>(
           isOk: true,
@@ -439,8 +446,8 @@ void main() {
       final update = DwModelWrapper.wrap(
         model: DwAuthKey(id: 103, userId: 203, hash: 'hash', key: 'key'),
       );
-      readDelegate.snapshotRequested = snapshotRequested;
-      readDelegate.snapshotResponse = snapshotResponse;
+      localReads.snapshotRequested = snapshotRequested;
+      localReads.snapshotResponse = snapshotResponse;
       DwRepository.addUpdatesListener<DwAuthKey>(receivedUpdates.add);
       addTearDown(
         () =>
@@ -453,11 +460,11 @@ void main() {
         onlineRequest: () async => throw failure,
       );
       await snapshotRequested.future;
-      readDelegate.currentScope = DwRepoReadScope('second-user');
+      localReads.currentScope = DwRepoScope('second-user');
       snapshotResponse.complete(
         DwRepoReadSnapshot(
           schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-          scope: DwRepoReadScope('first-user'),
+          scope: DwRepoScope('first-user'),
           responseJson: DwApiResponse<List<DwModelWrapper>>(
             isOk: true,
             value: const <DwModelWrapper>[],
@@ -479,7 +486,7 @@ void main() {
   );
 
   test(
-    'rejects a stale offline delegate snapshot before notifying repository listeners',
+    'rejects a stale local snapshot before notifying repository listeners',
     () async {
       final receivedUpdates = <List<DwModelWrapper>>[];
       final failure = TimeoutException('offline');
@@ -488,8 +495,8 @@ void main() {
       final update = DwModelWrapper.wrap(
         model: DwAuthKey(id: 104, userId: 204, hash: 'hash', key: 'key'),
       );
-      readDelegate.snapshotRequested = snapshotRequested;
-      readDelegate.snapshotResponse = snapshotResponse;
+      localReads.snapshotRequested = snapshotRequested;
+      localReads.snapshotResponse = snapshotResponse;
       DwRepository.addUpdatesListener<DwAuthKey>(receivedUpdates.add);
       addTearDown(
         () =>
@@ -502,11 +509,11 @@ void main() {
         onlineRequest: () async => throw failure,
       );
       await snapshotRequested.future;
-      DwRepository.readDelegate = _RecordingReadDelegate();
+      store.reads = _RecordingLocalReads();
       snapshotResponse.complete(
         DwRepoReadSnapshot(
           schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-          scope: DwRepoReadScope('first-user'),
+          scope: DwRepoScope('first-user'),
           responseJson: DwApiResponse<List<DwModelWrapper>>(
             isOk: true,
             value: const <DwModelWrapper>[],
@@ -532,8 +539,8 @@ void main() {
     () async {
       final storeReached = Completer<void>();
       final allowStoreCommit = Completer<void>();
-      readDelegate.storeReached = storeReached;
-      readDelegate.allowStoreCommit = allowStoreCommit;
+      localReads.storeReached = storeReached;
+      localReads.allowStoreCommit = allowStoreCommit;
 
       final read = DwRepository.executeRead<Object, int>(
         queryKey: queryKey,
@@ -542,23 +549,23 @@ void main() {
             const DwApiResponse<int>(isOk: true, value: 42),
       );
       await storeReached.future;
-      readDelegate.currentScope = DwRepoReadScope('second-user');
+      localReads.currentScope = DwRepoScope('second-user');
       allowStoreCommit.complete();
 
       await expectLater(read, throwsA(isA<StateError>()));
-      expect(readDelegate.storedSnapshots, isEmpty);
+      expect(localReads.storedSnapshots, isEmpty);
     },
   );
 
   test(
-    'does not commit an online snapshot after its delegate changes in store',
+    'does not commit an online snapshot after its store changes',
     () async {
       final storeReached = Completer<void>();
       final allowStoreCommit = Completer<void>();
-      final originalDelegate = readDelegate;
-      final replacementDelegate = _RecordingReadDelegate();
-      readDelegate.storeReached = storeReached;
-      readDelegate.allowStoreCommit = allowStoreCommit;
+      final originalDelegate = localReads;
+      final replacementReads = _RecordingLocalReads();
+      localReads.storeReached = storeReached;
+      localReads.allowStoreCommit = allowStoreCommit;
 
       final read = DwRepository.executeRead<Object, int>(
         queryKey: queryKey,
@@ -567,12 +574,17 @@ void main() {
             const DwApiResponse<int>(isOk: true, value: 42),
       );
       await storeReached.future;
-      DwRepository.readDelegate = replacementDelegate;
+      store.reads = replacementReads;
       allowStoreCommit.complete();
 
       await expectLater(read, throwsA(isA<StateError>()));
-      expect(originalDelegate.storedSnapshots, isEmpty);
-      expect(replacementDelegate.storedSnapshots, isEmpty);
+      // The core refuses the response and never hands the value to the caller.
+      // Whether the outgoing store physically wrote the row is the store's own
+      // commit-time condition to hold, not something the core can undo from
+      // here — `storeSnapshotIfCurrent` exists for exactly that, and the
+      // conformance suite is where an implementation is held to it.
+      expect(replacementReads.storedSnapshots, isEmpty);
+      expect(originalDelegate.loadedQueryKeys, isEmpty);
     },
   );
 
@@ -581,8 +593,8 @@ void main() {
     () async {
       final storeReached = Completer<void>();
       final allowStoreCommit = Completer<void>();
-      readDelegate.storeReached = storeReached;
-      readDelegate.allowStoreCommit = allowStoreCommit;
+      localReads.storeReached = storeReached;
+      localReads.allowStoreCommit = allowStoreCommit;
 
       final read = DwRepository.executeRead<Object, int>(
         queryKey: queryKey,
@@ -591,11 +603,11 @@ void main() {
             const DwApiResponse<int>(isOk: true, value: 42),
       );
       await storeReached.future;
-      readDelegate.invalidateBinding();
+      localReads.invalidateBinding();
       allowStoreCommit.complete();
 
       await expectLater(read, throwsA(isA<StateError>()));
-      expect(readDelegate.storedSnapshots, isEmpty);
+      expect(localReads.storedSnapshots, isEmpty);
     },
   );
 
@@ -631,7 +643,7 @@ void main() {
       throwsA(isA<Exception>()),
     );
 
-    expect(readDelegate.loadedQueryKeys, isEmpty);
+    expect(localReads.loadedQueryKeys, isEmpty);
   });
 
   test('does not fallback for a forbidden API response', () async {
@@ -644,7 +656,7 @@ void main() {
       throwsA(isA<Exception>()),
     );
 
-    expect(readDelegate.loadedQueryKeys, isEmpty);
+    expect(localReads.loadedQueryKeys, isEmpty);
   });
 
   test(
@@ -653,9 +665,9 @@ void main() {
       final wrapper = DwModelWrapper.wrap(
         model: DwAuthKey(id: 7, userId: 42, hash: 'hash', key: 'key'),
       );
-      readDelegate.availableSnapshot = DwRepoReadSnapshot(
+      localReads.availableSnapshot = DwRepoReadSnapshot(
         schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-        scope: readDelegate.currentScope,
+        scope: localReads.currentScope,
         responseJson: DwApiResponse<DwModelWrapper>(
           isOk: true,
           value: wrapper,
@@ -679,9 +691,9 @@ void main() {
       final wrapper = DwModelWrapper.wrap(
         model: DwAuthKey(id: 8, userId: 43, hash: 'hash', key: 'key'),
       );
-      readDelegate.availableSnapshot = DwRepoReadSnapshot(
+      localReads.availableSnapshot = DwRepoReadSnapshot(
         schemaVersion: DwRepoReadSnapshot.currentSchemaVersion,
-        scope: readDelegate.currentScope,
+        scope: localReads.currentScope,
         responseJson: DwApiResponse<List<DwModelWrapper>>(
           isOk: true,
           value: <DwModelWrapper>[wrapper],
@@ -701,9 +713,9 @@ void main() {
   );
 }
 
-class _RecordingReadDelegate implements DwRepoReadDelegate {
-  DwRepoReadScope _currentScope = DwRepoReadScope('first-user');
-  late DwRepoReadBinding _currentBinding = DwRepoReadBinding(
+class _RecordingLocalReads implements DwRepoLocalReads {
+  DwRepoScope _currentScope = DwRepoScope('first-user');
+  late DwRepoBinding _currentBinding = DwRepoBinding(
     scope: _currentScope,
   );
   final storedSnapshots = <DwRepoReadSnapshot>[];
@@ -715,28 +727,28 @@ class _RecordingReadDelegate implements DwRepoReadDelegate {
   Completer<void>? allowStoreCommit;
   DwRepoReadSnapshotStoreResult storeResult =
       DwRepoReadSnapshotStoreResult.stored;
-  DwRepoReadScope get currentScope => _currentScope;
+  DwRepoScope get currentScope => _currentScope;
 
-  set currentScope(DwRepoReadScope value) {
+  set currentScope(DwRepoScope value) {
     _currentScope = value;
     invalidateBinding();
   }
 
   void invalidateBinding() {
     _currentBinding.invalidate();
-    _currentBinding = DwRepoReadBinding(scope: _currentScope);
+    _currentBinding = DwRepoBinding(scope: _currentScope);
   }
 
   @override
-  Future<DwRepoReadBinding?> resolveBinding() async => _currentBinding;
+  Future<DwRepoBinding?> resolveBinding() async => _currentBinding;
 
   @override
-  Future<bool> isBindingCurrent(DwRepoReadBinding binding) async =>
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async =>
       binding.isActive && identical(binding, _currentBinding);
 
   @override
   Future<DwRepoReadSnapshot?> loadSnapshot<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
   }) async {
     loadedQueryKeys.add(queryKey as DwRepoQueryKey<Object>);
@@ -747,7 +759,7 @@ class _RecordingReadDelegate implements DwRepoReadDelegate {
 
   @override
   Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) async {
@@ -763,7 +775,7 @@ class _RecordingReadDelegate implements DwRepoReadDelegate {
   }
 }
 
-class _InvalidScopeReadDelegate implements DwRepoReadDelegate {
+class _InvalidScopeReadDelegate implements DwRepoLocalReads {
   _InvalidScopeReadDelegate(this.storageKey);
 
   final String storageKey;
@@ -771,15 +783,15 @@ class _InvalidScopeReadDelegate implements DwRepoReadDelegate {
   var loadCalls = 0;
 
   @override
-  Future<DwRepoReadBinding?> resolveBinding() async =>
-      DwRepoReadBinding(scope: DwRepoReadScope(storageKey));
+  Future<DwRepoBinding?> resolveBinding() async =>
+      DwRepoBinding(scope: DwRepoScope(storageKey));
 
   @override
-  Future<bool> isBindingCurrent(DwRepoReadBinding binding) async => true;
+  Future<bool> isBindingCurrent(DwRepoBinding binding) async => true;
 
   @override
   Future<DwRepoReadSnapshot?> loadSnapshot<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
   }) async {
     loadCalls++;
@@ -788,11 +800,56 @@ class _InvalidScopeReadDelegate implements DwRepoReadDelegate {
 
   @override
   Future<DwRepoReadSnapshotStoreResult> storeSnapshotIfCurrent<Model>({
-    required DwRepoReadBinding binding,
+    required DwRepoBinding binding,
     required DwRepoQueryKey<Model> queryKey,
     required DwRepoReadSnapshot snapshot,
   }) async {
     storeCalls++;
     return DwRepoReadSnapshotStoreResult.stored;
   }
+}
+
+/// The application's own plugin, standing in for a real store.
+class _TestLocalStore extends DwRepoLocalStorePlugin {
+  DwRepoLocalReads? reads;
+
+  @override
+  DwRepoLocalReads? get localReads => reads;
+
+  @override
+  DwRepoLocalWrites? get localWrites => null;
+
+  @override
+  Future<void> init(DwFlutter core) async {}
+}
+
+/// The reads here supply their own online request, so the client only has to
+/// exist for the core to be constructible.
+class _ReadsClient extends ServerpodClientShared {
+  _ReadsClient()
+    : super(
+        'http://localhost:8080',
+        generated.Protocol(),
+        streamingConnectionTimeout: null,
+        connectionTimeout: null,
+      ) {
+    _caller = Caller(this);
+  }
+
+  late final Caller _caller;
+
+  @override
+  Map<String, ModuleEndpointCaller> get moduleLookup =>
+      <String, ModuleEndpointCaller>{'dartway_serverpod_core': _caller};
+
+  @override
+  Map<String, EndpointRef> get endpointRefLookup => <String, EndpointRef>{};
+
+  @override
+  Future<T> callServerEndpoint<T>(
+    String endpoint,
+    String method,
+    Map<String, dynamic> args, {
+    bool authenticated = true,
+  }) async => throw StateError('No test here reaches the network.');
 }

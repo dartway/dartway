@@ -1,8 +1,8 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
 
 import '../download/dw_download_scheduler.dart';
-import '../repository/dw_offline_read_delegate.dart';
-import '../repository/dw_offline_write_delegate.dart';
+import '../repository/dw_offline_local_reads.dart';
+import '../repository/dw_offline_local_writes.dart';
 import '../storage/dw_offline_asset_store.dart';
 import '../storage/dw_offline_database.dart';
 import 'dw_offline_config.dart';
@@ -15,45 +15,43 @@ final class DwMobileOfflineRuntime implements DwOfflineRuntime {
     required DwOfflineDatabase database,
     required DwOfflineAssetStore assetStore,
     required DwDownloadScheduler downloadScheduler,
-    required DwOfflineReadDelegate readDelegate,
-    required DwOfflineWriteDelegate writeDelegate,
-    DwRepo repository = const DwRepo(),
+    required DwOfflineLocalReads localReads,
+    required DwOfflineLocalWrites localWrites,
   }) : _database = database,
        _assetStore = assetStore,
        _downloadScheduler = downloadScheduler,
-       _readDelegate = readDelegate,
-       _writeDelegate = writeDelegate,
-       _repository = repository;
+       _localReads = localReads,
+       _localWrites = localWrites;
 
   final DwOfflineDatabase _database;
   final DwOfflineAssetStore _assetStore;
   final DwDownloadScheduler _downloadScheduler;
-  final DwOfflineReadDelegate _readDelegate;
-  final DwOfflineWriteDelegate _writeDelegate;
-  final DwRepo _repository;
+  final DwOfflineLocalReads _localReads;
+  final DwOfflineLocalWrites _localWrites;
   String? _activeUserScopeId;
   bool _isInitialized = false;
   bool _isDisposed = false;
   Future<void> _operationTail = Future<void>.value();
+
+  /// The local copy of reads, offered to `dw.repo` through the plugin.
+  ///
+  /// `null` until [initialize] and again after [dispose], so the repository
+  /// stops reaching a runtime that is closing its database.
+  @override
+  DwRepoLocalReads? get localReads =>
+      _isInitialized && !_isDisposed ? _localReads : null;
+
+  /// The local copy of writes, on the same terms as [localReads].
+  @override
+  DwRepoLocalWrites? get localWrites =>
+      _isInitialized && !_isDisposed ? _localWrites : null;
 
   @override
   Future<void> initialize() {
     return _serialize(() async {
       _requireNotDisposed();
       if (_isInitialized) return;
-      final existingReadDelegate = _repository.readDelegate;
-      final existingWriteDelegate = _repository.writeDelegate;
-      if (existingReadDelegate != null &&
-          !identical(existingReadDelegate, _readDelegate)) {
-        throw StateError('Another repository read delegate is registered.');
-      }
-      if (existingWriteDelegate != null &&
-          !identical(existingWriteDelegate, _writeDelegate)) {
-        throw StateError('Another repository write delegate is registered.');
-      }
       await _downloadScheduler.initialize();
-      _repository.readDelegate = _readDelegate;
-      _repository.writeDelegate = _writeDelegate;
       _isInitialized = true;
     });
   }
@@ -63,9 +61,9 @@ final class DwMobileOfflineRuntime implements DwOfflineRuntime {
     return _serialize(() async {
       _requireInitialized();
       if (_activeUserScopeId == userScope.userScopeId) return;
-      await _readDelegate.activateUserScope(userScope.userScopeId);
+      await _localReads.activateUserScope(userScope.userScopeId);
       try {
-        await _writeDelegate.activateUserScope(userScope.userScopeId);
+        await _localWrites.activateUserScope(userScope.userScopeId);
         await _downloadScheduler.activateUserScope(userScope.userScopeId);
       } on Object {
         await _rollbackActivation(userScope.userScopeId);
@@ -92,7 +90,7 @@ final class DwMobileOfflineRuntime implements DwOfflineRuntime {
         throw StateError('Activate an offline user scope first.');
       }
       for (final queryStorageKey in distinctKeys) {
-        await _readDelegate.retainScopeQueryStorageKey(queryStorageKey);
+        await _localReads.retainScopeQueryStorageKey(queryStorageKey);
       }
     });
   }
@@ -114,12 +112,6 @@ final class DwMobileOfflineRuntime implements DwOfflineRuntime {
       if (_isInitialized && activeUserScopeId != null) {
         await _deactivateScope(activeUserScopeId);
       }
-      if (identical(_repository.readDelegate, _readDelegate)) {
-        _repository.readDelegate = null;
-      }
-      if (identical(_repository.writeDelegate, _writeDelegate)) {
-        _repository.writeDelegate = null;
-      }
       await _downloadScheduler.dispose();
       await _database.close();
       _isInitialized = false;
@@ -132,15 +124,15 @@ final class DwMobileOfflineRuntime implements DwOfflineRuntime {
       throw StateError('Cannot deactivate a different offline user scope.');
     }
     await _downloadScheduler.deactivateUserScope(userScopeId);
-    await _readDelegate.deactivateUserScope();
-    await _writeDelegate.deactivateUserScope();
+    await _localReads.deactivateUserScope();
+    await _localWrites.deactivateUserScope();
     if (_activeUserScopeId == userScopeId) _activeUserScopeId = null;
   }
 
   Future<void> _rollbackActivation(String userScopeId) async {
     await _downloadScheduler.deactivateUserScope(userScopeId);
-    await _readDelegate.deactivateUserScope();
-    await _writeDelegate.deactivateUserScope();
+    await _localReads.deactivateUserScope();
+    await _localWrites.deactivateUserScope();
   }
 
   void _requireInitialized() {
