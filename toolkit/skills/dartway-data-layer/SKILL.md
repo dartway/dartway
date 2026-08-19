@@ -658,6 +658,45 @@ Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size an
 
 ---
 
+## 10. Offline — a store on the core, and a flag per query
+
+**Why:** `dw.repo` is network-only. A read that cannot reach the backend fails, and so does a write. That is the right default and you leave it alone unless the project asked for offline.
+
+If it did, the project declares a **local store** once, at bootstrap, as a plugin:
+
+```dart
+dw = DwCore<Client, UserProfile>(
+  // ...
+  plugins: [DwOfflinePlugin(config: offlineConfig)],
+);
+```
+
+**There is no setter.** `dw.repo.localReads` and `dw.repo.localWrites` are read-only — if you are looking for where to assign a store, you are looking for something that deliberately does not exist. A store assigned after startup outlives the core it was attached to, and the failure is silent: everything keeps working, the writes go somewhere that belongs to nobody.
+
+**Feature code does not change.** The same `ref.watch(dw.repo.modelList<X>())`, the same `await dw.repo.saveModel(...)`. Do not write a branch for "are we offline" — there isn't one to write.
+
+**A read opts in for itself:**
+
+```dart
+ref.watch(
+  dw.repo.modelList<Lesson>(
+    customConfig: DwModelListStateConfig<Lesson>(
+      readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
+    ),
+  ),
+);
+```
+
+The default is `DwRepoReadStrategy.networkOnly`, and a store being declared does not change it. Turn it on for the handful of reads a screen genuinely needs without a network, not for everything.
+
+**A write does not opt in at the call site at all.** Which writes are queued is decided inside the store, per operation and model. Do not go looking for a `readStrategy` equivalent on `saveModel` — reading the two as a pair is the usual mistake, and a list kept offline for reading says nothing about whether saving that model is queued.
+
+**What is queued and what is not.** Only a *connection* failure falls back to the queue. A rejected authorization or a validation error surfaces to you exactly as it does online — replaying it later would mean retrying a request the server already refused.
+
+**Implementing a store is not app work.** It is `DwRepoLocalReads` / `DwRepoLocalWrites` in a package, and the core ships a conformance suite it has to pass (`package:dartway_serverpod_core_flutter/testing.dart`). If a task sounds like "cache this screen", the answer is a `readStrategy`, not a new store.
+
+---
+
 ## Data-layer checklist
 
 - [ ] Data — only `dw.repo`: reads are the `dw.repo.model/maybeModel/modelList` providers under `ref.watch/read/refresh`; writes are `dw.repo.saveModel/deleteModel`. No `ref.watchModel`, no `DwRepository.`, no repositories, no manual `Future`s, no direct client.
@@ -673,4 +712,5 @@ Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size an
 - [ ] Profile — `ref.watchUserProfile`/`readUserProfile` (getters), not `watchModel<UserProfile>()`. Signed out is a legal answer, or you want `.select` — `dw.userProfileProvider` / `dw.requireUserProfileProvider`. Only the id — `dw.signedInUserIdProvider`.
 - [ ] Sign-out — `ref.read(dw.sessionProvider!.notifier).signOut()`.
 - [ ] Must **another** user see the update? `dw.repo.modelList` doesn't do that by itself — `broadcastTo` in the config (public), a channel with the group id (group), `sendUpdatesToUser` (private).
+- [ ] Offline — the store is declared in `DwCore(plugins: [...])`, never assigned; a read opts in with `readStrategy: networkFirstWithSnapshot`, a write does not opt in at the call site at all.
 - [ ] Putting `broadcastTo` with a public channel — have you answered "any user is entitled to read this row"? If not — a narrower channel or `sendUpdatesToUser`.

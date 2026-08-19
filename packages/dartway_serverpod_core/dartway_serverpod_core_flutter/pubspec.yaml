@@ -1,6 +1,6 @@
 name: dartway_serverpod_core_flutter
 description: "Flutter side of the DartWay core: a typed realtime data layer over the Serverpod module, session management, connection-aware error handling and context-rich alerting."
-version: 0.9.0
+version: 0.10.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -16,13 +16,20 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # A real dependency, not a dev one: `package:dartway_serverpod_core_flutter/testing.dart`
+  # ships the conformance suites implementations of these contracts must pass,
+  # and a suite that lives in `test/` cannot be imported from another package.
+  flutter_test:
+    sdk: flutter
+
   serverpod_client: ^3.4.11
 
-  dartway_flutter: ^0.5.0
-  dartway_serverpod_core_client: ^0.9.0
-  dartway_serverpod_core_shared: ^0.9.0
+  dartway_flutter: ^0.6.0
+  dartway_serverpod_core_client: ^0.10.0
+  dartway_serverpod_core_shared: ^0.10.0
 
   collection: ^1.19.1
+  crypto: ^3.0.6
   flutter_riverpod: ^3.0.0
 
   heif_converter: '>=1.0.0 <2.0.0'
@@ -35,8 +42,6 @@ dependencies:
   file_picker: ^11.0.2
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
   flutter_lints: ^6.0.0
 
 flutter:

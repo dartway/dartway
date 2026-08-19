@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.10.0 is the
+Flutter side gaining the optional local-storage contract for `dw.repo` — `DwRepoLocalReads` and
+`DwRepoLocalWrites`, declared on the core as a plugin. Nothing changes for an app that declares no
+store. See the changelog of `dartway_serverpod_core_flutter`.
+
 ## 0.9.0
 
 **The sign-in response now waits for your SMS or mail provider, and reports it when the provider

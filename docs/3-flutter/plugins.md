@@ -167,6 +167,7 @@ combinations that were never tested instead of failing at runtime.
 | [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) | `dw.plugins.prefs` | Reactive riverpod providers over local storage |
 | [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) | `dw.plugins.telegram` | Telegram Mini App: viewport, safe-area insets, Telegram user id |
 | [`dartway_push_flutter`](https://pub.dev/packages/dartway_push_flutter) | `dw.plugins.push` | [Push notifications](push-notifications.md): permissions, token lifecycle, taps — with the transport itself in a package of its own |
+| [`dartway_offline_flutter`](https://pub.dev/packages/dartway_offline_flutter) | `dw.plugins.offline` | [Offline](offline.md): the local copy `dw.repo` reads and writes through, plus downloads, signed access leases and trusted time |
 
 `dartway_telegram` shows the other half of what a plugin buys you: `DwTelegramWebApp.create()`
 returns the real bridge on web and an inert stub on mobile and desktop, and outside Telegram every

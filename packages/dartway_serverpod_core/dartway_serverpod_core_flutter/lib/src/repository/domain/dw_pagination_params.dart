@@ -11,4 +11,11 @@ class DwPaginationParams {
     this.beforeId,
     this.afterId,
   });
+
+  Map<String, Object?> toQueryMap() => <String, Object?>{
+    if (offset != null) 'offset': offset,
+    if (limit != null) 'limit': limit,
+    if (beforeId != null) 'beforeId': beforeId,
+    if (afterId != null) 'afterId': afterId,
+  };
 }

@@ -6,6 +6,11 @@ import 'package:dartway_serverpod_core_flutter/src/app/socket/service/streaming_
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // This predicate is not only about which errors stay quiet. It is the single
+  // condition under which `dw.repo` puts a failed write into local storage
+  // instead of raising it, so every answer below decides where data goes.
+  // Widening it moves errors into the outbox; narrowing it drops writes on the
+  // floor that should have been kept.
   group('isStreamingConnectionError', () {
     test('swallows every failure the method-stream client raises', () {
       final connectionErrors = <Object>[
@@ -57,6 +62,26 @@ void main() {
           isStreamingConnectionError(error),
           isTrue,
           reason: 'should swallow: $error',
+        );
+      }
+    });
+
+    test('refuses the errors a replay must never retry', () {
+      // The ones that would be catastrophic to queue: the server already gave
+      // its answer, and replaying it later asks the same refused question
+      // again — sometimes as a different user.
+      final answeredErrors = <Object>[
+        Exception('Not authenticated'),
+        Exception('Forbidden'),
+        Exception('Validation failed: title must not be empty'),
+        StateError('Repository response reported an unsuccessful read.'),
+      ];
+
+      for (final error in answeredErrors) {
+        expect(
+          isStreamingConnectionError(error),
+          isFalse,
+          reason: 'must never reach the outbox: $error',
         );
       }
     });

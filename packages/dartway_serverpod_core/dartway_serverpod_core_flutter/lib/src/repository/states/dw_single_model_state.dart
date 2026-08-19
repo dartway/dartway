@@ -8,8 +8,12 @@ import '../dw_repository.dart';
 class DwSingleModelState<Model extends SerializableModel>
     extends AsyncNotifier<Model?> {
   DwSingleModelStateConfig<Model> config;
+  DwRepoReadOrigin? _lastReadOrigin;
 
   DwSingleModelState(this.config);
+
+  /// The source of the latest backend read, for stale-data diagnostics.
+  DwRepoReadOrigin? get lastReadOrigin => _lastReadOrigin;
 
   @override
   Future<Model?> build() async {
@@ -25,17 +29,20 @@ class DwSingleModelState<Model extends SerializableModel>
       "and timestamp $globalTimestamp",
     );
 
-    final response = config.initialModel != null
+    final readResult = config.initialModel != null
         ? null
-        : await dw.endpointCaller.dwCrud.getOne(
-            className: DwRepository.typeName<Model>(),
-            filter: config.backendFilter,
-            apiGroup: config.apiGroupOverride,
+        : await DwRepository.executeRead<Model, DwModelWrapper>(
+            queryKey: config.queryKey,
+            readStrategy: config.readStrategy,
+            onlineRequest: () => dw.endpointCaller.dwCrud.getOne(
+              className: DwRepository.typeName<Model>(),
+              filter: config.backendFilter,
+              apiGroup: config.apiGroupOverride,
+            ),
           );
 
-    final fetchedWrappedModel = response != null
-        ? DwRepository.processApiResponse<DwModelWrapper?>(response)
-        : null;
+    _lastReadOrigin = readResult?.origin;
+    final fetchedWrappedModel = readResult != null ? readResult.value : null;
 
     DwRepository.addUpdatesListener<Model>(_updatesListener);
 
@@ -58,18 +65,18 @@ class DwSingleModelState<Model extends SerializableModel>
     }
 
     // always fetch from backend when forced or no cached value
-    final res = await dw.endpointCaller.dwCrud
-        .getOne(
-          className: DwRepository.typeName<Model>(),
-          filter: config.backendFilter,
-          apiGroup: config.apiGroupOverride,
-        )
-        .then(
-          (response) =>
-              DwRepository.processApiResponse<DwModelWrapper>(response),
-        );
+    final readResult = await DwRepository.executeRead<Model, DwModelWrapper>(
+      queryKey: config.queryKey,
+      readStrategy: config.readStrategy,
+      onlineRequest: () => dw.endpointCaller.dwCrud.getOne(
+        className: DwRepository.typeName<Model>(),
+        filter: config.backendFilter,
+        apiGroup: config.apiGroupOverride,
+      ),
+    );
+    _lastReadOrigin = readResult.origin;
 
-    final model = res?.model as Model?;
+    final model = readResult.value?.model as Model?;
     state = AsyncValue.data(model);
     return model;
   }

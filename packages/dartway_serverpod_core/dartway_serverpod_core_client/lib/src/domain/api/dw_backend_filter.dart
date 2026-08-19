@@ -8,13 +8,14 @@ class DwBackendFilter<T> implements SerializableModel {
         'unknown';
   }
 
-  const DwBackendFilter._({
+  DwBackendFilter._({
     required this.type,
     required this.fieldName,
     required this.fieldValue,
-    required this.children,
+    required List<DwBackendFilter>? children,
     bool? negate,
-  }) : negate = negate ?? false;
+  }) : children = children == null ? null : List.unmodifiable(children),
+       negate = negate ?? false;
 
   final String? fieldName;
   final DwBackendFilterType type;
@@ -22,13 +23,15 @@ class DwBackendFilter<T> implements SerializableModel {
   final List<DwBackendFilter>? children;
   final bool negate;
 
-  const DwBackendFilter.and(this.children, {this.negate = false})
-    : fieldName = null,
+  DwBackendFilter.and(List<DwBackendFilter> children, {this.negate = false})
+    : children = List.unmodifiable(children),
+      fieldName = null,
       type = DwBackendFilterType.and,
       fieldValue = null;
 
-  const DwBackendFilter.or(this.children, {this.negate = false})
-    : fieldName = null,
+  DwBackendFilter.or(List<DwBackendFilter> children, {this.negate = false})
+    : children = List.unmodifiable(children),
+      fieldName = null,
       type = DwBackendFilterType.or,
       fieldValue = null;
 

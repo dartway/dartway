@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0
+
+**`dw.plugins.maybeOf<T>()`** — the lookup for a *role* rather than an integration. `of<T>()` is an
+app reaching for something it connected, so absence is a wiring mistake and it throws; `maybeOf<T>()`
+is the framework asking whether anybody took a job, where absence is an ordinary answer. Two plugins
+claiming one role is not an ordinary answer and still throws, rather than quietly picking the first
+and deciding something the app did not.
+
+Added for the data layer, which now asks this way whether the app declared a local store for
+`dw.repo` — see `dartway_serverpod_core_flutter` 0.10.0.
+
 ## 0.5.1
 
 **`dwBuildListAsync` builds its skeleton only when it is showing one.** The placeholder list — and

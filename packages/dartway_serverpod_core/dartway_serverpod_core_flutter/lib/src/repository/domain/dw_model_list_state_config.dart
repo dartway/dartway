@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../dw_repository.dart';
@@ -62,17 +63,36 @@ class DwModelListStateConfig<Model extends SerializableModel>
   relationUpdatesConfigs;
   final int Function(Model a, Model b)? updatesSortingMethod;
   final DwPaginationStrategy? paginationStrategy;
+  final DwRepoReadStrategy readStrategy;
 
-  const DwModelListStateConfig({
+  DwModelListStateConfig({
     this.backendFilter,
-    this.orderByList,
+    List<DwOrderBy>? orderByList,
     // this.pageSize,
     this.apiGroupOverride,
     this.customUpdatesListener,
     this.relationUpdatesConfigs,
     this.updatesSortingMethod,
     this.paginationStrategy,
-  });
+    this.readStrategy = DwRepoReadStrategy.networkOnly,
+  }) : orderByList = orderByList == null
+           ? null
+           : List<DwOrderBy>.unmodifiable(orderByList);
+
+  /// Builds the storage identity for one concrete list request.
+  ///
+  /// The supplied [pagination] comes from the pagination strategy at request
+  /// time, so a later page cannot reuse the first page's offline snapshot.
+  DwRepoQueryKey<Model> queryKeyFor(
+    DwPaginationParams pagination, {
+    DwBackendFilter? requestFilter,
+  }) => DwRepoQueryKey<Model>.getAll(
+    modelClassName: DwRepository.typeName<Model>(),
+    apiGroup: apiGroupOverride,
+    filters: (requestFilter ?? backendFilter)?.toJson(),
+    ordering: orderByList?.map((orderBy) => orderBy.toJson()).toList(),
+    pagination: pagination.toQueryMap(),
+  );
 
   @override
   Future<bool> loadNextPage(WidgetRef ref) {
@@ -91,31 +111,41 @@ class DwModelListStateConfig<Model extends SerializableModel>
     return identical(this, other) ||
         other is DwModelListStateConfig<Model> &&
             backendFilter == other.backendFilter &&
+            listEquals(orderByList, other.orderByList) &&
             paginationStrategy == other.paginationStrategy &&
             apiGroupOverride == other.apiGroupOverride &&
             customUpdatesListener == other.customUpdatesListener &&
             relationUpdatesConfigs == other.relationUpdatesConfigs &&
-            updatesSortingMethod == other.updatesSortingMethod;
+            updatesSortingMethod == other.updatesSortingMethod &&
+            readStrategy == other.readStrategy;
   }
 
   @override
   int get hashCode =>
       backendFilter.hashCode ^
+      Object.hash(
+        orderByList == null,
+        Object.hashAll(orderByList ?? const []),
+      ) ^
       paginationStrategy.hashCode ^
       apiGroupOverride.hashCode ^
       customUpdatesListener.hashCode ^
       relationUpdatesConfigs.hashCode ^
-      updatesSortingMethod.hashCode;
+      updatesSortingMethod.hashCode ^
+      readStrategy.hashCode;
 
   DwModelListStateConfig<Model> copyWith({
     DwBackendFilter? backendFilter,
+    List<DwOrderBy>? orderByList,
     int? pageSize,
     String? apiGroupOverride,
     Function(List<DwModelWrapper>)? customUpdatesListener,
     int Function(Model a, Model b)? updatesSortingMethod,
+    DwRepoReadStrategy? readStrategy,
   }) {
     return DwModelListStateConfig<Model>(
       backendFilter: backendFilter ?? this.backendFilter,
+      orderByList: orderByList ?? this.orderByList,
       paginationStrategy: paginationStrategy ?? this.paginationStrategy,
       apiGroupOverride: apiGroupOverride ?? this.apiGroupOverride,
       customUpdatesListener:
@@ -123,6 +153,7 @@ class DwModelListStateConfig<Model extends SerializableModel>
       relationUpdatesConfigs:
           relationUpdatesConfigs ?? this.relationUpdatesConfigs,
       updatesSortingMethod: updatesSortingMethod ?? this.updatesSortingMethod,
+      readStrategy: readStrategy ?? this.readStrategy,
     );
   }
 
@@ -130,11 +161,13 @@ class DwModelListStateConfig<Model extends SerializableModel>
   String toString() {
     return 'DwModelListStateConfig<$Model>('
         'backendFilter: $backendFilter, '
+        'orderByList: $orderByList, '
         'paginationStrategy: $paginationStrategy, '
         'apiGroupOverride: $apiGroupOverride, '
         'customUpdatesListener: $customUpdatesListener, '
         'relationUpdatesConfigs: $relationUpdatesConfigs, '
-        'updatesSortingMethod: $updatesSortingMethod'
+        'updatesSortingMethod: $updatesSortingMethod, '
+        'readStrategy: $readStrategy'
         ')';
   }
 }
