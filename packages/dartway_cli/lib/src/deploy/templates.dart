@@ -119,8 +119,8 @@ services:
     entrypoint: /bin/sh
     command:
       - -c
-      # \$\$ — так Compose передаёт вниз буквальный доллар, не подставляя
-      # переменную. YAML-escape вида \\\$ здесь недопустим и роняет разбор файла.
+      # \$\$ is how Compose passes a literal dollar down instead of
+      # substituting a variable. A YAML-style escape is invalid here and breaks parsing.
       - "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait \$\${!}; done"
 
 volumes:
