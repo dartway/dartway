@@ -17,8 +17,15 @@ enum DwRepoEnqueue {
 /// A store answers two questions with it, and only two: does this write get
 /// kept, and what does the caller see while it waits. It does not answer how
 /// the write reaches the server — the core sends it, by the one path it always
-/// sends writes by, and hands the store the same [DwRepoMutation] it sent so a
-/// later replay carries the identity of the first attempt.
+/// sends writes by, and hands the store the same [DwRepoMutation] it sent, so a
+/// replay is that same mutation rather than a new one.
+///
+/// That identity is the device's own, and does not extend to the server. The
+/// mutation's idempotency key is not carried by the CRUD endpoints, so a server
+/// that accepted the first attempt and then lost the response on the way back
+/// cannot tell the replay is a repeat — for a create, that is a duplicated row.
+/// Deduplicating a replay server-side is the application's job today; see
+/// https://github.com/dartway/dartway/issues/105.
 ///
 /// Returning `null` from `prepareSaveMutation` / `prepareDeleteMutation` means
 /// this operation/model combination is not opted into durable local writes.

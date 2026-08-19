@@ -90,8 +90,15 @@ a user identity itself. Each scope transition issues a fresh `DwRepoBinding`, re
 persisted, so the same user signing out and back in does not inherit the previous session's rows.
 
 **How a write leaves the device.** The core sends every write by its one path, whether or not it is
-kept locally, and hands the store the mutation it sent. That is what makes a queued replay carry the
-identity of the first attempt.
+kept locally, and hands the store the mutation it sent, so a replay is that same mutation rather
+than a new one.
+
+That identity is the device's own and stops there. The mutation carries an idempotency key, but the
+CRUD endpoints have nowhere to put it, so the server never sees it. A server that accepted the first
+attempt and lost the response on the way back cannot tell the replay is a repeat — harmless for an
+update or a delete, a duplicated row for a create. Deduplicating a replay server-side is the
+application's job today; the framework side of it is
+[issue #105](https://github.com/dartway/dartway/issues/105).
 
 ## Writing a store: the part the compiler will not check for you
 

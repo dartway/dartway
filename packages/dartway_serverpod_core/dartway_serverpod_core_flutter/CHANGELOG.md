@@ -35,6 +35,13 @@ identity itself), `DwRepoMutation`, `DwRepoWritePlan`, and `readStrategy` on the
 configs. Note the asymmetry, because reading it as one paired switch is the natural mistake: a read
 opts in at its config, a write opts in inside the store, per operation and model.
 
+A store keeps writes; it does not send them. The core sends every write by its one path, whether or
+not it is kept locally, and hands the store the mutation it sent — so a replay is that same
+mutation rather than a new one. That identity stops at the device: the mutation's idempotency key
+is not carried by the CRUD endpoints, so a server that accepted the first attempt and lost the
+response cannot tell a replay is a repeat. Deduplicating that is the application's job today —
+[issue #105](https://github.com/dartway/dartway/issues/105).
+
 `isStreamingConnectionError` is now load-bearing for data, not only for logging: it is the single
 condition under which a write falls back to local storage, which keeps a rejected authorization out
 of the outbox. Widening it changes where data goes.
