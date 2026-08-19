@@ -189,6 +189,21 @@ A read that omits it runs on its own connection: in production it works, merely 
 
 So `scope=serverOnly` is the right tool for anything the server owns and the client must not read: an internal hash, a computed score, a verification secret, a moderation note.
 
+The second rule is narrow on purpose — it skips the column **only** when the incoming value is `null` and the stored row has one. A hook that *computes* a `serverOnly` value writes it like any other field:
+
+```dart
+beforeSaveTransaction: (session, saveContext) async {
+  saveContext.currentModel = saveContext.currentModel.copyWith(
+    internalScore: await recomputeScore(session, saveContext),
+  );
+  return null;
+},
+```
+
+The one case that needs an opt-out is a hook meaning to **clear** a `serverOnly` field back to `null`: set `allowServerOnlyOverwrite: true` on the config, and accept that an ordinary client save will then blank the column too.
+
+One residual behaviour worth knowing: the model is not re-read from the database after the write, so from `afterSaveTransaction` onwards a `serverOnly` field on `currentModel` still holds what the client sent — `null` — even though the stored row kept its value. A hook that needs the stored value reads `saveContext.initialModel`.
+
 ### Returning a value the row does not hold
 
 `scope=serverOnly` says "the server keeps this and never sends it". The opposite need is just as ordinary — **the server sends this and never stores it**: a freshly issued access key, a one-time code, a receipt computed during the write. A save can answer with it, entirely through CRUD, and the pattern is three pieces that say nothing on their own:
@@ -221,21 +236,6 @@ afterSaveTransform: (session, saveContext) async {
 > ⚠️ **What you assign is also what gets broadcast.** The response and `broadcastTo` are built from the **same** object: `updatedModels` carries `DwModelWrapper(object: saveContext.currentModel)`, and every channel this config broadcasts to receives it. A one-time code assigned this way reaches every subscriber of that channel, not only the caller who earned it. So a save that issues a secret **must not broadcast** — and if the model genuinely needs live updates elsewhere, the secret is not travelling this way; it wants `scope=serverOnly` plus a read of its own.
 
 **Why this is worth spelling out.** Each piece is documented somewhere and none of them announces the pattern, so the reasoning that actually happens is: *the response is the row · the value is not in the row · therefore CRUD cannot do this · therefore a custom endpoint.* Only the third step is wrong, and it looks like arithmetic. The bill is not the exception spent for nothing: a write outside `dw.repo` leaves every list over that model stale, so the app reaches for `ref.invalidate`, which the clean-code contract forbids — and the damage surfaces three layers from its cause, looking like the framework's fault.
-
-The second rule is narrow on purpose — it skips the column **only** when the incoming value is `null` and the stored row has one. A hook that *computes* a `serverOnly` value writes it like any other field:
-
-```dart
-beforeSaveTransaction: (session, saveContext) async {
-  saveContext.currentModel = saveContext.currentModel.copyWith(
-    internalScore: await recomputeScore(session, saveContext),
-  );
-  return null;
-},
-```
-
-The one case that needs an opt-out is a hook meaning to **clear** a `serverOnly` field back to `null`: set `allowServerOnlyOverwrite: true` on the config, and accept that an ordinary client save will then blank the column too.
-
-One residual behaviour worth knowing: the model is not re-read from the database after the write, so from `afterSaveTransaction` onwards a `serverOnly` field on `currentModel` still holds what the client sent — `null` — even though the stored row kept its value. A hook that needs the stored value reads `saveContext.initialModel`.
 
 **To make other users see the change** — `broadcastTo` in the config: a callback over the context that returns the list of channels all the models touched by the save fly into. On the subscribers' side they are routed by type into any `dw.repo.modelList<T>()`, and the list redraws itself — nothing has to be written in Flutter (the app is subscribed to the public channel at the root).
 
