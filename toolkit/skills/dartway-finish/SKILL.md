@@ -134,8 +134,10 @@ managed files cannot be fixed here — they are overwritten on update (see `CLAU
   for filing, and one that has an issue is reported by its state rather than by what the file says —
   `gh issue view` answers that, the file does not. An issue that has closed is the signal to delete
   the entry, and to re-check the workaround it stood for if there was one. What to strip and restate
-  before filing is in `CLAUDE.md`, "Where an entry goes when it leaves this project"; the step is a
-  proposal like every other one here, never a push that happens on its own.
+  before filing is in `CLAUDE.md`, "Where an entry goes when it leaves this project" — including the
+  `impact:` label, which is proposed with the text rather than left for someone to guess later,
+  because what the finding cost this project is known now and not afterwards. The step is a proposal
+  like every other one here, never a push that happens on its own.
 - **A workaround over a `dartway_*` API is written down twice** — the entry in `dartway_notes.md`,
   and a `TODO(dartway, checked: <ref>)` marker on the code itself (see `CLAUDE.md`, "Notes back to
   the framework"). The journal says what should change upstream; the marker says what to re-check
