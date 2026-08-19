@@ -135,6 +135,12 @@ dw.repo.setupRepository(
 );
 ```
 
+This is the one place an app builds a model field by field with an id in hand, and it is not a
+rebuild: `mockModelId` is a sentinel, the instance is invented from nothing, and there is no stored
+row to copy from. `model_rebuild_by_constructor` reads the sentinel and stays silent, so
+`core/default_models.dart` needs no `// ignore_for_file:` — see
+[models](../2-core/models.md#an-existing-row-is-rebuilt-with-copywith-never-field-by-field).
+
 Skip it for a model and the failure is immediate and total, because this registration is not only
 about skeletons: `setupRepository` also maps the Dart type to the class name the CRUD endpoints
 speak. So:

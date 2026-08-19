@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.1
+
+`model_rebuild_by_constructor` no longer reports a skeleton default. A construction whose `id:` is
+`dw.repo.mockModelId` — the sentinel `setupRepository(defaultModel:)` instances carry — is out of the
+rule's scope: a stored row is a model with a real id, and a skeleton default is not a row. There is
+nothing there to rebuild with `copyWith`, because there is no row to copy from; the instance is
+invented from nothing to give a loading skeleton its shape.
+
+The bug was not noise in one project's file. `setupRepository(defaultModel:)` is the framework's own
+API and every project registers one default per model, so the rule produced exactly as many warnings
+as an app has models — 17 in one of them — in the one file where it had nothing to say. The framework
+shipped its own template with an `// ignore_for_file:` on top of that file, which is the shape of the
+problem rather than a fix: a rule guaranteed to be loud where it must be silent teaches people to
+scroll past its output. Both `example/` and `template/` have dropped the ignore.
+
+The exemption is keyed on the sentinel's value, not on the `defaultModel:` argument position. The
+value travels — through a helper that builds the instance, through defaults registered in a loop —
+while the argument position only covers the call written inline; and a *real* id handed to
+`setupRepository` pins a stored row as a skeleton, which is worth a warning rather than an exemption.
+The sentinel is matched by name, for the reason `forbidden_provider_scope` matches `ProviderScope` by
+name: an unresolved reference must not make the rule fire, since firing is the failure being fixed.
+
+The rule's message now names the reason it fired, so the exemption is visible from the warning: *a
+stored row is a model with a real id.*
+
 ## 0.3.0
 
 `model_rebuild_by_constructor`: a Serverpod model constructor called with a non-null `id:` is a

@@ -38,9 +38,9 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
   constructor argument.
 
 - **model_rebuild_by_constructor** (warning) — a Serverpod model constructor
-  called with a non-null `id:`. A row being created never passes one (the id
-  comes back from the database), so the call is rebuilding a row that already
-  exists — and rebuilding is `copyWith`'s job.
+  called with a real `id:`. A row being created never passes one (the id comes
+  back from the database), so the call is rebuilding a row that already exists —
+  and rebuilding is `copyWith`'s job.
 
   Serverpod makes a field with `default=`, and any nullable field, an *optional*
   argument. A method that rebuilds a model by naming its fields therefore keeps
@@ -57,8 +57,12 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
   rather than `TableRow`, because the client half of a generated model — the
   half an application is written against — implements only the former.
   Serverpod's own output (`lib/src/protocol/`, `lib/src/generated/`) is left
-  alone. The one legitimate hand-built instance in a DartWay app is the mock in
-  `core/default_models.dart`, and the template ships it with an `// ignore_for_file:`.
+  alone, and so are the two ids that are not real: `null`, and
+  `dw.repo.mockModelId`. The second is the sentinel a skeleton default carries —
+  `setupRepository(defaultModel: …)` builds an instance from nothing to give a
+  loading skeleton its shape, and there is no row there to rebuild. That
+  exemption is what `core/default_models.dart` rests on; the file needs no
+  `// ignore_for_file:` and neither `example/` nor `template/` carries one.
 
 ## Testing
 
@@ -67,7 +71,8 @@ Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
 that must stay silent — `lib/ui_kit/` writing styles freely, a feature importing
 its neighbour one `../` away, `test/` building its own `ProviderScope`,
 `lib/src/protocol/` rebuilding a model field by field the way the generator
-does — are there to catch an over-eager rule.
+does, `lib/core/default_models.dart` registering skeleton defaults on the
+`mockModelId` sentinel — are there to catch an over-eager rule.
 
 ```bash
 cd example && dart run custom_lint   # fails on a missed or an unexpected lint

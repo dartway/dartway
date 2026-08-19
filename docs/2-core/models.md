@@ -86,8 +86,11 @@ request.copyWith(status: RequestStatus.approved);  // assignee untouched
 ```
 
 `model_rebuild_by_constructor` ([`dartway_lints`](../5-tooling/conventions-checker.md), warning) says
-this in the editor: a model constructor passed a non-null `id:` is a rebuild, because a row being
-created has no id yet — it comes back from the database.
+this in the editor: a model constructor passed a real `id:` is a rebuild, because a row being created
+has no id yet — it comes back from the database. Two ids are not real and the rule skips both:
+`null`, and `dw.repo.mockModelId` — the sentinel a
+[skeleton default](../3-flutter/data-layer.md#placeholder-models-must-be-registered) carries, where
+there is no row to rebuild.
 
 ## Relations: `?` means "not loaded", the FK means "required"
 

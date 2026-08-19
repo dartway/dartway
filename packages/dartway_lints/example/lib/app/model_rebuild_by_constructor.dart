@@ -3,6 +3,7 @@
 // on the day a field is added to the model — at which point the field silently
 // arrives as its default in every one of them.
 
+import '../core/dw_core.dart';
 import '../src/protocol/club_session.dart';
 
 class SessionEditor {
@@ -38,6 +39,30 @@ class SessionEditor {
   /// `id: null` is not rebuilding anything.
   ClubSession createExplicitDraft(String title) =>
       ClubSession(id: null, title: title);
+
+  /// A skeleton default written inline. The id is the sentinel, so there is no
+  /// row and nothing to copy from — see `lib/core/default_models.dart` for the
+  /// shape an application actually registers.
+  ClubSession skeleton() => ClubSession(
+    id: dw.repo.mockModelId,
+    title: 'Group workout',
+    isPublished: true,
+  );
+
+  /// The other spelling of the same sentinel, the one the framework uses
+  /// internally. The rule reads the trailing identifier, so both are exempt.
+  ClubSession skeletonByStatic() =>
+      ClubSession(id: DwRepository.mockModelId, title: 'Group workout');
+
+  /// A real id handed to `setupRepository` is still a rebuild: it pins a stored
+  /// row as the skeleton. The exemption is the sentinel's, not the argument
+  /// position's, which is why this one is reported.
+  void registerStoredRow(ClubSession session) {
+    dw.repo.setupRepository(
+      // expect_lint: model_rebuild_by_constructor
+      defaultModel: ClubSession(id: session.id, title: session.title),
+    );
+  }
 }
 
 /// `id:` is a common argument name, and on anything that is not a Serverpod

@@ -524,10 +524,11 @@ request.copyWith(assigneeProfileId: null);
 ```
 
 **`model_rebuild_by_constructor`** (`dartway_lints`, warning) says this in the editor: a constructor
-call on a Serverpod model that is passed a non-null `id:` is a rebuild, because a row being created
-never carries an id — it comes back from the database. The one legitimate exception in a DartWay app
-is `core/default_models.dart`, where mock instances are invented from nothing with a synthetic id;
-it carries an `// ignore_for_file:` that says so.
+call on a Serverpod model that is passed a real `id:` is a rebuild, because a row being created never
+carries an id — it comes back from the database. The one legitimate hand-built instance in a DartWay
+app is the skeleton default in `core/default_models.dart`, invented from nothing with a synthetic id;
+the rule knows that sentinel — a construction whose `id:` is `dw.repo.mockModelId` is not a row and
+is left alone, so the file needs no `// ignore_for_file:`.
 
 **A doc comment is not a rule.** The method in that project had an honest request written above it —
 *"anything added to the model belongs here too"* — and it changed nothing, because the field was
