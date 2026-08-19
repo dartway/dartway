@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.10.0
+
+**`dw.repo` can keep a local copy of its reads and writes, and the contract for doing so is new
+public API.** Two optional boundaries — `DwRepoLocalReads` and `DwRepoLocalWrites` — let a store
+outside the core keep repository responses and queue mutations that failed on the connection.
+Nothing changes for an app that declares no store: every read and write is network-only, exactly as
+before, and the defaults say so (`DwRepoReadStrategy.networkOnly`, a `null` store).
+
+Declared with the core rather than assigned to it:
+
+```dart
+dw = DwCore(
+  config: ..., client: ..., dwAlerts: ..., getUserId: ...,
+  plugins: [DwOfflinePlugin(config: offlineConfig)],
+);
+```
+
+There is no setter. A store assigned after startup outlives the core it was attached to, and the
+failure is quiet — everything keeps working, the writes simply go somewhere that belongs to nobody.
+
+The dangerous half of the write contract is held by the shape of the call: the store opens a
+transaction (`write<R>`) and the core writes the binding check and the enqueue inside it, so an
+implementation cannot separate them. What a signature still cannot state — that the transaction is
+real, that the check reads inside it — is held by a suite the core now ships in
+`package:dartway_serverpod_core_flutter/testing.dart`, which every store is expected to run.
+
+Also new: `DwRepoQueryKey` (the stable identity of a read), `DwRepoScope` / `DwRepoBinding` (an
+opaque, revocable capability the application gives meaning to — the core never derives a user
+identity itself), `DwRepoMutation`, `DwRepoWritePlan`, and `readStrategy` on the list and single
+configs. Note the asymmetry, because reading it as one paired switch is the natural mistake: a read
+opts in at its config, a write opts in inside the store, per operation and model.
+
+`isStreamingConnectionError` is now load-bearing for data, not only for logging: it is the single
+condition under which a write falls back to local storage, which keeps a rejected authorization out
+of the outbox. Widening it changes where data goes.
+
 ## 0.9.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.9.0 is the

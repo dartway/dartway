@@ -293,6 +293,29 @@ booking cancelled from a card updates the list behind it with no refresh code an
 reactivity covers **your own writes**. Another user's write reaching your screen is a server-side
 decision — see [realtime](../2-core/realtime.md).
 
+## When the network is gone
+
+Everything above assumes a connection: `dw.repo` is network-only, a read that cannot reach the
+backend fails, and so does a write. An app that needs otherwise declares a **local store** on the
+core, and then a read may be served from the device and a write may be queued and replayed.
+
+Feature code does not change — the same `ref.watch(dw.repo.modelList<X>())`, the same
+`dw.repo.saveModel(...)`. What changes is one line of bootstrap and, per query, one flag:
+
+```dart
+ref.watch(
+  dw.repo.modelList<Lesson>(
+    customConfig: DwModelListStateConfig<Lesson>(
+      readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
+    ),
+  ),
+);
+```
+
+The default stays `DwRepoReadStrategy.networkOnly`, so declaring a store does not quietly turn the
+app into a cache. Writes work the other way round — which ones are queued is decided inside the
+store, not at the call site. See [offline](offline.md).
+
 ## Pagination
 
 By default a list is `DwNoPagination`: one request, everything. For long lists pass a strategy
