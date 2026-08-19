@@ -5,7 +5,10 @@ description: >-
   navigation → UI entry point → state/logic via the data layer and Riverpod → backend CRUD configs
   → models/DB → tests. Feature structure (entry point + widgets + logic), isolation (import the
   entry point only), domain/app/ui_kit boundaries, the `DwFeatureSpec` feature spec in the feature's
-  own file. Use when adding new functionality, a screen, a flow, or a model.
+  own file. A widget that decides something by a domain model is a feature (however small); one that
+  only lays out what it was handed is a block in lib/shared/ — and a feature must be constructible
+  from its address (identifiers and models), never from lists, maps and callbacks its parent assembled.
+  Use when adding new functionality, a screen, a flow, or a model.
 ---
 
 # DartWay — building a feature (end-to-end)
@@ -59,15 +62,29 @@ app/community_events/                  // group
 
 **Behaviour two features share is one more feature.** No new kind of entity is introduced: the card has exactly the same single public file as the screen.
 
-**A widget with no story of its own is a building block, and blocks live in `lib/shared/`** — never in a `common/`/`shared/`/`widgets/` folder inside a zone. The line is not how many places use it but whether there is anything to tell:
+**A widget with no story of its own is a building block, and blocks live in `lib/shared/`** — never in a `common/`/`shared/`/`widgets/` folder inside a zone. The line is not how many places use it:
 
 | | Where | Described by |
 |---|---|---|
-| **Feature** — product behaviour you can name in a user's words (a screen, a dialog, a flow, a block on a screen) | a zone: `app/`, `admin/`, `auth/`, `common/` | `DwFeatureSpec` |
-| **Building block** — a widget/helper features draw with: a form field, a badge row, a layout wrapper, an extension on a model | `lib/shared/` | a doc comment over the class |
+| **Feature** — it reads a domain model and **decides** something by it: shows different things in different states, picks a label, hides a button, opens a dialog, saves | a zone: `app/`, `admin/`, `auth/`, `common/` | `DwFeatureSpec` |
+| **Building block** — it **arranges what it was handed**: a row, an inset, a wrapper, a form field, a badge, an extension on a model | `lib/shared/` | a doc comment over the class |
 | **Layer** — presentation, infrastructure, localisation | `ui_kit/`, `core/`, `l10n/` | — |
 
-**Split small: that is the recommendation, not a tolerated evil.** Every feature brings a passport, so the finer the cut, the denser the description of the interface — one big feature is described in generalities, ten small ones each carry their own `behaviors` and `knownIssues`. A single consumer is not a sign of an internal; the sign of an internal is that there is nothing to tell (a slice of layout extracted so `build` stops growing).
+**Split small: that is the recommendation, not a tolerated evil.** Every feature brings a passport, so the finer the cut, the denser the description of the interface — one big feature is described in generalities, ten small ones each carry their own `behaviors` and `knownIssues`.
+
+**"Is there anything to tell?" is not a criterion — it is a request for taste, and it loses.** It is
+written above, and a zone still grew into four large features with ten-file `widgets/` folders under
+them, each answering "well, nothing much" about the parts. The criterion in the table is the one to
+apply, and it is answered by looking at the file: **does this widget decide anything by the domain,
+or does it lay out what it was given?**
+
+- decides → a feature, with its own folder and its own passport, however small it is. A card in a
+  list, one row of work, one question and its answer — each is a feature;
+- lays out → a block.
+
+**The consequence: a feature's `widgets/` holds blocks only.** A file in `widgets/` that imports the
+client package to `switch` over a model, choose a label from a state, or fire an action is a feature
+standing in the wrong place — move it up beside its neighbours and give it a passport.
 
 **Not a feature:** app-wide registries and infrastructure (the feature catalog, analytics, push initializers) — that is `lib/core/`; a helper several features share — `lib/shared/`. The sign that the placement is wrong: the file sits in one feature's `logic/` and is imported from other features — then all of them are reaching into its internals.
 
@@ -178,7 +195,10 @@ two public files, hides the widget in `widgets/`, and names a screen without nam
 see `dartway-clean-code` §1.3, which this convention is the answer to.
 
 ### 3. State & Logic
-Decide what data the UI needs. Data access goes through `dw.repo` only: reads via the `dw.repo.model`/`maybeModel`/`modelList` providers under the native `ref` (`ref.watch(...)` reactively, `ref.read(....future)` one-off), writes via the `dw.repo.saveModel`/`deleteModel` methods. For complex scenarios or reuse inside the feature — a Riverpod provider. Local state — Riverpod + StatefulWidget + flutter_hooks. Describe every user action (create/edit/delete) before wiring it to the backend.
+Decide what data the UI needs — for the **zone**, not per widget. An entity and everything hanging
+off it is one read (`include` on the server, `DwRelationUpdatesConfig` for live child updates — see
+`dartway-data-layer` §3a), and each widget then asks that same provider for itself rather than
+receiving pre-chewed lists from above (`dartway-clean-code` §1.9a). Data access goes through `dw.repo` only: reads via the `dw.repo.model`/`maybeModel`/`modelList` providers under the native `ref` (`ref.watch(...)` reactively, `ref.read(....future)` one-off), writes via the `dw.repo.saveModel`/`deleteModel` methods. For complex scenarios or reuse inside the feature — a Riverpod provider. Local state — Riverpod + StatefulWidget + flutter_hooks. Describe every user action (create/edit/delete) before wiring it to the backend.
 
 ### 4. Backend (CRUD configs)
 Every user action maps onto the CRUD layer — no arbitrary endpoints. Use `SaveConfig`/`DeleteConfig`/`GetModelConfig`/`GetListConfig`, wrap responses in `DwModelWrapper`. The configs hold permissions, validations, pre/post processing, side effects. Details — the `dartway-crud-config` skill.
@@ -242,6 +262,27 @@ Write one sentence per item: what is wrong and what it costs. This is a pointer 
 **Write the spec from what the code does, not from what was intended.** While you phrase verifiable statements you find things nobody ever claimed — that is how it surfaced that the events block on the home screen does not sort them by date while the screen does.
 
 The spec lives on a widget, which is another reason the entry point is one. A feature published as an extension or a bare function (`context.showInviteDialog()`) has nothing to attach the spec to — the checker cannot ask it for one, and the feature ends up with no description at all. If you meet one, that is what to fix: move the presentation into a static method on the widget (see "Showing a feature that is not a route") and the spec has a home.
+
+### A feature has to be constructible from its address
+
+The ceremony is checked — the spec is there, `id` is well-formed, the behaviours are verifiable —
+and **what the spec describes is not**. A widget with an exemplary fourteen-behaviour passport once
+had nowhere it could be placed except inside the one parent that already held its four ready-made
+lists and six callbacks. The passport was true and the feature did not exist: it was a piece of its
+parent's layout with a description attached.
+
+**The test, and it takes one attempt:** write the call. Can you construct this widget in the router,
+in a `showDialog`, in a `ListView.builder` — with nothing in hand but identifiers and domain models?
+
+- yes → a feature. It fetches the rest itself (`dartway-data-layer` §3, §3a);
+- no → it is part of its parent's markup, and no passport is due. Either fold it back into the
+  parent, or make it a feature by taking the assembled data out of its constructor
+  (`dartway-clean-code` §1.9a).
+
+Unlike most of what is written here, this one is mechanical: **a constructor that requires a
+`Function`, a `Map<…, …>` or a `List<…>` of a derived type is the shape to look for.** A `List` of a
+domain model is not automatically wrong (a card list takes its items), but a list the parent had to
+compute is.
 
 ## Entry point example
 

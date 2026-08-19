@@ -107,6 +107,12 @@ final clubSessionListConfig = DwGetModelListConfig<ClubSession>(
 );
 ```
 
+**An `include` is not a property of one config — it is a property of the model.** Give it a name of
+its own (`final clubSessionInclude = …`) and hand that same value to every config returning the
+entity, and to every hand-written read of it. **The client replaces the model with whatever
+arrives**, so one exit that forgets the include blanks the nested lists on every device — with no
+error anywhere. The full rule, and the three exits it covers, are in `dartway-data-layer` §3a.
+
 ## DwSaveConfig — create + update (unified)
 
 **All hooks share one signature:** `(Session session, DwSaveContext<T> saveContext)`. No `(initial, updated)` — both of them live in the context.
@@ -127,6 +133,18 @@ Execution order and signatures:
 The question is who needs to know, not when the work happens. A push notification nobody misses if it is late → `afterSaveSideEffects`. A verification code, a payment handed to a provider, an invitation the whole feature is about → `afterSaveTransform`, and the caller waits for it.
 
 One consequence to write into the hook: `afterSaveTransform` runs **after** the commit, so rejecting there does not undo the write. The row stays saved and only the response says no. Write the hook so that a retry is harmless, and say in the error text that retrying is what to do.
+
+**Its other job: re-reading the saved model with its `include`.** `saveContext.currentModel` holds
+the flat row that was written — hand that back and every client replaces its copy with a parent that
+has no children. Running after the commit, the hook also sees what the hooks themselves created:
+
+```dart
+afterSaveTransform: (session, saveContext) async {
+  final reloaded = await loadTicketGraph(session, saveContext.currentModel.id!);
+  if (reloaded != null) saveContext.currentModel = reloaded;
+  return null;
+},
+```
 
 ```dart
 afterSaveTransform: (session, saveContext) async {
@@ -192,6 +210,13 @@ One residual behaviour worth knowing: the model is not re-read from the database
 broadcastTo: (session, ctx) => [DwCoreConst.publicUpdatesChannel],   // public model
 broadcastTo: (session, ctx) => ['chat:${ctx.currentModel.chatId}'],  // a narrower audience
 ```
+
+What flies out is `beforeUpdates` + `currentModel` + `afterUpdates` — the very same set the caller
+gets back. So a model with an `include` reaches the channel with its graph **only if
+`afterSaveTransform` re-read it**; otherwise the subscribers' copies lose their children while the
+saver's own screen looks fine (`dartway-data-layer` §3a). The same goes for an imperative
+`session.sendUpdates(...)` and for a worker's `sendUpdatesToUser(...)`: whatever model you hand
+them is what replaces the client's.
 
 **A channel your app names itself has to be declared**, or nobody can subscribe to it. Add it to `channelConfigurations` in `DwCore.init` next to the `broadcastTo` that invented it — a channel name arrives from the client as a bare string, and the declaration is how the server tells a real one from a guess:
 
@@ -260,6 +285,11 @@ final clubSessionSaveConfig = DwSaveConfig<ClubSession>(
 ```
 
 The model is edited through `saveContext.currentModel`; related updates for the client go into `saveContext.beforeUpdates` / `saveContext.afterUpdates`. Transactional hooks must end with `return null` when they do not reject — otherwise the analyzer will catch `body_might_complete_normally_nullable`.
+
+**What goes into those lists is subject to the same include rule.** A child is put in flat and the
+client folds it into its parent itself; a **parent** is re-read with its include first. A bare
+`DwModelWrapper(object: parentModel)` — including from a child's own config, which is where it
+usually appears — wipes the graph on every subscriber, silently (`dartway-data-layer` §3a).
 
 ## DwDeleteConfig — deletion
 
