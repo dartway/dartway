@@ -93,6 +93,8 @@ dependency_overrides:
     path: ../../packages/dartway_cli
   dartway_lints:
     path: ../../packages/dartway_lints
+  dartway_router:
+    path: ../../packages/dartway_router
 
 
 # For information on the generic Dart part of this file, see the
