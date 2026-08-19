@@ -14,3 +14,6 @@
   `DwRepoLocalReads` conformance suites.
 - Manifest v2 accepts an application-calculated `leaseValidUntilUtc`. The framework verifies the
   signed boundary but carries no application-specific access categories or duration rules.
+- Web compilation no longer encounters JavaScript-inexact 64-bit integer literals: unbounded
+  leases use a far-future web-safe timestamp, while download size validation keeps the exact
+  SQLite integer boundary through `BigInt`.

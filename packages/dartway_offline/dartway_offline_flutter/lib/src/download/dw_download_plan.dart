@@ -30,6 +30,10 @@ final class DwDownloadAssetPlan {
 }
 
 final class DwDownloadPackagePlan {
+  static final BigInt _maximumSqliteInteger = BigInt.parse(
+    '9223372036854775807',
+  );
+
   DwDownloadPackagePlan({
     required this.userScopeId,
     required this.packageId,
@@ -53,7 +57,7 @@ final class DwDownloadPackagePlan {
         throw ArgumentError('Download plan contains a duplicate asset.');
       }
     }
-    if (packageTotalBytes > 0x7fffffffffffffff) {
+    if (BigInt.from(packageTotalBytes) > _maximumSqliteInteger) {
       throw ArgumentError('Download package exceeds SQLite integer range.');
     }
   }

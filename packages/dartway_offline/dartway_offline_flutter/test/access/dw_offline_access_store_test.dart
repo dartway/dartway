@@ -95,6 +95,23 @@ void main() {
     );
   });
 
+  test(
+    'persists an unbounded lease with a web-safe far-future expiry',
+    () async {
+      final manifest = await manifestFixture.verify(
+        assets: const [],
+        unboundedLease: true,
+      );
+
+      await accessStore.persistVerifiedManifestLease(manifest);
+
+      final storedLease = await database
+          .select(database.dwOfflineLeases)
+          .getSingle();
+      expect(storedLease.expiresAtEpochMs, 253402300799999);
+    },
+  );
+
   test('lease lookup treats SQL wildcard characters as literal text', () async {
     final candidate = await manifestFixture.verify(
       assets: const [],
@@ -114,7 +131,7 @@ void main() {
               'signedManifestEnvelopeJson': candidate.canonicalEnvelopeJson,
             }),
             trustedAtEpochMs: 0,
-            expiresAtEpochMs: 0x7fffffffffffffff,
+            expiresAtEpochMs: 253402300799999,
           ),
         );
 
