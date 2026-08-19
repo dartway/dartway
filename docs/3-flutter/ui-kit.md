@@ -221,5 +221,11 @@ guesses at meaning grows an exception list and teaches people to switch it off. 
 looks for hardcoded user text as part of its semantic pass. Inside the kit the guess is safe — a kit
 file has no content to speak of — which is why `uiKitContainsText` can be mechanical.
 
+**A typeface is not content.** `fontFamily: 'monospace'` and the names inside `fontFamilyFallback`
+are exempt: the platform's font matcher reads them and nobody else does, they are never translated,
+and there is nowhere to move them to, since the kit is precisely where a font belongs. The exemption
+is on those two argument positions rather than on the whole line — a label sharing the line with a
+font family is still a label that leaked into the kit, and is still reported.
+
 Finally: tempted to add a client-specific hack inside a framework widget? That is the signal an
 extension point is missing. Add it to your kit — do not fork `dartway_flutter`.

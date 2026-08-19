@@ -124,7 +124,7 @@ my_app_flutter/lib/
   common/                features more than one zone draws on (create it when that happens)
 
   LAYERS — everything that is not a feature
-  core/                  app-wide wiring: router/, dw_core.dart, app_settings/, studio/, dev/
+  core/                  app-wide wiring: router/, dw_core.dart, app_settings/, studio/, platform/, dev/
   shared/                building blocks: widgets and helpers with no story of their own
   ui_kit/                your design system, as source
   l10n/                  ARB files and their generated output
@@ -144,6 +144,12 @@ every question the checker asks about zones.
 Studio when the app runs inside its preview frame, plus the screen passports Studio renders beside
 it. It is wiring like the router, inert outside an iframe, and a project that never opens Studio can
 delete the folder.
+
+`core/platform/` is where a conditional-import trio lives — `x.dart` holding
+`export 'x_stub.dart' if (dart.library.js_interop) 'x_web.dart';`, plus the two halves. It is one
+symbol whose implementation the platform picks, which is wiring by any reading; and a feature that
+keeps its own copy has quietly acquired a second answer to the same question. `dartway check` names
+this folder in the `unusedFeatureFile` finding, so the shape does not have to be guessed at.
 
 **There is no `data/` and no `domain/`.** The data layer is `dw.repo`, so a `data/` folder in a
 DartWay app is either empty or a second way to do the same thing; and the rules of a DartWay app

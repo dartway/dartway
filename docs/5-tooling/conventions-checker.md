@@ -31,9 +31,16 @@ is decidable without understanding what the code means**.
 The third row is the one worth defending. `'Issues'`, `'issues/board'` and `'dd.MM'` are the same
 shape and different things, so a mechanical rule about hardcoded text can only guess — and a guessing
 rule grows an exception list with every complaint until somebody turns it off. That is not
-hypothetical: `uiKitContainsText` carries eight hand-grown exceptions today, and it survives only
-because its scope is narrow enough for the guess to be safe (a kit file has no content to speak of).
-Widened to features, the same rule would be noise.
+hypothetical: `uiKitContainsText` carries nine hand-grown exceptions today — the ninth being the
+`fontFamily` / `fontFamilyFallback` argument positions, where the string is a typeface the platform's
+font matcher reads and nobody else does, with nowhere to be moved to since the kit is exactly where
+fonts belong — and it survives only because its scope is narrow enough for the guess to be safe (a
+kit file has no content to speak of). Widened to features, the same rule would be noise.
+
+That last exception is positional rather than per line, and deliberately so: the literal in the
+`fontFamily` argument is stepped over and the reading continues, so a real label sharing the line is
+still found. An exemption that swallows the whole line is how a rule stops firing without anyone
+noticing.
 
 A rule that needs understanding is not a weaker rule. It is a rule for a reader.
 
@@ -153,12 +160,30 @@ which Law 3 makes it: nobody outside a feature may import its `widgets/`/`logic/
 that its own feature never mentions is unreachable. It compiles, it survives refactors, and it is
 found in one folder-deep pass.
 
-Two things it does *not* get wrong, because both cost real false positives before they were fixed: a
-type is not how it is called (an extension is reached by member name, a notifier through its provider
-variable, so every public name a file declares counts), and dead code keeps dead code alive (a
-handler nobody calls still calls its own settings, so the sweep repeats until a pass buries nobody).
+Four things it does *not* get wrong, because every one of them cost a real false positive before it
+was fixed:
+
+- **a type is not how it is called** — an extension is reached by member name, a notifier through its
+  provider variable, so every public name a file declares counts;
+- **a function is a declaration too** — the index read classes, enums and top-level variables and, for
+  want of an anchor, every `final blob = …` inside a function body as well, while missing functions
+  and getters themselves. A file whose only public member was a top-level function was therefore
+  judged on the names of its own locals, which appear nowhere else by definition;
+- **a conditional import is one symbol in several files** — `foo.dart` forwarding to `foo_stub.dart` /
+  `foo_web.dart` has no file that carries the name alone: the forwarder declares nothing, and each
+  half is a platform the other build never compiles. The trio answers as one unit, alive together and
+  reported together;
+- **dead code keeps dead code alive** — a handler nobody calls still calls its own settings, so the
+  sweep repeats until a pass buries nobody.
+
 What it cannot see: a reference made through a string, and a file whose own halves only reference
 each other.
+
+The finding names where the file should go instead — `lib/shared/` for a building block with no story
+of its own, `lib/core/` for wiring several features share, `lib/core/platform/` for a platform trio.
+"Dead code" is half an answer: a file its own feature stopped using is often a file somebody else
+needs, and a message that names no destination leaves the author to find the intended shape by moving
+the file until the rule stops firing.
 
 **`frameworkRefsDiverged`** (warning) is the one check that reads no Dart at all. A project that
 consumes DartWay by git writes `ref: master` on every framework package, which reads as "all of it
