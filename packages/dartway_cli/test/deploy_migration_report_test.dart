@@ -133,6 +133,16 @@ void main() {
       expect(report.failure, contains('create-repair-migration'));
     });
 
+    test('drift names the table, not only that there is drift', () {
+      // The header says the schema is behind; the lines under it say which
+      // table. Quoting the header alone hands an operator a stopped deploy and
+      // nothing to go and look at.
+      final report = DwMigrationReport.read(_drifted);
+
+      expect(report.failure, contains('dw_push_delivery'));
+      expect(report.failure, isNot(contains('Hint:')));
+    });
+
     test('a failure outranks the migrations that landed before it', () {
       final report = DwMigrationReport.read('$_appliedSeveral$_failedApply');
 

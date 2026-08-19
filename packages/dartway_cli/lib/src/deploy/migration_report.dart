@@ -83,6 +83,16 @@ class DwMigrationReport {
       if (line.contains(_integrityFailed)) {
         drifted = true;
         stated.add(line);
+        // `verifyDatabaseIntegrity` prints the header and then one ` - <what>`
+        // line per difference it found. The header says the schema is behind;
+        // those lines say which table, which is the half an operator acts on.
+        for (var next = index + 1; next < lines.length; next++) {
+          final difference = lines[next];
+          if (!difference.startsWith('- ')) {
+            break;
+          }
+          stated.add(difference);
+        }
         continue;
       }
       if (line.contains(_disabled)) {
