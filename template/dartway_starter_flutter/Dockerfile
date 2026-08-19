@@ -24,34 +24,11 @@ FROM nginx:alpine
 
 COPY --from=build /workspace/dartway_starter_flutter/build/web /usr/share/nginx/html
 
-# This server block serves the build inside the container; the deployment's own
-# Nginx sits in front of it and terminates TLS.
-COPY <<'EOF' /etc/nginx/conf.d/default.conf
-server {
-  listen 80;
-  root /usr/share/nginx/html;
-  index index.html;
-
-  # A Flutter route is not a file: everything unknown is answered by the app.
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
-
-  location ~* \.(png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-  }
-
-  # The build's own files change on every deploy and carry no hash in the name,
-  # so a cached copy is a stale app that nobody can refresh out of.
-  location ~* \.(js|css|json|wasm)$ {
-    add_header Cache-Control "no-cache";
-  }
-
-  location = /index.html {
-    add_header Cache-Control "no-cache";
-  }
-}
-EOF
+# How the build is served, and above all what a browser may keep. A file of its
+# own rather than a heredoc: the caching split is the part of a deployment that
+# fails silently — a stale entry point serves the previous build to a browser
+# that never asks again — so it has to be readable, diffable, and something
+# `dartway deploy check` can interrogate.
+COPY dartway_starter_flutter/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

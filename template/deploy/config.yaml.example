@@ -41,13 +41,21 @@ staging:
   # file. Listing them turns "the container starts and immediately dies" into a
   # pre-deploy error.
   #
+  # The split is by shape, not by importance. `secrets` are short values and
+  # live in passwords.yaml; `files` are whole documents — a service-account
+  # JSON, an .env for some integration — which do not belong in a passwords
+  # file at all: that file is the master copy of every environment's secrets,
+  # and an unquoted value starting with `{` is read by YAML as a mapping rather
+  # than as text.
+  #
   # `files` are delivered with `dartway deploy secret put-file` and mounted
   # read-only into the server container at /app/config/<name>, beside
-  # passwords.yaml — so the application reaches one as `config/<name>`. Each
-  # entry is a file name exactly as the store holds it: a pattern or a path
-  # cannot be mounted, and is refused rather than rendered.
+  # passwords.yaml — so the application reaches one as `config/<name>`, the
+  # same path it reads locally. Each entry is a file name exactly as the store
+  # holds it: a pattern or a path cannot be mounted, and is refused rather than
+  # rendered.
   # requires:
   #   secrets:
-  #     - firebaseServiceAccountKey
+  #     - fcmProjectId
   #   files:
-  #     - integrations.env
+  #     - fcm-service-account.json

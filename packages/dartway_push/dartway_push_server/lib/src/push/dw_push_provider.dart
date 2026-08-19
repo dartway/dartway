@@ -350,3 +350,31 @@ final class DwPushProviderTransport implements DwPushTransport {
     );
   }
 }
+
+/// A provider that was asked for and not finished.
+///
+/// Missing credentials used to be indistinguishable from absent ones: every
+/// built-in config answered `isConfigured == false` on any missing field, the
+/// app skipped the provider, and push went quiet. "We do not send push here"
+/// and "the key never made it to this environment" then look the same from
+/// inside the running server — and the second one is only noticed when somebody
+/// asks why a notification never arrived, which can be weeks.
+///
+/// So a provider states its intent with one key — its project id — and once
+/// that key is present, everything else it needs has to be there too. What is
+/// missing is named, and the server does not start.
+final class DwPushProviderConfigurationException implements Exception {
+  const DwPushProviderConfigurationException(this.provider, this.problem);
+
+  /// Which provider is half-configured, in the words the app uses for it.
+  final String provider;
+
+  /// What is missing or wrong, and where it was looked for.
+  final String problem;
+
+  @override
+  String toString() =>
+      'DwPushProviderConfigurationException: $provider push is configured for '
+      'this environment, but $problem. Supply it, or remove the declaration '
+      'entirely so that push is deliberately off rather than quietly broken.';
+}

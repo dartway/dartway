@@ -21,6 +21,7 @@ dartway deploy secret --help                # runtime secrets on the server
 | `../dartway_starter_server/config/<env>.yaml` | the **application**: domains, ports, database, Redis — read by the deploy, never written |
 | `../dartway_starter_server/Dockerfile` | the server image, built from the project root |
 | `../dartway_starter_flutter/Dockerfile` | the web image; the deploy passes it `DW_BACKEND_URL` |
+| `../dartway_starter_flutter/nginx.conf` | how that image serves the build, and above all **what a browser may keep** — see "Caching" |
 | `compose.override.yml` | anything this project adds to a standard deployment — create it when that happens. Read from the checkout on every deploy, so a committed change to it takes effect on the next `run` |
 | `nginx.d/{http,api,app}/*.conf` | extra Nginx directives, if any are ever needed |
 
@@ -36,6 +37,31 @@ every push turns a routine change into an infrastructure one. `compose.override.
 is the opposite: it is never copied to the server, only named on every Compose
 call, so the file the deploy merges is the committed one.
 
+## Caching — why a redeploy might not reach the browser
+
+**A Flutter web build hashes nothing.** `index.html`, `flutter_bootstrap.js`,
+`flutter.js`, `main.dart.js`, `main.dart.wasm` and every file under `assets/`
+carry the same name in every build. The familiar rule — "fingerprinted assets
+are immutable, cache them for a year" — is correct for a bundler that puts a
+content hash in the name, and here it lands on exactly the files that change on
+every deploy. A browser that took one under a long `max-age` will not ask again:
+it goes on running the previous build while the server serves the new one, and
+nothing anywhere reports it.
+
+So `../dartway_starter_flutter/nginx.conf` serves everything a build emits with
+`Cache-Control: no-cache` — the copy is kept, it just may not be reused before
+the server has confirmed it, which with an ETag costs a 304 rather than a
+download — and keeps the long-lived, immutable rule for names that genuinely
+carry a content hash. `dartway deploy check` reads that file and, separately,
+asks the deployed site what it actually answers.
+
+**Fixing the configuration does not un-poison the browsers already out there.**
+A response taken under `max-age=2592000` stays fresh in that browser for the
+rest of the thirty days, and it will not ask. Tell whoever you can reach to
+hard-reload (Ctrl+Shift+R) or clear site data; for the rest, either wait the
+window out or move the app to a URL that was never poisoned — a URL a browser
+has not seen is the only thing that gets through.
+
 ## Secrets
 
 `../dartway_starter_server/config/passwords.yaml` is **git-ignored** and holds
@@ -45,12 +71,20 @@ environment live on the server, outside the checkout, so the `git reset --hard`
 a deploy performs cannot touch them; `dartway deploy secret push/pull` moves
 them between the two.
 
-A credential that is a whole file — a service-account JSON, an `.env` for some
-integration — goes to the server with `dartway deploy secret put-file` and is
-named under `requires.files` in `config.yaml`. The deploy mounts each declared
-file read-only at `/app/config/<name>` in the server container, so the
-application reads it as `config/<name>`, and `dartway deploy check` asserts that
-the mount is really there rather than only that the file reached the machine.
+**The split is by shape.** A short value — a token, an identifier, a password —
+is a key in `passwords.yaml`. A credential that is a whole document — a
+service-account JSON, an `.env` for some integration — goes to the server with
+`dartway deploy secret put-file` and is named under `requires.files` in
+`config.yaml`. The deploy mounts each declared file read-only at
+`/app/config/<name>` in the server container, so the application reads it as
+`config/<name>` — the same path it reads locally — and `dartway deploy check`
+asserts that the mount is really there rather than only that the file reached
+the machine.
+
+A document does not belong in `passwords.yaml` even when it fits: that file is
+the master copy of every environment's secrets, and a value beginning with `{`
+is parsed by unquoted YAML as a mapping rather than as text, so what the
+application receives is not what was written.
 
 > `serviceSecret` is also the key other credentials are encrypted with, where a
 > project encrypts any. Rotating it makes them unreadable. Rotate deliberately.

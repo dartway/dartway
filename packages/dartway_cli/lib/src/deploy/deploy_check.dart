@@ -7,6 +7,7 @@ import '../checker/dw_check_type.dart';
 import 'deploy_target.dart';
 import 'serverpod_config.dart';
 import 'ssh_runner.dart';
+import 'web_cache.dart';
 
 /// Where a check can run.
 ///
@@ -209,6 +210,17 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     stage: DwDeployCheckStage.local,
     severity: DwCheckSeverity.error,
     evaluate: _checkEntrypointForm,
+  ),
+  DwDeployCheck(
+    id: 'web-cache-policy',
+    title: 'The web image revalidates the files a build overwrites',
+    stage: DwDeployCheckStage.local,
+    // A reading of configuration text, and text can hide things from it — an
+    // `include` outside the build context, a header set by an entrypoint
+    // script. What was actually served is answered over the wire by
+    // "web-cache-headers", which is the one that errors.
+    severity: DwCheckSeverity.warning,
+    evaluate: _checkWebCachePolicy,
   ),
   DwDeployCheck(
     id: 'override-web-build',
@@ -548,3 +560,81 @@ Future<DwDeployVerdict> _checkDockerContext(DwDeployContext context) async {
         'secrets — is sent to the Docker daemon on every build.',
   );
 }
+
+/// A redeploy that does not reach the browser, caught while it is still a line
+/// of configuration.
+///
+/// A Flutter web build hashes nothing: `main.dart.js`, `flutter_bootstrap.js`,
+/// `flutter.js` and everything under `assets/` are named identically in every
+/// build. So "fingerprinted assets are immutable, cache them for a year" — a
+/// correct rule elsewhere — lands here on precisely the files that change on
+/// every deploy, and a browser that took one under a long `max-age` never asks
+/// again. The deploy succeeds, the server serves the new bundle, the browser
+/// runs the old one, and every check anyone thinks to run says the right thing.
+Future<DwDeployVerdict> _checkWebCachePolicy(DwDeployContext context) async {
+  final dockerfile = File(
+    p.join(context.projectRoot.path, context.flutterPackage, 'Dockerfile'),
+  );
+  if (!dockerfile.existsSync()) {
+    return const DwDeployVerdict.skip('no web Dockerfile');
+  }
+
+  final configuration = dwWebServingConfiguration(
+    projectRoot: context.projectRoot,
+    dockerfile: dockerfile,
+  );
+  if (configuration == null) {
+    return DwDeployVerdict.fail(
+      'the web image ships no serving configuration',
+      fix: _webCacheFix(context),
+    );
+  }
+
+  final policies = dwEntryPointPolicies(configuration);
+  final freely = policies.entries
+      .where((entry) => entry.value == DwCacheReuse.freely)
+      .map((entry) => entry.key)
+      .toList();
+  if (freely.isNotEmpty) {
+    return DwDeployVerdict.fail(
+      'cached without revalidation: ${freely.join(', ')}',
+      fix: _webCacheFix(context),
+    );
+  }
+
+  final unstated = policies.entries
+      .where((entry) => entry.value == DwCacheReuse.unstated)
+      .map((entry) => entry.key)
+      .toList();
+  if (unstated.isNotEmpty) {
+    return DwDeployVerdict.fail(
+      'no cache policy stated for: ${unstated.join(', ')}',
+      fix:
+          'Nothing here is wrong yet — with no Cache-Control the browser falls '
+          'back to a heuristic based on Last-Modified, which is short for a '
+          'file that has just been deployed. Nobody decided it, though, and '
+          'the first person to "add caching" reaches for the immutable '
+          'rule. ${_webCacheFix(context)}',
+    );
+  }
+
+  return DwDeployVerdict.pass(
+    '${policies.length} entry points revalidate before reuse',
+  );
+}
+
+String _webCacheFix(DwDeployContext context) =>
+    'Serve the build so that everything a Flutter build emits revalidates '
+    '("Cache-Control: no-cache" plus an ETag, which makes it a 304 rather than '
+    'a download) and reserve the long-lived, immutable rule for names that '
+    'genuinely carry a content hash. The canonical configuration ships with '
+    'the DartWay template as '
+    '${context.flutterPackage}/nginx.conf, copied into the image by the '
+    'Dockerfile beside it. '
+    'Fixing it does not un-poison a browser that already holds a copy: a '
+    'response taken under "max-age=2592000" stays fresh in that browser for the '
+    'rest of the thirty days and it will not ask. Tell the people you can reach '
+    'to hard-reload (Ctrl+Shift+R, or clear site data); for the ones you '
+    'cannot, either wait the window out or move the app to a URL that was never '
+    'poisoned — a URL the browser has not seen is the only thing that reaches '
+    'it.';

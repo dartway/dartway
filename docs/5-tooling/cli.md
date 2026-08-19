@@ -261,12 +261,12 @@ data volume under a different name than the rendered configuration would use, it
 instead of starting the stack — Compose would otherwise create an empty database beside the real one
 and serve it, which looks like a successful deploy of an application that has lost everything.
 
-`check` changes nothing and answers whether a deployment would work. Thirteen assertions on the
-working copy, seven over the network — including that every `publicHost` resolves to the deployment
+`check` changes nothing and answers whether a deployment would work. Fourteen assertions on the
+working copy, eight over the network — including that every `publicHost` resolves to the deployment
 host, which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone notices.
 With the server unreachable it degrades: the SSH check fails, the rest report as skipped.
 
-Two of the local assertions are about the images. The rendered compose file builds both of them
+Two of the local assertions are about whether the images build at all. The rendered compose file builds both of them
 from the project root — `<project>_server/Dockerfile` and `<project>_flutter/Dockerfile`, named by
 convention rather than configured — so a project that never wrote one fails on the server, after the
 checkout has already moved. The other is the shape of the server image's `ENTRYPOINT`: migrations
@@ -279,6 +279,38 @@ The web image gets one build argument, `DW_BACKEND_URL`, and it comes from `publ
 Serverpod configuration. A web build compiles the API address into itself, so something has to
 supply it — having the deploy do it is what keeps the domain written down once. The template's
 `main.dart` reads it through `String.fromEnvironment` and falls back to localhost for a local run.
+
+**What the web image is allowed to let a browser keep is the other half of that image, and it fails
+silently.** A Flutter web build hashes nothing: `index.html`, `flutter_bootstrap.js`, `flutter.js`,
+`main.dart.js`, `main.dart.wasm` and everything under `assets/` are named identically in every
+build. The rule everyone reaches for — "fingerprinted assets are immutable, cache them for a year"
+— is correct for a bundler that puts a content hash in the name, and lands here on precisely the
+files that change on every deploy. A browser that took one under a long `max-age` does not ask
+again: it keeps running the previous build while the server serves the new one, with nothing to
+see on either side. It is the shape of failure a deploy cannot report, because from the deploy's
+point of view everything worked.
+
+So the template ships the serving configuration rather than leaving each project to invent one —
+`<project>_flutter/nginx.conf`, copied into the image by the Dockerfile beside it. It serves
+everything a build emits with `Cache-Control: no-cache` (the copy is kept and merely has to be
+confirmed, which with an ETag is a 304 rather than a download) and reserves the long-lived,
+immutable rule for names that genuinely carry a content hash.
+
+Two assertions guard it, and they ask different questions. `web-cache-policy` reads the
+configuration the web image is built with — the file it copies, or a heredoc written straight into
+the Dockerfile — resolves each Flutter entry point through Nginx's own `location` precedence, and
+warns when one of them would be served for reuse without revalidation. It warns rather than
+blocks: reading configuration text can miss an include outside the build context or a header some
+front proxy adds. `web-cache-headers` asks the deployed site itself, over HTTPS, exactly as a
+browser would, and errors on what it actually receives — there is nothing left to interpret in a
+response header. A path that answers 404 is not part of that build and says nothing about caching.
+
+**Fixing the configuration does not reach a browser that already holds a copy.** A response taken
+under `max-age=2592000` stays fresh there for the rest of the thirty days and the browser will not
+ask; no server-side change is capable of reaching it. Tell whoever you can reach to hard-reload or
+clear site data, and for the rest either wait the window out or move the app to a URL that was
+never poisoned. That asymmetry — cheap to prevent, impossible to revoke — is why these two
+assertions exist at all.
 
 `deploy/compose.override.yml` is where a project adds what a standard deployment does not have, and
 a third local assertion guards the one thing that does not belong in it: a `build` block for the
@@ -319,7 +351,7 @@ The rest are the flags worth knowing before you need them:
 | Subcommand | Flag | What it is for |
 |---|---|---|
 | `setup` | `--dry-run` | Print the rendered `docker-compose.yml` and `nginx.conf`, and what would be uploaded beside them, without touching the server. The way to review a template change |
-| `check` | `--local` | Skip DNS and the server; assert over the working copy only. The form that needs no SSH key and no host yet — the thirteen working-copy assertions still run, the seven network ones report as skipped |
+| `check` | `--local` | Skip DNS and the server; assert over the working copy only. The form that needs no SSH key and no host yet — the fourteen working-copy assertions still run, the eight network ones report as skipped |
 | `run` | `--dry-run` | Print the plan and change nothing |
 | `run` | `--skip-git-update` | Deploy what is already checked out on the server, without fetching. For a rebuild of the same commit — and the flag to suspect when a deploy "did not pick up" a push |
 | `secret push` | `--dry-run` | Report what would be sent, send nothing |
@@ -334,8 +366,8 @@ The rest are the flags worth knowing before you need them:
 | `host`, `ssh_user`, `deploy_user`, `os` | always |
 | `repo`, `branch` | always |
 | `ssl_email`, `web_app_domain` | always |
-| `requires.secrets` | to have `check` catch a credential nobody delivered |
-| `requires.files` | a credential that is a whole file. Each entry is delivered with `secret put-file` and **mounted read-only at `/app/config/<name>`** in the server container, beside `passwords.yaml` — the application reads it as `config/<name>`. `check` asserts the mount, not the delivery: it asks the server for the configuration Compose will actually run and looks for the file in it, because "the file is on the machine" is green exactly where the deploy is red. An entry is a file name, not a pattern or a path — a mount names one path on each side |
+| `requires.secrets` | to have `check` catch a credential nobody delivered. Short values only — a token, an identifier, a password |
+| `requires.files` | a credential that is a whole document — a service-account JSON, an `.env` for an integration. It belongs here rather than in `passwords.yaml` whatever its length: that file is the master copy of every environment's secrets, and an unquoted value starting with `{` is read by YAML as a mapping rather than as text. Each entry is delivered with `secret put-file` and **mounted read-only at `/app/config/<name>`** in the server container, beside `passwords.yaml` — the application reads it as `config/<name>`, the same path it reads locally. `check` asserts the mount, not the delivery: it asks the server for the configuration Compose will actually run and looks for the file in it, because "the file is on the machine" is green exactly where the deploy is red. An entry is a file name, not a pattern or a path — a mount names one path on each side |
 | `registry_mirror` | pulling base images through a mirror |
 | `firewall_ports` | a port beyond SSH, 80 and 443 |
 | `server_entrypoint` | only when the Dockerfile declares `ENTRYPOINT` in shell form — that form ignores the arguments `docker compose run` appends, so migrations would silently start an ordinary server instead. Setting it is also what tells `check` the shell form is deliberate |

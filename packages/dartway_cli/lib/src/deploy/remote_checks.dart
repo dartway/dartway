@@ -8,6 +8,7 @@ import 'deploy_check.dart';
 import 'master_passwords_file.dart';
 import 'secret_store.dart';
 import 'templates.dart';
+import 'web_cache.dart';
 
 /// Checks that need the network: DNS, and the server itself over SSH.
 const List<DwDeployCheck> dwRemoteDeployChecks = [
@@ -65,6 +66,17 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
     severity: DwCheckSeverity.warning,
     requiresSsh: true,
     evaluate: _checkSecretsMatchMaster,
+  ),
+  DwDeployCheck(
+    id: 'web-cache-headers',
+    title: 'The deployed web app tells browsers to revalidate its entry points',
+    stage: DwDeployCheckStage.remote,
+    // An observation, not a reading: this is the header the browser was
+    // actually handed. There is nothing left to interpret, so it errors.
+    severity: DwCheckSeverity.error,
+    // HTTP, not SSH — the question is what the site answers, and the answer is
+    // the same one a browser gets.
+    evaluate: _checkWebCacheHeaders,
   ),
 ];
 
@@ -389,5 +401,97 @@ Future<DwDeployVerdict> _checkSecretsMatchMaster(
         'Adopt what the server has with "dartway deploy secret pull", or make '
         'the server match with "dartway deploy secret push". A push would '
         'drop the server-only keys.',
+  );
+}
+
+/// What the deployed site actually tells a browser to do with the files a
+/// build overwrites.
+///
+/// The reading of the configuration text is `web-cache-policy`, and it is not
+/// the same question. A configuration can be right while a CDN, an
+/// `add_header` in the front proxy, or an image nobody rebuilt says something
+/// else — and it is the response header, not the file, that decides whether a
+/// redeploy reaches anybody. So this asks the site itself, over HTTPS, exactly
+/// as a browser would.
+///
+/// It stops short of comparing bodies between deploys: what is being judged is
+/// the policy, not the contents, and a policy is visible in one HEAD.
+Future<DwDeployVerdict> _checkWebCacheHeaders(DwDeployContext context) async {
+  final domain = context.target.webAppDomain;
+  final client = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 10)
+    // The certificate is somebody else's check. Refusing here would make this
+    // one silently skip on a server that has just been provisioned and still
+    // carries the one-day self-signed certificate `setup` installs — which is
+    // the deployment most likely to be serving a configuration nobody has
+    // looked at yet.
+    ..badCertificateCallback = (_, _, _) => true;
+
+  final freely = <String>[];
+  final unstated = <String>[];
+  var answered = 0;
+  try {
+    for (final path in dwProbedEntryPoints) {
+      final String? cacheControl;
+      try {
+        final request = await client.headUrl(Uri.https(domain, path));
+        final response = await request.close().timeout(
+          const Duration(seconds: 15),
+        );
+        await response.drain<void>();
+        // 404 means this build does not emit that path — a `--wasm` build has
+        // no main.dart.js — and says nothing about caching.
+        if (response.statusCode != 200) {
+          continue;
+        }
+        cacheControl = response.headers.value(HttpHeaders.cacheControlHeader);
+      } on Exception {
+        continue;
+      }
+      answered++;
+      switch (dwCacheReuse(cacheControl: cacheControl)) {
+        case DwCacheReuse.freely:
+          freely.add('$path: $cacheControl');
+        case DwCacheReuse.unstated:
+          unstated.add(path);
+        case DwCacheReuse.revalidated:
+          break;
+      }
+    }
+  } finally {
+    client.close(force: true);
+  }
+
+  if (answered == 0) {
+    return DwDeployVerdict.skip('nothing answered on https://$domain/');
+  }
+  if (freely.isEmpty) {
+    final note = unstated.isEmpty
+        ? ''
+        : ' (no policy stated for ${unstated.join(', ')} — the browser '
+              'falls back to a heuristic of its own)';
+    return DwDeployVerdict.pass(
+      '$answered entry point(s) revalidate before reuse$note',
+    );
+  }
+  return DwDeployVerdict.fail(
+    'served for reuse without revalidation: ${freely.join('; ')}',
+    fix:
+        'A Flutter web build hashes nothing — these names are identical in '
+        'every build — so this is a browser being told to keep the current '
+        'bundle and not ask again. The next deploy will not reach it, and '
+        'nothing will report that: the server serves the new files, the '
+        'browser never requests them. Serve every path a build emits with '
+        '"Cache-Control: no-cache" and an ETag, and keep the long-lived, '
+        'immutable rule for names that carry a content hash; the canonical '
+        'configuration ships with the DartWay template as '
+        '${context.flutterPackage}/nginx.conf. '
+        'Then deal with the copies already out there, because fixing the '
+        'server does not reach them: a response taken under a long max-age '
+        'stays fresh for the rest of that window and the browser will not ask. '
+        'Tell whoever you can reach to hard-reload or clear site data; for the '
+        'rest, wait the window out, or move the app to a URL that was never '
+        'poisoned — a URL a browser has not seen is the only thing that gets '
+        'through.',
   );
 }

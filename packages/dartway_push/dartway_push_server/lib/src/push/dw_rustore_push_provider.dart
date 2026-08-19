@@ -9,6 +9,11 @@ import 'dw_push_provider_utils.dart';
 
 const _ruStoreHost = 'vkpns.rustore.ru';
 
+/// Credentials for [DwRuStorePushProvider].
+///
+/// Both halves are short values and both stay in `passwords.yaml` — a RuStore
+/// service token is a token, not a document, so nothing here needs the file
+/// route FCM's service account takes.
 final class DwRuStorePushProviderConfig {
   DwRuStorePushProviderConfig({
     required String? projectId,
@@ -27,8 +32,12 @@ final class DwRuStorePushProviderConfig {
         'Must be positive',
       );
     }
+    _assertWholeOrAbsent();
   }
 
+  /// The project id doubles as the declaration: an environment that names it
+  /// wants RuStore push, so a missing service token is a fault rather than a
+  /// preference — see [DwPushProviderConfigurationException].
   factory DwRuStorePushProviderConfig.fromPasswords(
     Map<String, String> passwords, {
     String projectIdKey = 'rustorePushProjectId',
@@ -50,7 +59,33 @@ final class DwRuStorePushProviderConfig {
   final String? androidColor;
   final Duration requestTimeout;
 
+  /// Whether this provider has everything it needs. After construction there
+  /// is no half state left — anything between the two throws.
   bool get isConfigured => projectId != null && serviceToken != null;
+
+  /// Nothing, or everything. "We do not send RuStore push" and "the token
+  /// never reached this environment" must not look the same from inside a
+  /// running server.
+  void _assertWholeOrAbsent() {
+    if (projectId == null && serviceToken == null) {
+      return;
+    }
+    if (projectId == null) {
+      throw const DwPushProviderConfigurationException(
+        'RuStore',
+        'no project id was given. It is the key that declares an environment '
+            'wants RuStore at all, so a service token without one configures '
+            'nothing',
+      );
+    }
+    if (serviceToken == null) {
+      throw const DwPushProviderConfigurationException(
+        'RuStore',
+        'no service token was given. It is a short value: keep it in '
+            'passwords.yaml and deliver it with "dartway deploy secret set"',
+      );
+    }
+  }
 
   static String? _trimToNull(String? value) {
     final normalized = value?.trim();
