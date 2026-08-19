@@ -2,6 +2,10 @@
 
 ## 0.8.0
 
+- The comment the deploy template writes into a project's `docker-compose.yml` — the one
+  explaining why `$$` is spelled that way — was in Russian, and it shipped into every
+  generated file. It is in English now.
+
 - **`--notes-tracker owner/repo`: the framework journal gets somewhere to go.** `dartway_notes.md`
   collects what the framework got wrong, and until now that was the end of it — the file is
   git-ignored and lives on one machine, so an entry travelled only when somebody remembered it. The
