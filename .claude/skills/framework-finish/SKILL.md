@@ -1,81 +1,82 @@
 ---
 name: framework-finish
-description: Аудит синхронизации перед коммитом изменений фреймворка DartWay — проверяет, что изменения публичного API отражены в example/, template/, toolkit/skills/, docs/ и CHANGELOG, а бампнутые версии пакетов всё ещё проходят по каретам в example/ и template/. Запускать после завершения работы над кодом пакетов, перед коммитом/PR.
+description: The synchronisation audit to run before committing a change to the DartWay framework — checks that a public API change is reflected in example/, template/, toolkit/skills/, docs/ and the CHANGELOG, and that a bumped package version still satisfies the carets stated for it in example/ and template/. Run it once the package code is done, before the commit or the PR.
 ---
 
-# framework-finish — аудит синхронизации монорепо
+# framework-finish — the monorepo synchronisation audit
 
-Монорепо DartWay живёт по закону синхронизации (см. корневой CLAUDE.md): публичный API, example, **template**, скиллы тулкита и доки эволюционируют вместе, в одном PR. Этот скилл ловит рассинхроны по диффу.
+The DartWay monorepo lives by the synchronisation law (see the root `CLAUDE.md`): the public API, `example`, **`template`**, the toolkit skills and the docs evolve together, in one pull request. This skill catches the drift across a diff.
 
-## Шаг 1. Собери дифф
+## Step 1. Collect the diff
 
 ```bash
-git diff <base>...HEAD --stat        # + незакоммиченное: git status, git diff
+git diff <base>...HEAD --stat        # plus anything uncommitted: git status, git diff
 ```
 
-База — master, если не сказано иное. Интересуют изменения в `packages/`.
+The base is `master` unless told otherwise. What matters is what changed under `packages/`.
 
-## Шаг 2. Определи изменения публичного API
+## Step 2. Decide what counts as a public API change
 
-Публичный API пакета = его экспорты: файлы, доступные через `lib/<package>.dart` и `lib/src/...`, реэкспортируемые наружу. Изменением API считается:
+A package's public API is what it exports: the files reachable through `lib/<package>.dart` and whatever `lib/src/...` re-exports outward. It is an API change when there is:
 
-- новый / удалённый / переименованный публичный класс, метод, параметр, extension;
-- изменение сигнатуры или поведения публичного метода;
-- изменение дефолтов конфигов (`DwCrudConfig`, `DwSaveConfig`, `DwAuthConfig`, ...);
-- новые обязательные шаги инициализации (`DwCore.init`, `setupRepository`, ...).
+- a new, removed or renamed public class, method, parameter or extension;
+- a changed signature, or changed behaviour, of a public method;
+- a changed default in a config (`DwCrudConfig`, `DwSaveConfig`, `DwAuthConfig`, …);
+- a new mandatory initialization step (`DwCore.init`, `setupRepository`, …).
 
-Чисто внутренние правки (private-код, рефакторинг без смены поведения, `zarchive/`) — не API.
+Purely internal edits — private code, a refactor with no behaviour change, `zarchive/` — are not API.
 
-## Шаг 3. Проверь зеркала
+## Step 3. Check the mirrors
 
-Для каждого изменения API проверь, отражено ли оно в:
+For each API change, check whether it is reflected in:
 
-| Зеркало | Что проверять |
+| Mirror | What to look for |
 |---|---|
-| `example/` | Использует ли example затронутый API; компилируется ли; демонстрирует ли новую возможность |
-| `template/` | **Компилируется ли скелет.** Это то, что получает каждый новый проект через `dartway create`; шаблон никто не запускает в буднях, поэтому он гниёт молча, а узнаёшь об этом от чужого человека. Если API затронул auth, роли, навигацию, админку, UI-кит или `DwCore.init` — шаблон почти наверняка задет |
-| `toolkit/skills/` | grep по старым именам/сигнатурам в `toolkit/skills/*/SKILL.md` и `toolkit/CLAUDE.md` — скиллы не должны учить агентов устаревшему API |
-| `docs/` | grep по затронутым понятиям — страницы не должны противоречить коду |
-| `CHANGELOG.md` пакета | Есть ли запись под текущую (unreleased) версию |
+| `example/` | Does example use the API that changed; does it compile; does it demonstrate the new capability |
+| `template/` | **Does the skeleton compile.** This is what every new project receives through `dartway create`; nobody runs the template day to day, so it rots quietly and you hear about it from a stranger. If the change touched auth, roles, navigation, the admin panel, the UI kit or `DwCore.init`, the template is almost certainly affected |
+| `toolkit/skills/` | grep for the old names and signatures in `toolkit/skills/*/SKILL.md` and `toolkit/CLAUDE.md` — a skill must not teach an agent an API that is gone |
+| `docs/` | grep for the concepts involved — a page must not contradict the code |
+| the package's `CHANGELOG.md` | Is there an entry under the current (unreleased) version |
 
-**Зеркало за пределами репозитория.** Изменил `packages/dartway_studio_bridge` — у контракта две стороны, и вторая живёт в отдельном репозитории (`dartway/dartway_studio`). Соседства папок больше нет, поэтому проверка держится только на этом пункте:
+**The mirror outside this repository.** Change `packages/dartway_studio_bridge` and you have changed one side of a contract whose other side lives in a separate repository (`dartway/dartway_studio`). The folders are no longer neighbours, so this item is the only thing holding the check:
 
-- поле добавлено в модель моста → Studio должна его показывать, иначе оно доезжает и пропадает;
-- поле удалено или переименовано → Studio сломается на разборе.
+- a field added to a bridge model → Studio has to show it, or it arrives and disappears;
+- a field removed or renamed → Studio breaks on parsing.
 
-Если чекаут Studio есть на машине — посмотри и скажи, что там нужно поправить. Если нет — **назови это в отчёте явным пунктом**: «мост изменился, сторона Studio не проверена». Молча пропускать нельзя: рассинхрон моста не ловится ни компилятором, ни чекером — он проявляется пустой панелью в Studio.
+If a checkout of Studio exists on the machine, look and say what needs fixing there. If it does not — **say so as an explicit line in the report**: "the bridge changed, the Studio side was not checked". Passing over it in silence is not allowed: bridge drift is caught by neither the compiler nor the checker, and it surfaces as an empty panel in Studio.
 
-То же касается `docs/` и сайта, но мягче: сайт — потребитель, он забирает содержимое сам.
+The same applies to `docs/` and the site, but more gently — the site is a consumer and collects the content itself.
 
-Дополнительно (быстро):
-- тулкит-инвариант: в диффе по `toolkit/` нет литералов конкретных проектов — только токены `__*__`. Грепа тут нет намеренно: список известных нам проектов не поймает утечку из следующего, а прежний греп находил ровно самого себя в документации. Смотри глазами: имя, которое что-то значит ровно в одном проекте, должно быть токеном или выдуманным примером;
-- **скелет-инвариант:** в `template/` нет доменных моделей — `grep -riE 'club|booking|chat|news|fitness' template/ --include=*.dart --include=*.spy.yaml` → пусто. Домен просачивается в шаблон незаметно (скопировали виджет из example — приехал `ClubSession`);
-- **миграции и генерат шаблона под контролем версий** (`git ls-files template/dartway_starter_server/migrations/ | head -1` → не пусто). Однажды они были в `.gitignore`, и `dartway create` месяцами отдавал проект, который не поднимается: локально папка есть, в клоне — нет;
-- в дифф не попали новые файлы в `zarchive/`/`zarchiv/`;
-- новые пользовательские строки в ядре — на английском;
-- новые конфиги доступа не вводят «открыто всем» как умолчание.
+Quick additional checks:
 
-## Шаг 4. Констрейнты против версий пакетов
+- **the toolkit invariant:** the diff under `toolkit/` carries no literals from a specific project, only `__*__` tokens. There is deliberately no grep for this: a pattern listing the projects we remember today will not catch the leak that arrives from the next one, and the previous grep found precisely its own documentation. Read it with your eyes — a name that means something in exactly one project has to be a token or an invented example;
+- **the skeleton invariant:** `template/` holds no domain models — `grep -riE 'club|booking|chat|news|fitness' template/ --include=*.dart --include=*.spy.yaml` comes back empty. Domain leaks into the skeleton unnoticed (a widget copied out of example brings `ClubSession` with it);
+- **the template's migrations and generated code are under version control** (`git ls-files template/dartway_starter_server/migrations/ | head -1` is not empty). They were in `.gitignore` once, and for months `dartway create` handed out a project that would not start: the folder was there locally and missing from the clone;
+- no new files under `zarchive/`/`zarchiv/` sneaked into the diff;
+- new user-facing strings in the core are in English;
+- new access configs do not introduce "open to everyone" as a default.
 
-**Этот шаг выполняется всегда, а не только когда менялся API.** Его триггер — версия пакета, а не его публичные символы: бампнули `version:` — каретки на этот пакет в `example/` и `template/` могли остаться на прежнем миноре.
+## Step 4. Constraints against package versions
 
-**Сначала проверь, что бамп вообще был нужен** (корневой CLAUDE.md, «Versioning»): версия — номер следующего релиза, а не счётчик PR-ов, и двигается один раз за цикл. `git show origin/stable:packages/<pkg>/pubspec.yaml | grep -m1 '^version:'` — совпало с master, значит этот PR двигает; master уже впереди, значит релиз уже несёт бамп, и повторный — находка, а не норма. Исключение одно: ломающее изменение перед висящим патчем поднимает минор.
+**This step runs every time, not only when the API changed.** Its trigger is the package's version rather than its public symbols: bump `version:` and the carets on that package in `example/` and `template/` may have stayed on the previous minor.
 
-Почему это не ловится само: оба дерева держат блок `dependency_overrides` на локальные пакеты, а **для переопределённого пакета pub не проверяет констрейнт вообще**. Невыполнимая строчка резолвится молча ровно до тех пор, пока блок стоит. `dartway create` его вырезает — и констрейнт впервые читают по-настоящему в чужом дереве.
+**First check whether the bump was warranted at all** (root `CLAUDE.md`, "Versioning"): a version is the number of the next release, not a count of pull requests, and it moves once per release cycle. `git show origin/stable:packages/<pkg>/pubspec.yaml | grep -m1 '^version:'` — equal to master and this PR moves it; master already ahead and the pending release carries a bump, so a second one is a finding rather than the norm. The one exception is escalation: a breaking change in front of a pending patch raises the minor.
 
-Проверка механическая, на неё уходит минута:
+Why this is not caught on its own: both trees hold a `dependency_overrides` block pointing at the local packages, and **for an overridden package pub does not check the constraint at all**. An unsatisfiable line resolves in silence for exactly as long as the block is there. `dartway create` strips it — and the constraint is read for the first time, for real, in a stranger's tree.
+
+The check is mechanical and takes a minute:
 
 ```bash
 grep -H '^version:' packages/*/pubspec.yaml packages/*/*/pubspec.yaml
 grep -nE '^\s+dartway_[a-z_]+:\s*\^' template/*/pubspec.yaml example/*/pubspec.yaml
 ```
 
-Для каждого пакета из первого списка найди во втором каретки на него и проверь, что версия им удовлетворяет. **Главная ловушка — семантика каретки для `0.x`:** `^0.6.0` — это `>=0.6.0 <0.7.0`, а не «0.6.0 и новее». Пакет на `0.7.1` своей же каретке `^0.6.0` **не** удовлетворяет; для нулевого мажора минор работает как мажор. Именно так `dartway_studio_bridge` и `dartway_cli` отстали от собственных карет на минор, пока пять соседних пакетов вели в ногу.
+For each package in the first list, find the carets on it in the second and check that the version satisfies them. **The trap is what a caret means for `0.x`:** `^0.6.0` is `>=0.6.0 <0.7.0`, not "0.6.0 and newer". A package at `0.7.1` does **not** satisfy its own `^0.6.0`; under a zero major, a minor behaves like a major. That is exactly how `dartway_studio_bridge` and `dartway_cli` fell a minor behind their own carets while five sibling packages were kept in step.
 
-Не совпало — **пункт отчёта** вида `<пакет> <версия> → <файл>:<строка> ^<констрейнт>`, и правится подъёмом каретки до минора текущей версии. Пакеты, которых в `template/`/`example/` просто нет (`dartway_telegram`, транспорты пушей), — не находка.
+A mismatch is **a line in the report** of the form `<package> <version> → <file>:<line> ^<constraint>`, and it is fixed by raising the caret to the current version's minor. Packages that simply are not in `template/`/`example/` (`dartway_telegram`, the push transports) are not a finding.
 
-## Шаг 5. Отчёт и исправление
+## Step 5. Report and fix
 
-Выдай список рассинхронов в формате: `<API-изменение> → <зеркало> → <что именно устарело/отсутствует>`. Если рассинхронов нет — скажи это одной строкой.
+Give the drift as a list in the form `<API change> → <mirror> → <what exactly is stale or missing>`. If there is none, say so in one line.
 
-Предложи конкретные правки. **Применяй только подтверждённые** — кроме тривиальных (CHANGELOG-запись, поправка имени метода в скилле), которые можно применить сразу, перечислив их.
+Propose concrete edits. **Apply only the confirmed ones** — except the trivial ones (a CHANGELOG entry, a method name corrected in a skill), which you may apply straight away, listing what you applied.
