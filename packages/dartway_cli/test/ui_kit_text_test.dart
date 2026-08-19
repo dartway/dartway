@@ -76,6 +76,43 @@ class AppTextStyles {
   });
 
   group('the rule still catches what it exists for', () {
+    test('a label sharing the line that closes the fallback list', () async {
+      final findings = await kitFindings('''
+class AppTextStyles {
+  static const logLine = TextStyle(
+    fontFamilyFallback: [
+      'SF Mono',
+      'Courier New',
+    ], // Save changes
+  );
+}
+''');
+
+      expect(findings, isNot(contains(DwCheckType.uiKitContainsText)));
+    });
+
+    test('a label after the bracket that closes the list is reported', () async {
+      // The list opened on an earlier line, so there is no `[` on this one to
+      // measure the exemption against — it ends at the `]` instead. Carrying it
+      // to the end of the line would swallow everything written after the list.
+      final inspector = await checkKitFile('''
+class AppTextStyles {
+  static const logLine = TextStyle(
+    fontFamilyFallback: [
+      'SF Mono',
+      'Courier New',
+    ], debugLabel: 'Nothing here yet',
+  );
+}
+''');
+
+      expect(inspector.findingTypes, contains(DwCheckType.uiKitContainsText));
+      expect(
+        inspector.findingMessages,
+        contains(contains('"Nothing here yet"')),
+      );
+    });
+
     test('a label in the kit is reported', () async {
       final findings = await kitFindings('''
 class AppEmptyState {

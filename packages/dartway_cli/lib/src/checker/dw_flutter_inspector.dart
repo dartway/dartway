@@ -577,17 +577,33 @@ class DwFlutterInspector {
   /// list — one that opened earlier on this line, or on an earlier one
   /// ([insideFallbackList]).
   bool _isFontFamilyLiteral(String line, int start, bool insideFallbackList) {
-    if (insideFallbackList) return true;
+    if (insideFallbackList) {
+      // The list came from an earlier line, so there is no `[` on this one to
+      // measure against — the exemption ends at the `]` instead. Without that
+      // column a line closing the list carries the exemption over everything
+      // written after it, and a label sharing that line stops being reported.
+      final closes = _maskLiterals(line).indexOf(']');
+      return closes < 0 || start < closes;
+    }
     final before = line.substring(0, start);
     return _fontFamilyArgument.hasMatch(before) ||
         _fontFamilyFallbackOpen.hasMatch(before);
   }
 
+  /// [line] with every string literal blanked out, so a bracket written
+  /// inside one is not read as code. Each literal is replaced by as many
+  /// characters as it had: the exemption is measured in columns, and a mask
+  /// that shortened the line would move them.
+  static String _maskLiterals(String line) => line.replaceAllMapped(
+    _uiKitTextLiteral,
+    (match) => '_' * match.group(0)!.length,
+  );
+
   /// Whether a `fontFamilyFallback: [...]` list is still open after [line].
   /// `dart format` breaks a long fallback list across lines, so the exemption
   /// has to survive the line ends.
   bool _fontFallbackListContinues(String line, bool wasOpen) {
-    final code = line.replaceAll(_uiKitTextLiteral, '_');
+    final code = _maskLiterals(line);
     if (wasOpen) return !code.contains(']');
 
     final at = code.indexOf('fontFamilyFallback');
