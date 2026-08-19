@@ -307,8 +307,8 @@ class DwRouter<RouterState extends Listenable> {
   ///
   /// Performs comprehensive validation checks:
   /// - Ensures navigation zones are not empty
+  /// - Ensures no duplicate route names across zones
   /// - Ensures no duplicate route paths
-  /// - Ensures no duplicate route names
   /// - Ensures all paths are valid (start with '/')
   /// - Ensures routerState is provided when guards are used
   ///
@@ -324,44 +324,54 @@ class DwRouter<RouterState extends Listenable> {
       throw ArgumentError('navigationZones cannot contain empty zones');
     }
 
-    final allRoutes = navigationZones.expand((z) => z).toList();
+    // Keep every route paired with the zone it came from. Flattening the
+    // zones throws that away, and it is precisely what a collision report
+    // needs: the name of the offending value alone leaves the reader to find
+    // its two declarations by hand.
+    final allRoutes = <_ZonedRoute<RouterState>>[
+      for (var zoneIndex = 0; zoneIndex < navigationZones.length; zoneIndex++)
+        for (final route in navigationZones[zoneIndex])
+          _ZonedRoute(route, zoneIndex),
+    ];
+
+    // Check for duplicate route names.
+    //
+    // Runs before the path check on purpose: two zones declaring one name
+    // usually collide on the path as well, and the path is the symptom while
+    // the shared name is the cause.
+    _checkNoDuplicates(
+      allRoutes,
+      key: (zoned) => zoned.route.name,
+      summary: (name) => 'Duplicate route name "$name".',
+      explanation:
+          'Route names are global across navigation zones. DwRouter keeps a '
+          'single registry for the whole app and resolves routes by name, so a '
+          'name may be declared once and only once. An enum gives its values a '
+          'namespace of their own; the router does not. Rename one of the '
+          'two — for a .simple route the name is also its URL segment, so '
+          'the path moves with it.',
+    );
 
     // Check for duplicate route paths
-    final paths = <String, List<DwNavigationRoute>>{};
-    for (final route in allRoutes) {
-      paths.putIfAbsent(route.fullPath, () => []).add(route);
-    }
-
-    final duplicatePaths = paths.entries.where((e) => e.value.length > 1);
-    if (duplicatePaths.isNotEmpty) {
-      throw ArgumentError(
-        'Duplicate route paths:\n'
-        '${duplicatePaths.map((e) => e.key).join('\n')}',
-      );
-    }
-
-    // Check for duplicate route names
-    final names = <String, List<DwNavigationRoute>>{};
-    for (final route in allRoutes) {
-      names.putIfAbsent(route.name, () => []).add(route);
-    }
-
-    final duplicateNames = names.entries.where((e) => e.value.length > 1);
-    if (duplicateNames.isNotEmpty) {
-      throw ArgumentError(
-        'Duplicate route names:\n'
-        '${duplicateNames.map((e) => e.key).join('\n')}',
-      );
-    }
+    _checkNoDuplicates(
+      allRoutes,
+      key: (zoned) => zoned.route.fullPath,
+      summary: (path) => 'Duplicate route path "$path".',
+      explanation:
+          'A path is built from the zoneRoot of its zone, its parent chain and '
+          'its own segment. Two routes resolving to the same address means one '
+          'of them can never be reached.',
+    );
 
     // Validate that all paths start with '/'
-    for (final route in allRoutes) {
+    for (final zoned in allRoutes) {
+      final route = zoned.route;
       final path =
           route.descriptor.parent == null ? route.routePath : route.fullPath;
 
       if (!path.startsWith('/')) {
         throw ArgumentError(
-          'Invalid route path for ${route.name}: "$path"',
+          'Invalid route path for ${zoned.describe()}: "$path"',
         );
       }
     }
@@ -376,4 +386,54 @@ class DwRouter<RouterState extends Listenable> {
       );
     }
   }
+
+  /// Throws unless [key] is unique across every route of every zone.
+  ///
+  /// The failure names the duplicated value and each route that declares it,
+  /// zone included, so that the message itself ends the investigation.
+  void _checkNoDuplicates(
+    List<_ZonedRoute<RouterState>> routes, {
+    required String Function(_ZonedRoute<RouterState> route) key,
+    required String Function(String key) summary,
+    required String explanation,
+  }) {
+    final grouped = <String, List<_ZonedRoute<RouterState>>>{};
+    for (final zoned in routes) {
+      grouped.putIfAbsent(key(zoned), () => []).add(zoned);
+    }
+
+    final duplicates =
+        grouped.entries.where((e) => e.value.length > 1).toList();
+    if (duplicates.isEmpty) return;
+
+    throw ArgumentError(
+      duplicates
+          .map(
+            (entry) => '${summary(entry.key)}\n'
+                'Declared by:\n'
+                '${entry.value.map((z) => '  - ${z.describe()}').join('\n')}\n'
+                '\n$explanation',
+          )
+          .join('\n\n'),
+    );
+  }
+}
+
+/// A route paired with the index of the zone that declares it.
+///
+/// [DwRouter.navigationZones] is a list of lists; flattening it loses the one
+/// fact a duplicate-route message has to carry — which zones the colliding
+/// declarations came from.
+class _ZonedRoute<RouterState extends Listenable> {
+  const _ZonedRoute(this.route, this.zoneIndex);
+
+  final DwNavigationRoute<RouterState> route;
+
+  /// Position of the route's zone in [DwRouter.navigationZones].
+  final int zoneIndex;
+
+  /// `AdminRoutes.projects (navigationZones[1])` — the enum that declares
+  /// the value, and where its zone sits in the list handed to the router.
+  String describe() =>
+      '${route.runtimeType}.${route.name} (navigationZones[$zoneIndex])';
 }

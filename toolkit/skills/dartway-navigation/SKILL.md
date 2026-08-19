@@ -18,6 +18,7 @@ Navigation rules for DartWay projects. The router is a wrapper over go_router: `
 
 - **Enum routes only** — no string route names in calls.
 - **A zone is an enum** implementing `DwNavigationRoute<AppRouterState>`; route definitions live in `core/router/`, not in widgets.
+- **Route names are global** — a name belongs to the whole app, not to its enum. The same value in two zones is an error; see [Route names are global](#route-names-are-global).
 - **Guards live in the zone** (`zoneGuards`), not scattered across screens.
 - **Parameters are type-safe only**, via an enum with `DwNavigationParamsMixin`.
 - Do not mix navigation logic with UI.
@@ -133,6 +134,37 @@ final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
 
 In the app: `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)`.
 
+## Route names are global
+
+`navigationZones` is where the names of every zone meet. Each zone is an enum,
+and an enum gives its values a namespace of their own — so
+`AppNavigationZone.projects` and `AdminNavigationZone.projects` both compile
+without a word of complaint. The router works the other way round: it keeps a
+**single registry for the whole app** and resolves every route by name
+(`goNamed(...)`, `topRouteFromState`), so one name can belong to one route only.
+Two zones owning a concept called `projects` is the natural thing to write, and
+it is an error.
+
+`DwRouter` refuses to assemble in that case and names both declarations:
+
+```
+Duplicate route name "projects".
+Declared by:
+  - AppNavigationZone.projects (navigationZones[0])
+  - AdminNavigationZone.projects (navigationZones[1])
+```
+
+The router is usually built inside a provider, so the throw lands wherever that
+provider is first read — typically the first screen, or a widget test that has
+nothing to do with navigation. Read the message, not the stack.
+
+For a `.simple` route the name is also its URL segment, so renaming one moves
+its path with it: there is no way to keep `/admin/projects` while calling the
+value something else (`extraPathSegment` prefixes the segment, it does not
+replace it). Pick the word that describes *that* screen —
+`AdminNavigationZone.projectAdmin` — rather than a syllable bolted on to dodge
+the collision.
+
 ## Transitions
 
 The route name is `.name` (the enum), the full path is `.fullPath`. A transition:
@@ -176,5 +208,6 @@ Mixin methods: `set(value)` → the map for a transition; `fromPath(context)` / 
 
 - String route names and raw parameter maps instead of enums.
 - Checking authorization inside a screen instead of `zoneGuards`.
+- The same route name in two zones — the enums have separate namespaces, the router does not.
 - A forgotten `parent` on `.simple`/`.parameterized` — the route will not take its place in the zone tree.
 - Changing state without `notifyListeners()` — the guards will not re-run.
