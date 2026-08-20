@@ -1,12 +1,15 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:serverpod_client/serverpod_client.dart'
+    show SerializationManager;
 
 /// Stable identity for a repository read that can be used by offline storage.
 ///
-/// Query values may contain only JSON-compatible scalars, lists, and maps with
-/// string keys. Map key order is normalised while list order remains part of
-/// the identity.
+/// Query values use Serverpod's JSON encoding before canonicalisation. The
+/// encoded values may contain only JSON-compatible scalars, lists, and maps
+/// with string keys. Map key order is normalised while list order remains part
+/// of the identity.
 class DwRepoQueryKey<Model> {
   DwRepoQueryKey._canonical({
     required this.operation,
@@ -153,6 +156,12 @@ class DwRepoQueryKey<Model> {
       }
       return Map<String, Object?>.unmodifiable(canonicalMap);
     }
+
+    final serializedValue = SerializationManager.toEncodable(queryValue);
+    if (!identical(serializedValue, queryValue)) {
+      return _canonicalize(serializedValue);
+    }
+
     throw ArgumentError.value(
       queryValue,
       'queryValue',

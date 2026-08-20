@@ -204,7 +204,7 @@ void main() {
     expect(
       () => DwRepoQueryKey<_Lesson>.getAll(
         modelClassName: 'Lesson',
-        filters: <String, Object?>{'createdAt': DateTime.utc(2026, 8, 12)},
+        filters: <String, Object?>{'value': const _UnsupportedQueryValue()},
       ),
       throwsA(
         isA<ArgumentError>().having(
@@ -214,6 +214,30 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('canonicalizes values with Serverpod serialization', () {
+    final serializedKey = DwRepoQueryKey<_Lesson>.getAll(
+      modelClassName: 'Lesson',
+      filters: <String, Object?>{
+        'status': 'published',
+        'createdAt': '2026-08-12T05:00:00.000Z',
+        'duration': 120000,
+        'resource': 'https://dartway.dev/docs',
+      },
+    );
+    final typedKey = DwRepoQueryKey<_Lesson>.getAll(
+      modelClassName: 'Lesson',
+      filters: <String, Object?>{
+        'status': _QueryStatus.published,
+        'createdAt': DateTime.parse('2026-08-12T10:00:00+05:00'),
+        'duration': const Duration(minutes: 2),
+        'resource': Uri.parse('https://dartway.dev/docs'),
+      },
+    );
+
+    expect(typedKey, serializedKey);
+    expect(typedKey.toStorageKey(), serializedKey.toStorageKey());
   });
 
   test('list and single configs create keys from their request inputs', () {
@@ -582,6 +606,17 @@ void main() {
 }
 
 class _Lesson {}
+
+enum _QueryStatus implements SerializableModel {
+  published;
+
+  @override
+  String toJson() => name;
+}
+
+class _UnsupportedQueryValue {
+  const _UnsupportedQueryValue();
+}
 
 class _QueryLesson implements SerializableModel {
   @override
