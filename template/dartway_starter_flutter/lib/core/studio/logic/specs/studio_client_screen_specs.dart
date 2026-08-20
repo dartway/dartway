@@ -1,5 +1,5 @@
+import 'package:dartway_studio_binding/dartway_studio_binding.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
-import 'studio_route_specs.dart';
 
 /// Screen passports: what a screen is *for*, what it does, and what is still
 /// open about it. They live in code next to the screens they describe, and
@@ -8,7 +8,7 @@ import 'studio_route_specs.dart';
 /// Write one per screen you add. The questions are not decoration — they are
 /// what you ask the person who ordered the feature.
 
-final homeStudioSpec = studioSpecForRoute(
+final homeStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.home,
   title: 'Home',
   purpose:
@@ -19,7 +19,7 @@ final homeStudioSpec = studioSpecForRoute(
   ],
 );
 
-final profileStudioSpec = studioSpecForRoute(
+final profileStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.profile,
   title: 'Profile',
   purpose:

@@ -1,10 +1,10 @@
 import 'package:dartway_router/dartway_router.dart';
+import 'package:dartway_studio_binding/dartway_studio_binding.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 
 import 'package:dartway_example_flutter/core/router/router.dart';
 import 'studio_client_screen_specs.dart';
 import 'studio_club_screen_specs.dart';
-import 'studio_route_specs.dart';
 
 final clubZoneStudioSpec = StudioZoneSpec(
   label: 'Club app',
@@ -28,7 +28,7 @@ final adminZoneStudioSpec = StudioZoneSpec(
   // the protection. Studio only signs in with whatever persona is chosen —
   // a non-admin lands wherever the guards send it.
   screens: [
-    studioSpecForRoute(
+    dwStudioSpecForRoute(
       AdminNavigationZone.admin,
       title: 'Dashboard',
       purpose:
@@ -38,7 +38,7 @@ final adminZoneStudioSpec = StudioZoneSpec(
         'Which three numbers does a club owner check every morning?',
       ],
     ),
-    studioSpecForRoute(
+    dwStudioSpecForRoute(
       AdminNavigationZone.users,
       title: 'Users',
       purpose:
@@ -50,7 +50,7 @@ final adminZoneStudioSpec = StudioZoneSpec(
             'them here?',
       ],
     ),
-    studioSpecForRoute(
+    dwStudioSpecForRoute(
       AdminNavigationZone.settings,
       title: 'Settings',
       purpose:
@@ -68,7 +68,7 @@ final authZoneStudioSpec = StudioZoneSpec(
   rootPath: AuthNavigationZone.auth.fullPath,
   access: StudioZoneAccess.signedOut,
   screens: [
-    studioSpecForRoute(
+    dwStudioSpecForRoute(
       AuthNavigationZone.auth,
       title: 'Sign in',
       purpose:

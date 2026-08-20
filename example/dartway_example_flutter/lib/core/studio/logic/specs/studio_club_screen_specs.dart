@@ -1,7 +1,7 @@
+import 'package:dartway_studio_binding/dartway_studio_binding.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
-import 'studio_route_specs.dart';
 
-final chatStudioSpec = studioSpecForRoute(
+final chatStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.chat,
   title: 'Team chat',
   purpose:
@@ -13,7 +13,7 @@ final chatStudioSpec = studioSpecForRoute(
   ],
 );
 
-final profileStudioSpec = studioSpecForRoute(
+final profileStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.profile,
   title: 'Profile',
   purpose:
@@ -22,7 +22,7 @@ final profileStudioSpec = studioSpecForRoute(
   discussionQuestions: const ['Avatar upload via DartWay cloud storage?'],
 );
 
-final servicesStudioSpec = studioSpecForRoute(
+final servicesStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.services,
   title: 'Services',
   purpose:
