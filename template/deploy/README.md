@@ -37,6 +37,27 @@ every push turns a routine change into an infrastructure one. `compose.override.
 is the opposite: it is never copied to the server, only named on every Compose
 call, so the file the deploy merges is the committed one.
 
+## Migrations — what "migrate" in that one-liner actually promises
+
+The migration step prints everything the container said and fails when the text
+says the schema did not move: `Failed to apply migration <version>.`, `Failed to
+apply database migrations.`, Serverpod's `The database does not match the target
+database:` — and silence, which means the container never reached the migration
+code at all.
+
+It reads the text because the exit code cannot be asked. Serverpod aborts on a
+failed migration **only in development**; in staging and production the failure
+is swallowed and the container exits 0, so "migrate" used to mean "a container
+ran" and nothing more. A deploy could report success while the application went
+on running new code against an old schema.
+
+A failed step stops the deploy before services are restarted, so the previous
+version keeps serving while you read the reason. If the reason is that the
+database has drifted from the migration history — a table that is physically
+there and unrecorded, or the reverse — the route back is
+`serverpod create-repair-migration --mode <env>` and one run with
+`--apply-repair-migration`, not a hand-written `DROP TABLE`.
+
 ## Caching — why a redeploy might not reach the browser
 
 **A Flutter web build hashes nothing.** `index.html`, `flutter_bootstrap.js`,

@@ -333,6 +333,33 @@ deleted, in case somebody edited it on the box while debugging.
 every public URL. It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders
 infrastructure on every push turns a routine change into an infrastructure one.
 
+**The migration step prints what the container said, and fails on it.** It used to print its title
+and nothing else, because a step's output was shown only when its exit code was non-zero — and this
+particular exit code cannot be asked. Serverpod wraps the whole apply in a `try`/`catch`: a failure
+sets `verified = false`, and `verified` aborts the process **only in development**. Outside it the
+failure is swallowed, the maintenance role ends with the exit code it started with, and a container
+that applied nothing exits 0 exactly like one that applied everything. So "we deployed" stopped
+implying "the schema caught up": the application went on running new code against an old schema, the
+deploy log said nothing, and re-running it produced the same green step and the same broken schema.
+
+The outcome is only ever stated in the text, so the text is now read and shown. `Applied database
+migration:` with the versions, or `Latest database migration already applied.`, passes. Any of
+`Failed to apply migration <version>.`, `Failed to apply database migrations.` or Serverpod's own
+`The database does not match the target database:` fails the step — the last of those being the case
+where nothing threw and the schema still did not catch up. So does silence: a container that exits 0
+without mentioning the schema never reached the migration code, which usually means an `ENTRYPOINT`
+in shell form (see `server_entrypoint`). A failed step stops the deploy before `up`, so the previous
+version keeps serving while you read the reason, which is quoted in the log along with what to run
+next.
+
+There is deliberately no separate schema assertion in `deploy check`. The authoritative comparison
+already runs inside the migration container — Serverpod checks the live schema against the target
+definition table by table on every maintenance start — and the fix was to stop discarding its
+verdict, not to add a second one. A `check` that compared `migration_registry.txt` against the
+`serverpod_migrations` table would compare two version strings rather than a schema, go green on a
+database whose row says the right version while a table is missing, and answer before the deploy has
+run at all: green exactly where the deploy is red.
+
 `secret` moves credentials between the maintainer's `passwords.yaml` and a server, one environment
 at a time: `push` sends `shared` plus that environment, `pull` brings back what the server has and
 the file lacks, `list` shows names only. `set` stores one value, `put-file` uploads a whole file — a

@@ -27,6 +27,40 @@
   domain reading with no marker in the YAML (a rule keyed off an `*Event` suffix would miss the one
   called `BalanceEntry` and fire on a lookup table).
 
+- **The migration step of a deploy can now report its outcome, and until now it could not.** It
+  printed its title and nothing else, because a step's output was shown only when its exit code was
+  non-zero — and this particular exit code answers a different question. Serverpod wraps the whole
+  apply in a `try`/`catch`: a failure sets `verified = false`, and `verified` aborts the process
+  **only in development**. Outside it the failure is swallowed, the maintenance role ends with
+  `throw ExitException(_exitCode)` having never touched `_exitCode`, and a container that applied
+  nothing exits 0 exactly like one that applied everything. So the deploy reported success for work
+  it did not do: the application went on running new code against an old schema, nothing in the log
+  mentioned it, and re-running produced the same green step and the same broken schema — while the
+  command's own help describes `deploy run` as "update, rebuild, migrate, restart".
+
+  The step now prints the container's output whatever happened, and reads the outcome out of it.
+  `Applied database migration:` with the versions it names, or `Latest database migration already
+  applied.`, passes. `Failed to apply migration <version>.`, `Failed to apply database migrations.`
+  and Serverpod's own `The database does not match the target database:` each fail it — the last
+  being the case where nothing threw and the schema still did not catch up. So does silence: a
+  container that exits 0 without mentioning the schema never reached the migration code, which is
+  usually an `ENTRYPOINT` in shell form swallowing `--apply-migrations`. A failed step stops the
+  deploy before `up`, so the previous version keeps serving while the reason — quoted, with what to
+  run next — is read.
+
+  The mechanism is a step-level one rather than a special case: `DwDeployStep` gained `showOutput`
+  and `verdict`, so any step whose exit code and result can disagree says which text settles it.
+  The Serverpod literals are pinned by tests, and a Serverpod that renames one turns the step silent
+  rather than green.
+
+  No `deploy check` assertion was added for the schema, deliberately. The authoritative comparison
+  already runs inside the migration container — Serverpod checks the live schema against the target
+  definition table by table on every maintenance start — and the fix was to stop discarding its
+  verdict rather than to add a second one. Comparing `migration_registry.txt` against the
+  `serverpod_migrations` table would compare two version strings rather than a schema, pass on a
+  database whose row says the right version while a table is missing, and answer before the deploy
+  had run: green exactly where the deploy is red.
+
 - **The deploy templates now ship the configuration that serves a Flutter web build, and it caches
   by what is actually hashed.** Nothing was shipped before, so every project wrote its own, and what
   they wrote applied the rule everybody knows — "fingerprinted assets are immutable, cache them for

@@ -80,6 +80,29 @@ void initDartwayCore({required Map<String, String> passwords}) {
 }
 ```
 
+### The module reaches an existing database like any other model change
+
+`serverpod generate` → `serverpod create-migration` → deploy. Nothing else, and
+no special handling for a database that has been in production for years.
+
+Worth knowing, because the module's `migrations/` folder says otherwise: its
+first migration creates a whole schema — `serverpod_log`, `dw_auth_key` and the
+rest — rather than only the `dw_push_*` tables. That is what
+`serverpod create-migration` writes for **any** module, the DartWay core module
+included; it folds every dependency module into `migration.sql` and
+`definition.sql` and offers no way to ask it not to. Serverpod 3.4.11 never
+applies those two files: its migration manager is built from the *project*
+directory and migrates one module, the project. The module's chain is read once,
+by `create-migration` in the app, and only `definition_project.json` of its
+latest version — so the module's tables arrive as an ordinary `CREATE TABLE` in
+the app's own migration.
+
+Do not hand-edit anything under the module's `migrations/`, and do not copy its
+SQL into the app. If a deploy dies on `relation "dw_push_*" already exists`, the
+tables are physically there while the migration history says they are not — the
+route out is `serverpod create-repair-migration --mode <env>` and one run with
+`--apply-repair-migration`, never a `DROP TABLE`.
+
 ### Credentials come from two places, and which one is not a preference
 
 **Short values go in `passwords.yaml`; a credential that is a whole document

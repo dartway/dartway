@@ -109,10 +109,29 @@ Future<int> runDeploy(Command<int> command, ArgResults results) async {
     final step = steps[index];
     stdout.writeln('\n[${index + 1}/${steps.length}] ${step.title}');
     final result = await step.run();
+
+    // A step that declares it prints its own output prints it whatever
+    // happened. "Only on failure" is how a step that reports its outcome in
+    // text — and its exit code regardless — comes out green and blank.
+    if (step.showOutput) {
+      _indent(stdout, '${result.stdout}\n${result.stderr}');
+    }
+
     if (!result.ok) {
+      stderr.writeln('Step "${step.id}" failed:');
+      if (!step.showOutput) {
+        stderr.writeln(
+          result.stderr.trim().isEmpty ? result.stdout : result.stderr,
+        );
+      }
+      return 1;
+    }
+
+    final verdict = step.verdict?.call(result);
+    if (verdict != null) {
       stderr
-        ..writeln('Step "${step.id}" failed:')
-        ..writeln(result.stderr.trim().isEmpty ? result.stdout : result.stderr);
+        ..writeln('Step "${step.id}" exited 0 and did not do its work:')
+        ..writeln(verdict);
       return 1;
     }
     if (step.id == 'update-checkout') {
@@ -156,4 +175,17 @@ Future<int> runDeploy(Command<int> command, ArgResults results) async {
 
   stdout.writeln('\nDeployment completed.');
   return 0;
+}
+
+/// Writes [text] under the step that produced it, one indented line at a time,
+/// dropping the blank ones. Keeps a step's own output visibly subordinate to
+/// its title instead of merging into the deploy's own log.
+void _indent(Stdout sink, String text) {
+  for (final line in text.split('\n')) {
+    final trimmed = line.trimRight();
+    if (trimmed.isEmpty) {
+      continue;
+    }
+    sink.writeln('  $trimmed');
+  }
 }

@@ -69,6 +69,57 @@ dozen numbers you don't understand. The one knob worth knowing is
 `maxConcurrentDeliveries`: each in-flight send holds a database connection for
 the whole provider round-trip, so keep it a small fraction of your Postgres pool.
 
+## Adding the module to a database that already has data
+
+Nothing special is required, and it is worth knowing why, because the shape of a
+Serverpod module's `migrations/` folder suggests otherwise. Open
+`dartway_push_server/migrations/` and the first migration there creates a whole
+schema — `serverpod_log`, `serverpod_migrations`, `dw_auth_key` and the rest,
+alongside the `dw_push_*` tables. That is what `serverpod create-migration`
+writes for any module: it folds every module the module itself depends on into
+`migration.sql` and `definition.sql`, and offers no way to ask it not to. The
+core module's first migration has the identical shape.
+
+**Those two files are never applied to anything.** In Serverpod 3.4.11 the
+runtime migration manager is constructed with the *project* directory and
+migrates exactly one module — the project. A module's chain is read once, by
+`serverpod create-migration` running **in your project**, and only
+`definition_project.json` of the module's latest version, which lists the eight
+tables the module owns and nothing else. Those tables are merged into your
+project's target schema, and the difference against your previous migration
+becomes an ordinary `CREATE TABLE` step in **your** migration. Adding push to a
+five-year-old database is therefore the same three commands as adding a model of
+your own:
+
+```bash
+serverpod generate
+serverpod create-migration
+dartway deploy run --env production
+```
+
+The deploy's migration step now prints what the container said and fails when it
+says the schema did not move ([the CLI page](../5-tooling/cli.md)), so a
+collision is visible on the run that caused it rather than days later.
+
+If the `dw_push_*` tables somehow already exist — created by hand, or left behind
+by a migration that was rolled back in the repository but not in the database —
+the migration will die on `relation "dw_push_delivery" already exists`, and every
+later migration stays queued behind it. Do not resolve that by dropping tables:
+the supported route is a **repair migration**, which diffs the *live* database
+against the target schema instead of replaying history — Serverpod's own answer
+to "everything else is already here".
+
+```bash
+serverpod create-repair-migration --mode production
+# then start the server once with --apply-repair-migration
+```
+
+`create-repair-migration` connects to the database named by that mode's
+configuration to read what is actually there, so it has to be run from somewhere
+that can reach it. The repair lands in `repair-migration/`, is committed like any
+other migration, and is applied by a single run carrying
+`--apply-repair-migration` — after which the ordinary queue moves again.
+
 ## Where the credentials come from
 
 **Short values are passwords; a whole document is a file.** `fcmProjectId`,
