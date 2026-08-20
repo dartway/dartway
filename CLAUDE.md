@@ -135,12 +135,13 @@ These are not suggestions: each item closes off a way for one session to destroy
 
 ### CI
 
-Two workflows in `.github/workflows/`:
+Three workflows in `.github/workflows/`:
 
 | File | When | What it does |
 |---|---|---|
 | `claude-review.yml` | A PR is opened, updated, or taken out of draft | Reviews the diff automatically. Beyond ordinary bugs it checks three things specific to this repository: the synchronisation law, the presence of the hand-written `manualDeserialization` patch in the generated `protocol.dart`, and the absence of project literals in `toolkit/` |
 | `telegram-notify.yml` | A review finishes | Sends the verdict and a link to the PR to Telegram — the one notification that asks for a decision. Signals meant for the team (merges, promotion to `stable`) are deliberately absent: that is a separate task addressing a different audience |
+| `web-compile.yml` | A PR is opened or updated, and on push to `master` | Builds the web targets (`example/` and the `dartway_offline_flutter` harness). dart2js rejects code the VM accepts — an integer literal a JavaScript double cannot hold exactly is the standing case — and **unit tests on the VM cannot see that class of error at all**. A package no example and no template depends on is compiled nowhere else, which is how two such literals reached a consumer's release build |
 
 The review does not run on PRs from forks: repository secrets are unavailable to them and the step would fail on authentication anyway. Such a PR also goes unannounced — every current contributor is a collaborator pushing branches into the repository, so the case is theoretical for now.
 
