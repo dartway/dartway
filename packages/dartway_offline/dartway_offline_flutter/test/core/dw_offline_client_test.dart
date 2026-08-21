@@ -114,9 +114,23 @@ void main() {
       isNull,
     );
     expect(
+      await client.openDownloadedAsset(
+        userScopeId: 'scope-a',
+        assetId: 'not-downloaded',
+      ),
+      isNull,
+    );
+    expect(
       () => client.openDownloadedMedia(
         userScopeId: 'scope-b',
         downloadUrl: 'https://cdn.example.test/not-downloaded.mp4',
+      ),
+      throwsStateError,
+    );
+    expect(
+      () => client.openDownloadedAsset(
+        userScopeId: 'scope-b',
+        assetId: 'not-downloaded',
       ),
       throwsStateError,
     );

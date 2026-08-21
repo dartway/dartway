@@ -20,3 +20,5 @@
 - Ships a web-compilation harness under `example/`. The package is depended on by no example and
   no template, so nothing used to compile it for the web; `flutter build web` on that app runs in
   CI and fails on a dart2js-only error before a consumer's release build does.
+- Downloaded media can be opened by an application-defined asset identifier when its signed
+  download URL differs from the resource URL stored in an application model.

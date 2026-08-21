@@ -59,5 +59,32 @@ nothing about whether saving that model is queued.
 - **An outbox.** A write that failed on the connection is queued and replayed, once, on reconnect.
 - **Scoped storage.** Everything belongs to a user scope, and signing out purges it.
 
+## Opening downloaded assets
+
+The runtime only returns files that belong to an active manifest whose access lease is readable.
+Use the signed download URL when that URL is also stored in the application model:
+
+```dart
+final mediaHandle = await offlineClient.openDownloadedMedia(
+  userScopeId: userScopeId,
+  downloadUrl: modelDownloadUrl,
+);
+```
+
+If the application stores a source URL while the manifest downloads a processed or transcoded
+file from another URL, give the manifest an application-defined stable `assetId` and use it for
+lookup instead:
+
+```dart
+final mediaHandle = await offlineClient.openDownloadedAsset(
+  userScopeId: userScopeId,
+  assetId: sourceAssetId,
+);
+```
+
+Both lookups enforce the same scope, active-package, lease, ready-file and reader-pin checks. The
+identifier changes how the candidate file is found; it does not bypass manifest verification or
+access control.
+
 Platform support is Android and iOS. Elsewhere the plugin reports `disabled` and the app runs
 online-only, unchanged.

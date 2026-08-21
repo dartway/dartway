@@ -159,6 +159,32 @@ void main() {
 Run them against your store. Passing your own tests says it does what you meant; passing these says
 it does what `dw.repo` is entitled to assume.
 
+## Opening a downloaded file
+
+`DwOfflineClient` opens a file only through an active package with a readable signed lease. When
+the manifest URL is also the URL stored in the application model, look it up directly:
+
+```dart
+final mediaHandle = await offlineClient.openDownloadedMedia(
+  userScopeId: userScopeId,
+  downloadUrl: modelDownloadUrl,
+);
+```
+
+Processing may deliberately make those URLs different: the model can retain the original source
+while the manifest downloads an immutable transcoded result. In that case the application assigns
+the manifest asset a stable `assetId` and opens it by that identity:
+
+```dart
+final mediaHandle = await offlineClient.openDownloadedAsset(
+  userScopeId: userScopeId,
+  assetId: sourceAssetId,
+);
+```
+
+The second method changes only the lookup key. Scope isolation, active-manifest membership, access
+validation, file readiness and the reader pin are identical for both methods.
+
 ## Where to go next
 
 - [The offline package](https://pub.dev/packages/dartway_offline_flutter) — the ready-made store,
