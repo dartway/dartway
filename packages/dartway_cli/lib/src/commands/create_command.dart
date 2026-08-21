@@ -36,7 +36,7 @@ class CreateCommand extends Command<int> {
         defaultsTo: 'English',
         help:
             "Language the new project writes its own texts in (feature specs, "
-            "doc comments, dartway_notes.md).",
+            "doc comments, docs/dev_notes/).",
       )
       ..addOption(
         'notes-tracker',
@@ -44,8 +44,8 @@ class CreateCommand extends Command<int> {
         defaultsTo: ProjectLayout.defaultNotesTracker,
         help:
             'GitHub repository where findings about the framework are filed as '
-            'issues. Pass "${ProjectLayout.noNotesTracker}" to keep the '
-            'journal local instead.',
+            'issues. Pass "${ProjectLayout.noNotesTracker}" to file nothing '
+            'outside this project — findings then go to docs/dev_notes/.',
       )
       ..addFlag(
         'git',

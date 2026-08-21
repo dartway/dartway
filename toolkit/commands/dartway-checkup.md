@@ -34,8 +34,8 @@ Before analyzing, **read the full body of rules**: [.claude/skills/dartway-clean
 1. **Run every gate the project has** and record the result of each: `dartway check`, `dart run custom_lint`, `flutter analyze`, `dart analyze` in each Dart package, and the test suites. A failure here is a fact, not an opinion.
 2. **Then read the CI configuration and compare.** Which of those does CI actually run? *The gap between declared and executed is a finding class of its own, and usually the most valuable one in the report.* A rule configured and never executed is worse than a rule absent: it reads as covered. Watch for a test folder excluded with a comment explaining why — the comment is usually older than the reason.
 3. **Measure the distance to the framework.** `resolved-ref` in `pubspec.lock` against the DartWay monorepo's current `master`, and what landed there since. Two things follow: a workaround in this project may have become a duplicate of something the framework now does, and the installed harness may be teaching rules the current framework no longer holds (the harness channel must match the framework channel). The workarounds are findable rather than guessed at: each carries a `// TODO(dartway, checked: <ref>)` naming the version it was last confirmed against, so grep them **project-wide** and report the ones whose `checked:` has fallen behind the resolved version. `dartway-finish` does this too, but only over a task's diff — a workaround in a file nobody has opened in months is compared here or nowhere.
-4. **Read the journals**: `dev_notes.md` and `dartway_notes.md` at the project root. Open entries are context, and an entry that is already fixed should be closed in this run. Where `dartway_notes.md` names a tracker other than `none`, **the file does not get to answer whether an entry is still open** — an entry with an issue is judged by that issue's state (`gh issue view`), and this run is where the two are reconciled: a closed issue means delete the entry and re-check the workaround it stood for, an entry with no issue is offered for filing under the rules in `CLAUDE.md`. This is the checkup a journal needs to survive being written down: the last one to go unreconciled advertised eleven open findings a fortnight after all eleven had shipped.
-5. **Read the coverage table** in `dev_notes.md` — which features had a deep pass, and when. Phase 2 is chosen from it.
+4. **Read `docs/dev_notes/`** — one file per finding this project is carrying. They are context, and **the files do not get to answer whether a finding is still open**: each references an issue, and that issue's state is what counts (`gh issue view`). This run is where the two are reconciled — a closed issue means delete the entry and re-check the workaround it stood for. This is the reconciliation a record needs to survive being written down: the journal these files replaced went unreconciled and advertised eleven open findings a fortnight after all eleven had shipped. An entry with no issue is either a project on `--notes-tracker none`, where the entry is the whole record, or a finding nobody filed — offer to file it under the rules in `CLAUDE.md`.
+5. **Read `docs/dev_notes/_coverage.md`** — which features had a deep pass, and when. Phase 2 is chosen from it.
 
 ## Phase 1 — The sweep. Breadth, no deep reading
 
@@ -109,11 +109,11 @@ The report goes **in the chat**, in the user's language. Structure:
 |---|---|
 | is being fixed right now | fix it — no entry anywhere |
 | belongs to one feature | that feature's `knownIssues` (propose the edit) |
-| is about the framework, not this project | `dartway_notes.md` |
-| **is a nuance, problem or technical risk that does not fit the current task and is not confined to one feature** | `dev_notes.md` |
+| is about the framework, not this project | an issue in the framework tracker (`CLAUDE.md`, "Notes back to the framework") |
+| **has no address in code** — cross-cutting, infrastructural, a decision with a price | a file under `docs/dev_notes/` |
 
-`dev_notes.md` entries are **short**: where, what is wrong, what it leads to. Mention an option if one is obvious; do not write it up. A journal of treatises is a journal nobody reads.
+`docs/dev_notes/` entries are **short**: where, what is wrong, what we did about it, and the issue they reference. Mention an option if one is obvious; do not write it up. A journal of treatises is a journal nobody reads.
 
-Finally, update the **coverage table** in `dev_notes.md` with the features read this run and the date.
+Finally, update the **coverage table** in `docs/dev_notes/_coverage.md` with the features read this run and the date.
 
 Be concrete: a real `file:line` for every item, as a clickable markdown link. Fewer accurate findings beat a list of guesses.
