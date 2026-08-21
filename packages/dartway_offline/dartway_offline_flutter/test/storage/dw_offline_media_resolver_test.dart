@@ -69,6 +69,41 @@ void main() {
   });
 
   test(
+    'opens an authorized asset by its stable identifier when URLs differ',
+    () async {
+      await _MediaResolverFixture.publishPackage(
+        manifestFixture,
+        assetStore,
+        assetId: 'source-url-sha256',
+        downloadUrl: 'https://prepared.example.test/video.mp4',
+        mimeType: 'video/mp4',
+      );
+      final resolver = DwOfflineMediaResolver(
+        database: offlineDatabase,
+        assetStore: assetStore,
+        packageAccessPolicy: const _PackageAccessPolicy(isAllowed: true),
+      );
+
+      final mediaHandle = await resolver.openForAssetId(
+        userScopeId: 'scope-a',
+        assetId: 'source-url-sha256',
+      );
+
+      expect(mediaHandle, isNotNull);
+      final openedMedia = mediaHandle!;
+      addTearDown(openedMedia.close);
+      expect(openedMedia.mimeType, 'video/mp4');
+      expect(await File.fromUri(openedMedia.fileUri).readAsBytes(), const [
+        1,
+        2,
+        3,
+        4,
+        5,
+      ]);
+    },
+  );
+
+  test(
     'does not expose a ready blob when every package lease is denied',
     () async {
       await _MediaResolverFixture.publishPackage(manifestFixture, assetStore);

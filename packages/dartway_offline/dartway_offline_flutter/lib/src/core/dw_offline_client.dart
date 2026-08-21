@@ -410,6 +410,18 @@ final class DwOfflineClient implements DwOfflineRuntime {
     );
   }
 
+  /// Opens an active downloaded asset by its application-defined identifier.
+  Future<DwOfflineMediaHandle?> openDownloadedAsset({
+    required String userScopeId,
+    required String assetId,
+  }) {
+    _requireActiveScope(userScopeId);
+    return _mediaResolver.openForAssetId(
+      userScopeId: userScopeId,
+      assetId: assetId,
+    );
+  }
+
   Future<void> deletePackage({
     required String userScopeId,
     required String packageId,
