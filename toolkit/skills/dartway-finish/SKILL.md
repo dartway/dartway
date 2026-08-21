@@ -35,7 +35,8 @@ Run the detectors **over the changed files only** (not over the whole repo). For
 - Several responsibilities in one file (length is the weakest signal: >200 lines — take a look, >350 — a warning; a meaningful 300-line file beats a pointless split).
 - `BuildContext`/`WidgetRef` in the parameters of services/functions (outside `build`).
 - A `_buildXxx()` returning a `Widget` (instead of a widget class).
-- `ref.invalidate(...)` used for refreshing.
+- `ref.invalidate(...)` used to **propagate** data — after a write, in a listener, to move data between screens. Under a gesture (retry, pull-to-refresh) it is correct and not a finding (`dartway-clean-code` §1.5); after a write it usually means the write left `dw.repo`.
+- A **load-bearing** `dwBuildAsync`/`dwBuildListAsync` — the section its screen exists for — left on the default `errorWidget`, so a failed read renders as blank; and `asData?.value` / `.value ??` used to combine several `AsyncValue`s, which shows a failure as an endless spinner (§1.5a).
 - `GlobalKey().currentState/currentContext` used to look things up in the tree.
 - Outer `padding`/`margin` at the top level of a widget's `build`.
 - A private widget class (`class _Foo extends ...Widget`) inside a feature's public file that **has a `State` or takes a callback** — a slice of layout with neither is fine (`dartway-clean-code` §1.8).

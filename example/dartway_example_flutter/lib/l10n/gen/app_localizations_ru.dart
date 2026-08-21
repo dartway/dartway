@@ -9,6 +9,13 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
+  String get loadFailed =>
+      'Не удалось загрузить — проверьте связь и попробуйте снова.';
+
+  @override
+  String get retry => 'Повторить';
+
+  @override
   String get tabSchedule => 'Расписание';
 
   @override

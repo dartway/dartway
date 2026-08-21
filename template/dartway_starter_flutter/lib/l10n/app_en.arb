@@ -1,5 +1,7 @@
 {
   "@@locale": "en",
+  "loadFailed": "Could not load this — check your connection and try again.",
+  "retry": "Try again",
   "tabProfile": "Profile",
   "ourServices": "Our services",
   "profileTitle": "Profile",

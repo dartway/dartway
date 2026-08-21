@@ -219,6 +219,11 @@ class NotesList extends ConsumerWidget {
 No repository, no service, no provider, no API client. The list is typed, and it refreshes itself
 for the person who writes to it — a save returns the updated rows to whoever saved them.
 
+One thing is missing from that snippet on purpose, and it is the first thing to add once the list is
+real: an `errorBuilder`. `dwBuildListAsync` defaults its error branch to `SizedBox.shrink()`, so a
+failed read reports to your alerts and shows the reader nothing — indistinguishable from a note list
+with no notes in it. See [the error branch](../3-flutter/data-layer.md#the-error-branch-is-the-callers-decision).
+
 Writing goes through `dw.repo`, guarded by the action:
 
 ```dart

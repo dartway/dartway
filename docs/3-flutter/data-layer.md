@@ -116,9 +116,54 @@ has the shape of the content that is coming. `dwBuildAsync` (the single-value fo
 with one placeholder, and switches to `SliverSkeletonizer` when your builder returned a sliver,
 because a box skeleton is an invalid child of a `CustomScrollView`.
 
+### The error branch is the caller's decision
+
 Errors go into the framework error pipeline (`DwErrorSource.asyncBuild`) and are replaced on screen
 by `errorWidget`, which defaults to `SizedBox.shrink()`. A failing list is therefore *silent on
-screen and loud in your alerts* — set `errorWidget` when the user needs to see something.
+screen and loud in your alerts*.
+
+That default stays, and it is not an oversight: the builders are extensions on `AsyncValue`, which
+knows it holds a `List<ChatMessage>` and nothing about whether those messages are the screen or a
+badge in its corner. **A section that is the reason its screen exists renders its failure; a
+decoration need not.** Only the caller can tell which one it is looking at, so the caller passes
+`errorBuilder` — and blank is not a neutral choice, because an empty list already has copy of its
+own ("No news yet") and empty space reads as a third thing again.
+
+The failure state also needs a way out of it, and that is the one place `ref.invalidate` is right:
+the user asked for the state to be thrown away and fetched again.
+
+```dart
+// the provider is named once and used twice — watched, and thrown away by the retry
+final chatMessages = dw.repo.modelList<ChatMessage>(
+  backendFilter: AppBackendFilters.channelMessages(channel.id!),
+);
+
+ref
+    .watch(chatMessages)
+    .dwBuildListAsync(
+      loadingItemsCount: 5,
+      childBuilder: (messages) => ListView.builder(...),
+      errorBuilder: (_, _) => LoadFailedMessage(
+        onRetry: dw.action((_) => ref.invalidate(chatMessages)),
+      ),
+    );
+```
+
+`LoadFailedMessage` is the app's widget, not the framework's: the copy a person reads comes from
+`context.l10n`, so a package cannot own it. `example/` and `template/` each carry one in
+`lib/shared/widgets/load_failed_message.dart` — a message and a retry button — and it takes the
+retry as a `DwUiAction`, because only the caller knows which read failed.
+
+**Combining several `AsyncValue`s has one trap and it is worth naming.** `asData?.value` answers
+`null` while loading *and* on failure, so the shortest thing that compiles —
+
+```dart
+final profile = ref.watch(profileProvider).asData?.value;
+if (profile == null) return const Spinner();   // a 500 is now a spinner that never stops
+```
+
+— shows a wait for a request that answered long ago. `.value ?? const []` is the same trap wearing a
+fallback. Nest the builders instead, so each read answers for its own failure.
 
 ### Placeholder models must be registered
 

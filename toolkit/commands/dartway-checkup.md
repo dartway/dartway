@@ -44,7 +44,9 @@ Grep-level detectors across the scope, `file:line` for each. Do not read whole f
 - **Long files** — >350 lines is a warning (a likely dump of responsibilities), 200–350 worth noting. Judge responsibilities, not the counter: a meaningful 300-line file beats a pointless chop.
 - **`BuildContext`/`WidgetRef` in parameters** outside `build(...)`.
 - **`_buildXxx()` returning a widget** — `Widget\s+_\w+\s*\(`.
-- **`ref.invalidate(`** — any occurrence.
+- **`ref.invalidate(`** — any occurrence, **as a Phase 2 read rather than a verdict.** The rule (`dartway-clean-code` §1.5) permits it as a user command — a retry button, pull-to-refresh — and forbids it as a way to propagate data. Grep cannot tell a gesture handler from a listener, so every hit is opened: in an `onPressed`/`onRefresh`/`dw.action` it is correct and reported as nothing; anywhere else it is the finding. An `invalidate` right after a write is the one worth chasing — it means the write left `dw.repo`.
+- **`asData?.value` / `.value ??`** — combining several `AsyncValue`s by hand. Both answer `null` for loading *and* for error, so a failure renders as an endless spinner (§1.5a). Read the hit: a deliberate degradation is stated in the feature's `implementationNotes`, and an unstated one is the finding.
+- **`dwBuildAsync`/`dwBuildListAsync` with no `errorWidget`/`errorBuilder`** — a count, not yet a verdict. The default is `SizedBox.shrink()`, which is right for a decoration and wrong for the list its screen exists for; nothing mechanical separates the two, so the load-bearing ones are judged in Phase 2 (§1.5a).
 - **`GlobalKey`** with `.currentState` / `.currentContext`.
 - **Private widget classes in feature files.**
 - **Outer padding inside a widget** — a `Padding`/`margin:` at the top level of `build` (verify by reading in Phase 2).

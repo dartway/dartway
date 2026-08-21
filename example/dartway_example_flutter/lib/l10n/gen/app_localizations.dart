@@ -98,6 +98,18 @@ abstract class AppLocalizations {
     Locale('ru'),
   ];
 
+  /// No description provided for @loadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this — check your connection and try again.'**
+  String get loadFailed;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get retry;
+
   /// No description provided for @tabSchedule.
   ///
   /// In en, this message translates to:

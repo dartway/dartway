@@ -7,6 +7,7 @@ import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class MyBookingsPage extends ConsumerWidget implements DwFeature {
@@ -24,6 +25,8 @@ class MyBookingsPage extends ConsumerWidget implements DwFeature {
       'A booking that already has a review is marked as reviewed.',
       'With no bookings the screen says so instead of showing an empty list.',
       'While the first page loads, three placeholder cards are shown.',
+      'A failed read says so and offers a retry, rather than looking like a '
+          'member with no bookings.',
     ],
     requirements: [
       'A member sees only their own bookings; staff sees all of them. The '
@@ -32,28 +35,36 @@ class MyBookingsPage extends ConsumerWidget implements DwFeature {
     implementationNotes: [
       'A review count on the booking model would remove the second read; the '
           'local join is kept to show it costs little.',
+      'The reviews read degrades on purpose: if it fails, cards render as '
+          'not-yet-reviewed. The bookings read is the one this screen exists '
+          'for, and it is the one that renders its failure.',
     ],
   );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // A stated degradation, not an oversight: `.value ?? []` collapses loading
+    // and failure into "not reviewed yet", which this overlay can live with.
+    // The bookings list below cannot — see the passport.
     final reviewedBookingIds =
         (ref.watch(dw.repo.modelList<SessionReview>()).value ?? [])
             .map((review) => review.bookingId)
             .toSet();
 
+    // Named once, used twice: watched, and thrown away by the retry.
+    final myBookings = dw.repo.modelList<SessionBooking>(
+      backendFilter: AppBackendFilters.clientBookings(ref.watchUserProfile.id!),
+    );
+
     return AppScaffold.main(
       appBar: AppBar(title: AppText.title(context.l10n.tabBookings)),
       body: ref
-          .watch(
-            dw.repo.modelList<SessionBooking>(
-              backendFilter: AppBackendFilters.clientBookings(
-                ref.watchUserProfile.id!,
-              ),
-            ),
-          )
+          .watch(myBookings)
           .dwBuildListAsync(
             loadingItemsCount: 3,
+            errorBuilder: (_, _) => LoadFailedMessage(
+              onRetry: dw.action((_) => ref.invalidate(myBookings)),
+            ),
             childBuilder: (bookings) {
               if (bookings.isEmpty) {
                 return Center(child: AppText.body(context.l10n.noBookingsYet));

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dartway_example_flutter/app/news/widgets/news_post_card.dart';
 import 'package:dartway_example_flutter/app/news/widgets/news_post_list.dart';
+import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/example_test_core.dart';
@@ -74,7 +75,7 @@ void main() {
     expect(find.text('No news yet — stay tuned!'), findsOneWidget);
   });
 
-  testWidgets('does not claim there is no news when the read failed', (
+  testWidgets('says the read failed, and offers a way out of it', (
     tester,
   ) async {
     exampleTransport.answerGetAll = (_) async =>
@@ -84,8 +85,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // The distinction that matters to a member: "nothing was published" and
-    // "we could not ask" must not look the same. `dwBuildListAsync` renders its
-    // `errorWidget` — nothing, here — and routes the error into the dw pipeline
+    // "we could not ask" must not look the same, and neither may look like
+    // nothing at all. `dwBuildListAsync` defaults `errorWidget` to
+    // `SizedBox.shrink()`, which is right for a decoration and wrong for the
+    // feed this screen exists for — so the feature passes an `errorBuilder`
+    // (dartway-clean-code §1.5a). The error also goes to the dw pipeline
     // (alerting), which is the framework's business rather than this test's.
     // A failed read is retried: Riverpod 3 retries a failed provider on its
     // own, with a growing backoff, so `pumpAndSettle` drains a whole run of
@@ -97,5 +101,29 @@ void main() {
     });
     expect(find.byType(NewsPostCard), findsNothing);
     expect(find.text('No news yet — stay tuned!'), findsNothing);
+    expect(find.byType(LoadFailedMessage), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+  });
+
+  testWidgets('the retry throws the failed read away and asks again', (
+    tester,
+  ) async {
+    exampleTransport.answerGetAll = (_) async =>
+        throw TimeoutException('the backend is unreachable');
+
+    await tester.pumpFeature(const NewsPostList());
+    await tester.pumpAndSettle();
+
+    exampleTransport.answerGetAll = (_) async =>
+        newsPostsResponse([newsPost(id: 1, title: 'Pool closed on Monday')]);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+
+    // This is the one sanctioned `ref.invalidate` (§1.5): the user asked for
+    // the state to be thrown away and fetched again, so the reset is the point
+    // rather than the cost.
+    expect(find.byType(LoadFailedMessage), findsNothing);
+    expect(find.text('Pool closed on Monday'), findsOneWidget);
   });
 }

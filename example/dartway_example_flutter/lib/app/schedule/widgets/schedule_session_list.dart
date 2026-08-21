@@ -6,6 +6,7 @@ import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_backend_filters.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// Upcoming sessions grouped by day. Each list is live to *your own* writes:
@@ -28,6 +29,8 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
       'Booking or cancelling updates the card without a manual refresh.',
       'A session at capacity is shown as full and cannot be booked.',
       'While the first page loads, five placeholder cards are shown.',
+      'A failed read says so and offers a retry, rather than looking like a '
+          'week with nothing on.',
     ],
     requirements: [
       'Only sessions in the future are listed — the backend filter decides, '
@@ -38,11 +41,17 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
       'Live to your own writes only. Another member booking the last seat '
           'shows on the next fetch — pushing it to everyone needs a named '
           'channel, which this screen deliberately does not set up.',
+      'The bookings read degrades on purpose: if it fails, cards render as '
+          'not booked. The sessions read is the one this screen exists for, '
+          'and it is the one that renders its failure.',
     ],
   );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // A stated degradation, not an oversight: `.value ?? []` collapses loading
+    // and failure into "nothing booked", which this overlay can live with. The
+    // session list below cannot — see the passport.
     final myBookings =
         ref
             .watch(
@@ -55,14 +64,18 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
             .value ??
         [];
 
+    // Named once, used twice: watched, and thrown away by the retry.
+    final upcomingSessions = dw.repo.modelList<ClubSession>(
+      backendFilter: AppBackendFilters.upcomingSessions(),
+    );
+
     return ref
-        .watch(
-          dw.repo.modelList<ClubSession>(
-            backendFilter: AppBackendFilters.upcomingSessions(),
-          ),
-        )
+        .watch(upcomingSessions)
         .dwBuildListAsync(
           loadingItemsCount: 5,
+          errorBuilder: (_, _) => LoadFailedMessage(
+            onRetry: dw.action((_) => ref.invalidate(upcomingSessions)),
+          ),
           childBuilder: (sessions) {
             if (sessions.isEmpty) {
               return Center(

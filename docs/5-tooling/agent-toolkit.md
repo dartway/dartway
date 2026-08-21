@@ -129,7 +129,8 @@ subtleties and risks, and a checklist to verify against afterwards.
 
 **`dartway-clean-code`** — the cleanliness contract for all Dart/Flutter work: self-explanatory
 naming, one responsibility per file, never passing `BuildContext` or `WidgetRef` as parameters, no
-`_buildXxx()` widget methods, no `ref.invalidate`, plus SOLID/KISS/DRY/YAGNI and when tests are
+`_buildXxx()` widget methods, `ref.invalidate` only where the user asked for it, a failed read that
+looks like neither an empty list nor a spinner, plus SOLID/KISS/DRY/YAGNI and when tests are
 required.
 
 **`dartway-feature-scaffold`** — building a feature end to end: navigation → entry point → state

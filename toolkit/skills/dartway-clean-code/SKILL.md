@@ -5,7 +5,10 @@ description: >-
   self-explanatory naming (min 2 words), single responsibility per file
   (length is a soft signal: >200 lines a nudge, >350 a warning — split by
   responsibility, not by line count), never pass BuildContext or WidgetRef as params, no _buildXxx()
-  widget-returning methods, no ref.invalidate, no GlobalKey tree lookups, no
+  widget-returning methods, ref.invalidate only as a user command (retry,
+  pull-to-refresh) and never as a way to propagate data, a load-bearing
+  section renders its failure and never the same picture as its loading state
+  (no asData?.value), no GlobalKey tree lookups, no
   outer padding/margin inside a widget, no private widget classes in public
   feature files (and the one allowed kind has no State and no callbacks),
   a feature's constructor is its address (a model or an id) and not data its parent
@@ -264,17 +267,150 @@ Delete it. History lives in git, while a comment rots silently: one file in a pr
 commented-out lines out of 306 — a whole widget written against an API that no longer
 exists. You can't revive that anyway, and everyone has to read it.
 
-## 1.5 No `ref.invalidate(...)` for refreshing
+## 1.5 `ref.invalidate(...)` is a user command, not a propagation mechanism
 
-**Why:** `invalidate` is a blunt reset that takes down related providers and makes the UI flicker. Update the state through the proper state mechanism (in dartway — refresh on `DwRepository`/the state provider, re-fetching the data).
+**Why:** the harm was never that `invalidate` throws state away — it is that it gets used as a way to
+**move data**, and then the flow of data is invisible: nothing in the code says who updates whom, and
+the reason a list refreshed is three files from the list. When a person taps "retry" or pulls to
+refresh, the reset, the flicker and the lost scroll position are exactly what they asked for.
+
+**Allowed:** the user asked for the state to be thrown away and fetched again — a retry button in an
+error state, pull-to-refresh, "reload".
+
+**Not allowed**, and this is everything else: invalidating after a write so a list catches up;
+invalidating in a listener; invalidating to move data between screens. A write through `dw.repo`
+already updates every list over that model — reaching for `invalidate` after a write means the write
+went outside `dw.repo`, and **that** is what needs fixing (`dartway-crud-config`).
+
+**Automatic re-fetching** — on reconnect, on a timer — belongs to the data layer, not to a widget.
 
 ```dart
-// ❌
-onPressed: () { ref.invalidate(cartProvider); ref.invalidate(userProvider); }
+// ❌ propagation: the write went outside dw.repo, and the list is patched up by hand
+await api.confirmBooking(booking.id!);
+ref.invalidate(dw.repo.modelList<SessionBooking>());
 
-// ✅ explicit state refresh
-onPressed: () => ref.read(cartStateProvider.notifier).refresh(),
+// ❌ propagation in a listener: nothing here says who updates whom
+ref.listen(selectedClubProvider, (_, _) => ref.invalidate(dw.repo.modelList<ClubSession>()));
+
+// ✅ a user command — the retry is what the person pressed
+//    the provider is named once and used twice: watched, and thrown away
+final sessions = dw.repo.modelList<ClubSession>(
+  backendFilter: AppBackendFilters.upcomingSessions(),
+);
+
+return ref
+    .watch(sessions)
+    .dwBuildListAsync(
+      childBuilder: (list) => ...,
+      errorBuilder: (_, _) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppText.body(context.l10n.loadFailed),
+          AppButton.text(
+            context.l10n.retry,
+            onTap: dw.action((_) => ref.invalidate(sessions)),
+          ),
+        ],
+      ),
+    );
 ```
+
+**Name the provider once.** Writing `dw.repo.modelList<ClubSession>(backendFilter: ...)` out a second
+time inside the `errorBuilder` is how a retry ends up refreshing a *different* provider than the one
+that failed — the two expressions have to stay identical for the config's value equality to match.
+
+The error state is written out in full here to show where the `invalidate` sits; in a real app it is
+one shared widget, and §1.5a is where it comes from.
+
+**Reviewable by shape:** the call sits under a gesture — an `onPressed`, an `onRefresh`, or inside
+the `dw.action` a button runs. Anywhere else it is a finding.
+
+## 1.5a A failure must not look like anything else
+
+**Why:** `dwBuildAsync`/`dwBuildListAsync` default `errorWidget` to `SizedBox.shrink()`, and that
+default is right: the extension sits on an `AsyncValue` and cannot tell a decorative avatar from the
+list its screen exists for. **You can** — so the decision is the caller's, and it has to be taken
+rather than inherited.
+
+**The rule: a section that is the reason its screen exists renders its failure, and offers a way out
+of it.** A decoration may fail silently — the error still reaches alerting through `dw.handleError`,
+which is a different audience.
+
+**Blank is not neutral, it is already a meaning.** "No news yet — stay tuned!" asks the reader to
+wait; empty space says "this section has nothing to say"; a failed read means "go and look at the
+backend". Collapsing three opposite situations into one picture costs a diagnosis every time — and a
+default whose correct use is "always pass this parameter" is only a default by name, so the review
+has to be the thing that catches it.
+
+```dart
+// ❌ the list is the whole point of the screen, and a 500 shows as an empty page
+ref.watch(dw.repo.modelList<NewsPost>()).dwBuildListAsync(
+      childBuilder: (posts) => posts.isEmpty
+          ? Center(child: AppText.body(context.l10n.noNewsYet))
+          : NewsList(posts: posts),
+    );
+
+// ✅ "nothing was published" and "we could not ask" are two different pictures
+final newsPosts = dw.repo.modelList<NewsPost>();
+
+ref
+    .watch(newsPosts)
+    .dwBuildListAsync(
+      childBuilder: (posts) => ...,
+      errorBuilder: (_, _) => LoadFailedMessage(
+        onRetry: dw.action((_) => ref.invalidate(newsPosts)),
+      ),
+    );
+```
+
+**A shared failure widget is the app's, not the framework's** — the copy is user-visible, so it comes
+from `context.l10n` and cannot live in a package. One widget in `lib/shared/widgets/` covers a whole
+app; it takes the retry as a `DwUiAction`, which is the one callback that earns its place under §1.9b
+(only the caller knows which read failed, and a `DwUiAction` is a value the framework means to be
+passed around).
+
+### More than one `AsyncValue`: answer every branch
+
+**`asData?.value` answers `null` for loading *and* for error.** It is the shortest thing that
+compiles, it reads as correct, and it turns a failure into a spinner that never stops — a wait shown
+for a request that answered `500` long ago. `.value ?? const []` is the same trap wearing a fallback:
+a failed read becomes "you have no bookings".
+
+```dart
+// ❌ a failed read is now an eternal spinner
+final profile = ref.watch(profileProvider).asData?.value;
+final sessions = ref.watch(sessionsProvider).asData?.value;
+if (profile == null || sessions == null) return const AppSpinner();
+
+// ✅ each read answers for itself; neither failure hides behind the other's skeleton
+ref
+    .watch(sessionsProvider)
+    .dwBuildListAsync(
+      errorBuilder: (_, _) => LoadFailedMessage(
+        onRetry: dw.action((_) => ref.invalidate(sessionsProvider)),
+      ),
+      childBuilder: (sessions) => ref
+          .watch(profileProvider)
+          .dwBuildAsync(
+            errorBuilder: (_, _) => LoadFailedMessage(
+              onRetry: dw.action((_) => ref.invalidate(profileProvider)),
+            ),
+            childBuilder: (profile) =>
+                ScheduleView(sessions: sessions, profile: profile),
+          ),
+    );
+```
+
+Where a screen genuinely needs both values before it can render anything, answer the branches by
+hand — `hasError` first, then `isLoading`, then `requireValue`. What you may not do is collapse them.
+
+**Degrading on purpose is allowed; stumbling into it is not.** A secondary read feeding an overlay
+(which sessions you already booked) may fall back to "none" when it fails — say so in the feature's
+`implementationNotes`, and the next reader stops wondering whether it was considered.
+
+**The framework ships no combinator for this, deliberately.** Nesting the builders is the answer, and
+a second verb to learn is not worth the sugar. If the hand-written combine keeps appearing anyway,
+that is an issue against the framework, not a helper in `logic/`.
 
 ## 1.6 Don't look widgets up in the tree via `GlobalKey`
 
@@ -800,10 +936,16 @@ test('wallet does not go negative when charged more than its balance', () {
 ## Capstone: everything wrong → how it should be
 
 ```dart
-// ❌ 1-word name + build method + context/ref as parameters + invalidate + outer padding + duplication
+// ❌ 1-word name + build method + context/ref as parameters + invalidate as propagation
+//    (a gesture around it does not make it one — the tap asked to save, not to
+//    reload; the list is being patched up by hand) + outer padding + duplication
 class Page extends ConsumerWidget {
   Widget _buildItem(BuildContext context, WidgetRef ref, dynamic d) => GestureDetector(
-        onTap: () { ref.invalidate(someProvider); Navigator.of(context).pop(); },
+        onTap: () async {
+          await api.save(d);
+          ref.invalidate(someProvider);
+          Navigator.of(context).pop();
+        },
         child: Padding(padding: const EdgeInsets.all(16), child: Text(d.toString())),
       );
   @override
@@ -837,7 +979,8 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** `BuildContext`/`WidgetRef` in the parameters of services and functions — and **no `extension on BuildContext` that opens the app's own screens**: showing a feature is a static method on that feature's widget (§1.3).
 - [ ] **No** `_buildXxx()` methods returning a widget — those are separate widget classes (§1.4).
 - [ ] **No** private widget methods that transform the domain — those are extensions in the feature's `logic/` (§1.3c).
-- [ ] **No** `ref.invalidate(...)` — refresh through the state.
+- [ ] **`ref.invalidate(...)` only where the user asked for it** — a retry button, pull-to-refresh, "reload". Not after a write (that means the write left `dw.repo`), not in a listener, not to move data between screens (§1.5).
+- [ ] **A section that is the point of its screen renders its failure** and offers a way out; blank is a meaning of its own, and the `errorWidget` default is `SizedBox.shrink()`. **No `asData?.value`** (or `.value ?? const []`) to combine several `AsyncValue`s — it answers `null` for loading and for error alike, so a failure becomes an endless spinner (§1.5a).
 - [ ] **No** `GlobalKey` for looking widgets up in the tree.
 - [ ] **No** outer `padding`/`margin` inside a widget — the parent sets the padding (§1.7). When refactoring someone else's widget the outer padding moves to the caller instead of being "kept as it was".
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).

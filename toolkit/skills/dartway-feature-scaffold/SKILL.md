@@ -294,11 +294,19 @@ class TodoListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final search = ref.watch(todoSearchStringProvider);
-    final todos = ref.watch(dw.repo.modelList<Todo>());
+    // named once and used twice: watched, and thrown away again by the retry
+    final todoList = dw.repo.modelList<Todo>();
 
     return Scaffold(
-      body: todos.dwBuildListAsync(
+      body: ref.watch(todoList).dwBuildListAsync(
         loadingItemsCount: 5,
+        // the list is the whole point of this screen, so its failure gets a
+        // picture of its own — the default errorWidget is SizedBox.shrink(),
+        // which would make a 500 look like "no todos yet"
+        // (dartway-clean-code §1.5a)
+        errorBuilder: (_, _) => LoadFailedMessage(
+          onRetry: dw.action((_) => ref.invalidate(todoList)),
+        ),
         // local filtering — a plain .where in the widget; there is deliberately
         // no "framework" way to do it (see dartway-data-layer §3)
         childBuilder: (list) => ListView(
@@ -331,4 +339,6 @@ class TodoListPage extends ConsumerWidget {
 }
 ```
 
-The essentials: `AsyncValue` lists — through `dwBuildListAsync` (with `loadingItemsCount`); local search/filter — a `.where` in the widget (plus a provider for the search string); actions from the UI — inside `dw.action` (the callback receives `context`; use `(_)` if you don't need it — see `dartway-data-layer` §4).
+The essentials: `AsyncValue` lists — through `dwBuildListAsync` (with `loadingItemsCount`); a list the screen exists for also passes `errorBuilder`, because the default renders nothing at all (`dartway-clean-code` §1.5a); local search/filter — a `.where` in the widget (plus a provider for the search string); actions from the UI — inside `dw.action` (the callback receives `context`; use `(_)` if you don't need it — see `dartway-data-layer` §4).
+
+`LoadFailedMessage` above is **your** widget in `lib/shared/widgets/` — a sentence and a retry button — not one the framework ships: the copy is user-visible and has to come from `context.l10n`. `template/` starts you with one.
