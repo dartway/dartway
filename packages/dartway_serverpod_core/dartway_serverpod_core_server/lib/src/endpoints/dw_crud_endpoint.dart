@@ -10,6 +10,13 @@ import '../private/dw_singleton.dart';
 class DwCrudEndpoint extends Endpoint {
   final _deepEquality = const DeepCollectionEquality();
 
+  /// Reports [errorMessage] and answers with a failed [DwApiResponse].
+  ///
+  /// [stackTrace] is the stack of the *throw*, and it is what gets reported —
+  /// the helper falls back to its own stack only when the caller has none.
+  /// Passing the caught stack and then reporting `StackTrace.current` is not a
+  /// smaller version of the same thing: it points every report at this line
+  /// instead of at the code that failed.
   DwApiResponse<T> returnError<T>(
     String errorMessage, {
     Object? exception,
@@ -18,9 +25,45 @@ class DwCrudEndpoint extends Endpoint {
     dw.alerts.reportError(
       errorMessage,
       exception: exception,
-      stackTrace: StackTrace.current,
+      stackTrace: stackTrace ?? StackTrace.current,
     );
     return DwApiResponse(isOk: false, value: null, error: errorMessage);
+  }
+
+  /// The error boundary **every** method of this endpoint runs inside.
+  ///
+  /// One endpoint serves every model in the application, so an exception that
+  /// escapes it becomes a bare HTTP 500 whose client-side report reads
+  /// `Failed call: dartway_serverpod_core.dwCrud.getAll` — identical whichever
+  /// list broke, while `className` sat right there in the arguments. Inside the
+  /// guard the same failure comes back as `isOk: false` with the model named,
+  /// and passes through `dw.alerts` on the way.
+  ///
+  /// It is a wrapper rather than five `try`/`catch` blocks because the bug this
+  /// closes was not carelessness — `getCount` and `getAll` were simply the two
+  /// of five where the block was never written. A method that forgets the
+  /// wrapper is caught by `dw_crud_endpoint_guard_test.dart`, which reads this
+  /// file and fails on any endpoint method whose body does not delegate here.
+  ///
+  /// Only *thrown* failures are its business. `notConfigured` and
+  /// `notAuthenticated` are answers, not accidents: they are returned by the
+  /// body and travel back out unchanged, unreported.
+  Future<DwApiResponse<T>> _guard<T>(
+    String operation,
+    String className,
+    Future<DwApiResponse<T>> Function() body, {
+    String? details,
+  }) async {
+    try {
+      return await body();
+    } catch (ex, stackTrace) {
+      return returnError<T>(
+        'Unexpected error while handling the $operation request '
+        'for $className${details == null ? '' : ' ($details)'}',
+        exception: ex,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Stream<SerializableModel> subscribeOnUpdates(
@@ -56,54 +99,42 @@ class DwCrudEndpoint extends Endpoint {
     required String className,
     required DwBackendFilter filter,
     String? apiGroup,
-  }) async {
-    try {
-      final caller = dw.getCrudConfig(className, api: apiGroup);
+  }) => _guard('getOne', className, () async {
+    final caller = dw.getCrudConfig(className, api: apiGroup);
 
-      session.log(
-        'getOne for $className with filter: ${filter.attributeMap}',
-        level: LogLevel.debug,
-      );
+    session.log(
+      'getOne for $className with filter: ${filter.attributeMap}',
+      level: LogLevel.debug,
+    );
 
-      if (caller?.getModelConfigs == null || caller!.getModelConfigs!.isEmpty) {
-        return DwApiResponse.notConfigured(source: 'getOne for $className');
-      }
-
-      final config = caller.getModelConfigs!.firstWhereOrNull(
-        (e) => _deepEquality.equals(
-          e.filterPrototype.attributeMap,
-          filter.attributeMap,
-        ),
-      );
-
-      if (config == null) {
-        return DwApiResponse.notConfigured(source: 'getOne for $className');
-      }
-
-      if (!await _isCallerAllowed(session, config.allowAnonymous)) {
-        return DwApiResponse.notAuthenticated(source: 'getOne for $className');
-      }
-
-      return await config.call(session, caller.table, filter);
-    } catch (ex) {
-      dw.alerts.reportError(ex.toString(), stackTrace: StackTrace.current);
-
-      return DwApiResponse(
-        isOk: false,
-        value: null,
-        error:
-            'Unexpected error while handling the getOne request '
-            'for $className',
-      );
+    if (caller?.getModelConfigs == null || caller!.getModelConfigs!.isEmpty) {
+      return DwApiResponse.notConfigured(source: 'getOne for $className');
     }
-  }
+
+    final config = caller.getModelConfigs!.firstWhereOrNull(
+      (e) => _deepEquality.equals(
+        e.filterPrototype.attributeMap,
+        filter.attributeMap,
+      ),
+    );
+
+    if (config == null) {
+      return DwApiResponse.notConfigured(source: 'getOne for $className');
+    }
+
+    if (!await _isCallerAllowed(session, config.allowAnonymous)) {
+      return DwApiResponse.notAuthenticated(source: 'getOne for $className');
+    }
+
+    return await config.call(session, caller.table, filter);
+  });
 
   Future<DwApiResponse<int>> getCount(
     Session session, {
     required String className,
     DwBackendFilter? filter,
     String? apiGroup,
-  }) async {
+  }) => _guard('getCount', className, () async {
     final caller = dw.getCrudConfig(className, api: apiGroup);
 
     session.log(
@@ -126,7 +157,7 @@ class DwCrudEndpoint extends Endpoint {
       session,
       whereClause: filter?.prepareWhere(caller.table),
     );
-  }
+  });
 
   Future<DwApiResponse<List<DwModelWrapper>>> getAll(
     Session session, {
@@ -136,7 +167,7 @@ class DwCrudEndpoint extends Endpoint {
     int? limit,
     int? offset,
     String? apiGroup,
-  }) async {
+  }) => _guard('getAll', className, () async {
     final crudConfig = dw.getCrudConfig(className, api: apiGroup);
 
     DwGetListInterface? caller = crudConfig?.getListConfig;
@@ -167,74 +198,58 @@ class DwCrudEndpoint extends Endpoint {
       limit: limit,
       offset: offset,
     );
-  }
+  });
 
   Future<DwApiResponse<DwModelWrapper>> saveModel(
     Session session, {
     required DwModelWrapper wrappedModel,
     String? apiGroup,
-  }) async {
-    try {
-      final model = wrappedModel.object;
-      final className = wrappedModel.dwMappingClassname;
+  }) => _guard('saveModel', wrappedModel.dwMappingClassname, () async {
+    final model = wrappedModel.object;
+    final className = wrappedModel.dwMappingClassname;
 
-      if (model is! TableRow) {
-        // throw UnsupportedError(
-        //   'Received item of unsupported type: ${model.runtimeType}. Only TableRow could be saved to database',
-        // );
-        final caller = dw.getDtoConfig(className, api: apiGroup);
+    if (model is! TableRow) {
+      // throw UnsupportedError(
+      //   'Received item of unsupported type: ${model.runtimeType}. Only TableRow could be saved to database',
+      // );
+      final caller = dw.getDtoConfig(className, api: apiGroup);
 
-        if (caller == null || caller is! DwDtoActionConfig) {
-          return DwApiResponse.notConfigured(source: 'saveModel $className');
-        }
-        if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
-          return DwApiResponse.notAuthenticated(source: 'saveModel $className');
-        }
-        return await caller.save(session, model);
-      } else {
-        final caller = dw.getCrudConfig(className, api: apiGroup)?.saveConfig;
-
-        if (caller == null) {
-          return DwApiResponse.notConfigured(source: 'saveModel $className');
-        }
-        if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
-          return DwApiResponse.notAuthenticated(source: 'saveModel $className');
-        }
-        return await caller.save(session, model);
+      if (caller == null || caller is! DwDtoActionConfig) {
+        return DwApiResponse.notConfigured(source: 'saveModel $className');
       }
-    } catch (ex, st) {
-      return returnError(
-        'Unexpected error during saveModel ${wrappedModel.dwMappingClassname}',
-        exception: ex,
-        stackTrace: st,
-      );
+      if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
+        return DwApiResponse.notAuthenticated(source: 'saveModel $className');
+      }
+      return await caller.save(session, model);
+    } else {
+      final caller = dw.getCrudConfig(className, api: apiGroup)?.saveConfig;
+
+      if (caller == null) {
+        return DwApiResponse.notConfigured(source: 'saveModel $className');
+      }
+      if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
+        return DwApiResponse.notAuthenticated(source: 'saveModel $className');
+      }
+      return await caller.save(session, model);
     }
-  }
+  });
 
   Future<DwApiResponse<bool>> delete(
     Session session, {
     required String className,
     required int modelId,
     String? apiGroup,
-  }) async {
-    try {
-      final caller = dw.getCrudConfig(className, api: apiGroup)?.deleteConfig;
+  }) => _guard('delete', className, () async {
+    final caller = dw.getCrudConfig(className, api: apiGroup)?.deleteConfig;
 
-      if (caller == null) {
-        return DwApiResponse.notConfigured(source: 'delete $className');
-      }
-
-      if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
-        return DwApiResponse.notAuthenticated(source: 'delete $className');
-      }
-
-      return await caller.delete(session, modelId);
-    } catch (ex, st) {
-      return returnError(
-        'Unexpected error during delete $className with id $modelId',
-        exception: ex,
-        stackTrace: st,
-      );
+    if (caller == null) {
+      return DwApiResponse.notConfigured(source: 'delete $className');
     }
-  }
+
+    if (!await _isCallerAllowed(session, caller.allowAnonymous)) {
+      return DwApiResponse.notAuthenticated(source: 'delete $className');
+    }
+
+    return await caller.delete(session, modelId);
+  }, details: 'id $modelId');
 }

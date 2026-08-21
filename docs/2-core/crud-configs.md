@@ -84,6 +84,28 @@ reachable at all**. Access is something you grant, never something you forget to
 first encounter is a new model whose screen shows the "not configured" message — the config was
 written and the registration line was not.
 
+## When a call fails
+
+A denial and a failure are different answers. `notConfigured` and `notAuthenticated` above are
+decisions the server made on purpose; a **failure** is something that threw underneath — a table the
+database does not have yet, a column the schema never grew, a filter naming a field that does not
+exist.
+
+Every method of the CRUD endpoint runs inside one error boundary, so a failure is never a bare HTTP
+500. It comes back as `isOk: false` with the operation and the model in the text:
+
+```
+Unexpected error while handling the getAll request for ClubService
+```
+
+and the same failure — exception and the stack of the throw — is reported through `dw.alerts`
+(see [error reporting](error-reporting.md)). **The model name is the part that matters**: one
+endpoint serves every model in the application, so a report that says only which endpoint failed
+reads the same whichever list broke.
+
+Nothing about the failure text describes the database. What threw goes to the operator, never to the
+client — the same rule the save path states below for `DatabaseException`.
+
 ## Saving: one lifecycle for insert and update
 
 `DwSaveConfig<T>` has no separate create and update paths. `saveContext.isInsert` tells the hooks
