@@ -28,18 +28,34 @@ Priority, in order:
    more than a loud one.
 4. Age breaks ties; a cluster of issues around one seam beats a lone one.
 
-Before picking, discard the dead: an issue whose fix already rode in on a
-merged PR that forgot the `Closes #N` keyword. Cross-references
-(`/issues/<n>/timeline`) show these. Report them for closing — do not fix them
-twice.
+Before picking, discard the dead — and the body of an issue is not enough to
+tell whether it is alive:
+
+- **Read the comments** (`gh issue view <n> --comments`). An issue is a thread,
+  and the thread is where a premise gets refuted, a scope gets cut, or the
+  reporter is asked for data the fix waits on. Picking from the title and the
+  body alone is how you hand a subagent a brief that the issue itself already
+  contradicts.
+- **Check the tree for the fix.** An issue whose remedy already rode in on a
+  merged PR that forgot the `Closes #N` keyword is dead; cross-references
+  (`/issues/<n>/timeline`) and the files the last few PRs touched show these.
+  Report them for closing — do not fix them twice.
+
+An issue waiting on data from whoever reported it is not workable, however
+loud its label. Say so and take the next one.
 
 ### 2. Clarify it — briefly
 
-Read the issue, then read the code it names. Enough to answer three things:
-what actually happens, why it happens, and what the blast radius is. Confirm
-the mechanism in the tree rather than trusting the report's diagnosis; a report
-written from a production incident often names the symptom correctly and the
-cause approximately.
+Read the issue and its comments, then read the code it names. Enough to answer
+three things: what actually happens, why it happens, and what the blast radius
+is. Confirm the mechanism in the tree rather than trusting the report's
+diagnosis; a report written from a production incident names the symptom
+exactly and the cause approximately, and the two are easy to conflate because
+the symptom is the part that was actually observed.
+
+A version boundary is the usual place a diagnosis rots: behaviour that was real
+in a dependency's 2.x is written up as if it were current. Check the version
+this repository pins before you accept a mechanism.
 
 Stop when you can state the defect in one paragraph. This step is not the fix.
 
