@@ -187,14 +187,14 @@ AppText.body(post.description)
 AppText.caption('${date.dayLabel} · ${date.timeLabel}')
 ```
 
-**All user-facing text comes from l10n, not from a string literal.** The skeleton is localized (en/ru); `AppText.body('Book a spot')` with a hardcoded string desyncs the feature from the rest of the app. Take the text from `context.l10n`:
+**All user-facing text comes from l10n, not from a string literal.** Every DartWay project is localized — a requirement, not a description of how the project started, and if the wiring is missing it is fixed before the strings pile up (see the localization law and its migration entry in `CLAUDE.md`). `AppText.body('Book a spot')` with a hardcoded string desyncs the feature from the rest of the app. Take the text from `context.l10n`:
 
 ```dart
 final l10n = context.l10n;
 AppText.body(l10n.bookSpot)
 ```
 
-A new string = add a key to **both** ARBs (`lib/l10n/app_en.arb` and `app_ru.arb`) and run `flutter gen-l10n`. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
+A new string = add a key to **every** ARB the project keeps (the skeleton ships `lib/l10n/app_en.arb` and `app_ru.arb`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the generated protocol does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
 
 ```dart
 // ui_kit/theme/app_text.dart

@@ -42,11 +42,17 @@ A project may add a fourth one, `*_shared` — pure Dart for code that has to be
 5. **Naming.** Classes — at least 2 words (`UserProfile`, not `User`). Variables are fully descriptive and match the type (`userProfile`, `userProfileId`). Fields relating to a user always carry the word Profile: `userProfileId`, `authorProfileId`, `updatedByProfileId`. Forbidden: `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
 6. **Done = audit + a description next to the code.** A feature is not finished until `dartway-finish` has been run: an audit of the diff against the cleanliness contract, and a reconciliation of the feature's description with the new behavior. **The description lives in the code, not in a separate doc:** a screen's behavior — in the `DwFeatureSpec` of the feature widget, the server-side agreements — in the doc comments above the CRUD config. We do not keep separate "a doc per feature" files: a description far from the code drifts from it on the very first edit, and it drifts silently — the code compiles while the doc lies. Verified on a production project: a feature's doc described an API that had not been in the code for a year, and the agent wrote non-working code from it.
 
-## Code generation: not used by default
+## Code generation: two sanctioned generators, and no `build_runner`
 
-The only generator in the project is **`serverpod generate`** (models and client). It is a separate CLI, not `build_runner`, and it is unavoidable. Being a separate CLI is also why its output has to be re-formatted afterwards — it carries its own `dart_style`, and the sequence that keeps that from flooding every diff is in the Server section below (`serverpod generate` → `create-migration` → `dart format`, in that order).
+The project has exactly two: **`serverpod generate`** (models and the client package) and **`flutter gen-l10n`** (the typed `AppLocalizations` from `lib/l10n/*.arb`). Both are unavoidable — the first because the wire is generated, the second because the localization law in the Flutter section is not obeyable without it — and both share the same three properties.
 
-Everything else is written by hand:
+- **A separate CLI, not `build_runner`.** Neither one watches the tree, and neither is part of the edit loop: `serverpod generate` runs when a model's YAML changes, `flutter gen-l10n` when an `.arb` changes. Nothing runs on save.
+- **The output is committed.** The generated protocol is in the repository and so is `lib/l10n/gen/`, for the same reason: a tree that compiles only after somebody remembers to run a generator is a tree that is broken for whoever cloned it, and broken with an error that blames their code.
+- **They are run by hand, so they can be forgotten.** An `.arb` edited without a `gen-l10n` run gives `undefined getter` on a key that is plainly there — the same trap as a forgotten `serverpod generate`, and it reads as a typo rather than as a missing step.
+
+`serverpod generate` being a separate CLI is also why its output has to be re-formatted afterwards — it carries its own `dart_style`, and the sequence that keeps that from flooding every diff is in the Server section below (`serverpod generate` → `create-migration` → `dart format`, in that order). `flutter gen-l10n` ships no formatter of its own and needs no such step.
+
+Everything beyond those two is written by hand:
 
 - **providers and state** — plain `Provider` / `NotifierProvider`, no `riverpod_generator`. A family key is a record (`({int courseId, int? parentId})`): it has meaningful equality by construction, which is exactly what the generator is wanted for;
 - **state data classes** — a plain immutable class with `copyWith` and `==`, no `freezed`. Domain models already arrive generated from Serverpod;
@@ -260,6 +266,23 @@ Live migrations (delete an entry once no project is on the old shape):
   that a provider named in tests through `overrideWith` stays a named provider, it just changes
   address.
 
+- **An unlocalized app → the localization law (Flutter section).** *You have the old shape if:*
+  `grep -c flutter_localizations __FLUTTER_PKG__/pubspec.yaml` returns 0, `__FLUTTER_PKG__/lib/l10n/`
+  does not exist, or `grep -r 'context\.l10n' __FLUTTER_PKG__/lib` finds nothing while the widgets
+  are full of readable strings. Any one of the three is enough, and none of them makes anything fail
+  — which is why this migration exists at all. *Target:* the wiring the law lists, and every
+  user-visible string coming from `context.l10n` or `appL10n`. *What has accumulated:* **the wiring
+  goes in one commit, the strings screen by screen.** The wiring is small and mechanical — the
+  pubspec, `l10n.yaml`, one `.arb` in the project's own language, the locale provider, the delegates
+  on `MaterialApp`, the test harness — and half-present wiring is the state that has no honest
+  reading. The strings are not small: one production app carried around 450 of them across some 150
+  files, so they move as you touch a screen, like any other legacy. Two things to expect on the way
+  in. Every widget test that builds its own `MaterialApp` starts failing at the first lookup, all in
+  the same way, because a tree with no delegates has no `AppLocalizations` to find — fix it in the
+  shared harness, not in each test. And the first `.arb` is not automatically English: write it in
+  whatever language the app's strings are already in, or the migration turns into an unasked-for
+  translation.
+
 ## Skills and commands
 
 - Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-testing`, `dartway-finish` — loaded by relevance to the task.
@@ -298,7 +321,13 @@ Nothing else may sit at the top level, and nothing may carry one of those names 
 - **Data (the data layer):** access only through `dw.repo` — reads are providers under the native `ref.watch`/`read`/`refresh` (`dw.repo.model`/`maybeModel`/`modelList`), writes are `dw.repo.saveModel`/`deleteModel`. Lists — `dwBuildListAsync(loadingItemsCount:)`; narrowing by query — `backendFilter`, local filtering you do yourself with `.where` in the widget. The contract — `dartway-data-layer`, creating a feature — `dartway-feature-scaffold`.
 - **`ProviderScope` is not written by the app.** The only one belongs to `DwAppRunner`; tests may create their own with `overrides:`. A nested scope in the widget tree looks like it works — widgets under it do read the override — but a provider reaching the same provider through `Ref` starts from the root container and silently gets the base value instead: no exception, no warning, just a different value. **A value that must differ per subtree travels as a family key or a constructor argument**, not through a scope. Enforced by `forbidden_provider_scope` (`dartway_lints`) — `riverpod_lint`'s own rule for this cannot help, it only understands generated providers.
 - **The UI Kit is the only source of styles:** in the zones and in `shared/`, direct `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme` are forbidden; the only import is `ui_kit.dart`. Skill — `dartway-ui-kit`.
-- **Every project is localized, and user-visible text is never written in code.** The skeleton arrives with it wired: `l10n/*.arb`, `appLocaleProvider` (system locale by default, switchable at runtime and by Studio over the bridge), `context.l10n` in widgets and `appL10n` for code outside the tree — notification bodies, error toasts. A project with one language keeps one `.arb` and pays nothing; adding localization later means walking every screen, which is why it is not a choice made per project.
+- **Every project is localized, and user-visible text is never written in code.** This is a requirement on the project, not a report on how it began. **Check that the wiring is actually there, and if it is not, putting it there is the first thing fixed — not something to live with.** What has to be present: `flutter_localizations` and `generate: true` in the Flutter pubspec, `l10n.yaml` and `lib/l10n/*.arb` with its generated output committed beside them, `appLocaleProvider` (system locale by default, switchable at runtime and by Studio over the bridge), `context.l10n` in widgets and `appL10n` for code outside the tree — notification bodies, error toasts.
+
+  A project created by `dartway create` arrives with all of it, and the skeleton is where to read what each piece looks like. A project that reached this methodology by another road may have none of it, and **nothing will say so**: the compiler is happy, the tests are green, `dartway check` is silent, and the app looks finished. It surfaces as one item of an otherwise consistent menu turning up in a different language — because with no single place for text, the language of a string is decided by whoever happened to type it. That is a human noticing a screenshot, which is not a check.
+
+  A project with one language keeps one `.arb` and pays nothing; retrofitting localization means walking every screen and moving every string, which is why it is not a choice made per project. New strings are added to **every** `.arb`, then `flutter gen-l10n` is run and its output committed (see "Code generation" above).
+
+  **A widget test mounts three things, not two:** `localizationsDelegates`, `supportedLocales`, **and an explicit `locale:`**. The third is the one that reads as pedantry — without it the test resolves against the locale of the machine it runs on, so an assertion on the template's text passes for the author and fails for whoever else runs the suite. The skeleton's `test/support/` harness does it in one place; the rest is in `dartway-testing`.
 
   The reason is one sentence and it covers both places the rule bites: **a string the user reads is content, not decoration** — so `ui_kit` may not hold it (the kit does not own meaning) and a feature may not hardcode it (the feature does not own the language). `AppText.body(context.l10n.issuesTitle)`, never `AppText.body('Issues')`.
 

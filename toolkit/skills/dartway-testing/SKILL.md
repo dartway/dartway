@@ -143,6 +143,34 @@ widget test has no business answering.
 process and it cannot be replaced, so the second test file in a run would otherwise meet
 `Dw is already initialized` or a `LateInitializationError`.
 
+### Localization is mounted with a locale, not just with delegates
+
+Every user-visible string in a DartWay app comes from `context.l10n`, so a widget test needs the
+tree to be able to answer that lookup. The harness mounts **three** things, and the third is the one
+that gets left out:
+
+```dart
+MaterialApp(
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  // Explicit, because the default is the locale of the machine running the test.
+  locale: const Locale('en'),
+  home: /* … */,
+)
+```
+
+- **Without the delegates**, the first `context.l10n` fails a null check, and the failure lands where
+  the subject fails to build rather than where the localization is missing. When localization is
+  introduced into a living app this hits every test at once — one app saw 149 of 385 turn red in one
+  step, all with the same error. That is one line in the shared harness, not a line per test file.
+- **Without an explicit `locale:`**, the tree resolves against the platform locale, so
+  `find.text('Save')` asserts on whichever language the machine happened to pick. The suite is green
+  for the person who wrote it and red for the next person to clone the repository, with a diff that
+  says nothing about locales. Pin it to the language the assertions are written in.
+
+A test that needs another language passes that locale instead — that is the point of it being a
+value in one place rather than an ambient default.
+
 ### The core is needed to *render*, not only to tap
 
 `dw.action(...)` is constructed inside `build`. A feature therefore touches `dw` while building,
@@ -265,4 +293,6 @@ and at the layer where it lives**". That is what `dartway-finish` asks.
 - Reaching for `dw.repo.localWrites` to observe a save.
 - Asserting the number of server calls on a path where a read failed.
 - `pump` instead of `pumpAndSettle` after typing into `AppTextFormField`.
+- A `MaterialApp` in a test with the localization delegates but no `locale:` — green on the
+  author's machine, red on the next one.
 - Keeping a callback parameter on a widget "so it can be tested".
