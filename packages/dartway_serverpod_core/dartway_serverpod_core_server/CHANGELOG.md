@@ -2,10 +2,27 @@
 
 ## 0.10.0
 
-Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.10.0 is the
-Flutter side gaining the optional local-storage contract for `dw.repo` — `DwRepoLocalReads` and
-`DwRepoLocalWrites`, declared on the core as a plugin. Nothing changes for an app that declares no
-store. See the changelog of `dartway_serverpod_core_flutter`.
+**A CRUD call that fails now says which model it was about.** `getAll` and `getCount` had no error
+handling of their own, so a missing table, a column the schema never grew or a filter naming a field
+that does not exist escaped as a bare HTTP 500: nothing reached `DwAlerts`, and the client-side
+report read `Failed call: dartway_serverpod_core.dwCrud.getAll` — identical whichever list broke,
+while `className` sat right there in the arguments.
+
+- Every method of `DwCrudEndpoint` now runs inside one error boundary. A thrown failure comes back
+  as `DwApiResponse(isOk: false)` with the operation and the model in the text — `Unexpected error
+  while handling the getAll request for ClubService` — and is reported through `dw.alerts` with the
+  exception. `delete` keeps the id of the row it was about.
+- **`notConfigured` and `notAuthenticated` are unaffected.** They are answers, not accidents: they
+  travel back out unchanged and are not reported.
+- The report now carries **the stack of the throw**. `returnError` took a `stackTrace` and then
+  reported `StackTrace.current`, so every alert from `saveModel` and `delete` pointed at the handler
+  instead of at the code that failed.
+- `getOne` reported the raw `ex.toString()` as the alert headline; all five methods now report the
+  same way.
+
+This release also carries the Flutter side's optional local-storage contract for `dw.repo` —
+`DwRepoLocalReads` and `DwRepoLocalWrites`, declared on the core as a plugin. Nothing changes for an
+app that declares no store. See the changelog of `dartway_serverpod_core_flutter`.
 
 ## 0.9.0
 

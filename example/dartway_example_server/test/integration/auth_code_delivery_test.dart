@@ -76,10 +76,10 @@ void main() {
 
         final response = await _openLoginRequest(session);
 
-        // Not the generic "Unexpected error during saveModel DwAuthRequest" a
-        // thrown hook produces, and not the provider's complaint either — that
-        // one names the delivery configuration, and this endpoint answers
-        // anonymous callers.
+        // Not the generic "Unexpected error while handling the saveModel
+        // request for DwAuthRequest" a thrown hook produces, and not the
+        // provider's complaint either — that one names the delivery
+        // configuration, and this endpoint answers anonymous callers.
         expect(response.error, isNotNull);
         expect(response.error, isNot(contains('Unexpected error')));
         expect(response.error, isNot(contains('DwAuthRequest')));

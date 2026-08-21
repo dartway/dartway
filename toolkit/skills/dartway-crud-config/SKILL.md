@@ -39,6 +39,12 @@ Don't forget to register the config in `crudConfigurations` at `DwCore.init`. If
 > tell which you meant). A config carrying hand-written save or delete logic that no server test names
 > is `crudRuleUntested`; where that test goes is `dartway-testing`.
 
+A registered config can still **fail** — a table not migrated yet, a filter naming a column the
+schema does not have. That is a different answer from "not configured", and it reads differently:
+`Unexpected error while handling the getAll request for ClubService`, with the exception and the
+stack reported to `DwAlerts`. When a list is broken, the text tells you which of the two you are
+looking at — the registration, or the query.
+
 ## accessFilter — the heart of secure-by-default
 
 Two separate questions, and until 0.3.0 they were conflated into one:
