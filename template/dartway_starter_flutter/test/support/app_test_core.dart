@@ -99,6 +99,13 @@ extension AppFeaturePump on WidgetTester {
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          // Explicit, and not a detail: left out, the tree resolves against the
+          // locale of the machine running the test, so `find.text('Save')`
+          // asserts on whichever language that machine happened to pick. The
+          // suite then passes for whoever wrote it and fails for the next
+          // person to clone the repository, with a diff that mentions no
+          // locale. Pin it to the language the assertions are written in.
+          locale: const Locale('en'),
           home: DwNotificationsListener(
             handlers: {DwUiNotification: DwUiNotificationHandler()},
             child: Scaffold(body: SingleChildScrollView(child: child)),

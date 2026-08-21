@@ -202,11 +202,33 @@ AppText.body(context.l10n.issuesTitle)   // ✅
 AppText.body('Issues')                   // ❌ — content, nailed into a widget
 ```
 
-Every DartWay project is localized from the first day, and the skeleton arrives that way: `l10n/*.arb`,
+Every DartWay project is localized. That is a requirement on the project, and a project created by
+`dartway create` arrives satisfying it: `flutter_localizations` and `generate: true` in the pubspec,
+`l10n.yaml`, `lib/l10n/*.arb` with the generated `lib/l10n/gen/` committed beside them,
 `appLocaleProvider` (the system locale by default, switchable at runtime — and by DartWay Studio over
 the bridge), `context.l10n` inside widgets, `appL10n` for the code that runs outside the tree, such as
-notification bodies and error toasts. One language means one `.arb` file and costs nothing; adding
-localization afterwards means walking every screen, which is why it is not decided per project.
+notification bodies and error toasts.
+
+If your app does not have that wiring, putting it in is the first thing to fix rather than something
+to live with — and nothing will tell you: the compiler is happy, the tests pass and `dartway check`
+is silent. The symptom is one item of an otherwise English menu turning up in another language,
+because without a single place for text, the language of a string is decided by whoever typed it. One
+language means one `.arb` file and costs nothing; retrofitting localization means walking every screen
+and moving every string, which is why it is not decided per project.
+
+**Adding a string means running a generator.** A new key goes into every `.arb`, then `flutter
+gen-l10n` regenerates the typed `AppLocalizations`. It is the project's second and last generator —
+`serverpod generate` is the other — and like that one it is a separate CLI rather than `build_runner`,
+it runs when the `.arb` files change rather than on every save, and **its output is committed**, for
+the same reason the generated protocol is: a tree that only compiles after somebody remembers to run
+a generator is broken for whoever cloned it.
+
+**A widget test carries a requirement on its environment.** A tree that renders localized text needs
+`localizationsDelegates`, `supportedLocales` **and an explicit `locale:`** — without the delegates the
+first `context.l10n` fails a null check, and without the locale the test resolves against the machine
+it runs on, so an assertion on the app's text passes for its author and fails for the next person to
+clone the repository. The skeleton puts all three in its `test/support/` harness, once, rather than in
+every test file.
 
 **Yes, this costs you `const`.** A widget that displays a localized string cannot be `const` — the
 value is resolved from the context at runtime. The boundary simply moves one level down: `const Icon`,
