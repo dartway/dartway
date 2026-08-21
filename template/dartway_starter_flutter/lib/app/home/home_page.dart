@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_settings_reader.dart';
@@ -30,6 +31,8 @@ class HomePage extends ConsumerWidget implements DwFeature {
     behaviors: [
       'The app name comes from the database, not from a constant.',
       'Changing it in the admin panel updates this screen with no reload.',
+      'A failed read says so and offers a retry — the one thing this screen '
+          'exists to prove must not fail in silence.',
     ],
   );
 
@@ -37,6 +40,12 @@ class HomePage extends ConsumerWidget implements DwFeature {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final user = ref.watchUserProfile;
+
+    // Named once and used twice: watched below, and thrown away again by the
+    // retry inside the error state. Writing the expression out a second time is
+    // how a retry ends up refreshing a different provider than the one that
+    // failed.
+    final appSettings = dw.repo.modelList<AppSetting>();
 
     return AppScaffold.main(
       appBar: AppBar(title: AppText.title(l10n.homeTitle)),
@@ -52,9 +61,18 @@ class HomePage extends ConsumerWidget implements DwFeature {
                   const Gap(8),
                   // A live list from the server: one line, realtime, typed.
                   ref
-                      .watch(dw.repo.modelList<AppSetting>())
+                      .watch(appSettings)
                       .dwBuildListAsync(
                         loadingItemsCount: 1,
+                        // The default error widget is nothing at all, and this
+                        // read is the one thing the screen exists to prove.
+                        // A decoration may fail in silence; this may not — see
+                        // dartway-clean-code §1.5a.
+                        errorBuilder: (_, _) => LoadFailedMessage(
+                          onRetry: dw.action(
+                            (_) => ref.invalidate(appSettings),
+                          ),
+                        ),
                         childBuilder: (settings) => AppText.caption(
                           l10n.homeAppNameFromDatabase(
                             // Typed read by catalogue entry, not by string

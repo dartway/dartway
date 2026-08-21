@@ -1,6 +1,9 @@
 {
   "@@locale": "en",
 
+  "loadFailed": "Could not load this — check your connection and try again.",
+  "retry": "Try again",
+
   "tabSchedule": "Schedule",
   "tabBookings": "My bookings",
   "tabNews": "News",

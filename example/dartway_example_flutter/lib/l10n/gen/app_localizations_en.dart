@@ -9,6 +9,13 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get loadFailed =>
+      'Could not load this — check your connection and try again.';
+
+  @override
+  String get retry => 'Try again';
+
+  @override
   String get tabSchedule => 'Schedule';
 
   @override

@@ -64,6 +64,34 @@ coursesAsync.dwBuildListAsync(
 );
 ```
 
+**The error branch has no default worth inheriting.** `errorWidget` is `SizedBox.shrink()`: the
+error goes to alerting through `dw.handleError` and **nothing at all** goes on screen. That is the
+right default for a decoration and the wrong one for the list a screen exists for — and the
+extension cannot tell them apart, so you decide. `dartway-clean-code` §1.5a is the rule; the shape
+is a provider named once, watched, and thrown away again by the retry:
+
+```dart
+final courses = dw.repo.modelList<LearningCourse>();
+
+ref
+    .watch(courses)
+    .dwBuildListAsync(
+      loadingItemsCount: 5,
+      childBuilder: (list) => ...,
+      errorBuilder: (_, _) => LoadFailedMessage(
+        onRetry: dw.action((_) => ref.invalidate(courses)),
+      ),
+    );
+```
+
+`LoadFailedMessage` is **your** widget, in `lib/shared/widgets/` — the copy is user-visible and comes
+from `context.l10n`, which is why the framework does not ship one. The `ref.invalidate` in the retry
+is a reset the user asked for, which §1.5 allows and which nothing else may do.
+
+**Combining several `AsyncValue`s: never through `asData?.value`.** It answers `null` for loading and
+for error alike, so a failure renders as a spinner that never stops (`.value ?? const []` hides it
+the same way). Nest the builders instead — each read answers for its own failure. See §1.5a.
+
 **When you introduce a new model, register its default instance** in `__FLUTTER_PKG__/lib/core/default_models.dart` — one call per model:
 
 ```dart
@@ -708,6 +736,7 @@ The default is `DwRepoReadStrategy.networkOnly`, and a store being declared does
 - [ ] Data — only `dw.repo`: reads are the `dw.repo.model/maybeModel/modelList` providers under `ref.watch/read/refresh`; writes are `dw.repo.saveModel/deleteModel`. No `ref.watchModel`, no `DwRepository.`, no repositories, no manual `Future`s, no direct client.
 - [ ] Create and Update — one `saveModel` (not two different methods).
 - [ ] `AsyncValue` lists — through `dwBuildListAsync(loadingItemsCount:)`, not a scattering of `when`.
+- [ ] The list a screen **exists for** passes an `errorBuilder` — the default is `SizedBox.shrink()`, and a failed read must not look like an empty one (`dartway-clean-code` §1.5a). Several `AsyncValue`s are combined by nesting the builders, never through `asData?.value`.
 - [ ] Narrowing by query — `backendFilter`; local filtering you do yourself with `.where` in the widget (the framework doesn't provide it). The count that matters is **distinct configs**, not `modelList` calls: reading broadly and picking locally is right when it saves a request (§3).
 - [ ] An entity and what hangs off it — **one** read: relations declared in the YAML, raised with `include`, folded live by `DwRelationUpdatesConfig`, and that config list is a top-level `final` (§3a). No stitching flat lists by foreign key in the widget.
 - [ ] Does a parent with an `include` leave the server anywhere **without** it — a save response, an `afterUpdates`, a socket send? That silently blanks the nested lists on every client (§3a).
