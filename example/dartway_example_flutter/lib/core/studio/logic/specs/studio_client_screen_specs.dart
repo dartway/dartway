@@ -1,7 +1,7 @@
+import 'package:dartway_studio_binding/dartway_studio_binding.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
-import 'studio_route_specs.dart';
 
-final scheduleStudioSpec = studioSpecForRoute(
+final scheduleStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.schedule,
   title: 'Schedule',
   purpose:
@@ -14,7 +14,7 @@ final scheduleStudioSpec = studioSpecForRoute(
   ],
 );
 
-final bookingsStudioSpec = studioSpecForRoute(
+final bookingsStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.bookings,
   title: 'My bookings',
   purpose:
@@ -26,7 +26,7 @@ final bookingsStudioSpec = studioSpecForRoute(
   ],
 );
 
-final newsStudioSpec = studioSpecForRoute(
+final newsStudioSpec = dwStudioSpecForRoute(
   AppNavigationZone.news,
   title: 'Club news',
   purpose:

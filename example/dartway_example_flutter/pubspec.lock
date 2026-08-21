@@ -320,6 +320,13 @@ packages:
       relative: true
     source: path
     version: "0.10.0"
+  dartway_studio_binding:
+    dependency: "direct main"
+    description:
+      path: "../../packages/dartway_studio_binding"
+      relative: true
+    source: path
+    version: "0.1.0"
   dartway_studio_bridge:
     dependency: "direct main"
     description:

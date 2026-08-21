@@ -22,10 +22,34 @@ The open `dartway_studio_bridge` package is the only integration surface:
   A public web build therefore ships no test accounts and no special sign-in
   path. Role-gating of zones stays entirely in the app — guards and server
   filters, not spec metadata.
-- **`StudioBridgeHost.attach`** — call it once in your app shell (see
-  `lib/core/studio/studio_bridge_binding.dart` in the example). The host is inert
-  unless the app runs on web embedded in an iframe; the channel pins the
-  origin of the first valid Studio message for its replies.
+- **`DwStudioBinding`** — the app half, and the thing a Flutter project actually
+  mounts. It ships as its own package, `dartway_studio_binding`: one widget in
+  `MaterialApp.builder` that attaches the host, reports the route, the mounted
+  features, the session and the language, and runs what Studio asks for. The
+  project supplies only what the framework cannot know — the manifest, the
+  screen passports, and which profile field names the signed-in user:
+
+  ```dart
+  builder: (context, child) => DwStudioBinding(
+    core: dw,
+    manifest: appStudioManifest,
+    router: ref.watch(appRouterProvider),
+    describeUser: (profile) =>
+        DwStudioUser(identifier: profile.phone, label: profile.firstName),
+    validateAccessToken: studioSignedAccessValidator(
+      const String.fromEnvironment('STUDIO_APP_ORIGIN'),
+    ),
+    child: child ?? const SizedBox.shrink(),
+  ),
+  ```
+
+  It is a package rather than something a project copies because none of it
+  refers to any domain — it is protocol wiring nobody edits, and while it
+  travelled by copy-paste the two copies in this repository had already drifted
+  apart. Build on `StudioBridgeHost.attach` directly when an app needs a report
+  cadence of its own. Either way the host is inert unless the app runs on web
+  embedded in an iframe; the channel pins the origin of the first valid Studio
+  message for its replies.
 - **Access is proved by a signature.** Studio presents a short-lived token,
   signed with its own Ed25519 key and issued for a single origin — the address
   your build answers at — and the app accepts the connection only if that token
@@ -103,8 +127,9 @@ check that the URL serves a page, and that it permits `frame-ancestors`, as
 steps of their own before the probe.
 
 See the package [README](../packages/dartway_studio_bridge/README.md) for the
-full API, and `example/dartway_example_flutter/lib/core/studio/` for the reference
-integration (manifest, sign-in executor, binding widget).
+full API of the wire, `dartway_studio_binding` for the app half, and
+`example/dartway_example_flutter/lib/core/studio/` for what a project is left
+holding: its manifest and its screen passports, and nothing else.
 
 ## Apps that are not Flutter
 

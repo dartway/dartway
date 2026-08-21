@@ -1,4 +1,6 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_studio_binding/dartway_studio_binding.dart';
+import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
@@ -7,7 +9,7 @@ import 'core/app_l10n.dart';
 import 'core/default_models.dart';
 import 'core/dw_core.dart';
 import 'core/router/router.dart';
-import 'core/studio/studio_bridge_binding.dart';
+import 'core/studio/logic/studio_project_manifest.dart';
 import 'ui_kit/ui_kit.dart';
 
 /// The application: all wiring lives here, while `main` only supplies concrete
@@ -56,9 +58,30 @@ class _ExampleMaterialApp extends ConsumerWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       theme: AppTheme.light,
       builder: (context, child) {
-        // The Studio bridge is inert unless the app runs embedded in the
-        // DartWay Studio preview frame.
-        final appChild = StudioBridgeBinding(
+        // The Studio binding is inert unless the app runs embedded in the
+        // DartWay Studio preview frame. Everything mechanical about it — the
+        // handshake, the reports, the persona flow — belongs to the package;
+        // what stays here is only what this app alone can answer.
+        final appChild = DwStudioBinding(
+          core: dw,
+          manifest: appStudioManifest,
+          router: router,
+          // Which profile field is the identity Studio matches its personas
+          // against, and which one names the user on screen.
+          describeUser: (profile) =>
+              DwStudioUser(identifier: profile.phone, label: profile.firstName),
+          locale: DwStudioLocale(
+            provider: appLocaleProvider,
+            select: (languageCode) => ref
+                .read(appLocaleProvider.notifier)
+                .selectLanguageCode(languageCode),
+          ),
+          // Accept only a Studio presenting a token signed for this
+          // deployment's own address, so a token taken from here is useless
+          // anywhere else. Empty define = local dev, no check.
+          validateAccessToken: studioSignedAccessValidator(
+            const String.fromEnvironment('STUDIO_APP_ORIGIN'),
+          ),
           child: DwUserAsyncScope<UserProfile>(
             skipOnSignIn: false,
             whenProfileReadyCallback: (_) {},
