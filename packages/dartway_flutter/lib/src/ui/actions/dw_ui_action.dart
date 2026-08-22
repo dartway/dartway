@@ -6,6 +6,12 @@ import 'package:flutter/material.dart';
 /// A UI-aware async action: confirmation → run → notify → follow-up → error
 /// report, all in one value.
 ///
+/// A [DwRefusal] thrown inside it — by the repository, on a server response a
+/// rule refused, or by the app's own code — is shown to the user in its own
+/// words rather than as the action's generic error text. It still travels
+/// through `dw.handleError`, so an app's error policy sees everything and
+/// decides for itself; the framework's built-in policy does not alert it.
+///
 /// Create one through [DwFlutter.action] — `dw.action(...)` — never directly:
 /// the action's work is woven into the ambient `dw` services (it calls
 /// `dw.confirm`, `dw.notify`, `dw.handleError`), so its factory lives on `dw`.
@@ -61,7 +67,13 @@ extension DwActionExtension on DwFlutter {
 
         return value;
       } catch (error, stackTrace) {
-        if (onErrorNotification != null) {
+        // A refusal speaks for itself: it carries the text whoever wrote the
+        // rule wrote, about this call and this user, so it wins over the
+        // action's [onErrorNotification] — which was written once, for every
+        // way the action could fail.
+        if (error is DwRefusal) {
+          notify.error(error.message);
+        } else if (onErrorNotification != null) {
           notify.error(onErrorNotification);
         }
         onError?.call(error, stackTrace);

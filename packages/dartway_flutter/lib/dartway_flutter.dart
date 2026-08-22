@@ -48,6 +48,8 @@ export 'src/ui/confirmation/dw_ui_confirmation.dart';
 // diagnostics/error_reporting: app-state context captured into every report.
 // dw_error_report re-exports the source enum and the context snapshot.
 export 'src/diagnostics/error_reporting/dw_error_report.dart';
+// The one error that is an answer rather than an incident — see DwRefusal.
+export 'src/diagnostics/error_reporting/dw_refusal.dart';
 
 // diagnostics/dw_feature: mark a widget as a product feature and discover the
 // mounted ones at runtime — feature catalogs, error context, Studio passports.

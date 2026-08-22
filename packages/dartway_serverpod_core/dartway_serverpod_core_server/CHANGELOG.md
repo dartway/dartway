@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.11.0
+
+**A refusal now says on the wire that it is one.** A rule saying no and a server breaking both
+travel in `DwApiResponse.error`, so the client could tell them apart only by comparing the message
+against strings it hoped the server still used. It did not, and every ordinary refusal reached the
+app's error policy looking like an incident.
+
+- **New: `DwApiResponse.isRefusal`**, and `DwApiResponse.refusal(message)` to build one. Written to
+  the JSON only when true, so nothing changes for the responses that are the overwhelming majority
+  and an older client — which reads the missing key as "not a refusal" — is right about them.
+- Marked as refusals: every rejection by a rule (`validateSave`, `beforeSaveTransaction`,
+  `afterSaveTransaction`, `afterSaveTransform`, `validateAction`, `DwActionRejection`),
+  `forbidden()` from `allowSave`/`allowDelete`, a delete refused because other rows still reference
+  the model, and a save of a row that is already gone.
+- **Not** marked: a `DatabaseException`, anything the endpoint's guard caught, `notConfigured` (no
+  rule decided anything — the operation does not exist on this server) and `notAuthenticated` (an
+  answer, but its text carries a source written for the logs; sending the user to the login screen
+  needs a channel of its own).
+- `DwDeleteConfig`'s foreign-key refusal now answers with `value: null` rather than `false`. The
+  error was always what callers read.
+
+See `dartway_serverpod_core_flutter` for what the other side does with the flag.
+
 ## 0.10.0
 
 **A CRUD call that fails now says which model it was about.** `getAll` and `getCount` had no error

@@ -9,7 +9,8 @@ description: >-
   an entity and everything hanging off it read in ONE request (include on the server, DwRelationUpdatesConfig
   for live child updates — a parent that leaves the server without its include silently blanks the
   nested lists on every client),
-  actions from the UI via dw.action (unified error/loading handling), notifications via dw.notify.* (not SnackBar),
+  actions from the UI via dw.action (unified error/loading handling, and a server refusal shown to
+  the user as DwRefusal rather than reported as a crash), notifications via dw.notify.* (not SnackBar),
   the profile via ref.watchUserProfile/readUserProfile (getters, not CRUD), sign-out via
   sessionProvider.notifier.signOut(), local screen state that survives a restart via
   dw.plugins.prefs (providerFamily/mappedProviderFamily when the value belongs to an entity).
@@ -343,6 +344,37 @@ final deleteAction = dw.action<bool>(
 
 > The real name is **`DwUiAction`** (46+ usages). There is no `DwCallback` in the project.
 > Declining the confirm dialog cancels the action entirely (no notifications, no follow-up). A custom dialog is `DwConfig.confirmDialogBuilder`. Action errors automatically reach alerting with context (route, screen features, `label`) — see the framework's error-reporting doc.
+
+### A server refusal shows itself, and does not page anybody
+
+A rule on the server that said no — `validateSave` returning its text, an action throwing
+`DwActionRejection`, `allowSave` refusing — comes back marked, and `dw.repo` raises it as a
+**`DwRefusal`** carrying the rule's own text. `dw.action` shows that text instead of its
+`onErrorNotification`, and the framework's alerting steps over it: a rule doing its job is not an
+incident.
+
+```dart
+// The server answered "This booking is already cancelled".
+// The user reads exactly that — not "Could not cancel", and nobody is paged.
+dw.action(
+  (_) => dw.repo.saveModel(booking.copyWith(status: BookingStatus.cancelled)),
+  onErrorNotification: 'Could not cancel', // still used for real failures
+);
+```
+
+**What this means for your code:** write nothing. Do not catch `DwRefusal` to re-show it, do not
+add an `onErrorNotification` for the refusal case, and if the app has a custom
+`DwConfig.onErrorReport`, filter refusals there by type — `if (report.error is DwRefusal) return;` —
+never by matching the message text.
+
+A rule of your own that lives on the client throws the same type:
+
+```dart
+if (file.lengthSync() > maxUpload) throw const DwRefusal('This file is larger than 10 MB');
+```
+
+**The message reaches the screen unedited**, so write it for a user: no ids, no class names, no
+underlying error attached.
 
 **`dw.action` says what to write an action with; where it lives is `dartway-clean-code` §1.9b —
 in the widget that owns the button.** Not a callback handed down from a parent, and not a screen-wide

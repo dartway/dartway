@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0
+
+Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.11.0 is the
+refusal reaching the client as an answer rather than an exception — `DwApiResponse.isRefusal` on the
+wire, `DwRefusal` on the Flutter side. See the changelog of `dartway_serverpod_core_flutter`.
+
 ## 0.10.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.10.0 is the

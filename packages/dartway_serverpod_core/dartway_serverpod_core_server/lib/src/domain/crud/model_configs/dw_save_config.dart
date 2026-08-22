@@ -235,9 +235,7 @@ class DwSaveConfig<T extends TableRow> {
     // --- validateSave ---
     if (validateSave != null) {
       final error = await validateSave!(session, saveContext);
-      if (error != null) {
-        return DwApiResponse(isOk: false, value: null, error: error);
-      }
+      if (error != null) return DwApiResponse.refusal(error);
     }
 
     // --- transaction block ---
@@ -248,8 +246,9 @@ class DwSaveConfig<T extends TableRow> {
       });
     } on _DwSaveRejection catch (rejection) {
       // A rule said no. The transaction is rolled back; this is an answer to
-      // the caller, not a failure — no alert.
-      return DwApiResponse(isOk: false, value: null, error: rejection.message);
+      // the caller, not a failure — no alert, and the client is told it is an
+      // answer, so it does not report one either.
+      return DwApiResponse.refusal(rejection.message);
     } on DatabaseException catch (e, stackTrace) {
       return _databaseErrorResponse(e, stackTrace);
     }
@@ -300,11 +299,7 @@ class DwSaveConfig<T extends TableRow> {
         if (validateSave != null) {
           final error = await validateSave!(session, context);
           if (error != null) {
-            earlyResponse = DwApiResponse(
-              isOk: false,
-              value: null,
-              error: error,
-            );
+            earlyResponse = DwApiResponse.refusal(error);
             return;
           }
         }
@@ -312,7 +307,7 @@ class DwSaveConfig<T extends TableRow> {
         await _writeInsideTransaction(session, context, transaction);
       });
     } on _DwSaveRejection catch (rejection) {
-      return DwApiResponse(isOk: false, value: null, error: rejection.message);
+      return DwApiResponse.refusal(rejection.message);
     } on DatabaseException catch (e, stackTrace) {
       return _databaseErrorResponse(e, stackTrace);
     }
@@ -439,9 +434,7 @@ class DwSaveConfig<T extends TableRow> {
     // response says no. See [afterSaveTransform].
     if (afterSaveTransform != null) {
       final error = await afterSaveTransform!(session, saveContext);
-      if (error != null) {
-        return DwApiResponse(isOk: false, value: null, error: error);
-      }
+      if (error != null) return DwApiResponse.refusal(error);
     }
 
     // --- afterSideEffects (outside the transaction, non-blocking) ---
@@ -499,11 +492,13 @@ class DwSaveConfig<T extends TableRow> {
     }
   }
 
-  DwApiResponse<DwModelWrapper> _notFoundResponse(int id) => DwApiResponse(
-    isOk: false,
-    value: null,
-    error: 'Model with id $id not found (possibly deleted earlier)',
-  );
+  /// A refusal rather than a failure: the row being gone is an answer about
+  /// the data, usually because somebody else removed it a moment ago, and the
+  /// caller is meant to read it rather than have it reported for them.
+  DwApiResponse<DwModelWrapper> _notFoundResponse(int id) =>
+      DwApiResponse.refusal(
+        'Model with id $id not found (possibly deleted earlier)',
+      );
 
   DwApiResponse<DwModelWrapper> _databaseErrorResponse(
     DatabaseException exception,

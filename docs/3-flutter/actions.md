@@ -164,6 +164,14 @@ the pipeline and [features and specs](features-and-specs.md) for where the featu
 Give an action an explicit `label` when its notification texts are generic — twelve alerts titled
 "Action failed: Saved" tell you nothing.
 
+### Unless the server refused, which is not a failure
+
+A rule on the server that said no arrives as a **`DwRefusal`**, and the action treats it as the
+answer it is: the user is shown `refusal.message` — the words the rule was written in, not the
+action's `onErrorNotification` — and the framework's alerting leaves it alone. The report still
+reaches a custom `DwConfig.onErrorReport`, which sorts it out by type. See
+[error reporting](../2-core/error-reporting.md#a-refusal-is-not-an-error).
+
 ## Notifications
 
 `dw.notify.success / warning / error / info` post a `DwUiNotification` from anywhere, including

@@ -117,6 +117,12 @@ Refusing with a bare `throw Exception('Not enough rights to delete this message'
 thing. The text is lost on the way out, the caller is shown "Unexpected error while handling the
 saveModel request", and the operator is paged for a rule doing its job.
 
+**The difference travels to the client.** A refused response carries `isRefusal`, and the Flutter
+side raises it as a `DwRefusal` — shown to the user in the rule's own words, and kept out of the
+alert channel. A failure carries no such mark and stays an error the app reports. Nothing in a
+config sets the flag by hand: refusing the documented way is what sets it. See
+[error reporting](error-reporting.md#a-refusal-is-not-an-error).
+
 ## Saving: one lifecycle for insert and update
 
 `DwSaveConfig<T>` has no separate create and update paths. `saveContext.isInsert` tells the hooks

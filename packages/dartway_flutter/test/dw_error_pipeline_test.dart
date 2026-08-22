@@ -1,6 +1,15 @@
 import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// Collects what `dw.notify.*` delivered, in place of showing it.
+class _CapturingHandler implements DwNotificationHandler<DwUiNotification> {
+  final shown = <DwUiNotification>[];
+
+  @override
+  void show(BuildContext context, DwUiNotification event) => shown.add(event);
+}
 
 class _FeatureBox extends StatelessWidget implements DwFeature {
   const _FeatureBox(this.id);
@@ -96,6 +105,84 @@ void main() {
 
       final report = reports.single;
       expect(report.context.entries, {'good': 'value'});
+    });
+  });
+
+  group('a refusal is an answer, not an incident', () {
+    final notifications = _CapturingHandler();
+
+    /// The app as a refusal meets it: a notification listener mounted, so what
+    /// `dw.action` decides to show is observable.
+    Future<BuildContext> pumpApp(WidgetTester tester) async {
+      notifications.shown.clear();
+      await tester.pumpWidget(
+        ProviderScope(
+          child: DwNotificationsListener(
+            handlers: {DwUiNotification: notifications},
+            child: const SizedBox.shrink(),
+          ),
+        ),
+      );
+      return tester.element(find.byType(SizedBox));
+    }
+
+    testWidgets('is shown to the user in its own words', (tester) async {
+      final context = await pumpApp(tester);
+
+      final action = dwInstance.action<void>(
+        (_) => throw const DwRefusal('This message was already deleted'),
+        onErrorNotification: 'Could not delete',
+      );
+      await action(context);
+      await tester.pump();
+
+      // The rule's text wins over the action's generic one: it was written
+      // for this case, and the generic one for every case.
+      expect(
+        notifications.shown.single.message,
+        'This message was already deleted',
+      );
+      expect(notifications.shown.single.type, DwUiNotificationType.error);
+    });
+
+    testWidgets('an ordinary failure still shows the action text', (
+      tester,
+    ) async {
+      final context = await pumpApp(tester);
+
+      final action = dwInstance.action<void>(
+        (_) => throw StateError('boom'),
+        onErrorNotification: 'Could not delete',
+      );
+      await action(context);
+      await tester.pump();
+
+      expect(notifications.shown.single.message, 'Could not delete');
+    });
+
+    testWidgets('still reaches the error policy, as a DwRefusal', (
+      tester,
+    ) async {
+      final context = await pumpApp(tester);
+
+      await dwInstance.action<void>(
+        (_) => throw const DwRefusal('You have no access to this track'),
+      )(context);
+
+      // The app decides what to do with it — the point of the type is that
+      // one check is enough: `if (report.error is DwRefusal) return;`
+      expect(reports.single.error, isA<DwRefusal>());
+      expect(
+        (reports.single.error as DwRefusal).message,
+        'You have no access to this track',
+      );
+    });
+
+    test('reads as its message, so a report title says something', () {
+      expect(
+        const DwRefusal('This booking is gone').toString(),
+        'This booking is gone',
+      );
     });
   });
 

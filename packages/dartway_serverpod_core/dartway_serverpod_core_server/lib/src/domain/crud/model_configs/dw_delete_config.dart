@@ -70,10 +70,10 @@ class DwDeleteConfig<T extends TableRow> {
     try {
       await session.db.deleteRow(model);
     } on DatabaseException {
-      return DwApiResponse(
-        isOk: false,
-        value: false,
-        error: 'Cannot delete model because other entities reference it',
+      // A refusal, not a failure: the row is still referenced, which is an
+      // answer about the data and one the user can act on.
+      return DwApiResponse.refusal(
+        'Cannot delete model because other entities reference it',
       );
     }
 

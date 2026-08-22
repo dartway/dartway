@@ -408,7 +408,7 @@ Order: `validateAction` → **the transaction opens:** `actionProcessing` → ou
 - `validateAction` → `Future<String?>` — the error text or null, exactly like `validateSave`. Runs **before** the transaction, so the action never starts.
 - `DwActionRejection` — thrown from inside `actionProcessing`, where there is nothing to return the text in and where throwing is the only thing that rolls a Serverpod transaction back. The transaction rolls back, and the caller gets the message verbatim.
 
-Both are **answers**: nothing is reported to `DwAlerts`, and the text reaches the client word for word.
+Both are **answers**: nothing is reported to `DwAlerts`, and the text reaches the client word for word — marked `isRefusal`, so the Flutter side shows it to the user and keeps it out of the alert channel (`DwRefusal`, see `dartway-data-layer` §4). Refusing the documented way is what sets the mark; no config sets it by hand.
 
 **`throw Exception('Not enough rights to delete this message')` is not a refusal — it is a crash**, and the framework treats it as one. The endpoint's error boundary replaces the text with `Unexpected error while handling the saveModel request for X` and alerts the operator. The user reads "Application error" instead of the reason, and the alert channel fills up with rules working as intended.
 
