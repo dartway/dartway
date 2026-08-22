@@ -140,7 +140,7 @@ how such a folder often arrives, and the initial commit then lands in it rather 
 | `--channel` | Monorepo branch to create from. Default `stable`, or `DARTWAY_BRANCH` |
 | `--local-repo` | Use a local monorepo checkout instead of cloning (framework development) |
 | `--language` | The language the project writes its own texts in. Default English |
-| `--notes-tracker` | `owner/repo` where framework findings are filed as issues. Defaults to the framework's own tracker; `none` keeps the journal local |
+| `--notes-tracker` | `owner/repo` where framework findings are filed as issues. Defaults to the framework's own tracker; `none` files nothing outside the project |
 | `--no-git` | Skip `git init` and the initial commit |
 
 The last thing `create` prints is not a wall of commands: it points at `dartway doctor` and
@@ -174,25 +174,29 @@ pre-approves this stack's build commands so a first run is not a queue of permis
 denies reading `config/passwords.yaml`. A project extends it; an update will not take those edits
 away, at the price of an old default staying put until someone deletes the file.
 
-Three things land outside `.claude/`. Two journals are created at the project root and added to
-`.gitignore` unless they are already there: `dartway_notes.md` for what the *framework* got wrong —
-which the project cannot fix in place, because the harness is overwritten on update — and
-`dev_notes.md` for what this project itself carries and nobody else can fix. An existing journal is
-never overwritten; its content is the project's. And leftovers of the old shell installer
-(`tools/dw_claude_setup/`) are reported with the commands to remove them, never removed: that folder
-is usually a gitlink, and taking it out means editing the git index.
+One thing lands outside `.claude/`: **`docs/dev_notes/`**, where this project's own findings live —
+a risk, a pin that trails, a config written down twice, one file per finding. It is **tracked, not
+git-ignored**, which is the whole design: a finding travels out in the pull request that carries it,
+it is visible in review, and it survives a `git worktree remove`. Two files are created there.
+`README.md` states the form and is refreshed on every install, since it holds nothing of the
+project's to lose; `_coverage.md` is the table `/dartway-checkup` keeps of which features it has read
+properly, and is written once and never touched again. Entries themselves are never touched at all.
 
-That first journal is one end of a loop rather than a local file, and `--notes-tracker` is what names
-the other end. A filed entry records `**Issue:** owner/repo#123` **instead of a status**, and the state
-is then read from the tracker rather than restated in the file — a status written in both places is a
-status that goes stale in one of them silently.
+Two other things are **reported and not changed**. The journals this replaced (`dartway_notes.md` and
+`dev_notes.md` at the project root) are named with a pointer to the migration, because they hold
+findings nobody else has a copy of and an installer that deletes such a file is a different kind of
+tool. So are leftovers of the old shell installer (`tools/dw_claude_setup/`), with the commands to
+remove them: that folder is usually a gitlink, and taking it out means editing the git index.
 
-**It defaults to the framework's own tracker, and that default is the point.** Opting in would have
-meant every project deciding a question it has no particular reason to think about, and the projects
-that never got around to deciding are exactly the ones whose findings never left the laptop — which is
-the failure this mechanism exists to end. `--notes-tracker owner/repo` sends them somewhere else
-instead, for an installation that wants its developers' findings triaged internally first, and
-`--notes-tracker none` keeps the journal purely local, at which point no command reaches the network.
+A finding about the **framework** gets no file anywhere — it is filed straight as an issue, and
+`--notes-tracker` names the repository it goes to. **It defaults to the framework's own tracker, and
+that default is the point.** Opting in would have meant every project deciding a question it has no
+particular reason to think about, and the projects that never got around to deciding are exactly the
+ones whose findings never left the laptop — which is the failure this mechanism exists to end.
+`--notes-tracker owner/repo` sends them somewhere else instead, for an installation that wants its
+developers' findings triaged internally first. `--notes-tracker none` files nothing outside the
+project — the finding is written into `docs/dev_notes/` like any other, without an issue line, and no
+command reaches the network.
 
 Because the default now points at a public repository, the guard rails are not optional. What the
 installed `CLAUDE.md` requires before an issue is created — the finding restated without this codebase
@@ -207,7 +211,7 @@ generated-but-committed artifact, like the Serverpod client.
 |---|---|
 | `--base-branch` | Base branch of **this** project, used by the PR/commit skills. Default `master` |
 | `--language` | The language the project writes its own texts in. Default English |
-| `--notes-tracker` | `owner/repo` where framework findings are filed as issues. Defaults to the framework's own tracker; `none` keeps the journal local |
+| `--notes-tracker` | `owner/repo` where framework findings are filed as issues. Defaults to the framework's own tracker; `none` files nothing outside the project |
 | `--channel` | Monorepo branch to take the toolkit from. Default `stable`, or `DARTWAY_BRANCH` |
 | `--local-repo` | Use a local monorepo checkout instead of cloning |
 

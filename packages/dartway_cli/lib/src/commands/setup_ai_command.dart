@@ -22,7 +22,7 @@ class SetupAiCommand extends Command<int> {
         defaultsTo: 'English',
         help:
             "Language this project writes its own texts in (feature specs, doc "
-            "comments, dartway_notes.md). Package APIs and error strings stay "
+            "comments, docs/dev_notes/). Package APIs and error strings stay "
             "English regardless.",
       )
       ..addOption(
@@ -31,8 +31,8 @@ class SetupAiCommand extends Command<int> {
         defaultsTo: ProjectLayout.defaultNotesTracker,
         help:
             'GitHub repository where findings about the framework are filed as '
-            'issues. Pass "${ProjectLayout.noNotesTracker}" to keep the '
-            'journal local instead.',
+            'issues. Pass "${ProjectLayout.noNotesTracker}" to file nothing '
+            'outside this project — findings then go to docs/dev_notes/.',
       )
       ..addOption(
         'channel',

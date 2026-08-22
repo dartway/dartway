@@ -72,7 +72,8 @@ class ToolkitInstaller {
     _substituteTokens(managedFiles, tokens);
 
     _installSettings(toolkitDir, claudeDir);
-    _installNotesJournal(toolkitDir, projectRoot, tokens);
+    _installDevNotes(toolkitDir, projectRoot, tokens);
+    _reportRetiredJournals(projectRoot);
     _reportLegacyInstallerTraces(projectRoot);
   }
 
@@ -100,61 +101,76 @@ class ToolkitInstaller {
     stdout.writeln('Created .claude/settings.json (pre-approved dev commands)');
   }
 
-  /// Puts the two journals at the project root and git-ignores them.
+  /// Creates `docs/dev_notes/` — the project's own findings, one file per
+  /// entry, tracked like any other file in the repository.
   ///
-  /// The only files the installer writes outside `.claude/`, and the only ones
-  /// it refuses to overwrite: a journal holds what this project found, so its
-  /// content is the project's and not ours. Without this step the practice
-  /// exists only where somebody set it up by hand, which is exactly how the
-  /// last one was lost.
+  /// The only place the installer writes outside `.claude/`. It used to put two
+  /// git-ignored journals at the project root, and being ignored is what broke
+  /// them: a finding written into one never travelled out through a pull
+  /// request, never appeared in review, and `git worktree remove` deleted it
+  /// without a word, because `git status` says nothing about ignored files.
   ///
-  /// Two of them, because a finding has two possible addresses and mixing them
-  /// loses both: `dartway_notes.md` is what the *framework* got wrong and has
-  /// to travel to the monorepo; `dev_notes.md` is what *this project* carries
-  /// and nobody else can fix. What belongs to a single feature goes in neither —
-  /// it is a line in that feature's `knownIssues`, next to the code.
-  static void _installNotesJournal(
+  /// Two files, because they answer to different owners. [_devNotesForm] is the
+  /// toolkit's — what the directory is and how an entry is written — so it is
+  /// overwritten on every install, like the skills; there is no project content
+  /// in it to lose. [_devNotesCoverage] is the project's own record of which
+  /// features `/dartway-checkup` has read, so it is created once and never
+  /// touched again.
+  ///
+  /// A finding about the *framework* goes in neither: it is filed straight as an
+  /// issue in the tracker named by `__NOTES_TRACKER__`. One that belongs to a
+  /// single feature is a line in that feature's `knownIssues`, next to the code.
+  static const _devNotesForm = 'README.md';
+  static const _devNotesCoverage = '_coverage.md';
+
+  static void _installDevNotes(
     Directory toolkitDir,
     Directory projectRoot,
     Map<String, String> tokens,
   ) {
-    const journals = {
-      'dartway_notes.md':
-          'Findings to carry back into the DartWay monorepo — a local journal.',
-      'dev_notes.md':
-          "This project's own findings — risks and nuances, a local journal.",
-    };
+    final templateDir = Directory(p.join(toolkitDir.path, 'dev_notes'));
+    if (!templateDir.existsSync()) return;
 
-    for (final entry in journals.entries) {
-      final template = File(p.join(toolkitDir.path, entry.key));
-      final journal = File(p.join(projectRoot.path, entry.key));
+    final devNotesDir = Directory(p.join(projectRoot.path, 'docs', 'dev_notes'))
+      ..createSync(recursive: true);
 
-      if (template.existsSync() && !journal.existsSync()) {
-        template.copySync(journal.path);
-        _substituteTokens([journal], tokens);
-        stdout.writeln('Created ${entry.key}');
+    for (final fileName in const [_devNotesForm, _devNotesCoverage]) {
+      final template = File(p.join(templateDir.path, fileName));
+      final installed = File(p.join(devNotesDir.path, fileName));
+      if (!template.existsSync()) continue;
+      if (fileName == _devNotesCoverage && installed.existsSync()) continue;
+
+      final existed = installed.existsSync();
+      template.copySync(installed.path);
+      _substituteTokens([installed], tokens);
+      if (!existed) {
+        stdout.writeln('Created docs/dev_notes/$fileName');
       }
-
-      _ignoreJournal(projectRoot, entry.key, entry.value);
     }
   }
 
-  static void _ignoreJournal(
-    Directory projectRoot,
-    String fileName,
-    String comment,
-  ) {
-    final gitignore = File(p.join(projectRoot.path, '.gitignore'));
-    if (!gitignore.existsSync()) return;
+  /// Reports the two journals the `docs/dev_notes/` directory replaced.
+  ///
+  /// Reported, never removed, and for the same reason as the journals were
+  /// worth replacing: they hold findings nobody else has a copy of. Deleting
+  /// them would take that content with it, and leaving them unmentioned is the
+  /// failure this change ends — a file that looks like the project's journal,
+  /// which nothing reads any more.
+  static void _reportRetiredJournals(Directory projectRoot) {
+    final retired = ['dartway_notes.md', 'dev_notes.md']
+        .where((name) => File(p.join(projectRoot.path, name)).existsSync())
+        .toList();
+    if (retired.isEmpty) return;
 
-    final lines = gitignore.readAsLinesSync();
-    if (lines.any((line) => line.trim() == fileName)) return;
-
-    gitignore.writeAsStringSync(
-      '\n# $comment\n$fileName\n',
-      mode: FileMode.append,
+    stdout.writeln(
+      '\nRetired root journals are still in this project:\n'
+      '  ${retired.join('\n  ')}\n'
+      'Nothing reads them any more. Framework findings are filed as issues in '
+      'the notes tracker;\nthe project\'s own findings are one file each under '
+      'docs/dev_notes/. Carry the open\nentries over, then delete the files and '
+      'their .gitignore lines — the migration entry\nin .claude/CLAUDE.md says '
+      'how.',
     );
-    stdout.writeln('Added $fileName to .gitignore');
   }
 
   /// The toolkit used to be installed by a shell script from a private

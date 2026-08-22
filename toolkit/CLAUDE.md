@@ -4,9 +4,9 @@ A monorepo on the **Serverpod + DartWay + Flutter + Riverpod** stack. DartWay is
 
 > This harness (methodology + skills + commands) ships from the DartWay monorepo (`toolkit/`, branch `stable`) and is installed into this repository's `.claude/` (committed). The files `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-checkup` commands are **managed**: don't edit them here, they get overwritten on update; customize by copying under your own name. The source of truth is the toolkit in the monorepo. The package structure is detected automatically; the paths below were substituted at install time.
 >
-> **A rule that let you down is not fixed here** — the fix would be overwritten on the next update. Write it down in `dartway_notes.md` at the project root instead; see "Notes back to the framework" below.
+> **A rule that let you down is not fixed here** — the fix would be overwritten on the next update. File it as an issue in the framework tracker instead; see "Notes back to the framework" below.
 
-**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `dartway_notes.md` — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, error strings, and anything going back into the framework.
+**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `docs/dev_notes/` — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, error strings, and anything going back into the framework.
 
 ## Monorepo structure
 
@@ -89,11 +89,11 @@ The cases that used to justify one, and where they go instead:
 | The roles and access matrix | Doc comments above the `DwCrudConfig`s — the rule sits where it is enforced |
 | An external integration's payload | Doc comments on the model or the endpoint that receives it |
 | "How this app is put together" | The skills. That is what they are: the methodology ships from the framework and is updated with it, and a copy inside the project would only fall behind it |
-| A checkup report | The chat. `/dartway-checkup` writes no report file on purpose: what belongs to a feature becomes a line in its `knownIssues`, what belongs to the project goes to `dev_notes.md`, and the rest was worth saying once |
+| A checkup report | The chat. `/dartway-checkup` writes no report file on purpose: what belongs to a feature becomes a line in its `knownIssues`, what belongs to the project goes to `docs/dev_notes/`, and the rest was worth saying once |
 
 Before starting any document, name what it would say that a `DwFeatureSpec`, a doc comment or a piece of code cannot. Usually the answer is that the spec is silent where it should not be, and the fix is in the spec.
 
-**`docs/` is for what survives that question** — the documents this project genuinely needs. One kind is known to the framework and has rules, because it is the one that keeps being reinvented.
+**`docs/` is for what survives that question** — the documents this project genuinely needs. Two kinds are known to the framework and have rules, because they are the ones that keep being reinvented.
 
 ### `docs/adr/` — the decisions, and what they ruled out
 
@@ -115,6 +115,59 @@ An ADR records **the alternatives that were rejected, and why**. That is the one
 
 **Planning reads them.** `dartway-plan` looks in `docs/adr/` before proposing an approach, so a decision whose alternatives were already weighed is not re-argued from scratch — and a plan that itself makes such a choice proposes a new ADR as one of its steps.
 
+### `docs/dev_notes/` — the findings with no address in code
+
+A finding this project made that **does not fit the task at hand and is not confined to a single
+feature**: CI that runs less than it declares, a pin that trails, a config written down twice, a
+tendency you keep seeing.
+
+**The admission test is whether the finding has an address in code.** Take the first line that fits:
+
+| The finding… | Goes to |
+|---|---|
+| is being fixed right now | fix it — no entry anywhere |
+| belongs to one feature or screen | that feature's `knownIssues` in its `DwFeatureSpec` |
+| **has no address in code** — cross-cutting, infrastructural, a decision with a price | `docs/dev_notes/` |
+
+If the finding has an address, it lives at that address, where the compiler, `dartway check`, Studio
+and the next reader all pass by it — one product-level sentence in `knownIssues`, deleted when the
+fix lands. What that field is for is written on the field itself, in `DwFeatureSpec`'s doc comment;
+it is not restated here, because two wordings of one rule is how the rule stops being one.
+
+**The defect itself lives in the tracker; a `knownIssues` line and a `docs/dev_notes/` entry only
+reference it.** The issue holds the status, the discussion and the pull request that closes it, and
+an entry repeating any of that is a second copy of a state that changes elsewhere. It rots silently:
+one project's journal listed eleven `open` findings a fortnight after every one of them had shipped
+— including the entry that asked for this mechanism. When the issue closes, delete the file.
+
+`docs/dev_notes/<slug>.md`, one file per finding, no numbering, written in this project's language.
+Each one is short — where, what is wrong, what we did about it, and the issue:
+
+```markdown
+# <short title>
+
+- **Issue:** owner/repo#123
+- **Where:** `path/file.dart:12` — or the area, if it is not one place
+- **What is wrong:** one or two sentences
+- **What we did about it:** the workaround that is in place, or nothing yet
+- **Possible direction:** optional, one line
+```
+
+Mention an option if one is obvious; do not write it up. A journal of treatises is a journal nobody
+reads.
+
+**Committed, not git-ignored, and that is the whole design.** The two root journals this replaced
+were ignored, so nothing written in them travelled out through a pull request, nothing appeared in
+review, and `git worktree remove` deleted them without a word — `git status` says nothing about
+ignored files. On one project a single day's findings had to be pulled out of throwaway working
+copies by hand before they were deleted. **One file per finding rather than one file appended to**,
+because parallel branches appending to one journal conflict on the same lines in every second pull
+request; separate files have nothing to conflict on, each entry stands on its own in the diff, and a
+finished one is deleted as one file.
+
+`docs/dev_notes/_coverage.md` sits beside the entries and is not one: it is the table
+`/dartway-checkup` keeps of which features have had a deep pass, and when.
+
 ## Cleanliness and finishing
 
 For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/dartway-clean-code/SKILL.md` (the team's hard rules + SOLID/KISS/DRY/YAGNI + tests for the complex stuff). This is a style contract — check against it while writing, refactoring and reviewing.
@@ -123,64 +176,54 @@ For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/d
 
 **Finishing a task (Law 6):** when a feature/task is done, run `dartway-finish` before the commit/PR. It audits the diff against the contract, checks the feature's documentation for drift and the test coverage, and **shows suggestions and applies only what was confirmed**.
 
-## Notes back to the framework (`dartway_notes.md`)
+## Notes back to the framework
 
 The harness is managed and gets overwritten on update, so a rule that let you down cannot be fixed
 here. It also cannot be left unsaid: the rules are only ever proven wrong by real code, and this
-project is the real code. `dartway_notes.md` at the project root is where such findings wait to be
-carried into the DartWay monorepo. It is git-ignored — a working journal, not a shared document.
+project is the real code. Such a finding is **filed as an issue in the framework tracker** — there is
+no local journal in between, and no step where somebody remembers to carry entries over.
 
-**Write there without being asked when:**
+**Tracker:** `__NOTES_TRACKER__` — the GitHub repository this project's framework findings are filed
+in as issues.
+
+**File one without being asked when:**
 
 - the code broke a rule that does not exist, or exists too vaguely to have prevented it;
 - the app had to work around a `dartway_*` API — an extra wrapper, a `hide`, a copied private helper;
 - you are tempted to edit a managed file (`CLAUDE.md`, `skills/dartway-*`, the `commit` /
-  `dartway-checkup` commands). That temptation *is* the note.
+  `dartway-checkup` commands). That temptation *is* the finding.
 
 Write it the way it would have to be written in the toolkit: the example from the code, why the
 existing rule did not catch it, and the concrete wording to add — not "something is off here". An
-entry nobody can act on without re-deriving it is the same as no entry.
+issue nobody can act on without re-deriving it is the same as no issue.
 
-`dartway-finish` shows what is still open at the end of a task, so the journal gets carried over
-rather than accumulated.
+### What travels, and what must not
 
-### Where an entry goes when it leaves this project
-
-**Tracker:** `__NOTES_TRACKER__` — the GitHub repository this project's framework findings are filed
-in as issues. An entry that has been filed records its issue instead of its status:
-
-```markdown
-- **Issue:** owner/repo#123
-```
-
-**The status field then goes away**, and that is the point rather than a shortcut. A status written
-here is a second copy of a state that changes elsewhere, and it rots silently: one project's journal
-listed eleven `open` entries two weeks after every one of them had shipped — including the entry that
-asked for this mechanism. The issue holds the state, the decision and the link to the pull request
-that closed it. The journal holds what an issue must not.
-
-The one value that is not a repository is `none`, and it means this journal is the whole mechanism:
-entries wait here with their statuses, and carrying them over is somebody remembering to. That is the
-state the tracker exists to get out of, so it is chosen deliberately (`dartway setup-ai
---notes-tracker none`) and never arrived at by default.
-
-That is the other half of the split, and it is what makes filing something other than a copy: **the
-part that names this codebase does not travel.** Paths, class names, what the app did as a
-workaround, where the marker sits — exactly what makes the entry actionable here, and exactly what
-must not appear in a repository other people read.
+**The part that names this codebase does not travel.** Paths, class names, what the app did as a
+workaround, where the marker sits — exactly what makes the finding actionable here, and exactly what
+must not appear in a repository other people read. That split is what makes filing something other
+than a copy, and it is why a workaround leaves a record in **both** places: the issue says what
+should change in the framework, `docs/dev_notes/` and the marker in the code say what this project is
+carrying meanwhile.
 
 So before an issue is created:
 
-1. **Restate the entry for a stranger** — the rule that was missing, the API that forced the
+1. **Restate the finding for a stranger** — the rule that was missing, the API that forced the
    workaround, put so that it stands without this project's code. If nothing survives that, the
-   entry was never about the framework and belongs in `dev_notes.md`.
+   finding was never about the framework and belongs in `docs/dev_notes/`.
 2. **Write it in English** — the tracker is read by people who do not work on this project, so the
-   language the journal itself is kept in does not follow the entry there.
+   language this project writes in does not follow the finding there.
 3. **Search the tracker first.** Three projects meeting one API gap is one issue with three voices,
    not three issues.
 4. **Label what it did to you** — the two labels below, and they are part of the text you show.
-5. **Show the text and wait for a yes.** This is the only irreversible step the journal has — an
-   issue exists publicly from the moment it is created, and deleting it does not un-index it.
+5. **Show the text and wait for a yes.** This is the only irreversible step here — an issue exists
+   publicly from the moment it is created, and deleting it does not un-index it.
+
+**The one tracker value that is not a repository is `none`**, and it is chosen deliberately
+(`dartway setup-ai --notes-tracker none`) by a project that must not push into a repository other
+people read. Nothing then reaches the network: the finding is written into `docs/dev_notes/` in the
+same form as any other, without the issue line, and carrying it to the framework happens through
+whatever channel that project has.
 
 #### The two labels
 
@@ -207,8 +250,8 @@ and GitHub records it without being asked. Nothing about your codebase travels w
 
 ### A workaround over a `dartway_*` API also leaves a marker in the code
 
-The journal entry records that the workaround exists. It does not record whether it is still needed
-— and that is the half which goes wrong, because the framework moves while the project's code does
+The issue records that the framework should change. It does not record whether this project's
+workaround is still needed — and that is the half which goes wrong, because the framework moves while the project's code does
 not. The day the fix lands upstream nothing here changes: the workaround keeps running, now
 duplicating the framework, and nobody is looking. It is not a cosmetic duplicate either. A real one
 threw where the framework had chosen to degrade softly, so the app crashed on an offline start; the
@@ -226,8 +269,9 @@ So the code carries a marker naming the framework version the workaround was las
   workaround to go. Without it the next reader cannot tell whether the framework has answered the
   problem or merely moved past it, and re-deriving that costs more than writing it did.
 
-The marker and the `dartway_notes.md` entry are two halves of one record: the journal says what
-should change in the monorepo, the marker says what to re-check here once it has. Write both.
+The marker and the `docs/dev_notes/` entry are two halves of one record: the entry says what this
+project is carrying and links the issue that will end it, the marker says what to re-check here once
+that issue closes. Write both.
 
 `dartway-finish` compares `checked:` against the version resolved in `pubspec.lock` and raises the
 marker **only when the two have diverged** — the question is asked exactly when its answer can have
@@ -282,6 +326,22 @@ Live migrations (delete an entry once no project is on the old shape):
   shared harness, not in each test. And the first `.arb` is not automatically English: write it in
   whatever language the app's strings are already in, or the migration turns into an unasked-for
   translation.
+
+- **The two root journals → `docs/dev_notes/` and the tracker.** *You have the old shape if:*
+  `ls dartway_notes.md dev_notes.md` finds either one at the project root, or `git check-ignore
+  dev_notes.md` answers. *Target:* a finding about the framework is an issue in the tracker; a
+  finding of this project's own is one tracked file under `docs/dev_notes/`; a finding that belongs
+  to one feature is a line in its `knownIssues`, as it always was. *What has accumulated:* both
+  journals were git-ignored, so **read them before anything else touches the working copy** — they
+  are the one copy that exists, `git status` does not show them, and `git worktree remove` deletes
+  them without a word. Then: every open `dartway_notes.md` entry becomes an issue under the filing
+  rules above (restate for a stranger, English, search the tracker first, show and wait) — except the
+  ones that already carry an `**Issue:**` line, which are filed already and only need their issue's
+  state checked; entries whose issue has closed are simply dropped, and a workaround one stood for is
+  re-checked. Every open `dev_notes.md` entry becomes a file under `docs/dev_notes/`, one per entry,
+  and the coverage table at the bottom moves whole into `docs/dev_notes/_coverage.md`. Only then
+  delete both files and the two lines the installer added to `.gitignore`. `dartway setup-ai` reports
+  the journals while they are still there, and creates `docs/dev_notes/` on its own.
 
 ## Skills and commands
 

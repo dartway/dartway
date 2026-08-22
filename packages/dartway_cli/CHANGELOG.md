@@ -2,6 +2,45 @@
 
 ## 0.8.0
 
+- **The two git-ignored journals are retired; the project's own findings become `docs/dev_notes/`,
+  tracked.** The installer no longer writes anything to the project root and no longer edits
+  `.gitignore`.
+
+  Being ignored is what broke them. A finding written into `dartway_notes.md` or `dev_notes.md` never
+  travelled out in a pull request, never appeared in review, and `git worktree remove` deleted it
+  without a word — `git status` says nothing about ignored files, so a worktree holding a day's
+  findings looks clean. On one project five framework findings and one project finding had to be
+  pulled out of throwaway working copies by hand before they were deleted, while three more copies
+  held nothing but the empty template the installer had just put there.
+
+  What replaces them:
+
+  - **A finding about the framework is filed straight as an issue** in the repository
+    `--notes-tracker` names. There is no local file in between and no step where somebody remembers
+    to carry entries over — which finishes what `--notes-tracker` started, since a filed entry
+    already carried an address and kept no status of its own.
+  - **A finding of the project's own is one file under `docs/dev_notes/`**, committed like anything
+    else. One file per finding rather than one appended to: parallel branches appending to a single
+    journal conflict on the same lines in every second pull request, while separate files have
+    nothing to conflict on and a finished one is deleted whole.
+  - **A finding that belongs to one feature is unchanged** — a line in that feature's `knownIssues`.
+    The boundary between the three is written down once, in the installed `CLAUDE.md`: the test is
+    whether the finding has an address in code.
+
+  `setup-ai` creates two files there. `README.md` states the entry form and is **refreshed on every
+  install**, since it holds nothing of the project's to lose. `_coverage.md` — the table
+  `/dartway-checkup` keeps of which features it has read properly — is written **once and never
+  overwritten**. Entries are never touched.
+
+  A project still holding the old journals is **told, not edited**: they contain findings nobody else
+  has a copy of, and an installer that deletes such a file is a different kind of tool. The migration
+  entry in the installed `CLAUDE.md` says what to do with what has accumulated. Read them before
+  anything else touches the working copy.
+
+  Closes the way `setup-ai` inside a `git worktree` used to create empty look-alike journals: a
+  tracked file in a worktree travels out through the pull request like any other, so there is nothing
+  left to detect.
+
 - **`dartway check` reads the server now, and names three things a project is missing.** Every one
   of them fails *closed*: the code compiles, the server starts, the migration applies, and the app
   quietly cannot do something.

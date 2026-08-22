@@ -136,29 +136,32 @@ Every finding has exactly one home — take the first line that fits:
 |---|---|
 | is being fixed in this task | fix it — no entry anywhere |
 | belongs to one feature | that feature's `knownIssues`, proposed in Phase B |
-| is about the **framework**: a rule that does not exist or is too vague to have prevented the mistake, two skills that disagree, an API that forced a workaround | `dartway_notes.md` |
-| is a nuance, problem or technical risk of **this project** that does not fit the task and is not confined to one feature | `dev_notes.md` |
+| is about the **framework**: a rule that does not exist or is too vague to have prevented the mistake, two skills that disagree, an API that forced a workaround | an issue in the framework tracker |
+| is a nuance, problem or technical risk of **this project** that does not fit the task and is not confined to one feature | a file under `docs/dev_notes/` |
 
-Both journals sit at the project root and are git-ignored. The framework one exists because the
-managed files cannot be fixed here — they are overwritten on update (see `CLAUDE.md`).
+The framework row leaves this project entirely because the managed files cannot be fixed here — they
+are overwritten on update (see `CLAUDE.md`). The project row stays, tracked and committed, so it
+travels out in this pull request like anything else in the diff.
 
-- **Write down now** anything of either kind you have not written yet. `dartway_notes.md` asks for
-  the example, why the rule missed it and the wording to add. `dev_notes.md` asks for three lines:
-  where, what is wrong, what it leads to — an option may be named, not written up.
-- **Then list the `open` entries of both** in the report, one line each. A reminder, not a gate: the
-  task is finished either way, but the entries stop being invisible.
-- **When `dartway_notes.md` names a tracker other than `none`**, an entry with no issue yet is offered
-  for filing, and one that has an issue is reported by its state rather than by what the file says —
-  `gh issue view` answers that, the file does not. An issue that has closed is the signal to delete
-  the entry, and to re-check the workaround it stood for if there was one. What to strip and restate
-  before filing is in `CLAUDE.md`, "Where an entry goes when it leaves this project" — including the
-  `impact:` label, which is proposed with the text rather than left for someone to guess later,
-  because what the finding cost this project is known now and not afterwards. The step is a proposal
-  like every other one here, never a push that happens on its own.
-- **A workaround over a `dartway_*` API is written down twice** — the entry in `dartway_notes.md`,
+- **A framework finding is offered for filing now**, with the issue text written out: the example
+  from the code restated so it stands without it, in English, and the `impact:` label proposed with
+  the text rather than left for someone to guess later — what the finding cost this project is known
+  now and not afterwards. Search the tracker first; a gap another project has already filed gets a
+  comment, not a second issue. The full rules are in `CLAUDE.md`, "Notes back to the framework".
+  **This is a proposal like every other one here, never a push that happens on its own** — an issue
+  is public from the moment it exists, so it waits for a yes. Where the tracker is `none` the finding
+  goes to `docs/dev_notes/` instead, without an issue line.
+- **A project finding is written down now** as `docs/dev_notes/<slug>.md`: where, what is wrong, what
+  we did about it, and the issue it references. An option may be named, not written up.
+- **Then list what the diff added or should add** — new entries under `docs/dev_notes/`, issues filed
+  or offered — one line each in the report. A reminder, not a gate: the task is finished either way.
+- **An entry whose issue has closed is deleted**, and the workaround it stood for is re-checked.
+  `gh issue view` answers that; the file does not, and is not asked to — it carries no status.
+- **A workaround over a `dartway_*` API is written down twice** — the entry under `docs/dev_notes/`,
   and a `TODO(dartway, checked: <ref>)` marker on the code itself (see `CLAUDE.md`, "Notes back to
-  the framework"). The journal says what should change upstream; the marker says what to re-check
-  here once it has. Wrote the entry and left the code bare — add the marker now.
+  the framework"). The entry says what this project is carrying and links the issue that will end it;
+  the marker says what to re-check here once that issue closes. Wrote the entry and left the code
+  bare — add the marker now.
 
 ### A.7 Workarounds whose framework has moved
 
@@ -187,7 +190,8 @@ so test whether the longer starts with the shorter. A `version` comparison is ex
 one-token change:
 
 - the workaround is still needed → refresh `checked:` to the resolved version;
-- the framework now does this → delete the workaround, and close the `dartway_notes.md` entry with it;
+- the framework now does this → delete the workaround, the `docs/dev_notes/` entry that stood for it,
+  and comment on the issue if it is still open;
 - the framework now does this **differently** → the case the whole mechanism exists for. A workaround
   that duplicates the framework only wastes code; one that contradicts it breaks the app, and it
   breaks it in exactly the edge case the framework had thought about — throwing where the framework
@@ -205,11 +209,11 @@ Produce a structured report in the chat:
 3. **🟢 Minor** — naming, magic numbers, small stuff.
 4. **📄 Docs** — which feature docs/`CLAUDE.md`/skills are outdated, **with a concrete proposed diff** for the fix.
 5. **🧪 Tests** — which non-trivial parts are uncovered.
-6. **📓 Journals** — the `open` entries of both, one line each. From `dartway_notes.md`: what it is
-   and where in the monorepo it lands — plus its issue and that issue's current state where a tracker
-   is configured, and an offer to file the ones that have none. From `dev_notes.md`: what this project
-   is carrying. Nothing is applied here — the first list is what to take to the framework, the second
-   is what to schedule.
+6. **📓 Findings that outlive the task** — one line each. Framework findings: what it is and where in
+   the monorepo it lands, plus the issue text ready to file and the `impact:` label proposed with it.
+   Project findings: what this project is carrying, and the `docs/dev_notes/` entry proposed for it.
+   Plus any existing entry whose issue has closed, which is the signal to delete it. Nothing is
+   applied here — the first list is what to take to the framework, the second is what to schedule.
 7. **🔖 Workarounds** — only the markers A.7 found diverged, one line each: `file:line`, what is
    worked around, `checked:` versus the resolved version. **Omit the whole item when nothing
    diverged** — this section appears when the framework has moved under a workaround, and a report
@@ -236,7 +240,7 @@ For every item give a **concrete proposed edit**, ready to apply. Mark anything 
 |---|---|---|
 | Scope | the diff of one task vs the base branch | the whole project by default — packages, CI, configs, pins — narrowed by an argument |
 | Extra checks | docs sync + tests + application | the gates actually running, the distance to the framework, a rolling deep pass over features |
-| Output | report + edits on confirmation | report in the chat + entries placed in `knownIssues` / the journals |
+| Output | report + edits on confirmation | report in the chat + findings placed in `knownIssues` / `docs/dev_notes/` / the tracker |
 | When | finishing a task, before a PR | on demand, and periodically — its findings change without a commit here |
 
 The detectors are shared (their source is `dartway-clean-code`). Do not duplicate the logic — reference the contract.

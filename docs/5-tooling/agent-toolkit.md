@@ -71,23 +71,25 @@ compose down`, commits and pushes still ask. A project adds its own permissions 
 update will not take them away — the price being that a changed default reaches an existing project
 only if someone deletes the file first.
 
-That is also why the install leaves a `dartway_notes.md` at the project root, git-ignored. A rule
-that did not catch a mistake, two skills that disagree, an API the app had to work around — none of
-that can be fixed in the installed copy, and all of it is worth keeping: the rules are only ever
-proven wrong by real code. The journal is where such findings wait to be carried into the monorepo,
-and `dartway-finish` lists the open ones at the end of a task so they do not just accumulate.
+That is also why a finding about the framework leaves the project entirely. A rule that did not catch
+a mistake, two skills that disagree, an API the app had to work around — none of that can be fixed in
+the installed copy, and all of it is worth keeping: the rules are only ever proven wrong by real code.
+Such a finding is **filed as an issue in the framework's tracker**, and `dartway-finish` writes the
+issue text and offers it at the end of a task. Unless `dartway setup-ai --notes-tracker owner/repo`
+names another repository, that tracker is the framework's own; `--notes-tracker none` keeps
+everything inside the project, and nothing reaches the network.
 
-Waiting in a file is as far as an entry gets on its own, so the journal is pointed at a tracker from
-the start — the framework's own, unless `dartway setup-ai --notes-tracker owner/repo` names another or
-`--notes-tracker none` keeps the whole thing local. A filed entry records its issue **instead of its
-status**, and the state is read from the tracker. Keeping a status in both places is what this exists
-to prevent: one project's journal advertised eleven open findings a fortnight after all eleven had
-shipped, the entry asking for this mechanism among them, because the fixes landed in the monorepo and
-nothing wrote back to the laptop.
+**The default is deliberate.** A project that never decided where its findings should go was a
+project whose findings stayed put — waiting in a git-ignored file that nothing else in the world
+could see.
 
-**The default is deliberate, and it is the whole lesson of that journal.** Nothing about it was hard
-to carry over — it was carried over in full, quickly. What failed is that the file had no other end,
-so a project that never decided where its findings should go was a project whose findings stayed put.
+There used to be a journal in between, and it is worth saying why it is gone. It kept a status of its
+own beside each entry, which is a second copy of a state that changes elsewhere: one project's
+journal advertised eleven open findings a fortnight after all eleven had shipped, the entry asking
+for this mechanism among them, because the fixes landed in the monorepo and nothing wrote back to the
+laptop. Being git-ignored, it was invisible in every place work is actually reviewed — and a
+`git worktree remove` deleted a copy of it without a word, since `git status` says nothing about
+ignored files.
 Making that decision a precondition would have reproduced the failure in every project that skipped
 it.
 
@@ -183,10 +185,12 @@ pin trails the framework, since a workaround here may already be a duplicate of 
 now does. Only then does it spend reading on a handful of features, chosen from a coverage table so
 that successive runs go deeper instead of skimming the same surface.
 
-What it finds gets placed rather than announced: a finding that belongs to a feature becomes a line
-in its `knownIssues`, one about the framework goes to `dartway_notes.md`, and a project-wide risk
-that fits neither goes to `dev_notes.md`. Both journals live at the project root, git-ignored, and
-`dartway-finish` lists their open entries at the end of a task.
+What it finds gets placed rather than announced, and the test is whether the finding has an address
+in code: one that belongs to a feature becomes a line in its `knownIssues`, one about the framework
+becomes an issue in the tracker, and a cross-cutting risk with no address at all becomes a file under
+`docs/dev_notes/` — tracked and committed, so it travels out in a pull request and is visible in
+review. The defect itself lives in the tracker either way; the entry beside the code only references
+it, which is why neither carries a status of its own.
 
 ## What the toolkit does not do
 
