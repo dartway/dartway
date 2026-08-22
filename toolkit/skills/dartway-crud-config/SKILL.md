@@ -4,7 +4,8 @@ description: >-
   The DartWay/Serverpod server playbook: how to write CRUD configs — DwCrudConfig<T> (one per
   model), DwGetModelConfig, DwGetModelListConfig (both require accessFilter), DwSaveConfig
   (allowSave/validateSave/beforeSaveTransaction/afterSaveTransaction/afterSaveTransform/
-  afterSaveSideEffects), DwDeleteConfig (allowDelete/afterDelete), DwModelWrapper,
+  afterSaveSideEffects), DwDeleteConfig (allowDelete/afterDelete), DwDtoActionConfig
+  (validateAction/actionProcessing, refusing with DwActionRejection), DwModelWrapper,
   Event models, the domain(pure)/app(session-aware) boundary. All server logic goes through
   configs, not through endpoints. Use when adding or changing server logic, permissions,
   validations, or side effects for a model.
@@ -382,6 +383,37 @@ Future<int> purgeStale<T extends TableRow>(Session session, Expression stale) as
 
 For **one known model**, keep using that model's own repository (`ClubSession.db.findById(...)`) — typed, public, and more readable. `dw.db` is not a replacement for it.
 
+## DwDtoActionConfig — an action that is not one model
+
+For a write that does not fit "the client saves one row": the client sends a DTO (a serializable model with **no table**), and the config runs an arbitrary transaction.
+
+```dart
+DwDtoActionConfig<CancelBooking>(
+  validateAction: (session, dto) async =>
+      session.signedInUserProfileId == null ? 'Sign in first' : null,
+  actionProcessing: (session, transaction, dto) async {
+    final booking = await Booking.db.findById(session, dto.bookingId,
+        transaction: transaction);
+    if (booking == null) throw const DwActionRejection('This booking is gone');
+    // ... the work; return the models the client should refresh
+    return DwModelWrapper.wrapMany([booking]);
+  },
+)
+```
+
+Order: `validateAction` → **the transaction opens:** `actionProcessing` → outside it, non-blocking: `afterSaveSideEffects`.
+
+**Two ways to refuse, one for each side of the transaction, and neither of them is a bare `throw`:**
+
+- `validateAction` → `Future<String?>` — the error text or null, exactly like `validateSave`. Runs **before** the transaction, so the action never starts.
+- `DwActionRejection` — thrown from inside `actionProcessing`, where there is nothing to return the text in and where throwing is the only thing that rolls a Serverpod transaction back. The transaction rolls back, and the caller gets the message verbatim.
+
+Both are **answers**: nothing is reported to `DwAlerts`, and the text reaches the client word for word.
+
+**`throw Exception('Not enough rights to delete this message')` is not a refusal — it is a crash**, and the framework treats it as one. The endpoint's error boundary replaces the text with `Unexpected error while handling the saveModel request for X` and alerts the operator. The user reads "Application error" instead of the reason, and the alert channel fills up with rules working as intended.
+
+`afterSaveSideEffects` here is the same hook as on `DwSaveConfig` and carries the same warning: nobody waits for it, so nothing it does — a `DwActionRejection` included — can reach the caller.
+
 ## A custom endpoint — the last resort
 
 Only when it does not fit into CRUD (file upload/download — often still shaped as a `FileUploadRequest` model, webhooks, heavy async processing). Document it as an exception.
@@ -391,7 +423,7 @@ Only when it does not fit into CRUD (file upload/download — often still shaped
 | The need | Where it already lives |
 |---|---|
 | The response must carry a value the row does not hold | `!persist` + `extras` + `afterSaveTransform` — "Returning a value the row does not hold" above |
-| The operation is a write that is not one model | `DwDtoActionConfig` |
+| The operation is a write that is not one model | `DwDtoActionConfig` — see above |
 | The answer is a projection over rows rather than the rows | `DwDtoGetListConfig` |
 | The response must carry the model's relations | `afterSaveTransform` re-reading with the same `include` |
 

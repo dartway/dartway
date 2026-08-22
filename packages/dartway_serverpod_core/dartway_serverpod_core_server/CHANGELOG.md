@@ -20,6 +20,24 @@ while `className` sat right there in the arguments.
 - `getOne` reported the raw `ex.toString()` as the alert headline; all five methods now report the
   same way.
 
+**A `DwDtoActionConfig` can now refuse without crashing.** `actionProcessing` had no way to say no
+except `throw`, and the endpoint's error boundary treats a throw as an incident: the user read
+"Unexpected error while handling the saveModel request", the text the rule was written in was lost
+on the way out, and the operator was paged. One production install collected twenty such alerts in
+two days, every one of them a rule doing its job.
+
+- **New: `validateAction`** — `Future<String?> Function(Session, DTO)`, run before the transaction
+  opens. Return the error text to refuse, or null to let the action through. The same contract as
+  `DwSaveConfig.validateSave`.
+- **New: `DwActionRejection`** — throw it from inside `actionProcessing`, where there is nothing to
+  return the text in and where throwing is the only thing that rolls a Serverpod transaction back.
+  The transaction rolls back and the caller is answered with the message.
+- Both are **answers**: the text reaches the client verbatim and nothing is reported to `dw.alerts`,
+  the way `notConfigured` and `notAuthenticated` already behaved. Any other exception is still a
+  failure — wrapped in the guard's message and alerted, unchanged.
+- Nothing to migrate: a config that refuses by throwing keeps working exactly as before. It now has
+  a way to do it right.
+
 This release also carries the Flutter side's optional local-storage contract for `dw.repo` —
 `DwRepoLocalReads` and `DwRepoLocalWrites`, declared on the core as a plugin. Nothing changes for an
 app that declares no store. See the changelog of `dartway_serverpod_core_flutter`.
