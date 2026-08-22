@@ -210,10 +210,16 @@ class DwCore<
   /// Out-of-the-box alerting: unless the app installed its own error policy
   /// in [DwConfig], every reported error goes to [dwAlerts] enriched with the
   /// app-state context (route, mounted features, action/call, user).
-  /// Connection blips are UX, not alerts — they are filtered out here.
+  /// Connection blips are UX, not alerts — they are filtered out here, and so
+  /// are refusals, which are answers ([DwRefusal]).
   @override
   void dispatchReport(DwErrorReport report) {
     if (hasCustomErrorHandling) return super.dispatchReport(report);
+
+    // A rule saying no is not an incident. It has already reached the user in
+    // its own words through `dw.action`; alerting it as well was how twenty
+    // ordinary refusals became twenty pages in two days.
+    if (report.error is DwRefusal) return;
 
     if (isStreamingConnectionError(report.error)) return;
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0
+
+`DwApiResponse` gains **`isRefusal`** and the `DwApiResponse.refusal(message)` constructor, mirroring
+the server's envelope: whether the `error` is a rule saying no rather than something breaking. False
+when the key is absent, which is how a server older than the flag reads — every error stays an
+incident, exactly as before. See `dartway_serverpod_core_flutter` 0.11.0.
+
 ## 0.10.0
 
 Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.10.0 is the

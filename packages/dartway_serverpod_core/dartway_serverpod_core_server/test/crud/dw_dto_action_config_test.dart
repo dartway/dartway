@@ -199,6 +199,12 @@ void main() {
       expect(reports, isEmpty, reason: 'a refusal is an answer, not an error');
     });
 
+    test('is marked as a refusal, so the client can tell too', () async {
+      final response = await saveModel(TrackAction());
+
+      expect(response.isRefusal, isTrue);
+    });
+
     test('stops the action before it runs', () async {
       await saveModel(TrackAction());
 
@@ -221,6 +227,12 @@ void main() {
       await saveModel(RejectingAction());
 
       expect(reports, isEmpty);
+    });
+
+    test('is marked as a refusal, so the client can tell too', () async {
+      final response = await saveModel(RejectingAction());
+
+      expect(response.isRefusal, isTrue);
     });
 
     test('does not fire the side effects', () async {
@@ -248,6 +260,12 @@ void main() {
       expect(reports, hasLength(1));
       expect(reports.single, contains('BrokenAction'));
       expect(reports.single, contains('relation'));
+    });
+
+    test('is not marked as a refusal — nobody refused anything', () async {
+      final response = await saveModel(BrokenAction());
+
+      expect(response.isRefusal, isFalse);
     });
   });
 

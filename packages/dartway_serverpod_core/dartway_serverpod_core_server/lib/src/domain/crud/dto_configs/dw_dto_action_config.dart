@@ -176,7 +176,7 @@ class DwDtoActionConfig<DTO extends SerializableModel> with DwCrudEntity<DTO> {
   /// at the operator as an incident. `notConfigured` and `notAuthenticated`
   /// take the same route out.
   DwApiResponse<DwModelWrapper> _rejectedResponse(String message) =>
-      DwApiResponse(isOk: false, value: null, error: message);
+      DwApiResponse.refusal(message);
 
   /// Runs [afterSaveSideEffects] with nobody waiting for it, and makes sure a
   /// failure still lands somewhere — unawaited, it would otherwise go to the

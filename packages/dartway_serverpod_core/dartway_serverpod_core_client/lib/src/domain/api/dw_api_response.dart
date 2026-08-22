@@ -33,21 +33,36 @@ class DwApiResponse<T> implements SerializableModel {
     this.warning,
     this.error,
     this.updatedModels,
+    this.isRefusal = false,
   });
+
+  /// A rule on the server said no, and [message] is what it said.
+  ///
+  /// The twin of `DwApiResponse.refusal` on the server side; here it is what a
+  /// locally built response uses to refuse the same way the server would.
+  const DwApiResponse.refusal(String message)
+    : isOk = false,
+      value = null,
+      error = message,
+      warning = null,
+      updatedModels = null,
+      isRefusal = true;
 
   const DwApiResponse.notConfigured()
     : isOk = false,
       value = null,
       error = 'This action is not supported by the server',
       warning = null,
-      updatedModels = null;
+      updatedModels = null,
+      isRefusal = false;
 
   const DwApiResponse.forbidden()
     : isOk = false,
       value = null,
       error = 'Not enough permissions',
       warning = null,
-      updatedModels = null;
+      updatedModels = null,
+      isRefusal = true;
 
   /// The caller is not signed in and the config did not opt into anonymous
   /// access. Distinct from [DwApiResponse.forbidden]: there the caller is
@@ -58,13 +73,25 @@ class DwApiResponse<T> implements SerializableModel {
       value = null,
       error = 'Authentication required${source != null ? ' ($source)' : ''}',
       warning = null,
-      updatedModels = null;
+      updatedModels = null,
+      isRefusal = false;
 
   final bool isOk;
   final T? value;
   final String? warning;
   final String? error;
   final List<DwModelWrapper>? updatedModels;
+
+  /// Whether [error] is a rule saying no rather than something breaking.
+  ///
+  /// The two share the `error` field, and only the server knows which it
+  /// built. `DwRepository.processApiResponse` reads this flag to answer with a
+  /// `DwRefusal` — a message meant for the user — instead of an exception the
+  /// app's error policy would report as an incident.
+  ///
+  /// **False when the key is absent**, which is how a server older than the
+  /// flag reads: every error stays an incident, exactly as before.
+  final bool isRefusal;
 
   static K? manualDeserialization<K>(Map<String, dynamic> jsonSerialization) {
     if (K == DwApiResponse<List<int>>) {
@@ -105,6 +132,7 @@ class DwApiResponse<T> implements SerializableModel {
                       .deserialize<DwModelWrapper>(e),
                 )
                 .toList(),
+      isRefusal: jsonSerialization['isRefusal'] as bool? ?? false,
     );
   }
 
@@ -115,6 +143,7 @@ class DwApiResponse<T> implements SerializableModel {
       'value': _serializeValue(value),
       if (warning != null) 'warning': warning,
       if (error != null) 'error': error,
+      if (isRefusal) 'isRefusal': true,
       if (updatedModels != null)
         'updatedModels': updatedModels?.toJson(valueToJson: (v) => v.toJson()),
     };

@@ -16,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_flutter: ^0.6.0
+  dartway_flutter: ^0.7.0
   flutter_riverpod: ^3.0.0
   shared_preferences: ^2.3.0
 

@@ -54,6 +54,39 @@ Features come for free: any widget implementing `DwFeature` (see the example
 app) is picked up by `DwFeature.scanMounted()` at the moment of the error — the
 alert names the features of the screen where it happened.
 
+## A refusal is not an error
+
+A rule on the server saying no — `validateSave` returning its text, an action
+throwing `DwActionRejection`, `allowSave` refusing — comes back as a
+`DwApiResponse` marked `isRefusal`, and `dw.repo` raises it as a **`DwRefusal`**
+rather than as an ordinary exception. Three things follow, none of which the app
+has to arrange:
+
+- **the user reads the rule's own words.** `dw.action` shows `refusal.message`
+  instead of its generic `onErrorNotification` — "This message was already
+  deleted" rather than "Could not delete";
+- **the alert channel stays quiet.** The out-of-the-box policy steps over a
+  refusal the way it steps over connection blips: a rule doing its job is not an
+  incident, and twenty of them in two days is how one production channel stopped
+  being read;
+- **a custom policy still sees it**, and sorts it out by type instead of by
+  matching the message:
+
+  ```dart
+  onErrorReport: (report) {
+    if (report.error is DwRefusal) return; // the user has already been told
+    mySentry.capture(report.error, report.stackTrace);
+  },
+  ```
+
+An app can throw one itself for a rule of its own — `throw const DwRefusal('This
+file is larger than 10 MB')` — and get the same treatment. Write the message for
+a user: it reaches the screen unedited.
+
+Everything else is unchanged, and deliberately so: a `DatabaseException`, an
+exception the server's guard caught, or a call the server has no config for
+still arrive as ordinary exceptions and are still reported.
+
 ## Custom policy
 
 Set `DwConfig.onErrorReport` to receive the full `DwErrorReport` (error,

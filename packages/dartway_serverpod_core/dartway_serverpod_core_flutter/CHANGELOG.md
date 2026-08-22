@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.11.0
+
+**A server refusal is no longer an exception like any other.** `processApiResponse` turned every
+`error` into `throw Exception(...)`, so a rule saying no arrived at the app indistinguishable from a
+crash: the alert channel filled with ordinary refusals, and telling them apart meant matching the
+message against strings.
+
+- A response carrying `isRefusal` is now answered with **`DwRefusal`** (from `dartway_flutter`),
+  which holds the text the rule was written in. Everything else still throws the same `Exception` it
+  did.
+- **The framework's own error policy no longer alerts a refusal.** `DwCore.dispatchReport` steps
+  over it the way it already steps over connection blips. An app that installed its own
+  `DwConfig.onErrorReport` still receives it and decides for itself — one type check,
+  `if (report.error is DwRefusal) return;`, instead of a list of message prefixes.
+- `dw.action` shows the refusal's own words to the user instead of the action's generic
+  `onErrorNotification` — see `dartway_flutter` 0.7.0.
+
+**What changes for an app that does nothing:** refusals stop arriving in the alert channel, and the
+user reads the rule's text rather than a generic error. An app whose `onErrorReport` filtered
+refusals by matching message strings can delete that code.
+
 ## 0.10.0
 
 **Everything `dw.repo` sends to the server now goes through one narrow port, `DwServerTransport`,

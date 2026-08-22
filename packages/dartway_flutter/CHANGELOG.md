@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0
+
+**`DwRefusal`** — the one error that is an answer. It carries a `message` written for the user
+("This message was already deleted"), and everything downstream treats it as a decision rather than
+an incident:
+
+- `dw.action` shows that message instead of the action's `onErrorNotification`. The rule's text was
+  written for this case; the action's was written for every case.
+- it still travels through `dw.handleError`, so an app's `DwConfig.onErrorReport` sees it and sorts
+  it out with one type check. The core's built-in alerting does not raise it — see
+  `dartway_serverpod_core_flutter` 0.11.0, where a server response marked `isRefusal` becomes one.
+- an app can throw one from its own code for a local rule ("this file is larger than 10 MB") and get
+  the same treatment.
+
 ## 0.6.0
 
 **`dw.plugins.maybeOf<T>()`** — the lookup for a *role* rather than an integration. `of<T>()` is an

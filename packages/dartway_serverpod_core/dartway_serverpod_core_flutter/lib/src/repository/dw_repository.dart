@@ -3,6 +3,7 @@
 
 import 'dart:math';
 
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -477,25 +478,26 @@ class DwRepository {
     // where a sign-out would otherwise slip through and leave a snapshot of a
     // session that has ended sitting on the device, past the purge that was
     // supposed to take it.
-    final result = await readBinding.store
-        .keep<DwRepoReadSnapshotStoreResult>((tx) async {
-          if (!identical(localReads, readBinding.store)) {
-            return DwRepoReadSnapshotStoreResult.stale;
-          }
-          if (!readBinding.binding.isActive) {
-            return DwRepoReadSnapshotStoreResult.stale;
-          }
-          if (!await tx.isBindingCurrent(readBinding.binding)) {
-            return DwRepoReadSnapshotStoreResult.stale;
-          }
-          final kept = await tx.storeSnapshot(
-            queryKey: queryKey,
-            snapshot: snapshot,
-          );
-          return kept
-              ? DwRepoReadSnapshotStoreResult.stored
-              : DwRepoReadSnapshotStoreResult.ignored;
-        });
+    final result = await readBinding.store.keep<DwRepoReadSnapshotStoreResult>((
+      tx,
+    ) async {
+      if (!identical(localReads, readBinding.store)) {
+        return DwRepoReadSnapshotStoreResult.stale;
+      }
+      if (!readBinding.binding.isActive) {
+        return DwRepoReadSnapshotStoreResult.stale;
+      }
+      if (!await tx.isBindingCurrent(readBinding.binding)) {
+        return DwRepoReadSnapshotStoreResult.stale;
+      }
+      final kept = await tx.storeSnapshot(
+        queryKey: queryKey,
+        snapshot: snapshot,
+      );
+      return kept
+          ? DwRepoReadSnapshotStoreResult.stored
+          : DwRepoReadSnapshotStoreResult.ignored;
+    });
     return result != DwRepoReadSnapshotStoreResult.stale;
   }
 
@@ -830,8 +832,15 @@ class DwRepository {
       );
     }
 
+    // A rule saying no and a server breaking both arrive in `error`, and only
+    // the server knows which it built. `isRefusal` is that knowledge: answered
+    // with a [DwRefusal], the message reaches the user in the words the rule
+    // was written in, and the app's error policy can sort it out by type
+    // instead of by matching the text.
     if (response.error != null) {
-      throw Exception(response.error);
+      throw response.isRefusal
+          ? DwRefusal(response.error!)
+          : Exception(response.error);
     }
     if (!response.isOk) {
       throw StateError('Repository response reported an unsuccessful read.');
