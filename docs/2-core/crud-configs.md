@@ -106,6 +106,17 @@ reads the same whichever list broke.
 Nothing about the failure text describes the database. What threw goes to the operator, never to the
 client — the same rule the save path states below for `DatabaseException`.
 
+**A business rule saying no is a denial, and every config has a channel for it that is not a
+throw.** In `DwSaveConfig` the rule hooks return the error text (`validateSave` and the ones inside
+the transaction — see the lifecycle below). In `DwDtoActionConfig` it is `validateAction` before the
+transaction opens, and `throw DwActionRejection('This message was already deleted')` from inside
+`actionProcessing`, where throwing is the only thing that rolls a transaction back. Either way the
+caller reads the text the rule was written in, word for word, and nothing reaches `dw.alerts`.
+
+Refusing with a bare `throw Exception('Not enough rights to delete this message')` is the other
+thing. The text is lost on the way out, the caller is shown "Unexpected error while handling the
+saveModel request", and the operator is paged for a rule doing its job.
+
 ## Saving: one lifecycle for insert and update
 
 `DwSaveConfig<T>` has no separate create and update paths. `saveContext.isInsert` tells the hooks
@@ -344,7 +355,10 @@ that is not about a single row.
 Two intermediate steps come first, and skipping them is the usual mistake:
 
 1. **A DTO config.** `DwDtoActionConfig<DTO>` runs an arbitrary transaction from a serializable
-   model that has no table and returns the models it touched — an action shaped as a save.
+   model that has no table and returns the models it touched — an action shaped as a save. Its
+   rules refuse through `validateAction` (before the transaction, return the error text) or
+   `DwActionRejection` (thrown from inside it, rolls the transaction back), never through a bare
+   exception — see [when a call fails](#when-a-call-fails).
    `DwDtoGetListConfig<DTO, Model>` serves a list of projections built from real rows.
 2. **A model for the event.** If the operation is a fact worth recording — an auth attempt, a
    balance movement — write the fact as a row and put the logic in its save config. That is how
