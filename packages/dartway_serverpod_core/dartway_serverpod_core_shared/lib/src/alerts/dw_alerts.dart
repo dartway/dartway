@@ -1,3 +1,5 @@
+import 'package:http/http.dart' as http;
+
 import '../services/dw_telegram_service.dart';
 import 'configs/dw_telegram_alerts_config.dart';
 import 'dw_alert_context.dart';
@@ -5,6 +7,7 @@ import 'dw_alert_formatter.dart';
 
 class DwAlerts {
   final DwTelegramAlertsConfig? _telegramConfig;
+  final http.Client? _httpClient;
   final Function(String message)? _logFunction;
   final bool _logMessages;
   final bool _logErrors;
@@ -18,14 +21,24 @@ class DwAlerts {
     return _instance!;
   }
 
+  /// Builds the process-wide sink.
+  ///
+  /// [httpClient] is the transport alerts are sent through. Left null — the
+  /// usual case — each send builds and closes a plain client of its own, which
+  /// reaches Telegram directly. Where outbound access to `api.telegram.org` is
+  /// blocked, the server passes a proxying client built by
+  /// `DwProxyHttpClient.fromEnv`; it is kept for the lifetime of the process,
+  /// so pass one that is safe to reuse.
   static DwAlerts init({
     DwTelegramAlertsConfig? telegramConfig,
+    http.Client? httpClient,
     Function(String message) logFunction = print,
     bool logMessages = false,
     bool logErrors = true,
   }) {
     _instance = DwAlerts._(
       telegramConfig: telegramConfig,
+      httpClient: httpClient,
       logFunction: logFunction,
       logMessages: logMessages,
       logErrors: logErrors,
@@ -36,10 +49,12 @@ class DwAlerts {
 
   DwAlerts._({
     DwTelegramAlertsConfig? telegramConfig,
+    http.Client? httpClient,
     Function(String message)? logFunction,
     required bool logMessages,
     required bool logErrors,
   }) : _telegramConfig = telegramConfig,
+       _httpClient = httpClient,
        _logFunction = logFunction,
        _logMessages = logMessages,
        _logErrors = logErrors;
@@ -90,6 +105,7 @@ class DwAlerts {
         // template markup alive) — escaping them again would kill the markup.
         escapeMessage: !isPreformatted,
         reportErrorFunction: suppressErrors ? (_) {} : _sendAlertingError,
+        client: _httpClient,
       );
     }
 

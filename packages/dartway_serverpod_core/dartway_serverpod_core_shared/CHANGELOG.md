@@ -2,9 +2,25 @@
 
 ## 0.11.0
 
-Version bump only. The four `dartway_serverpod_core_*` packages move in lockstep, and 0.11.0 is the
-refusal reaching the client as an answer rather than an exception — `DwApiResponse.isRefusal` on the
-wire, `DwRefusal` on the Flutter side. See the changelog of `dartway_serverpod_core_flutter`.
+**An alert now has a deadline and a way through a proxy.** Both are about the same production
+symptom: a host that cannot reach `api.telegram.org`.
+
+- **New: `DwAlerts.init(httpClient: ...)`** — the transport every alert is sent through. Left null,
+  each send builds and closes a plain client of its own and goes out directly, exactly as before.
+  On the server, `DwProxyHttpClient.fromEnv` builds a proxying one from `passwords.yaml` (see
+  `dartway_serverpod_core_server`).
+- `DwTelegramService.sendMessage` takes the same `client`, one level down — the seam `DwAlerts`
+  passes it through.
+- **New: a 10-second timeout on the send.** There was none. A firewall that *drops* packets rather
+  than refusing them leaves the connection hanging instead of failing it, so every alert held a
+  socket open until the platform default gave up minutes later — and a server reports errors in
+  bursts, which is precisely when it cannot afford to.
+- **New: `DwTelegramAlertsKeys.dwTelegramAlertsProxyUrlKey`** (`dwTelegramAlertsProxyUrl`), read on
+  the server. It sits with the other alert keys so the name cannot drift from `passwords.yaml`.
+
+Also in 0.11.0, from the other packages moving in lockstep: the refusal reaching the client as an
+answer rather than an exception — `DwApiResponse.isRefusal` on the wire, `DwRefusal` on the Flutter
+side. See the changelog of `dartway_serverpod_core_flutter`.
 
 ## 0.10.0
 
