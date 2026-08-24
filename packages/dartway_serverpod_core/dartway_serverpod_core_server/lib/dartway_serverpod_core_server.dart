@@ -1,5 +1,6 @@
 export 'package:dartway_serverpod_core_shared/dartway_serverpod_core_shared.dart';
 
+export 'src/business/alerts/dw_proxy_http_client.dart';
 export 'src/business/auth/dw_auth_config.dart';
 export 'src/business/auth/dw_authentification_handler.dart';
 export 'src/business/auth/dw_password_hashing.dart';

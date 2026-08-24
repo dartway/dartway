@@ -54,6 +54,49 @@ Features come for free: any widget implementing `DwFeature` (see the example
 app) is picked up by `DwFeature.scanMounted()` at the moment of the error — the
 alert names the features of the screen where it happened.
 
+## Sending them to Telegram
+
+The sink is configured once, where `DwCore.init` is called on the server:
+
+```dart
+dwAlerts: DwAlerts.init(
+  telegramConfig: DwTelegramAlertsConfig.fromEnv(env: passwords),
+  httpClient: DwProxyHttpClient.fromEnv(env: passwords),
+),
+```
+
+Both read `config/passwords.yaml`, and both return `null` when their keys are
+absent — a project with no bot token logs its alerts instead of failing to
+boot.
+
+```yaml
+production:
+  dwTelegramAlertsToken: '123456:ABC-DEF...'
+  dwTelegramAlertsChatId: '-1001234567890'
+  dwTelegramAlertsMessageThreadId: '42'   # optional, a topic in the group
+  dwTelegramAlertsProxyUrl: 'http://user:pass@10.0.0.5:3128'  # optional
+```
+
+`DwTelegramAlertsKeys` names all four in code, so a typo is a compile error
+rather than a `null` discovered in production.
+
+### When the server cannot reach Telegram
+
+`dwTelegramAlertsProxyUrl` is for hosts whose outbound access to
+`api.telegram.org` is blocked — which is the normal state of a Russian
+production host, and of plenty of corporate networks. `DwProxyHttpClient.fromEnv`
+turns the URL into the client every alert is then sent through; credentials are
+optional, and a value that is not a proxy URL is logged and ignored rather than
+taken down with the boot.
+
+The failure it prevents is worth naming, because it does not look like a
+network failure. A firewall that **drops** packets instead of refusing them
+leaves the connection hanging rather than failing it, so every alert holds a
+socket open until the platform gives up minutes later. A server reporting errors
+in bursts — which is exactly when it is reporting errors — runs out of sockets,
+and the symptom shows up somewhere else entirely. Alerts carry their own
+deadline for that reason (10 seconds), proxy or no proxy.
+
 ## A refusal is not an error
 
 A rule on the server saying no — `validateSave` returning its text, an action

@@ -2,6 +2,13 @@
 
 ## 0.11.0
 
+**New: `DwProxyHttpClient.fromEnv`** — alerts reach Telegram from a host that cannot reach it
+directly. Reads `dwTelegramAlertsProxyUrl` (`http://user:pass@host:port`, credentials optional)
+from `passwords.yaml` and returns the `http.Client` to hand `DwAlerts.init(httpClient: ...)`. The
+key absent, blank or unparseable returns null — no client, direct access, today's behaviour bit for
+bit — and says so through the optional `logFunction` rather than failing the boot. See the alerts
+entry in `dartway_serverpod_core_shared` for the timeout that ships with it.
+
 **A refusal now says on the wire that it is one.** A rule saying no and a server breaking both
 travel in `DwApiResponse.error`, so the client could tell them apart only by comparing the message
 against strings it hoped the server still used. It did not, and every ordinary refusal reached the

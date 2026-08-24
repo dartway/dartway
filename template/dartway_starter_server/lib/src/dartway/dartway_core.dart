@@ -53,7 +53,14 @@ void initDartwayCore({
     //   ),
     channelConfigurations: [],
     userProfileConstructor: _buildUserProfile,
-    dwAlerts: DwAlerts.init(),
+    // Telegram when this run mode carries the dwTelegramAlerts* keys, the log
+    // otherwise. `DwProxyHttpClient` is the way out of a host whose outbound
+    // access to api.telegram.org is blocked: set dwTelegramAlertsProxyUrl and
+    // the same alerts travel through a proxy; absent, they go out directly.
+    dwAlerts: DwAlerts.init(
+      telegramConfig: DwTelegramAlertsConfig.fromEnv(env: passwords),
+      httpClient: DwProxyHttpClient.fromEnv(env: passwords),
+    ),
     // Uploads are optional: configured when this run mode carries the
     // dwCloudStorage* keys (development points them at the `minio` service in
     // docker-compose), and simply absent when it does not — rather than a boot
