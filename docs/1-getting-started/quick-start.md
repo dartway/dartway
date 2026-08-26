@@ -9,6 +9,9 @@ and 2 for you — [start with an agent](start-with-an-agent.md).
 ## Prerequisites
 
 - Dart SDK `>=3.11` and Flutter `>=3.41` (FVM works; the template carries a `.fvmrc`)
+- git, with `user.name` and `user.email` set — `create` commits the project it makes for you
+- Network access to pub.dev (or a mirror in `PUB_HOSTED_URL`). `pub get` has no deadline of its
+  own: where the route is filtered or throttled it does not fail, it hangs
 - Docker — the project brings up its own Postgres
 - The Serverpod CLI, **pinned to the version the template depends on**:
 
@@ -20,8 +23,8 @@ and 2 for you — [start with an agent](start-with-an-agent.md).
   version, and a CLI newer than the `serverpod` in your pubspec produces a generated protocol that
   compiles and then misbehaves at runtime.
 
-`dartway doctor` checks all four and prints the fix for whatever is missing — run it instead of
-checking by hand.
+`dartway doctor` checks all of these and prints the fix for whatever is missing — run it instead
+of checking by hand.
 
 ## 1. Create the project
 

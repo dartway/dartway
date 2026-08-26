@@ -41,8 +41,8 @@ flutter run
 Sign in as **79990000003** (a client), **79990000002** (a coach) or **79990000001** (the admin).
 There are no passwords: the one-time code is printed in the server console.
 
-`dartway doctor` says whether this machine has what any of it needs — Dart, Flutter, a responding
-Docker daemon, a `serverpod_cli` matching the pin.
+`dartway doctor` says whether this machine has what any of it needs — Dart, Flutter, git, a pub
+host that answers, a responding Docker daemon, a `serverpod_cli` matching the pin.
 
 ## Tests
 
