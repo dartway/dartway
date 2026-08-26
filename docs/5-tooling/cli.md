@@ -73,12 +73,14 @@ friendlier version to drift from it.
 dartway doctor
 ```
 
-Checks the five things that break a first run, and prints the exact fix for each:
+Checks the seven things that break a first run, and prints the exact fix for each:
 
 | Check | Why it is here |
 |---|---|
 | Dart `>=3.11` | The SDK running the CLI is the one that will run the project |
 | Flutter `>=3.41` | |
+| git, and a configured `user.name`/`user.email` | `create` clones the template with git and then commits the result. A missing binary is a failure; an unset identity is a warning — the project is complete either way, but its repository has no initial commit, and git says so in its own text in the machine's locale, in the middle of successful output |
+| A pub host that answers | `pub get` sets no deadline on a connection that opens and then goes quiet, so a filtered or throttled route to pub.dev surfaces as a resolve step that prints one line and hangs with no error and no exit. The probe asks for bytes rather than for a socket — a TCP connect succeeds even when the handshake after it is filtered — and honours `PUB_HOSTED_URL`, so it tests whatever pub itself would talk to |
 | A responding Docker daemon | Postgres comes from it, and there is no second path. Installed-but-stopped is reported separately from missing |
 | `serverpod_cli` matching the project's pin | The generator writes code for its own version; a drifted CLI produces a protocol that compiles and then misbehaves at runtime. Inside a project the expected version is read from the server package rather than assumed |
 | The pub global bin directory on PATH | The cause of `dartway: command not found` right after a successful install. A warning, not a failure — the fallback is `dart pub global run dartway_cli:dartway` |

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../project_layout.dart';
+import '../pub_host.dart';
 import '../version_check.dart';
 
 /// Checks that this machine can actually create and run a DartWay project.
@@ -14,6 +16,12 @@ import '../version_check.dart';
 /// those surfaces much later — as a connection refused during migrations, as
 /// generated code that compiles and then misbehaves, as `dartway: not found` —
 /// and each is trivially detectable up front.
+///
+/// Two of the checks below are here because doctor once passed a machine that
+/// could not get past the first command of the setup brief. A route to the pub
+/// host that opens and then goes quiet makes `dart pub get` hang forever with
+/// no output at all, and git without an identity leaves `dartway create` unable
+/// to make the initial commit it just promised.
 ///
 /// Every failure prints the command that fixes it. An agent runs this first and
 /// relays what is missing; nothing below it works until this passes.
@@ -27,6 +35,10 @@ class DoctorCommand extends Command<int> {
   /// Inside a project the pin is read from the server package instead — the
   /// generator must match the runtime, and only the project knows its runtime.
   static const _defaultServerpodCli = '3.4.11';
+
+  /// Long enough for a slow but working link, short enough that doctor stays a
+  /// command you run without planning for it.
+  static const _networkTimeout = Duration(seconds: 10);
 
   @override
   String get name => 'doctor';
@@ -44,6 +56,8 @@ class DoctorCommand extends Command<int> {
     final checks = [
       _checkDart(),
       _checkFlutter(),
+      _checkGit(),
+      await _checkPubHost(),
       _checkDocker(),
       _checkServerpodCli(expectedServerpodCli),
       _checkPubGlobalBinOnPath(),
@@ -117,6 +131,101 @@ class DoctorCommand extends Command<int> {
             fix: 'flutter upgrade',
           );
   }
+
+  /// git is not optional here: `dartway create` clones the framework template
+  /// with it and then commits the result. The identity half is only a warning —
+  /// the project it produces is complete either way — but an unset identity
+  /// fails the commit, and the reason arrives as a wall of git's own text in
+  /// the machine's locale, in the middle of otherwise successful output.
+  _Check _checkGit() {
+    if (_run('git', ['--version']) == null) {
+      return _Check.fail(
+        'git',
+        'not found on PATH',
+        fix:
+            'Install git — https://git-scm.com/downloads '
+            '(`dartway create` clones the template with it)',
+      );
+    }
+    final missing = [
+      if (_gitConfig('user.name') == null) 'user.name',
+      if (_gitConfig('user.email') == null) 'user.email',
+    ];
+    if (missing.isEmpty) {
+      return _Check.ok('git', 'installed, identity configured');
+    }
+    return _Check.warn(
+      'git',
+      'installed, but ${missing.join(' and ')} '
+          '${missing.length == 1 ? 'is' : 'are'} not set',
+      fix:
+          'git config --global user.name "Your Name" && '
+          'git config --global user.email "you@example.com"  '
+          '(without an identity `dartway create` leaves the new project '
+          'without its initial commit)',
+    );
+  }
+
+  String? _gitConfig(String key) {
+    final result = _run('git', ['config', '--get', key]);
+    if (result == null || result.exitCode != 0) return null;
+    final value = (result.stdout as String).trim();
+    return value.isEmpty ? null : value;
+  }
+
+  /// The one prerequisite whose absence does not announce itself.
+  ///
+  /// `dart pub get` sets no deadline on a connection that opens and then goes
+  /// quiet, so a filtered or throttled route to the pub host shows up as a
+  /// resolve step that hangs forever having printed a single line — and every
+  /// step after this one begins with `pub get`. Reported as a failure rather
+  /// than a warning for that reason: a machine that cannot fetch packages
+  /// cannot create or run a project, whatever else is in place.
+  Future<_Check> _checkPubHost() async {
+    final uri = pubHostProbeUri(Platform.environment['PUB_HOSTED_URL']);
+    final host = uri.host;
+    final client = HttpClient()..connectionTimeout = _networkTimeout;
+    try {
+      // `getUrl` completes once the socket *and* the TLS session are up, which
+      // is the step that hangs when traffic is filtered mid-handshake. A bare
+      // TCP connect succeeds in that case and proves nothing, so this asks for
+      // bytes back rather than for a socket.
+      final request = await client.getUrl(uri).timeout(_networkTimeout);
+      request.headers.set(
+        HttpHeaders.acceptHeader,
+        'application/vnd.pub.v2+json',
+      );
+      final response = await request.close().timeout(_networkTimeout);
+      await response.drain<void>().timeout(_networkTimeout);
+      if (response.statusCode >= 400) {
+        return _Check.warn(
+          'pub host',
+          '$host answered ${response.statusCode}',
+          fix: 'Check that $host serves the pub package API',
+        );
+      }
+      return _Check.ok('pub host', '$host answers');
+    } on TimeoutException {
+      return _Check.fail(
+        'pub host',
+        'no answer from $host within ${_networkTimeout.inSeconds}s',
+        fix: _pubHostFix(host),
+      );
+    } on IOException catch (error) {
+      return _Check.fail(
+        'pub host',
+        'cannot reach $host — $error',
+        fix: _pubHostFix(host),
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  String _pubHostFix(String host) =>
+      'Restore network access to $host, or point PUB_HOSTED_URL at a mirror '
+      'you trust — `dart pub get` has no deadline of its own and will hang '
+      'on this without printing anything';
 
   _Check _checkDocker() {
     final result = _run('docker', ['ps']);

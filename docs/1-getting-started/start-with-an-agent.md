@@ -32,6 +32,12 @@ The assistant will run `dartway doctor` first, which reports each of these and p
 whatever is missing:
 
 - **Dart `>=3.11` and Flutter `>=3.41`**
+- **git, with an identity.** `create` commits the project it makes for you; without
+  `user.name` and `user.email` that commit is the one step that does not happen.
+- **A pub host that answers.** Every step of the setup begins with `pub get`, and pub sets no
+  deadline on a connection that opens and then goes quiet — where the route to pub.dev is
+  filtered or throttled you get no error, just a resolve step that hangs. Doctor rules it out in
+  one request; a mirror in `PUB_HOSTED_URL` is checked instead when you have one.
 - **Docker, running.** The database comes from it and there is no second path. This is the one an
   assistant cannot solve for you: Docker Desktop does not install unattended, so if doctor says the
   daemon is not responding, start it.

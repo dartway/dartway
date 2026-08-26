@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.9.0
+
+- **`doctor` checks the two prerequisites that used to let a machine through and then stop it dead:
+  the route to the pub host, and a git identity.**
+
+  Doctor's promise is that a machine can create and run a project. It was possible for it to report
+  one problem, have that fixed, and then hand over to a `dart pub get` that hung for an hour: pub
+  sets no deadline on a connection that opens and then goes quiet, so a filtered or throttled route
+  to pub.dev surfaces as a resolve step printing one line and nothing after it, with no error, no
+  progress and no exit. That is the worst shape a prerequisite failure can take, and it is one
+  request to rule out. The check asks the pub host for bytes rather than for a socket — a TCP
+  connect succeeds even when the handshake after it is being filtered — honours `PUB_HOSTED_URL` so
+  it probes whatever pub itself would talk to, gives up after ten seconds and fails, since a machine
+  that cannot fetch packages cannot create or run anything.
+
+  The git half is a warning, not a failure. `create` clones the template with git and then commits
+  the result, and with no `user.name`/`user.email` that commit fails: the project is complete and
+  usable, but its repository has no initial commit, and the reason arrives as a wall of git's own
+  text in the machine's locale in the middle of otherwise successful output. Doctor now names the
+  two config commands up front. A missing git binary is a failure — the clone needs it.
+
 ## 0.8.0
 
 - **The two git-ignored journals are retired; the project's own findings become `docs/dev_notes/`,

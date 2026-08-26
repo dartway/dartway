@@ -30,11 +30,15 @@ Project packages: `__SERVER_PKG__` (backend), `__FLUTTER_PKG__` (app),
 dartway doctor
 ```
 
-It reports Dart, Flutter, a running Docker daemon, whether `serverpod_cli` matches this
-project's pin, and whether globally activated executables are on PATH — with the exact fix
-for each. Exit code 1 means something below will fail; relay what it names and ask the human
-rather than working around it. Half the failure table further down is a problem doctor names
-in a second.
+It reports Dart, Flutter, git and its identity, whether the pub host answers, a running
+Docker daemon, whether `serverpod_cli` matches this project's pin, and whether globally
+activated executables are on PATH — with the exact fix for each. Exit code 1 means something
+below will fail; relay what it names and ask the human rather than working around it. Half
+the failure table further down is a problem doctor names in a second.
+
+Take the pub host check seriously in particular: `pub get` has no deadline of its own, so an
+unreachable host is not an error you can wait out — it is a command that prints one line and
+never returns.
 
 ## The order (it is not arbitrary)
 
