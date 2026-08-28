@@ -34,9 +34,9 @@
   and the profile a registration builds. `dw.normalizeAuthIdentifier` exposes the same rule to an
   app's own seeds and admin tools, and `getUserProfileByIdentifier` applies it too.
 
-  **The default changes nothing:** with no rule declared the identifier is matched exactly, as
-  before. Switching one on over live data is a data migration — rows written in another form stop
-  being found, silently, as "no such user".
+  Switching a rule on over live data is a data migration — rows written in another form stop being
+  found, silently, as "no such user". The parameter shipped optional in this same cycle and is
+  required by the entry above; within this release there is no "no rule declared" state.
 
 - **A web route no longer answers the caller with whatever the exception happened to say.**
 
