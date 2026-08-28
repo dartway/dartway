@@ -32,7 +32,7 @@ import 'dw_telegram_web_app_stub.dart'
 /// `dartway_flutter` knows nothing of Telegram: it knows only what a [DwPlugin]
 /// is. The `dw.plugins.telegram` accessor is an extension declared *here*, so it
 /// exists only for apps that chose this package.
-abstract class DwTelegramWebApp implements DwPlugin {
+abstract class DwTelegramWebApp extends DwPlugin {
   const DwTelegramWebApp();
 
   /// The platform implementation: the real bridge on web, an inert stub on
