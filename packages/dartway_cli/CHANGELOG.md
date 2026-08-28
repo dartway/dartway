@@ -2,6 +2,27 @@
 
 ## 0.9.0
 
+- **A bare `docker compose` in the checkout now means the same stack the deploy applies.**
+
+  Naming `deploy/compose.override.yml` on every call is airtight inside the CLI and nowhere else.
+  In a directory holding only the rendered `docker-compose.yml`, the command in every runbook —
+  `docker compose up -d` — brings the stack up **without a single service the override declares**,
+  and exits 0, because from Compose's point of view nothing is missing. A staging stand lost its
+  `minio` that way and stayed down for eleven hours; the deploy that caused it reported success.
+
+  `setup` and `run` now write a two-line bridge under `docker-compose.override.yml`, the name
+  Compose loads on its own, which `include`s the committed override rather than copying it. It
+  holds no content, so it cannot go stale — which was the whole reason the old copy was retired.
+  The CLI's own calls are unaffected: explicit `-f` flags replace the default file selection, so
+  the bridge is read only by the command a person types.
+
+  A file already under that name and not carrying the marker — a stale copy, or a hand edit made
+  while debugging — is still moved aside to `.retired` rather than deleted. Where the checkout has
+  no `deploy/compose.override.yml` at all, the deploy **refuses**: that file may be the only place
+  its services are declared, and removing it would be pure subtraction. The step moved after
+  `update-checkout`, so a deploy that itself introduces the override is not refused on a tree that
+  does not have it yet.
+
 - **`doctor` checks the two prerequisites that used to let a machine through and then stop it dead:
   the route to the pub host, and a git identity.**
 

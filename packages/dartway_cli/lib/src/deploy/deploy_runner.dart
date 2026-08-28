@@ -65,13 +65,14 @@ class DwDeployRunner {
   String _compose(String arguments) =>
       DwComposeFiles.commandIn(_appDir, arguments);
 
-  /// Moves aside the automatically loaded override copy older CLIs wrote.
+  /// Keeps a hand-typed `docker compose` in the checkout honest.
   ///
-  /// A server that has one merges it into every deploy, silently and forever,
-  /// while the committed override it was copied from goes on being ignored.
-  /// Idempotent, and a no-op on a server that never had the copy.
-  Future<DwSshResult> retireOverrideCopy() =>
-      ssh.runAs(target.deployUser, DwComposeFiles.retireLegacyCopyIn(_appDir));
+  /// The CLI names the project override on every call of its own; nothing
+  /// makes the command a person types do the same, and in a directory holding
+  /// only the rendered file that command applies a strictly smaller stack
+  /// without saying so. See [DwComposeFiles.bridgeIn].
+  Future<DwSshResult> bridgeOverride() =>
+      ssh.runAs(target.deployUser, DwComposeFiles.bridgeIn(_appDir));
 
   /// Brings the checkout to the tip of the deployment branch.
   ///
@@ -128,17 +129,21 @@ class DwDeployRunner {
   );
 
   List<DwDeployStep> steps({required bool skipGitUpdate}) => [
-    DwDeployStep(
-      id: 'retire-override-copy',
-      title: 'Retire the setup-time compose override copy',
-      run: retireOverrideCopy,
-    ),
     if (!skipGitUpdate)
       DwDeployStep(
         id: 'update-checkout',
         title: 'Update the checkout to origin/${target.branch}',
         run: updateCheckout,
       ),
+    // After the checkout and before anything reads the stack: the bridge names
+    // a file in the working copy, so it has to judge the revision this deploy
+    // is applying. Judged before the update, a deploy that itself introduces
+    // deploy/compose.override.yml would see a tree without it.
+    DwDeployStep(
+      id: 'bridge-override',
+      title: 'Bridge a bare docker compose to the project override',
+      run: bridgeOverride,
+    ),
     DwDeployStep(id: 'build', title: 'Build images', run: build),
     DwDeployStep(
       id: 'migrate',

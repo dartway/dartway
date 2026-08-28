@@ -294,16 +294,14 @@ chmod 600 '${target.appDir}/.env'
     return 1;
   }
 
-  // The project's override is not copied anywhere. Every Compose call names
-  // deploy/compose.override.yml inside the checkout, which the deploy's
-  // `git reset --hard` refreshes. A copy taken here would freeze the file as
-  // it was on the day setup last ran — and Compose would prefer it.
+  // The project's override is never copied. What is written here names it —
+  // two lines that Compose loads on its own, so a bare `docker compose` in the
+  // checkout applies the same stack the deploy does. A copy taken here would
+  // freeze the file as it was on the day setup last ran, and Compose would
+  // prefer the frozen one.
   if (!await step(
-    'Retire the setup-time compose override copy',
-    () => ssh.runAs(
-      target.deployUser,
-      DwComposeFiles.retireLegacyCopyIn(target.appDir),
-    ),
+    'Bridge a bare docker compose to the project override',
+    () => ssh.runAs(target.deployUser, DwComposeFiles.bridgeIn(target.appDir)),
   )) {
     return 1;
   }

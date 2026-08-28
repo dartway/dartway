@@ -37,6 +37,15 @@ every push turns a routine change into an infrastructure one. `compose.override.
 is the opposite: it is never copied to the server, only named on every Compose
 call, so the file the deploy merges is the committed one.
 
+Because the CLI names it and nothing else does, the deploy also writes a
+`docker-compose.override.yml` beside the rendered file — two lines, marked
+`dartway-bridge`, that `include` this one. Compose loads that name on its own, so
+a hand-typed `docker compose up -d` on the server applies the same stack the
+deploy does instead of a silently smaller one. **Do not edit it and do not commit
+one of your own**: a file under that name which is not the bridge is treated as
+possibly the only declaration of its services, and the deploy stops rather than
+touch it.
+
 ## Migrations — what "migrate" in that one-liner actually promises
 
 The migration step prints everything the container said and fails when the text

@@ -328,15 +328,36 @@ rather than an error, because only the build block reintroduces the duplicate.
 The override is **never copied to the server**. Every Compose call the CLI issues names it explicitly
 — `docker compose -f docker-compose.yml -f deploy/compose.override.yml …` — so the file being merged
 is the one in the checkout, which `git reset --hard` refreshes on every deploy. It used to be copied
-to `docker-compose.override.yml` beside the rendered file, the name Compose loads on its own, on the
-grounds that nothing then has to remember the flag; but there is nobody to forget it, since every
-invocation is built in one place, and the price was a second copy that a deploy silently preferred
-over the committed one for as long as `setup` was not re-run. A server carrying that copy has it
-moved to `docker-compose.override.yml.retired` on the next `setup` or `run` — renamed rather than
-deleted, in case somebody edited it on the box while debugging.
+to `docker-compose.override.yml` beside the rendered file, and the price was a second copy that a
+deploy silently preferred over the committed one for as long as `setup` was not re-run.
 
-`run` retires that copy, updates the checkout, rebuilds, applies migrations and restarts, then polls
-every public URL. It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders
+**A two-line bridge is written under that name instead.** Naming the override on every call is
+airtight inside the CLI and nowhere else: `docker compose up -d` — the command in every runbook and
+every habit — applies a strictly smaller stack in a directory that holds only the rendered file, and
+exits 0, because from Compose's point of view nothing is missing. A staging stand lost its `minio`
+that way and stayed down for eleven hours. So the deploy writes
+
+```yaml
+# dartway-bridge: written by dartway deploy. Do not edit.
+include:
+  - deploy/compose.override.yml
+```
+
+which Compose loads on its own and which holds no content to go stale. The CLI's own calls are
+untouched: explicit `-f` flags replace the default file selection outright, so this file is read
+only by the command a person types.
+
+A file already sitting under that name and **not** carrying the marker — a stale copy, or a hand
+edit made while debugging — is moved to `docker-compose.override.yml.retired` rather than deleted.
+And where `deploy/compose.override.yml` is absent from the checkout there is nothing to bridge to:
+the deploy **refuses**, because that file may be the only place its services are declared and
+removing it would be pure subtraction. A bridge left pointing at an override the project has since
+deleted holds nothing and is removed.
+
+`run` updates the checkout, writes the bridge, rebuilds, applies migrations and restarts, then polls
+every public URL. The bridge is written **after** the checkout update: it judges the revision this
+deploy is applying, and a deploy that itself introduces the override must not be refused on a tree
+that does not have it yet. It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders
 infrastructure on every push turns a routine change into an infrastructure one.
 
 **The migration step prints what the container said, and fails on it.** It used to print its title
