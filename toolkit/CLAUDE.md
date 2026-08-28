@@ -18,7 +18,7 @@ Dart packages (the role is determined by the name suffix):
 | `__CLIENT_PKG__` | client | The generated Serverpod protocol. **Never edit by hand** |
 | `__FLUTTER_PKG__` | flutter | The Flutter app: features, UI Kit, navigation, data layer |
 
-A project may add a fourth one, `*_shared` — pure Dart for code that has to behave identically on the server and in Flutter (see "Shared" below). The skeleton has none: until such code shows up, the package is not needed.
+A fourth one, `*_shared` — pure Dart for code that has to behave identically on the server and in Flutter (see "Shared" below). The skeleton ships it wired, with one worked example in it.
 
 ## Cross-stack laws (they hold everywhere)
 
@@ -401,9 +401,13 @@ Not to be confused with `lib/shared/` in the Flutter package: that one holds bui
 with no story of their own. This is a separate Dart **package**, for code that must behave identically
 on the server and in Flutter.
 
-**The skeleton does not include this package** — create it once code appears that has to behave **identically** on the backend and the frontend (format validation, shared enums, computations over fields without IO). Until such code exists there is nothing to duplicate and the package is not needed.
+**The skeleton ships this package**, wired and holding one worked example — a handle rule both sides enforce. Put your own rules beside it: format validation, shared enums, computations over fields without IO. It used to be something a project assembled by hand the day it needed one, and assembling it by hand is where projects lost a day each time.
 
-✅ Allowed: pure Dart, a dependency on the client package. ❌ Not allowed: Flutter, server APIs, `Session`, IO, the DB. The public API goes in `lib/<package_name>.dart`, the implementation in `lib/src/`.
+✅ Allowed: pure Dart, and nothing else. ❌ Not allowed: **a dependency on the client package**, Flutter, server APIs, `Session`, IO, the DB. The public API goes in `lib/<package_name>.dart`, the implementation in `lib/src/`.
+
+**Why not the client package.** The server does not depend on it either — it carries its own copy of the generated models under `lib/src/generated`. A shared package that reached for the protocol would be usable by exactly one of the two sides, which is the opposite of what it is for, and the failure shows up as a duplicate model class rather than as anything naming the mistake. So: plain values in, plain values out; each side unpacks its own models at the call site.
+
+**Adding a path dependency means adding it to both Dockerfiles.** The images are built from the project root and copy package directories by name; one that is never named does not enter the build context, and `pub get` inside the image fails as exit code 66, three layers from the cause. Nothing in a checkout can tell — repository checks resolve the path fine, and the images are built only by `dartway deploy`.
 
 ## Client (`__CLIENT_PKG__`)
 

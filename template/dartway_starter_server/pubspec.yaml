@@ -12,6 +12,12 @@ dependencies:
   dartway_serverpod_core_server: ^0.11.0
   http: ^1.5.0
 
+  # Rules that must hold identically here and in the app. A path dependency,
+  # so both Dockerfiles have to copy this directory too — an image that does
+  # not is unbuildable, and pub says so three layers from the cause.
+  dartway_starter_shared:
+    path: ../dartway_starter_shared
+
 
 
 dev_dependencies:

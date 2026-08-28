@@ -163,7 +163,8 @@ Installs or updates `.claude/` in the current project: the methodology `CLAUDE.m
 
 It finds the project root through `git rev-parse --show-toplevel` (falling back to the current
 directory), then detects the package layout by directory suffix: `*_server`, `*_client`,
-`*_flutter` are required, `*_shared` is optional. Two packages with the same suffix, or none, and
+`*_flutter` are required, `*_shared` is optional — the skeleton ships one, and a project that
+deletes it is still a valid layout. Two packages with the same suffix, or none, and
 the command stops with a layout error rather than guessing. The detected names are substituted
 into the installed markdown, so the skills speak your package names, not placeholders.
 
