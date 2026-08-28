@@ -23,7 +23,7 @@ dartway deploy secret --help                # runtime secrets on the server
 | `../dartway_starter_flutter/Dockerfile` | the web image; the deploy passes it `DW_BACKEND_URL` |
 | `../dartway_starter_flutter/nginx.conf` | how that image serves the build, and above all **what a browser may keep** — see "Caching" |
 | `compose.override.yml` | anything this project adds to a standard deployment — create it when that happens. Read from the checkout on every deploy, so a committed change to it takes effect on the next `run` |
-| `nginx.d/{http,api,app}/*.conf` | extra Nginx directives, if any are ever needed |
+| `nginx.d/{http,api,app}/*.conf` | extra Nginx directives, if any are ever needed. A `proxy_pass` here that names a Compose service must name one the stack declares — `deploy check` and the deploy both refuse otherwise, because nginx resolves upstreams once at start and would only fail at the next restart |
 
 A domain appears in exactly one of the first two, and `dartway deploy check`
 fails when they disagree. One thing does not belong in the override: a `build`
