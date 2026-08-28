@@ -354,7 +354,7 @@ Live migrations (delete an entry once no project is on the old shape):
 
 ## Git
 
-PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commit: `<type>: <description in English> #<TICKET>` (`type` = `feat`/`fix`/`chore`); the ticket is passed as an argument to `/commit`, and the project's CI checks the exact format.
+PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commit: `<type>(<scope>): <description in English>` — `type` = `feat`/`fix`/`chore`, the scope optional. Whether commits also carry a ticket, and whether anything checks the format, is this project's own convention and is stated here rather than assumed by the toolkit.
 
 ---
 

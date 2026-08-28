@@ -31,7 +31,7 @@ The skills are **generic**: project-specific values are extracted into placehold
 
 `docs/dev_notes/` is the one thing installed outside `.claude/`: the project's own findings — a risk, a pin that trails, a config written down twice — one **tracked** file per finding, so it travels out in a pull request and is visible in review. `README.md` there states the form and is refreshed on every install; `_coverage.md` is the project's own table of which features `/dartway-checkup` has read, and is written once and never overwritten. A finding about the **framework** gets no file at all — it is filed as an issue in the repository `__NOTES_TRACKER__` names.
 
-Beyond `docs/adr/` and `docs/dev_notes/`, a DartWay project keeps no docs: the description of a feature lives in its `DwFeatureSpec`, the server-side rules in doc comments above the `DwCrudConfig`, cross-cutting registries in code under `lib/core/`, and the methodology in these skills. The ticket for `/commit` is passed as an argument, and the project's CI checks the format.
+Beyond `docs/adr/` and `docs/dev_notes/`, a DartWay project keeps no docs: the description of a feature lives in its `DwFeatureSpec`, the server-side rules in doc comments above the `DwCrudConfig`, cross-cutting registries in code under `lib/core/`, and the methodology in these skills. `/commit` writes one conventional-commit line and decides nothing local: a ticket convention, if the project has one, is stated in the project's own `CLAUDE.md`.
 
 ## Wiring it into a client repo
 

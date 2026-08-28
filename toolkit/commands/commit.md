@@ -1,28 +1,29 @@
 ---
-description: Commit the current branch's changes in the format the CI checks
-argument-hint: "<TICKET> (e.g. PROJ-123)"
+description: Commit the current branch's changes as one conventional-commit line, in English
 ---
 
 Analyze all the changes in the current branch and make a commit with a precise description of what was done, **in English**, briefly.
 
-## The ticket is a required argument
-
-The ticket number is passed as a **command argument**: `$ARGUMENTS` (e.g. `PROJ-123`). We do **not** pull the ticket out of the branch name. If the argument is empty — stop and ask for the ticket number, do not commit.
-
 ## The format of the first line
 
-`<type>: <short description> #<TICKET>`
+`<type>(<scope>): <short description>`
 
-- `<type>` — `feat`, `fix` or `chore` (lowercase), then `: ` (a colon plus one space). Determine it from the meaning of the changes.
-- `<short description>` — in English, terse, what was done; latin letters/digits/spaces/`-`/`.`/`_`.
-- `#<TICKET>` — `#` + the argument passed in (e.g. `#PROJ-123`).
+- `<type>` — `feat`, `fix` or `chore` (lowercase). Determine it from the meaning of the changes.
+- `<scope>` — optional, and welcome where the change belongs to a named part: `feat(session):`, `fix(deploy):`.
+- `<short description>` — terse, what was done, in English.
 
 Examples:
 
-- `fix: stabilize quiz result option bar layout #PROJ-58`
-- `feat: add survey redirect condition #PROJ-149`
-- `chore: add local docker dev setup #PROJ-14`
+- `fix: stabilize the quiz result option bar layout`
+- `feat(survey): add a redirect condition`
+- `chore: add a local docker dev setup`
 
-The exact ticket format (prefix, case) is set by the project's CI — it does the final check; see the project's `CLAUDE.md`/README if you need to confirm. The commit body (after a blank line) is optional; keep useful context the way the project does.
+The body (after a blank line) is optional; keep useful context the way the project does.
 
-First determine the type (`feat`/`fix`/`chore`) from the meaning of the changes, assemble one correct first line with the ticket passed in, and make the commit.
+## What this command deliberately does not decide
+
+**Anything local belongs to the project, not here.** Whether commits carry a ticket number, in what format, whether a CI job checks the message at all — that is the project's convention, and it lives in the project's own `CLAUDE.md`. Read it; follow it if it says something; do not invent a requirement it does not state, and do not stop to ask for a ticket in a project that has no tracker. A command that blocks on an answer that does not exist looks like compliance and is not.
+
+**A trailing `(#NN)` in the history is not part of the format.** GitHub appends the pull request number on squash-merge, after the fact. Reading `git log` to learn the convention therefore shows a number nobody typed — reproduce it and the next merge yields two, one of them meaningless. In a project numbering its tickets, the two are indistinguishable on sight.
+
+First determine the type from the meaning of the changes, assemble one correct first line, and make the commit.
