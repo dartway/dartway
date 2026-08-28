@@ -42,4 +42,5 @@ export 'src/domain/crud/model_configs/dw_save_config.dart';
 export 'src/generated/endpoints.dart' hide ServerpodFutureCallsGetter;
 export 'src/generated/protocol.dart';
 export 'src/static/dw_configuration_keys.dart';
+export 'src/utils/web_logs/dw_public_web_exception.dart';
 export 'src/utils/web_logs/dw_web_server_logger.dart';
