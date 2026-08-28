@@ -788,10 +788,15 @@ final _uiKitTextLiteral = RegExp('''["']([^"']{3,})["']''');
 /// `Map<String, Color>`. All three are the same mistake, so the rule asks
 /// whether the line declares a const and names the type anywhere in it.
 ///
-/// `\bColor\b` rather than `Color`: `iconColor` is a name, not a type, and a
-/// rule that reported it would be narrowed within a week.
+/// `Colors` is listed separately on purpose: a word boundary after `Color`
+/// does not fire on `Colors.grey`, which is as ordinary a way to write a
+/// hardcoded colour as the constructor is.
+///
+/// Bounded rather than bare, because `iconColor` is a name and not a type, and
+/// a rule that reported names would be narrowed within a week — and a narrowed
+/// rule stops firing where it mattered.
 final _uiKitConstStyle = RegExp(
-  r'^static\s+const\b.*\b(Color|TextStyle)\b',
+  r'^static\s+const\b.*\b(Colors|Color|TextStyle)\b',
 );
 
 /// `fontFamily: 'monospace'` — the literal sits directly in that argument.

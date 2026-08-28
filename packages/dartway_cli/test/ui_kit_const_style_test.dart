@@ -72,6 +72,18 @@ class AppTone {
       expect(findings, contains(DwCheckType.uiKitConstStyle));
     });
 
+    test('Colors.grey is a hardcoded colour like any other', () async {
+      // A word boundary after `Color` does not fire on `Colors`, so the
+      // Flutter palette went unreported while the constructor did not.
+      final findings = await findingsFor('ui_kit/app_divider.dart', '''
+class AppDivider {
+  static const line = Colors.grey;
+}
+''');
+
+      expect(findings, contains(DwCheckType.uiKitConstStyle));
+    });
+
     test('a palette held in a collection is reported too', () async {
       final findings = await findingsFor('ui_kit/app_palette.dart', '''
 class AppPalette {
