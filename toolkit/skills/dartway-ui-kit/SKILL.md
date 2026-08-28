@@ -46,6 +46,18 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
    **moves into the kit whole**, and the feature composes it. Inside the kit the style is taken from a
    token (`AppTextStyle.body.resolve(context)`). Working around the rule with `// ignore:` is a style
    that escaped the kit; the next screen will never learn about it.
+
+   **And inside the kit a colour comes from the context too.** The rule above says where styling may
+   live and nothing about how a kit widget obtains a colour — so a `static const Color` looks
+   permitted, and it is the token that will not survive a second theme: a const does not depend on a
+   context, so changing `ThemeData` does not touch it. Nothing diagnoses it — the analyzer is quiet,
+   the tests are green — and it surfaces on the day somebody asks for a light theme, as a rewrite of
+   every read in the kit at once. Take colours and text styles from the palette
+   (`context.colorScheme`, a `resolve(context)` token); `dartway check` warns on a `static const
+   Color`/`TextStyle` under `lib/ui_kit/` (`uiKitConstStyle`). **`ui_kit/theme/` is exempt** — that is
+   where the theme is assembled and a seed colour has to live somewhere. Geometry stays `const`: a
+   radius does not depend on the theme. One theme in a project means a palette with one set of
+   colours, not the absence of `of(context)`.
 4. **Isolated visual layer.** The kit does not depend on business logic or state. A component =
    pure visuals + minimal props.
 5. **The kit is the app's design system, not a library of shared widgets.** A composite needed by a

@@ -2,6 +2,21 @@
 
 ## 0.9.0
 
+- **`dartway check` warns on a `static const Color` or `TextStyle` inside `lib/ui_kit/`.**
+
+  A token declared const does not depend on a context, so changing `ThemeData` does not touch it:
+  the theme switches and the kit stays as it was. Nothing said so — the guidance covers where
+  styling may live and not how a kit widget obtains a colour, the analyzer is quiet, the tests are
+  green — and it surfaces on the day somebody asks for a light theme, as a rewrite of every read in
+  the kit at once, along with everything that composed a colour outside `build`. In one real kit
+  that was 127 reads across 18 files.
+
+  A warning, not an error: one theme is a legitimate state for a project to be in, and what it will
+  not survive is the second one. **`ui_kit/theme/` is exempt** — that is where the theme is
+  assembled, and a seed colour has to be written down somewhere; without the exemption the rule
+  fires on every project's palette and gets switched off. Geometry is not the rule's business
+  either: a radius does not depend on the theme.
+
 - **An Nginx upstream that no service answers to now stops the deploy, instead of the proxy.**
 
   A snippet under `deploy/nginx.d/` names Compose services as backends, and nothing checked that

@@ -510,7 +510,39 @@ class DwFlutterInspector {
       }
 
       _checkUiKitTextConstants(rel, content);
+      _checkUiKitConstStyles(rel, content);
       _checkAssetPaths(rel, content, 'ui_kit');
+    }
+  }
+
+  /// `static const Color` / `static const TextStyle` in the kit.
+  ///
+  /// Exempt: `ui_kit/theme/`, which is where the theme is assembled — a seed
+  /// colour or a base style has to be written down somewhere, and that is the
+  /// one place it does not depend on a context. Everything else in the kit is
+  /// a consumer, and a consumer holding its own constant is the token that
+  /// will not survive a second theme.
+  void _checkUiKitConstStyles(String rel, String content) {
+    if (rel.startsWith('ui_kit/theme/')) return;
+
+    final lines = content.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.startsWith('//') || line.startsWith('*')) continue;
+
+      final match = _uiKitConstStyle.firstMatch(line);
+      if (match == null) continue;
+
+      _add(
+        DwCheckType.uiKitConstStyle,
+        '$rel declares a const ${match.group(1)} (line ${i + 1}) — '
+            'it will not follow a second theme; take it from '
+            'Theme.of(context) through the palette instead',
+        'ui_kit',
+      );
+      // One finding per file: the rest are the same mistake, and a list of
+      // forty is a list nobody reads to the end.
+      return;
     }
   }
 
@@ -744,6 +776,12 @@ class _DwGrade {
 /// A quoted run of at least three characters — what the kit rule reads as a
 /// candidate text constant.
 final _uiKitTextLiteral = RegExp('''["']([^"']{3,})["']''');
+
+/// `static const Color x = …` and its TextStyle twin, in any order of
+/// modifiers a formatter may leave behind.
+final _uiKitConstStyle = RegExp(
+  r'\bstatic\s+(?:final\s+)?const\s+(Color|TextStyle)\b',
+);
 
 /// `fontFamily: 'monospace'` — the literal sits directly in that argument.
 final _fontFamilyArgument = RegExp(r'\bfontFamily\s*:\s*(?:const\s+)?$');

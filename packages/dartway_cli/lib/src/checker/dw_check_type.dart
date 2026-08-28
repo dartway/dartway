@@ -14,6 +14,20 @@ enum DwCheckType {
   /// Raw styles (Color/TextStyle/BorderRadius/theme access) outside `ui_kit/`.
   forbiddenUiUsage,
 
+  /// A `static const Color` or `static const TextStyle` inside `ui_kit/`,
+  /// outside the folder where the theme is assembled.
+  ///
+  /// A token declared const does not depend on a context, so `ThemeData`
+  /// changing does not touch it: the theme switches and the kit stays as it
+  /// was. Nothing diagnoses that — the analyzer is quiet, this checker used to
+  /// be quiet, the tests are green — and it surfaces on the day somebody asks
+  /// for a light theme, as a rewrite of every token read in the kit.
+  ///
+  /// A warning rather than an error: the kit still works, and one theme is a
+  /// legitimate state for a project to be in. What it will not survive is the
+  /// second one.
+  uiKitConstStyle,
+
   /// Importing `ui_kit/*` files directly instead of the `ui_kit.dart` barrel.
   forbiddenUiKitImport,
 
@@ -145,6 +159,7 @@ enum DwCheckType {
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
     DwCheckType.uiKitContainsText ||
+    DwCheckType.uiKitConstStyle ||
     DwCheckType.featureSpecMissing ||
     DwCheckType.forbiddenAssetPath ||
     DwCheckType.unusedFeatureFile ||
