@@ -3,6 +3,7 @@ import 'dart:io';
 import 'compose_files.dart';
 import 'deploy_target.dart';
 import 'migration_report.dart';
+import 'nginx_upstreams.dart';
 import 'serverpod_config.dart';
 import 'ssh_runner.dart';
 
@@ -73,6 +74,49 @@ class DwDeployRunner {
   /// without saying so. See [DwComposeFiles.bridgeIn].
   Future<DwSshResult> bridgeOverride() =>
       ssh.runAs(target.deployUser, DwComposeFiles.bridgeIn(_appDir));
+
+  /// Marks the boundary between the two answers [checkUpstreams] collects.
+  static const String _upstreamMarker = '--dw-nginx-d--';
+
+  /// Asks the server what the stack actually holds and what nginx expects.
+  ///
+  /// On the server, not against the working copy: the checkout can be right
+  /// while the invocation was not, and that is exactly the case that took a
+  /// stand down — `deploy/compose.override.yml` was committed and present at
+  /// the deployed revision, and the container stamps show it was never
+  /// applied. The local check answers a different question and both are worth
+  /// asking.
+  Future<DwSshResult> checkUpstreams() => ssh.runAs(
+    target.deployUser,
+    "cd '$_appDir' && ${DwComposeFiles.selectFiles} && "
+    '${DwComposeFiles.invoke} config --services && '
+    "echo '$_upstreamMarker' && "
+    "{ find nginx.d -name '*.conf' -exec cat {} + 2>/dev/null || true; }",
+  );
+
+  /// Why a stack that came up is still not fit to have its proxy restarted.
+  ///
+  /// Null when it is. Separate from [checkUpstreams] because the command
+  /// exits 0 either way: it asks two questions, and the disagreement between
+  /// the answers is the finding.
+  static String? upstreamVerdict(DwSshResult result) {
+    final parts = result.stdout.split(_upstreamMarker);
+    if (parts.length < 2) {
+      return null;
+    }
+    final missing = DwNginxUpstreams.missing(
+      snippets: {'nginx.d': parts[1]},
+      services: DwNginxUpstreams.servicesInListing(parts.first),
+    );
+    if (missing.isEmpty) {
+      return null;
+    }
+    final names = missing.map((line) => line.split(': ').last).join(', ');
+    return 'Nginx is configured to proxy to $names, and the applied stack has '
+        'no such service. Restarting nginx now would make it read that '
+        'configuration for the first time and refuse to start, taking the whole '
+        'stand down. Nothing has been restarted.';
+  }
 
   /// Brings the checkout to the tip of the deployment branch.
   ///
@@ -158,6 +202,15 @@ class DwDeployRunner {
           DwMigrationReport.read('${result.stdout}\n${result.stderr}').failure,
     ),
     DwDeployStep(id: 'up', title: 'Start services', run: up),
+    // Between `up` and the restart, and it has to be exactly here: the stack
+    // is now the one nginx will be pointed at, and the proxy has not been
+    // touched yet. A step later this is a post-mortem.
+    DwDeployStep(
+      id: 'check-upstreams',
+      title: 'Check nginx upstreams against the applied stack',
+      run: checkUpstreams,
+      verdict: upstreamVerdict,
+    ),
     DwDeployStep(
       id: 'restart-proxy',
       title: 'Restart nginx',

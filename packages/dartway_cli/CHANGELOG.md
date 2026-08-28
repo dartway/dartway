@@ -2,6 +2,26 @@
 
 ## 0.9.0
 
+- **An Nginx upstream that no service answers to now stops the deploy, instead of the proxy.**
+
+  A snippet under `deploy/nginx.d/` names Compose services as backends, and nothing checked that
+  those services are in the stack. Nginx resolves an upstream once, when it starts, so the mismatch
+  is not felt at the deploy that introduced it — the proxy runs on addresses resolved long ago and
+  the unread configuration sits there as deferred failure. What cashes it in is `restart-proxy`, the
+  deploy's own last step: on the u90 stand nginx had been up for ten days, had never parsed the
+  snippet written on day five, read it at an unrelated deploy and refused to start. A healthy stand
+  became a dead one as a direct result of the deploy's recovery step, with the cause ten days
+  upstream.
+
+  Checked in two places, because they answer different questions. `deploy check` reads the working
+  copy — the rendered stack plus `deploy/compose.override.yml` — and fails on a snippet naming
+  anything else. The new `check-upstreams` step asks the server, between `up` and `restart-proxy`,
+  against the stack that was really applied: the checkout can be right while the invocation was not,
+  which is what actually happened. Nothing is restarted when they disagree.
+
+  Addresses, fully qualified names, `localhost`, nginx variables and aliases defined by the file's
+  own `upstream` block are not services and are not reported.
+
 - **A bare `docker compose` in the checkout now means the same stack the deploy applies.**
 
   Naming `deploy/compose.override.yml` on every call is airtight inside the CLI and nowhere else.

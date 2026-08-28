@@ -245,6 +245,127 @@ void main() {
     });
   });
 
+  group('the local upstream check reads the working copy', () {
+    late Directory root;
+
+    setUp(() {
+      root = Directory.systemTemp.createTempSync('dw_upstreams_');
+    });
+    tearDown(() => root.deleteSync(recursive: true));
+
+    Future<DwDeployVerdict> run() {
+      final check = dwLocalDeployChecks.firstWhere(
+        (c) => c.id == 'nginx-upstreams',
+      );
+      return check.evaluate(
+        DwDeployContext(
+          projectRoot: root,
+          serverPackage: 'shop_server',
+          flutterPackage: 'shop_flutter',
+          target: _target(),
+          serverpod: _serverpod(),
+        ),
+      );
+    }
+
+    void snippet(String relative, String body) =>
+        File(p.join(root.path, 'deploy', 'nginx.d', relative))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync(body);
+
+    test('a project with no snippets has nothing to disagree about', () async {
+      expect((await run()).skipped, isTrue);
+    });
+
+    test('a service the rendered stack provides passes', () async {
+      snippet('api/extra.conf', 'proxy_pass http://backend:8080;\n');
+      final verdict = await run();
+      expect(verdict.passed, isTrue, reason: verdict.detail);
+    });
+
+    test('a service only the override declares passes', () async {
+      // This is the shape the guard must not punish: minio is not in the
+      // rendered file and never will be — it is exactly what an override is
+      // for.
+      snippet('app/storage.conf', 'proxy_pass http://minio:9000;\n');
+      File(p.join(root.path, 'deploy', 'compose.override.yml'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('services:\n  minio:\n    image: minio\n');
+
+      final verdict = await run();
+      expect(verdict.passed, isTrue, reason: verdict.detail);
+    });
+
+    test('a service nothing declares fails and names it', () async {
+      snippet('app/storage.conf', 'proxy_pass http://minio:9000;\n');
+
+      final verdict = await run();
+      expect(verdict.passed, isFalse);
+      expect(verdict.detail, contains('app/storage.conf: minio'));
+      expect(verdict.fix, contains('restarts the proxy'));
+    });
+  });
+
+  group('the upstream guard the deploy runs before restarting nginx', () {
+    DwDeployRunner runner() => DwDeployRunner(
+      ssh: _ScriptedSsh(const []),
+      target: _target(),
+      serverpod: _serverpod(),
+      stdout: stdout,
+    );
+
+    test('stands between starting the stack and restarting the proxy', () {
+      // The position is the whole point: the stack is the one nginx is about
+      // to be pointed at, and the proxy has not been touched yet. A step later
+      // and this is a post-mortem.
+      final steps = runner()
+          .steps(skipGitUpdate: true)
+          .map((s) => s.id)
+          .toList();
+
+      expect(steps.indexOf('check-upstreams'), greaterThan(steps.indexOf('up')));
+      expect(
+        steps.indexOf('check-upstreams'),
+        lessThan(steps.indexOf('restart-proxy')),
+      );
+    });
+
+    test('asks the server for the applied stack, not the working copy', () {
+      final ssh = _ScriptedSsh(const []);
+      DwDeployRunner(
+        ssh: ssh,
+        target: _target(),
+        serverpod: _serverpod(),
+        stdout: stdout,
+      ).checkUpstreams();
+
+      expect(ssh.issued.single, contains('config --services'));
+      expect(ssh.issued.single, contains('-f ${DwComposeFiles.projectOverride}'));
+      expect(ssh.issued.single, contains('nginx.d'));
+    });
+
+    test('a stack that answers every upstream is not a finding', () {
+      expect(
+        DwDeployRunner.upstreamVerdict(
+          _ok('backend\nweb\nnginx\n--dw-nginx-d--\nproxy_pass http://backend:8080;'),
+        ),
+        isNull,
+      );
+    });
+
+    test('an upstream nothing declares stops the restart and says why', () {
+      // The command exits 0 either way — it asked two questions. The
+      // disagreement between the answers is the finding.
+      final verdict = DwDeployRunner.upstreamVerdict(
+        _ok('backend\nweb\nnginx\n--dw-nginx-d--\nproxy_pass http://minio:9000;'),
+      );
+
+      expect(verdict, isNotNull);
+      expect(verdict, contains('minio'));
+      expect(verdict, contains('Nothing has been restarted'));
+    });
+  });
+
   group('requires.files becomes a mount', () {
     String render({List<String> files = const []}) => DwInfraRenderer(
       projectRoot: Directory.systemTemp,

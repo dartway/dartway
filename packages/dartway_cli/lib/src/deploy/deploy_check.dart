@@ -5,6 +5,8 @@ import 'package:yaml/yaml.dart';
 
 import '../checker/dw_check_type.dart';
 import 'deploy_target.dart';
+import 'nginx_upstreams.dart';
+import 'renderer.dart';
 import 'serverpod_config.dart';
 import 'ssh_runner.dart';
 import 'web_cache.dart';
@@ -221,6 +223,13 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     // "web-cache-headers", which is the one that errors.
     severity: DwCheckSeverity.warning,
     evaluate: _checkWebCachePolicy,
+  ),
+  DwDeployCheck(
+    id: 'nginx-upstreams',
+    title: 'Every Nginx upstream is a service the stack declares',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkNginxUpstreams,
   ),
   DwDeployCheck(
     id: 'override-web-build',
@@ -494,6 +503,63 @@ Future<DwDeployVerdict> _checkEntrypointForm(DwDeployContext context) async {
         'Rewrite it as exec form — ENTRYPOINT ["/app/server"] with the ordinary '
         'flags in CMD — or name the binary in server_entrypoint, which makes '
         'the deploy override the entrypoint for the migration run only.',
+  );
+}
+
+/// Compose service names declared by a Compose document.
+Set<String> _servicesIn(String yaml) {
+  final Object? document;
+  try {
+    document = loadYaml(yaml);
+  } on YamlException {
+    return const {};
+  }
+  final services = document is YamlMap ? document['services'] : null;
+  if (services is! YamlMap) {
+    return const {};
+  }
+  return services.keys.map((key) => key.toString()).toSet();
+}
+
+Future<DwDeployVerdict> _checkNginxUpstreams(DwDeployContext context) async {
+  final renderer = DwInfraRenderer(
+    projectRoot: context.projectRoot,
+    target: context.target,
+    serverpod: context.serverpod,
+    serverPackage: context.serverPackage,
+    flutterPackage: context.flutterPackage,
+  );
+  final snippets = renderer.nginxSnippets;
+  if (snippets.isEmpty) {
+    return const DwDeployVerdict.skip('no deploy/nginx.d snippets');
+  }
+
+  final services = {
+    ..._servicesIn(renderer.composeFile),
+    if (renderer.composeOverride case final override?)
+      ..._servicesIn(override.readAsStringSync()),
+  };
+
+  final missing = DwNginxUpstreams.missing(
+    snippets: {
+      for (final entry in snippets.entries)
+        entry.key: entry.value.readAsStringSync(),
+    },
+    services: services,
+  );
+  if (missing.isEmpty) {
+    return DwDeployVerdict.pass(
+      '${snippets.length} snippet(s) against ${services.length} service(s)',
+    );
+  }
+  return DwDeployVerdict.fail(
+    missing.join(', '),
+    fix:
+        'Nginx resolves an upstream once, when it starts, so a name no service '
+        'answers to does not fail at the deploy that introduced it — it fails '
+        'at whatever restarts the proxy next, which is the deploy\'s own last '
+        'step and may be days later. Declare the service in '
+        'deploy/compose.override.yml, or drop the snippet that names it.',
   );
 }
 

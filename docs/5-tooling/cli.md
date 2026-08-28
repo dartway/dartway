@@ -354,8 +354,29 @@ the deploy **refuses**, because that file may be the only place its services are
 removing it would be pure subtraction. A bridge left pointing at an override the project has since
 deleted holds nothing and is removed.
 
-`run` updates the checkout, writes the bridge, rebuilds, applies migrations and restarts, then polls
-every public URL. The bridge is written **after** the checkout update: it judges the revision this
+**An upstream no service answers to stops the deploy before the restart does.** A snippet under
+`deploy/nginx.d/` names Compose services as backends — `proxy_pass http://minio:9000` — and nothing
+used to check that those services are in the stack. Nginx resolves an upstream **once, when it
+starts**, so the mismatch is not felt at the deploy that introduced it: the proxy keeps running on
+addresses resolved long ago, and the configuration it has not read yet sits there as deferred
+failure. What cashes it in is `restart-proxy`, the deploy's own last step, at the moment an operator
+is looking at an unrelated change. On the u90 stand the nginx container had been up for ten days and
+had never once parsed the snippet written on day five.
+
+The invariant is checked in two places, because they answer different questions. `deploy check`
+reads the working copy — the rendered stack plus `deploy/compose.override.yml` — and fails on a
+snippet naming anything else; that is cheap and catches it before anyone travels. The `check-upstreams`
+step then asks the **server**, between `up` and `restart-proxy`, using `docker compose config
+--services` on the stack that was really applied: the checkout can be right while the invocation was
+not, which is exactly what happened. Nothing is restarted when they disagree, and the message names
+the service.
+
+Addresses, fully qualified names, `localhost`, nginx variables and aliases the file defines through
+its own `upstream` block are not services and are not reported — a check that flagged them would be
+switched off within a week.
+
+`run` updates the checkout, writes the bridge, rebuilds, applies migrations, checks the upstreams and
+restarts, then polls every public URL. The bridge is written **after** the checkout update: it judges the revision this
 deploy is applying, and a deploy that itself introduces the override must not be refused on a tree
 that does not have it yet. It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders
 infrastructure on every push turns a routine change into an infrastructure one.
