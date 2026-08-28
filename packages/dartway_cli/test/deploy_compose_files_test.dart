@@ -137,21 +137,29 @@ void main() {
     });
   });
 
-  group('retiring the copy an older setup left behind', () {
-    test('a deployment always offers to move it aside', () {
+  group('bridging a bare docker compose to the project override', () {
+    test('runs after the checkout update, not before it', () {
+      // The bridge names a file in the working copy, so it has to judge the
+      // revision this deploy is applying. Before the update it would judge
+      // yesterday's — and a deploy that itself introduces the override would
+      // refuse on a tree that does not have it yet.
       final steps = DwDeployRunner(
         ssh: _ScriptedSsh(const []),
         target: _target(),
         serverpod: _serverpod(),
         stdout: stdout,
-      ).steps(skipGitUpdate: true);
+      ).steps(skipGitUpdate: false).map((s) => s.id).toList();
 
-      expect(steps.first.id, 'retire-override-copy');
+      expect(
+        steps.indexOf('bridge-override'),
+        greaterThan(steps.indexOf('update-checkout')),
+      );
+      expect(steps.indexOf('bridge-override'), lessThan(steps.indexOf('build')));
     });
 
-    test('is idempotent, and a no-op where the copy never existed', () async {
+    test('writes the bridge, keeps a foreign file, and is idempotent', () async {
       // Shell is the only place this can be judged: the whole point is what
-      // happens on a server that has the file, and on one that never did.
+      // happens to files on a server.
       try {
         Process.runSync('sh', ['-c', 'true']);
       } on ProcessException {
@@ -162,34 +170,78 @@ void main() {
       final root = Directory.systemTemp.createTempSync('dw_override_');
       addTearDown(() => root.deleteSync(recursive: true));
       final dir = root.path.replaceAll(r'\', '/');
-      final script = DwComposeFiles.retireLegacyCopyIn(dir);
+      final script = DwComposeFiles.bridgeIn(dir);
+      final autoLoaded = File(p.join(root.path, DwComposeFiles.autoLoaded));
 
-      // A server that never had the copy.
-      final clean = Process.runSync('sh', ['-c', script]);
-      expect(clean.exitCode, 0);
-      expect(clean.stdout.toString().trim(), isEmpty);
-
-      // A server that has one, twice over.
-      File(
-        p.join(root.path, DwComposeFiles.legacyCopy),
-      ).writeAsStringSync('services:\n  backend:\n    restart: always\n');
+      // A checkout that carries the override, and a stale copy left by an
+      // older CLI. The copy is kept — it may hold a hand edit made while
+      // debugging, and losing that silently would be its own bug.
+      File(p.join(root.path, DwComposeFiles.projectOverride))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('services:\n  minio:\n    image: minio\n');
+      autoLoaded.writeAsStringSync('services:\n  backend:\n    restart: always\n');
 
       final first = Process.runSync('sh', ['-c', script]);
       expect(first.exitCode, 0);
-      expect(first.stdout.toString(), contains('Retired'));
-
-      final second = Process.runSync('sh', ['-c', script]);
-      expect(second.exitCode, 0);
-      expect(second.stdout.toString().trim(), isEmpty);
-
-      expect(
-        File(p.join(root.path, DwComposeFiles.legacyCopy)).existsSync(),
-        isFalse,
-      );
+      expect(first.stdout.toString(), contains('Bridged'));
       expect(
         File(p.join(root.path, DwComposeFiles.retiredCopy)).readAsStringSync(),
         contains('restart: always'),
       );
+      expect(autoLoaded.readAsStringSync(), contains(DwComposeFiles.projectOverride));
+      expect(autoLoaded.readAsStringSync(), contains(DwComposeFiles.bridgeMarker));
+
+      // A rerun recognises its own file and says nothing.
+      final second = Process.runSync('sh', ['-c', script]);
+      expect(second.exitCode, 0);
+      expect(second.stdout.toString().trim(), isEmpty);
+    });
+
+    test('refuses when the override is gone and the file is not ours', () async {
+      try {
+        Process.runSync('sh', ['-c', 'true']);
+      } on ProcessException {
+        markTestSkipped('no POSIX shell on this machine');
+        return;
+      }
+
+      final root = Directory.systemTemp.createTempSync('dw_override_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final dir = root.path.replaceAll(r'\', '/');
+      final autoLoaded = File(p.join(root.path, DwComposeFiles.autoLoaded))
+        ..writeAsStringSync('services:\n  minio:\n    image: minio\n');
+
+      // Nothing else declares those services. Removing the file would be pure
+      // subtraction, and that is how a stand loses a service for eleven hours.
+      final refused = Process.runSync('sh', ['-c', DwComposeFiles.bridgeIn(dir)]);
+      expect(refused.exitCode, isNot(0));
+      expect(refused.stderr.toString(), contains(DwComposeFiles.projectOverride));
+      expect(autoLoaded.existsSync(), isTrue);
+
+      // Our own bridge, left pointing at an override the project has deleted,
+      // holds nothing and goes.
+      autoLoaded.writeAsStringSync('# ${DwComposeFiles.bridgeMarker}\ninclude:\n');
+      final cleaned = Process.runSync('sh', ['-c', DwComposeFiles.bridgeIn(dir)]);
+      expect(cleaned.exitCode, 0);
+      expect(autoLoaded.existsSync(), isFalse);
+    });
+
+    test('a checkout with neither file is left alone', () async {
+      try {
+        Process.runSync('sh', ['-c', 'true']);
+      } on ProcessException {
+        markTestSkipped('no POSIX shell on this machine');
+        return;
+      }
+
+      final root = Directory.systemTemp.createTempSync('dw_override_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final clean = Process.runSync(
+        'sh',
+        ['-c', DwComposeFiles.bridgeIn(root.path.replaceAll(r'\', '/'))],
+      );
+      expect(clean.exitCode, 0);
+      expect(clean.stdout.toString().trim(), isEmpty);
     });
   });
 
