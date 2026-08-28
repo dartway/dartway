@@ -122,6 +122,12 @@ void initDartwayCore({
         : null,
     dwAuthConfig: DwAuthConfig(
       passwords: passwords,
+      // One identifier, one account. The identifier here is a phone number, so
+      // this rule only ever strips a stray space — but it is the seam an app
+      // switching to email addresses needs, and stating it now means the day
+      // that happens nobody has to remember that `Ivan@` and `ivan@` were two
+      // people. See `docs/4-server/auth-identity.md`.
+      normalizeIdentifier: (identifier) => identifier.trim().toLowerCase(),
       legacyPasswordVerifiers: legacyPasswordVerifiers,
       // Test/reviewer accounts carry a fixed, admin-rotated code
       // (UserProfile.testVerificationCode, serverOnly — never sent to clients);
