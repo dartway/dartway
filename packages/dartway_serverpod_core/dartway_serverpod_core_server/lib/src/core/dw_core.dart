@@ -269,8 +269,9 @@ class DwCore<UserProfileClass extends TableRow> {
   /// [identifier] in the form this app stores identifiers in — see
   /// [DwAuthConfig.normalizeIdentifier].
   ///
-  /// Returns the value untouched when the app declared no rule, and when it
-  /// runs without the auth module at all. Public because an app has its own
+  /// Returns the value untouched when the app runs without the auth module at
+  /// all — there is no other way to get an unrewritten identifier now, since
+  /// [DwAuthConfig.normalizeIdentifier] is required. Public because an app has its own
   /// paths that write or match an identifier — a seed, an admin tool, an
   /// invitation — and the whole point is that they state the rule once rather
   /// than each carrying a copy of it.

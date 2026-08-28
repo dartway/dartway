@@ -175,11 +175,23 @@ void main() {
     );
   });
 
-  group('with no rule declared', () {
-    test('the identifier is left exactly as it was typed', () {
-      const config = DwAuthConfig<TestUserProfile>(passwords: {});
+  group('the app has to state the form it stores', () {
+    // There is no default any more, and that is the fix: the previous one
+    // changed nothing, so the defect this exists to close stayed open in every
+    // project that did not remember to declare a rule. A question the framework
+    // cannot answer is not one it may answer quietly.
+    test('both named answers are idempotent, as the contract demands', () {
+      for (final form in [DwIdentifierForm.folded, DwIdentifierForm.asTyped]) {
+        expect(form(form(' Ivan@Acme.com ')), form(' Ivan@Acme.com '));
+      }
+    });
 
-      expect(config.normalizeIdentifier(_asTyped), _asTyped);
+    test('folded brings the shapes of one address together', () {
+      expect(DwIdentifierForm.folded(' Ivan@Acme.com '), 'ivan@acme.com');
+    });
+
+    test('asTyped keeps what was typed, for a case-significant identifier', () {
+      expect(DwIdentifierForm.asTyped(' Ivan@Acme.com '), ' Ivan@Acme.com ');
     });
   });
 }

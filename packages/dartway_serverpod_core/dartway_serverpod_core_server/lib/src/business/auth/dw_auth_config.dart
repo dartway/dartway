@@ -36,10 +36,25 @@ final class DwAuthKeyIssuanceRejectedException implements Exception {
       'DwAuthKeyIssuanceRejectedException(reason: ${reason.name})';
 }
 
-/// The default [DwAuthConfig.normalizeIdentifier]: the identifier is whatever
-/// the caller typed, matched byte for byte. That is what DartWay has always
-/// done, and staying on it is the only choice that cannot break stored data.
-String _identifierAsTyped(String identifier) => identifier;
+/// The two answers to "what form does this app store its identifier in".
+///
+/// Named rather than written inline, so the choice is readable at the call site
+/// and greppable across projects — and so that the common one is not
+/// re-implemented slightly differently in each of them. A project whose rule is
+/// neither of these passes its own function; it only has to be idempotent, see
+/// [DwAuthConfig.normalizeIdentifier].
+abstract final class DwIdentifierForm {
+  /// Trim and case-fold. What an email address wants, and what a phone number
+  /// does not object to.
+  static String folded(String identifier) => identifier.trim().toLowerCase();
+
+  /// Byte for byte, as the caller typed it.
+  ///
+  /// The right answer for an app whose identifier is case-significant, and the
+  /// only one that cannot break data already stored in mixed forms. Choosing it
+  /// is choosing it — that is the point of making the parameter required.
+  static String asTyped(String identifier) => identifier;
+}
 
 class DwAuthConfig<UserProfileClass extends TableRow> {
   final Map<String, String> passwords;
@@ -71,16 +86,22 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.authRequestRateLimitWindow = const Duration(minutes: 10),
     this.passwordHasher = const DwBcryptPasswordHasher(),
     this.legacyPasswordVerifiers = const [],
-    this.normalizeIdentifier = _identifierAsTyped,
+    required this.normalizeIdentifier,
   });
 
   /// Brings a user identifier to the single form this app stores it in.
   ///
   /// `Ivan@acme.com` and `ivan@acme.com` are one person, or they are two, and
   /// only the app knows which — the identifier is not declared to be an email
-  /// address, and an app may legitimately use a case-significant one. So
-  /// nothing is folded until the app says so, and the default leaves the
-  /// identifier exactly as it was typed.
+  /// address, and an app may legitimately use a case-significant one.
+  ///
+  /// **Required, and deliberately so.** It shipped with a default that changed
+  /// nothing, which meant the defect this exists to close — the same address
+  /// typed with a capital signing a person into a second account — stayed open
+  /// in every project that did not remember to declare a rule. A question the
+  /// framework cannot answer is not a question it may answer quietly; it is one
+  /// the compiler asks once, per project. Take [DwIdentifierForm.folded] or
+  /// [DwIdentifierForm.asTyped], or state your own.
   ///
   /// Where it is applied: to the auth request the moment it arrives, before
   /// anything reads the identifier off it, and inside

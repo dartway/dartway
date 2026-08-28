@@ -94,7 +94,11 @@ dw = DwCore.init<UserProfile>(
   dtoConfigurations: [],
   userProfileConstructor: _buildUserProfile,
   dwAlerts: DwAlerts.init(),
-  dwAuthConfig: DwAuthConfig(passwords: passwords),
+  dwAuthConfig: DwAuthConfig(
+    passwords: passwords,
+    // Required: the app states the one form it stores identifiers in.
+    normalizeIdentifier: DwIdentifierForm.folded,
+  ),
 );
 ```
 
