@@ -530,6 +530,10 @@ class DwFlutterInspector {
       final line = lines[i].trim();
       if (line.startsWith('//') || line.startsWith('*')) continue;
 
+      // Trimmed, so an indented member matches; a declaration wrapped across
+      // lines by the formatter is missed, as in the text-constant rule beside
+      // it — the same trade, and the same reason: a line is a shape a regex
+      // can judge, and a parse is not what this checker is.
       final match = _uiKitConstStyle.firstMatch(line);
       if (match == null) continue;
 
@@ -777,10 +781,17 @@ class _DwGrade {
 /// candidate text constant.
 final _uiKitTextLiteral = RegExp('''["']([^"']{3,})["']''');
 
-/// `static const Color x = …` and its TextStyle twin, in any order of
-/// modifiers a formatter may leave behind.
+/// A `static const` declaration that mentions a colour or a text style.
+///
+/// Not just `static const Color x` — the type is usually inferred
+/// (`static const muted = Color(0xFF888888)`), and a palette is as often a
+/// `Map<String, Color>`. All three are the same mistake, so the rule asks
+/// whether the line declares a const and names the type anywhere in it.
+///
+/// `\bColor\b` rather than `Color`: `iconColor` is a name, not a type, and a
+/// rule that reported it would be narrowed within a week.
 final _uiKitConstStyle = RegExp(
-  r'\bstatic\s+(?:final\s+)?const\s+(Color|TextStyle)\b',
+  r'^static\s+const\b.*\b(Color|TextStyle)\b',
 );
 
 /// `fontFamily: 'monospace'` — the literal sits directly in that argument.

@@ -58,6 +58,30 @@ class AppTextStyles {
       expect(findings, contains(DwCheckType.uiKitConstStyle));
     });
 
+    test('an inferred type is the same mistake, and the usual spelling',
+        () async {
+      // `static const muted = Color(0xFF888888)` is how this is written more
+      // often than with the type spelled out; a rule that missed it would
+      // report the rarer half of the problem.
+      final findings = await findingsFor('ui_kit/app_tone.dart', '''
+class AppTone {
+  static const muted = Color(0xFF888888);
+}
+''');
+
+      expect(findings, contains(DwCheckType.uiKitConstStyle));
+    });
+
+    test('a palette held in a collection is reported too', () async {
+      final findings = await findingsFor('ui_kit/app_palette.dart', '''
+class AppPalette {
+  static const Map<String, Color> tones = {};
+}
+''');
+
+      expect(findings, contains(DwCheckType.uiKitConstStyle));
+    });
+
     test('it is a warning, not a failure — one theme is a legitimate state',
         () {
       expect(DwCheckType.uiKitConstStyle.severity, DwCheckSeverity.warning);
@@ -86,6 +110,19 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         color: Theme.of(context).colorScheme.surface,
       );
+}
+''');
+
+      expect(findings, isNot(contains(DwCheckType.uiKitConstStyle)));
+    });
+
+    test('a name that merely contains the word is not a type', () async {
+      // `iconColor` is a name. A rule that reported it would be narrowed
+      // within a week, and a narrowed rule stops firing where it mattered.
+      final findings = await findingsFor('ui_kit/app_icon.dart', '''
+class AppIcon {
+  static const double iconColorOpacity = 0.6;
+  static const String colorKey = 'color';
 }
 ''');
 
