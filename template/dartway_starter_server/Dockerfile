@@ -5,6 +5,10 @@
 FROM dart:3.12.0 AS build
 
 WORKDIR /workspace
+# Both packages, and both by name: a path dependency whose directory never
+# enters the build context fails inside `dart pub get` as exit code 66, three
+# layers from the cause and pointing at neither the Dockerfile nor the package.
+COPY dartway_starter_shared/ dartway_starter_shared/
 COPY dartway_starter_server/ dartway_starter_server/
 
 WORKDIR /workspace/dartway_starter_server

@@ -4,7 +4,7 @@
 dartway create my_app
 ```
 
-Three Dart packages side by side, an agent toolkit, and a git repository with an initial commit.
+Four Dart packages side by side, an agent toolkit, and a git repository with an initial commit.
 The source is `template/` in the DartWay monorepo — a skeleton with auth, roles, navigation, an
 admin panel and a UI kit, and zero domain models.
 
@@ -13,6 +13,7 @@ my_app/
   my_app_server/     Serverpod backend — models, CRUD configs, business logic
   my_app_client/     generated protocol + API client — never edited by hand
   my_app_flutter/    the app — features, UI kit, navigation
+  my_app_shared/     rules both sides must apply identically — pure Dart, no dependencies
   .claude/           the agent toolkit (installed, then committed)
   .vscode/           Server / Flutter (web) launch configs
   .github/           a Claude PR-review workflow (delete it to turn review off)
@@ -31,16 +32,23 @@ An ADR exists for the one thing that cannot live beside code — the *rejected* 
 have no file to sit next to. The rules for writing one (and for never editing it) are in the agent
 toolkit's `CLAUDE.md`; `dartway-plan` reads the folder before proposing an approach.
 
-## Why three packages
+## Why four packages
 
 `server` and `flutter` cannot depend on each other — one imports `dart:io` and Serverpod, the other
-imports Flutter. `client` is the package both halves *can* see, which is why the protocol lives
-there and why it is generated rather than written.
+imports Flutter. `client` holds the generated protocol, and `flutter` depends on it. **The server
+does not:** it carries its own copy of the same models under `lib/src/generated`, which is why the
+protocol is generated on both sides rather than shared through one package — and why a shared
+package must not route through the client, see below.
 
-A project may add a fourth, `my_app_shared`: pure Dart for code that has to behave **identically**
-on both sides — format validation, shared enums, computation over fields with no IO. The skeleton
-ships none, because until such code exists the package is a folder with a pubspec in it. The CLI
-recognises it by the `*_shared` directory suffix if you add it.
+The fourth, `my_app_shared`, is pure Dart for code that has to behave **identically** on both sides
+— format validation, shared enums, computation over fields with no IO. The skeleton ships it wired
+into both halves, holding one worked example; it used to be a package each project assembled by
+hand, and the guidance for doing so was wrong about the one thing that matters.
+
+**It depends on nothing, and that constraint is its design.** It may not depend on the client
+package: the server does not depend on that package either — it carries its own copy of the
+generated models — so a shared package reaching for the protocol would serve exactly one of the two
+sides. Plain values in, plain values out; each side unpacks its own models at the call site.
 
 ## `my_app_server` — where the rules live
 

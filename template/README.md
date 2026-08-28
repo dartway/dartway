@@ -5,6 +5,7 @@ A fullstack app built with [DartWay](https://dartway.dev) (Flutter + Serverpod):
 - `dartway_starter_server` — Serverpod backend (models, CRUD configs, logic)
 - `dartway_starter_flutter` — Flutter app (features, UI kit, navigation)
 - `dartway_starter_client` — generated API client (**do not edit by hand**)
+- `dartway_starter_shared` — rules that must hold identically on both sides; pure Dart, no dependencies
 
 ## Getting started
 

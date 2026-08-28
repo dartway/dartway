@@ -5,7 +5,10 @@
 FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
 
 WORKDIR /workspace
+# Every path dependency by name. One that is missing from the context fails
+# inside `flutter pub get`, three layers from the cause.
 COPY dartway_starter_client/ dartway_starter_client/
+COPY dartway_starter_shared/ dartway_starter_shared/
 COPY dartway_starter_flutter/ dartway_starter_flutter/
 
 WORKDIR /workspace/dartway_starter_flutter

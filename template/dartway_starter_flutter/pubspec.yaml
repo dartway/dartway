@@ -30,6 +30,10 @@ dependencies:
   serverpod_flutter: 3.4.11
   dartway_starter_client:
     path: ../dartway_starter_client
+  # The same rules the server enforces, so the app can refuse before sending.
+  # A path dependency: the web image copies this directory too.
+  dartway_starter_shared:
+    path: ../dartway_starter_shared
 
   flutter_hooks: ^0.21.2
   hooks_riverpod: ^3.0.0
