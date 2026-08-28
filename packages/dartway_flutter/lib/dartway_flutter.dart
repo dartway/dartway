@@ -19,6 +19,7 @@
 // (`dw.plugins.<name>`).
 export 'src/core/dw_flutter.dart';
 export 'src/core/logic/dw_config.dart';
+export 'src/core/logic/dw_key_value_store.dart';
 export 'src/core/logic/dw_plugin.dart';
 
 // bootstrap: ProviderScope, native splash, ordered initializers, the global

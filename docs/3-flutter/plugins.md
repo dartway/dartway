@@ -174,6 +174,31 @@ What a plugin must **not** do is keep the core and read it during `init` for som
 finished setting up. Session state is the usual example: at `init` time nobody is signed in yet.
 Capture the provider, watch it from the widget tree, and react — do not read a value.
 
+## A role the framework asks for: `DwKeyValueStorePlugin`
+
+Most plugins are an app reaching for its own integration. A few are the other way round — the
+framework needs a **job done** and has no opinion about who does it. Those are declared as an
+abstract role in the framework and claimed by whatever plugin an app declares:
+
+| role | who asks | what happens without one |
+|---|---|---|
+| `DwRepoLocalStorePlugin` | `dw.repo` | reads and writes stay network-only |
+| `DwKeyValueStorePlugin` | the auth key manager | a signed-in session cannot survive a reload, and the manager says so |
+
+`DwKeyValueStorePlugin` is a handful of key-value methods plus `isPersistent`. `DwSharedPreferences`
+claims it; an app that keeps its key somewhere of its own writes its own plugin, or hands
+`DwAuthenticationKeyManager` a store directly.
+
+**This replaced a second copy.** The core used to reach for `shared_preferences` itself, in its own
+`SharedPreferenceStorage`, while the plugin implemented the same job a package away — two
+implementations that agreed only because they happened to sit on the same store. A decision taken on
+one side could not be seen from the other, and a browser with no local storage broke both,
+separately. One implementation, named through a role, is what the role is for.
+
+The framework asks with `maybeOf`, so absence is an ordinary answer to the question rather than a
+crash — the key manager turns it into a message naming the plugin to declare, at the moment
+something actually needs the key.
+
 ## Distribution: pub.dev, and nothing else
 
 **Plugins ship on pub.dev, versioned independently of the core.** Not as a git ref, not as a path
@@ -198,7 +223,7 @@ combinations that were never tested instead of failing at runtime.
 
 | Package | Reached as | What it is |
 |---|---|---|
-| [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) | `dw.plugins.prefs` | Reactive riverpod providers over local storage |
+| [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) | `dw.plugins.prefs` | Reactive riverpod providers over local storage; claims `DwKeyValueStorePlugin`, so it is also where the signed-in session's key lives |
 | [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) | `dw.plugins.telegram` | Telegram Mini App: viewport, safe-area insets, Telegram user id |
 | [`dartway_push_flutter`](https://pub.dev/packages/dartway_push_flutter) | `dw.plugins.push` | [Push notifications](push-notifications.md): permissions, token lifecycle, taps — with the transport itself in a package of its own |
 | [`dartway_offline_flutter`](https://pub.dev/packages/dartway_offline_flutter) | `dw.plugins.offline` | [Offline](offline.md): the local copy `dw.repo` reads and writes through, plus downloads, signed access leases and trusted time |

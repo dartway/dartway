@@ -15,4 +15,4 @@ dependencies:
   # wrapper types. Inside the workspace this resolved without being declared,
   # which is exactly the kind of dependency that only fails once the package is
   # published and somebody else resolves it.
-  dartway_serverpod_core_client: ^0.11.0
+  dartway_serverpod_core_client: ^0.12.0
