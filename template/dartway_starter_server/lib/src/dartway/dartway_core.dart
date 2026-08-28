@@ -76,7 +76,7 @@ void initDartwayCore({
       // switching to email addresses needs, and stating it now means the day
       // that happens nobody has to remember that `Ivan@` and `ivan@` were two
       // people. See `docs/4-server/auth-identity.md`.
-      normalizeIdentifier: (identifier) => identifier.trim().toLowerCase(),
+      normalizeIdentifier: DwIdentifierForm.folded,
       legacyPasswordVerifiers: legacyPasswordVerifiers,
       // Test/reviewer accounts carry a fixed, admin-rotated code
       // (UserProfile.testVerificationCode, serverOnly — never sent to clients);

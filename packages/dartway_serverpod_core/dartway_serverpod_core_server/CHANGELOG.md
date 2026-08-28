@@ -2,6 +2,24 @@
 
 ## 0.12.0
 
+- **Breaking: `DwAuthConfig.normalizeIdentifier` is required.**
+
+  It arrived a release earlier with a default that changed nothing, on the reasoning that folding
+  case cannot be right for every app and must not break stored data. Both true — and together they
+  meant the defect the parameter exists to close stayed open in every project that did not remember
+  to declare a rule, which is precisely the projects that needed it. A default that changes nothing
+  is not a safe default; it is the old behaviour wearing a new name.
+
+  So the compiler asks once, per project. `DwIdentifierForm.folded` trims and case-folds;
+  `DwIdentifierForm.asTyped` keeps the identifier byte for byte, and is still the only choice that
+  cannot break identifiers already stored in mixed forms — but it is now chosen rather than
+  inherited. A rule of your own still works; it only has to be idempotent.
+
+  **Migration:** one line at the `DwAuthConfig` call site. An app that wants today's behaviour
+  passes `DwIdentifierForm.asTyped` — and, having read this far, knows what it is keeping. The
+  skeleton and `example/` state `DwIdentifierForm.folded`, so a new project starts on the rule
+  rather than remembering to add it.
+
 - **The same address, typed with a capital, no longer signs a person into a second account.**
 
   The auth identifier was matched byte for byte, so `Ivan@acme.com` found nothing where

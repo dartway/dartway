@@ -30,21 +30,40 @@ The same split runs deeper than the account. The per-identifier lock and the
 rate-limit bucket are keyed on the same string, so two spellings are also **two
 rate-limit buckets** — an attacker gets the limit once per spelling.
 
-## The rule is yours to state
+## The rule is yours to state, and stating it is not optional
 
 DartWay does not fold case on its own, and that is deliberate. The identifier is
 not declared to be an email address; an app may legitimately use one where case
-is significant. So the framework refuses to guess and asks instead:
+is significant. So the framework refuses to guess.
+
+**`normalizeIdentifier` is a required parameter.** It shipped with a default
+that changed nothing, and a default that changes nothing is how a defect stays
+open everywhere: the projects that most needed the rule were exactly the ones
+that would not remember to declare it. A question the framework cannot answer is
+not one it may answer quietly — the compiler asks it once, per project.
+
+Two named answers, so the choice reads at the call site:
 
 ```dart
 DwCore.init<UserProfile>(
   // ...
   dwAuthConfig: DwAuthConfig(
     passwords: passwords,
-    normalizeIdentifier: (identifier) => identifier.trim().toLowerCase(),
+    // Trim and case-fold — what an email address wants, and what a phone
+    // number does not object to. This is what `dartway create` gives you.
+    normalizeIdentifier: DwIdentifierForm.folded,
   ),
 );
 ```
+
+`DwIdentifierForm.asTyped` is the other one: byte for byte, for an identifier
+where case is significant — and the only choice that cannot break identifiers
+already stored in mixed forms. A rule of your own is fine too; it only has to be
+idempotent, because DartWay applies it more than once.
+
+**A new project starts on `folded`.** The skeleton states it, so the day a
+project moves from phone numbers to email addresses nobody has to remember that
+`Ivan@` and `ivan@` were two people.
 
 Declared once, that rule is applied by DartWay everywhere the identifier decides
 *who* someone is:
