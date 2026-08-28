@@ -270,7 +270,7 @@ packages:
       path: "../../packages/dartway_flutter"
       relative: true
     source: path
-    version: "0.7.0"
+    version: "0.8.0"
   dartway_lints:
     dependency: "direct dev"
     description:
@@ -291,21 +291,28 @@ packages:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_client"
       relative: true
     source: path
-    version: "0.11.0"
+    version: "0.12.0"
   dartway_serverpod_core_flutter:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_flutter"
       relative: true
     source: path
-    version: "0.11.0"
+    version: "0.12.0"
   dartway_serverpod_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_serverpod_core/dartway_serverpod_core_shared"
       relative: true
     source: path
-    version: "0.11.0"
+    version: "0.12.0"
+  dartway_shared_preferences:
+    dependency: "direct main"
+    description:
+      path: "../../packages/dartway_shared_preferences"
+      relative: true
+    source: path
+    version: "0.5.0"
   dartway_starter_client:
     dependency: "direct main"
     description:

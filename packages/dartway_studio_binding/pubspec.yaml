@@ -25,7 +25,7 @@ dependencies:
   dartway_router: ^1.1.1
   # The persona switch runs the core's own OTP flow, so the binding sits above
   # the core rather than inside it.
-  dartway_serverpod_core_flutter: ^0.11.0
+  dartway_serverpod_core_flutter: ^0.12.0
   # The wire. Both this package and Studio depend on it; its version means the
   # protocol, which is why host-side changes do not belong there.
   dartway_studio_bridge: ^0.8.0

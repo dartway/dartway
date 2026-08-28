@@ -1,7 +1,7 @@
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'dart:async';
 
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
-import 'package:dartway_serverpod_core_flutter/src/app/session/service/dw_auth_storage_interface.dart';
 import 'package:dartway_serverpod_core_flutter/src/app/session/service/dw_authentification_key_manager.dart';
 import 'package:dartway_serverpod_core_flutter/src/app/session/service/dw_session_service.dart';
 import 'package:dartway_serverpod_core_flutter/src/repository/dw_repository.dart';
@@ -146,7 +146,11 @@ class _FakeProtocol extends SerializationManager {
   }
 }
 
-class _NoopStorage implements Storage {
+class _NoopStore extends DwKeyValueStorePlugin {
+  @override
+  Future<void> init(DwFlutter core) async {}
+  @override
+  bool get isPersistent => false;
   @override
   Future<int?> getInt(String key) async => null;
   @override
@@ -160,7 +164,7 @@ class _NoopStorage implements Storage {
 }
 
 class _FakeKeyManager extends DwAuthenticationKeyManager {
-  _FakeKeyManager(this._result) : super(storage: _NoopStorage());
+  _FakeKeyManager(this._result) : super(store: _NoopStore());
   final (int?, SerializableModel?) _result;
 
   int removeCalls = 0;

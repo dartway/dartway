@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0
+
+- **Claims the `DwKeyValueStorePlugin` role**, so the signed-in session's key lives here instead of
+  in a second copy of the same storage code inside the core. An app declares this plugin — or one of
+  its own — and the core stops carrying `shared_preferences`.
+
+- **A browser without local storage no longer takes the app down.** `init` was a single unguarded
+  `SharedPreferences.getInstance()`. On the web that call reads `window.localStorage`, and a browser
+  is allowed to have none: an Android WebView with DOM storage disabled returns `null` there rather
+  than throwing, so the package walks a null and dies. What reached Dart was a null check inside a
+  third-party package, with storage nowhere in sight, and `dw.init()` carried it out — white screen,
+  no route mounted. Seen in production.
+
+  `DwSharedPreferences(whenUnavailable:)` decides what that costs. The default, `useMemory`, falls
+  back to an in-memory store so `raw` is always usable and the app runs, remembering nothing;
+  `isPersistent` then says so, and the fallback is reported once rather than on every read — a login
+  that will not stick is worth explaining, and looks like a bug when it is not explained. An app for
+  which running without persistence is worse than not running sets `fail`, and with `blocksStartup`
+  at its default the app does not start.
+
+  The fallback is process-wide by design: it replaces the platform store, so everything asking for
+  preferences afterwards — this plugin, the auth key, the app's own calls — gets the same answer.
+  Half the app remembering and half not would be worse than neither.
+
 ## 0.4.0
 
 - **`providerFamily(keyFor:, defaultValue:)` and `mappedProviderFamily(keyFor:, mapFrom:, mapTo:)`

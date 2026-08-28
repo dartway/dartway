@@ -1,4 +1,5 @@
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:flutter/foundation.dart';
 import 'package:serverpod_flutter/serverpod_flutter.dart';
@@ -44,6 +45,10 @@ void initExampleDwCore({String? backendUrl, DwServerTransport? transport}) {
   _coreInitialized = true;
 
   dw = DwCore<Client, UserProfile>(
+    // The session's key lives here. The core asks the plugins for whoever
+    // claimed the DwKeyValueStorePlugin role rather than reaching for a
+    // storage package of its own — see DwSharedPreferences.
+    plugins: [DwSharedPreferences()],
     config: DwConfig(
       defaultModelGetter: dwGetDefault,
       // Shown in error reports next to the platform and user.

@@ -39,9 +39,13 @@ dependencies:
   device_frame: ^1.4.0
 
   dartway_flutter: ^0.8.0
+  # Where the signed-in session is kept: the core asks the plugins for whoever
+  # claimed the DwKeyValueStorePlugin role, and without one there is nowhere
+  # to put the auth key.
+  dartway_shared_preferences: ^0.5.0
   dartway_router: ^1.1.1
 
-  dartway_serverpod_core_flutter: ^0.11.0
+  dartway_serverpod_core_flutter: ^0.12.0
   dartway_studio_bridge: ^0.8.0
 
   dartway_studio_binding: ^0.1.0
@@ -76,6 +80,8 @@ dev_dependencies:
 dependency_overrides:
   dartway_flutter:
     path: ../../packages/dartway_flutter
+  dartway_shared_preferences:
+    path: ../../packages/dartway_shared_preferences
   dartway_serverpod_core_flutter:
     path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_flutter
   dartway_serverpod_core_client:

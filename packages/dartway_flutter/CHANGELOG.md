@@ -2,6 +2,18 @@
 
 ## 0.8.0
 
+- **`DwKeyValueStorePlugin` — the role the framework asks for when it needs to keep a small value.**
+
+  The core needed the signed-in session's key to survive a reload and reached for
+  `shared_preferences` itself, in its own copy of the contract, while `dartway_shared_preferences`
+  implemented the same job a package away. Two implementations that agreed only because they sat on
+  the same store: a decision taken on one side — a fallback, a failure mode — could not be seen from
+  the other, and a browser with no local storage broke both, separately.
+
+  The role is declared here so neither side has to depend on the other, the same shape as
+  `DwRepoLocalStorePlugin`. The framework asks through `maybeOf`, so nobody claiming it is an
+  ordinary answer that turns into a message naming the plugin to declare.
+
 - **One plugin's failed `init` no longer takes the whole app start with it, and the report says
   which plugin it was.**
 

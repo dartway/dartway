@@ -1,6 +1,6 @@
 name: dartway_shared_preferences
 description: "Shared-preferences plugin for DartWay: typed riverpod providers over local storage, reached as dw.plugins.prefs. Optional by design."
-version: 0.4.0
+version: 0.5.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -19,6 +19,10 @@ dependencies:
   dartway_flutter: ^0.8.0
   flutter_riverpod: ^3.0.0
   shared_preferences: ^2.3.0
+  # For InMemorySharedPreferencesStore — the fallback when the platform has no
+  # store. Declared rather than reached through shared_preferences: importing a
+  # transitive dependency is a lint, and this one is used directly.
+  shared_preferences_platform_interface: ^2.4.0
 
 dev_dependencies:
   flutter_test:

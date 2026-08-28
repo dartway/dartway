@@ -18,7 +18,7 @@ dependencies:
 
   dartway_flutter: ^0.8.0
   dartway_offline_shared: ^0.1.0
-  dartway_serverpod_core_flutter: ^0.11.0
+  dartway_serverpod_core_flutter: ^0.12.0
   drift: 2.31.0
   drift_flutter: 0.2.8
   background_downloader: ^9.5.7

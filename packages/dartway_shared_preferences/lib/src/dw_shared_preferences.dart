@@ -2,6 +2,7 @@ import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 import 'logic/mapped_pref_notifier.dart';
 import 'logic/pref_notifier.dart';
@@ -77,17 +78,90 @@ typedef DwMappedPrefProviderFamily<T, Arg> =
 ///
 /// ref.watch(projectSortProvider(project.id));
 /// ```
-class DwSharedPreferences extends DwPlugin {
-  DwSharedPreferences();
+/// What the plugin does when the platform has no store to give it.
+enum DwPrefsUnavailable {
+  /// Keep everything in memory for the life of the tab or process. The app
+  /// runs and remembers nothing, [DwSharedPreferences.isPersistent] says so,
+  /// and the failure is reported once.
+  useMemory,
+
+  /// Let the failure out. With [DwPlugin.blocksStartup] left at its default
+  /// this stops the app from starting — the right answer where running without
+  /// persistence is worse than not running.
+  fail,
+}
+
+class DwSharedPreferences extends DwKeyValueStorePlugin {
+  DwSharedPreferences({this.whenUnavailable = DwPrefsUnavailable.useMemory});
+
+  /// What to do when the platform store cannot be opened.
+  ///
+  /// A browser is allowed to have no local storage: an Android WebView with
+  /// DOM storage off returns null there rather than throwing, and
+  /// `shared_preferences_web` walks that null and dies. The failure reaches
+  /// Dart as a null check somewhere inside a third-party package, with storage
+  /// nowhere in sight, and it used to take the whole app start with it.
+  ///
+  /// The default keeps the app alive, because in that browser the honest
+  /// behaviour is "runs, remembers nothing" — and [isPersistent] exists so the
+  /// app can say that out loud instead of looking broken. An app for which a
+  /// session that cannot survive a reload is worse than no app at all sets
+  /// [DwPrefsUnavailable.fail].
+  final DwPrefsUnavailable whenUnavailable;
 
   /// The underlying [SharedPreferences], for direct imperative reads/writes.
   /// Available after `dw.init()` has run.
   late final SharedPreferences raw;
 
+  bool _persistent = true;
+
+  @override
+  bool get isPersistent => _persistent;
+
   @override
   Future<void> init(DwFlutter core) async {
-    raw = await SharedPreferences.getInstance();
+    try {
+      raw = await SharedPreferences.getInstance();
+    } catch (error, stackTrace) {
+      if (whenUnavailable == DwPrefsUnavailable.fail) rethrow;
+      // The store is a process-wide platform slot, and the in-memory one is
+      // the package's own. Everything that asks for preferences afterwards —
+      // this plugin, the auth key, an app's own call — gets the same answer,
+      // which is the point: half the app remembering and half not would be
+      // worse than neither.
+      SharedPreferencesStorePlatform.instance =
+          InMemorySharedPreferencesStore.empty();
+      // The retry is possible because `getInstance` clears its cached completer
+      // when the load fails — a successful load is cached for the life of the
+      // process, a failed one is not.
+      raw = await SharedPreferences.getInstance();
+      _persistent = false;
+      // Once, here, rather than on every read: a warning per read is a warning
+      // nobody reads.
+      core.handleError(
+        StateError(
+          'No persistent preference store on this platform, so settings and '
+          'the signed-in session last only as long as this tab: $error',
+        ),
+        stackTrace,
+      );
+    }
   }
+
+  @override
+  Future<String?> getString(String key) async => raw.getString(key);
+
+  @override
+  Future<void> setString(String key, String value) => raw.setString(key, value);
+
+  @override
+  Future<int?> getInt(String key) async => raw.getInt(key);
+
+  @override
+  Future<void> setInt(String key, int value) => raw.setInt(key, value);
+
+  @override
+  Future<void> remove(String key) => raw.remove(key);
 
   /// Builds a provider whose value is the stored [key], falling back to
   /// [defaultValue]. Update it through the notifier's `update`.

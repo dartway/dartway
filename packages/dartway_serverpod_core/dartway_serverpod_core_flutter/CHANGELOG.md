@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.12.0
+
+- **Breaking: the auth key is kept by a plugin, not by the core.** `DwAuthenticationKeyManager` asked
+  `shared_preferences` directly through its own `SharedPreferenceStorage`, which was a second
+  implementation of what `dartway_shared_preferences` already did — agreeing with it only because
+  both sat on the same store, so a fallback or a failure mode chosen on one side was invisible from
+  the other, and a browser with no local storage broke each of them separately.
+
+  The manager now resolves a `DwKeyValueStorePlugin` (injected, or whoever claimed the role), and the
+  core no longer depends on `shared_preferences` at all. **Migration is one line:** declare a store
+  plugin at startup — `DwCore(plugins: [DwSharedPreferences()])`. Without one, reaching for the key
+  throws a message that says exactly that, at the moment something needs it.
+
+  `Storage` and `SharedPreferenceStorage` are gone; `DwAuthenticationKeyManager(storage:)` is now
+  `store:` and takes the role.
+
 ## 0.11.0
 
 **A server refusal is no longer an exception like any other.** `processApiResponse` turned every
