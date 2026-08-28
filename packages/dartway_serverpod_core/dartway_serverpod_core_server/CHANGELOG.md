@@ -2,6 +2,24 @@
 
 ## 0.12.0
 
+- **The same address, typed with a capital, no longer signs a person into a second account.**
+
+  The auth identifier was matched byte for byte, so `Ivan@acme.com` found nothing where
+  `ivan@acme.com` was stored. No step failed: the lookup honestly reported "unknown", the flow
+  honestly resolved the request as a registration, and the person ended up with an empty second
+  account — in no team, owning nothing. Nothing was logged, because nothing went wrong.
+
+  `DwAuthConfig.normalizeIdentifier` lets the app state the rule once — `(id) => id.trim()
+  .toLowerCase()` for an email app — and DartWay applies it at the edge, to the auth request the
+  moment it arrives. Everything downstream reads the identifier off that one field: the profile
+  lookup, the per-identifier lock, the rate-limit bucket (two spellings used to be two buckets),
+  and the profile a registration builds. `dw.normalizeAuthIdentifier` exposes the same rule to an
+  app's own seeds and admin tools, and `getUserProfileByIdentifier` applies it too.
+
+  **The default changes nothing:** with no rule declared the identifier is matched exactly, as
+  before. Switching one on over live data is a data migration — rows written in another form stop
+  being found, silently, as "no such user".
+
 - **A web route no longer answers the caller with whatever the exception happened to say.**
 
   `DwWebServerLogger.handleWithExceptions` caught everything and wrote `e.toString()` into the

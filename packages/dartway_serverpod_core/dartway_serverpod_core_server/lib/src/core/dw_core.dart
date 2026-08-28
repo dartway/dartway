@@ -31,6 +31,7 @@ import '../utils/iterable_extension.dart';
 /// - [init]: Initializes the framework.
 /// - [getUserProfile]: Gets the user profile.
 /// - [getUserProfileByIdentifier]: Gets the user profile by identifier.
+/// - [normalizeAuthIdentifier]: Brings an identifier to the form this app stores.
 class DwCore<UserProfileClass extends TableRow> {
   final Table userProfileTable;
   final Map<String, Map<String, DwCrudConfig>> _crudConfiguration = {};
@@ -240,24 +241,41 @@ class DwCore<UserProfileClass extends TableRow> {
 
   /// The profile row carrying [identifier], or `null` when there is none.
   ///
+  /// [identifier] is put through [normalizeAuthIdentifier] first, so a caller
+  /// holding an address a human typed does not have to remember the app's own
+  /// rule. Without a rule configured this is an exact match, as it always was.
+  ///
   /// [transaction] carries the same meaning as on [getUserProfile].
   Future<UserProfileClass?> getUserProfileByIdentifier(
     Session session,
     String identifier, {
     Transaction? transaction,
   }) async {
+    final normalized = normalizeAuthIdentifier(identifier);
+
     final profile = await session.db.findFirstRow<UserProfileClass>(
-      where: _userIdentifierColumn.equals(identifier),
+      where: _userIdentifierColumn.equals(normalized),
       include: _userProfileInclude,
       transaction: transaction,
     );
 
     if (profile == null) {
-      session.log('Warning: User profile not found for identifier $identifier');
+      session.log('Warning: User profile not found for identifier $normalized');
     }
 
     return profile;
   }
+
+  /// [identifier] in the form this app stores identifiers in — see
+  /// [DwAuthConfig.normalizeIdentifier].
+  ///
+  /// Returns the value untouched when the app declared no rule, and when it
+  /// runs without the auth module at all. Public because an app has its own
+  /// paths that write or match an identifier — a seed, an admin tool, an
+  /// invitation — and the whole point is that they state the rule once rather
+  /// than each carrying a copy of it.
+  String normalizeAuthIdentifier(String identifier) =>
+      auth?.config.normalizeIdentifier(identifier) ?? identifier;
 
   /// The signed-in caller's profile row, or `null` for a caller with no session.
   ///

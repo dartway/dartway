@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:dartway_starter_server/src/generated/protocol.dart';
 import 'package:serverpod/serverpod.dart';
 
+import '../dartway/dartway_core.dart';
+
 /// The `config/passwords.yaml` key naming the first administrator.
 const bootstrapAdminIdentifierKey = 'bootstrapAdminIdentifier';
 
@@ -21,8 +23,8 @@ const bootstrapAdminIdentifierKey = 'bootstrapAdminIdentifier';
 /// admin yet, so restarts stay quiet and an address demoted through the admin
 /// panel is back on the next start.
 Future<void> bootstrapAdmin(Serverpod pod) async {
-  final identifier = pod.server.passwords[bootstrapAdminIdentifierKey]?.trim();
-  if (identifier == null || identifier.isEmpty) {
+  final declared = pod.server.passwords[bootstrapAdminIdentifierKey]?.trim();
+  if (declared == null || declared.isEmpty) {
     stdout.writeln(
       'No administrator is declared: set $bootstrapAdminIdentifierKey in '
       'config/passwords.yaml to reach the admin panel.',
@@ -30,10 +32,17 @@ Future<void> bootstrapAdmin(Serverpod pod) async {
     return;
   }
 
+  // Through the app's own identifier rule, so the row written below carries the
+  // form the sign-in screen will look for. Declared as `Admin@acme.com` and
+  // stored verbatim, the administrator was a second empty account waiting to
+  // happen — the very thing `DwAuthConfig.normalizeIdentifier` exists to stop.
+  final identifier = dw.normalizeAuthIdentifier(declared);
+
   final session = await pod.createSession(enableLogging: false);
   try {
-    // Case-insensitive, and with no wildcards in the pattern: the identifier is
-    // typed twice by a human — once into the config, once on the sign-in screen.
+    // Case-insensitive on top of the rule, and with no wildcards in the
+    // pattern: this also has to recognise an administrator whose row predates
+    // the rule, and refusing to would create the duplicate instead.
     final existing = await UserProfile.db.findFirstRow(
       session,
       where: (t) => t.userIdentifier.ilike(identifier),

@@ -36,6 +36,11 @@ final class DwAuthKeyIssuanceRejectedException implements Exception {
       'DwAuthKeyIssuanceRejectedException(reason: ${reason.name})';
 }
 
+/// The default [DwAuthConfig.normalizeIdentifier]: the identifier is whatever
+/// the caller typed, matched byte for byte. That is what DartWay has always
+/// done, and staying on it is the only choice that cannot break stored data.
+String _identifierAsTyped(String identifier) => identifier;
+
 class DwAuthConfig<UserProfileClass extends TableRow> {
   final Map<String, String> passwords;
 
@@ -66,7 +71,38 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.authRequestRateLimitWindow = const Duration(minutes: 10),
     this.passwordHasher = const DwBcryptPasswordHasher(),
     this.legacyPasswordVerifiers = const [],
+    this.normalizeIdentifier = _identifierAsTyped,
   });
+
+  /// Brings a user identifier to the single form this app stores it in.
+  ///
+  /// `Ivan@acme.com` and `ivan@acme.com` are one person, or they are two, and
+  /// only the app knows which — the identifier is not declared to be an email
+  /// address, and an app may legitimately use a case-significant one. So
+  /// nothing is folded until the app says so, and the default leaves the
+  /// identifier exactly as it was typed.
+  ///
+  /// Where it is applied: to the auth request the moment it arrives, before
+  /// anything reads the identifier off it, and inside
+  /// [DwCore.getUserProfileByIdentifier]. That covers the profile lookup, the
+  /// per-identifier lock, the rate-limit bucket and — on a registration — the
+  /// profile the app builds out of that same request. **The rule is therefore
+  /// applied more than once, and must be idempotent:** `f(f(x)) == f(x)`.
+  ///
+  /// ```dart
+  /// DwAuthConfig(
+  ///   passwords: passwords,
+  ///   normalizeIdentifier: (identifier) => identifier.trim().toLowerCase(),
+  /// )
+  /// ```
+  ///
+  /// What it does *not* do is touch rows that are already stored. An
+  /// identifier written before the rule existed keeps whatever form it was
+  /// written in, and one that the rule would change stops being found —
+  /// silently, as a "no such user". Switching this on over live data is a data
+  /// migration, not a config change: bring the stored identifiers to the same
+  /// form in the same release.
+  final String Function(String identifier) normalizeIdentifier;
 
   /// The one hash format DartWay writes — on registration, on password change,
   /// and when upgrading a legacy hash after a successful sign-in.

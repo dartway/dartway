@@ -39,6 +39,19 @@ final dwAuthRequestConfig = DwCrudConfig<DwAuthRequest>(
             saveContext.currentModel.createdAt = DateTime.now();
           }
 
+          // Fold the identifier once, here, before anything has read it.
+          // Everything that follows decides *who* this is from this one field:
+          // the profile lookup, the per-identifier lock, the rate-limit bucket
+          // it counts against, and — on a registration — the profile the app
+          // builds out of this very request. Normalising at each of them
+          // instead would be the same rule in five copies, and the day one is
+          // missed a person signs in with the address they always use, matches
+          // nothing, and is registered a second empty account without a single
+          // error being raised.
+          saveContext.currentModel.userIdentifier = dw.normalizeAuthIdentifier(
+            saveContext.currentModel.userIdentifier,
+          );
+
           final failReason = await dw.prevalidateAuthAttempt(
             session,
             saveContext.currentModel,
