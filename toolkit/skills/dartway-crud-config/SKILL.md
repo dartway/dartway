@@ -427,6 +427,10 @@ Only when it does not fit into CRUD (file upload/download — often still shaped
 | The answer is a projection over rows rather than the rows | `DwDtoGetListConfig` |
 | The response must carry the model's relations | `afterSaveTransform` re-reading with the same `include` |
 
+**A webhook is not an endpoint, and it is not yours to wrap.** A route an outside system calls goes through `DwWebServerLogger.handleWithExceptions`, which reads the body once, logs the request into `DwWebServerLog` with sensitive values hidden, and answers in `{success, data}`. Four projects wrote that themselves because nothing pointed at it; the page is `docs/4-server/web-routes.md`.
+
+The part that matters while writing the handler: **only a `DwPublicWebException` reaches the caller.** Its message is the response body and it raises no alert — the route refusing on its own terms is not an incident. A bare `Exception` is answered with a fixed sentence and a `500`, because its text was written for us and the caller of a webhook is not somebody we authenticated. This is the same distinction `DwActionRejection` draws inside CRUD, at the other door.
+
 One class of operation genuinely has no rung, and it is worth naming so the search stops: an operation whose **answer comes from outside the database** — probing an external service under credentials the client must not hold, verifying that a connection works, resolving something from a third party. It reads nothing, writes nothing, and its result must not be stored, because a stored answer to "is this working right now" goes stale in silence. `DwDtoGetListConfig` cannot carry it (the projection is synchronous, and its only argument becomes a SQL `WHERE`), and `DwDtoActionConfig` holds a database connection open across the network call. That one is an endpoint, deliberately — not because you failed to find the rung.
 
 ## Workflow and tests
