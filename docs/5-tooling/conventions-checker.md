@@ -112,6 +112,7 @@ commit over a 210-line file is a check people disable.
 | `forbiddenUiKitImport` | error | Importing inside `ui_kit/` instead of the `ui_kit.dart` barrel |
 | `uiKitPartMissing` | error | A kit file without `part of '../ui_kit.dart'` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
+| `uiKitConstStyle` | warning | A `static const Color`/`TextStyle` in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, or a fixed name that is missing |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `invalidFeatureStructure` | error | A feature folder with more than one root file |

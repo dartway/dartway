@@ -79,6 +79,37 @@ into the kit whole** and the feature composes it. Inside the kit the style comes
 (`AppTextStyle.body.resolve(context)`). Silencing the rule with `// ignore:` is a style that escaped
 the kit, and the next screen will never learn it exists.
 
+
+### Inside the kit, a colour comes from the context too
+
+The rule above says where styling may live. It says nothing about **how a kit widget obtains a
+colour**, and the silence has a default answer: a project repeats what the scaffold shows. A token
+declared `static const` does not depend on a context, so changing `ThemeData` does not touch it —
+the theme switches and the kit stays as it was.
+
+Nothing diagnoses that. The analyzer is quiet, the tests are green, and it surfaces on the day
+somebody asks for a light theme: not as a bug but as a rewrite, because every read has to be
+converted at once, along with everything that composed a colour outside `build` — a `decoration`
+getter, a tone's `color`, an icon button's `_iconColor`, none of which had a context. In one real
+kit that was 127 reads across 18 files.
+
+So a kit widget takes its colour and its text style **from the context**, through the palette:
+
+```dart
+// ❌ will not follow a second theme
+static const Color mutedColor = Color(0xFF888888);
+
+// ✅
+Color muted(BuildContext context) => context.colorScheme.onSurfaceVariant;
+```
+
+`dartway check` warns on a `static const Color` or `TextStyle` under `lib/ui_kit/` —
+[`uiKitConstStyle`](../5-tooling/conventions-checker.md). **`ui_kit/theme/` is exempt**: that is
+where the theme is assembled, and a seed colour has to be written down somewhere. Geometry stays
+`const` as well — a radius does not depend on the theme.
+
+One theme in a project means a palette with one set of colours, not the absence of `of(context)`.
+
 ## The rule that makes the previous one hold
 
 **A kit widget's public API accepts no visual types.** No `Color`, `TextStyle`, `EdgeInsets`,
