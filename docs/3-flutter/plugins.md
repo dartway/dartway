@@ -93,6 +93,40 @@ DwAppRunner(
 ready before the first frame. A plugin that throws during `init()` surfaces on `DwAppRunner`'s error
 screen rather than half-booting the app.
 
+### What a failing plugin costs — `blocksStartup`
+
+**By default, everything: the app does not start.** `DwPlugin.blocksStartup` is `true` unless a plugin
+says otherwise, because a plugin an app declared is one it expects to have, and an app running
+without it is an app whose features fail one by one, later and further from the cause.
+
+Starting anyway is a decision, and it is made by the plugin that knows whether it is load-bearing:
+
+```dart
+class MyAnalytics extends DwPlugin {
+  // Its absence costs analytics and nothing else.
+  @override
+  bool get blocksStartup => false;
+
+  @override
+  Future<void> init(DwFlutter core) async { ... }
+}
+```
+
+A non-blocking failure is reported once through the error pipeline and the remaining plugins run.
+**Declaration order used to decide this silently:** the list ran bare, so a single `init` that threw
+aborted `dw.init()` and every plugin after it never ran — an optional integration listed first could
+take down an app that would have run perfectly without it. That is not something an app author
+weighs while writing `plugins: [...]`.
+
+Either way the failure now travels as `DwPluginInitException`, naming the plugin and carrying the
+cause, so a report says which plugin failed rather than showing a raw exception from inside a
+third-party package.
+
+Reaching for a plugin that failed says so. `of<T>()` throws a `StateError` naming the plugin and the
+failure — not a `LateInitializationError` from inside the package, which is what a swallowed error
+would have produced, further from the cause than the crash it replaced. `maybeOf<T>()` asks whether
+anybody holds a role, and a plugin that did not survive does not hold it, so it answers `null`.
+
 Declare a plugin and forget it, and the failure is loud and immediate: `dw.plugins.of<T>()` throws a
 `StateError` naming the type that was never registered. It cannot silently return null.
 

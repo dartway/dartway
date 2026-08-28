@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.8.0
+
+- **One plugin's failed `init` no longer takes the whole app start with it, and the report says
+  which plugin it was.**
+
+  `DwPlugins.initAll` ran the list bare: a single `init` that threw aborted `dw.init()`, so every
+  plugin declared after it never ran and the application did not start at all. Declaration order
+  silently decided the blast radius — not something an app author weighs while writing
+  `plugins: [...]`. In production this cost a whole app start: the first plugin in the list met a
+  browser with no `localStorage`, and the integrations after it, none of which needed storage,
+  never got their turn. The report was as unhelpful as the outcome — a raw exception out of a
+  third-party package, naming neither the plugin nor initialization.
+
+  What a failure costs is now the plugin's own answer. **`DwPlugin.blocksStartup` defaults to
+  `true`**, so nothing changes for an app that says nothing: a plugin it declared is one it expects
+  to have. An integration that is genuinely optional sets it to `false`, and its failure is
+  reported once through the error pipeline while the app starts without it.
+
+  Either way the failure now travels as `DwPluginInitException`, which names the plugin and carries
+  the cause, so the message says what happened wherever it is caught.
+
+  **Breaking for a class that `implements DwPlugin`** rather than extending it: the new member has a
+  default body, so `extends` inherits it and `implements` must declare it. `DwTelegramWebApp` was
+  such a class and now extends instead — which is what a plugin base wants anyway, so the next
+  member with a default does not break it either.
+
+  Reaching for a plugin that failed no longer leaks a `LateInitializationError` from inside the
+  package — further from the cause than the crash it replaced. `of<T>()` throws a `StateError`
+  naming the plugin and the failure; `maybeOf<T>()`, which asks whether anybody holds a role,
+  answers that nobody does, because a plugin that did not survive does not hold it.
+
 ## 0.7.0
 
 **`DwRefusal`** — the one error that is an answer. It carries a `message` written for the user

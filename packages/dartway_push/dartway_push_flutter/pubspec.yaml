@@ -16,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_flutter: ^0.7.0
+  dartway_flutter: ^0.8.0
   # The device registration request, and the CRUD action that carries it. The
   # app half talks to the server half through the generated protocol, not
   # through an endpoint of its own.

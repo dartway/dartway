@@ -175,7 +175,7 @@ packages:
       path: "../../../dartway_flutter"
       relative: true
     source: path
-    version: "0.7.0"
+    version: "0.8.0"
   dartway_offline_flutter:
     dependency: "direct main"
     description:

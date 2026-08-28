@@ -16,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_flutter: ^0.7.0
+  dartway_flutter: ^0.8.0
   dartway_offline_shared: ^0.1.0
   dartway_serverpod_core_flutter: ^0.11.0
   drift: 2.31.0
