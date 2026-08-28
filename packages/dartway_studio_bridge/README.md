@@ -244,3 +244,60 @@ separate steps before this one.
 
 `runStudioHandshake(channel)` is the same state machine over a channel you
 already own — what the probe is with the frame taken out of it.
+
+## Why nothing arrived (both sides)
+
+A bridge channel drops what is not for it, and says nothing about it — foreign
+traffic on `window` is normal traffic, and logging it would be noise. The cost
+is that a rejection then looks like every other reason a message never came,
+including the one that is a genuine fault: **our own envelope at another
+protocol version.** An app on v3 and a Studio on v4 are simply quiet at each
+other, and that quiet once cost a day.
+
+Two things separate those cases, and neither changes what the bridge does by
+default.
+
+**Read the version off any raw postMessage data:**
+
+```dart
+final version = StudioBridgeProtocol.envelopeVersionOf(data);
+// null            — not our envelope at all; somebody else's message
+// == StudioBridgeProtocol.version — ours, and current
+// anything else   — ours, and one of us needs rebuilding
+```
+
+`tryDecode` cannot tell you this: it answers null to a foreign message and to
+our own envelope at the wrong version alike. Takes the raw string or a map you
+have already decoded. The same reader exists in `@dartway/studio-bridge` as
+`studioBridgeEnvelopeVersion`.
+
+**Or watch what a channel refuses**, which is the same answer plus the steps
+that happen before decoding:
+
+```dart
+final controller = createStudioFrameController(
+  appUrl: appUrl,
+  onMessageDropped: (drop) => diagnostics.add('$drop'),
+);
+// StudioMessageDrop(versionMismatch, origin: https://app.example, envelope: v3)
+```
+
+`onMessageDropped` is taken by `createStudioFrameController`,
+`openStudioProbeFrame` and `probeStudioBridge` on the Studio side, and by
+`StudioBridgeHost.attach` on the app side — an app that hears nothing from
+Studio has the same problem from the other end. The reason names the step:
+`notAMessageEvent`, `foreignOrigin`, `foreignSource`, `nonStringData`,
+`notAnEnvelope`, `versionMismatch`, `unknownType`. The last one means the other
+side is *newer* — a type added inside a version, which is how the protocol grows
+without cutting off builds in the field — so it is not a fault and nobody should
+go rebuilding over it.
+
+Installing an observer changes nothing else: the channel filters exactly as
+before, and an observer that throws is reported through
+`FlutterError.reportError` instead of taking the channel down with it.
+
+An embedder cannot write this from outside. The Studio-side channel compares the
+sender against the window of **its own** frame; an observer on `window` can only
+ask "is this some frame of this page", which stops distinguishing anything the
+moment the page carries two — a live preview and a probe, say. What an outside
+observer *can* reuse is the payload half, `StudioMessageDropReason.ofPayload`.

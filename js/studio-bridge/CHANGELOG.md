@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0
+
+**`studioBridgeEnvelopeVersion(data)` — a protocol version mismatch stops
+looking like a stranger's message.** `decodeStudioBridgeMessage` returns null
+for both, and they are opposite diagnoses: foreign traffic on `window` is
+normal and ignored, while our own envelope at another version means neither
+side will hear the other until one is rebuilt. One such handshake — an app on
+v3, a Studio on v4 — cost a day, with nothing anywhere to say which it was.
+
+The reader takes the raw string or an already-parsed object, and `decode` now
+reads the envelope through it, so the check and the diagnostic cannot disagree
+about what an envelope is. The twin of `StudioBridgeProtocol.envelopeVersionOf`
+in the Dart package, kept honest by the same golden wire strings.
+
+**The protocol version stays 4.** Nothing on the wire changed.
+
 ## 0.2.0
 
 **A refused handshake now gets an answer instead of silence.** The app sends

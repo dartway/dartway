@@ -23,6 +23,7 @@ export { studioBridgeProtocol } from './protocol/protocol.ts';
 export {
   decodeStudioBridgeMessage,
   encodeStudioBridgeMessage,
+  studioBridgeEnvelopeVersion,
   type AppReadyMessage,
   type ConnectRefusedMessage,
   type FeaturesChangedMessage,

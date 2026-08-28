@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.9.0
+
+**Silence now has a reason attached, on both sides of the wire.** A channel that
+drops a window message has five or six ways to arrive at the same nothing, and
+the most expensive one — our own envelope at another protocol version — looked
+exactly like a stranger's message on `window`. An app on v3 and a Studio on v4
+say nothing to each other; one such handshake cost a day of debugging, and
+neither end could say why.
+
+**`StudioBridgeProtocol.envelopeVersionOf(data)` reads the envelope version out
+of raw postMessage data**, or answers null when there is no envelope. It is the
+one thing decoding cannot tell you: `tryDecode` returns null for a foreign
+message and for our own envelope at the wrong version alike, and those are
+opposite diagnoses — ignore the first, rebuild for the second. It takes the raw
+string or an already-decoded map, so a caller that has parsed the JSON does not
+parse it twice, and `tryDecode` now reads the envelope through it: the check
+and the diagnostic that explains a drop cannot disagree about what an envelope
+is. The same reader exists in `@dartway/studio-bridge` as
+`studioBridgeEnvelopeVersion`.
+
+**The channels can be asked what they refused.** `createStudioFrameController`,
+`openStudioProbeFrame`, `probeStudioBridge` and `StudioBridgeHost.attach` take
+an optional `onMessageDropped`, called with a `StudioMessageDrop` for every
+window message that did not make it: the reason, the sender's origin, and the
+envelope version where there was one. Nothing changes without one — the bridge
+is exactly as quiet as before, and an observer that throws is reported through
+`FlutterError.reportError` rather than taking the channel down.
+
+`StudioMessageDropReason` names each step: `notAMessageEvent`, `foreignOrigin`,
+`foreignSource`, `nonStringData`, `notAnEnvelope`, `versionMismatch`,
+`unknownType`. The last three are what the payload turned out to be, and they
+are split for the same reason the version reader exists — `unknownType` means
+the other side is *newer* (a type added inside a version is how the protocol
+grows without cutting off the field), which is not a fault and must not send
+anyone rebuilding. `StudioMessageDropReason.ofPayload(data)` classifies a raw
+string on its own, for an embedder watching `window` from outside.
+
+**Why an observer rather than exposing the frame.** An embedder cannot
+reproduce the Studio-side filtering from outside: the channel compares the
+sender against the window of *its own* frame, so an outside observer can only
+ask "is this some frame of this page", which stops distinguishing anything the
+moment the page carries two — a live preview and a probe, say. The reason now
+lives where the decision is made and cannot drift from it.
+
+Closes #98 and #95.
+
 ## 0.8.1
 
 **A parameterized screen is recognised again.** `StudioManifestIndex.specForPath`

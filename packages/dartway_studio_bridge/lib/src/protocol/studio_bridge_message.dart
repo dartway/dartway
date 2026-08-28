@@ -34,7 +34,10 @@ sealed class StudioBridgeMessage {
       return null;
     }
     if (decoded is! Map<String, dynamic>) return null;
-    if (decoded[StudioBridgeProtocol.envelopeKey] !=
+    // Read through [StudioBridgeProtocol.envelopeVersionOf] rather than the key
+    // directly: the version check and the diagnostic that explains a drop have
+    // to agree about what an envelope is, and two readings of it would not.
+    if (StudioBridgeProtocol.envelopeVersionOf(decoded) !=
         StudioBridgeProtocol.version) {
       return null;
     }

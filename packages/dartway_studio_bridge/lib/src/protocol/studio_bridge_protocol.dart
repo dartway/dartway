@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Wire-level constants of the Studio bridge protocol.
 ///
 /// Every message is a JSON object encoded as a string:
@@ -49,4 +51,29 @@ abstract final class StudioBridgeProtocol {
   static const signOutRequest = 'signOutRequest';
   static const localeRequest = 'localeRequest';
   static const inspectPointRequest = 'inspectPointRequest';
+
+  /// The envelope version inside raw postMessage [data], or null when there is
+  /// no envelope — the data is not ours at all.
+  ///
+  /// This is the one thing decoding cannot tell you. A message that fails to
+  /// decode fails the same way whether it belongs to somebody else or is our
+  /// own envelope at another [version], and the two are opposite diagnoses:
+  /// ignore the first, repair the second. An app on v3 and a Studio on v4 were
+  /// simply quiet at each other for a day because nothing here said which.
+  ///
+  /// Accepts either the raw string off the wire or an already-decoded map, so a
+  /// caller that has parsed the JSON does not parse it twice.
+  static int? envelopeVersionOf(Object? data) {
+    Object? decoded = data;
+    if (data is String) {
+      try {
+        decoded = jsonDecode(data);
+      } on FormatException {
+        return null;
+      }
+    }
+    if (decoded is! Map) return null;
+    final version = decoded[envelopeKey];
+    return version is int ? version : null;
+  }
 }

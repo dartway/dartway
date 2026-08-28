@@ -15,7 +15,10 @@ export 'studio_probe_frame_stub.dart'
 /// corner of the screen for the lifetime of the app.
 ///
 /// Create instances via `openStudioProbeFrame` from the compile-time
-/// implementation; the non-web stub throws, as Studio runs on web only.
+/// implementation; the non-web stub throws, as Studio runs on web only. It
+/// takes the same optional `onMessageDropped` as the preview's controller:
+/// a probe that comes back silent is exactly when the refused messages are
+/// worth seeing.
 abstract interface class StudioProbeFrame {
   /// Channel to the app inside the frame (origin-locked to the app URL).
   StudioMessageChannel get channel;

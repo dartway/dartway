@@ -8,7 +8,11 @@ export 'studio_frame_controller_stub.dart'
 /// exposes the message channel to the app inside.
 ///
 /// Create instances via `createStudioFrameController` from the compile-time
-/// implementation; the non-web stub throws (Studio runs on web only).
+/// implementation; the non-web stub throws (Studio runs on web only). It takes
+/// an optional `onMessageDropped` — a diagnostic observer of the window
+/// messages the channel refuses, and the only way to see them: the source check
+/// compares against *this* frame's window, which nothing outside the channel
+/// can reproduce once the page carries more than one frame.
 abstract interface class StudioFrameController {
   /// Platform view type to pass to `HtmlElementView`.
   String get viewType;

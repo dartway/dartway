@@ -1,6 +1,6 @@
 name: dartway_studio_binding
 description: "The app half of the DartWay Studio wiring: one widget that attaches the bridge, reports route, features, session and language, and executes what Studio asks."
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -28,7 +28,7 @@ dependencies:
   dartway_serverpod_core_flutter: ^0.12.0
   # The wire. Both this package and Studio depend on it; its version means the
   # protocol, which is why host-side changes do not belong there.
-  dartway_studio_bridge: ^0.8.0
+  dartway_studio_bridge: ^0.9.0
   flutter_riverpod: ^3.0.0
 
 dev_dependencies:

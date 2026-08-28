@@ -333,14 +333,14 @@ packages:
       path: "../../packages/dartway_studio_binding"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.1"
   dartway_studio_bridge:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_studio_bridge"
       relative: true
     source: path
-    version: "0.8.1"
+    version: "0.9.0"
   dbus:
     dependency: transitive
     description:

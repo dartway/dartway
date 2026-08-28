@@ -4,6 +4,7 @@ import { describe, test } from 'node:test';
 import {
   decodeStudioBridgeMessage,
   encodeStudioBridgeMessage,
+  studioBridgeEnvelopeVersion,
   studioBridgeProtocol,
   type StudioBridgeMessage,
 } from '../src/index.ts';
@@ -307,4 +308,38 @@ test('every message type survives a round trip', () => {
       `round trip failed for ${message.type}`,
     );
   }
+});
+
+describe('a version mismatch is not a foreign message', () => {
+  test('reads the version out of one of our envelopes', () => {
+    assert.equal(
+      studioBridgeEnvelopeVersion(encodeStudioBridgeMessage({ type: 'appReady' })),
+      studioBridgeProtocol.version,
+    );
+  });
+
+  test('reads a version this build does not speak — the whole point', () => {
+    // `decodeStudioBridgeMessage` answers null here and to the foreign message
+    // below alike; only this tells the two apart, and they are opposite
+    // diagnoses: rebuild one side, or ignore the traffic.
+    const wrongVersion = '{"dartwayStudioBridge":3,"type":"appReady","payload":{}}';
+    assert.equal(decodeStudioBridgeMessage(wrongVersion), null);
+    assert.equal(studioBridgeEnvelopeVersion(wrongVersion), 3);
+  });
+
+  test('null for somebody else message on the same window', () => {
+    assert.equal(studioBridgeEnvelopeVersion('{"source":"react-devtools"}'), null);
+    assert.equal(studioBridgeEnvelopeVersion('not json at all'), null);
+    assert.equal(studioBridgeEnvelopeVersion('[1,2,3]'), null);
+    assert.equal(studioBridgeEnvelopeVersion(null), null);
+    assert.equal(studioBridgeEnvelopeVersion(42), null);
+  });
+
+  test('null when the marker is there but is not a version', () => {
+    assert.equal(studioBridgeEnvelopeVersion('{"dartwayStudioBridge":"4"}'), null);
+  });
+
+  test('takes an already-parsed object, so nobody parses twice', () => {
+    assert.equal(studioBridgeEnvelopeVersion({ dartwayStudioBridge: 4 }), 4);
+  });
 });

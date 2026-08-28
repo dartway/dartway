@@ -236,6 +236,34 @@ export function encodeStudioBridgeMessage(message: StudioBridgeMessage): string 
  * (dev tooling, browser extensions, other frames) and must be ignored
  * silently.
  */
+/**
+ * The envelope version inside raw postMessage `data`, or null when there is no
+ * envelope — the data is not ours at all.
+ *
+ * This is the one thing decoding cannot tell you. A message that fails to
+ * decode fails the same way whether it belongs to somebody else or is our own
+ * envelope at another version, and the two are opposite diagnoses: ignore the
+ * first, repair the second. An app on v3 and a Studio on v4 were simply quiet
+ * at each other for a day because nothing said which.
+ *
+ * Accepts either the raw string off the wire or an already-parsed object, so a
+ * caller that has parsed the JSON does not parse it twice. The twin of
+ * `StudioBridgeProtocol.envelopeVersionOf` in the Dart package.
+ */
+export function studioBridgeEnvelopeVersion(data: unknown): number | null {
+  let decoded: unknown = data;
+  if (typeof data === 'string') {
+    try {
+      decoded = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof decoded !== 'object' || decoded === null || Array.isArray(decoded)) return null;
+  const version = (decoded as Record<string, unknown>)[studioBridgeProtocol.envelopeKey];
+  return typeof version === 'number' ? version : null;
+}
+
 export function decodeStudioBridgeMessage(data: unknown): StudioBridgeMessage | null {
   if (typeof data !== 'string') return null;
   let decoded: unknown;
@@ -247,7 +275,10 @@ export function decodeStudioBridgeMessage(data: unknown): StudioBridgeMessage | 
   if (typeof decoded !== 'object' || decoded === null || Array.isArray(decoded)) return null;
 
   const envelope = decoded as Record<string, unknown>;
-  if (envelope[studioBridgeProtocol.envelopeKey] !== studioBridgeProtocol.version) return null;
+  // Read through `studioBridgeEnvelopeVersion` rather than the key directly:
+  // the version check and the diagnostic that explains a drop have to agree
+  // about what an envelope is, and two readings of it would not.
+  if (studioBridgeEnvelopeVersion(envelope) !== studioBridgeProtocol.version) return null;
 
   const payload = asJson(envelope[studioBridgeProtocol.payloadKey]);
   const string = (value: unknown, fallback = ''): string =>

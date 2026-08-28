@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Follows `dartway_studio_bridge` to `^0.9.0`. Nothing here changed: the binding
+  attaches the host exactly as before. An app that wants the bridge's new
+  connection diagnostics (`onMessageDropped`) reaches for
+  `StudioBridgeHost.attach` directly for now.
+
 ## 0.1.0
 
 - First release. `DwStudioBinding` is the app half of the Studio wiring: one widget in

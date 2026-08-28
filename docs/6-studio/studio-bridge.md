@@ -126,6 +126,33 @@ silence. Cross-origin they are one silence and cannot be separated from here:
 check that the URL serves a page, and that it permits `frame-ancestors`, as
 steps of their own before the probe.
 
+## When a connection is silent
+
+Every step of the bridge's filtering ends the same way — the message is dropped
+and nothing is said. That is correct for the ordinary case (a page's `window` is
+a shared bus and most of what crosses it belongs to somebody else) and useless
+for the one case that is a real fault: **an app and a Studio on different
+protocol versions.** Both are speaking the bridge, neither will hear the other
+until one is rebuilt, and it looks exactly like a stranger's message. That is
+what `silent` above hides, and what once cost a day.
+
+`StudioBridgeProtocol.envelopeVersionOf(data)` reads the envelope version out of
+raw postMessage data — null when there is no envelope, so "not ours" and "ours,
+wrong version" stop being the same answer. Decoding cannot tell them apart:
+`tryDecode` returns null for both.
+
+For the steps that happen before decoding — the origin, the sending window, the
+data's type — pass `onMessageDropped` to `createStudioFrameController`,
+`openStudioProbeFrame`, `probeStudioBridge` or, on the app side,
+`StudioBridgeHost.attach`. Each refused message arrives as a `StudioMessageDrop`
+naming the step it died at. Nothing else changes: without an observer the bridge
+is as quiet as it always was.
+
+The observer exists rather than an exposed frame handle because the Studio-side
+source check compares against the window of *its own* frame — an embedder
+watching `window` from outside can only ask "is this some frame of this page",
+which stops distinguishing anything as soon as the page carries two.
+
 See the package [README](../packages/dartway_studio_bridge/README.md) for the
 full API of the wire, `dartway_studio_binding` for the app half, and
 `example/dartway_example_flutter/lib/core/studio/` for what a project is left
