@@ -9,6 +9,7 @@ import '../models/studio_session_state.dart';
 import '../protocol/studio_bridge_message.dart';
 import '../transport/host/studio_host_channel.dart';
 import '../transport/studio_message_channel.dart';
+import '../transport/studio_message_drop.dart';
 
 /// What the app does when Studio asks — navigation and session actions run
 /// inside the app through its regular flows (Studio never learns router
@@ -89,8 +90,17 @@ class StudioBridgeHost {
     // only thing an app ever wants; pass one to drive the host from a test, or
     // to embed the app somewhere that is not an iframe.
     StudioMessageChannel? channel,
+    // Told about every window message the default channel refused — a
+    // diagnostic for "Studio says it connected and this app heard nothing",
+    // which until now looked identical to a stranger's message on `window`.
+    // Installing one changes no behaviour: the app is as quiet as before.
+    //
+    // Ignored when [channel] is given, because then this host owns no channel
+    // to observe — a caller supplying its own pipe already sees everything that
+    // arrives on it.
+    StudioMessageDropObserver? onMessageDropped,
   }) {
-    channel ??= createStudioHostChannel();
+    channel ??= createStudioHostChannel(onMessageDropped: onMessageDropped);
     if (channel == null) return null;
     return StudioBridgeHost._(
       channel,

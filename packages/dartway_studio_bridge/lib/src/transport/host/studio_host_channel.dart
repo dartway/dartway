@@ -3,7 +3,10 @@
 /// reports "not embedded" on every other platform.
 ///
 /// Provides `isEmbeddedInStudioFrame` (web and inside an iframe) and
-/// `createStudioHostChannel` (null when not embedded).
+/// `createStudioHostChannel` (null when not embedded). The latter takes an
+/// optional `onMessageDropped`: an app that hears nothing from Studio has the
+/// same problem the Studio side has, from the other end — a version mismatch
+/// and a stranger's message on `window` are both simply silence otherwise.
 ///
 /// Origin note: the channel accepts the first valid bridge message from the
 /// embedding window and pins that origin for its replies. There is no origin

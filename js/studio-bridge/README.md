@@ -179,6 +179,33 @@ sit at "not connected" with nothing anywhere pointing at the reason, since a
 refusal is silence by design. The local-dev mode above is unaffected: it
 verifies nothing and needs neither.
 
+## When the preview stays empty
+
+The host ignores anything on `window` that is not a bridge message, silently —
+most of what crosses a page's `window` belongs to somebody else. One case hides
+in that silence and is a real fault: **this package and the Studio you are
+connecting to speak different protocol versions.** Both are talking, neither
+hears the other, and it looks exactly like a stranger's message.
+
+`studioBridgeEnvelopeVersion(data)` separates them:
+
+```ts
+import { studioBridgeEnvelopeVersion, studioBridgeProtocol } from '@dartway/studio-bridge';
+
+window.addEventListener('message', (event) => {
+  const version = studioBridgeEnvelopeVersion(event.data);
+  if (version === null) return;                      // not ours — ignore
+  if (version !== studioBridgeProtocol.version) {
+    console.warn(`Studio speaks v${version}, this build speaks v${studioBridgeProtocol.version}`);
+  }
+});
+```
+
+`decodeStudioBridgeMessage` cannot tell you this — it returns null for a foreign
+message and for our own envelope at the wrong version alike. Upgrading this
+package is what closes a mismatch; the version is checked strictly on decode, in
+both directions.
+
 ## Licence
 
 Apache-2.0, as the rest of the [DartWay](https://github.com/dartway/dartway)

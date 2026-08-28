@@ -3,6 +3,7 @@ import 'dart:async';
 import '../protocol/studio_bridge_message.dart';
 import '../transport/client/studio_probe_frame.dart';
 import '../transport/studio_message_channel.dart';
+import '../transport/studio_message_drop.dart';
 import 'studio_bridge_client.dart';
 
 /// What came back from one handshake — the three answers a preview cannot tell
@@ -51,6 +52,12 @@ enum StudioHandshakeResult {
 /// be repeated at a frame that is still loading — and nothing retries: an
 /// answer that has not arrived within [timeout] is [StudioHandshakeResult.silent].
 ///
+/// [StudioHandshakeResult.silent] stays as coarse as it is documented to be,
+/// but it is no longer the only thing this call can tell you: pass
+/// [onMessageDropped] and the frame's channel reports what it refused on the
+/// way — an app answering at another protocol version arrives there, as
+/// [StudioMessageDropReason.versionMismatch], rather than as more silence.
+///
 /// Throws whatever [accessToken] throws. A supplier that cannot produce a token
 /// leaves the question unasked, and reporting that as silence would blame the
 /// app for something on this side.
@@ -61,8 +68,12 @@ Future<StudioHandshakeResult> probeStudioBridge({
   required String appUrl,
   StudioAccessTokenSupplier? accessToken,
   Duration timeout = const Duration(seconds: 10),
+  StudioMessageDropObserver? onMessageDropped,
 }) async {
-  final frame = openStudioProbeFrame(appUrl: appUrl);
+  final frame = openStudioProbeFrame(
+    appUrl: appUrl,
+    onMessageDropped: onMessageDropped,
+  );
   try {
     return await runStudioHandshake(
       frame.channel,

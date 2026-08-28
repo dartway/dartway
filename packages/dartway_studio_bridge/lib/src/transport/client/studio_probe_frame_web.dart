@@ -1,14 +1,20 @@
 import 'package:web/web.dart' as web;
 
 import '../studio_message_channel.dart';
+import '../studio_message_drop.dart';
 import 'studio_client_web_channel.dart';
 import 'studio_probe_frame.dart';
 
-StudioProbeFrame openStudioProbeFrame({required String appUrl}) =>
-    _StudioProbeFrameWeb(appUrl);
+StudioProbeFrame openStudioProbeFrame({
+  required String appUrl,
+  StudioMessageDropObserver? onMessageDropped,
+}) => _StudioProbeFrameWeb(appUrl, onMessageDropped);
 
 class _StudioProbeFrameWeb implements StudioProbeFrame {
-  _StudioProbeFrameWeb(String appUrl) {
+  _StudioProbeFrameWeb(
+    String appUrl,
+    StudioMessageDropObserver? onMessageDropped,
+  ) {
     _frame = web.document.createElement('iframe') as web.HTMLIFrameElement
       ..src = appUrl;
     _frame.style
@@ -42,7 +48,11 @@ class _StudioProbeFrameWeb implements StudioProbeFrame {
       _container,
     );
 
-    _channel = StudioClientWebChannel(_frame, Uri.parse(appUrl).origin);
+    _channel = StudioClientWebChannel(
+      _frame,
+      Uri.parse(appUrl).origin,
+      onMessageDropped: onMessageDropped,
+    );
   }
 
   late final web.HTMLIFrameElement _frame;
