@@ -2,6 +2,24 @@
 
 ## 0.9.0
 
+- **`/commit` stops deciding what belongs to the project.**
+
+  It demanded a ticket number as a required argument and, with none, stopped and asked — so in a
+  project with no tracker the agent stalled mid-task on a question that has no answer. The worst
+  kind of block: it looks like compliance. Whether commits carry a ticket, in what format, and
+  whether any CI job checks the message is the project's own convention, and it is stated in the
+  project's `CLAUDE.md` rather than assumed by the toolkit.
+
+  Two claims went with it. The command described the format as "what the CI checks" — a statement
+  about the consumer's infrastructure that the toolkit cannot make, and one this very repository
+  disproves: there is no such job here. And the format it taught had no scope, while DartWay's own
+  convention welcomes one and its history is full of `feat(cli):` and `fix(deploy):`.
+
+  Added instead: a trailing `(#NN)` in the history is the pull request number GitHub appends on
+  squash-merge, not part of the format. An agent reading `git log` to learn the convention sees a
+  number nobody typed, and reproducing it yields two on the next merge — indistinguishable on sight
+  in a project that numbers its tickets.
+
 - **`dartway check` warns on a `static const Color` or `TextStyle` inside `lib/ui_kit/`.**
 
   A token declared const does not depend on a context, so changing `ThemeData` does not touch it:

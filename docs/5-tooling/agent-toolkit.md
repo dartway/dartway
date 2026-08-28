@@ -173,9 +173,11 @@ tested, and why there are no coverage thresholds.
 contract, checks the feature's description for drift and the test coverage, then shows suggestions
 and applies only what you confirm.
 
-Two commands come with them. `/commit` — a commit in the format the project's CI checks, with the
-ticket passed as an argument. And `/dartway-checkup` — the state of the project and what is worth
-taking into work next.
+Two commands come with them. `/commit` — one conventional-commit line in English, and nothing local
+decided for you: whether commits carry a ticket, and whether anything checks the message, belongs to
+the project's own `CLAUDE.md`. It used to demand a ticket as a required argument and stop without
+one, which in a project with no tracker stalled the agent mid-task on a question that has no answer.
+And `/dartway-checkup` — the state of the project and what is worth taking into work next.
 
 The checkup answers two questions for the same person on different days: *how bad is it* and *what
 do I fix first*. It runs the project's own gates before reading anything — the checker, the lints,
