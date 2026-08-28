@@ -506,15 +506,6 @@ Future<DwDeployVerdict> _checkEntrypointForm(DwDeployContext context) async {
   );
 }
 
-/// The deploy renders the `web` service itself, build argument included: the
-/// API address comes from `publicHost`, which is what keeps the domain written
-/// down once. An override that builds `web` states it a second time, and
-/// nothing compares the two copies — the image keeps building successfully
-/// against yesterday's API, which is a failure with no error message.
-///
-/// A warning rather than an error: overriding `web` for something that is not
-/// the build (a label, a limit, a volume) is legitimate, and only the build
-/// block reintroduces the second copy.
 /// Compose service names declared by a Compose document.
 Set<String> _servicesIn(String yaml) {
   final Object? document;
@@ -572,6 +563,15 @@ Future<DwDeployVerdict> _checkNginxUpstreams(DwDeployContext context) async {
   );
 }
 
+/// The deploy renders the `web` service itself, build argument included: the
+/// API address comes from `publicHost`, which is what keeps the domain written
+/// down once. An override that builds `web` states it a second time, and
+/// nothing compares the two copies — the image keeps building successfully
+/// against yesterday's API, which is a failure with no error message.
+///
+/// A warning rather than an error: overriding `web` for something that is not
+/// the build (a label, a limit, a volume) is legitimate, and only the build
+/// block reintroduces the second copy.
 Future<DwDeployVerdict> _checkOverrideWebBuild(DwDeployContext context) async {
   final file = File(
     p.join(context.projectRoot.path, 'deploy', 'compose.override.yml'),
