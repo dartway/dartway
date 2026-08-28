@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.12.0
+
+- **A web route no longer answers the caller with whatever the exception happened to say.**
+
+  `DwWebServerLogger.handleWithExceptions` caught everything and wrote `e.toString()` into the
+  response body. An arbitrary exception carries what it carries — a database error carries its
+  query, a null check carries a file path — and it was written for us, while whoever called a
+  webhook is not somebody we authenticated. The `500` looked ordinary from the outside, so nothing
+  drew attention to what had been sent with it.
+
+  `DwPublicWebException` makes "safe to show the caller" a type instead of a convention: its
+  message and status code go to the caller verbatim, and it raises no alert, because a route
+  refusing on its own terms is not an incident. Everything else answers with a fixed sentence and
+  `500`; the text lives in the alert and in the `DwWebServerLog` row.
+
+  The decision is `DwWebServerLogger.failureFor`, a function rather than two branches inside a
+  `try`, so the security-relevant half can be checked without a server, a session or a socket.
+
+- **A secret inside a list is now hidden in the log row too.** The sanitiser walked nested maps and
+  stopped there, so `{"items":[{"token":"…"}]}` was written into `DwWebServerLog` intact — and
+  nothing failed, which is the whole difficulty with this class of bug.
+
+- Web routes are documented: `docs/4-server/web-routes.md`. Three of the four things every project
+  was rewriting had been in the framework for a while with nothing pointing at them.
+
 ## 0.11.0
 
 **New: `DwProxyHttpClient.fromEnv`** — alerts reach Telegram from a host that cannot reach it

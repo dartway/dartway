@@ -13,6 +13,8 @@ environment:
 
 dependencies:
   serverpod: ^3.4.11
+  # For @visibleForTesting on the two web-route helpers a test drives directly.
+  meta: ^1.16.0
 
   dartway_serverpod_core_shared: ^0.12.0
   collection: ^1.19.1

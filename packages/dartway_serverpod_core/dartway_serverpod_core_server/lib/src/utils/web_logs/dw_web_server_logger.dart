@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
+import 'package:meta/meta.dart';
 import 'package:serverpod/serverpod.dart';
 import '../../private/dw_singleton.dart';
 
@@ -83,16 +84,20 @@ class DwWebServerLogger {
 
       return true;
     } catch (e, st) {
+      final failure = failureFor(e);
+
       error = e.toString();
       status = 'error';
-      statusCode = HttpStatus.internalServerError;
+      statusCode = failure.statusCode;
 
-      dw.alerts.reportError('❌ $handler failed', exception: e, stackTrace: st);
+      if (failure.alert) {
+        dw.alerts.reportError('❌ $handler failed', exception: e, stackTrace: st);
+      }
 
       request.response
-        ..statusCode = HttpStatus.internalServerError
+        ..statusCode = failure.statusCode
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({'success': false, 'error': e.toString()}));
+        ..write(jsonEncode({'success': false, 'error': failure.message}));
 
       return true;
     } finally {
@@ -134,6 +139,39 @@ class DwWebServerLogger {
     }
   }
 
+  /// What the caller is told about [error], and whether it is an incident.
+  ///
+  /// The whole security question of a web route sits in this one line, so it
+  /// is a function rather than two branches inside a `try`: it can be checked
+  /// without a server, a session or a socket.
+  ///
+  /// A [DwPublicWebException] was written for the caller and goes to the caller
+  /// — and raises no alert, because the route refusing on its own terms is not
+  /// an incident. Anything else was written for us: a database error carries
+  /// its query, a null check carries a file path, and whoever called a webhook
+  /// is not somebody we authenticated. The caller is told that it failed; the
+  /// text lives in the alert and in the [DwWebServerLog] row, where it is of
+  /// use.
+  @visibleForTesting
+  static ({int statusCode, String message, bool alert}) failureFor(
+    Object error,
+  ) => error is DwPublicWebException
+      ? (statusCode: error.statusCode, message: error.message, alert: false)
+      : (
+          statusCode: HttpStatus.internalServerError,
+          message: 'Internal error. The failure has been recorded.',
+          alert: true,
+        );
+
+  /// The body as it is written to [DwWebServerLog] — sensitive values replaced.
+  ///
+  /// Exposed for the test rather than for callers: a walk that misses a shape
+  /// writes a secret into a table and nothing fails, which is not something to
+  /// find out from a log review.
+  @visibleForTesting
+  static String? sanitizeBody(String? body, List<String> keys) =>
+      _sanitizeBody(body, keys);
+
   static bool _isSensitiveKey(String key, List<String> keys) {
     final lower = key.toLowerCase();
 
@@ -159,17 +197,27 @@ class DwWebServerLogger {
       final decoded = jsonDecode(body);
       if (decoded is! Map<String, dynamic>) return null;
 
-      void sanitizeMap(Map<String, dynamic> map) {
-        for (final key in map.keys.toList()) {
-          if (_isSensitiveKey(key, extraKeys)) {
-            map[key] = _sensitiveValue;
-          } else if (map[key] is Map<String, dynamic>) {
-            sanitizeMap(map[key] as Map<String, dynamic>);
+      // Lists as well as maps. A payload keeps its secrets one level inside an
+      // array as readily as under a key — `{"items":[{"token":"…"}]}` — and a
+      // walk that stops at maps writes that token into the log table intact,
+      // with nothing failing.
+      void sanitizeValue(Object? value) {
+        if (value is Map<String, dynamic>) {
+          for (final key in value.keys.toList()) {
+            if (_isSensitiveKey(key, extraKeys)) {
+              value[key] = _sensitiveValue;
+            } else {
+              sanitizeValue(value[key]);
+            }
+          }
+        } else if (value is List) {
+          for (final item in value) {
+            sanitizeValue(item);
           }
         }
       }
 
-      sanitizeMap(decoded);
+      sanitizeValue(decoded);
       return jsonEncode(decoded);
     } catch (_) {
       // Non-JSON bodies are never logged
