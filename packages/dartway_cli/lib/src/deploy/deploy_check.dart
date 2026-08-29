@@ -453,9 +453,6 @@ Future<DwDeployVerdict> _checkPasswordsCoverEnvironment(
   );
 }
 
-/// The compose file names two Dockerfiles by convention rather than by
-/// configuration, so a project that never wrote one fails at build time on the
-/// server — after the checkout has already moved.
 /// The package graph, as the Dockerfiles and the ignore file each restate it.
 ///
 /// Two comparisons, because the graph is written down three times and the pairs
@@ -489,6 +486,9 @@ Future<DwDeployVerdict> _checkBuildContextPackages(
   );
 }
 
+/// The compose file names two Dockerfiles by convention rather than by
+/// configuration, so a project that never wrote one fails at build time on the
+/// server — after the checkout has already moved.
 Future<DwDeployVerdict> _checkDockerfiles(DwDeployContext context) async {
   final missing = [
     for (final package in [context.serverPackage, context.flutterPackage])
