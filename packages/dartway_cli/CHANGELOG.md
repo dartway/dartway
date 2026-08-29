@@ -2,6 +2,25 @@
 
 ## 0.9.0
 
+- **`deploy check` reads the package graph, so a project learns before the deploy that an image cannot build.**
+
+  Images are built from the project root and copy package directories **by name**, which writes the
+  package list down twice more than the pubspec does: the `COPY` lines, and the allow-list of a
+  `.dockerignore` that denies by default. A package missing from the first fails inside the image as
+  `pub get` exit code 66 — three layers from the cause, naming neither the Dockerfile nor the package.
+  Missing from the second, the `COPY` fails outright.
+
+  **Neither is visible in a checkout**, and that is structural rather than unlucky: repository checks
+  compile inside the working copy, where every path resolves, and the images are built only by
+  `dartway deploy`, on the server. So a project stays green and cannot ship, and the two facts do not
+  meet until somebody deploys — for the project that hit this, hours after the package landed and
+  several merges on top of it.
+
+  The new local check, `docker-context-packages`, compares both pairs and errors. `COPY . .` is read
+  as taking the whole context and passes; `COPY --from=<stage>` reads an earlier stage rather than the
+  context and is not counted as a declaration. The reading it uses is the one the template's own
+  regression test uses, moved into `lib/` so there is one parser rather than two.
+
 - **A created project can be deployed again: the skeleton's build context admits its shared package.**
 
   Both images failed at their first `COPY`. `template/.dockerignore` denies everything and re-admits

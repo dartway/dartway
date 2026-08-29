@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dartway_cli/src/build_context.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -39,65 +40,15 @@ void main() {
     }
   }();
 
-  /// Package directories a Dockerfile copies into its context.
-  Set<String> copiedBy(File dockerfile) => {
-    for (final line in dockerfile.readAsLinesSync())
-      if (RegExp(r'^\s*COPY\s+([a-z0-9_]+)/\s').firstMatch(line)
-          case final match?)
-        match.group(1)!,
-  };
-
-  /// Top-level directories `.dockerignore` lets back into the build context.
-  ///
-  /// The file denies everything and re-admits packages by name, so it is a
-  /// third copy of the same list — after the pubspec's `path:` dependencies and
-  /// the Dockerfile's `COPY` lines. It is the copy that broke: the shared
-  /// package was wired into both halves and copied by both images, and stayed
-  /// out of the context because nothing here admitted it.
-  ///
-  /// Returns null when the file does not deny by default, in which case there
-  /// is nothing to admit and no way to get this wrong.
-  Set<String>? admittedByIgnoreFile(File ignoreFile) {
-    if (!ignoreFile.existsSync()) return null;
-    final lines = ignoreFile
-        .readAsLinesSync()
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty && !line.startsWith('#'));
-    var deniesEverything = false;
-    final admitted = <String>{};
-    for (final line in lines) {
-      if (line == '**' || line == '*') deniesEverything = true;
-      if (RegExp(r'^!([a-z0-9_]+)/').firstMatch(line) case final match?) {
-        admitted.add(match.group(1)!);
-      }
-    }
-    return deniesEverything ? admitted : null;
-  }
-
-  /// Sibling packages [pubspec] depends on by path.
-  Set<String> pathDepsOf(File pubspec) {
-    final document = loadYaml(pubspec.readAsStringSync());
-    final dependencies = document is YamlMap ? document['dependencies'] : null;
-    if (dependencies is! YamlMap) {
-      return const {};
-    }
-    return {
-      for (final entry in dependencies.entries)
-        if (entry.value is YamlMap && (entry.value as YamlMap)['path'] != null)
-          entry.key.toString(),
-    };
-  }
-
   for (final package in const [
     'dartway_starter_server',
     'dartway_starter_flutter',
   ]) {
     test('$package: the image copies every package it depends on', () {
       final dockerfile = File(p.join(template.path, package, 'Dockerfile'));
-      final pubspec = File(p.join(template.path, package, 'pubspec.yaml'));
       expect(dockerfile.existsSync(), isTrue, reason: dockerfile.path);
 
-      final copied = copiedBy(dockerfile);
+      final copied = readsOf(dockerfile).directories;
       expect(
         copied,
         contains(package),
@@ -106,19 +57,7 @@ void main() {
 
       // Transitive: the client is a path dependency of flutter, and whatever
       // the client itself pulls in by path has to be in the context too.
-      final pending = <String>{...pathDepsOf(pubspec)};
-      final needed = <String>{};
-      while (pending.isNotEmpty) {
-        final name = pending.first;
-        pending.remove(name);
-        if (!needed.add(name)) {
-          continue;
-        }
-        final nested = File(p.join(template.path, name, 'pubspec.yaml'));
-        if (nested.existsSync()) {
-          pending.addAll(pathDepsOf(nested));
-        }
-      }
+      final needed = packagesNeededBy(template, package);
 
       expect(
         needed.difference(copied),
@@ -145,14 +84,12 @@ void main() {
       // source; the images are built by `dartway deploy`, on a server, by a
       // person. So the loud failure went unheard for as long as nobody
       // deployed a fresh skeleton.
-      final admitted = admittedByIgnoreFile(
-        File(p.join(template.path, '.dockerignore')),
-      );
+      final admitted = admittedBy(File(p.join(template.path, '.dockerignore')));
       if (admitted == null) return;
 
-      final copied = copiedBy(
+      final copied = readsOf(
         File(p.join(template.path, package, 'Dockerfile')),
-      );
+      ).directories;
 
       expect(
         copied.difference(admitted),
@@ -174,7 +111,9 @@ void main() {
       'dartway_starter_flutter',
     ]) {
       expect(
-        pathDepsOf(File(p.join(template.path, package, 'pubspec.yaml'))),
+        pathDependenciesOf(
+          File(p.join(template.path, package, 'pubspec.yaml')),
+        ),
         contains('dartway_starter_shared'),
         reason: package,
       );

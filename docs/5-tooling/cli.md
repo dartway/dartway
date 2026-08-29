@@ -302,15 +302,30 @@ data volume under a different name than the rendered configuration would use, it
 instead of starting the stack — Compose would otherwise create an empty database beside the real one
 and serve it, which looks like a successful deploy of an application that has lost everything.
 
-`check` changes nothing and answers whether a deployment would work. Fourteen assertions on the
-working copy, eight over the network — including that every `publicHost` resolves to the deployment
-host, which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone notices.
-With the server unreachable it degrades: the SSH check fails, the rest report as skipped.
+`check` changes nothing and answers whether a deployment would work. One set of assertions runs over
+the working copy and another over the network — including that every `publicHost` resolves to the
+deployment host, which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone
+notices. With the server unreachable it degrades: the SSH check fails, the rest report as skipped.
 
-Two of the local assertions are about whether the images build at all. The rendered compose file builds both of them
+**The current list is what the command prints**, each with its stable id, and it is not counted here
+on purpose: a number maintained by hand is a second copy of something the code already knows, and
+this one had already fallen a check behind before anybody noticed.
+
+Three of the local assertions are about whether the images build at all. The rendered compose file builds both of them
 from the project root — `<project>_server/Dockerfile` and `<project>_flutter/Dockerfile`, named by
 convention rather than configured — so a project that never wrote one fails on the server, after the
-checkout has already moved. The other is the shape of the server image's `ENTRYPOINT`: migrations
+checkout has already moved.
+
+The second reads the package graph, because the images copy package directories **by name** and the
+name has to be written down in two more places than the pubspec: the `COPY` lines, and the
+allow-list of a `.dockerignore` that denies by default. A package missing from the first fails inside
+the image as `pub get` exit code 66, three layers from the cause; missing from the second, the `COPY`
+fails outright. Neither is visible in a checkout — there the path resolves — so the two facts meet
+the first time somebody deploys, by which point the change is several merges back. `COPY . .` is
+read as taking everything and passes; `COPY --from=<stage>` is not a context read and does not count
+as one.
+
+The third is the shape of the server image's `ENTRYPOINT`: migrations
 run as `docker compose run backend … --apply-migrations`, and shell form ignores appended arguments,
 so an unnoticed shell form turns every migration into an ordinary server start that reports success.
 The template ships the canonical pair; `server_entrypoint` remains the escape for an image you did
@@ -461,7 +476,7 @@ The rest are the flags worth knowing before you need them:
 | Subcommand | Flag | What it is for |
 |---|---|---|
 | `setup` | `--dry-run` | Print the rendered `docker-compose.yml` and `nginx.conf`, and what would be uploaded beside them, without touching the server. The way to review a template change |
-| `check` | `--local` | Skip DNS and the server; assert over the working copy only. The form that needs no SSH key and no host yet — the fourteen working-copy assertions still run, the eight network ones report as skipped |
+| `check` | `--local` | Skip DNS and the server; assert over the working copy only. The form that needs no SSH key and no host yet — every working-copy assertion still runs, the network ones report as skipped |
 | `run` | `--dry-run` | Print the plan and change nothing |
 | `run` | `--skip-git-update` | Deploy what is already checked out on the server, without fetching. For a rebuild of the same commit — and the flag to suspect when a deploy "did not pick up" a push |
 | `secret push` | `--dry-run` | Report what would be sent, send nothing |
