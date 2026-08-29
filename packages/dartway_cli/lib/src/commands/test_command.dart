@@ -105,12 +105,24 @@ class TestCommand extends Command<int> {
       return 1;
     }
 
+    final keep = argResults?['keep'] as bool? ?? false;
+
     // The container has to go even when the run does not end normally: an
     // abandoned one holds a port and, worse, holds rows that the next run would
     // find. Ctrl-C is the common case and is not an exception a `finally` sees.
+    //
+    // `--keep` survives the interrupt, because an interrupted run is exactly
+    // the one somebody wants to look inside.
     final signals = <StreamSubscription<ProcessSignal>>[
       ProcessSignal.sigint.watch().listen((_) async {
-        await database.remove(ephemeral);
+        if (keep) {
+          stdout.writeln(
+            '\nKept: container ${ephemeral.id} on localhost:${ephemeral.port}. '
+            'Remove it with `docker rm -f ${ephemeral.id}`.',
+          );
+        } else {
+          await database.remove(ephemeral);
+        }
         exit(130);
       }),
     ];
@@ -145,7 +157,7 @@ class TestCommand extends Command<int> {
       for (final signal in signals) {
         await signal.cancel();
       }
-      if (argResults?['keep'] as bool? ?? false) {
+      if (keep) {
         stdout.writeln(
           '\nKept: container ${ephemeral.id} on localhost:${ephemeral.port}. '
           'Remove it with `docker rm -f ${ephemeral.id}`.',
