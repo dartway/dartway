@@ -234,6 +234,40 @@ from the project root or from inside the `*_flutter` package — both work.
 What it checks, and why those checks exist, is a page of its own:
 [The conventions checker](conventions-checker.md).
 
+## `dartway test` — the server tests, on a database that belongs to the run
+
+```bash
+dartway test                        # from the project root
+dartway test -- --name 'auth'       # everything after -- goes to `dart test`
+dartway test --keep                 # leave the container up to look inside it
+```
+
+Starts a Postgres container for this run, waits until it accepts connections, runs the server
+package's tests against it, and removes it afterwards — including when you interrupt the run.
+The coordinates reach the suite as `SERVERPOD_DATABASE_HOST/PORT/NAME/USER/PASSWORD`, which
+Serverpod applies over `config/test.yaml`. The image is the one the project's own compose file
+uses for development, so the tests do not run on a different Postgres major than the code is
+written against; `--image` overrides it.
+
+**No host port is named**, which is the point. A test database declared as a compose service is
+shared, named, long-lived and on a fixed port, and all four are wrong for it:
+
+- **Fixed** meant every project created from the template asked for the same port. The second
+  container up does not get it and *does not fail either* — Docker starts it with the port
+  unpublished — so the suite connects to the neighbouring project's database. Where the schemas
+  are close enough for migrations to apply, the run is green having verified nothing.
+- **Long-lived** meant rows outlived the run that wrote them. The service declared no volume, on
+  the stated grounds that a surviving test database is a liability — but the `postgres` image
+  declares an anonymous one and Compose keeps it. The symptom arrives as arithmetic
+  (`Expected: <2>, Actual: <3>`), several hypotheses away from its cause.
+
+Both stop existing when the database is created per run: there is no port to lose and nothing to
+survive. `docker compose up -d` still brings up the development database and object storage; it
+no longer has anything to do with tests.
+
+Widget tests in the `*_flutter` package need no database and are not this command's business —
+`flutter test` runs them.
+
 ## `dartway deploy` — the server, without a folder of shell scripts
 
 ```bash

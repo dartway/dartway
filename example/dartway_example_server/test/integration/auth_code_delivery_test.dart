@@ -152,6 +152,10 @@ void _bootDartway() {
         'dwVerificationCodeSalt': 'test-verification-code-salt',
         'dwAuthKeySalt': 'test-auth-key-salt',
       },
+      // The same form the example itself states in `initDartwayCore`: a test
+      // config that folds differently from the app under test is testing
+      // something the app does not do.
+      normalizeIdentifier: DwIdentifierForm.folded,
       sendVerificationCodeMethod:
           (
             session, {

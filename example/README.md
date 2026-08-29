@@ -54,10 +54,16 @@ hold: the limits are enforced with database locks, a race cannot be observed in
 a rolled-back transaction, and neither can a hash that must actually be written.
 
 ```bash
-cd dartway_example_server
-docker compose up -d          # dev database on 8090, test database on 9090
-dart test
+dartway test                  # from the project root
 ```
+
+`dartway test` creates the database this run needs, on a port Docker picks, and
+removes it when the run ends. Nothing is shared and nothing survives, so two
+projects — or two runs of this one — cannot reach each other's rows, and a row
+written by yesterday's run cannot turn up in today's assertions. The coordinates
+reach the suite as `SERVERPOD_DATABASE_*`, which Serverpod reads over
+`config/test.yaml`. `docker compose up -d` is still what the development
+database and object storage need; it no longer has anything to do with tests.
 
 The suites commit real transactions (`RollbackDatabase.disabled`) and wipe the
 auth tables around themselves, which makes them stateful neighbours rather than

@@ -13,19 +13,12 @@ services:
     volumes:
       - dartway_starter_data:/var/lib/postgresql/data
 
-  # Test database. Matches config/test.yaml (localhost:9090, database
-  # "dartway_starter_test"). Kept separate from development on purpose: the
-  # integration tests commit real transactions (concurrency cannot be observed
-  # inside a rolled-back one) and truncate tables between cases.
-  postgres_test:
-    image: postgres:16
-    ports:
-      - '9090:5432'
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_DB: dartway_starter_test
-      POSTGRES_PASSWORD: 'dartway_test_pw'
-    # No volume: a test database that survives a restart is a liability.
+  # No test database here, on purpose. `dartway test` creates one for the run
+  # and removes it afterwards, on a port Docker picks — see the comment in
+  # config/test.yaml. A test database declared as a service is shared, named,
+  # long-lived and on a fixed port, and every one of those is wrong for it:
+  # two projects on one machine fight over the port, the loser silently reads
+  # the winner's rows, and rows outlive the run that wrote them.
 
   # Object storage for uploads. DartWay's cloud storage speaks S3 through the
   # minio client, so a local Minio is the same code path production runs — not a

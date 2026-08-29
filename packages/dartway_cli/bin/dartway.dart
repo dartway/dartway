@@ -8,6 +8,7 @@ import 'package:dartway_cli/src/commands/doctor_command.dart';
 import 'package:dartway_cli/src/commands/quickstart_command.dart';
 import 'package:dartway_cli/src/commands/setup_ai_command.dart';
 import 'package:dartway_cli/src/commands/stats_command.dart';
+import 'package:dartway_cli/src/commands/test_command.dart';
 
 Future<void> main(List<String> args) async {
   final runner =
@@ -22,7 +23,8 @@ Future<void> main(List<String> args) async {
         ..addCommand(SetupAiCommand())
         ..addCommand(CheckCommand())
         ..addCommand(DeployCommand())
-        ..addCommand(StatsCommand());
+        ..addCommand(StatsCommand())
+        ..addCommand(TestCommand());
 
   try {
     exitCode = await runner.run(args) ?? 0;

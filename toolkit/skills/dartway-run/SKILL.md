@@ -4,7 +4,8 @@ description: >-
   Bring a DartWay project up locally and confirm it is alive (DartWay projects):
   dependencies, Postgres in docker, migrations, the first administrator, the server, the app.
   Knows the order of the steps (migrations before anything writes rows), the real ports
-  (API 8080, development DB 8090, test DB 9090, object storage 8100 and its console 8101),
+  (API 8080, development DB 8090, object storage 8100 and its console 8101 — the test database
+  has no fixed port, `dartway test` creates one per run),
   where to find the sign-in code (printed in the server console) and how to fix the typical
   failures: docker not running, port already taken, schema drifted, model changed without
   serverpod generate, serverpod_cli version not matching the project, images not opening
@@ -65,6 +66,7 @@ flutter run
 - **Migrations before anything writes rows**, and **after `docker compose up`** and **after the DB is ready.** A container that is "Started"
   ≠ Postgres accepting connections; there are seconds between them, and a migration in that window fails
   with connection refused. Wait for `pg_isready`, not for a `sleep`.
+- **There is no test database in `docker compose`.** `dartway test` creates one for the run and removes it after; nothing here has to be up for the tests, and nothing here is what they connect to.
 - **Storage comes up with the same `docker compose up`.** Alongside Postgres it brings up `minio` (S3 for uploads) and a one-shot `minio_init`, which creates the bucket and opens it for reading — without that, uploaded images will not open by link.
 - **The server is a long-running process.** Start it in the background and do not wait for it to finish:
   waiting "until the command completes" will hang you forever.
@@ -90,7 +92,8 @@ identifier from `bootstrapAdminIdentifier` yields the admin; any other number yi
 | `docker: command not found` / `cannot connect to the Docker daemon` | Docker Desktop is not running | Ask to start Docker; do not try to bring Postgres up another way |
 | The first `docker compose up` hangs for minutes | The `postgres:16` image is being pulled | This is normal, wait it out; next time `docker pull postgres:16` in advance |
 | `connection refused` during migrations | The DB is not accepting connections yet | Wait for `pg_isready`, retry |
-| `port is already allocated` (8090/9090/8100) | Taken by another project or a leftover container | `docker ps` → stop the conflicting container. **8090 is a frequent collision** between DartWay projects |
+| `port is already allocated` (8090/8100) | Taken by another project or a leftover container | `docker ps` → stop the conflicting container. **8090 is a frequent collision** between DartWay projects: the development database is still on a fixed port, and only the test one was moved off |
+| The integration suite exits 1 having printed only `loading <file>`, with no error at all | `dart test` was run by hand, so nothing created the database. **`withServerpod` suppresses the test server's startup output**, so failing to reach a database looks like nothing happening | Run **`dartway test`** — it creates the database and passes the coordinates through `SERVERPOD_DATABASE_*`. Do not go looking for the message; there is none. To see it, the suite has to be built with a verbose output mode |
 | Images do not load, the link returns 404 | The bucket was not created or is closed for reading | Check the `minio_init` logs (`docker compose logs minio_init`): they must say "Bucket created" and "set to `download`". A public link of the form `http://localhost:8100/uploads/<file>` must open in a browser |
 | Upload fails with "Cloud storage is not configured" | No `dwCloudStorage*` keys for this run mode | Add them to `config/passwords.yaml` (in development they point at the `minio` service) |
 | `Missing password for "database"` on a fresh clone | `config/passwords.yaml` is not in Git and never was — `dartway create` wrote it on the machine the project was created on | `cp __SERVER_PKG__/config/passwords.yaml.example __SERVER_PKG__/config/passwords.yaml`. The example carries working development values; ask a teammate only for keys a deployed environment needs |

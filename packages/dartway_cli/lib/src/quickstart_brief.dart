@@ -72,9 +72,10 @@ The order is not arbitrary; each line explains why it comes where it does.
     # set bootstrapAdminIdentifier in config/passwords.yaml — see below
     dart bin/main.dart
 
-- **`docker compose up -d`** starts Postgres for development (host port 8090), a separate
-  test database (9090) and object storage for uploads (8100, console 8101). The first run
-  pulls images and can take minutes.
+- **`docker compose up -d`** starts Postgres for development (host port 8090) and object
+  storage for uploads (8100, console 8101). The first run pulls images and can take minutes.
+  There is no test database among them: `dartway test` creates one for the run, on a port
+  Docker picks, and removes it at the end.
 - **Wait for the database to accept connections before migrating.** A container reported as
   "Started" is not yet Postgres listening; migrating in that window fails with
   `connection refused`. Poll for readiness — `docker compose exec -T postgres pg_isready -U postgres`
