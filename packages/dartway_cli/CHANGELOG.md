@@ -2,6 +2,33 @@
 
 ## 0.9.0
 
+- **New skill `dartway-on-device`: what only a real phone will tell you.**
+
+  Three findings from one week shared no topic and one provenance — each was invisible in the iOS
+  simulator, in a desktop browser and in a widget test, and appeared for the first time on a device.
+  They had been scattered into three homes that were about something else: the keyboard's travel into
+  the UI-kit skill, whose subject is that the kit owns styles; the gesture rule into feature
+  scaffolding, whose subject is that a feature is a folder with one public file; the web shell into
+  the harness constitution, whose subject is the layout of `lib/`. Each host took a paragraph that
+  was not about it, and the next such finding would have gone to a fourth.
+
+  So they now sit together, by provenance rather than by topic: the keyboard reported as a step
+  change while it travels for 250 ms, WebKit raising the keyboard only for a focus inside the
+  gesture, and the web shell that has to pin the document or the first focused field carries the
+  canvas off screen. Mechanism and workaround for each.
+
+  **Admission is a rule, not a habit**, because a skill like this becomes a junk drawer otherwise: an
+  entry needs to reproduce on a device, be invisible in the simulator, a desktop browser and a widget
+  test, and have a written-down workaround. Anything assertable in a test belongs in a test.
+
+  The laws stayed where laws belong — the kit still forbids a raw `viewInsets`, and `CLAUDE.md` still
+  says the web shell is part of the application. What moved is the explanation of why the platform
+  makes them necessary.
+
+  Also: the skill list in `toolkit/CLAUDE.md` is now compared against the directories that ship. The
+  installer walks the folder rather than reading the list, so the two could part with nothing
+  failing — a skill shipped but unnamed is one no agent knows to load.
+
 - **`dartway-run` names the one migration that erases a table, and the route around it.**
 
   Adding a non-nullable column without a default to a table that already has rows makes
