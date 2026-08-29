@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
+import '../build_context.dart';
 import '../checker/dw_check_type.dart';
 import 'deploy_target.dart';
 import 'nginx_upstreams.dart';
@@ -205,6 +206,18 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     stage: DwDeployCheckStage.local,
     severity: DwCheckSeverity.error,
     evaluate: _checkDockerfiles,
+  ),
+  DwDeployCheck(
+    id: 'docker-context-packages',
+    title: 'Each image copies every package it depends on',
+    stage: DwDeployCheckStage.local,
+    // Error, and not a warning like "docker-context" next to it: that one
+    // judges how much is sent to the daemon, this one whether the build can
+    // succeed at all. A package missing from the context is not a deploy that
+    // ships too much — it is a deploy that cannot happen, discovered on the
+    // server.
+    severity: DwCheckSeverity.error,
+    evaluate: _checkBuildContextPackages,
   ),
   DwDeployCheck(
     id: 'dockerfile-entrypoint-form',
@@ -437,6 +450,39 @@ Future<DwDeployVerdict> _checkPasswordsCoverEnvironment(
         'Add the section and push it with "dartway deploy secret push --env '
         '$environment", or create the values on the server with '
         '"dartway deploy secret init".',
+  );
+}
+
+/// The package graph, as the Dockerfiles and the ignore file each restate it.
+///
+/// Two comparisons, because the graph is written down three times and the pairs
+/// fail differently. A package a Dockerfile never copies fails as `pub get`
+/// exit code 66, three layers down. A package the ignore file never admits
+/// fails at the `COPY` itself — louder, but still only on the machine that
+/// builds the image, which is the server.
+///
+/// **Neither is visible in a checkout**, which is why this is a deploy check
+/// and not something the repository's own tests could ever catch: they compile
+/// inside the working copy, where every path resolves. The two facts meet the
+/// first time somebody deploys, and by then the change is several merges back.
+Future<DwDeployVerdict> _checkBuildContextPackages(
+  DwDeployContext context,
+) async {
+  final problems = buildContextProblems(
+    projectRoot: context.projectRoot,
+    packages: [context.serverPackage, context.flutterPackage],
+  );
+  if (problems.isEmpty) {
+    return const DwDeployVerdict.pass('every package reaches the image');
+  }
+  return DwDeployVerdict.fail(
+    problems.join('; '),
+    fix:
+        'Add a `COPY <package>/ <package>/` line for each package the image '
+        'needs, and — if the project has a `.dockerignore` that denies by '
+        'default — the matching `!<package>/` and `!<package>/**` lines. '
+        'Without both, `pub get` inside the image fails as exit code 66, or '
+        'the COPY fails outright, and neither happens until a deploy.',
   );
 }
 
