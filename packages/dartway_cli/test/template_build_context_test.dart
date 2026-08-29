@@ -47,6 +47,33 @@ void main() {
         match.group(1)!,
   };
 
+  /// Top-level directories `.dockerignore` lets back into the build context.
+  ///
+  /// The file denies everything and re-admits packages by name, so it is a
+  /// third copy of the same list — after the pubspec's `path:` dependencies and
+  /// the Dockerfile's `COPY` lines. It is the copy that broke: the shared
+  /// package was wired into both halves and copied by both images, and stayed
+  /// out of the context because nothing here admitted it.
+  ///
+  /// Returns null when the file does not deny by default, in which case there
+  /// is nothing to admit and no way to get this wrong.
+  Set<String>? admittedByIgnoreFile(File ignoreFile) {
+    if (!ignoreFile.existsSync()) return null;
+    final lines = ignoreFile
+        .readAsLinesSync()
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty && !line.startsWith('#'));
+    var deniesEverything = false;
+    final admitted = <String>{};
+    for (final line in lines) {
+      if (line == '**' || line == '*') deniesEverything = true;
+      if (RegExp(r'^!([a-z0-9_]+)/').firstMatch(line) case final match?) {
+        admitted.add(match.group(1)!);
+      }
+    }
+    return deniesEverything ? admitted : null;
+  }
+
   /// Sibling packages [pubspec] depends on by path.
   Set<String> pathDepsOf(File pubspec) {
     final document = loadYaml(pubspec.readAsStringSync());
@@ -61,7 +88,10 @@ void main() {
     };
   }
 
-  for (final package in const ['dartway_starter_server', 'dartway_starter_flutter']) {
+  for (final package in const [
+    'dartway_starter_server',
+    'dartway_starter_flutter',
+  ]) {
     test('$package: the image copies every package it depends on', () {
       final dockerfile = File(p.join(template.path, package, 'Dockerfile'));
       final pubspec = File(p.join(template.path, package, 'pubspec.yaml'));
@@ -97,6 +127,40 @@ void main() {
             'path dependencies missing from the build context of $package. '
             'Add a COPY line for each, or pub inside the image fails on a '
             'directory that is not there.',
+      );
+    });
+  }
+
+  for (final package in const [
+    'dartway_starter_server',
+    'dartway_starter_flutter',
+  ]) {
+    test('$package: .dockerignore admits everything the image copies', () {
+      // A COPY line and an allow-list entry are two statements of one fact, and
+      // they fail in opposite directions. A missing COPY fails as `pub get`
+      // exit code 66, three layers deep; a missing allow-list entry fails
+      // earlier and louder — `"/<package>": not found` at the COPY itself —
+      // but only for whoever builds the image, and nothing in this repository
+      // builds them. `web-compile.yml` compiles the Flutter web target from
+      // source; the images are built by `dartway deploy`, on a server, by a
+      // person. So the loud failure went unheard for as long as nobody
+      // deployed a fresh skeleton.
+      final admitted = admittedByIgnoreFile(
+        File(p.join(template.path, '.dockerignore')),
+      );
+      if (admitted == null) return;
+
+      final copied = copiedBy(
+        File(p.join(template.path, package, 'Dockerfile')),
+      );
+
+      expect(
+        copied.difference(admitted),
+        isEmpty,
+        reason:
+            'the $package image copies directories that .dockerignore keeps '
+            'out of the build context. The COPY fails outright — add the pair '
+            'of `!<name>/` and `!<name>/**` lines for each.',
       );
     });
   }

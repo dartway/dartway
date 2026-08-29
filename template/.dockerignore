@@ -13,6 +13,8 @@
 !dartway_starter_flutter/**
 !dartway_starter_server/
 !dartway_starter_server/**
+!dartway_starter_shared/
+!dartway_starter_shared/**
 
 **/.dart_tool/
 **/build/
