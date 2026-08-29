@@ -14,9 +14,9 @@ import 'test_tools/serverpod_test_tools.dart';
 /// hides the field proves only that the field is hidden. Copy the shape of this
 /// file when a CRUD config grows a rule of its own.
 ///
-/// It runs against a live database — `docker compose up -d postgres_test`, then
-/// `dart test`. See the `dartway-testing` skill for which layer a test belongs
-/// to.
+/// It runs against a live database, and the run makes its own: `dartway test`
+/// from the project root. See the `dartway-testing` skill for which layer a
+/// test belongs to.
 const _testKey = 'appSettingAccessTest.appName';
 
 void main() {

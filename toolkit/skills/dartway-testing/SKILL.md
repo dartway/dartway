@@ -73,8 +73,15 @@ withServerpod('Given the app settings CRUD config', (sessionBuilder, endpoints) 
 `DwSaveConfig.save` runs the whole pipeline the endpoint runs — `allowSave` → `validateSave` →
 transaction — so the assertion lands on the project's own rule, not on a re-statement of it.
 
-It needs a live database: `docker compose up -d postgres_test`, then `dart test` from the server
-package.
+It needs a live database, and the run makes its own: **`dartway test`** from the project root
+starts one on a port Docker picks, runs `dart test` in the server package against it, and removes
+it at the end. Arguments after `--` go to `dart test` (`dartway test -- --name 'auth'`).
+
+Do not add a test database to `docker compose`, and do not point the suite at a fixed port. That
+is the arrangement this replaced, and it failed in two silent ways: two projects on one machine
+asked for the same port, and the loser read the winner's rows without an error (green, having
+verified nothing); and the database outlived the run, so a row from an earlier one turned up as
+`Expected: <2>, Actual: <3>` in an assertion about rows the test had just created.
 
 **Write one when the rule is the point:** a role boundary, an ownership check, a validation that
 rejects, `beforeSaveTransaction` / `afterSaveTransaction` ordering, a filter that must not leak

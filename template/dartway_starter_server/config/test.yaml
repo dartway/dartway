@@ -29,9 +29,26 @@ webServer:
   publicScheme: http
 
 # This is the database setup for your test server.
+#
+# `dartway test` supplies host and port through SERVERPOD_DATABASE_*: it starts a
+# database for the run, on a port Docker picks, and removes it at the end. Name
+# and user are read from here, so that container carries the names this project
+# expects.
+#
+# The port is 0 on purpose, and it is not the same 0 as the servers above — they
+# ask the OS for a free port to listen on, while nothing can be *reached* at
+# port 0. That is the point: a suite run by hand connects nowhere instead of
+# reaching whatever else happens to be listening. It used to name a fixed port,
+# and on a machine with two DartWay projects that meant reading the other
+# project's database — green, having verified nothing.
+#
+# Be warned about how that failure looks: `withServerpod` suppresses the test
+# server's startup output, so a run that cannot reach its database exits 1 with
+# nothing but "loading <file>" printed. No message names the database. If you
+# see that, you ran `dart test`; run `dartway test`.
 database:
   host: localhost
-  port: 9090
+  port: 0
   name: dartway_starter_test
   user: postgres
 

@@ -2,6 +2,39 @@
 
 ## 0.9.0
 
+- **`dartway test`: the test database belongs to the run, not to the project.**
+
+  It was a `postgres_test` service in every generated project's `docker-compose.yaml`, on a
+  hardcoded host port, and both halves of that failed silently.
+
+  The port was the same in every project created from the template. The second container up does
+  not get it and does not fail either — Docker starts it with the port unpublished — so the suite
+  connects to a *neighbouring project's* database. Where the schemas are close enough for
+  migrations to apply, the run comes back green having verified nothing. Diagnosing it once cost
+  three wrong hypotheses; a project that hit it moved its own port and told nobody, which is the
+  shape of a workaround that helps exactly one repository.
+
+  The lifetime was the second half. The service declared no volume and said why — "a test database
+  that survives a restart is a liability" — but the `postgres` image declares an anonymous one and
+  Compose keeps it across a recreate. Rows outlived the run that wrote them and arrived as
+  arithmetic: `Expected: <2>, Actual: <3>`, counting rows the test had just created. The comment
+  stating the intended property as an achieved one is what made it expensive — anyone asking
+  whether a stale database could explain the failure read that line and crossed the question off.
+
+  `dartway test` starts a container for the run on a port Docker picks, waits for it, runs
+  `dart test` in the server package against it, and removes it at the end — interrupted runs
+  included. The coordinates travel as `SERVERPOD_DATABASE_HOST/PORT/NAME/USER/PASSWORD`, which
+  `ServerpodConfig.load` applies over the run mode's YAML; the environment is deliberate, because
+  `withServerpod`'s own config override is per test file and a file can be written without it (in
+  one real project such an override was honoured by 25 files of 29, which is worse than none). The
+  image is the one the project's compose already uses for development, so the tests do not quietly
+  run on another Postgres major.
+
+  **Migration:** delete the `postgres_test` service from `docker-compose.yaml` and run
+  `dartway test` instead of `dart test`. The `database:` block in `config/test.yaml` still supplies
+  the name and user; its port becomes a deliberately closed default, so a suite run by hand fails
+  loudly rather than reaching whatever else is listening.
+
 - **`/commit` stops deciding what belongs to the project.**
 
   It demanded a ticket number as a required argument and, with none, stopped and asked — so in a
