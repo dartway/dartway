@@ -33,6 +33,7 @@ part 'theme/app_button.dart';
 part 'theme/app_context.dart';
 part 'theme/app_text.dart';
 part 'theme/app_theme.dart';
+part 'utils/app_keyboard_inset.dart';
 part 'utils/conditional_parent.dart';
 part 'utils/date_labels.dart';
 part 'utils/formatters.dart';

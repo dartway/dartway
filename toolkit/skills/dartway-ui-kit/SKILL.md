@@ -374,7 +374,7 @@ lib/ui_kit/
   3_special/               // narrow, grouped by feature: pin code, chat bubble
   theme/                   // app_theme.dart, app_text.dart, app_button.dart, app_context.dart
   layout/                  // device_frame_shell.dart
-  utils/                   // conditional_parent.dart, formatters, date labels
+  utils/                   // conditional_parent.dart, app_keyboard_inset.dart, formatters, date labels
 ```
 
 The numbered prefixes keep the kit sorted by usage frequency — the most needed on top.
@@ -385,5 +385,16 @@ The numbered prefixes keep the kit sorted by usage frequency — the most needed
 - Don't breed variants by copy-paste — composition and extensions (see `dartway-clean-code`).
 - Don't put outer `padding`/`margin` inside a component — the parent sets the spacing.
 - Consistency beats visual hacks.
+- **Anything that depends on the keyboard is computed from the smoothed inset, never from
+  `MediaQuery.viewInsets` directly.** The system reports the keyboard as a step change — on iOS as
+  two steps, the accessory bar and then the keyboard — while it actually travels for about 250 ms, so
+  layout taken from the raw inset lands in its final geometry before the keyboard gets there and
+  reads as "it blinked and re-opened". `AppKeyboardInset` in `utils/` hands the same inset over at
+  the keyboard's own pace; `showAppBottomSheet` computes both its height and its bottom padding
+  through it. Compute **everything** keyboard-dependent from it: half the layout left on the raw
+  inset visibly slides apart from the other half, which is worse than the snap. It does not look like
+  a violation on the page — a raw `viewInsets` in layout is exactly what the Flutter documentation
+  suggests — so the check is a grep: `grep -rn 'viewInsetsOf' lib/ui_kit`, and any hit outside the
+  smoother itself is one.
 - Tempted by a "client-specific hack" inside a framework widget — that's a signal that an extension
   point is missing. Introduce it in the kit, don't fork `dartway_flutter`.
