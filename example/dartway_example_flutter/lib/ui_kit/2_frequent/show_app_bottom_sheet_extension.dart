@@ -28,47 +28,53 @@ extension ShowAppBottomSheetExtension on BuildContext {
         ),
       ),
       builder: (sheetContext) {
-        return Container(
-          constraints: BoxConstraints.loose(
-            Size(
-              min(MediaQuery.of(sheetContext).size.width, 500),
-              MediaQuery.of(sheetContext).size.height * 0.9 +
-                  MediaQuery.viewInsetsOf(sheetContext).bottom,
-            ),
-          ),
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
+        // Both the height and the bottom padding come from the same smoothed
+        // inset. Leaving either one on the raw `viewInsets` makes the two
+        // halves visibly slide apart, which is worse than the snap this fixes.
+        return AppKeyboardInset(
+          builder: (_, keyboardInset) => Container(
+            constraints: BoxConstraints.loose(
+              Size(
+                min(MediaQuery.of(sheetContext).size.width, 500),
+                MediaQuery.of(sheetContext).size.height * 0.9 + keyboardInset,
               ),
             ),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                16 +
-                    MediaQuery.viewInsetsOf(sheetContext).bottom +
-                    MediaQuery.paddingOf(sheetContext).bottom,
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(32),
+                  topRight: Radius.circular(32),
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isWithDragHandle)
-                    const SizedBox(
-                      width: 32,
-                      height: 4,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.circular(100)),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  16 +
+                      keyboardInset +
+                      MediaQuery.paddingOf(sheetContext).bottom,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isWithDragHandle)
+                      const SizedBox(
+                        width: 32,
+                        height: 4,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.all(
+                              Radius.circular(100),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  const SizedBox(height: 16),
-                  Flexible(fit: FlexFit.loose, child: child),
-                ],
+                    const SizedBox(height: 16),
+                    Flexible(fit: FlexFit.loose, child: child),
+                  ],
+                ),
               ),
             ),
           ),
