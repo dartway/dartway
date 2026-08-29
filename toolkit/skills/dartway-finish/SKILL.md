@@ -125,6 +125,18 @@ is verified through the public kit widget. A test of a private composition → a
 - **Analyze the whole package, without a path argument.** `dart analyze lib` looks faster and "good enough", but `test/` is not included in it — and tests reference the code by paths and names, which is exactly where the consequences of moves and API changes settle. A green `dart analyze lib` with 59 compilation errors in `test/` is a case that actually happened.
 - **`dart run custom_lint` in the Flutter package is mandatory.** `flutter analyze` does NOT run its rules, and it is `dartway_lints` that catches the ban on raw `Color`/`TextStyle`/`BorderRadius` outside ui_kit and the other conventions. A green `flutter analyze` with a red `custom_lint` is a classic trap.
 - **A generated-code diff wider than the models the task touched is almost never a real change.** If `git diff --stat` over `__SERVER_PKG__/lib/src/generated/` or `__CLIENT_PKG__/lib/src/protocol/` names files the task has nothing to do with, the cause is a formatter mismatch, not new behaviour: `serverpod generate` writes through the `dart_style` bundled with the Serverpod CLI, and the repository holds code formatted by the project's SDK. Do not read those files line by line looking for what changed, and do not commit them — run `dart format` over **both** paths and re-check, remembering that `create-migration` regenerates, so the format pass has to be the last step of the three (`dartway-models`). `dartway check` reports the state as `generatedCodeUnformatted`. What survives the format pass is the real diff, and that is what gets reviewed.
+- **A migration in the diff is read, not counted.** If `git status` shows a new folder under
+  `__SERVER_PKG__/migrations/`, grep its SQL before anything else:
+  `grep -n 'DROP TABLE' __SERVER_PKG__/migrations/*/migration.sql`. A hit is a stop, not a note.
+  `serverpod create-migration` emits `DROP TABLE ... CASCADE` + `CREATE TABLE` whenever a
+  non-nullable column without a default is added to an existing table, and `--force` — which reads
+  as "I have read the warning" — writes exactly that file. It then looks like every other generated
+  migration and is applied on boot by a server that asks nobody anything, so this is the last
+  reading before the rows are gone. Legitimate hits exist (a table genuinely removed, a module's
+  first migration); the illegitimate one is a `DROP TABLE` of a table the task was only adding a
+  column to. Rewrite `migration.sql` into add-nullable / backfill / `SET NOT NULL` and leave
+  `definition.json` and `definition.sql` untouched — `dartway-run`, "When `create-migration`
+  refuses", has the shape and how to prove it landed.
 - **`flutter test` was actually run, not "the tests probably weren't touched".** The analyzer proves that the code compiles and says nothing about behavior: an overflow in a narrow layout, an uninitialized `dw`, a layout that fell apart — all of that is only visible in a run. A test failing after a refactoring starts with the hypothesis "I broke it", and only after checking against HEAD becomes "the test was red before me".
 
 ### A.6 Findings that outlive this task

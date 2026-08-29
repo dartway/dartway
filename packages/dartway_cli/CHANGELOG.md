@@ -18,8 +18,9 @@
   is silent: the server never compares the live schema against the definition, and the next
   `create-migration` diffs against the definition rather than against the database.
 
-  It is a rule, not a mechanism. Nothing stops a destructive migration from being committed, and
-  nothing takes a dump before one is applied — that is issue #180.
+  `dartway-finish` gained the reading that goes with it: a new folder under `migrations/` is grepped
+  for `DROP TABLE` before the pull request, and a hit is a stop rather than a note. Legitimate ones
+  exist — a table genuinely removed, a module's first migration — so it is a reading and not a ban.
 
 - **`deploy check` reads the package graph, so a project learns before the deploy that an image cannot build.**
 

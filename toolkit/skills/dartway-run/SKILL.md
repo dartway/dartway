@@ -211,9 +211,10 @@ generate the following migration for a database that does not exist.
 Never hand-write `definition.json`. It is not a record of what happened; it is the premise of the
 next diff.
 
-**None of this is enforced.** It is a rule you are reading, and a destructive migration that gets
-past it is applied to production with no dump taken first. If you are about to do this against real
-data, take one by hand.
+**The net is one reading, and it is in `dartway-finish`.** Finishing a task greps every new
+migration for `DROP TABLE` before the PR, which is the last point at which this is cheap. Backups of
+a deployed database are not the application's business — but nothing between that grep and the rows
+will stop you, so the grep is not a formality.
 
 Then: a `DwCrudConfig` for the new model + registration in `crudConfigurations`,
 a default instance in `default_models.dart`, and only after that the screen.
