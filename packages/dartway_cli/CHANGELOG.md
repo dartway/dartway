@@ -2,6 +2,26 @@
 
 ## 0.9.0
 
+- **`dartway-run` names the one migration that erases a table, and the route around it.**
+
+  Adding a non-nullable column without a default to a table that already has rows makes
+  `serverpod create-migration` emit `DROP TABLE ... CASCADE` followed by `CREATE TABLE`. It warns and
+  aborts, which reads as a safety net working — and `--force`, which everywhere else means "I have
+  read the warning", writes a migration whose first statement destroys the table. The file then looks
+  like every other generated migration and is applied on boot by a server that asks nobody anything.
+
+  The skill now separates the two things `--force` produces: `migration.sql` is the **route** and is
+  yours to rewrite into add-nullable / backfill / `SET NOT NULL`; `definition.json` and
+  `definition.sql` are the **destination** and are never touched — the destination is correct either
+  way, since the column ends up `NOT NULL` however you get there. With how to prove it afterwards
+  (the rows are still there, the column matches the line in `definition.sql`) and why a wrong rewrite
+  is silent: the server never compares the live schema against the definition, and the next
+  `create-migration` diffs against the definition rather than against the database.
+
+  `dartway-finish` gained the reading that goes with it: a new folder under `migrations/` is grepped
+  for `DROP TABLE` before the pull request, and a hit is a stop rather than a note. Legitimate ones
+  exist — a table genuinely removed, a module's first migration — so it is a reading and not a ban.
+
 - **`deploy check` reads the package graph, so a project learns before the deploy that an image cannot build.**
 
   Images are built from the project root and copy package directories **by name**, which writes the
