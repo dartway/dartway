@@ -350,10 +350,7 @@ Live migrations (delete an entry once no project is on the old shape):
 
 **Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + reconciling the specs and doc comments with the code + tests before the PR).
 
-**"It works in the simulator and not on my phone"** — `dartway-on-device`: what the iOS simulator, a
-desktop browser and a widget test all fail to reproduce, with the mechanism and the workaround. Read
-it by the symptom rather than by the phase — the keyboard not coming up, the screen jumping when a
-field is tapped, a sheet that blinks and reopens.
+**"It works in the simulator and not on my phone"** — `dartway-on-device`: what the iOS simulator, a desktop browser and a widget test all fail to reproduce, with the mechanism and the workaround for each. Read it by the symptom rather than by the phase — the keyboard not coming up, the screen jumping when a field is tapped, a sheet that blinks and reopens.
 
 **Bringing the project up locally** (a fresh clone, "it won't start", after a model change) — `dartway-run`: DB, migrations, the first administrator, server, app, plus diagnostics for the typical failures. A liveness check is mandatory — report it as a fact (the API response code, the applied migrations), not as an assumption.
 
