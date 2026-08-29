@@ -345,10 +345,12 @@ Live migrations (delete an entry once no project is on the old shape):
 
 ## Skills and commands
 
-- Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-testing`, `dartway-finish` — loaded by relevance to the task.
+- Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-testing`, `dartway-on-device`, `dartway-finish` — loaded by relevance to the task.
 - Commands (`.claude/commands/`): `/dartway-checkup` — the state of the project and what to take into work next (whole project by default, a path narrows it); `/commit` — a commit in the project's CI format.
 
 **Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + reconciling the specs and doc comments with the code + tests before the PR).
+
+**"It works in the simulator and not on my phone"** — `dartway-on-device`: what the iOS simulator, a desktop browser and a widget test all fail to reproduce, with the mechanism and the workaround for each. Read it by the symptom rather than by the phase — the keyboard not coming up, the screen jumping when a field is tapped, a sheet that blinks and reopens.
 
 **Bringing the project up locally** (a fresh clone, "it won't start", after a model change) — `dartway-run`: DB, migrations, the first administrator, server, app, plus diagnostics for the typical failures. A liveness check is mandatory — report it as a fact (the API response code, the applied migrations), not as an assumption.
 
@@ -394,7 +396,12 @@ Nothing else may sit at the top level, and nothing may carry one of those names 
   Not mechanically enforced outside the kit, and deliberately so: telling `'Issues'` from `'issues/board'` or `'dd.MM'` takes reading the meaning, which no regex or lint rule does. `/dartway-checkup` looks for it. Inside `ui_kit/` the guess is safe — a kit file has no content to speak of — and `dartway check` reports it as `uiKitContainsText`. A typeface is not content: strings in the `fontFamily` and `fontFamilyFallback` positions are exempt, because the platform's font matcher reads them and nobody else does, and the kit is exactly where a font belongs.
 - **Navigation:** the DartWay Router — enum routes, enum parameters, transitions through context extensions (`context.goNamed`/`pushTo`/`replaceWith`, not `router.go()`), guards centralized. Skill — `dartway-navigation`.
 - **Specials:** notifications — `dw.notify.*` (not `SnackBar`); the profile — `ref.watchUserProfile`/`readUserProfile` (not `watchModel<UserProfile>`); actions from the UI — `dw.action`; sign-out — `signOut()`.
-- **The web shell (`web/index.html`) is part of the app, not scaffolding.** The skeleton ships it with a scroll lock (`viewport-scroll-lock-style` / `-script`), and the app depends on that block. Without it, focusing a text field on iOS takes the app off the screen: the engine parks its own DOM input and restores it ~100 ms later at a position computed before the layout knew about the keyboard, WebKit scrolls the document to bring that position into view, and the Flutter canvas — exactly one layout viewport tall — travels up with it. What is left on screen is the canvas's bottom edge. Nothing fails and nothing is logged; from Dart the widget tree is intact, so the search goes to the sheet's own markup, where the bug is not. Neither the iOS simulator nor a desktop browser reproduces it, and a phone in a browser is how a staging build gets shown — so this is found by the person you are showing it to. Anything that regenerates the shell (`flutter create .`, a splash-screen tool) drops the block silently: `grep -q 'focusin' web/index.html` is the check.
+- **The web shell (`web/index.html`) is part of the app, not scaffolding.** It is outside `lib/`,
+  which is the only reason it reads as something the build generates. The skeleton ships it with a
+  scroll lock (`viewport-scroll-lock-style` / `-script`) that the app depends on: without that block,
+  focusing a text field on iOS takes the app off the screen, silently and only on a real phone.
+  Anything that regenerates the shell drops it — `grep -q 'focusin' web/index.html` is the check, and
+  `dartway-on-device` has the mechanism.
 
 ## Shared (the optional `*_shared`)
 
