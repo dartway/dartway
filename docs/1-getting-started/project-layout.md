@@ -141,6 +141,14 @@ my_app_flutter/lib/
 `main.dart` holds nothing but the concrete environment (the backend URL differs on an Android
 device, which is the one line most people edit first). Everything structural is in the app file.
 
+**`web/index.html` is part of the app too.** It sits outside `lib/`, which makes it easy to read as
+scaffolding, and it is not: the shell the skeleton ships carries a scroll lock, and without that block
+focusing a text field on iOS scrolls the document — and with it the Flutter canvas, which is exactly
+one layout viewport tall — off the screen. Nothing fails and nothing is logged, and neither the iOS
+simulator nor a desktop browser reproduces it; a real phone does, which is where a staging build gets
+opened. Anything that regenerates the shell drops the block silently, so `grep -q 'focusin'
+web/index.html` is the check worth running before you hand a web build to someone.
+
 **A zone is not a feature and not a folder you invent.** The four are the kinds of thing an app is
 made of, not a list of sections: a fifth navigation zone in the router does *not* earn a folder of
 its own — it is a group inside `app/`, like any other group. The zones are also the only places

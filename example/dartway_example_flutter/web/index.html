@@ -103,6 +103,55 @@
       document.body.style.background = "transparent";
     }
   </script>
+  <!--
+    The document must have nothing to scroll. On iOS, focusing a text field
+    makes the engine park its own DOM input off screen and put it back ~100 ms
+    later, at a position computed before the layout knew about the keyboard —
+    i.e. underneath it. WebKit then scrolls the page to bring that element into
+    view, and since the Flutter canvas is exactly one layout viewport tall, the
+    canvas travels up with the document: the app is replaced by its bottom edge,
+    with nothing failing and nothing logged. Neither the iOS simulator nor a
+    desktop browser reproduces it, so it is found only on a real phone.
+
+    This costs the app nothing: Flutter on web scrolls its own content and keeps
+    the document exactly one window tall.
+  -->
+  <style id="viewport-scroll-lock-style">
+    html { overflow: hidden; }
+    body {
+      position: fixed;
+      top: 0; right: 0; bottom: 0; left: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+  </style>
+  <script id="viewport-scroll-lock-script">
+    (function () {
+      function pinToTop() {
+        if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
+        var scroller = document.scrollingElement;
+        if (scroller && scroller.scrollTop !== 0) scroller.scrollTop = 0;
+      }
+
+      // The shift does not happen at focus time: the engine restores its input
+      // 100 ms later, and that is when WebKit pulls the page. So the whole
+      // travel is watched, not one moment of it.
+      window.addEventListener('focusin', function () {
+        pinToTop();
+        window.requestAnimationFrame(pinToTop);
+        window.setTimeout(pinToTop, 150);
+        window.setTimeout(pinToTop, 400);
+      }, true);
+
+      window.addEventListener('scroll', pinToTop, true);
+      window.addEventListener('resize', pinToTop);
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', pinToTop);
+        window.visualViewport.addEventListener('scroll', pinToTop);
+      }
+    })();
+  </script>
 </head>
 <body>
   <picture id="splash">
