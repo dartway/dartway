@@ -2,6 +2,18 @@
 
 ## 0.9.0
 
+- **A created project can be deployed again: the skeleton's build context admits its shared package.**
+
+  Both images failed at their first `COPY`. `template/.dockerignore` denies everything and re-admits
+  packages by name, and it never named `dartway_starter_shared` — which both Dockerfiles copy. So
+  every project `dartway create` produced carried a skeleton that could not be built:
+  `"/dartway_starter_shared": not found`.
+
+  The package list lives in three places — the pubspec's `path:` dependencies, the `COPY` lines, and
+  that allow-list — and the test guarding this class compared only the first two. It now reads the
+  allow-list as well. **Nothing to do in an existing project** unless its own `.dockerignore` was
+  written before its shared package existed, in which case the two `!<name>/` lines are the fix.
+
 - **`dartway test`: the test database belongs to the run, not to the project.**
 
   It was a `postgres_test` service in every generated project's `docker-compose.yaml`, on a
