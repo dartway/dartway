@@ -114,6 +114,7 @@ commit over a 210-line file is a check people disable.
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const Color`/`TextStyle` in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, or a fixed name that is missing |
+| `l10nNotWired` | error | The app has no localization wiring — `flutter_localizations`, `generate: true`, `l10n.yaml`, a `.arb` catalogue. Names the missing pieces, not the diagnosis |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `invalidFeatureStructure` | error | A feature folder with more than one root file |
 | `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
@@ -262,6 +263,26 @@ guessed at are deliberately absent. A Flutter feature's tests are not countable 
 coverage number this exists instead of. And an *Event model* — a change written on top of a base — is
 a domain reading with no marker in the YAML: a rule keying off an `*Event` suffix would miss the one
 called `BalanceEntry` and fire on the one that is a plain lookup table.
+
+## Why `l10nNotWired` is an error, and the only one you cannot cause
+
+Every other rule here catches something written. This one catches something **never done** — and it
+is the difference that makes it an error rather than a warning.
+
+An app with no localization wiring has broken no convention. Its widgets hold their text because
+there was nowhere else to put it; the compiler is happy, the tests pass, and every other check is
+silent. The state is reachable only one way: by a project adopting this methodology from somewhere
+else, since `dartway create` ships all four pieces. In the case that produced this rule it was around
+450 strings across some 150 files, and what surfaced it was a person noticing one item of an
+otherwise English menu in another language — because with no single place for text, the language of a
+string is decided by whoever typed it.
+
+The law's own wording settles the severity: localization is *"the first thing fixed, not something to
+live with"*. A warning would say the opposite.
+
+The finding names **which** of the four is missing rather than reporting "not wired", because the
+half-wired states are the ones that produce strange errors — an `.arb` with no `generate: true`
+generates nothing, and the failure reads as a missing key.
 
 ## Why `generatedCodeUnformatted` is a warning that names a command
 

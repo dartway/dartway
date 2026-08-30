@@ -238,11 +238,19 @@ Every DartWay project is localized. That is a requirement on the project, and a 
 `l10n.yaml`, `lib/l10n/*.arb` with the generated `lib/l10n/gen/` committed beside them,
 `appLocaleProvider` (the system locale by default, switchable at runtime — and by DartWay Studio over
 the bridge), `context.l10n` inside widgets, `appL10n` for the code that runs outside the tree, such as
-notification bodies and error toasts.
+an error toast or a dialog raised from a handler.
+
+The law reaches as far as the app does. Text composed on the **server** — a push body, a
+transactional email — is outside it: the queue stores a finished title and body and the module sends
+them as they are, so there is no `appL10n` to reach for. That text is its own subject and does not
+have a rule yet. Saying so is the point: this paragraph used to name notification bodies among the
+examples, which promised a coverage that did not exist and left anyone reading it honestly with a
+case named and no way to satisfy it.
 
 If your app does not have that wiring, putting it in is the first thing to fix rather than something
-to live with — and nothing will tell you: the compiler is happy, the tests pass and `dartway check`
-is silent. The symptom is one item of an otherwise English menu turning up in another language,
+to live with — and nothing else will tell you: the compiler is happy and the tests pass. `dartway
+check` reports it as `l10nNotWired`, an error naming which piece is absent; left to itself the
+symptom is one item of an otherwise English menu turning up in another language,
 because without a single place for text, the language of a string is decided by whoever typed it. One
 language means one `.arb` file and costs nothing; retrofitting localization means walking every screen
 and moving every string, which is why it is not decided per project.
