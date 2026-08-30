@@ -13,7 +13,7 @@ skills/dartway-*/SKILL.md     # the DartWay methodology — 12 skills: requireme
                               #   feature-scaffold, models, crud-config, data-layer, navigation,
                               #   ui-kit, clean-code, push-delivery, finish
 commands/{commit,dartway-checkup}.md
-settings.json                 # default permissions, seeded once as .claude/settings.json
+settings.json                 # default permissions, merged into .claude/settings.json
 ```
 
 `CLAUDE.md` is installed as `.claude/CLAUDE.md` and committed with the project, which Claude Code automatically keeps in context — which is why a client repo needs no project `CLAUDE.md` files: the methodology rides in from the toolkit, and project knowledge lives in the code that holds it — `DwFeatureSpec`, doc comments, the registries of `lib/core/`.
@@ -27,7 +27,7 @@ The skills are **generic**: project-specific values are extracted into placehold
 | `__PROJECT_LANGUAGE__` | the language the project writes its own texts in | `--language`, default English |
 | `__NOTES_TRACKER__` | the GitHub repository framework findings are filed in as issues | `--notes-tracker`, the framework's own tracker by default; `none` opts out |
 
-`settings.json` is installed as `.claude/settings.json` **only when the project has none**, and is never overwritten afterwards — a project adds its own permissions to it, and losing those on an update would cost more than a stale default. It pre-approves this stack's build commands (`dart pub get`, `docker compose up`, `serverpod generate`, the test runners) so that bringing a fresh project up is not a queue of permission prompts, and it denies reading `config/passwords.yaml` — turning a rule the skills merely state into one the harness enforces. Nothing destructive is on the allow list: `docker compose down`, commits and pushes still ask.
+`settings.json` is installed as `.claude/settings.json` and **merged** on every later install: what the toolkit has and the project lacks is added and printed entry by entry, and everything the project added stays. It is the third kind of file here — neither the toolkit's outright like the skills, nor the project's outright like the dev-notes coverage table, but a default the project extends. Never touching it, which is what happened before, meant a new `deny` rule reached no existing project. It pre-approves this stack's build commands (`dart pub get`, `docker compose up`, `serverpod generate`, the test runners) so that bringing a fresh project up is not a queue of permission prompts, and it denies reading `config/passwords.yaml` — turning a rule the skills merely state into one the harness enforces. Nothing destructive is on the allow list: `docker compose down`, commits and pushes still ask.
 
 `docs/dev_notes/` is the one thing installed outside `.claude/`: the project's own findings — a risk, a pin that trails, a config written down twice — one **tracked** file per finding, so it travels out in a pull request and is visible in review. `README.md` there states the form and is refreshed on every install; `_coverage.md` is the project's own table of which features `/dartway-checkup` has read, and is written once and never overwritten. A finding about the **framework** gets no file at all — it is filed as an issue in the repository `__NOTES_TRACKER__` names.
 

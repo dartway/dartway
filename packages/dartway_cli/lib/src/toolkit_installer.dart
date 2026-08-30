@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -7,8 +8,9 @@ import 'package:path/path.dart' as p;
 /// `.claude/` is a generated-but-committed artifact (like the Serverpod
 /// client). Only MANAGED files are overwritten: `CLAUDE.md`, skills named
 /// `dartway-*` and the `commit` / `dartway-checkup` commands. Project-own
-/// skills and commands are never touched, and `settings.json` is seeded once
-/// and then belongs to the project.
+/// skills and commands are never touched. `settings.json` is a third kind —
+/// a toolkit default the project extends — and is merged rather than
+/// overwritten or skipped; see [_installSettings].
 class ToolkitInstaller {
   /// Removed before every install, then re-copied from the toolkit — so a
   /// command that has been retired disappears from a project instead of
@@ -77,8 +79,8 @@ class ToolkitInstaller {
     _reportLegacyInstallerTraces(projectRoot);
   }
 
-  /// Puts a default `.claude/settings.json` in place, unless the project
-  /// already has one.
+  /// Brings `.claude/settings.json` up to date, keeping whatever the project
+  /// added to it.
   ///
   /// It pre-approves the build commands of this stack — `dart pub get`,
   /// `docker compose up`, `serverpod generate`, the test runners — so that
@@ -87,18 +89,132 @@ class ToolkitInstaller {
   /// state into one the harness enforces. Nothing destructive is on the list:
   /// `docker compose down`, commits and pushes still ask.
   ///
-  /// **Not a managed file** — unlike the skills it is never overwritten, since
-  /// a project adds its own permissions to it and losing those on an update
-  /// would be worse than shipping a stale default. The consequence: changes
-  /// here reach existing projects only if someone deletes the file first.
+  /// **The third kind of file, and the reason this is a merge.** The installer
+  /// otherwise deals in two: a *managed* file is the toolkit's and is
+  /// overwritten (`CLAUDE.md`, the skills — the project has nothing in them to
+  /// lose), and a *project* file is the project's and is never touched
+  /// (`docs/dev_notes/_coverage.md` — the toolkit has no opinion on its
+  /// contents). This one is neither: it is a toolkit default that the project
+  /// *extends*. Treating it as a project file, which is what it used to be,
+  /// picks one half of that and drops the other — a changed default reached
+  /// existing projects only if somebody deleted the file first, and a new
+  /// `deny` rule reached none of them at all, which is the half the harness is
+  /// supposed to enforce rather than merely state.
+  ///
+  /// So: entries the template has and the project lacks are added, everything
+  /// the project added stays, and **every added entry is printed**. That last
+  /// part is not decoration. The one real cost of merging is a project that
+  /// removed an entry *on purpose* — dropping `Bash(curl:*)`, say — and would
+  /// have it quietly returned. Printing turns that into something visible in
+  /// the same run rather than a discovery months later.
+  ///
+  /// A file that is not valid JSON is left exactly as it is and reported: an
+  /// installer that rewrites something it could not read is worse than one that
+  /// skips it.
   static void _installSettings(Directory toolkitDir, Directory claudeDir) {
     final template = File(p.join(toolkitDir.path, 'settings.json'));
+    if (!template.existsSync()) return;
+
     final settings = File(p.join(claudeDir.path, 'settings.json'));
-    if (!template.existsSync() || settings.existsSync()) {
+    if (!settings.existsSync()) {
+      template.copySync(settings.path);
+      stdout.writeln(
+        'Created .claude/settings.json (pre-approved dev commands)',
+      );
       return;
     }
-    template.copySync(settings.path);
-    stdout.writeln('Created .claude/settings.json (pre-approved dev commands)');
+
+    // Read as an object or not at all. `jsonDecode` answers `[]` and `42`
+    // without complaint, and casting those would throw a `TypeError` past the
+    // `FormatException` guard — a crash, which is the one outcome this whole
+    // branch exists to avoid.
+    final templateJson = _settingsObject(template);
+    final projectJson = _settingsObject(settings);
+    if (templateJson == null) return;
+    if (projectJson == null) {
+      stdout.writeln(
+        '.claude/settings.json is not a JSON object and was left untouched.',
+      );
+      return;
+    }
+
+    final added = _mergeSettings(templateJson, projectJson);
+    if (added.isEmpty) return;
+
+    settings.writeAsStringSync(
+      '${const JsonEncoder.withIndent('  ').convert(projectJson)}\n',
+    );
+    stdout.writeln('Updated .claude/settings.json:');
+    for (final entry in added) {
+      stdout.writeln('  + $entry');
+    }
+  }
+
+  /// The file's contents as a JSON object, or null when it is anything else —
+  /// unparseable, or parseable but a list, a number or a string.
+  static Map<String, dynamic>? _settingsObject(File file) {
+    try {
+      final decoded = jsonDecode(file.readAsStringSync());
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  /// Adds what [template] has and [project] lacks, in place, and answers with
+  /// what was added — `permissions.allow: Bash(...)` and the like.
+  ///
+  /// Lists are merged as sets while keeping the project's order first, so an
+  /// update reads as an addition rather than as a reshuffle. A value the
+  /// project already holds under a key is never replaced: the template seeds
+  /// defaults, it does not overrule decisions.
+  static List<String> _mergeSettings(
+    Map<String, dynamic> template,
+    Map<String, dynamic> project,
+  ) {
+    final added = <String>[];
+
+    void mergeInto(
+      Map<String, dynamic> from,
+      Map<String, dynamic> into,
+      String path,
+    ) {
+      for (final key in from.keys) {
+        final incoming = from[key];
+        final existing = into[key];
+        final where = path.isEmpty ? key : '$path.$key';
+
+        if (incoming is Map<String, dynamic>) {
+          if (existing is! Map<String, dynamic>) {
+            if (existing == null) {
+              into[key] = incoming;
+              added.add(where);
+            }
+            continue;
+          }
+          mergeInto(incoming, existing, where);
+        } else if (incoming is List) {
+          if (existing is! List) {
+            if (existing == null) {
+              into[key] = incoming;
+              added.add(where);
+            }
+            continue;
+          }
+          for (final value in incoming) {
+            if (existing.contains(value)) continue;
+            existing.add(value);
+            added.add('$where: $value');
+          }
+        } else if (existing == null) {
+          into[key] = incoming;
+          added.add('$where: $incoming');
+        }
+      }
+    }
+
+    mergeInto(template, project, '');
+    return added;
   }
 
   /// Creates `docs/dev_notes/` — the project's own findings, one file per
