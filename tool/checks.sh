@@ -19,6 +19,18 @@ cd "$(dirname "$0")/.."
 MODE="${1:-all}"
 FAILED=()
 
+# A mistyped mode must not look like a clean run. This script is invoked by hand
+# as well as by CI, and "tool/checks.sh tests" printing "everything green"
+# without having run anything is the worst answer a gate can give.
+case "$MODE" in
+  all|analyze|test) ;;
+  *)
+    echo "unknown mode: $MODE" >&2
+    echo "usage: tool/checks.sh [analyze|test]   (default: both)" >&2
+    exit 64
+    ;;
+esac
+
 # Suites this script deliberately does not run, each with its reason. A package
 # is skipped only by being named here — anything new with a `test/` directory is
 # picked up and run, which is the direction that fails loudly rather than
