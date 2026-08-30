@@ -13,7 +13,11 @@ void main() {
     // from a file is a copy, which is why this compares them.
     var dir = Directory.current.absolute;
     while (!File(p.join(dir.path, 'pubspec.yaml')).existsSync()) {
-      dir = dir.parent;
+      final up = dir.parent;
+      if (up.path == dir.path) {
+        throw StateError('no pubspec.yaml above ${Directory.current.path}');
+      }
+      dir = up;
     }
     final pubspec =
         loadYaml(File(p.join(dir.path, 'pubspec.yaml')).readAsStringSync())

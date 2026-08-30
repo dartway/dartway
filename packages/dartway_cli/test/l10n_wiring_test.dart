@@ -107,7 +107,14 @@ void main() {
     while (!Directory(
       p.join(dir.path, 'template', 'dartway_starter_flutter'),
     ).existsSync()) {
-      dir = dir.parent;
+      final up = dir.parent;
+      // At the filesystem root `parent` answers itself, so without this the
+      // loop spins rather than failing — a hang in CI, which is worse than an
+      // error because nothing says what it was looking for.
+      if (up.path == dir.path) {
+        throw StateError('no template/ above ${Directory.current.path}');
+      }
+      dir = up;
     }
 
     expect(
