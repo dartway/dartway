@@ -114,10 +114,12 @@ void main() {
       ToolkitProvenance? installed,
       String requested = 'stable',
       bool explicit = false,
+      bool local = false,
     }) => channelSwitchRefusal(
       installed: installed,
       requestedChannel: requested,
       channelWasExplicit: explicit,
+      fromLocalCheckout: local,
     );
 
     test('refuses the silent rollback', () {
@@ -138,6 +140,15 @@ void main() {
 
     test('allows an update on the same channel', () {
       expect(refusalFor(installed: onMaster, requested: 'master'), isNull);
+    });
+
+    test('allows an install from a local checkout', () {
+      // `--local-repo` resolves to the directory it was handed and ignores the
+      // channel entirely, then records none. Judging it against the `--channel`
+      // default would block the framework's own development loop for any
+      // project whose harness came from a non-default channel — over a channel
+      // the run was never going to touch.
+      expect(refusalFor(installed: onMaster, local: true), isNull);
     });
 
     test('allows a project that has no manifest yet', () {

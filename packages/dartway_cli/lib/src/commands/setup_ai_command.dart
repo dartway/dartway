@@ -89,6 +89,7 @@ class SetupAiCommand extends Command<int> {
       installed: ToolkitProvenance.read(projectRoot),
       requestedChannel: channel,
       channelWasExplicit: argResults!.wasParsed('channel'),
+      fromLocalCheckout: localRepo != null && localRepo.isNotEmpty,
     );
     if (refusal != null) {
       stderr.writeln(refusal);

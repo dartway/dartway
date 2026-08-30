@@ -120,7 +120,16 @@ String? channelSwitchRefusal({
   required ToolkitProvenance? installed,
   required String requestedChannel,
   required bool channelWasExplicit,
+  required bool fromLocalCheckout,
 }) {
+  // A local checkout ignores the channel entirely — `MonorepoSource` resolves
+  // to the directory it was handed — and the install that follows records no
+  // channel. Judging it against the `--channel` default would block the
+  // framework's own development loop (`dartway setup-ai --local-repo ../dartway`)
+  // for any project whose harness came from a non-default channel, over a
+  // channel the run was never going to touch.
+  if (fromLocalCheckout) return null;
+
   final recorded = installed?.channel;
   if (recorded == null || channelWasExplicit) return null;
   if (recorded == requestedChannel) return null;
