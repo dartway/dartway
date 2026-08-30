@@ -172,10 +172,11 @@ into the installed markdown, so the skills speak your package names, not placeho
 journal — straight into the installed `CLAUDE.md`. It defaults to English and does not touch what
 ships to other people: package APIs and error strings stay English either way.
 
-`.claude/settings.json` is written only when the project has none, and never touched again: it
-pre-approves this stack's build commands so a first run is not a queue of permission prompts, and
-denies reading `config/passwords.yaml`. A project extends it; an update will not take those edits
-away, at the price of an old default staying put until someone deletes the file.
+`.claude/settings.json` is **merged** rather than overwritten or skipped: it pre-approves this
+stack's build commands so a first run is not a queue of permission prompts, and denies reading
+`config/passwords.yaml`. A project extends it and keeps everything it added; what the toolkit has
+gained since is added and printed, entry by entry. Written once and never touched again — what it
+used to do — meant a new `deny` rule reached no existing project at all.
 
 One thing lands outside `.claude/`: **`docs/dev_notes/`**, where this project's own findings live —
 a risk, a pin that trails, a config written down twice, one file per finding. It is **tracked, not

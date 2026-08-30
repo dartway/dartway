@@ -2,6 +2,26 @@
 
 ## 0.9.0
 
+- **`setup-ai` brings `.claude/settings.json` up to date instead of skipping it.**
+
+  It used to be written only when the project had none, and never touched again. Its own doc comment
+  admitted the consequence — "changes here reach existing projects only if someone deletes the file
+  first" — and the never-overwrite reasoning covers only half of the case. Adding a pre-approved
+  build command and losing it on an update would be bad; **a new `deny` rule reaching no existing
+  project at all** is worse, because that is the half the harness is supposed to enforce rather than
+  merely state.
+
+  The file is a third kind, which is why neither of the installer's two rules fitted: a *managed*
+  file is the toolkit's and is overwritten, a *project* file is the project's and is never touched,
+  and this one is a toolkit default the project **extends**. It is now merged — entries the template
+  has and the project lacks are added, everything the project added stays, and a value the project
+  already set is never replaced.
+
+  **Every added entry is printed.** Merging has exactly one real cost — an entry a project removed on
+  purpose comes back — and naming each addition in the output turns that into something visible in
+  the same run rather than a discovery months later. A `settings.json` that is not valid JSON is
+  reported and left exactly as it was.
+
 - **New skill `dartway-on-device`: what only a real phone will tell you.**
 
   Three findings from one week shared no topic and one provenance — each was invisible in the iOS
