@@ -80,23 +80,27 @@ class SetupAiCommand extends Command<int> {
     );
 
     final channel = argResults!['channel'] as String;
-    final localRepo = argResults!['local-repo'] as String?;
+    final source = MonorepoSource(
+      branch: channel,
+      localDir: argResults!['local-repo'] as String?,
+    );
 
     // Before anything is fetched: a channel switch nobody asked for is the one
     // way this command moves a project backwards, and it costs nothing to
-    // notice it here rather than after the clone.
+    // notice it here rather than after the clone. The source is asked whether
+    // this is a local checkout, because it is the only thing that knows —
+    // `--local-repo` and `DARTWAY_MONOREPO_DIR` both end up in it.
     final refusal = channelSwitchRefusal(
       installed: ToolkitProvenance.read(projectRoot),
       requestedChannel: channel,
       channelWasExplicit: argResults!.wasParsed('channel'),
-      fromLocalCheckout: localRepo != null && localRepo.isNotEmpty,
+      fromLocalCheckout: source.isLocalCheckout,
     );
     if (refusal != null) {
       stderr.writeln(refusal);
       return 1;
     }
 
-    final source = MonorepoSource(branch: channel, localDir: localRepo);
     final monorepoDir = await source.resolve();
 
     await ToolkitInstaller.install(
@@ -107,15 +111,7 @@ class SetupAiCommand extends Command<int> {
         language: language,
         notesTracker: notesTracker,
       ),
-      provenance: ToolkitProvenance(
-        source: localRepo != null && localRepo.isNotEmpty
-            ? monorepoDir.path
-            : source.repoUrl,
-        channel: localRepo != null && localRepo.isNotEmpty ? null : channel,
-        commit: await monorepoCommit(monorepoDir),
-        cliVersion: dartwayCliVersion,
-        installedAt: DateTime.now().toUtc().toIso8601String(),
-      ),
+      provenance: await source.provenance(monorepoDir),
     );
 
     stdout.writeln(

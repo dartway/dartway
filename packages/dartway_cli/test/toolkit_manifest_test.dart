@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dartway_cli/src/monorepo_source.dart';
 import 'package:dartway_cli/src/toolkit_manifest.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -167,6 +168,61 @@ void main() {
       );
 
       expect(refusalFor(installed: local), isNull);
+    });
+  });
+
+  group('MonorepoSource.isLocalCheckout', () {
+    test('the argument makes it local', () {
+      expect(
+        MonorepoSource(
+          branch: 'stable',
+          localDir: '/home/dev/dartway',
+          environment: const {},
+        ).isLocalCheckout,
+        isTrue,
+      );
+    });
+
+    test('so does the environment variable, with no argument', () {
+      // The half that was missed: a caller checking the `--local-repo`
+      // argument disagreed with what `resolve()` would actually do, and
+      // refused a channel switch over a channel nothing was going to touch.
+      expect(
+        MonorepoSource(
+          branch: 'stable',
+          environment: const {'DARTWAY_MONOREPO_DIR': '/home/dev/dartway'},
+        ).isLocalCheckout,
+        isTrue,
+      );
+    });
+
+    test('the argument wins over the variable', () {
+      expect(
+        MonorepoSource(
+          branch: 'stable',
+          localDir: '/from/argument',
+          environment: const {'DARTWAY_MONOREPO_DIR': '/from/env'},
+        ).localDir,
+        '/from/argument',
+      );
+    });
+
+    test('an empty argument falls through to the variable', () {
+      expect(
+        MonorepoSource(
+          branch: 'stable',
+          localDir: '',
+          environment: const {'DARTWAY_MONOREPO_DIR': '/from/env'},
+        ).localDir,
+        '/from/env',
+      );
+    });
+
+    test('neither means a channel', () {
+      expect(
+        MonorepoSource(branch: 'stable', environment: const {}).isLocalCheckout,
+        isFalse,
+      );
     });
   });
 }
