@@ -20,6 +20,11 @@
   existed has no manifest and is left alone rather than blocked, and an install from a local checkout
   records no channel — a working directory's branch says nothing about what a project should follow.
 
+  Whether the toolkit comes from a local checkout is now `MonorepoSource`'s answer rather than a
+  condition each caller re-derives: `--local-repo` and `DARTWAY_MONOREPO_DIR` both fold into it, so
+  nothing can disagree with what `resolve()` will do. Asking the argument instead was how a refusal
+  fired over a channel the run was never going to touch.
+
   The issue also asked the command to refuse when the incoming commit is an *ancestor* of the
   installed one. That is not implementable as asked: the monorepo cache is cloned `--depth 1` and has
   no history to compare with. The channel guard covers the case that actually happens.

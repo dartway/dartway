@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'toolkit_manifest.dart';
+
 /// Resolves a checkout of the DartWay monorepo to read `toolkit/` and
 /// `template/` from.
 ///
@@ -10,16 +12,34 @@ import 'package:path/path.dart' as p;
 ///    used when developing the framework itself;
 /// 2. a shallow clone of [branch] cached in `~/.dartway/monorepo`.
 class MonorepoSource {
-  MonorepoSource({required this.branch, String? localDir})
-    : localDir = (localDir != null && localDir.isNotEmpty)
-          ? localDir
-          : Platform.environment['DARTWAY_MONOREPO_DIR'];
+  /// [environment] is injectable because the fallback below is a seam that has
+  /// already produced one bug: a caller that checked the `--local-repo`
+  /// argument instead of asking this object got a different answer whenever
+  /// `DARTWAY_MONOREPO_DIR` was the thing in play.
+  MonorepoSource({
+    required this.branch,
+    String? localDir,
+    Map<String, String>? environment,
+  }) : localDir = (localDir != null && localDir.isNotEmpty)
+           ? localDir
+           : (environment ?? Platform.environment)['DARTWAY_MONOREPO_DIR'];
 
   static const defaultRepoUrl = 'https://github.com/dartway/dartway.git';
   static const defaultBranch = 'stable';
 
   final String branch;
   final String? localDir;
+
+  /// Whether the toolkit comes from a checkout on this machine rather than
+  /// from a channel.
+  ///
+  /// **The single answer to that question.** Both entry points — the
+  /// `--local-repo` argument and the `DARTWAY_MONOREPO_DIR` variable — are
+  /// already folded into [localDir] by the constructor, so anything that asks
+  /// here cannot disagree with what [resolve] will actually do. Asking the
+  /// argument instead is how a channel refusal fired over a channel that was
+  /// never going to be touched.
+  bool get isLocalCheckout => localDir != null && localDir!.isNotEmpty;
 
   String get repoUrl =>
       Platform.environment['DARTWAY_REPO_URL'] ?? defaultRepoUrl;
@@ -31,6 +51,20 @@ class MonorepoSource {
         '.';
     return Directory(p.join(home, '.dartway', 'monorepo'));
   }
+
+  /// Where an install from this source came from, for the manifest.
+  ///
+  /// Built here rather than at each call site: the two commands used to repeat
+  /// the same ternaries over the raw argument, and repeating a condition is how
+  /// the two copies of it stopped agreeing.
+  Future<ToolkitProvenance> provenance(Directory resolved) async =>
+      ToolkitProvenance(
+        source: isLocalCheckout ? resolved.path : repoUrl,
+        channel: isLocalCheckout ? null : branch,
+        commit: await monorepoCommit(resolved),
+        cliVersion: dartwayCliVersion,
+        installedAt: DateTime.now().toUtc().toIso8601String(),
+      );
 
   /// Returns the monorepo root, cloning or updating the cache if needed.
   Future<Directory> resolve() async {
