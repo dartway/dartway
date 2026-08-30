@@ -364,7 +364,12 @@ Rules that matter:
   platform and is available on the device wins. No platform switch in app code;
 - the plugin **never navigates**. `onOpened` fires once per tap, after a frame,
   for cold start, background and foreground alike; mapping a data map to a route
-  is the app's business, and the payload keys are the app's too;
+  is the app's business, and the payload keys are the app's too. The `appRouter.go`
+  above is not a lapse from the navigation rule — `onOpened` is declared in this
+  very `plugins:` list, before `ProviderScope` and before the first frame, so
+  there is no context to go through. `dartway-navigation`, "The one transition
+  that has no context", holds the boundary: one seam per application, in `core/`,
+  cancelled when the tree is destroyed;
 - `requestPermissionOnAttach: false` plus `dw.plugins.push.requestPermission()`
   asks at a moment the user understands;
 - **call `dw.plugins.push.revokeToken()` before signing out**, while the session
