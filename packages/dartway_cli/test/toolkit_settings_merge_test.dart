@@ -176,6 +176,24 @@ void main() {
     );
   });
 
+  test(
+    'valid JSON that is not an object is left alone, not crashed on',
+    () async {
+      // `jsonDecode` accepts these without complaint, so the parse guard alone
+      // does not catch them — and the cast that used to follow threw past it,
+      // turning a malformed settings file into a failed `setup-ai`.
+      for (final content in ['[]', '42', '"oops"']) {
+        final root = await installInto(null, seed);
+        final file = File(p.join(root.path, '.claude', 'settings.json'));
+        file.writeAsStringSync(content);
+
+        await installInto(root, seed);
+
+        expect(file.readAsStringSync(), content, reason: content);
+      }
+    },
+  );
+
   test('a file that is not valid JSON is left exactly as it was', () async {
     // An installer that rewrites something it could not read is worse than one
     // that skips it: the unreadable file is still the project's only copy.

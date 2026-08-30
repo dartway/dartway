@@ -124,17 +124,16 @@ class ToolkitInstaller {
       return;
     }
 
-    final Map<String, dynamic> templateJson;
-    final Map<String, dynamic> projectJson;
-    try {
-      templateJson =
-          jsonDecode(template.readAsStringSync()) as Map<String, dynamic>;
-      projectJson =
-          jsonDecode(settings.readAsStringSync()) as Map<String, dynamic>;
-    } on FormatException catch (error) {
+    // Read as an object or not at all. `jsonDecode` answers `[]` and `42`
+    // without complaint, and casting those would throw a `TypeError` past the
+    // `FormatException` guard — a crash, which is the one outcome this whole
+    // branch exists to avoid.
+    final templateJson = _settingsObject(template);
+    final projectJson = _settingsObject(settings);
+    if (templateJson == null) return;
+    if (projectJson == null) {
       stdout.writeln(
-        '.claude/settings.json is not valid JSON and was left untouched: '
-        '${error.message}',
+        '.claude/settings.json is not a JSON object and was left untouched.',
       );
       return;
     }
@@ -148,6 +147,17 @@ class ToolkitInstaller {
     stdout.writeln('Updated .claude/settings.json:');
     for (final entry in added) {
       stdout.writeln('  + $entry');
+    }
+  }
+
+  /// The file's contents as a JSON object, or null when it is anything else —
+  /// unparseable, or parseable but a list, a number or a string.
+  static Map<String, dynamic>? _settingsObject(File file) {
+    try {
+      final decoded = jsonDecode(file.readAsStringSync());
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } on FormatException {
+      return null;
     }
   }
 
