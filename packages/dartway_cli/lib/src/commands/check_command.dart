@@ -8,6 +8,7 @@ import '../checker/dw_crud_coverage.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_framework_lock.dart';
 import '../checker/dw_generated_format.dart';
+import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_layout.dart';
 import '../project_layout.dart';
 
@@ -78,6 +79,14 @@ class CheckCommand extends Command<int> {
       errorCount += DwLayoutInspector(
         flutterPackageDir: flutterPackageDir,
         serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
+
+      // Judges the package's wiring rather than any file in it, so it has
+      // nothing to say about a run narrowed to a folder either.
+      errorCount += DwL10nWiringInspector(
+        flutterPackageDir: flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();

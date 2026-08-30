@@ -8,6 +8,18 @@ enum DwCheckType {
   /// A file inside `ui_kit/` without the `part of '../ui_kit.dart'` directive.
   uiKitPartMissing,
 
+  /// The app's localization is not wired: `flutter_localizations`,
+  /// `generate: true`, `l10n.yaml` and a `.arb` catalogue.
+  ///
+  /// An error, because the law's own wording about it is "the first thing
+  /// fixed, not something to live with". It is the one convention that cannot
+  /// be broken by writing bad code — only by never having had it, which is the
+  /// state a project reaching this methodology from elsewhere arrives in. And
+  /// nothing else notices: the compiler is happy, the tests pass, and the app
+  /// looks finished until somebody sees one item of a menu in the wrong
+  /// language.
+  l10nNotWired,
+
   /// A text constant inside `ui_kit/` (texts belong to features/l10n).
   uiKitContainsText,
 

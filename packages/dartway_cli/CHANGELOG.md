@@ -2,6 +2,26 @@
 
 ## 0.9.0
 
+- **`dartway check` notices an app whose localization was never wired, and the law stops promising a side it cannot reach.**
+
+  The rule said every project is localized, and nothing checked it. That is not a theoretical gap: one
+  application had no `l10n/`, no `.arb`, no `flutter_localizations` and not one `context.l10n` —
+  around 450 strings written straight into 150 widget files, with nobody having broken anything,
+  because the rule used to describe a starting state and a project that arrived by another road never
+  had it to lose. It is silent everywhere: the compiler is happy, the tests are green, the app looks
+  finished. What surfaced it was a person seeing one item of an otherwise English menu in another
+  language.
+
+  `l10nNotWired` is an error and names **which** of the four pieces is missing — `flutter_localizations`,
+  `generate: true`, `l10n.yaml`, an `.arb` catalogue. "Not wired" is not something anyone can act on,
+  and the half-wired states are the ones that produce the strangest errors.
+
+  Separately, the law's examples used to include **notification bodies**, and those are composed on the
+  server: the queue stores a finished title and body, so there is no `appL10n` there and cannot be. A
+  project reading the law honestly found its case named and no way to comply. The law now states the
+  side it applies to, and server-composed text is named as its own subject without a rule yet — a gap
+  named rather than one quietly promised as covered.
+
 - **An installed harness records where it came from, and a channel is no longer switched by a default.**
 
   `setup-ai` left no trace of its source: no version, no commit, no channel. So *"how far behind is
