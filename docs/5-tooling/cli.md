@@ -172,6 +172,22 @@ into the installed markdown, so the skills speak your package names, not placeho
 journal — straight into the installed `CLAUDE.md`. It defaults to English and does not touch what
 ships to other people: package APIs and error strings stay English either way.
 
+The install records where it came from, in `.claude/dartway-toolkit.json`: the repository, the
+channel, the commit and the CLI version, committed with the rest. The installed files themselves say
+none of that — they are the toolkit's files, so comparing them against the current toolkit answers
+*"is this behind"* and nothing about *which channel it follows*.
+
+That distinction has teeth, because **`--channel` defaults to `stable`**. A project deliberately
+moved to `master` is rolled back by the next plain `dartway setup-ai`, and the diff of that rollback
+is indistinguishable from the diff of an ordinary update. So when the recorded channel differs from
+the one about to be installed and `--channel` was not given, the command **refuses** and says which
+two channels are involved. Naming either one proceeds — the point is that moving between them stops
+being something a default decides, and ends up written in the command that ran.
+
+It records provenance rather than content on purpose: a list of installed files or their hashes
+would be a second copy of the files, and copies drift. Where they came from is written nowhere else.
+A project installed before this existed has no manifest, and is left alone rather than blocked.
+
 `.claude/settings.json` is **merged** rather than overwritten or skipped: it pre-approves this
 stack's build commands so a first run is not a queue of permission prompts, and denies reading
 `config/passwords.yaml`. A project extends it and keeps everything it added; what the toolkit has

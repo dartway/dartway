@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import '../monorepo_source.dart';
 import '../project_layout.dart';
+import '../toolkit_manifest.dart';
 import '../toolkit_installer.dart';
 
 /// Creates a new DartWay project from the `template/` skeleton of the monorepo:
@@ -89,10 +90,10 @@ class CreateCommand extends Command<int> {
         ? _requireEmptyCurrentDirectory()
         : _requireFreeSubdirectory(projectName);
 
-    final monorepoDir = await MonorepoSource(
-      branch: argResults!['channel'] as String,
-      localDir: argResults!['local-repo'] as String?,
-    ).resolve();
+    final channel = argResults!['channel'] as String;
+    final localRepo = argResults!['local-repo'] as String?;
+    final source = MonorepoSource(branch: channel, localDir: localRepo);
+    final monorepoDir = await source.resolve();
     final templateDir = Directory(p.join(monorepoDir.path, _sourceDirectory));
     if (!templateDir.existsSync()) {
       throw StateError(
@@ -113,6 +114,15 @@ class CreateCommand extends Command<int> {
         baseBranch: 'master',
         language: argResults!['language'] as String,
         notesTracker: argResults!['notes-tracker'] as String,
+      ),
+      provenance: ToolkitProvenance(
+        source: localRepo != null && localRepo.isNotEmpty
+            ? monorepoDir.path
+            : source.repoUrl,
+        channel: localRepo != null && localRepo.isNotEmpty ? null : channel,
+        commit: await monorepoCommit(monorepoDir),
+        cliVersion: dartwayCliVersion,
+        installedAt: DateTime.now().toUtc().toIso8601String(),
       ),
     );
 

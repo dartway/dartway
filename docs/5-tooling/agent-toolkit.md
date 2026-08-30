@@ -60,7 +60,12 @@ So do not edit a `dartway-*` skill in place; the next `setup-ai` will drop your 
 floor. To customize, **copy the skill under a different name** and edit the copy. The source of
 truth is the toolkit in the monorepo, and there is no reverse sync.
 
-Updating is a deliberate act with a visible diff: run `setup-ai` again, read what changed, commit.
+Updating is a deliberate act with a visible diff: run `setup-ai` again, read what changed, commit. What
+was installed is written down beside it, in `.claude/dartway-toolkit.json` — repository, channel,
+commit, CLI version — because the files themselves do not say which channel they follow, and
+`--channel` defaults to `stable`. Update a project that had been moved to `master` with the plain
+command and it would be rolled back, with the diff looking like any other update; instead the
+command refuses and asks for the channel by name.
 
 `.claude/settings.json` sits on neither side of that line, and is the third kind of file here: a
 toolkit default the project **extends**. It pre-approves this stack's build commands — `dart pub

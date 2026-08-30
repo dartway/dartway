@@ -4,6 +4,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../monorepo_source.dart';
+import '../toolkit_manifest.dart';
 import '../project_layout.dart';
 import '../toolkit_installer.dart';
 
@@ -78,10 +79,25 @@ class SetupAiCommand extends Command<int> {
           : 'Notes tracker: $notesTracker',
     );
 
-    final monorepoDir = await MonorepoSource(
-      branch: argResults!['channel'] as String,
-      localDir: argResults!['local-repo'] as String?,
-    ).resolve();
+    final channel = argResults!['channel'] as String;
+    final localRepo = argResults!['local-repo'] as String?;
+
+    // Before anything is fetched: a channel switch nobody asked for is the one
+    // way this command moves a project backwards, and it costs nothing to
+    // notice it here rather than after the clone.
+    final refusal = channelSwitchRefusal(
+      installed: ToolkitProvenance.read(projectRoot),
+      requestedChannel: channel,
+      channelWasExplicit: argResults!.wasParsed('channel'),
+      fromLocalCheckout: localRepo != null && localRepo.isNotEmpty,
+    );
+    if (refusal != null) {
+      stderr.writeln(refusal);
+      return 1;
+    }
+
+    final source = MonorepoSource(branch: channel, localDir: localRepo);
+    final monorepoDir = await source.resolve();
 
     await ToolkitInstaller.install(
       toolkitDir: Directory(p.join(monorepoDir.path, 'toolkit')),
@@ -90,6 +106,15 @@ class SetupAiCommand extends Command<int> {
         baseBranch: baseBranch,
         language: language,
         notesTracker: notesTracker,
+      ),
+      provenance: ToolkitProvenance(
+        source: localRepo != null && localRepo.isNotEmpty
+            ? monorepoDir.path
+            : source.repoUrl,
+        channel: localRepo != null && localRepo.isNotEmpty ? null : channel,
+        commit: await monorepoCommit(monorepoDir),
+        cliVersion: dartwayCliVersion,
+        installedAt: DateTime.now().toUtc().toIso8601String(),
       ),
     );
 
