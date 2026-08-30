@@ -124,7 +124,7 @@ These are not suggestions: each item closes off a way for one session to destroy
 4. **Create the branch at the start of the task, not at the end.** While a branch has no commits, any collision between sessions is resolved by splitting files; after the first foreign commit lands on your branch, only `cherry-pick` and manual surgery remain.
 5. **Never branch from someone else's HEAD.** Branch from an explicit point: `git switch -c <name> master`. Otherwise a foreign commit rides into your PR.
 6. **Push and open PRs only when asked directly.** Never merge a PR, never push to `master` directly, never touch `stable` without an explicit instruction.
-7. **Before offering a PR** — `framework-finish`, analyze and tests all green.
+7. **Before offering a PR** — `framework-finish`, then `tool/checks.sh`, all green. That script is what CI runs, so running it here is not a rehearsal of the gate but the gate itself, answered earlier. Running only the suites you touched is what let a broken one reach `master`.
 8. **Clean up your worktree:** `git worktree remove ../dartway-wt/<slug>` once the branch is merged. Abandoned worktrees hold branches checked out, and the next session cannot switch to them.
 9. **Everything that travels to GitHub is written in English:** branch name, commit message, PR title and description, PR comments. Re-read the title before `gh pr create` — it becomes a commit on `master` and is not editable afterwards. That the task was discussed in Russian makes no difference — see "Language".
 
@@ -136,10 +136,11 @@ These are not suggestions: each item closes off a way for one session to destroy
 
 ### CI
 
-Three workflows in `.github/workflows/`:
+Four workflows in `.github/workflows/`:
 
 | File | When | What it does |
 |---|---|---|
+| `checks.yml` | A PR is opened, updated, or taken out of draft, and on push to `master` | Runs `tool/checks.sh` — `dart analyze` over every resolution root, and every suite that needs no services (eighteen of the twenty-one; the three that want a database are a second tier). It exists because none of that was run anywhere: a change to one package could break a suite in another and reach `master` green, which is what #165 did for a day. The review cannot close that gap — it reads the diff, and the call site that broke was not in it |
 | `claude-review.yml` | A PR is opened, updated, or taken out of draft | Reviews the diff automatically. Beyond ordinary bugs it checks three things specific to this repository: the synchronisation law, the presence of the hand-written `manualDeserialization` patch in the generated `protocol.dart`, and the absence of project literals in `toolkit/` |
 | `telegram-notify.yml` | A review finishes | Sends the verdict and a link to the PR to Telegram — the one notification that asks for a decision. Signals meant for the team (merges, promotion to `stable`) are deliberately absent: that is a separate task addressing a different audience |
 | `web-compile.yml` | A PR is opened or updated, and on push to `master` | Builds the web targets (`example/` and the `dartway_offline_flutter` harness). dart2js rejects code the VM accepts — an integer literal a JavaScript double cannot hold exactly is the standing case — and **unit tests on the VM cannot see that class of error at all**. A package no example and no template depends on is compiled nowhere else, which is how two such literals reached a consumer's release build |
