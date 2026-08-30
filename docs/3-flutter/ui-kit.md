@@ -248,8 +248,9 @@ examples, which promised a coverage that did not exist and left anyone reading i
 case named and no way to satisfy it.
 
 If your app does not have that wiring, putting it in is the first thing to fix rather than something
-to live with — and nothing will tell you: the compiler is happy, the tests pass and `dartway check`
-is silent. The symptom is one item of an otherwise English menu turning up in another language,
+to live with — and nothing else will tell you: the compiler is happy and the tests pass. `dartway
+check` reports it as `l10nNotWired`, an error naming which piece is absent; left to itself the
+symptom is one item of an otherwise English menu turning up in another language,
 because without a single place for text, the language of a string is decided by whoever typed it. One
 language means one `.arb` file and costs nothing; retrofitting localization means walking every screen
 and moving every string, which is why it is not decided per project.
