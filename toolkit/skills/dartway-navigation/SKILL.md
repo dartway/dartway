@@ -22,6 +22,8 @@ Navigation rules for DartWay projects. The router is a wrapper over go_router: `
 - **Guards live in the zone** (`zoneGuards`), not scattered across screens.
 - **Parameters are type-safe only**, via an enum with `DwNavigationParamsMixin`.
 - Do not mix navigation logic with UI.
+- **Transitions go through the context**, with one exception that is a fact rather than a
+  preference — see [The one transition that has no context](#the-one-transition-that-has-no-context).
 
 ## Structure
 
@@ -174,6 +176,47 @@ GoRouter.of(context).goNamed(AdminNavigationZone.admin.name);
 ```
 
 `GoRouter` comes from `dartway_router` (the re-export), a separate `go_router` import is not needed. Type safety comes from the enum: there are no string names in the call.
+
+### The one transition that has no context
+
+A transition **not started by a gesture in the tree** takes the navigation
+function from the router instead, because at that moment nobody holds a context:
+
+- a tapped push notification — `DwPushConfig.onOpened` is declared in the
+  `plugins:` list of the `DwCore` constructor, which runs before `ProviderScope`,
+  before the first frame and long before the router exists, and it hands over a
+  `Map<String, String>`;
+- a cold start from the same tap — `takeInitialPayload` exists precisely because
+  "the tap happened before there was an app", as its own doc comment puts it;
+- a deep link, and a reply from a background handler.
+
+This is not a loophole in the rule above; it is a place the rule does not reach.
+Every push integration meets it, and meets it identically, so a project that
+writes it correctly looks like a project that broke the convention — and the
+next agent arrives to "fix" working code. Hence this section.
+
+**The boundary, which is the part that matters:**
+
+- **one seam per application**, in `core/` — not a helper each feature reaches
+  for. The moment two of them exist, a transition from a gesture will go through
+  one of them and the rule really is broken;
+- it **holds the router**, it does not rebuild routing logic: the payload maps to
+  a route name and parameters, and the transition is the router's own;
+- it **cancels its subscription when the tree is destroyed**, because it
+  outlives the widgets by construction;
+- inside a widget the rule is unchanged: `GoRouter.of(context).goNamed(...)`.
+  "There was no context" is a fact about the callback, not an opinion about
+  convenience.
+
+Mark it, so it is re-read when the framework grows one of its own:
+
+```dart
+// TODO(dartway, checked: <ref>): navigating from a payload with no context;
+// the framework hands over the payload and stops there.
+```
+
+The framework can hand over the payload; **which route a payload means is the
+application's**, so a seam of some shape stays the application's either way.
 
 ## Parameters
 
