@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'toolkit_manifest.dart';
+
 /// Installs the DartWay AI toolkit into a project's `.claude/` directory.
 ///
 /// `.claude/` is a generated-but-committed artifact (like the Serverpod
@@ -28,10 +30,13 @@ class ToolkitInstaller {
 
   /// Copies the toolkit from [toolkitDir] into `<projectRoot>/.claude/`,
   /// substituting [tokens] in the managed markdown files.
+  /// [provenance] is written beside the files it describes. Omitted only by
+  /// tests that have no monorepo to describe.
   static Future<void> install({
     required Directory toolkitDir,
     required Directory projectRoot,
     required Map<String, String> tokens,
+    ToolkitProvenance? provenance,
   }) async {
     final toolkitSkillsDir = Directory(p.join(toolkitDir.path, 'skills'));
     final toolkitCommandsDir = Directory(p.join(toolkitDir.path, 'commands'));
@@ -77,6 +82,11 @@ class ToolkitInstaller {
     _installDevNotes(toolkitDir, projectRoot, tokens);
     _reportRetiredJournals(projectRoot);
     _reportLegacyInstallerTraces(projectRoot);
+
+    if (provenance != null) {
+      provenance.write(projectRoot);
+      stdout.writeln('Toolkit: ${provenance.describe()}');
+    }
   }
 
   /// Brings `.claude/settings.json` up to date, keeping whatever the project

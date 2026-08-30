@@ -2,6 +2,28 @@
 
 ## 0.9.0
 
+- **An installed harness records where it came from, and a channel is no longer switched by a default.**
+
+  `setup-ai` left no trace of its source: no version, no commit, no channel. So *"how far behind is
+  this project"* was answerable only by checking out the monorepo and comparing files, and a worse
+  case had no answer at all — **`--channel` defaults to `stable`**, so a project deliberately moved to
+  `master` was rolled back by the next plain `dartway setup-ai`, with a diff indistinguishable from an
+  ordinary update.
+
+  Installs now write `.claude/dartway-toolkit.json` — repository, channel, commit, CLI version, date —
+  and print the same line. When the recorded channel differs from the one about to be installed and
+  `--channel` was not given, the command refuses and names both, so moving between channels is a
+  decision written in the command that ran rather than one a default makes.
+
+  It records **provenance, not content**: a file list or hashes would be a second copy of the files,
+  and copies drift; where they came from is written nowhere else. A project installed before this
+  existed has no manifest and is left alone rather than blocked, and an install from a local checkout
+  records no channel — a working directory's branch says nothing about what a project should follow.
+
+  The issue also asked the command to refuse when the incoming commit is an *ancestor* of the
+  installed one. That is not implementable as asked: the monorepo cache is cloned `--depth 1` and has
+  no history to compare with. The channel guard covers the case that actually happens.
+
 - **`setup-ai` brings `.claude/settings.json` up to date instead of skipping it.**
 
   It used to be written only when the project had none, and never touched again. Its own doc comment
