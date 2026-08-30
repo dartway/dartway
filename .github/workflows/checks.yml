@@ -1,0 +1,50 @@
+name: Checks
+
+# Analyze every package and run every suite that needs no services.
+#
+# It exists because neither was run anywhere. Twenty-one suites, a thousand
+# tests, and the three workflows beside this one read a diff, forward a verdict
+# and build two web targets — so a change to one package could break a suite in
+# another and reach master green. That is not hypothetical: #165 made
+# `DwAuthConfig.normalizeIdentifier` required, updated the two application call
+# sites, and missed a third in a test that builds its own config. The author ran
+# what they touched; the suite that broke belonged to a package they had no
+# reason to open. It sat on master for a day.
+#
+# The automated review cannot close this gap either — it reads the diff, and
+# that call site was not in it, so it passed the pull request correctly.
+#
+# Both jobs run `tool/checks.sh`, which is also what you run locally. One set of
+# checks rather than two, so "I ran the tests" and "CI ran the tests" stop being
+# different claims.
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+  push:
+    branches: [master]
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Separate jobs so a red one says which half failed without reading a
+        # log, and so the faster of the two answers first.
+        mode: [analyze, test]
+    name: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+
+      - run: tool/checks.sh ${{ matrix.mode }}
