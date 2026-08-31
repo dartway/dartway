@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
+import 'dart:math' show Random;
 import 'dart:typed_data';
 
 import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
@@ -13,26 +15,58 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 
 class DwFileUploadHandler {
-  static String Function(XFile file) defaultUploadNameTemplate = (XFile file) =>
-      DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now());
+  static final Random _random = Random.secure();
 
-  // The PlatformFile counterpart: it carries an extension but no usable name
-  static String Function(PlatformFile file)
-  defaultPlatformUploadNameTemplate = (PlatformFile file) =>
-      '${DateFormat('yyyy-MM-dd hh:mm:ss').format(DateTime.now())}${file.extension != null ? '.${file.extension!.toLowerCase()}' : ''}';
+  /// A name no other upload can take, whatever the clock says.
+  ///
+  /// The timestamp is a prefix for humans reading the bucket; the random
+  /// segment is what makes the name unique, and it is the only thing that
+  /// does. Naming an object after a calendar second made two uploads in the
+  /// same second address one key — the second silently replaced the first —
+  /// and it made every key guessable from a neighbouring one, which a bucket
+  /// serving anonymous `GetObject` has nothing else to hide behind.
+  static String _uniqueObjectName() {
+    final stamp = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+    final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
+    final suffix = base64Url.encode(bytes).replaceAll('=', '');
+    return '$stamp $suffix';
+  }
+
+  /// Names the object an [XFile] is uploaded as, **without an extension**.
+  ///
+  /// The extension is appended by [uploadXFileToServer], which is the only
+  /// place that knows it: that method converts most images to JPEG, so the
+  /// picked file's own extension describes the source rather than the bytes
+  /// that reach the bucket — and the server reads the recorded mime type off
+  /// this name.
+  static String Function(XFile file) defaultUploadNameTemplate =
+      (XFile file) => _uniqueObjectName();
+
+  /// The [PlatformFile] counterpart, on the same terms: no extension here,
+  /// [uploadPlatformFileToServer] appends it. That path uploads the bytes it
+  /// was given, so there the source extension is the uploaded one.
+  static String Function(PlatformFile file) defaultPlatformUploadNameTemplate =
+      (PlatformFile file) => _uniqueObjectName();
 
   // -----------------------------
   //  EXISTING IMAGE UPLOAD LOGIC
   // -----------------------------
 
+  /// [path] is the folder the object is placed in, as in
+  /// [uploadXFileToServer]. Picking a file and deciding where it lands are
+  /// unrelated choices, and taking the first used to forfeit the second:
+  /// every picked image went to the bucket root.
   static Future<String?> pickAndUploadImageUrl({
     ImageSource imageSource = ImageSource.gallery,
+    String? path,
   }) async => pickAndUploadImage(
     imageSource: imageSource,
+    path: path,
   ).then((media) => media?.publicUrl);
 
   static Future<DwCloudFile?> pickAndUploadImage({
     ImageSource imageSource = ImageSource.gallery,
+    String? path,
   }) async {
     final file = await ImagePicker().pickImage(source: imageSource);
 
@@ -41,7 +75,7 @@ class DwFileUploadHandler {
       return null;
     }
 
-    return await uploadXFileToServer(xFile: file);
+    return await uploadXFileToServer(xFile: file, path: path);
   }
 
   static Future<String?> uploadXFileToServerUrl({
@@ -64,9 +98,13 @@ class DwFileUploadHandler {
 
     final bytesToUpload = jpegBytes ?? originalBytes;
 
-    final uploadPath = path == null
-        ? defaultUploadNameTemplate(xFile)
-        : '$path/${defaultUploadNameTemplate(xFile)}';
+    // The bytes decide the extension, not the picked file: a HEIC that was
+    // converted is uploaded as JPEG, and the server derives the recorded mime
+    // type from this name.
+    final uploadedExtension = jpegBytes != null ? '.jpg' : fileExtension;
+
+    final name = '${defaultUploadNameTemplate(xFile)}$uploadedExtension';
+    final uploadPath = path == null ? name : '$path/$name';
 
     return uploadBytesToServer(bytes: bytesToUpload, path: uploadPath);
   }
@@ -103,9 +141,15 @@ class DwFileUploadHandler {
 
     final bytesToUpload = bytes;
 
-    final uploadPath = path == null
-        ? defaultPlatformUploadNameTemplate(platformFile)
-        : '$path/${defaultPlatformUploadNameTemplate(platformFile)}';
+    // Nothing converts here, so the picked file's extension is the uploaded
+    // one.
+    final uploadedExtension = platformFile.extension != null
+        ? '.${platformFile.extension!.toLowerCase()}'
+        : '';
+
+    final name =
+        '${defaultPlatformUploadNameTemplate(platformFile)}$uploadedExtension';
+    final uploadPath = path == null ? name : '$path/$name';
 
     return uploadBytesToServer(bytes: bytesToUpload, path: uploadPath);
   }

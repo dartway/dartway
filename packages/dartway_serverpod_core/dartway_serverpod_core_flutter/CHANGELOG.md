@@ -2,6 +2,28 @@
 
 ## 0.12.0
 
+- **An upload is no longer named after a calendar second.** `DwFileUploadHandler` named every object
+  `yyyy-MM-dd hh:mm:ss` — a 12-hour clock with nothing marking AM from PM, so one in the afternoon
+  and one in the morning were the same key. Two uploads addressing one object needed no concurrency
+  at all, the later one replaced the earlier, and nothing on either side reported it. The key space
+  being a calendar second also meant that one public URL let anyone walk the neighbouring seconds:
+  withholding the bucket listing protects nothing when the keys enumerate themselves.
+
+  The name now carries 16 secure random bytes, and that is what makes it unique; the timestamp stays
+  as a readable prefix and moved to `HH`.
+
+  **Breaking: the two name templates no longer carry the file extension** — `uploadXFileToServer` and
+  `uploadPlatformFileToServer` append it, because only they know what was uploaded: the `XFile` path
+  converts most images to JPEG, so the picked file's extension described the source rather than the
+  bytes, and the server derives the recorded mime type from this name. An app that replaced
+  `defaultUploadNameTemplate` or `defaultPlatformUploadNameTemplate` with one that adds its own
+  extension will now get it twice.
+
+- **`pickAndUploadImage` and `pickAndUploadImageUrl` take `path`**, as `uploadXFileToServer` already
+  did. Picking a file and deciding where it lands are unrelated choices; taking the first forfeited
+  the second, so every picked image went to the bucket root and the workaround was to stop using the
+  convenient call.
+
 - **Breaking: the auth key is kept by a plugin, not by the core.** `DwAuthenticationKeyManager` asked
   `shared_preferences` directly through its own `SharedPreferenceStorage`, which was a second
   implementation of what `dartway_shared_preferences` already did — agreeing with it only because

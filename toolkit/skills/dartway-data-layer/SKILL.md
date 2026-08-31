@@ -718,6 +718,10 @@ From then on the link lives as an ordinary model field and travels the same CRUD
 
 Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size and mime), `uploadXFileToServer(xFile:)` — when the file is already obtained (camera, drag-n-drop).
 
+Every one of them takes an optional `path` — the folder inside the bucket (`avatars`, `chat/$roomId`). Omit it and the object sits at the root.
+
+**Do not name the object yourself.** The framework names it after 16 secure random bytes behind a readable timestamp, and that is a guarantee, not a style: the bucket serves anonymous `GetObject`, so a guessable name is a readable file, and two uploads that collide overwrite each other with no trace on either side. Group uploads with `path`; leave the name alone.
+
 **Wrap it in `dw.action`** — the upload is long, and `DwActionBuilder` will suppress a repeated tap by itself and hand back `busy` for the indicator.
 
 **What is needed on the server:** `cloudStorageConfig` in `DwCore.init` (in the project these are the `dwCloudStorage*` keys in `config/passwords.yaml`, and in development the `minio` service from `docker-compose.yaml`). If storage is not configured, the upload will honestly say so instead of failing silently.
