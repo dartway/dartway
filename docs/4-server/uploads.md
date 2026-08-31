@@ -19,6 +19,24 @@ forms exist when you need more: `pickAndUploadImage()` returns a `DwCloudFile` (
 `uploadXFileToServer(xFile:)` takes a file you already have — from a camera, a drop target, a share
 intent.
 
+Every one of them takes an optional `path` — the folder inside the bucket the object lands in, `avatars` or
+`chat/$roomId`. Omit it and the object sits at the bucket root.
+
+## The object name
+
+You do not name the object; the framework does, and the name is 16 secure random bytes behind a
+readable timestamp. **The randomness is not decoration.** The bucket serves anonymous `GetObject`,
+so a name anyone can guess from a neighbouring one is a file anyone can read — withholding the
+listing protects nothing when the keys enumerate themselves. A guessable name is also a name two
+uploads can collide on, and an overwrite in object storage leaves no trace on either side: the first
+file simply stops existing.
+
+`path` is therefore the knob to reach for when you want uploads grouped or scoped; the name itself is
+not. If you do replace `DwFileUploadHandler.defaultUploadNameTemplate`, keep a random segment in it,
+and leave the extension off — the upload call appends the extension of the bytes it actually sends,
+which is not always the extension of the file that was picked (most images are converted to JPEG on
+the way).
+
 Wrap it in `dw.action`: an upload is slow, and `DwActionBuilder` supplies the `busy` flag and blocks
 the second tap for free.
 
