@@ -96,7 +96,9 @@ analyze() {
   # Errors only. One warning stands today and it is in generated code
   # (`dw_updates_transport.dart`), which nobody reviews and the generator
   # rewrites — gating on it would make red mean "the generator again".
-  run "packages (workspace)" dart analyze --no-fatal-warnings packages
+  # `tool` is in here so the scripts this repository runs on itself are held
+  # to the same analyzer as the code they check.
+  run "packages + tool (workspace)" dart analyze --no-fatal-warnings packages tool
   for package in $(packages); do
     is_member "$package" && continue
     run "$package" bash -c "cd '$package' && dart analyze --no-fatal-warnings"

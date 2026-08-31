@@ -75,6 +75,18 @@ For each package in the first list, find the carets on it in the second and chec
 
 A mismatch is **a line in the report** of the form `<package> <version> → <file>:<line> ^<constraint>`, and it is fixed by raising the caret to the current version's minor. Packages that simply are not in `template/`/`example/` (`dartway_telegram`, the push transports) are not a finding.
 
+### The lockfiles say a version too
+
+The carets are not the only copy of a package's version outside its `pubspec.yaml`. Every committed `pubspec.lock` records one for each path-overridden local package, and that copy is written by whichever `pub get` ran last — nothing keeps it in step with a bump. It is checked in one command:
+
+```bash
+dart run tool/lock_check.dart
+```
+
+It names every lockfile whose recorded version disagrees with the package's own, and exits 1. The fix it prints is the fix: `flutter pub get` in each tree it named, then commit the lockfile.
+
+**Why it earns a step of its own rather than a mention.** A stale lock breaks nothing at runtime, so nothing ever fails because of it. What it does is dirty the working tree: the next `pub get` in any tree rewrites the file, and `git status` comes back modified in a tree where nobody touched it. `CLAUDE.md` makes a clean tree mean "another session is working here" — it is the first rule of Claude's git protocol — so this noise is read as the alarming thing, and it puts the forbidden `git add -A` back in reach. Two locks sat a minor behind for a whole release cycle exactly this way (#192).
+
 ## Step 5. Report and fix
 
 Give the drift as a list in the form `<API change> → <mirror> → <what exactly is stale or missing>`. If there is none, say so in one line.
