@@ -55,8 +55,7 @@ void main() async {
   }
 
   final findings = <String>[];
-  for (final constraint
-      in constraints..sort((a, b) => a.where.compareTo(b.where))) {
+  for (final constraint in constraints..sort(_Constraint.order)) {
     final latest = published[constraint.package]!;
     if (latest.missing) {
       findings.add(
@@ -122,7 +121,7 @@ Iterable<_Constraint> _carets(File pubspec) sync* {
 
     final min = _Version.tryParse(entry.group(2)!);
     if (min == null) continue;
-    yield _Constraint(entry.group(1)!, min, '${pubspec.path}:$line');
+    yield _Constraint(entry.group(1)!, min, pubspec.path, line);
   }
 }
 
@@ -156,10 +155,21 @@ Future<_Published> _latestOf(String package) async {
 }
 
 class _Constraint {
-  const _Constraint(this.package, this.min, this.where);
+  const _Constraint(this.package, this.min, this.file, this.line);
   final String package;
   final _Version min;
-  final String where;
+  final String file;
+  final int line;
+
+  String get where => '$file:$line';
+
+  /// File first, then the line **as a number**: sorting the rendered
+  /// `path:line` string puts line 10 above line 9, which reads as a bug in
+  /// something else the first time you scan the output.
+  static int order(_Constraint a, _Constraint b) {
+    final byFile = a.file.compareTo(b.file);
+    return byFile != 0 ? byFile : a.line.compareTo(b.line);
+  }
 }
 
 class _Published {
