@@ -75,6 +75,18 @@ For each package in the first list, find the carets on it in the second and chec
 
 A mismatch is **a line in the report** of the form `<package> <version> → <file>:<line> ^<constraint>`, and it is fixed by raising the caret to the current version's minor. Packages that simply are not in `template/`/`example/` (`dartway_telegram`, the push transports) are not a finding.
 
+### And pub.dev has the last word
+
+Both checks above read the tree. Neither can see the thing that actually breaks a stranger: the caret in `template/` is compared with the **local** `packages/*/pubspec.yaml`, and those two move in the same pull request. The check is therefore green in exactly the situation that hurts — local version 0.12.0, caret `^0.12.0`, pub.dev 0.11.0 — because `dependency_overrides` mean pub never reads the constraint here at all, and `dartway create` strips the block on the way out.
+
+```bash
+dart run tool/caret_check.dart
+```
+
+It asks pub.dev for each `dartway_*` the skeleton depends on and names every caret the published version does not satisfy, with the file and line. **Its exit code has three values, and the third matters:** `0` all satisfied, `1` findings listed, `2` pub.dev could not be asked. A lost connection reported as a finding would read as "the release is broken" and be believed, so it is kept separate.
+
+A finding here is not fixed by editing the caret — it is fixed by publishing, which is a release decision. Report it and say which packages lag.
+
 ### The lockfiles say a version too
 
 The carets are not the only copy of a package's version outside its `pubspec.yaml`. Every committed `pubspec.lock` records one for each path-overridden local package, and that copy is written by whichever `pub get` ran last — nothing keeps it in step with a bump. It is checked in one command:
