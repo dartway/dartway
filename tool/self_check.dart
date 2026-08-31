@@ -38,11 +38,7 @@ void main(List<String> arguments) async {
   final offline = arguments.contains('--offline');
 
   final reports = <CheckReport>[checkGitConfig(), checkLockfiles()];
-  if (offline) {
-    stdout.writeln('— carets against pub.dev: skipped (--offline)');
-  } else {
-    reports.add(await checkCarets());
-  }
+  if (!offline) reports.add(await checkCarets());
 
   for (final report in reports) {
     stdout.writeln('— ${report.title}');
@@ -51,6 +47,9 @@ void main(List<String> arguments) async {
     }
     stdout.writeln('  ${report.summary}');
   }
+  // Last, so the skipped check keeps the place it would have occupied. A note
+  // that jumps to the top reads as something that happened first.
+  if (offline) stdout.writeln('— carets against pub.dev: skipped (--offline)');
 
   final failed = reports.where((r) => r.outcome == CheckOutcome.findings);
   final unavailable = reports.where(
@@ -74,9 +73,9 @@ void main(List<String> arguments) async {
     exit(1);
   }
   stdout.writeln(
-    '? ${unavailable.length} check could not be carried out: '
-    '${unavailable.map((r) => r.title).join(', ')}. Nothing is known to be '
-    'wrong, and nothing is confirmed right either.',
+    '? ${unavailable.length} check${unavailable.length == 1 ? '' : 's'} could '
+    'not be carried out: ${unavailable.map((r) => r.title).join(', ')}. '
+    'Nothing is known to be wrong, and nothing is confirmed right either.',
   );
   exit(2);
 }
