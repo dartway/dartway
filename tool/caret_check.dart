@@ -23,9 +23,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'check_result.dart';
+
 const _host = 'pub.dev';
 
 void main() async {
+  final report = await checkCarets();
+  report.findings.forEach(stdout.writeln);
+  final sink = report.outcome == CheckOutcome.unavailable ? stderr : stdout;
+  sink.writeln(report.summary);
+  if (report.exitCode != 0) exit(report.exitCode);
+}
+
+Future<CheckReport> checkCarets() async {
+  const title = 'carets against $_host';
   final constraints = <_Constraint>[];
   for (final tree in ['template', 'example']) {
     final directory = Directory(tree);
@@ -37,11 +48,11 @@ void main() async {
   }
 
   if (constraints.isEmpty) {
-    stderr.writeln(
+    return const CheckReport.unavailable(
+      title,
       'No dartway_* carets found under template/ or example/. '
       'Run this from the repository root.',
     );
-    exit(2);
   }
 
   final published = <String, _Published>{};
@@ -49,8 +60,10 @@ void main() async {
     try {
       published[name] = await _latestOf(name);
     } on _Unreachable catch (failure) {
-      stderr.writeln('Could not ask $_host about $name: ${failure.reason}');
-      exit(2);
+      return CheckReport.unavailable(
+        title,
+        'Could not ask $_host about $name: ${failure.reason}',
+      );
     }
   }
 
@@ -82,20 +95,20 @@ void main() async {
   }
 
   if (findings.isEmpty) {
-    stdout.writeln(
+    return CheckReport.ok(
+      title,
       '✓ all ${constraints.length} dartway carets are satisfied by $_host',
     );
-    return;
   }
 
-  findings.forEach(stdout.writeln);
-  stdout.writeln(
-    '\n${findings.length} caret${findings.length == 1 ? '' : 's'} a stranger '
+  return CheckReport.findings(
+    title,
+    findings,
+    '${findings.length} caret${findings.length == 1 ? '' : 's'} a stranger '
     'cannot resolve. Fix: publish the packages, or lower the carets to what is '
     'published. Inside the monorepo nothing will fail either way — '
     'dependency_overrides hide this until `dartway create`.',
   );
-  exit(1);
 }
 
 /// Every `dartway_*: ^X.Y.Z` a pubspec states as a real dependency.
