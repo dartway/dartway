@@ -10,10 +10,21 @@
 //
 // Usage: dart run tool/lock_check.dart   (from the repository root)
 // Exits 1 and names every stale entry; exits 0 and says so when there are none.
+// `tool/self_check.dart` runs this together with its siblings.
 
 import 'dart:io';
 
+import 'check_result.dart';
+
 void main() {
+  final report = checkLockfiles();
+  report.findings.forEach(stdout.writeln);
+  stdout.writeln(report.summary);
+  if (report.exitCode != 0) exit(report.exitCode);
+}
+
+CheckReport checkLockfiles() {
+  const title = 'lockfiles';
   final root = Directory.current;
   final locks =
       root
@@ -50,16 +61,18 @@ void main() {
   }
 
   if (stale.isEmpty) {
-    stdout.writeln('✓ every lockfile agrees with the packages it locks');
-    return;
+    return const CheckReport.ok(
+      title,
+      '✓ every lockfile agrees with the packages it locks',
+    );
   }
 
-  stale.forEach(stdout.writeln);
-  stdout.writeln(
-    '\n${stale.length} stale entr${stale.length == 1 ? 'y' : 'ies'}. '
+  return CheckReport.findings(
+    title,
+    stale,
+    '${stale.length} stale entr${stale.length == 1 ? 'y' : 'ies'}. '
     'Fix: `flutter pub get` in each tree above and commit the lockfile.',
   );
-  exit(1);
 }
 
 /// The lockfile entries resolved through a local path, one record each.

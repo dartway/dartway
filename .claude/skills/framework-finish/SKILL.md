@@ -75,29 +75,26 @@ For each package in the first list, find the carets on it in the second and chec
 
 A mismatch is **a line in the report** of the form `<package> <version> → <file>:<line> ^<constraint>`, and it is fixed by raising the caret to the current version's minor. Packages that simply are not in `template/`/`example/` (`dartway_telegram`, the push transports) are not a finding.
 
-### And pub.dev has the last word
+### Step 4b. Ask the repository whether it is what it says it is
 
-Both checks above read the tree. Neither can see the thing that actually breaks a stranger: the caret in `template/` is compared with the **local** `packages/*/pubspec.yaml`, and those two move in the same pull request. The check is therefore green in exactly the situation that hurts — local version 0.12.0, caret `^0.12.0`, pub.dev 0.11.0 — because `dependency_overrides` mean pub never reads the constraint here at all, and `dartway create` strips the block on the way out.
+Three of the facts this repository states about itself are copies of something else, and a copy goes stale in silence:
 
-```bash
-dart run tool/caret_check.dart
-```
+- **the lockfiles** record a version for each path-overridden local package, written by whichever `pub get` ran last — stale ones dirty every working tree on the next resolve, and a tree that dirties itself makes "dirty means another session is here" meaningless (#192, #172);
+- **the carets** in `template/`/`example/` are compared, everywhere else, against the **local** `packages/*/pubspec.yaml` — and those two move in the same pull request, so that comparison is green exactly when the skeleton has become uninstallable for a stranger (#143);
+- **the git settings** `CLAUDE.md` names live in `.git/config`, per clone and per machine, and nothing sets them or notices they are missing (#170).
 
-It asks pub.dev for each `dartway_*` the skeleton depends on and names every caret the published version does not satisfy, with the file and line. **Its exit code has three values, and the third matters:** `0` all satisfied, `1` findings listed, `2` pub.dev could not be asked. A lost connection reported as a finding would read as "the release is broken" and be believed, so it is kept separate.
-
-A finding here is not fixed by editing the caret — it is fixed by publishing, which is a release decision. Report it and say which packages lag.
-
-### The lockfiles say a version too
-
-The carets are not the only copy of a package's version outside its `pubspec.yaml`. Every committed `pubspec.lock` records one for each path-overridden local package, and that copy is written by whichever `pub get` ran last — nothing keeps it in step with a bump. It is checked in one command:
+One command asks all three:
 
 ```bash
-dart run tool/lock_check.dart
+dart run tool/self_check.dart            # everything
+dart run tool/self_check.dart --offline  # skip the check that needs pub.dev
 ```
 
-It names every lockfile whose recorded version disagrees with the package's own, and exits 1. The fix it prints is the fix: `flutter pub get` in each tree it named, then commit the lockfile.
+**Its exit code has three values, and the third is the point:** `0` clean, `1` something is not what we say it is, `2` a check could not be carried out — pub.dev unreachable, most likely. A check that could not run is not a check that failed; reporting the two the same way is how people learn to skim a gate.
 
-**Why it earns a step of its own rather than a mention.** A stale lock breaks nothing at runtime, so nothing ever fails because of it. What it does is dirty the working tree: the next `pub get` in any tree rewrites the file, and `git status` comes back modified in a tree where nobody touched it. `CLAUDE.md` makes a clean tree mean "another session is working here" — it is the first rule of Claude's git protocol — so this noise is read as the alarming thing, and it puts the forbidden `git add -A` back in reach. Two locks sat a minor behind for a whole release cycle exactly this way (#192).
+**What a finding means differs by check, so read the summary rather than the count.** A stale lockfile is fixed by `flutter pub get` and a commit. A missing git setting is fixed by the `git config` line it prints, and it is yours alone — setting it here sets it for nobody else. **A caret finding is not fixed by editing the caret:** it means the packages are not published yet, which is a release decision. Report it and name the packages that lag.
+
+This is deliberately not in `tool/checks.sh`, and therefore not in CI: two of the three would be red on every runner by construction — a fresh clone has none of the git settings, and the carets are unsatisfied for as long as a release is pending. A gate that is red by design is a gate people stop reading.
 
 ## Step 5. Report and fix
 

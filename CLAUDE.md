@@ -132,7 +132,17 @@ These are not suggestions: each item closes off a way for one session to destroy
 
 **Protection.** `master` and `stable` are covered by the `protect-trunk` ruleset: force-pushes and deletion are forbidden, with no bypass. A fast-forward push (promotion included) goes through normally. Needing to rewrite the trunk's history is a reason to stop and discuss, not to switch the rule off.
 
-**Hygiene.** A branch is deleted automatically when its PR merges (`deleteBranchOnMerge`). Locally: `fetch.prune=true` (dead remote references stop piling up), `pull.rebase=true`, `rerere.enabled=true`. In this repository `user.email` is set locally to the work address, because the repository is public.
+**Hygiene.** A branch is deleted automatically when its PR merges (`deleteBranchOnMerge`). In this repository `user.email` is set locally to the work address, because the repository is public.
+
+Three local settings are expected, and **they do not travel with the code** — they live in `.git/config`, per clone and per machine. Run them once after cloning:
+
+```bash
+git config fetch.prune true      # dead remote references stop piling up
+git config pull.rebase true      # no merge commits from a pull
+git config rerere.enabled true   # a conflict resolved once is remembered
+```
+
+This used to be written here as a statement of fact about a clone, and it was not one: a real clone worked in daily for months had one of the three. Without `fetch.prune`, remote-tracking refs outlive the branches they track and read as unfinished work — three of them were investigated one at a time before it turned out all three had been merged. `dart run tool/self_check.dart` is what notices now.
 
 ### CI
 
