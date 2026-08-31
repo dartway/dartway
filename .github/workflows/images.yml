@@ -1,0 +1,115 @@
+name: Images
+
+# Build the two Docker images a new project ships with — from what
+# `dartway create` actually produces, not from `template/` as it sits here.
+#
+# The distinction is the whole point. `template/` in this repository carries
+# `dependency_overrides` pointing at `../../packages/...`, outside any build
+# context a Dockerfile can have; `dartway create` strips that block on the way
+# out, and the carets underneath it are read for the first time in a stranger's
+# tree. So `docker build` on `template/` fails inside `dart pub get` for a
+# reason that has nothing to do with images, and proves nothing about the
+# artefact anyone receives.
+#
+# Why a build at all, when `dartway deploy check` already compares the three
+# copies of the package list: a static comparison is not a build. #177 was a
+# skeleton whose *both* images failed at their first `COPY`, because
+# `.dockerignore` never admitted a package both Dockerfiles copy — every project
+# `dartway create` produced could not be deployed, and nothing noticed.
+# `web-compile.yml` compiles the Flutter web target from source, not from the
+# image. The images were built only by `dartway deploy`, on a server, by a
+# person. A comparison of `COPY` lines says nothing about a base image that
+# moved, a `RUN` that fails, or a `dart compile exe` that stopped working.
+#
+# Nothing here is a required check — `protect-trunk` requires none — so a red
+# run reports and does not block. That is deliberate for now: this job has never
+# run, and a gate is worth making blocking after it has been watched, not
+# before.
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    paths:
+      # What the produced project is made of, and what produces it. `toolkit/`
+      # is deliberately absent: it is installed into the project's `.claude/`
+      # and never reaches an image, and it changes often enough that including
+      # it would run this on diffs that cannot affect the result. The nightly
+      # run below covers it within a day.
+      - 'template/**'
+      - 'packages/dartway_cli/**'
+      - '.github/workflows/images.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'template/**'
+      - 'packages/dartway_cli/**'
+      - '.github/workflows/images.yml'
+  # The build resolves from pub.dev, so it can go red without this repository
+  # changing at all — a published version lagging the carets the skeleton states
+  # is exactly what breaks `dartway create` for a stranger (#143). A daily run
+  # is what turns that from something a person discovers during a promotion into
+  # something we are told about.
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: images-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # Separate jobs so a red one names which image failed without reading a
+        # log — and so each gets a runner's full disk to itself. The Flutter
+        # base image is several gigabytes against roughly fourteen free, which
+        # makes disk the likeliest way this falls over.
+        include:
+          - image: server
+            package: imagecheck_server
+          - image: web
+            package: imagecheck_flutter
+    name: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+
+      - name: Install the CLI from this commit
+        run: dart pub global activate --source path packages/dartway_cli
+
+      - name: Create a project the way a stranger does
+        # `--local-repo` points the skeleton at this commit rather than at the
+        # `stable` branch the CLI clones by default: the whole question is
+        # whether *this* tree still produces a project that builds.
+        run: |
+          mkdir -p "$RUNNER_TEMP/create"
+          cd "$RUNNER_TEMP/create"
+          dartway create imagecheck --local-repo "$GITHUB_WORKSPACE" --no-git
+
+      - name: Disk before the build
+        run: df -h /
+
+      - name: Build the ${{ matrix.image }} image
+        # Both Dockerfiles build from the project root — the web one needs two
+        # packages, and a context can only be one directory. DW_BACKEND_URL is
+        # compiled into the web build and the Dockerfile refuses an empty one;
+        # what it points at is irrelevant to whether the image builds.
+        run: |
+          cd "$RUNNER_TEMP/create/imagecheck"
+          docker build \
+            --file "${{ matrix.package }}/Dockerfile" \
+            --build-arg DW_BACKEND_URL=https://images.invalid \
+            --tag "dartway-imagecheck-${{ matrix.image }}" \
+            .
+
+      - name: Disk after the build
+        if: always()
+        run: df -h /
