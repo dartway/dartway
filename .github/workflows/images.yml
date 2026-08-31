@@ -64,10 +64,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Separate jobs so a red one names which image failed without reading a
-        # log — and so each gets a runner's full disk to itself. The Flutter
-        # base image is several gigabytes against roughly fourteen free, which
-        # makes disk the likeliest way this falls over.
+        # Separate jobs so a red one names which image failed without reading
+        # a log. Disk was the other reason expected for the split and turned
+        # out not to be one: the first run measured 84 GB free of 145 GB on the
+        # runner, and the web build — the heavier of the two, Flutter base
+        # image included — moved it by under a gigabyte. The `df` steps below
+        # stay because that number belongs to the runner image, not to us, and
+        # a guess about it is what put this comment here in the first place.
         include:
           - image: server
             package: imagecheck_server
@@ -94,6 +97,7 @@ jobs:
           cd "$RUNNER_TEMP/create"
           dartway create imagecheck --local-repo "$GITHUB_WORKSPACE" --no-git
 
+      # Kept as instrumentation, not ceremony: see the note on the matrix.
       - name: Disk before the build
         run: df -h /
 
