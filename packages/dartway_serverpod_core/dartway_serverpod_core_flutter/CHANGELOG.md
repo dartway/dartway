@@ -12,7 +12,7 @@
   The name now carries 16 secure random bytes, and that is what makes it unique; the timestamp stays
   as a readable prefix and moved to `HH`.
 
-  **The two name templates no longer carry the file extension** — `uploadXFileToServer` and
+  **Breaking: the two name templates no longer carry the file extension** — `uploadXFileToServer` and
   `uploadPlatformFileToServer` append it, because only they know what was uploaded: the `XFile` path
   converts most images to JPEG, so the picked file's extension described the source rather than the
   bytes, and the server derives the recorded mime type from this name. An app that replaced
