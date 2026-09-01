@@ -161,7 +161,7 @@ void main() {
     },
     runMode: 'test',
     applyMigrations: true,
-    // The default: everything written here is rolled back with the test.,
+    // The default: everything written here is rolled back with the test.
     testServerOutputMode: testServerOutputMode,
   );
 }

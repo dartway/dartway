@@ -157,7 +157,7 @@ void main() {
     runMode: 'test',
     applyMigrations: true,
     // Left at the default on purpose — see the note above. Everything these
-    // tests write is rolled back with it, so they need no cleanup of their own.,
+    // tests write is rolled back with it, so they need no cleanup of their own.
     testServerOutputMode: testServerOutputMode,
   );
 }
