@@ -3,6 +3,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 const _identifier = '+70000000042';
@@ -24,6 +25,10 @@ late Future<void> Function(String verificationCode) _sendVerificationCode;
 /// not: the send hung in `afterSaveSideEffects`, which nobody awaits, so the
 /// screen said "code sent" for a code nobody sent.
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'Given a verification code sender',
     (sessionBuilder, endpoints) {
@@ -128,6 +133,7 @@ void main() {
     applyMigrations: true,
     // The auth flow commits its own transactions; cleanup is explicit.
     rollbackDatabase: RollbackDatabase.disabled,
+    testServerOutputMode: testServerOutputMode,
   );
 }
 

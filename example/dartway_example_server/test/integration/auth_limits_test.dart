@@ -4,6 +4,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 /// Limits configured on `DwAuthConfig` — mirrored here so the assertions read
@@ -16,6 +17,10 @@ const _knownCode = '123456';
 const _wrongCode = '000000';
 
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'Given the DartWay auth flow',
     (sessionBuilder, endpoints) {
@@ -199,6 +204,7 @@ void main() {
     // Concurrency cannot be observed inside a single rolled-back transaction:
     // these tests need real, separately committed ones. Cleanup is explicit.
     rollbackDatabase: RollbackDatabase.disabled,
+    testServerOutputMode: testServerOutputMode,
   );
 }
 

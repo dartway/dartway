@@ -3,6 +3,7 @@ import 'package:dartway_example_server/src/generated/protocol.dart';
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 /// `dw.db(session)` is what an application reaches for when the model is a type
@@ -13,6 +14,10 @@ import 'test_tools/serverpod_test_tools.dart';
 /// So the test is written the way such code is written: through a helper that
 /// knows nothing about the model it is handed.
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'Given generic database access through dw.db',
     (sessionBuilder, endpoints) {
@@ -157,6 +162,7 @@ void main() {
     runMode: 'test',
     applyMigrations: true,
     // The default: everything written here is rolled back with the test.
+    testServerOutputMode: testServerOutputMode,
   );
 }
 
