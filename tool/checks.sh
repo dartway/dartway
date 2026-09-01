@@ -8,7 +8,7 @@
 # another — the author ran what they touched, which was green, and the suite
 # that failed belonged to a package they had no reason to open.
 #
-# Nothing here needs Docker. The three suites that need a database are named
+# Nothing here needs Docker. The two suites that need a database are named
 # below and skipped; they are a second tier, not this one.
 #
 # Usage:  tool/checks.sh [analyze|test]      (default: both)
