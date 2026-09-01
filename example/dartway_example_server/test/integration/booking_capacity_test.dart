@@ -4,6 +4,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 /// The spot capacity of the session under test.
@@ -13,6 +14,10 @@ const _capacity = 5;
 const _contenders = 20;
 
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'Given a club session with limited capacity',
     (sessionBuilder, endpoints) {
@@ -129,6 +134,7 @@ void main() {
     // A race cannot be observed inside a single rolled-back transaction: these
     // need real, separately committed ones. Cleanup is explicit.
     rollbackDatabase: RollbackDatabase.disabled,
+    testServerOutputMode: testServerOutputMode,
   );
 }
 

@@ -5,11 +5,16 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 const _testKeyPrefix = 'dw_save_config_lock_test_';
 
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'DwSaveConfig transactional update validation',
     (sessionBuilder, endpoints) {
@@ -403,6 +408,7 @@ void main() {
       );
     },
     rollbackDatabase: RollbackDatabase.disabled,
+    testServerOutputMode: testServerOutputMode,
   );
 }
 

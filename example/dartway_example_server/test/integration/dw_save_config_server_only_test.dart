@@ -3,6 +3,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 const _testIdentifierPrefix = 'dw_server_only_test_';
@@ -21,6 +22,10 @@ const _testIdentifierPrefix = 'dw_server_only_test_';
 /// abstract: it is the fixed sign-in code for reviewer and demo accounts.
 /// Leaking it hands over a login; blanking it locks those accounts out.
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'DwSaveConfig and scope=serverOnly',
     (sessionBuilder, endpoints) {
@@ -297,6 +302,7 @@ void main() {
       });
     },
     rollbackDatabase: RollbackDatabase.disabled,
+    testServerOutputMode: testServerOutputMode,
   );
 }
 

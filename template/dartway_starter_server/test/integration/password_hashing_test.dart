@@ -7,6 +7,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 const _identifier = '+70000000002';
@@ -31,6 +32,10 @@ class _LegacySha256Verifier extends DwPasswordVerifier {
 }
 
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'Given a user whose password was hashed by the old backend',
     (sessionBuilder, endpoints) {
@@ -154,6 +159,7 @@ void main() {
     // The upgrade is a real write during a real sign-in: it cannot be observed
     // inside a transaction that is rolled back afterwards.
     rollbackDatabase: RollbackDatabase.disabled,
+    testServerOutputMode: testServerOutputMode,
   );
 }
 

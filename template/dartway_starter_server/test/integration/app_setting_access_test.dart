@@ -4,6 +4,7 @@ import 'package:dartway_starter_server/src/generated/protocol.dart';
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 /// The starting point for testing a **rule** in this project.
@@ -20,85 +21,90 @@ import 'test_tools/serverpod_test_tools.dart';
 const _testKey = 'appSettingAccessTest.appName';
 
 void main() {
-  withServerpod('Given the app settings CRUD config', (
-    sessionBuilder,
-    endpoints,
-  ) {
-    late Session adminSession;
-    late Session memberSession;
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
 
-    setUp(() async {
-      // `withServerpod` builds its own Serverpod and never calls `run`, so
-      // DartWay has to be booted here — the config's `session.isAdmin` resolves
-      // the profile through the core.
-      initDartwayCore(
-        passwords: const {
-          'dwVerificationCodeSalt': 'test-verification-code-salt',
-          'dwAuthKeySalt': 'test-auth-key-salt',
-        },
-      );
+  withServerpod(
+    'Given the app settings CRUD config',
+    (sessionBuilder, endpoints) {
+      late Session adminSession;
+      late Session memberSession;
 
-      final setupSession = sessionBuilder.build();
-      await _wipeTables(setupSession);
+      setUp(() async {
+        // `withServerpod` builds its own Serverpod and never calls `run`, so
+        // DartWay has to be booted here — the config's `session.isAdmin` resolves
+        // the profile through the core.
+        initDartwayCore(
+          passwords: const {
+            'dwVerificationCodeSalt': 'test-verification-code-salt',
+            'dwAuthKeySalt': 'test-auth-key-salt',
+          },
+        );
 
-      final admin = await _seedProfile(
-        setupSession,
-        identifier: '+70000000010',
-        role: UserRole.admin,
-      );
-      final member = await _seedProfile(
-        setupSession,
-        identifier: '+70000000011',
-        role: UserRole.user,
-      );
+        final setupSession = sessionBuilder.build();
+        await _wipeTables(setupSession);
 
-      adminSession = _signedInAs(sessionBuilder, admin);
-      memberSession = _signedInAs(sessionBuilder, member);
-    });
+        final admin = await _seedProfile(
+          setupSession,
+          identifier: '+70000000010',
+          role: UserRole.admin,
+        );
+        final member = await _seedProfile(
+          setupSession,
+          identifier: '+70000000011',
+          role: UserRole.user,
+        );
 
-    tearDown(() async => _wipeTables(sessionBuilder.build()));
+        adminSession = _signedInAs(sessionBuilder, admin);
+        memberSession = _signedInAs(sessionBuilder, member);
+      });
 
-    test('the admin writes a setting, and the row lands', () async {
-      final response = await appSettingCrudConfig.saveConfig!.save(
-        adminSession,
-        AppSetting(settingKey: _testKey, settingValue: 'Acme'),
-      );
+      tearDown(() async => _wipeTables(sessionBuilder.build()));
 
-      expect(response.isOk, isTrue);
-      final stored = await AppSetting.db.find(
-        adminSession,
-        where: (row) => row.settingKey.equals(_testKey),
-      );
-      expect(stored.single.settingValue, 'Acme');
-    });
+      test('the admin writes a setting, and the row lands', () async {
+        final response = await appSettingCrudConfig.saveConfig!.save(
+          adminSession,
+          AppSetting(settingKey: _testKey, settingValue: 'Acme'),
+        );
 
-    test('a signed-in member is refused, and nothing is written', () async {
-      final response = await appSettingCrudConfig.saveConfig!.save(
-        memberSession,
-        AppSetting(settingKey: _testKey, settingValue: 'Not allowed'),
-      );
-
-      expect(response.isOk, isFalse);
-      expect(
-        await AppSetting.db.find(
-          memberSession,
+        expect(response.isOk, isTrue);
+        final stored = await AppSetting.db.find(
+          adminSession,
           where: (row) => row.settingKey.equals(_testKey),
-        ),
-        isEmpty,
-        reason: 'a refused save must not reach the table',
-      );
-    });
+        );
+        expect(stored.single.settingValue, 'Acme');
+      });
 
-    test('an empty key is rejected even for the admin', () async {
-      final response = await appSettingCrudConfig.saveConfig!.save(
-        adminSession,
-        AppSetting(settingKey: '   ', settingValue: 'Acme'),
-      );
+      test('a signed-in member is refused, and nothing is written', () async {
+        final response = await appSettingCrudConfig.saveConfig!.save(
+          memberSession,
+          AppSetting(settingKey: _testKey, settingValue: 'Not allowed'),
+        );
 
-      expect(response.isOk, isFalse);
-      expect(response.error, isNotNull);
-    });
-  });
+        expect(response.isOk, isFalse);
+        expect(
+          await AppSetting.db.find(
+            memberSession,
+            where: (row) => row.settingKey.equals(_testKey),
+          ),
+          isEmpty,
+          reason: 'a refused save must not reach the table',
+        );
+      });
+
+      test('an empty key is rejected even for the admin', () async {
+        final response = await appSettingCrudConfig.saveConfig!.save(
+          adminSession,
+          AppSetting(settingKey: '   ', settingValue: 'Acme'),
+        );
+
+        expect(response.isOk, isFalse);
+        expect(response.error, isNotNull);
+      });
+    },
+    testServerOutputMode: testServerOutputMode,
+  );
 }
 
 Session _signedInAs(TestSessionBuilder sessionBuilder, UserProfile profile) =>

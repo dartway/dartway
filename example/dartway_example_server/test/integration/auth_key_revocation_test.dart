@@ -4,6 +4,7 @@ import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart
 import 'package:serverpod/serverpod.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 /// An auth key has no expiry and nothing deletes it on its own, so ending a
@@ -11,6 +12,10 @@ import 'test_tools/serverpod_test_tools.dart';
 /// cover both ways it happens: [DwAuth.revokeAuthKeys] when the app knows the
 /// account is over, and [DwOrphanedAuthKeyCleanup] when nobody said so.
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod('Given auth keys in the database', (sessionBuilder, endpoints) {
     late Session session;
     late int userProfileId;
@@ -135,7 +140,7 @@ void main() {
         expect(await _keyCountFor(session, userProfileId), 1);
       });
     });
-  });
+  }, testServerOutputMode: testServerOutputMode);
 }
 
 Future<int> _createProfile(Session session, String identifier) async {

@@ -3,6 +3,7 @@ import 'package:dartway_example_server/src/generated/protocol.dart';
 import 'package:dartway_serverpod_core_server/dartway_serverpod_core_server.dart';
 import 'package:test/test.dart';
 
+import '../support/test_database.dart';
 import 'test_tools/serverpod_test_tools.dart';
 
 /// A CRUD config whose save hooks read the caller's profile is the ordinary
@@ -24,6 +25,10 @@ import 'test_tools/serverpod_test_tools.dart';
 /// at all. Note the contrast with the neighbouring files, which switch rollback
 /// off because they observe races that must genuinely commit.
 void main() {
+  // Before anything registers: a missing database is knowable here, and
+  // `withServerpod` silences the output that would have said so.
+  requireTestDatabase();
+
   withServerpod(
     'Given save hooks that read the caller profile inside the transaction',
     (sessionBuilder, endpoints) {
@@ -152,7 +157,8 @@ void main() {
     runMode: 'test',
     applyMigrations: true,
     // Left at the default on purpose — see the note above. Everything these
-    // tests write is rolled back with it, so they need no cleanup of their own.
+    // tests write is rolled back with it, so they need no cleanup of their own.,
+    testServerOutputMode: testServerOutputMode,
   );
 }
 
