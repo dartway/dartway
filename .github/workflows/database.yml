@@ -1,0 +1,75 @@
+name: Database
+
+# Tier two of the checks: the suites that only hold against a real database.
+#
+# `checks.yml` runs everything that needs no services and skips these two by
+# name. What they assert is what the framework is trusted for and what nothing
+# else can prove: the auth attempt limit holding under a lock, two parallel
+# redemptions signing in exactly once, a legacy password hash rewritten during a
+# login. Until this workflow they were proved by nobody but a person running
+# them by hand.
+#
+# `dartway test` is the whole job: it starts a Postgres for the run on a port
+# Docker picks, applies the migrations, runs the suite and removes the container
+# afterwards. Nothing is shared between runs, so nothing is left to collide.
+#
+# **Not on pull requests yet, on purpose.** Every measurement of these suites so
+# far was taken on one developer's machine — 15 tests in about 4 seconds for the
+# template, 50 in 12 for example, container start included. That is fast, but
+# speed was never the worry: these are the only suites in the repository that
+# test *races* — two activations of one code at once, parallel requests against
+# a rate limit — and a race is what goes intermittently red on a smaller,
+# busier runner. A flaky red teaches people to stop reading the gate, which is
+# the state this whole tier was meant to end, so it runs on a schedule until
+# there is a week of runs to look at, and only then blocks anything.
+
+on:
+  schedule:
+    - cron: '7 5 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: database-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # One job per project, so a red one names which without opening a log.
+        # They share nothing — each `dartway test` gets a container of its own.
+        include:
+          - project: example
+            directory: example
+            server: dartway_example_server
+          - project: template
+            directory: template
+            server: dartway_starter_server
+    name: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+
+      - name: Install the CLI from this commit
+        run: dart pub global activate --source path packages/dartway_cli
+
+      - name: Resolve the project
+        # `dartway test` runs `dart test` in the server package; the workspace
+        # has to be resolved first, and these two trees are separate resolution
+        # roots rather than workspace members.
+        run: |
+          flutter pub get
+          cd "${{ matrix.directory }}/${{ matrix.server }}"
+          dart pub get
+
+      - name: Run the database suite
+        # From the project root: the command finds the `*_server` sibling and
+        # reads its `config/test.yaml` for the shape of the connection.
+        run: cd "${{ matrix.directory }}" && dartway test
