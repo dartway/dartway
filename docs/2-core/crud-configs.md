@@ -132,6 +132,7 @@ The order, exactly as `DwSaveConfig.save` runs it:
 
 | # | Hook | Returns | Where |
 |---|---|---|---|
+| 0 | `resolveExistingRowForInsert` | `Future<T?>` | before the transaction, on inserts only |
 | 1 | `allowSave` | `Future<bool>` — **required** | before the transaction |
 | 2 | `validateSave` | `Future<String?>` | before the transaction |
 | 3 | `beforeSaveTransaction` | `Future<String?>` | **inside** the transaction |
@@ -139,6 +140,8 @@ The order, exactly as `DwSaveConfig.save` runs it:
 | 5 | `afterSaveTransaction` | `Future<String?>` | inside the transaction |
 | 6 | `afterSaveTransform` | `Future<String?>` | after commit |
 | 7 | `afterSaveSideEffects` | `Future<void>` | after commit, not awaited |
+
+Step 0 is the odd one out and is described below; the rest run on every save.
 
 All seven share one signature — `(Session session, DwSaveContext<T> saveContext)`. There is no
 `(initial, updated)` pair anywhere; both models live in the context, along with `currentUserId`,
@@ -217,6 +220,37 @@ last spot count the same four and both get in.
 transaction and `allowSave` / `validateSave` are evaluated against what was actually committed. It
 is opt-in so the default lifecycle is unchanged, and it does nothing on insert — there is no row to
 lock yet.
+
+**When the model has a natural key** — one person's answer to one question, one membership of one
+user in one chat — the client thinks in that key, not in the id, and sooner or later it sends a
+*create* for a row that already exists: its list lagged, the person answered from a second device,
+the first response never arrived. Left alone, that write reaches the unique index and comes back a
+database error — an alert for you, and for the caller a failure it can do nothing about, since what
+it sent is exactly what it wants stored.
+
+`resolveExistingRowForInsert` is step 0 for exactly this: on an insert it looks the row up by that
+key and returns the model to write instead — the incoming values carrying the stored id.
+
+```dart
+resolveExistingRowForInsert: (session, answer) async {
+  final stored = await UserQuizAnswer.db.findFirstRow(
+    session,
+    where: (t) =>
+        t.userProfileId.equals(answer.userProfileId) &
+        t.questionId.equals(answer.questionId),
+  );
+  return stored == null ? null : answer.copyWith(id: stored.id);
+},
+```
+
+From there the save is an ordinary update: `isInsert` is `false`, `initialModel` is the stored row,
+and every hook after step 0 sees the save that is actually happening. Returning `null` leaves the
+insert an insert.
+
+It runs before the transaction, so it does not settle a race between two simultaneous creates — both
+can find nothing and both insert, and the unique index answers the second one. Guard that in
+`beforeSaveTransaction` if it matters; step 0 is about the client that is simply behind, which is
+the case that actually happens.
 
 **A `scope=serverOnly` column is not overwritten by a client save, and there is nothing to switch on
 for that.** Such a field does not exist on the client class, so it is never in the JSON a client

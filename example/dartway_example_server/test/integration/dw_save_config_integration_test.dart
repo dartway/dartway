@@ -406,6 +406,83 @@ void main() {
           await Future<void>.delayed(const Duration(milliseconds: 50));
         },
       );
+
+      // `settingKey` is unique, so a create for a key that is already taken is
+      // the natural-key case: without the hook that write reaches the index and
+      // comes back a database error the caller can do nothing about.
+      test(
+        'a create onto a taken natural key updates that row instead',
+        () async {
+          final session = sessionBuilder.build();
+          final stored = await AppSetting.db.insertRow(
+            session,
+            AppSetting(
+              settingKey: '${_testKeyPrefix}natural_key',
+              settingValue: 'initial',
+            ),
+          );
+
+          DwSaveContext<AppSetting>? allowContext;
+
+          final response =
+              await DwSaveConfig<AppSetting>(
+                resolveExistingRowForInsert: _resolveSettingByKey,
+                allowSave: (session, context) async {
+                  allowContext = context;
+                  return true;
+                },
+              ).save(
+                session,
+                AppSetting(
+                  settingKey: '${_testKeyPrefix}natural_key',
+                  settingValue: 'from a client that had not seen the row',
+                ),
+              );
+
+          expect(response.isOk, isTrue);
+
+          // The hooks are told what is actually happening: an update, with the
+          // stored row as the initial model.
+          expect(allowContext?.isInsert, isFalse);
+          expect(allowContext?.initialModel?.id, stored.id);
+          expect(allowContext?.initialModel?.settingValue, 'initial');
+
+          final rows = await AppSetting.db.find(
+            session,
+            where: (t) => t.settingKey.equals('${_testKeyPrefix}natural_key'),
+          );
+          expect(rows, hasLength(1));
+          expect(rows.single.id, stored.id);
+          expect(
+            rows.single.settingValue,
+            'from a client that had not seen the row',
+          );
+        },
+      );
+
+      test('a create onto a free natural key stays an insert', () async {
+        final session = sessionBuilder.build();
+        DwSaveContext<AppSetting>? allowContext;
+
+        final response =
+            await DwSaveConfig<AppSetting>(
+              resolveExistingRowForInsert: _resolveSettingByKey,
+              allowSave: (session, context) async {
+                allowContext = context;
+                return true;
+              },
+            ).save(
+              session,
+              AppSetting(
+                settingKey: '${_testKeyPrefix}natural_key_free',
+                settingValue: 'inserted',
+              ),
+            );
+
+        expect(response.isOk, isTrue);
+        expect(allowContext?.isInsert, isTrue);
+        expect(allowContext?.initialModel, isNull);
+      });
     },
     rollbackDatabase: RollbackDatabase.disabled,
     testServerOutputMode: testServerOutputMode,
@@ -443,6 +520,20 @@ Future<_HeldRowLock> _holdUpdatedSettingRow(
   });
   await held.future;
   return _HeldRowLock(release, completion);
+}
+
+/// The natural key of [AppSetting]: one row per `settingKey`, held by a unique
+/// index. Returns the incoming values carrying the stored row's id, which is
+/// what turns the insert into an update of that row.
+Future<AppSetting?> _resolveSettingByKey(
+  Session session,
+  AppSetting model,
+) async {
+  final existing = await AppSetting.db.findFirstRow(
+    session,
+    where: (table) => table.settingKey.equals(model.settingKey),
+  );
+  return existing == null ? null : model.copyWith(id: existing.id);
 }
 
 Future<void> _waitForLockedSettingReader(Session session) async {
