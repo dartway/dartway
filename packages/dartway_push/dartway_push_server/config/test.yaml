@@ -46,11 +46,14 @@ database:
   name: dartway_push_test
   user: postgres
 
-# This is the setup for your Redis test instance.
+# Redis is off, and nothing in this module refers to it — not `lib/`, not
+# `test/`. The port is 0 for the same reason the database's is: the service it
+# used to name was deleted with the compose file, so a number here would point
+# at nothing.
 redis:
   enabled: false
   host: localhost
-  port: 9091
+  port: 0
   #user: # defaults to empty
   #requireSsl: true # defaults to false
 
