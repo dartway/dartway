@@ -36,7 +36,7 @@ esac
 # picked up and run, which is the direction that fails loudly rather than
 # quietly leaving a package uncovered.
 #
-# The three database ones are a second tier, not this one: `dartway test` makes
+# The two database ones are a second tier, not this one: `dartway test` makes
 # them runnable, but wiring them in brings Docker, an image pull and integration
 # suites whose timing is the fragile part. The lints fixture is not a `dart test`
 # suite at all — the files under its `test/` are written to violate the rules and
@@ -48,7 +48,6 @@ esac
 SKIP="\
 example/dartway_example_server|needs a database
 template/dartway_starter_server|needs a database
-packages/dartway_push/dartway_push_server|needs a database and Redis (issue #174)
 packages/dartway_lints/example|verified by custom_lint, not by dart test"
 
 # The reason this package is skipped, or nothing if it is not.

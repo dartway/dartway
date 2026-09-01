@@ -29,9 +29,20 @@ webServer:
   publicScheme: http
 
 # This is the database setup for your test server.
+# No test database is served for this module, and there is no compose file here
+# to serve one. The module has no integration suite — every test under `test/`
+# is a unit test and needs nothing running — so a declared Postgres would be a
+# container nobody starts, on a port shared with whatever else is on the
+# machine. The reasoning is the template's, written out in its
+# `docker-compose.yaml`: a test database declared as a service is shared, named,
+# long-lived and on a fixed port, and every one of those is wrong for it.
+#
+# The port is therefore 0, as it is in `template/` and `example/`: when an
+# integration suite arrives here it will be handed a database and its
+# coordinates, the way `dartway test` hands them to a project.
 database:
   host: localhost
-  port: 9090
+  port: 0
   name: dartway_push_test
   user: postgres
 
