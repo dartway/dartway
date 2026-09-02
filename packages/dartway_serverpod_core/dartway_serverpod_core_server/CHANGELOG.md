@@ -2,6 +2,23 @@
 
 ## 0.12.0
 
+- **`DwSaveConfig.resolveExistingRowForInsert` — a create onto a taken natural key becomes an
+  update of that row.**
+
+  A model with a natural key besides its id — one person's answer to one question, one membership
+  of one user in one chat — gets *created* by clients that have not seen the stored row: the list
+  lagged, the person acted from a second device, the first response never arrived. That write hit
+  the unique index and came back a database error: an alert for the team, and for the caller a
+  failure it could do nothing about, because what it sent was exactly what it wanted stored.
+
+  The new hook runs before everything else on an insert, looks the row up by that key and returns
+  the model to write instead — the incoming values carrying the stored id. From there it is an
+  ordinary update, so `isInsert`, `initialModel` and every later hook describe the save that is
+  actually happening. Opt-in; return `null` and the insert stays an insert.
+
+  It runs before the transaction, so two simultaneous creates can still both find nothing and race
+  to the unique index — guard that in `beforeSaveTransaction` where it matters.
+
 - **Breaking: `DwAuthConfig.normalizeIdentifier` is required.**
 
   It arrived a release earlier with a default that changed nothing, on the reasoning that folding

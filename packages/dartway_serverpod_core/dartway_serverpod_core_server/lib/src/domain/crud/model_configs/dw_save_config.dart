@@ -10,6 +10,8 @@ import '../../../private/dw_singleton.dart';
 /// happens around the write.
 ///
 /// The lifecycle, in order:
+/// 0. [resolveExistingRowForInsert] — an insert onto a natural key that is
+///                              already taken becomes an update of that row
 /// 1. [allowSave]             — permissions
 /// 2. [validateSave]          — validation
 /// 3. [beforeSaveTransaction] — prepare the model (inside the transaction)
@@ -41,6 +43,7 @@ class DwSaveConfig<T extends TableRow> {
   const DwSaveConfig({
     this.allowAnonymous = false,
     required this.allowSave,
+    this.resolveExistingRowForInsert,
     this.validateSave,
     this.beforeSaveTransaction,
     this.afterSaveTransaction,
@@ -64,6 +67,39 @@ class DwSaveConfig<T extends TableRow> {
 
   final Future<bool> Function(Session session, DwSaveContext<T> saveContext)
   allowSave;
+
+  /// Turns an insert onto an already taken natural key into an update of the
+  /// row that holds it.
+  ///
+  /// Some models have a second identity besides their id — one person's answer
+  /// to one question, one membership of one user in one chat — and it is the
+  /// one the caller thinks in. A client that has not seen the stored row (its
+  /// list lagged, it answered from another device, the first response never
+  /// arrived) sends a *create* for a row that already exists. Without this hook
+  /// that write reaches the unique index and comes back as a database error:
+  /// an alert for the team, and for the caller a failure it can do nothing
+  /// about — the value it sent is exactly the value it wants stored.
+  ///
+  /// Return the model to write: the incoming values carrying the stored row's
+  /// id. The save then continues on the update path, so [allowSave],
+  /// [validateSave] and every later hook see `isInsert == false` and the stored
+  /// row as [DwSaveContext.initialModel]. Return null to leave the insert an
+  /// insert.
+  ///
+  /// ```dart
+  /// resolveExistingRowForInsert: (session, answer) async {
+  ///   final stored = await _findByNaturalKey(session, answer);
+  ///   return stored == null ? null : answer.copyWith(id: stored.id);
+  /// },
+  /// ```
+  ///
+  /// Runs before the transaction opens, so it does not settle a race between
+  /// two simultaneous creates: both can find nothing, both insert, and the
+  /// unique index answers the second one. Where that race is worth guarding,
+  /// guard it in [beforeSaveTransaction] as well — this hook is about the
+  /// client that is simply behind, which is the common case.
+  final Future<T?> Function(Session session, T model)?
+  resolveExistingRowForInsert;
 
   /// Validates the model. Return the error text to reject the save, or null to
   /// let it through. Runs before the transaction opens — see the note on
@@ -203,28 +239,32 @@ class DwSaveConfig<T extends TableRow> {
 
   /// Saves [model], running the lifecycle described on [DwSaveConfig].
   Future<DwApiResponse<DwModelWrapper>> save(Session session, T model) async {
-    final isInsert = model.id == null;
+    // A create onto a taken natural key is an update of that row, and it is
+    // resolved here — before anything else looks at `isInsert`, so the whole
+    // lifecycle, row lock included, sees the save it actually is.
+    final modelToSave = await _resolvedForInsert(session, model);
+    final isInsert = modelToSave.id == null;
 
     // Opt-in serialisation: take the row lock before the rules read the row, so
     // a concurrent save of the same row cannot slip between check and write.
     // Inserts have no row to lock yet, so they keep the default lifecycle.
     if (!isInsert && lockInitialModelForUpdate) {
-      return _saveWithLockedInitialModel(session, model);
+      return _saveWithLockedInitialModel(session, modelToSave);
     }
 
     final initialModel = isInsert
         ? null
-        : await session.db.findById<T>(model.id!);
+        : await session.db.findById<T>(modelToSave.id!);
 
     if (initialModel == null && !isInsert) {
-      return _notFoundResponse(model.id!);
+      return _notFoundResponse(modelToSave.id!);
     }
 
     final saveContext = DwSaveContext<T>(
       currentUserId: session.signedInUserProfileId,
       isInsert: isInsert,
       initialModel: initialModel,
-      currentModel: model,
+      currentModel: modelToSave,
     );
 
     // --- allowSave ---
@@ -254,6 +294,21 @@ class DwSaveConfig<T extends TableRow> {
     }
 
     return _finishSave(session, saveContext);
+  }
+
+  /// The model this save actually writes: [model] itself, or — for an insert
+  /// whose natural key is already taken — what [resolveExistingRowForInsert]
+  /// returned, which carries the stored row's id and turns the save into an
+  /// update of that row.
+  ///
+  /// A hook that returns a model without an id changes nothing: it would leave
+  /// the save an insert, and the only reason to return a model at all is the id
+  /// on it.
+  Future<T> _resolvedForInsert(Session session, T model) async {
+    if (model.id != null || resolveExistingRowForInsert == null) return model;
+
+    final resolved = await resolveExistingRowForInsert!(session, model);
+    return resolved?.id == null ? model : resolved!;
   }
 
   /// The update path with the row held from the first read through the write.

@@ -135,10 +135,27 @@ error anywhere. The full rule, and the three exits it covers, are in `dartway-da
 
 Execution order and signatures:
 
+0. `resolveExistingRowForInsert` → `Future<T?>` — inserts only, and only if the model has a natural key (see below)
 1. `allowSave` → `Future<bool>` — permissions, **required**
 2. `validateSave` → `Future<String?>` — the error text or null
 3. **the transaction opens:** `beforeSaveTransaction` → `Future<String?>` → insert/update → `afterSaveTransaction` → `Future<String?>`
 4. outside the transaction: `afterSaveTransform` → `Future<String?>` (awaited, can reject), then `afterSaveSideEffects` → `Future<void>` (non-blocking)
+
+**A model with a natural key gets *created* twice, and step 0 is the answer.** One person's answer to one question, one membership of one user in one chat: the client thinks in that key, and when it has not seen the stored row — its list lagged, the person acted from a second device, the first response never arrived — it sends a create for a row that exists. That write hits the unique index and comes back a database error: an alert for you, and for the caller a failure it can do nothing about. `resolveExistingRowForInsert` looks the row up by that key and returns the model to write instead:
+
+```dart
+resolveExistingRowForInsert: (session, answer) async {
+  final stored = await UserQuizAnswer.db.findFirstRow(
+    session,
+    where: (t) =>
+        t.userProfileId.equals(answer.userProfileId) &
+        t.questionId.equals(answer.questionId),
+  );
+  return stored == null ? null : answer.copyWith(id: stored.id);
+},
+```
+
+From there it is an ordinary update — `isInsert == false`, `initialModel` is the stored row — so every hook below sees the save that is actually happening. Return `null` and the insert stays an insert. It runs before the transaction, so two simultaneous creates can still race to the unique index; guard that in `beforeSaveTransaction` if it matters.
 
 **Both in-transaction hooks return `String?` — just like `validateSave`.** Returned text → the save is rejected, the transaction is rolled back, the text reaches the client; returned `null` → we move on. This is precisely how you reject on a rule that is only visible inside the transaction.
 
