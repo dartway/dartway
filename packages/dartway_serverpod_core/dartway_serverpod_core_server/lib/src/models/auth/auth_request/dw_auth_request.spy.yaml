@@ -19,3 +19,9 @@ fields:
   failReason: DwAuthFailReason?
 
   extraData: Map<String, String>?
+
+indexes:
+  # Каждый запрос кода читает историю отправок этого же идентификатора.
+  # Без индекса это последовательный перебор всей таблицы на каждый вход.
+  dw_auth_request_identifier_created_idx:
+    fields: userIdentifier, createdAt

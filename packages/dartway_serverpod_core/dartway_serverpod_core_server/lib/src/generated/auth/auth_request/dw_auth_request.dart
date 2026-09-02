@@ -302,7 +302,15 @@ class _DwAuthRequestImpl extends DwAuthRequest {
           : this.failReason,
       extraData: extraData is Map<String, String>?
           ? extraData
-          : this.extraData?.map((key0, value0) => MapEntry(key0, value0)),
+          : this.extraData?.map(
+              (
+                key0,
+                value0,
+              ) => MapEntry(
+                key0,
+                value0,
+              ),
+            ),
     );
   }
 }
@@ -311,54 +319,92 @@ class DwAuthRequestUpdateTable extends _i1.UpdateTable<DwAuthRequestTable> {
   DwAuthRequestUpdateTable(super.table);
 
   _i1.ColumnValue<DateTime, DateTime> createdAt(DateTime value) =>
-      _i1.ColumnValue(table.createdAt, value);
+      _i1.ColumnValue(
+        table.createdAt,
+        value,
+      );
 
   _i1.ColumnValue<_i3.DwAuthRequestType, _i3.DwAuthRequestType> requestType(
     _i3.DwAuthRequestType value,
-  ) => _i1.ColumnValue(table.requestType, value);
+  ) => _i1.ColumnValue(
+    table.requestType,
+    value,
+  );
 
   _i1.ColumnValue<String, String> userIdentifier(String value) =>
-      _i1.ColumnValue(table.userIdentifier, value);
+      _i1.ColumnValue(
+        table.userIdentifier,
+        value,
+      );
 
-  _i1.ColumnValue<int, int> userId(int? value) =>
-      _i1.ColumnValue(table.userId, value);
+  _i1.ColumnValue<int, int> userId(int? value) => _i1.ColumnValue(
+    table.userId,
+    value,
+  );
 
   _i1.ColumnValue<_i4.DwAuthProvider, _i4.DwAuthProvider> authProvider(
     _i4.DwAuthProvider value,
-  ) => _i1.ColumnValue(table.authProvider, value);
+  ) => _i1.ColumnValue(
+    table.authProvider,
+    value,
+  );
 
   _i1.ColumnValue<_i5.DwAuthVerificationType, _i5.DwAuthVerificationType>
-  verificationType(_i5.DwAuthVerificationType? value) =>
-      _i1.ColumnValue(table.verificationType, value);
+  verificationType(_i5.DwAuthVerificationType? value) => _i1.ColumnValue(
+    table.verificationType,
+    value,
+  );
 
   _i1.ColumnValue<String, String> verificationHash(String? value) =>
-      _i1.ColumnValue(table.verificationHash, value);
+      _i1.ColumnValue(
+        table.verificationHash,
+        value,
+      );
 
   _i1.ColumnValue<_i2.DwAuthRequestStatus, _i2.DwAuthRequestStatus> status(
     _i2.DwAuthRequestStatus value,
-  ) => _i1.ColumnValue(table.status, value);
+  ) => _i1.ColumnValue(
+    table.status,
+    value,
+  );
 
   _i1.ColumnValue<_i6.DwAuthFailReason, _i6.DwAuthFailReason> failReason(
     _i6.DwAuthFailReason? value,
-  ) => _i1.ColumnValue(table.failReason, value);
+  ) => _i1.ColumnValue(
+    table.failReason,
+    value,
+  );
 
   _i1.ColumnValue<Map<String, String>, Map<String, String>> extraData(
     Map<String, String>? value,
-  ) => _i1.ColumnValue(table.extraData, value);
+  ) => _i1.ColumnValue(
+    table.extraData,
+    value,
+  );
 }
 
 class DwAuthRequestTable extends _i1.Table<int?> {
   DwAuthRequestTable({super.tableRelation})
     : super(tableName: 'dw_auth_request') {
     updateTable = DwAuthRequestUpdateTable(this);
-    createdAt = _i1.ColumnDateTime('createdAt', this, hasDefault: true);
+    createdAt = _i1.ColumnDateTime(
+      'createdAt',
+      this,
+      hasDefault: true,
+    );
     requestType = _i1.ColumnEnum(
       'requestType',
       this,
       _i1.EnumSerialization.byName,
     );
-    userIdentifier = _i1.ColumnString('userIdentifier', this);
-    userId = _i1.ColumnInt('userId', this);
+    userIdentifier = _i1.ColumnString(
+      'userIdentifier',
+      this,
+    );
+    userId = _i1.ColumnInt(
+      'userId',
+      this,
+    );
     authProvider = _i1.ColumnEnum(
       'authProvider',
       this,
@@ -369,7 +415,10 @@ class DwAuthRequestTable extends _i1.Table<int?> {
       this,
       _i1.EnumSerialization.byIndex,
     );
-    verificationHash = _i1.ColumnString('verificationHash', this);
+    verificationHash = _i1.ColumnString(
+      'verificationHash',
+      this,
+    );
     status = _i1.ColumnEnum(
       'status',
       this,
@@ -381,7 +430,10 @@ class DwAuthRequestTable extends _i1.Table<int?> {
       this,
       _i1.EnumSerialization.byName,
     );
-    extraData = _i1.ColumnSerializable<Map<String, String>>('extraData', this);
+    extraData = _i1.ColumnSerializable<Map<String, String>>(
+      'extraData',
+      this,
+    );
   }
 
   late final DwAuthRequestUpdateTable updateTable;
@@ -589,7 +641,10 @@ class DwAuthRequestRepository {
     DwAuthRequest row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.insertRow<DwAuthRequest>(row, transaction: transaction);
+    return session.db.insertRow<DwAuthRequest>(
+      row,
+      transaction: transaction,
+    );
   }
 
   /// Updates all [DwAuthRequest]s in the list and returns the updated rows. If
@@ -674,7 +729,10 @@ class DwAuthRequestRepository {
     List<DwAuthRequest> rows, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.delete<DwAuthRequest>(rows, transaction: transaction);
+    return session.db.delete<DwAuthRequest>(
+      rows,
+      transaction: transaction,
+    );
   }
 
   /// Deletes a single [DwAuthRequest].
@@ -683,7 +741,10 @@ class DwAuthRequestRepository {
     DwAuthRequest row, {
     _i1.Transaction? transaction,
   }) async {
-    return session.db.deleteRow<DwAuthRequest>(row, transaction: transaction);
+    return session.db.deleteRow<DwAuthRequest>(
+      row,
+      transaction: transaction,
+    );
   }
 
   /// Deletes all rows matching the [where] expression.

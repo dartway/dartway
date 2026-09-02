@@ -238,7 +238,15 @@ class _DwAuthRequestImpl extends DwAuthRequest {
           : this.failReason,
       extraData: extraData is Map<String, String>?
           ? extraData
-          : this.extraData?.map((key0, value0) => MapEntry(key0, value0)),
+          : this.extraData?.map(
+              (
+                key0,
+                value0,
+              ) => MapEntry(
+                key0,
+                value0,
+              ),
+            ),
     );
   }
 }
