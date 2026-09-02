@@ -127,7 +127,7 @@ packages:
       path: "../../packages/dartway_push/dartway_push_server"
       relative: true
     source: path
-    version: "0.3.0"
+    version: "0.4.0"
   dartway_serverpod_core_server:
     dependency: "direct main"
     description:
