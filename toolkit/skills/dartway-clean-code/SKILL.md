@@ -412,6 +412,58 @@ hand — `hasError` first, then `isLoading`, then `requireValue`. What you may n
 a second verb to learn is not worth the sugar. If the hand-written combine keeps appearing anyway,
 that is an issue against the framework, not a helper in `logic/`.
 
+## 1.5b A silent rejection at someone else's boundary leaves a trace on our side
+
+**Why:** §1.5a is about a screen that must not render a failure as blank. The same collapse happens
+one layer out, where we talk to something we do not control — an embedded application, a webhook, an
+external API — and it costs more there, because nobody is watching a screen.
+
+**Listing the possible causes in the error text is not a diagnosis.** The list reads identically
+under every cause, which is exactly what makes it useless for telling them apart. A description can
+say what a component *does*; a diagnosis needs what it *saw*. A day went into a version mismatch
+between two sides of an embedded bridge for that reason — both sides rejected quietly, correctly,
+and neither kept a record of what had arrived.
+
+**The rule: when a message from outside is dropped, the drop names its own step.** Not a boolean
+"rejected", not a sentence listing five possibilities — the step, as a value, one per way the thing
+can be turned away. Types, addresses, versions, timestamps. **No secrets and no payloads:** a trace
+that carries the body is a log that cannot be shown to anyone.
+
+**The framework does this to itself, and it is the shape to copy** —
+`StudioMessageDropReason` in `dartway_studio_bridge`:
+
+```dart
+enum StudioMessageDropReason {
+  notAMessageEvent,   // not an event of this kind at all
+  foreignOrigin,      // someone else's page
+  foreignSource,      // our origin, another frame — the case an embedder cannot reproduce
+  nonStringData,      // an event carrying something we never send
+  notAnEnvelope,      // a string, but somebody else's traffic — nothing to repair
+  versionMismatch,    // ours, at another protocol version: the one that looks like silence
+  unknownType,        // ours, our version, a type this build predates — read as "they are newer"
+}
+```
+
+Three things make it worth copying, and each is a rule of its own:
+
+- **every reason carries what it means**, not what it is called. `unknownType` says *read this as
+  "the other side is newer", not as a fault* — an enum whose members only restate their own names
+  moves the guessing rather than ending it;
+- **the reasons cover every exit**, including one the code cannot reach today (`notAMessageEvent`),
+  so a reader never has to wonder whether silence means "no reason applied" or "a path with no
+  reason attached";
+- **each one is tested.** A drop reason is written when a thing goes wrong and read months later,
+  which is the worst combination for a value nobody exercises.
+
+**Where the trace surfaces is a separate decision from whether it exists.** For a UI boundary, under
+the element it belongs to, collapsed by default. For a server boundary, the error pipeline. What must
+not happen is the trace being skipped because there was no obvious place to put it.
+
+**This is a default, not a law** (see "Law and default" in `.claude/CLAUDE.md`): `dartway check`
+cannot see it, and a project that has a better answer for its own boundary may record one. What is
+not a matter of taste is the failure it prevents — a rejection indistinguishable from every other
+reason nothing arrived.
+
 ## 1.6 Don't look widgets up in the tree via `GlobalKey`
 
 **Why:** `GlobalKey().currentState` reaches into someone else's state past state management. Drive the data through a provider/controller instead of poking the tree.
@@ -981,6 +1033,7 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** private widget methods that transform the domain — those are extensions in the feature's `logic/` (§1.3c).
 - [ ] **`ref.invalidate(...)` only where the user asked for it** — a retry button, pull-to-refresh, "reload". Not after a write (that means the write left `dw.repo`), not in a listener, not to move data between screens (§1.5).
 - [ ] **A section that is the point of its screen renders its failure** and offers a way out; blank is a meaning of its own, and the `errorWidget` default is `SizedBox.shrink()`. **No `asData?.value`** (or `.value ?? const []`) to combine several `AsyncValue`s — it answers `null` for loading and for error alike, so a failure becomes an endless spinner (§1.5a).
+- [ ] **A message dropped at a boundary with someone else's system names its own step** — a value per way the thing can be turned away, each carrying what it means, none of them a sentence listing five possibilities. Types, addresses, versions, timestamps; no secrets and no payloads (§1.5b).
 - [ ] **No** `GlobalKey` for looking widgets up in the tree.
 - [ ] **No** outer `padding`/`margin` inside a widget — the parent sets the padding (§1.7). When refactoring someone else's widget the outer padding moves to the caller instead of being "kept as it was".
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
