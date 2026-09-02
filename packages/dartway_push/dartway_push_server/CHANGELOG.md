@@ -1,5 +1,28 @@
 ## 0.3.0
 
+**A worker pass now respects a wall-clock deadline, and stops re-reading one
+message per delivery.**
+
+`DwPushWorker.processBatch` (and `DwPush.processBatch`) take an optional
+`deadline`. A caller that drains in a loop could only check its budget *between*
+passes, and the pass it was inside of was the one that overran it: a batch is
+`batchSize` deliveries at `maxConcurrentDeliveries` in flight, each waiting out a
+provider round-trip, which is minutes when the provider is slow. Observed on a
+production app: a 20-second drain budget producing runs of 55 to 77 seconds. With
+a deadline the batch stops between concurrency chunks and hands the deliveries it
+did not reach straight back to the queue — unleased, so the next pass can take
+them instead of waiting out `leaseDuration`.
+
+The batch also loads its messages in one query and passes them to the deliveries.
+A fan-out is thousands of deliveries of the *same* message, and each of them was
+re-reading that one row: on the same app, 11 to 13 thousand queries in a single
+pass. The row is written once at enqueue and never updated, so reading it once
+per batch sees exactly what the per-delivery read saw.
+
+`DwPushBatchResult.claimed` now counts the deliveries the pass actually
+processed, not the ones it claimed — the two differ only when a deadline cut the
+pass short.
+
 Web click-through no longer rests on the app's service worker alone, and a
 provider that was asked for and not finished now says so.
 
