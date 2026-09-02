@@ -4,7 +4,7 @@
 
 Read `.claude/CLAUDE.md` first: it carries DartWay's laws and its defaults, and the section "Law and default" says which of the two a project may override.
 
-## Conventions
+## Project conventions
 
 Nothing here yet, and the emptiness is the point — this is the stated place for the rules this project decides for itself, so that they sit where a reader is actually sent rather than in a README inside the folder they happen to be about.
 
