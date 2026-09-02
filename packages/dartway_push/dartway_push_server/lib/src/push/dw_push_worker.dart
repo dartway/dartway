@@ -418,7 +418,11 @@ ORDER BY classified."availableAt", classified."id"
   }) async {
     var sendStarted = false;
     try {
-      final outcome = await session.db.transaction((transaction) async {
+      // Phase one: everything the send needs, decided under the recipient lock
+      // and committed before the provider is called. What the lock buys is
+      // unchanged here — a recipient being deleted either gets this transaction
+      // in first, and the delivery is gone before we look, or waits for it.
+      final prepared = await session.db.transaction((transaction) async {
         final recipientLockAcquired = await _recipientLock.tryAcquire(
           session,
           recipientId: claimed.recipientId,
@@ -431,7 +435,7 @@ ORDER BY classified."availableAt", classified."id"
             leaseId: leaseId,
             transaction: transaction,
           );
-          return const _DeliveryOutcome.ignored();
+          return const _PreparedDelivery.done(_DeliveryOutcome.ignored());
         }
         final delivery = await DwPushDelivery.db.findById(
           session,
@@ -440,7 +444,7 @@ ORDER BY classified."availableAt", classified."id"
           lockMode: LockMode.forUpdate,
         );
         if (delivery == null || delivery.leaseId != leaseId) {
-          return const _DeliveryOutcome.ignored();
+          return const _PreparedDelivery.done(_DeliveryOutcome.ignored());
         }
 
         final message =
@@ -456,10 +460,12 @@ ORDER BY classified."availableAt", classified."id"
             delivery,
             transaction: transaction,
           );
-          return const _DeliveryOutcome(
-            category: '_missing_message',
-            metric: DwPushMetricOutcome.failed,
-            removed: true,
+          return const _PreparedDelivery.done(
+            _DeliveryOutcome(
+              category: '_missing_message',
+              metric: DwPushMetricOutcome.failed,
+              removed: true,
+            ),
           );
         }
 
@@ -470,10 +476,12 @@ ORDER BY classified."availableAt", classified."id"
             delivery,
             transaction: transaction,
           );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.expired,
-            removed: true,
+          return _PreparedDelivery.done(
+            _DeliveryOutcome(
+              category: message.category,
+              metric: DwPushMetricOutcome.expired,
+              removed: true,
+            ),
           );
         }
 
@@ -489,10 +497,12 @@ ORDER BY classified."availableAt", classified."id"
             delivery,
             transaction: transaction,
           );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.skipped,
-            removed: true,
+          return _PreparedDelivery.done(
+            _DeliveryOutcome(
+              category: message.category,
+              metric: DwPushMetricOutcome.skipped,
+              removed: true,
+            ),
           );
         }
 
@@ -504,16 +514,56 @@ ORDER BY classified."availableAt", classified."id"
           transaction: transaction,
         );
         delivery.attemptCount = attemptNumber;
-        final attempt = DwPushDeliveryAttempt(
-          deliveryId: delivery.id!,
-          recipientId: delivery.recipientId,
-          attemptNumber: attemptNumber,
-          payload: payload,
-          targets: recipient.targets,
+        return _PreparedDelivery.send(
+          delivery: delivery,
+          category: message.category,
+          attempt: DwPushDeliveryAttempt(
+            deliveryId: delivery.id!,
+            recipientId: delivery.recipientId,
+            attemptNumber: attemptNumber,
+            payload: payload,
+            targets: recipient.targets,
+          ),
         );
-        sendStarted = true;
-        final transportResult = await _config.transport.send(session, attempt);
-        _verifyTransportResult(attempt, transportResult);
+      });
+
+      final earlyOutcome = prepared.outcome;
+      if (earlyOutcome != null) return earlyOutcome;
+
+      // Phase two: the provider call, with no database connection held. This is
+      // where a pass spends its wall clock, and holding a connection through it
+      // was what let one slow provider make every other query in the app wait.
+      final attempt = prepared.attempt!;
+      final delivery = prepared.delivery!;
+      final category = prepared.category!;
+      sendStarted = true;
+      final transportResult = await _config.transport.send(session, attempt);
+      _verifyTransportResult(attempt, transportResult);
+
+      // Phase three: write down what happened. The delivery row is re-read and
+      // every write is conditioned on it, so a recipient deleted during the send
+      // leaves nothing behind — the row is already gone and there is nothing to
+      // reschedule. The push itself is out by then, and that is the one thing
+      // the split gives up.
+      final outcome = await session.db.transaction((transaction) async {
+        final current = await DwPushDelivery.db.findById(
+          session,
+          delivery.id!,
+          transaction: transaction,
+          lockMode: LockMode.forUpdate,
+        );
+        if (current == null || current.leaseId != leaseId) {
+          return _DeliveryOutcome(
+            category: category,
+            metric: transportResult.wasDelivered
+                ? DwPushMetricOutcome.delivered
+                : DwPushMetricOutcome.failed,
+            delivered: transportResult.wasDelivered,
+            invalidTargets: transportResult.invalidTargets,
+            recipientId: delivery.recipientId,
+          );
+        }
+        current.attemptCount = delivery.attemptCount;
         await _rememberDiscoveredProviders(
           session,
           recipientId: delivery.recipientId,
@@ -521,59 +571,12 @@ ORDER BY classified."availableAt", classified."id"
           transaction: transaction,
         );
 
-        if (transportResult.wasDelivered) {
-          await DwPushDelivery.db.deleteRow(
-            session,
-            delivery,
-            transaction: transaction,
-          );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.delivered,
-            delivered: true,
-            removed: true,
-            invalidTargets: transportResult.invalidTargets,
-            recipientId: delivery.recipientId,
-          );
-        }
-
-        final policyDelay = transportResult.shouldRetry
-            ? _config.retryPolicy.delayAfterFailure(delivery.attemptCount)
-            : null;
-        final providerDelay = transportResult.retryAfter;
-        final retryDelay = policyDelay == null
-            ? null
-            : providerDelay != null && providerDelay > policyDelay
-            ? providerDelay
-            : policyDelay;
-        if (retryDelay != null) {
-          await _reschedule(
-            session,
-            delivery,
-            retryDelay,
-            _transportError(transportResult),
-            transaction,
-          );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.retryScheduled,
-            retried: true,
-            invalidTargets: transportResult.invalidTargets,
-            recipientId: delivery.recipientId,
-          );
-        }
-
-        await DwPushDelivery.db.deleteRow(
+        return _recordSendOutcome(
           session,
-          delivery,
+          delivery: current,
+          category: category,
+          transportResult: transportResult,
           transaction: transaction,
-        );
-        return _DeliveryOutcome(
-          category: message.category,
-          metric: DwPushMetricOutcome.failed,
-          removed: true,
-          invalidTargets: transportResult.invalidTargets,
-          recipientId: delivery.recipientId,
         );
       });
 
@@ -594,6 +597,70 @@ ORDER BY classified."availableAt", classified."id"
         sendStarted: sendStarted,
       );
     }
+  }
+
+  /// The write half of a finished send, inside the phase-three transaction.
+  Future<_DeliveryOutcome> _recordSendOutcome(
+    Session session, {
+    required DwPushDelivery delivery,
+    required String category,
+    required DwPushTransportResult transportResult,
+    required Transaction transaction,
+  }) async {
+    if (transportResult.wasDelivered) {
+      await DwPushDelivery.db.deleteRow(
+        session,
+        delivery,
+        transaction: transaction,
+      );
+      return _DeliveryOutcome(
+        category: category,
+        metric: DwPushMetricOutcome.delivered,
+        delivered: true,
+        removed: true,
+        invalidTargets: transportResult.invalidTargets,
+        recipientId: delivery.recipientId,
+      );
+    }
+
+    final policyDelay = transportResult.shouldRetry
+        ? _config.retryPolicy.delayAfterFailure(delivery.attemptCount)
+        : null;
+    final providerDelay = transportResult.retryAfter;
+    final retryDelay = policyDelay == null
+        ? null
+        : providerDelay != null && providerDelay > policyDelay
+        ? providerDelay
+        : policyDelay;
+    if (retryDelay != null) {
+      await _reschedule(
+        session,
+        delivery,
+        retryDelay,
+        _transportError(transportResult),
+        transaction,
+      );
+      return _DeliveryOutcome(
+        category: category,
+        metric: DwPushMetricOutcome.retryScheduled,
+        retried: true,
+        invalidTargets: transportResult.invalidTargets,
+        recipientId: delivery.recipientId,
+      );
+    }
+
+    await DwPushDelivery.db.deleteRow(
+      session,
+      delivery,
+      transaction: transaction,
+    );
+    return _DeliveryOutcome(
+      category: category,
+      metric: DwPushMetricOutcome.failed,
+      removed: true,
+      invalidTargets: transportResult.invalidTargets,
+      recipientId: delivery.recipientId,
+    );
   }
 
   Future<void> _releaseLeaseAfterLockContention(
@@ -863,6 +930,33 @@ WHERE "id" = @deliveryId
 
   static String _truncate(String value, int maximum) =>
       value.length <= maximum ? value : value.substring(0, maximum);
+}
+
+/// What phase one of a delivery decided: either the whole outcome, because the
+/// delivery ended before any provider was called, or everything phase two needs
+/// to make the call.
+final class _PreparedDelivery {
+  const _PreparedDelivery.done(_DeliveryOutcome this.outcome)
+    : delivery = null,
+      category = null,
+      attempt = null;
+
+  const _PreparedDelivery.send({
+    required DwPushDelivery this.delivery,
+    required String this.category,
+    required DwPushDeliveryAttempt this.attempt,
+  }) : outcome = null;
+
+  /// Set when the delivery is already finished and nothing is sent.
+  final _DeliveryOutcome? outcome;
+
+  /// The claimed row, with its attempt counter already advanced and committed.
+  final DwPushDelivery? delivery;
+
+  /// The message's category, kept because the row itself is not read again.
+  final String? category;
+
+  final DwPushDeliveryAttempt? attempt;
 }
 
 final class _DeliveryOutcome {
