@@ -24,6 +24,29 @@ name: Database
 # there is a week of runs to look at, and only then blocks anything.
 
 on:
+  # A workflow woken only by a clock and by hand has no way to prove it is
+  # alive, and this one did not: added on 2026-09-01, it was never registered as
+  # a workflow at all — the file sat on the default branch, `actions/workflows`
+  # kept returning the other five, the manual dispatch answered 404, and the
+  # nightly did not fire. Two pushes to `master` went by without changing that
+  # (#206).
+  #
+  # Its neighbour `images.yml` registered on the pull request that added it,
+  # because it had an event a pull request could match. So does this now, and
+  # the path is the workflow's own file: **a change to this job proves the job.**
+  # That is worth having for its own sake, not only to get registered — a CI
+  # gate whose last edit was never executed is a gate nobody has run.
+  push:
+    # `master` only. Without it a branch push and the pull request both match,
+    # and the job runs twice for one change — which it did on the pull request
+    # that added these triggers.
+    branches: [master]
+    paths:
+      - '.github/workflows/database.yml'
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    paths:
+      - '.github/workflows/database.yml'
   schedule:
     - cron: '7 5 * * *'
   workflow_dispatch:
