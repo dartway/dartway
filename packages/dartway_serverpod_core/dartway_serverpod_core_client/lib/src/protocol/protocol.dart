@@ -76,6 +76,15 @@ class Protocol extends _i1.SerializationManager {
   ]) {
     t ??= T;
 
+    if (data is Map<String, dynamic>) {
+      final manualDeserialization = _i21.DwApiResponse.manualDeserialization<T>(
+        data,
+      );
+      if (manualDeserialization != null) {
+        return manualDeserialization;
+      }
+    }
+
     final dataClassName = getClassNameFromObjectJson(data);
     if (dataClassName != null && dataClassName != getClassNameForType(t)) {
       try {
