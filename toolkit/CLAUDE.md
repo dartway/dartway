@@ -42,6 +42,25 @@ A fourth one, `*_shared` — pure Dart for code that has to behave identically o
 5. **Naming.** Classes — at least 2 words (`UserProfile`, not `User`). Variables are fully descriptive and match the type (`userProfile`, `userProfileId`). Fields relating to a user always carry the word Profile: `userProfileId`, `authorProfileId`, `updatedByProfileId`. Forbidden: `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x`.
 6. **Done = audit + a description next to the code.** A feature is not finished until `dartway-finish` has been run: an audit of the diff against the cleanliness contract, and a reconciliation of the feature's description with the new behavior. **The description lives in the code, not in a separate doc:** a screen's behavior — in the `DwFeatureSpec` of the feature widget, the server-side agreements — in the doc comments above the CRUD config. We do not keep separate "a doc per feature" files: a description far from the code drifts from it on the very first edit, and it drifts silently — the code compiles while the doc lies. Verified on a production project: a feature's doc described an API that had not been in the code for a year, and the agent wrote non-working code from it.
 
+## Law and default — and which one a project may override
+
+Two kinds of rule live in this file and, until this section existed, read exactly alike: the same prose, the same voice, the same apparent weight. So an agent obeyed them alike — including where the rule was never DartWay's to make. A commit format demanded a ticket number, a project had no tracker, and the agent stopped mid-task on a question that had no answer. The rule was removed; the shape that produced it is what this section is for.
+
+**Law is what makes it DartWay.** The six numbered rules above: traffic through CRUD rather than arbitrary endpoints, domain-first models, a feature as a folder with exactly one public file, the escalation order for logic, the naming, a description that lives next to the code. Break one and the thing you are building stops being a DartWay project — a second architecture grows inside the first, confidently and fast. **A project does not override a law.**
+
+**Default is what DartWay proposes because something has to be proposed.** Everything else here and in the skills: how a commit message is shaped, the base branch, how a decision is recorded, the language a project writes its own texts in. These are opinions, and good ones, but they are this framework's habits rather than its architecture. **A project may replace a default with its own rule.**
+
+**Precedence, once, so nobody has to guess:** a default yields to the project's own root `CLAUDE.md`; a law does not. Where the two are silent, this file stands.
+
+**A project records its override in its own root `CLAUDE.md`, under "Project conventions", with the reason.** Not in a README inside the folder the rule is about — that is where an override goes to die. It has happened: a project decided from experience that an ADR should be revised in place rather than superseded, wrote the cancellation and its reasoning into `docs/adr/README.md`, and it was correct — but nothing points a reader there, so an agent working from this file alone kept opening new ADR numbers against the project's own decided practice. The rule that is in force has to live where the reader is sent.
+
+Two consequences worth stating, because both are easy to get wrong:
+
+- **`.claude/CLAUDE.md` is managed and overwritten on update.** A project's own rule written into it disappears at the next `dartway setup-ai`. The root `CLAUDE.md` is the project's and is never touched by the installer — that is why the override lives there.
+- **An override is a decision, not a preference, so it carries its reason.** "We do it differently" ages into nobody remembering whether it was considered. The ADR case above is the model: what was tried, what it cost, what replaced it.
+
+**How the boundary stays honest over time: law is what `dartway check` can enforce.** Anything the checker cannot see is broken silently, which is exactly the state the removed commit rule documented — so promote a rule to law and you owe it a check. Today the checker reaches Law 3 in detail (the zone → group → feature tree, `invalidFeatureStructure`, `notAFeature`, `barrelFile`, `forbiddenFeatureImport`) and half of Law 6 (`featureSpecMissing`); Laws 2, 4 and 5 it does not reach at all. That gap is real and is not resolved by this section — it is named here so the next person has the fact rather than the slogan.
+
 ## Code generation: two sanctioned generators, and no `build_runner`
 
 The project has exactly two: **`serverpod generate`** (models and the client package) and **`flutter gen-l10n`** (the typed `AppLocalizations` from `lib/l10n/*.arb`). Both are unavoidable — the first because the wire is generated, the second because the localization law in the Flutter section is not obeyable without it — and both share the same three properties.
@@ -112,6 +131,8 @@ An ADR records **the alternatives that were rejected, and why**. That is the one
 **Never write "how it works now".** That is the part that rots, and it rots silently, because the code changes under it without an error. A real ADR described a `--dart-define` as the source of an app's URL while the README on the very same commit said that mechanism was gone.
 
 **An ADR is never edited — it is superseded by a new one**, and the old one gets `superseded by NNNN` in its status. Editing destroys the only thing it is for: what was known at the moment of the choice. A record you may rewrite is not a record.
+
+**This is a default, and a project may replace it** — see "Law and default" above. What must not be destroyed is *what was known at the moment of the choice*; a new number preserves that, and so does a change log at the end of one long-lived file, which is what one project moved to after several documents about a single model started contradicting each other. Either mechanism is fine, the property is not. If the project has decided otherwise, its decision belongs in its root `CLAUDE.md` with the reason — **check there before opening a number**, because a cancellation recorded only inside `docs/adr/` is one nobody is sent to read.
 
 **Planning reads them.** `dartway-plan` looks in `docs/adr/` before proposing an approach, so a decision whose alternatives were already weighed is not re-argued from scratch — and a plan that itself makes such a choice proposes a new ADR as one of its steps.
 
