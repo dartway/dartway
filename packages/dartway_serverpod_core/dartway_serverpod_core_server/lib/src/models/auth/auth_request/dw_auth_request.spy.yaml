@@ -21,10 +21,11 @@ fields:
   extraData: Map<String, String>?
 
 indexes:
-  # Каждый запрос кода читает историю отправок этого же идентификатора —
-  # rate limit по построению спрашивает «сколько раз мы слали ему за окно».
-  # Без индекса это последовательный перебор всей таблицы на каждый вход:
-  # на боевом проекте 126 тысяч строк и 12 мс на запрос, и цифра растёт
-  # вместе с таблицей, которая по природе своей только копится.
+  # Every code request reads this identifier's own send history — rate
+  # limiting asks, by construction, "how many times have we sent to them in
+  # the window". Without an index that answer is a sequential scan of the
+  # whole table on every sign-in: 126 thousand rows and 12 ms per request on
+  # a production app, and the number grows with a table that only ever
+  # accumulates.
   dw_auth_request_identifier_created_idx:
     fields: userIdentifier, createdAt

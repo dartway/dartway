@@ -2,15 +2,15 @@
 
 ## 0.12.0
 
-- **`dw_auth_request` получил индекс по `(userIdentifier, createdAt)`.**
+- **`dw_auth_request` is indexed on `(userIdentifier, createdAt)`.**
 
-  Каждый запрос кода читает историю отправок этого же идентификатора — rate limit по построению
-  спрашивает «сколько раз мы слали ему за окно». Без индекса это последовательный перебор всей
-  таблицы на каждый вход: на боевом проекте 126 тысяч строк, 12 мс на запрос, и цифра растёт
-  вместе с таблицей, которая по природе своей только копится.
+  Every code request reads that identifier's own send history — rate limiting asks, by
+  construction, "how many times have we sent to them in the window". Without an index the answer
+  is a sequential scan of the whole table on every sign-in: 126 thousand rows and 12 ms per
+  request on a production app, and the number grows with a table that only ever accumulates.
 
-  Приложению индекс приезжает обычным путём — `serverpod generate` и `create-migration` в самом
-  приложении подхватят его из определения модуля.
+  An app inherits the index the ordinary way: its own `serverpod generate` and
+  `create-migration` pick it up from the module definition.
 
 - **`DwSaveConfig.resolveExistingRowForInsert` — a create onto a taken natural key becomes an
   update of that row.**
