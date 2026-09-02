@@ -1,5 +1,24 @@
 ## 0.4.0
 
+**The provider call no longer happens inside a database transaction.**
+
+A delivery used to run as one transaction: take the recipient's advisory lock,
+read the row, call the provider, write the outcome. The provider call is the
+slow part, and holding a pooled connection through it is how one slow provider
+made every unrelated query in the app wait — measured on a production app as a
+uniform multi-second tail across queries that had nothing to do with push.
+
+A delivery is now three steps: a transaction that decides and commits what the
+send needs (under the same lock, so a recipient being deleted still either wins
+the race outright or waits for this short step), the send itself with no
+connection held, and a transaction that writes the outcome. The outcome write
+re-reads the row and is conditioned on it, so a delivery cancelled meanwhile —
+account deletion cancels the recipient's queue — leaves nothing behind.
+
+**What this gives up, deliberately:** a push already handed to the provider can
+land on the device of an account whose deletion started during that call. The
+window is one provider round-trip. Before, the deletion waited instead.
+
 **A worker pass now respects a wall-clock deadline, and stops re-reading one
 message per delivery.**
 

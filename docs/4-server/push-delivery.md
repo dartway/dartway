@@ -288,6 +288,14 @@ while (DateTime.now().isBefore(deadline)) {
 `DwPushBatchResult.claimed` counts what the pass processed, so that loop ends on
 an empty queue rather than on a batch the deadline cut short.
 
+**The provider call happens outside a transaction.** A delivery is three steps —
+a short transaction that decides what to send (under the recipient's lock), the
+send itself with no database connection held, and a short transaction that
+writes the outcome, conditioned on the delivery row still being there. The
+consequence to know: a push already handed to the provider can land on the
+device of an account whose deletion began during that call, a window of one
+round-trip. Deleting an account still cancels everything still queued.
+
 Delivery is **at-least-once**: a crash right
 after the provider accepted a message can produce a duplicate — a deliberate,
 documented tradeoff, since for notifications a rare duplicate beats a silent
