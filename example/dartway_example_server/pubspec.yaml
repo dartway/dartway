@@ -12,7 +12,7 @@ dependencies:
   dartway_serverpod_core_server: ^0.12.0
   # Optional push delivery module. An app that does not need push simply omits
   # this dependency and gets none of the dw_push_* tables.
-  dartway_push_server: ^0.3.0
+  dartway_push_server: ^0.4.0
 
   http: ^1.5.0
 

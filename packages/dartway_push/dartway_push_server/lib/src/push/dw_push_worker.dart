@@ -31,9 +31,21 @@ final class DwPushWorker {
   final Random _random = Random.secure();
 
   /// Claims and processes one bounded batch using PostgreSQL `SKIP LOCKED`.
+  ///
+  /// [deadline] bounds the pass in wall-clock time. Without it a pass runs to
+  /// the end of its claimed batch however long that takes, and how long that is
+  /// belongs to the provider, not to us: `batchSize` deliveries at
+  /// `maxConcurrentDeliveries` in flight, each waiting out a round-trip, is
+  /// minutes when the provider is slow. A caller that drains in a loop and
+  /// stops after N seconds is measuring the wrong thing if it can only check
+  /// between passes — the pass it is inside of is the one that overran. Given a
+  /// deadline, the batch stops between concurrency chunks and hands the
+  /// deliveries it did not reach straight back to the queue instead of holding
+  /// them leased.
   Future<DwPushBatchResult> processBatch(
     Session session, {
     String workerName = 'default',
+    DateTime? deadline,
   }) async {
     if (await _runtime.isPaused(session, workerName)) {
       return const DwPushBatchResult.paused();
@@ -63,12 +75,21 @@ final class DwPushWorker {
       () => _runtime.markClaimed(session, workerName: workerName),
     );
 
+    // One read for the whole batch instead of one per delivery. A fan-out is
+    // thousands of deliveries of the *same* message, so the per-delivery
+    // `findById` was re-reading one row thousands of times; the row is written
+    // once at enqueue and never updated, so reading it outside the delivery's
+    // own transaction changes nothing it could have seen.
+    final messages = await _loadMessages(session, deliveries);
+
     final outcomes = <_DeliveryOutcome>[];
+    var processed = 0;
     for (
       var offset = 0;
       offset < deliveries.length;
       offset += _config.maxConcurrentDeliveries
     ) {
+      if (deadline != null && !_config.clock().isBefore(deadline)) break;
       final end = min(
         offset + _config.maxConcurrentDeliveries,
         deliveries.length,
@@ -77,9 +98,21 @@ final class DwPushWorker {
         await Future.wait(
           deliveries
               .sublist(offset, end)
-              .map((delivery) => _process(session, delivery, leaseId)),
+              .map(
+                (delivery) =>
+                    _process(session, delivery, leaseId, messages: messages),
+              ),
         ),
       );
+      processed = end;
+    }
+
+    // Whatever the deadline cut off is queue work again, not work in progress:
+    // left leased it would sit out `leaseDuration` before any worker could take
+    // it, which is the opposite of what a deadline is for.
+    final abandoned = deliveries.sublist(processed);
+    if (abandoned.isNotEmpty) {
+      await _releaseLeases(session, abandoned, leaseId);
     }
 
     await _recordMetrics(session, outcomes);
@@ -99,11 +132,54 @@ final class DwPushWorker {
     );
 
     return DwPushBatchResult(
-      claimed: deliveries.length,
+      claimed: processed,
       delivered: outcomes.where((outcome) => outcome.delivered).length,
       retried: outcomes.where((outcome) => outcome.retried).length,
       removed: outcomes.where((outcome) => outcome.removed).length,
       paused: false,
+    );
+  }
+
+  /// The messages the claimed batch refers to, by id.
+  Future<Map<int, DwPushMessage>> _loadMessages(
+    Session session,
+    List<DwPushDelivery> deliveries,
+  ) async {
+    final ids = deliveries.map((delivery) => delivery.messageId).toSet();
+    if (ids.isEmpty) return const {};
+    final rows = await DwPushMessage.db.find(
+      session,
+      where: (table) => table.id.inSet(ids),
+    );
+    return {for (final row in rows) row.id!: row};
+  }
+
+  /// Hands leases back for deliveries this pass will not process. Conditioned
+  /// on the lease id, so a delivery another worker has since claimed is left
+  /// alone.
+  Future<void> _releaseLeases(
+    Session session,
+    List<DwPushDelivery> deliveries,
+    String leaseId,
+  ) async {
+    final ids = deliveries
+        .map((delivery) => delivery.id)
+        .whereType<int>()
+        .toList();
+    if (ids.isEmpty) return;
+    await session.db.unsafeExecute(
+      '''
+UPDATE "dw_push_delivery"
+SET
+  "leaseId" = NULL,
+  "leaseExpiresAt" = NULL
+WHERE "id" = ANY(@deliveryIds)
+  AND "leaseId" = @leaseId
+''',
+      parameters: QueryParameters.named({
+        'deliveryIds': ids,
+        'leaseId': leaseId,
+      }),
     );
   }
 
@@ -337,11 +413,16 @@ ORDER BY classified."availableAt", classified."id"
   Future<_DeliveryOutcome> _process(
     Session session,
     DwPushDelivery claimed,
-    String leaseId,
-  ) async {
+    String leaseId, {
+    Map<int, DwPushMessage> messages = const {},
+  }) async {
     var sendStarted = false;
     try {
-      final outcome = await session.db.transaction((transaction) async {
+      // Phase one: everything the send needs, decided under the recipient lock
+      // and committed before the provider is called. What the lock buys is
+      // unchanged here — a recipient being deleted either gets this transaction
+      // in first, and the delivery is gone before we look, or waits for it.
+      final prepared = await session.db.transaction((transaction) async {
         final recipientLockAcquired = await _recipientLock.tryAcquire(
           session,
           recipientId: claimed.recipientId,
@@ -354,7 +435,7 @@ ORDER BY classified."availableAt", classified."id"
             leaseId: leaseId,
             transaction: transaction,
           );
-          return const _DeliveryOutcome.ignored();
+          return const _PreparedDelivery.done(_DeliveryOutcome.ignored());
         }
         final delivery = await DwPushDelivery.db.findById(
           session,
@@ -363,24 +444,28 @@ ORDER BY classified."availableAt", classified."id"
           lockMode: LockMode.forUpdate,
         );
         if (delivery == null || delivery.leaseId != leaseId) {
-          return const _DeliveryOutcome.ignored();
+          return const _PreparedDelivery.done(_DeliveryOutcome.ignored());
         }
 
-        final message = await DwPushMessage.db.findById(
-          session,
-          delivery.messageId,
-          transaction: transaction,
-        );
+        final message =
+            messages[delivery.messageId] ??
+            await DwPushMessage.db.findById(
+              session,
+              delivery.messageId,
+              transaction: transaction,
+            );
         if (message == null) {
           await DwPushDelivery.db.deleteRow(
             session,
             delivery,
             transaction: transaction,
           );
-          return const _DeliveryOutcome(
-            category: '_missing_message',
-            metric: DwPushMetricOutcome.failed,
-            removed: true,
+          return const _PreparedDelivery.done(
+            _DeliveryOutcome(
+              category: '_missing_message',
+              metric: DwPushMetricOutcome.failed,
+              removed: true,
+            ),
           );
         }
 
@@ -391,10 +476,12 @@ ORDER BY classified."availableAt", classified."id"
             delivery,
             transaction: transaction,
           );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.expired,
-            removed: true,
+          return _PreparedDelivery.done(
+            _DeliveryOutcome(
+              category: message.category,
+              metric: DwPushMetricOutcome.expired,
+              removed: true,
+            ),
           );
         }
 
@@ -410,10 +497,12 @@ ORDER BY classified."availableAt", classified."id"
             delivery,
             transaction: transaction,
           );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.skipped,
-            removed: true,
+          return _PreparedDelivery.done(
+            _DeliveryOutcome(
+              category: message.category,
+              metric: DwPushMetricOutcome.skipped,
+              removed: true,
+            ),
           );
         }
 
@@ -425,16 +514,56 @@ ORDER BY classified."availableAt", classified."id"
           transaction: transaction,
         );
         delivery.attemptCount = attemptNumber;
-        final attempt = DwPushDeliveryAttempt(
-          deliveryId: delivery.id!,
-          recipientId: delivery.recipientId,
-          attemptNumber: attemptNumber,
-          payload: payload,
-          targets: recipient.targets,
+        return _PreparedDelivery.send(
+          delivery: delivery,
+          category: message.category,
+          attempt: DwPushDeliveryAttempt(
+            deliveryId: delivery.id!,
+            recipientId: delivery.recipientId,
+            attemptNumber: attemptNumber,
+            payload: payload,
+            targets: recipient.targets,
+          ),
         );
-        sendStarted = true;
-        final transportResult = await _config.transport.send(session, attempt);
-        _verifyTransportResult(attempt, transportResult);
+      });
+
+      final earlyOutcome = prepared.outcome;
+      if (earlyOutcome != null) return earlyOutcome;
+
+      // Phase two: the provider call, with no database connection held. This is
+      // where a pass spends its wall clock, and holding a connection through it
+      // was what let one slow provider make every other query in the app wait.
+      final attempt = prepared.attempt!;
+      final delivery = prepared.delivery!;
+      final category = prepared.category!;
+      sendStarted = true;
+      final transportResult = await _config.transport.send(session, attempt);
+      _verifyTransportResult(attempt, transportResult);
+
+      // Phase three: write down what happened. The delivery row is re-read and
+      // every write is conditioned on it, so a recipient deleted during the send
+      // leaves nothing behind — the row is already gone and there is nothing to
+      // reschedule. The push itself is out by then, and that is the one thing
+      // the split gives up.
+      final outcome = await session.db.transaction((transaction) async {
+        final current = await DwPushDelivery.db.findById(
+          session,
+          delivery.id!,
+          transaction: transaction,
+          lockMode: LockMode.forUpdate,
+        );
+        if (current == null || current.leaseId != leaseId) {
+          return _DeliveryOutcome(
+            category: category,
+            metric: transportResult.wasDelivered
+                ? DwPushMetricOutcome.delivered
+                : DwPushMetricOutcome.failed,
+            delivered: transportResult.wasDelivered,
+            invalidTargets: transportResult.invalidTargets,
+            recipientId: delivery.recipientId,
+          );
+        }
+        current.attemptCount = delivery.attemptCount;
         await _rememberDiscoveredProviders(
           session,
           recipientId: delivery.recipientId,
@@ -442,59 +571,12 @@ ORDER BY classified."availableAt", classified."id"
           transaction: transaction,
         );
 
-        if (transportResult.wasDelivered) {
-          await DwPushDelivery.db.deleteRow(
-            session,
-            delivery,
-            transaction: transaction,
-          );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.delivered,
-            delivered: true,
-            removed: true,
-            invalidTargets: transportResult.invalidTargets,
-            recipientId: delivery.recipientId,
-          );
-        }
-
-        final policyDelay = transportResult.shouldRetry
-            ? _config.retryPolicy.delayAfterFailure(delivery.attemptCount)
-            : null;
-        final providerDelay = transportResult.retryAfter;
-        final retryDelay = policyDelay == null
-            ? null
-            : providerDelay != null && providerDelay > policyDelay
-            ? providerDelay
-            : policyDelay;
-        if (retryDelay != null) {
-          await _reschedule(
-            session,
-            delivery,
-            retryDelay,
-            _transportError(transportResult),
-            transaction,
-          );
-          return _DeliveryOutcome(
-            category: message.category,
-            metric: DwPushMetricOutcome.retryScheduled,
-            retried: true,
-            invalidTargets: transportResult.invalidTargets,
-            recipientId: delivery.recipientId,
-          );
-        }
-
-        await DwPushDelivery.db.deleteRow(
+        return _recordSendOutcome(
           session,
-          delivery,
+          delivery: current,
+          category: category,
+          transportResult: transportResult,
           transaction: transaction,
-        );
-        return _DeliveryOutcome(
-          category: message.category,
-          metric: DwPushMetricOutcome.failed,
-          removed: true,
-          invalidTargets: transportResult.invalidTargets,
-          recipientId: delivery.recipientId,
         );
       });
 
@@ -515,6 +597,70 @@ ORDER BY classified."availableAt", classified."id"
         sendStarted: sendStarted,
       );
     }
+  }
+
+  /// The write half of a finished send, inside the phase-three transaction.
+  Future<_DeliveryOutcome> _recordSendOutcome(
+    Session session, {
+    required DwPushDelivery delivery,
+    required String category,
+    required DwPushTransportResult transportResult,
+    required Transaction transaction,
+  }) async {
+    if (transportResult.wasDelivered) {
+      await DwPushDelivery.db.deleteRow(
+        session,
+        delivery,
+        transaction: transaction,
+      );
+      return _DeliveryOutcome(
+        category: category,
+        metric: DwPushMetricOutcome.delivered,
+        delivered: true,
+        removed: true,
+        invalidTargets: transportResult.invalidTargets,
+        recipientId: delivery.recipientId,
+      );
+    }
+
+    final policyDelay = transportResult.shouldRetry
+        ? _config.retryPolicy.delayAfterFailure(delivery.attemptCount)
+        : null;
+    final providerDelay = transportResult.retryAfter;
+    final retryDelay = policyDelay == null
+        ? null
+        : providerDelay != null && providerDelay > policyDelay
+        ? providerDelay
+        : policyDelay;
+    if (retryDelay != null) {
+      await _reschedule(
+        session,
+        delivery,
+        retryDelay,
+        _transportError(transportResult),
+        transaction,
+      );
+      return _DeliveryOutcome(
+        category: category,
+        metric: DwPushMetricOutcome.retryScheduled,
+        retried: true,
+        invalidTargets: transportResult.invalidTargets,
+        recipientId: delivery.recipientId,
+      );
+    }
+
+    await DwPushDelivery.db.deleteRow(
+      session,
+      delivery,
+      transaction: transaction,
+    );
+    return _DeliveryOutcome(
+      category: category,
+      metric: DwPushMetricOutcome.failed,
+      removed: true,
+      invalidTargets: transportResult.invalidTargets,
+      recipientId: delivery.recipientId,
+    );
   }
 
   Future<void> _releaseLeaseAfterLockContention(
@@ -565,7 +711,12 @@ WHERE "id" = @deliveryId
           transaction: transaction,
         );
         final category = message?.category ?? '_missing_message';
-        final completedAttempts = delivery.attemptCount + (sendStarted ? 1 : 0);
+        // The row already counts this attempt once the send has started: the
+        // increment is written and committed in the first phase, before the
+        // provider is called. It used to share a transaction with that call and
+        // roll back with it, which is where the `+ 1` came from. Keeping it now
+        // would count every failed attempt twice, and halve the retries.
+        final completedAttempts = delivery.attemptCount;
         final retryDelay = sendStarted
             ? _config.retryPolicy.delayAfterFailure(completedAttempts)
             : delivery.attemptCount == 0
@@ -593,7 +744,8 @@ WHERE "id" = @deliveryId
           retryDelay,
           runtimeError,
           transaction,
-          attemptCount: sendStarted ? completedAttempts : null,
+          // Nothing to rewrite: the row already holds this count.
+          attemptCount: null,
         );
         return _DeliveryOutcome(
           category: category,
@@ -784,6 +936,33 @@ WHERE "id" = @deliveryId
 
   static String _truncate(String value, int maximum) =>
       value.length <= maximum ? value : value.substring(0, maximum);
+}
+
+/// What phase one of a delivery decided: either the whole outcome, because the
+/// delivery ended before any provider was called, or everything phase two needs
+/// to make the call.
+final class _PreparedDelivery {
+  const _PreparedDelivery.done(_DeliveryOutcome this.outcome)
+    : delivery = null,
+      category = null,
+      attempt = null;
+
+  const _PreparedDelivery.send({
+    required DwPushDelivery this.delivery,
+    required String this.category,
+    required DwPushDeliveryAttempt this.attempt,
+  }) : outcome = null;
+
+  /// Set when the delivery is already finished and nothing is sent.
+  final _DeliveryOutcome? outcome;
+
+  /// The claimed row, with its attempt counter already advanced and committed.
+  final DwPushDelivery? delivery;
+
+  /// The message's category, kept because the row itself is not read again.
+  final String? category;
+
+  final DwPushDeliveryAttempt? attempt;
 }
 
 final class _DeliveryOutcome {

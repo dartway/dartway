@@ -1,3 +1,53 @@
+## 0.4.0
+
+**The provider call no longer happens inside a database transaction.**
+
+A delivery used to run as one transaction: take the recipient's advisory lock,
+read the row, call the provider, write the outcome. The provider call is the
+slow part, and holding a pooled connection through it is how one slow provider
+made every unrelated query in the app wait — measured on a production app as a
+uniform multi-second tail across queries that had nothing to do with push.
+
+A delivery is now three steps: a transaction that decides and commits what the
+send needs (under the same lock, so a recipient being deleted still either wins
+the race outright or waits for this short step), the send itself with no
+connection held, and a transaction that writes the outcome. The outcome write
+re-reads the row and is conditioned on it, so a delivery cancelled meanwhile —
+account deletion cancels the recipient's queue — leaves nothing behind.
+
+**What this gives up, deliberately:** a push already handed to the provider can
+land on the device of an account whose deletion started during that call. The
+window is one provider round-trip. Before, the deletion waited instead.
+
+The row lock no longer spans the provider call either, so a send that outlives
+`leaseDuration` — two minutes by default, against a ten-second provider timeout
+— can be reclaimed and re-sent by another worker while the first call is still
+out. Delivery was already at-least-once; this is one more way to reach it, and
+the margin between the two defaults is what keeps it rare.
+
+**A worker pass now respects a wall-clock deadline, and stops re-reading one
+message per delivery.**
+
+`DwPushWorker.processBatch` (and `DwPush.processBatch`) take an optional
+`deadline`. A caller that drains in a loop could only check its budget *between*
+passes, and the pass it was inside of was the one that overran it: a batch is
+`batchSize` deliveries at `maxConcurrentDeliveries` in flight, each waiting out a
+provider round-trip, which is minutes when the provider is slow. Observed on a
+production app: a 20-second drain budget producing runs of 55 to 77 seconds. With
+a deadline the batch stops between concurrency chunks and hands the deliveries it
+did not reach straight back to the queue — unleased, so the next pass can take
+them instead of waiting out `leaseDuration`.
+
+The batch also loads its messages in one query and passes them to the deliveries.
+A fan-out is thousands of deliveries of the *same* message, and each of them was
+re-reading that one row: on the same app, 11 to 13 thousand queries in a single
+pass. The row is written once at enqueue and never updated, so reading it once
+per batch sees exactly what the per-delivery read saw.
+
+`DwPushBatchResult.claimed` now counts the deliveries the pass actually
+processed, not the ones it claimed — the two differ only when a deadline cut the
+pass short.
+
 ## 0.3.0
 
 Web click-through no longer rests on the app's service worker alone, and a

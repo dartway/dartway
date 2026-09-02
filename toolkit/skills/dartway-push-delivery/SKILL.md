@@ -265,6 +265,21 @@ await dwPush!.processBatch(session);
 await dwPush!.cleanup(session);
 ```
 
+**Draining in a loop with a time budget — pass the budget in.** A pass without a
+deadline runs to the end of its claimed batch however long the provider takes, so
+a loop that only checks its clock between passes overruns by whatever the pass
+inside it cost (a real case: a 20-second budget producing 55-77-second runs).
+With `deadline:` the batch stops between concurrency chunks and returns what it
+did not reach to the queue unleased, ready for the next pass:
+
+```dart
+final deadline = DateTime.now().add(const Duration(seconds: 20));
+while (DateTime.now().isBefore(deadline)) {
+  final result = await dwPush!.processBatch(session, deadline: deadline);
+  if (result.claimed == 0) break; // claimed counts what the pass processed
+}
+```
+
 Several instances may run: claim uses `FOR UPDATE SKIP LOCKED` + leases, takes at
 most one delivery per recipient per batch, and serialises with `pause` via
 runtime state. `attemptCount` is incremented only immediately before a real

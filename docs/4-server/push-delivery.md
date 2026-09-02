@@ -266,7 +266,37 @@ await dwPush!.queue.enqueue(
 
 Your app schedules the worker with [`DwRecurringFutureCall`](recurring-jobs.md)
 and calls `dwPush!.processBatch(session)` and `dwPush!.cleanup(session)`. Several
-instances can run at once safely. Delivery is **at-least-once**: a crash right
+instances can run at once safely.
+
+**A job that drains in a loop passes its budget in**, as `processBatch(session,
+deadline: ...)`. Without it a pass runs to the end of its claimed batch however
+long the provider takes, and a loop that checks its own clock between passes is
+measuring the wrong thing — the pass it is inside of is the one that overran. A
+production app watched its 20-second drain budget produce 55-to-77-second runs
+exactly this way. Given a deadline the batch stops between concurrency chunks
+and hands the deliveries it did not reach back to the queue **unleased**, so the
+next pass takes them immediately instead of waiting out `leaseDuration`:
+
+```dart
+final deadline = DateTime.now().add(const Duration(seconds: 20));
+while (DateTime.now().isBefore(deadline)) {
+  final result = await dwPush!.processBatch(session, deadline: deadline);
+  if (result.claimed == 0) break;
+}
+```
+
+`DwPushBatchResult.claimed` counts what the pass processed, so that loop ends on
+an empty queue rather than on a batch the deadline cut short.
+
+**The provider call happens outside a transaction.** A delivery is three steps —
+a short transaction that decides what to send (under the recipient's lock), the
+send itself with no database connection held, and a short transaction that
+writes the outcome, conditioned on the delivery row still being there. The
+consequence to know: a push already handed to the provider can land on the
+device of an account whose deletion began during that call, a window of one
+round-trip. Deleting an account still cancels everything still queued.
+
+Delivery is **at-least-once**: a crash right
 after the provider accepted a message can produce a duplicate — a deliberate,
 documented tradeoff, since for notifications a rare duplicate beats a silent
 drop. The attempt counter only advances on a real send, so recovering a crashed
