@@ -37,6 +37,10 @@ on:
   # That is worth having for its own sake, not only to get registered — a CI
   # gate whose last edit was never executed is a gate nobody has run.
   push:
+    # `master` only. Without it a branch push and the pull request both match,
+    # and the job runs twice for one change — which it did on the pull request
+    # that added these triggers.
+    branches: [master]
     paths:
       - '.github/workflows/database.yml'
   pull_request:
