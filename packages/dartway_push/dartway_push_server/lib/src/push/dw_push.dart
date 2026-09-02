@@ -118,12 +118,20 @@ final class DwPush {
     },
   );
 
+  /// Claims and processes one batch. [deadline] bounds the pass in wall-clock
+  /// time — a caller draining in a loop passes its own budget, so the pass it is
+  /// inside of cannot overrun it. See [DwPushWorker.processBatch].
   Future<DwPushBatchResult> processBatch(
     Session session, {
     String workerName = 'default',
+    DateTime? deadline,
   }) async {
     await _ensureStorageSettings(session);
-    return worker.processBatch(session, workerName: workerName);
+    return worker.processBatch(
+      session,
+      workerName: workerName,
+      deadline: deadline,
+    );
   }
 
   /// Applies the recommended per-table autovacuum settings for the two

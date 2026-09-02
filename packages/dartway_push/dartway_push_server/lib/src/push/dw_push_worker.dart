@@ -31,9 +31,21 @@ final class DwPushWorker {
   final Random _random = Random.secure();
 
   /// Claims and processes one bounded batch using PostgreSQL `SKIP LOCKED`.
+  ///
+  /// [deadline] bounds the pass in wall-clock time. Without it a pass runs to
+  /// the end of its claimed batch however long that takes, and how long that is
+  /// belongs to the provider, not to us: `batchSize` deliveries at
+  /// `maxConcurrentDeliveries` in flight, each waiting out a round-trip, is
+  /// minutes when the provider is slow. A caller that drains in a loop and
+  /// stops after N seconds is measuring the wrong thing if it can only check
+  /// between passes — the pass it is inside of is the one that overran. Given a
+  /// deadline, the batch stops between concurrency chunks and hands the
+  /// deliveries it did not reach straight back to the queue instead of holding
+  /// them leased.
   Future<DwPushBatchResult> processBatch(
     Session session, {
     String workerName = 'default',
+    DateTime? deadline,
   }) async {
     if (await _runtime.isPaused(session, workerName)) {
       return const DwPushBatchResult.paused();
@@ -63,12 +75,21 @@ final class DwPushWorker {
       () => _runtime.markClaimed(session, workerName: workerName),
     );
 
+    // One read for the whole batch instead of one per delivery. A fan-out is
+    // thousands of deliveries of the *same* message, so the per-delivery
+    // `findById` was re-reading one row thousands of times; the row is written
+    // once at enqueue and never updated, so reading it outside the delivery's
+    // own transaction changes nothing it could have seen.
+    final messages = await _loadMessages(session, deliveries);
+
     final outcomes = <_DeliveryOutcome>[];
+    var processed = 0;
     for (
       var offset = 0;
       offset < deliveries.length;
       offset += _config.maxConcurrentDeliveries
     ) {
+      if (deadline != null && !_config.clock().isBefore(deadline)) break;
       final end = min(
         offset + _config.maxConcurrentDeliveries,
         deliveries.length,
@@ -77,9 +98,21 @@ final class DwPushWorker {
         await Future.wait(
           deliveries
               .sublist(offset, end)
-              .map((delivery) => _process(session, delivery, leaseId)),
+              .map(
+                (delivery) =>
+                    _process(session, delivery, leaseId, messages: messages),
+              ),
         ),
       );
+      processed = end;
+    }
+
+    // Whatever the deadline cut off is queue work again, not work in progress:
+    // left leased it would sit out `leaseDuration` before any worker could take
+    // it, which is the opposite of what a deadline is for.
+    final abandoned = deliveries.sublist(processed);
+    if (abandoned.isNotEmpty) {
+      await _releaseLeases(session, abandoned, leaseId);
     }
 
     await _recordMetrics(session, outcomes);
@@ -99,11 +132,54 @@ final class DwPushWorker {
     );
 
     return DwPushBatchResult(
-      claimed: deliveries.length,
+      claimed: processed,
       delivered: outcomes.where((outcome) => outcome.delivered).length,
       retried: outcomes.where((outcome) => outcome.retried).length,
       removed: outcomes.where((outcome) => outcome.removed).length,
       paused: false,
+    );
+  }
+
+  /// The messages the claimed batch refers to, by id.
+  Future<Map<int, DwPushMessage>> _loadMessages(
+    Session session,
+    List<DwPushDelivery> deliveries,
+  ) async {
+    final ids = deliveries.map((delivery) => delivery.messageId).toSet();
+    if (ids.isEmpty) return const {};
+    final rows = await DwPushMessage.db.find(
+      session,
+      where: (table) => table.id.inSet(ids),
+    );
+    return {for (final row in rows) row.id!: row};
+  }
+
+  /// Hands leases back for deliveries this pass will not process. Conditioned
+  /// on the lease id, so a delivery another worker has since claimed is left
+  /// alone.
+  Future<void> _releaseLeases(
+    Session session,
+    List<DwPushDelivery> deliveries,
+    String leaseId,
+  ) async {
+    final ids = deliveries
+        .map((delivery) => delivery.id)
+        .whereType<int>()
+        .toList();
+    if (ids.isEmpty) return;
+    await session.db.unsafeExecute(
+      '''
+UPDATE "dw_push_delivery"
+SET
+  "leaseId" = NULL,
+  "leaseExpiresAt" = NULL
+WHERE "id" = ANY(@deliveryIds)
+  AND "leaseId" = @leaseId
+''',
+      parameters: QueryParameters.named({
+        'deliveryIds': ids,
+        'leaseId': leaseId,
+      }),
     );
   }
 
@@ -337,8 +413,9 @@ ORDER BY classified."availableAt", classified."id"
   Future<_DeliveryOutcome> _process(
     Session session,
     DwPushDelivery claimed,
-    String leaseId,
-  ) async {
+    String leaseId, {
+    Map<int, DwPushMessage> messages = const {},
+  }) async {
     var sendStarted = false;
     try {
       final outcome = await session.db.transaction((transaction) async {
@@ -366,11 +443,13 @@ ORDER BY classified."availableAt", classified."id"
           return const _DeliveryOutcome.ignored();
         }
 
-        final message = await DwPushMessage.db.findById(
-          session,
-          delivery.messageId,
-          transaction: transaction,
-        );
+        final message =
+            messages[delivery.messageId] ??
+            await DwPushMessage.db.findById(
+              session,
+              delivery.messageId,
+              transaction: transaction,
+            );
         if (message == null) {
           await DwPushDelivery.db.deleteRow(
             session,
