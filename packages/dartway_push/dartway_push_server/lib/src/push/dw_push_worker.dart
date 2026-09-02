@@ -711,7 +711,12 @@ WHERE "id" = @deliveryId
           transaction: transaction,
         );
         final category = message?.category ?? '_missing_message';
-        final completedAttempts = delivery.attemptCount + (sendStarted ? 1 : 0);
+        // Строка уже учитывает эту попытку, если отправка началась: инкремент
+        // пишется и коммитится в первой фазе, до вызова провайдера. Раньше он
+        // жил в одной транзакции с вызовом и откатывался вместе с ним — отсюда
+        // и было «+1». Оставить его теперь значит считать каждую неудачную
+        // попытку дважды и вдвое сократить число ретраев.
+        final completedAttempts = delivery.attemptCount;
         final retryDelay = sendStarted
             ? _config.retryPolicy.delayAfterFailure(completedAttempts)
             : delivery.attemptCount == 0
@@ -739,7 +744,8 @@ WHERE "id" = @deliveryId
           retryDelay,
           runtimeError,
           transaction,
-          attemptCount: sendStarted ? completedAttempts : null,
+          // Ничего не переписываем: счётчик уже такой в строке.
+          attemptCount: null,
         );
         return _DeliveryOutcome(
           category: category,

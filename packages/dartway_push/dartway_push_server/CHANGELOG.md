@@ -19,6 +19,12 @@ account deletion cancels the recipient's queue — leaves nothing behind.
 land on the device of an account whose deletion started during that call. The
 window is one provider round-trip. Before, the deletion waited instead.
 
+The row lock no longer spans the provider call either, so a send that outlives
+`leaseDuration` — two minutes by default, against a ten-second provider timeout
+— can be reclaimed and re-sent by another worker while the first call is still
+out. Delivery was already at-least-once; this is one more way to reach it, and
+the margin between the two defaults is what keeps it rare.
+
 **A worker pass now respects a wall-clock deadline, and stops re-reading one
 message per delivery.**
 
