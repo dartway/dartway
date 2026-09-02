@@ -1,4 +1,4 @@
-## 0.3.0
+## 0.4.0
 
 **A worker pass now respects a wall-clock deadline, and stops re-reading one
 message per delivery.**
@@ -22,6 +22,8 @@ per batch sees exactly what the per-delivery read saw.
 `DwPushBatchResult.claimed` now counts the deliveries the pass actually
 processed, not the ones it claimed — the two differ only when a deadline cut the
 pass short.
+
+## 0.3.0
 
 Web click-through no longer rests on the app's service worker alone, and a
 provider that was asked for and not finished now says so.
