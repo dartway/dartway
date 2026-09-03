@@ -4,10 +4,23 @@ table: dw_cloud_file
 fields:
   createdBy: int? # userId 
   bucket: String # Bucket name (can be separated by projects or environments)
-  path: String # Path inside the bucket (uploads/user_123/avatar.png)
+  path: String # Path inside the bucket (avatars/u123/2026-09-03T14-22-07_photo.jpg)
   publicUrl: String # Public URL of the file, if available
+  fileName: String? # The name the upload was labelled with, before the key was built
   size: int? # File size in bytes
   mimeType: String? # MIME type (image/png, application/pdf and etc.)
   
   createdAt: DateTime # When the file was uploaded
   verifiedAt: DateTime? # When the file was verified (if there is a verify process)
+
+indexes:
+  # A row is created when the server hands out an upload description and
+  # stamped when the bytes are confirmed, so this table is the ledger of every
+  # key the server has issued. That is what makes the key unique: the leaf is
+  # built from a second-resolution timestamp and a caller-supplied name, both
+  # of which repeat, and an overwrite in object storage leaves no trace on
+  # either side. The index is what turns a repeat into a refused insert the
+  # endpoint can answer by trying the next candidate.
+  dw_cloud_file_bucket_path_idx:
+    fields: bucket, path
+    unique: true

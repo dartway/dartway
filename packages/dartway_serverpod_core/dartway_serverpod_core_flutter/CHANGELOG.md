@@ -2,6 +2,30 @@
 
 ## 0.12.0
 
+- **`DwFileUploadHandler` no longer names the object — the server does.** Naming it here was the
+  hole: the name was correct, but it was correct on a device, and the endpoint signed an upload for
+  whatever key it was handed. See `dartway_serverpod_core_server` 0.12.0 for what the server does
+  now.
+
+  What this changes for an application, in the order you are likely to meet it:
+
+  1. **Nothing**, if uploads go through `pickAndUploadImage`, `pickAndUploadImageUrl`,
+     `uploadXFileToServer` or `uploadPlatformFileToServer`. `path` is still the folder inside the
+     bucket, and the file name is now taken from the picked file automatically.
+  2. **`uploadBytesToServer` and `uploadBytesToServerUrl` changed shape.** `path` was the whole key
+     there — the one form where the caller named the leaf. They now take `folder`, a required
+     `fileExtension` describing the bytes being sent, and an optional `fileName`. The parameter was
+     renamed rather than reused so that a call site cannot keep compiling with a new meaning.
+  3. **`defaultUploadNameTemplate` and `defaultPlatformUploadNameTemplate` are gone.** There is no
+     client-side name left to template.
+  4. **Rewrite anything that built an object path by hand** or called
+     `dw.serverTransport.getUploadDescription` / `verifyUpload` directly.
+
+  New keys look like `avatars/u123/2026-09-03T14-22-07_photo.jpg`, so the object downloads under
+  the name it was given — with a public URL and no `Content-Disposition` to set, the last path
+  segment is what the browser saves. Links already stored keep working; nothing in the bucket
+  moves.
+
 - **An upload is no longer named after a calendar second.** `DwFileUploadHandler` named every object
   `yyyy-MM-dd hh:mm:ss` — a 12-hour clock with nothing marking AM from PM, so one in the afternoon
   and one in the morning were the same key. Two uploads addressing one object needed no concurrency

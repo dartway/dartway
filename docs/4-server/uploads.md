@@ -20,22 +20,41 @@ forms exist when you need more: `pickAndUploadImage()` returns a `DwCloudFile` (
 intent.
 
 Every one of them takes an optional `path` — the folder inside the bucket the object lands in, `avatars` or
-`chat/$roomId`. Omit it and the object sits at the bucket root.
+`chat/$roomId`. Omit it and the object sits under your own segment at the bucket root.
+
+When you already hold the bytes, `uploadBytesToServer` takes them plus `folder`, a required
+`fileExtension` describing what the bytes are, and an optional `fileName`.
 
 ## The object name
 
-You do not name the object; the framework does, and the name is 16 secure random bytes behind a
-readable timestamp. **The randomness is not decoration.** The bucket serves anonymous `GetObject`,
-so a name anyone can guess from a neighbouring one is a file anyone can read — withholding the
-listing protects nothing when the keys enumerate themselves. A guessable name is also a name two
-uploads can collide on, and an overwrite in object storage leaves no trace on either side: the first
-file simply stops existing.
+**You do not name the object, and you cannot.** The server does, from what you send: the folder,
+your user id, a UTC timestamp, the file name you suggested and the extension of the bytes.
 
-`path` is therefore the knob to reach for when you want uploads grouped or scoped; the name itself is
-not. If you do replace `DwFileUploadHandler.defaultUploadNameTemplate`, keep a random segment in it,
-and leave the extension off — the upload call appends the extension of the bytes it actually sends,
-which is not always the extension of the file that was picked (most images are converted to JPEG on
-the way).
+```
+avatars/u123/2026-09-03T14-22-07_photo.jpg
+```
+
+This is not a matter of style. The endpoint used to sign an upload for whatever key the client
+asked for, which meant a signed-in user who knew somebody else's key could overwrite the object
+behind it — and object storage reports an overwrite on neither side, so the first file simply stops
+existing. Any check the client performs is a check on a device; the guarantee has to be a key the
+client does not choose.
+
+Three consequences worth knowing:
+
+- **The folder is a hint, not a boundary.** It is sanitised into plain path segments — `..`, leading
+  slashes, backslashes and control characters do not survive — and capped at four levels deep. Your
+  own `u<id>` segment is inserted after it either way.
+- **The suggested name is sanitised too**, and it is what the object downloads as: these URLs are
+  public and direct, so there is no `Content-Disposition` to set and the browser saves the file
+  under the last path segment.
+- **The extension is a separate argument from the name**, because the two disagree. Most images are
+  converted to JPEG on the way out, so the picked file is `.heic` while the bytes are `.jpg` — and
+  the recorded mime type is read off the key.
+
+Uniqueness is held by the `dw_cloud_file` table, not by the name: the row is written when the
+server hands out the description, a unique index on `(bucket, path)` refuses a key already issued,
+and the endpoint tries the next candidate.
 
 Wrap it in `dw.action`: an upload is slow, and `DwActionBuilder` supplies the `busy` flag and blocks
 the second tap for free.
@@ -84,6 +103,16 @@ have hit a collision on their first run.
 
 ## What is stored
 
-`verifyUpload` records a `DwCloudFile` row — object path, bucket, size, mime type, the uploading user
-and the public URL — so the file is queryable afterwards rather than being a URL nobody can account
-for. The endpoint requires a signed-in user; anonymous uploads are not a thing.
+An upload is two calls, and the server owns both ends.
+
+`getUploadDescription` builds the key, writes a `DwCloudFile` row for it — bucket, path, public URL,
+file name, the uploading user — and answers with a `DwUploadTicket`: the signed description, plus
+the id of that row. The row is a **reservation** at this point, with no size and no `verifiedAt`.
+
+`verifyUpload` takes that id, not a path. It stats the object, fills in the size and stamps
+`verifiedAt`, and it answers `null` when the reservation is unknown, belongs to somebody else, or
+holds no bytes yet — so a caller has nothing to name but its own upload. A row that never gets a
+size is an upload that never landed.
+
+The endpoint requires a signed-in user with a profile; anonymous uploads are not a thing, and the
+key is built from that id.

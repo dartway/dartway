@@ -2,6 +2,37 @@
 
 ## 0.12.0
 
+- **Uploads: the server names the object, and confirms only the reservation it issued.**
+
+  `DwUploadEndpoint.getUploadDescription` took an object path from the caller and signed an S3
+  policy for exactly it. `requireLogin` was the whole check — nothing tested that the key was
+  free, that it belonged to the caller, or that it had any shape at all. So a signed-in user who
+  knew somebody else's key overwrote the object behind it, and object storage reports an overwrite
+  on neither side. `verifyUpload` completed the picture: it stated any path it was given and
+  inserted a `DwCloudFile` naming the caller as the owner, so an object could be claimed without
+  uploading a byte.
+
+  The caller now names neither. It passes the folder the object belongs in, the extension of the
+  bytes actually being sent and, optionally, a file name to be readable by; the server builds
+  `<folder>/u<userId>/<stamp>_<name><ext>`, records it as a reservation and answers with a
+  `DwUploadTicket` — the signed description plus the id of that row. `verifyUpload` takes that id
+  and answers `null` for a reservation that is unknown, is not the caller's, or holds no bytes.
+
+  `DwCloudFile` gains `fileName` and a **unique index on `(bucket, path)`**. The ledger is what
+  makes a key unique now, so a repeat is a refused insert the endpoint answers by trying the next
+  candidate rather than a silent overwrite.
+
+  **The migration fails on a table that already holds two rows for one `(bucket, path)`** — which
+  is precisely the trace this defect leaves. Find them before applying it:
+
+  ```sql
+  SELECT bucket, path, count(*), array_agg(id)
+  FROM dw_cloud_file GROUP BY bucket, path HAVING count(*) > 1;
+  ```
+
+  Objects already in the bucket do not move, and `publicUrl` values already stored keep resolving:
+  what changes is how new keys are built. Closes #191.
+
 - **`dw_auth_request` is indexed on `(userIdentifier, createdAt)`.**
 
   Every code request reads that identifier's own send history — rate limiting asks, by

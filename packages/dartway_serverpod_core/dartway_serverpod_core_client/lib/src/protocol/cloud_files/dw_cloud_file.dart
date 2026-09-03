@@ -19,6 +19,7 @@ abstract class DwCloudFile implements _i1.SerializableModel {
     required this.bucket,
     required this.path,
     required this.publicUrl,
+    this.fileName,
     this.size,
     this.mimeType,
     required this.createdAt,
@@ -31,6 +32,7 @@ abstract class DwCloudFile implements _i1.SerializableModel {
     required String bucket,
     required String path,
     required String publicUrl,
+    String? fileName,
     int? size,
     String? mimeType,
     required DateTime createdAt,
@@ -44,6 +46,7 @@ abstract class DwCloudFile implements _i1.SerializableModel {
       bucket: jsonSerialization['bucket'] as String,
       path: jsonSerialization['path'] as String,
       publicUrl: jsonSerialization['publicUrl'] as String,
+      fileName: jsonSerialization['fileName'] as String?,
       size: jsonSerialization['size'] as int?,
       mimeType: jsonSerialization['mimeType'] as String?,
       createdAt: _i1.DateTimeJsonExtension.fromJson(
@@ -68,6 +71,8 @@ abstract class DwCloudFile implements _i1.SerializableModel {
 
   String publicUrl;
 
+  String? fileName;
+
   int? size;
 
   String? mimeType;
@@ -85,6 +90,7 @@ abstract class DwCloudFile implements _i1.SerializableModel {
     String? bucket,
     String? path,
     String? publicUrl,
+    String? fileName,
     int? size,
     String? mimeType,
     DateTime? createdAt,
@@ -99,6 +105,7 @@ abstract class DwCloudFile implements _i1.SerializableModel {
       'bucket': bucket,
       'path': path,
       'publicUrl': publicUrl,
+      if (fileName != null) 'fileName': fileName,
       if (size != null) 'size': size,
       if (mimeType != null) 'mimeType': mimeType,
       'createdAt': createdAt.toJson(),
@@ -121,6 +128,7 @@ class _DwCloudFileImpl extends DwCloudFile {
     required String bucket,
     required String path,
     required String publicUrl,
+    String? fileName,
     int? size,
     String? mimeType,
     required DateTime createdAt,
@@ -131,6 +139,7 @@ class _DwCloudFileImpl extends DwCloudFile {
          bucket: bucket,
          path: path,
          publicUrl: publicUrl,
+         fileName: fileName,
          size: size,
          mimeType: mimeType,
          createdAt: createdAt,
@@ -147,6 +156,7 @@ class _DwCloudFileImpl extends DwCloudFile {
     String? bucket,
     String? path,
     String? publicUrl,
+    Object? fileName = _Undefined,
     Object? size = _Undefined,
     Object? mimeType = _Undefined,
     DateTime? createdAt,
@@ -158,6 +168,7 @@ class _DwCloudFileImpl extends DwCloudFile {
       bucket: bucket ?? this.bucket,
       path: path ?? this.path,
       publicUrl: publicUrl ?? this.publicUrl,
+      fileName: fileName is String? ? fileName : this.fileName,
       size: size is int? ? size : this.size,
       mimeType: mimeType is String? ? mimeType : this.mimeType,
       createdAt: createdAt ?? this.createdAt,

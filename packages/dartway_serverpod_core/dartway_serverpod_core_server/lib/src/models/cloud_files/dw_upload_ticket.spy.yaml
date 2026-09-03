@@ -1,0 +1,12 @@
+### What the server hands back when it agrees to an upload.
+###
+### The key is deliberately absent: the client does not need it and must not
+### act on it. It uploads with the signed description, then confirms with
+### [fileId] — the row the server reserved for this upload, which is also the
+### only thing `verifyUpload` accepts. A path travelling back to the client and
+### in again is what let one caller confirm another caller's object.
+class: DwUploadTicket
+
+fields:
+  fileId: int
+  uploadDescription: String
