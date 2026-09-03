@@ -99,10 +99,17 @@ final class DwServerpodTransport implements DwServerTransport {
       _caller.dwCrud.subscribeOnUpdates(channel: channel);
 
   @override
-  Future<String?> getUploadDescription({required String path}) =>
-      _caller.dwUpload.getUploadDescription(path: path);
+  Future<DwUploadTicket?> getUploadDescription({
+    String? folder,
+    required String fileExtension,
+    String? fileName,
+  }) => _caller.dwUpload.getUploadDescription(
+    folder: folder,
+    fileExtension: fileExtension,
+    fileName: fileName,
+  );
 
   @override
-  Future<DwCloudFile?> verifyUpload({required String path}) =>
-      _caller.dwUpload.verifyUpload(path: path);
+  Future<DwCloudFile?> verifyUpload({required int fileId}) =>
+      _caller.dwUpload.verifyUpload(fileId: fileId);
 }

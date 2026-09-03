@@ -64,8 +64,10 @@ class ProfileSettingsWidget extends HookConsumerWidget {
           Center(
             child: DwActionBuilder(
               action: dw.action((_) async {
-                // `path` is the folder in the bucket; the object's own name
-                // is the framework's business and is random by design.
+                // `path` is the folder in the bucket. The key itself is
+                // the server's to build — folder, this user's segment, a
+                // timestamp and the picked file's name — so no caller can
+                // name, and overwrite, another user's object.
                 final imageUrl =
                     await DwFileUploadHandler.pickAndUploadImageUrl(
                       path: 'avatars',

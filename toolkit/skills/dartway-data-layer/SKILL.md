@@ -718,9 +718,11 @@ From then on the link lives as an ordinary model field and travels the same CRUD
 
 Neighbouring forms: `pickAndUploadImage()` (returns a `DwCloudFile` with size and mime), `uploadXFileToServer(xFile:)` — when the file is already obtained (camera, drag-n-drop).
 
-Every one of them takes an optional `path` — the folder inside the bucket (`avatars`, `chat/$roomId`). Omit it and the object sits at the root.
+Every one of them takes an optional `path` — the folder inside the bucket (`avatars`, `chat/$roomId`). Omit it and the object sits under your own segment at the bucket root.
 
-**Do not name the object yourself.** The framework names it after 16 secure random bytes behind a readable timestamp, and that is a guarantee, not a style: the bucket serves anonymous `GetObject`, so a guessable name is a readable file, and two uploads that collide overwrite each other with no trace on either side. Group uploads with `path`; leave the name alone.
+**You cannot name the object, and that is the point.** The server builds the key from the folder, the caller's user id, a timestamp and the picked file's name — `avatars/u123/2026-09-03T14-22-07_photo.jpg`. It used to sign an upload for whatever key the client asked for, which let a signed-in user overwrite another user's object; object storage reports an overwrite on neither side. Group uploads with `path`; the rest is not yours to choose.
+
+When you already hold the bytes, `uploadBytesToServer(bytes:, folder:, fileExtension:, fileName:)` — the extension is separate from the name because most images are converted to JPEG on the way out, and the recorded mime type is read off the key.
 
 **Wrap it in `dw.action`** — the upload is long, and `DwActionBuilder` will suppress a repeated tap by itself and hand back `busy` for the indicator.
 

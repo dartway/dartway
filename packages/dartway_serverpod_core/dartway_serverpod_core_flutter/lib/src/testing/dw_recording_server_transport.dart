@@ -204,10 +204,15 @@ class DwRecordingServerTransport implements DwServerTransport {
   Stream<SerializableModel> Function(String channel)? answerSubscribe;
 
   /// Answers `getUploadDescription`. Unset means it throws.
-  Future<String?> Function(String path)? answerUploadDescription;
+  Future<DwUploadTicket?> Function(
+    String? folder,
+    String fileExtension,
+    String? fileName,
+  )?
+  answerUploadDescription;
 
   /// Answers `verifyUpload`. Unset means it throws.
-  Future<DwCloudFile?> Function(String path)? answerVerifyUpload;
+  Future<DwCloudFile?> Function(int fileId)? answerVerifyUpload;
 
   /// Forgets everything recorded and every prepared answer.
   void reset() {
@@ -345,29 +350,33 @@ class DwRecordingServerTransport implements DwServerTransport {
       );
 
   @override
-  Future<String?> getUploadDescription({required String path}) {
+  Future<DwUploadTicket?> getUploadDescription({
+    String? folder,
+    required String fileExtension,
+    String? fileName,
+  }) {
     final answer = answerUploadDescription;
     if (answer == null) {
       throw DwUnpreparedServerCall(
         'getUploadDescription',
         'answerUploadDescription',
-        'path: $path',
+        'folder: $folder, fileExtension: $fileExtension, fileName: $fileName',
       );
     }
-    return answer(path);
+    return answer(folder, fileExtension, fileName);
   }
 
   @override
-  Future<DwCloudFile?> verifyUpload({required String path}) {
+  Future<DwCloudFile?> verifyUpload({required int fileId}) {
     final answer = answerVerifyUpload;
     if (answer == null) {
       throw DwUnpreparedServerCall(
         'verifyUpload',
         'answerVerifyUpload',
-        'path: $path',
+        'fileId: $fileId',
       );
     }
-    return answer(path);
+    return answer(fileId);
   }
 }
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0
+
+**`dwUpload` changed shape.** `getUploadDescription` takes a folder, an extension and an optional
+file name instead of an object path, and answers with a `DwUploadTicket`; `verifyUpload` takes the
+reservation's id instead of a path. The caller no longer names the object — see
+`dartway_serverpod_core_server` 0.12.0 for why, and `dartway_serverpod_core_flutter` 0.12.0 for what
+an application has to change.
+
 ## 0.11.0
 
 `DwApiResponse` gains **`isRefusal`** and the `DwApiResponse.refusal(message)` constructor, mirroring

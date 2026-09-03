@@ -88,11 +88,21 @@ abstract interface class DwServerTransport {
 
   // --- Uploads ---------------------------------------------------------------
 
-  /// Asks the server for a one-shot upload description for [path], or `null`
-  /// when it refuses the path.
-  Future<String?> getUploadDescription({required String path});
+  /// Asks the server to reserve a key and sign a one-shot upload for it.
+  ///
+  /// The caller does not name the key: [folder] says where in the bucket the
+  /// object belongs, [fileName] suggests its readable part, and
+  /// [fileExtension] describes the bytes actually being sent — which is not
+  /// always the extension of the file that was picked. The ticket carries the
+  /// signed description and the id of the reservation to confirm with.
+  Future<DwUploadTicket?> getUploadDescription({
+    String? folder,
+    required String fileExtension,
+    String? fileName,
+  });
 
-  /// Confirms with the server that the bytes at [path] arrived, and answers
-  /// with the stored file — `null` when the upload cannot be verified.
-  Future<DwCloudFile?> verifyUpload({required String path});
+  /// Confirms with the server that the bytes for reservation [fileId] arrived,
+  /// and answers with the stored file — `null` when the upload cannot be
+  /// verified or the reservation is not the caller's.
+  Future<DwCloudFile?> verifyUpload({required int fileId});
 }

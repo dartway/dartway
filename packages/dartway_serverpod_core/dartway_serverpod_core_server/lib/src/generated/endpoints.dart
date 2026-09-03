@@ -237,10 +237,20 @@ class Endpoints extends _i1.EndpointDispatch {
         'getUploadDescription': _i1.MethodConnector(
           name: 'getUploadDescription',
           params: {
-            'path': _i1.ParameterDescription(
-              name: 'path',
+            'folder': _i1.ParameterDescription(
+              name: 'folder',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'fileExtension': _i1.ParameterDescription(
+              name: 'fileExtension',
               type: _i1.getType<String>(),
               nullable: false,
+            ),
+            'fileName': _i1.ParameterDescription(
+              name: 'fileName',
+              type: _i1.getType<String?>(),
+              nullable: true,
             ),
           },
           call:
@@ -250,15 +260,17 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async => (endpoints['dwUpload'] as _i3.DwUploadEndpoint)
                   .getUploadDescription(
                     session,
-                    path: params['path'],
+                    folder: params['folder'],
+                    fileExtension: params['fileExtension'],
+                    fileName: params['fileName'],
                   ),
         ),
         'verifyUpload': _i1.MethodConnector(
           name: 'verifyUpload',
           params: {
-            'path': _i1.ParameterDescription(
-              name: 'path',
-              type: _i1.getType<String>(),
+            'fileId': _i1.ParameterDescription(
+              name: 'fileId',
+              type: _i1.getType<int>(),
               nullable: false,
             ),
           },
@@ -269,7 +281,7 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async =>
                   (endpoints['dwUpload'] as _i3.DwUploadEndpoint).verifyUpload(
                     session,
-                    path: params['path'],
+                    fileId: params['fileId'],
                   ),
         ),
       },
