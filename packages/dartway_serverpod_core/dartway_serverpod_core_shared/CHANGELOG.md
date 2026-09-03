@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.0
+
+No changes of its own. The four `dartway_serverpod_core_*` packages move in lockstep — one version
+across all four — so this package carries the release even when the work landed in its siblings.
+An entry is written anyway: a version published with no line in the changelog reads, to anyone
+reading from pub.dev, as a release nobody could describe.
+
+See `dartway_serverpod_core_server` 0.12.0 for what moved.
+
 ## 0.11.0
 
 **An alert now has a deadline and a way through a proxy.** Both are about the same production
