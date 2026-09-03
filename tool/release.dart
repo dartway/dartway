@@ -20,7 +20,9 @@
 // Exit codes, the same three the other tools use:
 //   0  nothing to publish, or the plan printed / everything published
 //   1  something is wrong, or a publication failed
-//   2  pub.dev could not be asked at all — not a finding, an unknown
+//   2  the question could not be put at all — pub.dev unreachable, or this was
+//      not run from the repository root. Not an answer, an unknown; the same
+//      third code the other tools here use, and for the same reason.
 
 import 'dart:convert';
 import 'dart:io';
@@ -65,10 +67,20 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  final plan = _order(
-    packages.where((p) => !published[p.name]!.contains(p.version)).toList(),
-  );
-  _verifyOrder(plan);
+  final List<_Package> plan;
+  try {
+    plan = _order(
+      packages.where((p) => !published[p.name]!.contains(p.version)).toList(),
+    );
+    _verifyOrder(plan);
+  } on StateError catch (failure) {
+    // The header states what each exit code means, and a promise about
+    // behaviour is checked the same way as any other: an ordering failure is
+    // "something is wrong", so it leaves by that door rather than through
+    // Dart's uncaught-exception path with a stack trace and code 255.
+    stderr.writeln(failure.message);
+    exit(1);
+  }
 
   if (plan.isEmpty) {
     stdout.writeln('\n✓ every package is published at the version this tree '
@@ -166,8 +178,9 @@ String? _refuseToPublishBecause() {
 /// Every publishable package in the workspace.
 ///
 /// `publish_to: none` marks the ones that exist to be run rather than depended
-/// on — the two `example` packages — and they are skipped by that mark rather
-/// than by name, so a third one needs no edit here.
+/// on — the `example` apps — and they are skipped by that mark rather than by
+/// name or by count, so the next one needs no edit here. (The comment used to
+/// say "the two", and there were three by the time anyone read it.)
 List<_Package> _packages() {
   final found = <_Package>[];
   for (final directory in Directory('packages').existsSync()
