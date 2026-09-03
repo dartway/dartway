@@ -157,7 +157,8 @@ Future<void> _writePackages(
 }) async {
   // The tag's own moment, not midnight of its day: a day-wide boundary sweeps
   // in whatever the previous release published later that same day.
-  final since = DateTime.parse(_timestampOf(from)).toUtc();
+  final boundary = _timestampOf(from);
+  final since = DateTime.parse(boundary.at).toUtc();
   final released = <String>[];
   var pubDevAnswered = true;
 
@@ -194,6 +195,15 @@ Future<void> _writePackages(
   }
   for (final line in released..sort()) {
     out.writeln(line);
+  }
+  if (!boundary.annotated) {
+    out.writeln();
+    out.writeln(
+      '_`$from` is a lightweight tag, so it records no moment of its own and '
+      'this window opens at the commit it names instead. Anything the previous '
+      'release published after that commit is listed above as belonging to this '
+      'one. Annotated tags (`git tag -a`) make the boundary exact._',
+    );
   }
   if (!pubDevAnswered) {
     out.writeln();
@@ -350,18 +360,34 @@ String? _fieldIn(String revision, String path, String field) {
 String _dateOf(String revision) =>
     _git(['log', '--format=%cs', '-n1', revision]);
 
-/// When [revision] was tagged, falling back to the commit it names.
+/// When [revision] was tagged, and whether that moment is real.
 ///
-/// A tag carries its own creation time and the commit carries another; for a
-/// release the tag is the later of the two and the one that means "cut here".
-String _timestampOf(String revision) {
-  final tagged = _git([
+/// **Only an annotated tag records when it was applied.** A lightweight tag is
+/// just a ref pointing at a commit: it stores no date of its own, and
+/// `%(creatordate)` silently answers with the commit's committer date instead.
+/// So reading `creatordate` and calling it "when we tagged" is a mechanism that
+/// looks like it works and does nothing — the boundary stays the merge time,
+/// which is before the release published, which is the misattribution this file
+/// exists to avoid.
+///
+/// Every existing `stable-*` tag here is lightweight, so the fallback is the
+/// present rather than the exception, and the caller says so in the notes
+/// instead of quietly being wrong.
+({String at, bool annotated}) _timestampOf(String revision) {
+  final kind = _git([
     'for-each-ref',
-    '--format=%(creatordate:iso-strict)',
+    '--format=%(objecttype)',
     'refs/tags/$revision',
   ]);
-  if (tagged.isNotEmpty) return tagged;
-  return _git(['log', '--format=%cI', '-n1', revision]);
+  if (kind == 'tag') {
+    final tagged = _git([
+      'for-each-ref',
+      '--format=%(taggerdate:iso-strict)',
+      'refs/tags/$revision',
+    ]);
+    if (tagged.isNotEmpty) return (at: tagged, annotated: true);
+  }
+  return (at: _git(['log', '--format=%cI', '-n1', revision]), annotated: false);
 }
 
 String _git(List<String> args) {
