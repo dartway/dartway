@@ -196,13 +196,19 @@ Future<void> _writePackages(
   for (final line in released..sort()) {
     out.writeln(line);
   }
-  if (!boundary.annotated) {
+  if (boundary.kind == _Boundary.lightweightTag) {
     out.writeln();
     out.writeln(
       '_`$from` is a lightweight tag, so it records no moment of its own and '
       'this window opens at the commit it names instead. Anything the previous '
       'release published after that commit is listed above as belonging to this '
       'one. Annotated tags (`git tag -a`) make the boundary exact._',
+    );
+  } else if (boundary.kind == _Boundary.notATag) {
+    out.writeln();
+    out.writeln(
+      '_`$from` is not a tag, so this window opens at the moment that commit '
+      'landed rather than at a release._',
     );
   }
   if (!pubDevAnswered) {
@@ -373,22 +379,32 @@ String _dateOf(String revision) =>
 /// Every existing `stable-*` tag here is lightweight, so the fallback is the
 /// present rather than the exception, and the caller says so in the notes
 /// instead of quietly being wrong.
-({String at, bool annotated}) _timestampOf(String revision) {
-  final kind = _git([
+({String at, _Boundary kind}) _timestampOf(String revision) {
+  final objectType = _git([
     'for-each-ref',
     '--format=%(objecttype)',
     'refs/tags/$revision',
   ]);
-  if (kind == 'tag') {
+
+  if (objectType == 'tag') {
     final tagged = _git([
       'for-each-ref',
       '--format=%(taggerdate:iso-strict)',
       'refs/tags/$revision',
     ]);
-    if (tagged.isNotEmpty) return (at: tagged, annotated: true);
+    if (tagged.isNotEmpty) return (at: tagged, kind: _Boundary.annotatedTag);
   }
-  return (at: _git(['log', '--format=%cI', '-n1', revision]), annotated: false);
+
+  return (
+    at: _git(['log', '--format=%cI', '-n1', revision]),
+    // An explicit range may start anywhere — a branch, a bare sha — and calling
+    // that "a lightweight tag" in the notes would be its own small lie.
+    kind: objectType.isEmpty ? _Boundary.notATag : _Boundary.lightweightTag,
+  );
 }
+
+/// What the window's opening moment actually came from.
+enum _Boundary { annotatedTag, lightweightTag, notATag }
 
 String _git(List<String> args) {
   final result = Process.runSync('git', args);
