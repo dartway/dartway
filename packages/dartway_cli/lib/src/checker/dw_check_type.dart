@@ -168,6 +168,16 @@ enum DwCheckType {
   /// good enough signal to raise the question, not to fail a build on.
   crudRuleUntested;
 
+  /// Which severity a check carries, and the answer is read elsewhere.
+  ///
+  /// The `error` set is published as the law list in `toolkit/CLAUDE.md` — the
+  /// rules a project on this framework may not override, as against the
+  /// defaults it may. That is deliberately derived rather than sorted by hand:
+  /// a check that declines to fail because it has a second legitimate reading
+  /// is not something a project can be forbidden to decide for itself.
+  ///
+  /// So moving a check across this boundary moves it in or out of the law, and
+  /// `toolkit_law_list_test.dart` holds the two together.
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
     DwCheckType.uiKitContainsText ||

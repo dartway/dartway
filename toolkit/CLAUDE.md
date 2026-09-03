@@ -59,7 +59,22 @@ Two consequences worth stating, because both are easy to get wrong:
 - **`.claude/CLAUDE.md` is managed and overwritten on update.** A project's own rule written into it disappears at the next `dartway setup-ai`. The root `CLAUDE.md` is the project's and is never touched by the installer — that is why the override lives there.
 - **An override is a decision, not a preference, so it carries its reason.** "We do it differently" ages into nobody remembering whether it was considered. The ADR case above is the model: what was tried, what it cost, what replaced it.
 
-**How the boundary stays honest over time: law is what `dartway check` can enforce.** Anything the checker cannot see is broken silently, which is exactly the state the removed commit rule documented — so promote a rule to law and you owe it a check. Today the checker reaches Law 3 in detail (the zone → group → feature tree, `invalidFeatureStructure`, `notAFeature`, `barrelFile`, `forbiddenFeatureImport`) and half of Law 6 (`featureSpecMissing`); Laws 2, 4 and 5 it does not reach at all. That gap is real and is not resolved by this section — it is named here so the next person has the fact rather than the slogan.
+**How the boundary stays honest over time: law is what `dartway check` *fails* on.** Anything the checker cannot see is broken silently, which is exactly the state the removed commit rule documented — so promote a rule to law and you owe it a check. But "what the checker can check" is one word too wide, and the checker itself says which word. It has **three** severities, not two, and several checks are warnings **precisely because they have a second legitimate reading**: `crudConfigMissing` cannot tell a model no client can reach from a table the server owns alone, and `generatedCodeUnformatted` cannot tell a skipped step from an SDK newer than the one that formatted the file. A check that deliberately declines to fail is not a rule a project is forbidden to decide for itself. So the `error` severity is law; a warning is a strong default, and the one `info` is a nudge.
+
+**The law list is therefore derived rather than sorted** — it is `DwCheckType.severity` in `dartway_cli`, one `switch` statement, and reading it off is the whole method. Twelve checks fail today:
+
+| What it holds | Checks that fail |
+|---|---|
+| The feature boundary (Law 3) | `invalidFeatureStructure`, `notAFeature`, `barrelFile`, `forbiddenFeatureImport` |
+| The UI kit boundary | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport` |
+| The widget's contract with its parent | `widgetSizesItself` |
+| The declared top-level layout | `invalidTopLevelLayout` |
+| What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
+| CRUD reachability (Law 1) | `crudConfigUnregistered` |
+
+Ten further checks are warnings and one is a nudge; those are defaults, however firmly the prose around them is written. **That is the point of deriving the list: anything it does not name is a default by construction** — no rule in this file or in the skills becomes law by being phrased definitely, and promoting one costs a failing check rather than a sentence.
+
+**The gap this leaves is real, and is named rather than smoothed over.** Laws 2, 4 and 5 — domain-first, the escalation order, the naming — have no failing check at all, and Law 6 has only a warning (`featureSpecMissing`). They are declared as law and are not yet held as one. The debt is now a missing row in the table above rather than a slogan.
 
 ## Code generation: two sanctioned generators, and no `build_runner`
 
@@ -259,10 +274,17 @@ next until the field means nothing.
 | `impact:workaround` | It was worked around, and the code carries the marker to prove it. The cost is known and dated: the day the fix lands upstream, that code starts duplicating the framework |
 | `impact:friction` | It works, but the API pushes you to write the wrong thing, or the documentation says something untrue. Nobody was blocked and there was nothing to work around |
 
-**`silent` — it breaks with no error attached.** Orthogonal to impact, and it is the label that
-moves a decision: a `friction` that quietly corrupts data outranks a `blocks` that crashes on the
-first run, because the loud one gets fixed the day it appears. It is visible; the other one is
-found by eye, months later, if at all.
+**`silent` — it breaks with no error attached.** Orthogonal to impact: a finding carries it
+alongside any one of the three above. Nothing announced the defect — no exception, no red test, no
+line in a log — so it was found by eye, months later, if at all, and the label is the only thing
+that says so. A defect that crashes on the first run needs no label to be noticed.
+
+**None of this ranks your finding against anyone else's.** The labels record what happened to this
+project, and that is the whole of a reporter's job; which issue is picked up first is decided where
+the queue lives, once. This file used to state an order of its own, and the two had quietly
+disagreed — the same finding coming out ahead under one rule and behind under the other, with
+nobody placed to read both. It is the same line as "Law and default" above: saying what a thing
+means is this file's business, deciding it on everyone else's behalf is not.
 
 **A gap another project has already filed gets a comment, not a second issue** (rule 3 above): your
 impact in one line, and the label rises to the worst voice on the issue if yours is worse. That is

@@ -104,6 +104,14 @@ Then findings by feature (the first six of each), then a count per check, then t
 errors. **Only errors fail the run.** Warnings and infos print and pass — a check that blocks a
 commit over a 210-line file is a check people disable.
 
+**That set carries a second meaning outside this command.** The harness installed by
+`dartway setup-ai` draws its law/default line on it: the checks that fail are the framework's law,
+which a project does not override, and everything else — warnings included — is a default it may
+replace with its own rule. A warning is a warning precisely because the check cannot tell one
+legitimate state from another (`crudConfigMissing`, `generatedCodeUnformatted` below), and that is
+not something a project can be forbidden to decide for itself. So changing a check's level here
+moves it in or out of the law; `toolkit_law_list_test.dart` fails when the two stop agreeing.
+
 ## The checks
 
 | Check | Level | What it means |
