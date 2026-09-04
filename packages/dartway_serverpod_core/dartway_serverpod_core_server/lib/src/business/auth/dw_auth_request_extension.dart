@@ -229,7 +229,8 @@ extension DwAuthRequestVerification on DwAuthRequest {
           verifiedRequest: this,
         );
 
-        if (updatedProfile == null) {
+        final wrapped = DwModelWrapper.wrap(updatedProfile);
+        if (wrapped == null) {
           // Either the app never said where a verified identifier goes, or the
           // account disappeared mid-flow. Both leave the person having proved
           // an address that was then not written, so the request says so
@@ -238,7 +239,7 @@ extension DwAuthRequestVerification on DwAuthRequest {
           return [];
         }
 
-        return [DwModelWrapper(object: updatedProfile as SerializableModel)];
+        return [wrapped];
 
       case DwAuthRequestType.register:
         userId = await dw.createUserProfile(session, registrationRequest: this);
