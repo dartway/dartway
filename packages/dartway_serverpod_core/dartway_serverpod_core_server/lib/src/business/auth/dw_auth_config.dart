@@ -86,8 +86,48 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.authRequestRateLimitWindow = const Duration(minutes: 10),
     this.passwordHasher = const DwBcryptPasswordHasher(),
     this.legacyPasswordVerifiers = const [],
+    this.findUserProfileByIdentifier,
     required this.normalizeIdentifier,
   });
+
+  /// How this app finds the account an identifier belongs to.
+  ///
+  /// Unset, the core matches the profile table's `userIdentifier` column
+  /// exactly, and that column is required — one account, one login value.
+  /// That is the right shape until an account can be reached by more than one
+  /// value, and then it stops being expressible: a person who registered by
+  /// phone and signs in with their email is not found, and registers again.
+  ///
+  /// Set, this function is the whole lookup. The core stops requiring the
+  /// `userIdentifier` column, because an app that answers this question itself
+  /// has no use for a column it never reads:
+  ///
+  /// ```dart
+  /// findUserProfileByIdentifier: (session, identifier, {transaction}) =>
+  ///     UserProfile.db.findFirstRow(
+  ///       session,
+  ///       where: (t) => t.phone.equals(identifier) | t.email.equals(identifier),
+  ///       transaction: transaction,
+  ///     ),
+  /// ```
+  ///
+  /// [identifier] arrives already through [normalizeIdentifier] — the rule is
+  /// the app's own, and applying it here too would apply it twice.
+  ///
+  /// **Three obligations come with taking this over, and nothing checks any of
+  /// them.** The columns searched need a unique index each, or two accounts
+  /// claim one address and the lookup resolves to whichever row the database
+  /// returns first. The account has to be reachable by every value that can
+  /// create one: a channel written on registration but absent from this query
+  /// is a door in with no way back. And the query carries its own `include:`
+  /// where the profile has relations the app expects loaded — the core applies
+  /// its own only to the lookup it performs itself.
+  final Future<UserProfileClass?> Function(
+    Session session,
+    String identifier, {
+    Transaction? transaction,
+  })?
+  findUserProfileByIdentifier;
 
   /// Brings a user identifier to the single form this app stores it in.
   ///

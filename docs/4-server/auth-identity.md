@@ -116,3 +116,56 @@ after.
 A new project has none of this to worry about: declare the rule in
 `DwAuthConfig` on day one and the question never arises. `dartway create` ships
 `template/` with it already declared.
+
+## When one account has two identifiers
+
+Everything above assumes one account is reached by one string. Some products are
+not shaped that way: sign in by phone **or** by email, with both belonging to
+the same person. Matching a single column cannot express that, and the failure
+is the one this page opened with, arriving by a different road — the second
+channel matches nothing, so it registers a second account.
+
+`DwAuthConfig.findUserProfileByIdentifier` hands the lookup to the app:
+
+```dart
+DwAuthConfig(
+  passwords: passwords,
+  normalizeIdentifier: DwIdentifierForm.folded,
+  findUserProfileByIdentifier: (session, identifier, {transaction}) =>
+      UserProfile.db.findFirstRow(
+        session,
+        where: (t) => t.phone.equals(identifier) | t.email.equals(identifier),
+        transaction: transaction,
+      ),
+);
+```
+
+The identifier arrives already normalized, so the rule is still stated once —
+do not apply it again inside the query. With this set, the `userIdentifier`
+column is never read and is no longer required to exist: an app answering the
+question itself has no use for a column nothing consults.
+
+**What you take on with it.** The framework can no longer see the shape of the
+lookup, so three things stop being its problem and become yours, and none of
+them raises an error when it is wrong:
+
+| What | What it costs to skip |
+|---|---|
+| a unique index on **every** column the query searches | two accounts claim one address, and `findFirstRow` resolves to whichever row the database hands back first |
+| the query reaches the account by every value that can **create** one | a channel written at registration but missing from the query is a door in with no way back — the person registers again on their second visit |
+| the query carries its own `include:` | relations the app expects loaded arrive null; the core applies its own include only to the lookup it performs itself |
+
+The second row is the one that bites, because it looks like it works. A
+registration writes the identifier into whichever column matches the provider —
+so if the query searches `email` but a phone registration wrote only `phone`,
+the account exists and cannot be found. **Write and read the same set of
+columns.**
+
+**Being able to sign in by two values is not the same as having two values.** A
+person who registered by phone has an empty `email` column until something puts
+one there, and until then the email door is shut for them specifically. Adding a
+second identifier to an existing account is a flow of its own — a code sent to
+the new address and verified before the column is written — and the framework
+does not implement it yet: `DwAuthRequestType.addAuthProvider` and
+`changeIdentifier` are declared in the enum and answer with
+`UnimplementedError`.
