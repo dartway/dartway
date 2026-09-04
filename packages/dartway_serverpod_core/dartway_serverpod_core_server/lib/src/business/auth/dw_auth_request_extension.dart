@@ -75,13 +75,41 @@ extension DwAuthRequestVerification on DwAuthRequest {
       return;
     }
 
-    // TODO: add alternative logic for registration requests
-    if (requestType != DwAuthRequestType.register && userProfile == null) {
+    // Two request types claim an identifier that must be free rather than
+    // present: a registration, and a signed-in person moving their phone or
+    // address onto their own account. For both, finding a profile is the
+    // failure and finding none is the happy path — the mirror image of a
+    // sign-in.
+    final claimsFreeIdentifier =
+        requestType == DwAuthRequestType.register ||
+        requestType == DwAuthRequestType.changeIdentifier;
+
+    if (!claimsFreeIdentifier && userProfile == null) {
       return setFailed(session, DwAuthFailReason.userNotFound);
     }
 
-    if (requestType == DwAuthRequestType.register && userProfile != null) {
+    if (claimsFreeIdentifier && userProfile != null) {
       return setFailed(session, DwAuthFailReason.userAlreadyExists);
+    }
+
+    if (requestType == DwAuthRequestType.changeIdentifier) {
+      // Refused here rather than after the code has been sent: an app that
+      // never said where a verified identifier goes cannot finish this flow,
+      // and finding that out at the end costs the person an SMS and the belief
+      // that their address changed.
+      if (!dw.canAttachVerifiedIdentifier) {
+        return setFailed(session, DwAuthFailReason.userNotFound);
+      }
+
+      // The account being changed is the caller's own, and it is read from the
+      // session rather than from the request: `userId` arrives on a model the
+      // client sends, so taking it at its word would let anyone write an
+      // identifier onto anyone's profile.
+      final callerProfileId = session.signedInUserProfileId;
+      if (callerProfileId == null) {
+        return setFailed(session, DwAuthFailReason.userNotFound);
+      }
+      userId = callerProfileId;
     }
 
     if (password != null) {
@@ -191,6 +219,28 @@ extension DwAuthRequestVerification on DwAuthRequest {
         );
 
         return [];
+      case DwAuthRequestType.changeIdentifier:
+        // Nobody is being signed in here — the caller already is. What travels
+        // back is the profile carrying its new value, so the screen that asked
+        // redraws without a second read.
+        final updatedProfile = await dw.attachVerifiedIdentifier(
+          session,
+          userId: userId!,
+          verifiedRequest: this,
+        );
+
+        final wrapped = DwModelWrapper.wrap(updatedProfile);
+        if (wrapped == null) {
+          // Either the app never said where a verified identifier goes, or the
+          // account disappeared mid-flow. Both leave the person having proved
+          // an address that was then not written, so the request says so
+          // instead of reporting success.
+          setFailed(session, DwAuthFailReason.userNotFound);
+          return [];
+        }
+
+        return [wrapped];
+
       case DwAuthRequestType.register:
         userId = await dw.createUserProfile(session, registrationRequest: this);
 

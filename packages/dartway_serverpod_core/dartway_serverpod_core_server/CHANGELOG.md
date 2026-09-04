@@ -2,6 +2,25 @@
 
 ## 0.12.1
 
+- **A signed-in person can move their phone number or email onto their own account, with the same
+  code they would sign in with.**
+
+  `DwAuthRequestType.changeIdentifier` was declared in the enum and answered `UnimplementedError`,
+  so the second half of the feature above was missing: an account could be *reached* by two
+  identifiers, and there was no way to *acquire* the second one. A person who registered by phone
+  kept an empty email column forever, and the email door stayed shut for them specifically.
+
+  The request now runs the sign-in flow backwards. The identifier must be **free** — held by
+  nobody, `userAlreadyExists` otherwise — and the account it lands on is read from the session, not
+  from the request, so a client naming somebody else's profile id changes its own and nothing more.
+  `DwAuthConfig.attachVerifiedIdentifier` writes it where the app keeps it and answers with the
+  updated profile, which travels back to the caller so the screen that asked redraws without a
+  second read.
+
+  Unset, a `changeIdentifier` request is refused **before a code is sent** rather than after: an
+  identifier verified and then dropped is the worst of the three outcomes — the person watched the
+  code arrive, typed it, was told nothing went wrong, and their address did not change.
+
 - **An account can be reached by more than one identifier.**
 
   `DwCore` found the profile by matching one column, `userIdentifier`, exactly — and required that

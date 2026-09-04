@@ -161,11 +161,63 @@ so if the query searches `email` but a phone registration wrote only `phone`,
 the account exists and cannot be found. **Write and read the same set of
 columns.**
 
+## Acquiring the second identifier
+
 **Being able to sign in by two values is not the same as having two values.** A
 person who registered by phone has an empty `email` column until something puts
-one there, and until then the email door is shut for them specifically. Adding a
-second identifier to an existing account is a flow of its own — a code sent to
-the new address and verified before the column is written — and the framework
-does not implement it yet: `DwAuthRequestType.addAuthProvider` and
-`changeIdentifier` are declared in the enum and answer with
-`UnimplementedError`.
+one there, and until then the email door is shut for them specifically.
+
+`DwAuthRequestType.changeIdentifier` is that something, and it is the sign-in
+flow run backwards. A **signed-in** caller names a new phone number or address;
+DartWay sends a code to it and verifies it exactly as it would a sign-in; the
+app then writes it wherever it keeps it:
+
+```dart
+DwAuthConfig(
+  // ...
+  attachVerifiedIdentifier:
+      (session, {required userProfile, required verifiedRequest}) =>
+          UserProfile.db.updateRow(
+            session,
+            verifiedRequest.authProvider == DwAuthProvider.email
+                ? userProfile.copyWith(email: verifiedRequest.userIdentifier)
+                : userProfile.copyWith(phone: verifiedRequest.userIdentifier),
+          ),
+);
+```
+
+Return the profile as it now stands: it travels back to the caller, so the
+screen that asked shows the new value without a second read.
+
+**The two inversions are the whole of it**, and both are the opposite of a
+sign-in:
+
+- **the identifier must be free.** Finding an account is the failure here
+  (`userAlreadyExists`), not the happy path. Two people cannot hold one address,
+  because the sign-in lookup would then resolve them arbitrarily;
+- **the account is read from the session, never from the request.** `userId`
+  arrives on a model the client sends. Taken at its word, it would let anyone
+  write their address onto anyone's profile — so it is overwritten with the
+  caller's own id before anything else looks at it.
+
+**Unset, the flow is refused before a code is sent**, not after. An identifier
+verified and then dropped on the floor is the worst of the three outcomes: the
+person watched the code arrive, typed it, was told nothing went wrong, and their
+address did not change.
+
+What DartWay checks before calling you: the caller is signed in, the identifier
+is normalized, nobody else holds it, and the code came back correct. What it
+cannot check is whether *your* rules allow this person that identifier — a
+corporate domain, a blocked number, a plan that permits one channel. That check
+belongs in the callback, before the write.
+
+And one trap worth naming twice: **writing a column the sign-in query does not
+search** leaves the owner a door they cannot come back through. The pair has to
+agree.
+
+### Still not implemented
+
+`addAuthProvider` and `removeAuthProvider` remain `UnimplementedError`. They are
+a different subject — linking and unlinking an **external** credential (Apple,
+Google, Telegram), where there is no code to send and the provider's token is
+the proof.
