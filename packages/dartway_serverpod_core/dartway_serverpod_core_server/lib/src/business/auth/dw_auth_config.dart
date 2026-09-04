@@ -87,8 +87,53 @@ class DwAuthConfig<UserProfileClass extends TableRow> {
     this.passwordHasher = const DwBcryptPasswordHasher(),
     this.legacyPasswordVerifiers = const [],
     this.findUserProfileByIdentifier,
+    this.attachVerifiedIdentifier,
     required this.normalizeIdentifier,
   });
+
+  /// How this app records an identifier the owner has just proved is theirs.
+  ///
+  /// Answers `DwAuthRequestType.changeIdentifier`: a **signed-in** caller names
+  /// a new phone number or email address, DartWay sends a code to it and
+  /// verifies it exactly as it would a sign-in, and then hands it here to be
+  /// written. Where it goes is the app's business — the framework does not know
+  /// which column holds a phone and which an address, and there may be one of
+  /// each:
+  ///
+  /// ```dart
+  /// attachVerifiedIdentifier: (session, {required userProfile, required verifiedRequest}) =>
+  ///     UserProfile.db.updateRow(
+  ///       session,
+  ///       verifiedRequest.authProvider == DwAuthProvider.email
+  ///           ? userProfile.copyWith(email: verifiedRequest.userIdentifier)
+  ///           : userProfile.copyWith(phone: verifiedRequest.userIdentifier),
+  ///     ),
+  /// ```
+  ///
+  /// Return the profile as it now stands: the core sends it back to the caller,
+  /// so the screen that asked shows the new value without a second read.
+  ///
+  /// **Leaving it unset closes the flow rather than opening it half-way** — a
+  /// `changeIdentifier` request is refused. An identifier verified and then
+  /// dropped on the floor is the worse failure of the two: the person watched
+  /// a code arrive, typed it, was told nothing went wrong, and their address
+  /// did not change.
+  ///
+  /// What DartWay guarantees before calling this, so the app does not repeat
+  /// it: the caller is signed in, the identifier is normalized, it belongs to
+  /// nobody else (otherwise the request fails with
+  /// [DwAuthFailReason.userAlreadyExists]), and the code sent to it came back
+  /// correct. What it does **not** know is whether the app's own rules allow
+  /// this person that identifier — that check belongs here, before the write.
+  ///
+  /// Writing a column the sign-in query does not search leaves the owner a door
+  /// they cannot come back through; see [findUserProfileByIdentifier].
+  final Future<UserProfileClass> Function(
+    Session session, {
+    required UserProfileClass userProfile,
+    required DwAuthRequest verifiedRequest,
+  })?
+  attachVerifiedIdentifier;
 
   /// How this app finds the account an identifier belongs to.
   ///

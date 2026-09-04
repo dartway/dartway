@@ -309,6 +309,49 @@ class DwCore<UserProfileClass extends TableRow> {
     return getUserProfile(session, userId, transaction: transaction);
   }
 
+  /// Whether this app has said where a verified identifier goes — that is,
+  /// whether `DwAuthRequestType.changeIdentifier` can complete at all.
+  ///
+  /// A getter rather than a read of the field at the call site, and the
+  /// difference is not style. `dw` is the raw `DwCore`, so a caller reading
+  /// [DwAuthConfig.attachVerifiedIdentifier] through it reads a function that
+  /// takes `dynamic` where the real one takes the app's profile type — and a
+  /// function is contravariant in its parameters, so that read throws at
+  /// runtime rather than failing to compile. Inside this class the type
+  /// argument is the real one and the read is sound.
+  bool get canAttachVerifiedIdentifier =>
+      auth?.config.attachVerifiedIdentifier != null;
+
+  /// Writes an identifier its owner has just verified onto their profile, and
+  /// answers with the profile as it now stands.
+  ///
+  /// The app decides where the value goes — see
+  /// [DwAuthConfig.attachVerifiedIdentifier]. Returns `null` when no app has
+  /// said how, which the caller treats as a refusal: an identifier verified and
+  /// then not written is the worst of the three outcomes.
+  Future<UserProfileClass?> attachVerifiedIdentifier(
+    Session session, {
+    required int userId,
+    required DwAuthRequest verifiedRequest,
+    Transaction? transaction,
+  }) async {
+    final attach = auth?.config.attachVerifiedIdentifier;
+    if (attach == null) return null;
+
+    final profile = await getUserProfile(
+      session,
+      userId,
+      transaction: transaction,
+    );
+    if (profile == null) return null;
+
+    return attach(
+      session,
+      userProfile: profile,
+      verifiedRequest: verifiedRequest,
+    );
+  }
+
   Future<int> createUserProfile(
     Session session, {
     required DwAuthRequest registrationRequest,
