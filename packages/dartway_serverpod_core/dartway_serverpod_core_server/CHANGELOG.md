@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.12.1
+
+- **An account can be reached by more than one identifier.**
+
+  `DwCore` found the profile by matching one column, `userIdentifier`, exactly — and required that
+  column to exist. That is the right shape while an account has exactly one login value, and it
+  cannot express the case where it has two: a person who registered with their phone number and
+  came back with their email address was not found, and the flow did to them what it does to any
+  unknown identifier — it registered them again, silently, into a second empty account.
+
+  `DwAuthConfig.findUserProfileByIdentifier` takes the lookup over when an app sets it. The
+  identifier arrives already through `normalizeIdentifier`, so the app's rule is still stated
+  once, and the `userIdentifier` column stops being required — an app that answers the question
+  itself has no use for a column nothing reads.
+
+  ```dart
+  findUserProfileByIdentifier: (session, identifier, {transaction}) =>
+      UserProfile.db.findFirstRow(
+        session,
+        where: (t) => t.phone.equals(identifier) | t.email.equals(identifier),
+        transaction: transaction,
+      ),
+  ```
+
+  Nothing changes for an app that does not set it, the boot-time check for the column included.
+  Three obligations come with taking it over and none of them is checked: a unique index on every
+  column searched, a query that reaches the account by every value that can create one, and the
+  `include:` the app's own relations need. See `docs/4-server/auth-identity.md`.
+
 ## 0.12.0
 
 - **Uploads: the server names the object, and confirms only the reservation it issued.**

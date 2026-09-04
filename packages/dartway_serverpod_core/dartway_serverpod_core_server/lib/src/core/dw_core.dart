@@ -41,7 +41,12 @@ class DwCore<UserProfileClass extends TableRow> {
   final List<DwChannelConfig> _channelConfiguration = [];
 
   late final ColumnInt _userInfoIdColumn;
-  late final ColumnString _userIdentifierColumn;
+
+  /// The `userIdentifier` column, when the app leaves the lookup to the core.
+  /// Null when [DwAuthConfig.findUserProfileByIdentifier] answers instead — an
+  /// app that finds an account by its own columns is not asked for a column it
+  /// never reads.
+  late final ColumnString? _userIdentifierColumn;
 
   final Include? _userProfileInclude;
   final Future<UserProfileClass> Function(
@@ -118,14 +123,19 @@ class DwCore<UserProfileClass extends TableRow> {
             )
             as ColumnInt;
 
-    _userIdentifierColumn =
-        userProfileTable.columns.firstWhereOrThrow(
-              (column) =>
-                  column is ColumnString &&
-                  column.columnName == DwCoreConst.userIdentifierColumnName,
-              'User profile table must have a String ${DwCoreConst.userIdentifierColumnName} column',
-            )
-            as ColumnString;
+    // Required only while the core does the looking up. The check stays a boot
+    // failure rather than a first-sign-in failure: a missing column is a fact
+    // about the schema, and the schema is known here.
+    _userIdentifierColumn = auth?.config.findUserProfileByIdentifier != null
+        ? null
+        : userProfileTable.columns.firstWhereOrThrow(
+                (column) =>
+                    column is ColumnString &&
+                    column.columnName == DwCoreConst.userIdentifierColumnName,
+                'User profile table must have a String ${DwCoreConst.userIdentifierColumnName} column, '
+                'or DwAuthConfig.findUserProfileByIdentifier must say how to find an account',
+              )
+              as ColumnString;
 
     _crudConfiguration[DwCoreConst.dartwayInternalApi] = Map.fromEntries(
       [
@@ -246,6 +256,10 @@ class DwCore<UserProfileClass extends TableRow> {
   /// rule. Without a rule configured this is an exact match, as it always was.
   ///
   /// [transaction] carries the same meaning as on [getUserProfile].
+  /// An app that can be signed into by more than one value — a phone *or* an
+  /// email on one account — answers this itself through
+  /// [DwAuthConfig.findUserProfileByIdentifier]; then that function is the
+  /// lookup and the `userIdentifier` column is not consulted at all.
   Future<UserProfileClass?> getUserProfileByIdentifier(
     Session session,
     String identifier, {
@@ -253,11 +267,16 @@ class DwCore<UserProfileClass extends TableRow> {
   }) async {
     final normalized = normalizeAuthIdentifier(identifier);
 
-    final profile = await session.db.findFirstRow<UserProfileClass>(
-      where: _userIdentifierColumn.equals(normalized),
-      include: _userProfileInclude,
-      transaction: transaction,
-    );
+    final findByApp = auth?.config.findUserProfileByIdentifier;
+    final identifierColumn = _userIdentifierColumn;
+
+    final profile = findByApp != null
+        ? await findByApp(session, normalized, transaction: transaction)
+        : await session.db.findFirstRow<UserProfileClass>(
+            where: identifierColumn!.equals(normalized),
+            include: _userProfileInclude,
+            transaction: transaction,
+          );
 
     if (profile == null) {
       session.log('Warning: User profile not found for identifier $normalized');

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.1
+
+- Version only: the four `dartway_serverpod_core_*` packages move in lockstep. The change is in
+  `dartway_serverpod_core_server` — an app may now answer the profile lookup itself, so an account
+  can be signed into by more than one identifier.
+
 ## 0.12.0
 
 - **`DwFileUploadHandler` no longer names the object — the server does.** Naming it here was the

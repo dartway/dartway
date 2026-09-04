@@ -1,6 +1,6 @@
 name: dartway_serverpod_core_flutter
 description: "Flutter side of the DartWay core: a typed realtime data layer over the Serverpod module, session management, connection-aware error handling and context-rich alerting."
-version: 0.12.0
+version: 0.12.1
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
