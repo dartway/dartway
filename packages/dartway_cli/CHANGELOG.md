@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.10.0
+
+- **`dartway update` — the one command that carries a project onto a newer framework.**
+
+  Nothing in a project ever said it had fallen behind. The toolkit is a committed artifact that
+  looks identical when it is a month old; a git dependency shows no version anywhere a person
+  reads; and a framework change that expects the project's own code to be different announced
+  itself as a compile error, weeks later, to whoever happened to run `pub upgrade` next. Measured
+  across the four projects on this framework on 2026-09-05: toolkits between one day and three
+  weeks old, one with no toolkit at all, packages up to eight minors behind, and no project holding
+  a provenance manifest — every one of them looking fine.
+
+  `dartway update` installs the toolkit and then reports the rest: the framework packages this
+  project is behind on, with the instruction split by source, and the migration notes it still owes
+  an edit to. It **changes nothing but `.claude/`** — a caret is one line, a changed API is not, and
+  a command that half-applied the rest would leave a tree nobody can tell apart from a finished one.
+  The `dartway-update` skill in the toolkit is what carries the list out.
+
+  Its default channel is the one the project recorded rather than `stable`: "update" means move
+  forward on my own channel, and a project deliberately put on `master` must not be carried
+  backwards by a command run without arguments.
+
+- **`docs/migrations/` is read by a project, so the notes are now a checked artifact.** Each note
+  names the packages it affects and the version the change lands in; a project below that version
+  on any of them is shown it, and a project that does not depend on any of them never is — the "who
+  is affected" filter, done mechanically. Keyed by version rather than by commit because the CLI
+  reads the monorepo from a shallow clone with no history to diff. A note that cannot be parsed is
+  **reported rather than skipped**: a migration dropped for a typo in its frontmatter is a migration
+  nobody is ever told about, which is the exact failure the notes exist to prevent.
+
+- **An install no longer resets what the project was set up with.** `--base-branch`, `--language`
+  and `--notes-tracker` are recorded in `.claude/dartway-toolkit.json` and replayed by the next run;
+  an explicit flag still wins. Previously a re-run silently returned all three to their defaults,
+  and the diff of that reset was indistinguishable from an ordinary update. It went unnoticed while
+  re-installing was a rare, deliberate act — `update` is meant to be run without arguments and would
+  have made it routine.
+
+- The lock reader behind `dartway check`'s framework-lock warning now returns every `dartway_*`
+  entry rather than the git ones alone, so the version comparison and the divergence check read one
+  answer to "what is a framework package, and where in a lock file is that written".
+
 ## 0.9.0
 
 - **`dartway check` notices an app whose localization was never wired, and the law stops promising a side it cannot reach.**

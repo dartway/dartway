@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 /// A copy of what `pubspec.yaml` says, because a compiled or globally activated
 /// executable has no reliable way back to its own pubspec. It is a checked
 /// copy: `cli_version_test.dart` compares the two and goes red when they part.
-const dartwayCliVersion = '0.9.0';
+const dartwayCliVersion = '0.10.0';
 
 /// Where an installed harness came from.
 ///
@@ -29,7 +29,18 @@ class ToolkitProvenance {
     required this.commit,
     required this.cliVersion,
     required this.installedAt,
+    this.settings = const {},
   });
+
+  /// The install settings worth remembering: the three that come from a flag
+  /// and cannot be detected from the tree.
+  ///
+  /// Named here rather than at each call site because the writer and the reader
+  /// have to agree on the spelling, and a key misspelled on one side of that
+  /// pair fails as a silently defaulted setting.
+  static const baseBranchSetting = 'baseBranch';
+  static const languageSetting = 'language';
+  static const notesTrackerSetting = 'notesTracker';
 
   /// Reads the manifest a previous install left, or null when there is none —
   /// which is every project installed before this existed.
@@ -39,12 +50,20 @@ class ToolkitProvenance {
     try {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, dynamic>) return null;
+      final settings = decoded['settings'];
       return ToolkitProvenance(
         source: decoded['source'] as String? ?? '?',
         channel: decoded['channel'] as String?,
         commit: decoded['commit'] as String?,
         cliVersion: decoded['cliVersion'] as String? ?? '?',
         installedAt: decoded['installedAt'] as String? ?? '?',
+        settings: settings is Map
+            ? {
+                for (final entry in settings.entries)
+                  if (entry.key is String && entry.value is String)
+                    entry.key as String: entry.value as String,
+              }
+            : const {},
       );
     } on FormatException {
       return null;
@@ -65,12 +84,27 @@ class ToolkitProvenance {
   final String cliVersion;
   final String installedAt;
 
+  /// What the install was told, in the terms of the flags that said it.
+  ///
+  /// The package names are re-detected on every run and are therefore not kept;
+  /// these three are choices, and a choice that is not written down is a choice
+  /// the next run makes again from its defaults. `dartway update` exists to be
+  /// run without arguments, so without this it would quietly reset a project's
+  /// language, base branch and notes tracker — an update that silently undoes a
+  /// decision is worse than no update command at all.
+  final Map<String, String> settings;
+
+  String? setting(String key) {
+    final value = settings[key];
+    return (value == null || value.isEmpty) ? null : value;
+  }
+
   static File _fileIn(Directory projectRoot) =>
       File(p.join(projectRoot.path, '.claude', 'dartway-toolkit.json'));
 
   void write(Directory projectRoot) {
     _fileIn(projectRoot).writeAsStringSync(
-      '${const JsonEncoder.withIndent('  ').convert({'source': source, if (channel != null) 'channel': channel, if (commit != null) 'commit': commit, 'cliVersion': cliVersion, 'installedAt': installedAt})}\n',
+      '${const JsonEncoder.withIndent('  ').convert({'source': source, if (channel != null) 'channel': channel, if (commit != null) 'commit': commit, 'cliVersion': cliVersion, 'installedAt': installedAt, if (settings.isNotEmpty) 'settings': settings})}\n',
     );
   }
 

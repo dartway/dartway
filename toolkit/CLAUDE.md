@@ -388,8 +388,10 @@ Live migrations (delete an entry once no project is on the old shape):
 
 ## Skills and commands
 
-- Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-testing`, `dartway-on-device`, `dartway-finish` — loaded by relevance to the task.
+- Skills (`.claude/skills/`): `dartway-run`, `dartway-requirements`, `dartway-plan`, `dartway-clean-code`, `dartway-navigation`, `dartway-feature-scaffold`, `dartway-crud-config`, `dartway-ui-kit`, `dartway-data-layer`, `dartway-models`, `dartway-push-delivery`, `dartway-testing`, `dartway-on-device`, `dartway-finish`, `dartway-update` — loaded by relevance to the task.
 - Commands (`.claude/commands/`): `/dartway-checkup` — the state of the project and what to take into work next (whole project by default, a path narrows it); `/commit` — a commit in the project's CI format.
+
+**Moving onto a newer framework** is its own job, not part of a task: `dartway-update` installs the toolkit, reads the framework's migration notes, makes the edits they ask for and only then moves the package versions. Run it when `dartway update` says this project is behind — nothing else in a project ever says so.
 
 **Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (the layer skills) → `dartway-finish` (audit + reconciling the specs and doc comments with the code + tests before the PR).
 

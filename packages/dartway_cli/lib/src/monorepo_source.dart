@@ -57,14 +57,17 @@ class MonorepoSource {
   /// Built here rather than at each call site: the two commands used to repeat
   /// the same ternaries over the raw argument, and repeating a condition is how
   /// the two copies of it stopped agreeing.
-  Future<ToolkitProvenance> provenance(Directory resolved) async =>
-      ToolkitProvenance(
-        source: isLocalCheckout ? resolved.path : repoUrl,
-        channel: isLocalCheckout ? null : branch,
-        commit: await monorepoCommit(resolved),
-        cliVersion: dartwayCliVersion,
-        installedAt: DateTime.now().toUtc().toIso8601String(),
-      );
+  Future<ToolkitProvenance> provenance(
+    Directory resolved, {
+    Map<String, String> settings = const {},
+  }) async => ToolkitProvenance(
+    source: isLocalCheckout ? resolved.path : repoUrl,
+    channel: isLocalCheckout ? null : branch,
+    commit: await monorepoCommit(resolved),
+    cliVersion: dartwayCliVersion,
+    installedAt: DateTime.now().toUtc().toIso8601String(),
+    settings: settings,
+  );
 
   /// Returns the monorepo root, cloning or updating the cache if needed.
   Future<Directory> resolve() async {

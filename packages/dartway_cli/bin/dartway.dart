@@ -9,6 +9,7 @@ import 'package:dartway_cli/src/commands/quickstart_command.dart';
 import 'package:dartway_cli/src/commands/setup_ai_command.dart';
 import 'package:dartway_cli/src/commands/stats_command.dart';
 import 'package:dartway_cli/src/commands/test_command.dart';
+import 'package:dartway_cli/src/commands/update_command.dart';
 
 Future<void> main(List<String> args) async {
   final runner =
@@ -21,6 +22,7 @@ Future<void> main(List<String> args) async {
         ..addCommand(DoctorCommand())
         ..addCommand(CreateCommand())
         ..addCommand(SetupAiCommand())
+        ..addCommand(UpdateCommand())
         ..addCommand(CheckCommand())
         ..addCommand(DeployCommand())
         ..addCommand(StatsCommand())

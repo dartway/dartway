@@ -263,7 +263,7 @@ packages:
       path: "../../packages/dartway_cli"
       relative: true
     source: path
-    version: "0.9.0"
+    version: "0.10.0"
   dartway_example_client:
     dependency: "direct main"
     description:

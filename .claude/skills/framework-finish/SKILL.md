@@ -1,11 +1,11 @@
 ---
 name: framework-finish
-description: The synchronisation audit to run before committing a change to the DartWay framework — checks that a public API change is reflected in example/, template/, toolkit/skills/, docs/ and the CHANGELOG, and that a bumped package version still satisfies the carets stated for it in example/ and template/. Run it once the package code is done, before the commit or the PR.
+description: The synchronisation audit to run before committing a change to the DartWay framework — checks that a public API change is reflected in example/, template/, toolkit/skills/, docs/ and the CHANGELOG, that a change asking projects to edit their own code carries a migration note in docs/migrations/, and that a bumped package version still satisfies the carets stated for it in example/ and template/. Run it once the package code is done, before the commit or the PR.
 ---
 
 # framework-finish — the monorepo synchronisation audit
 
-The DartWay monorepo lives by the synchronisation law (see the root `CLAUDE.md`): the public API, `example`, **`template`**, the toolkit skills and the docs evolve together, in one pull request. This skill catches the drift across a diff.
+The DartWay monorepo lives by the synchronisation law (see the root `CLAUDE.md`): the public API, `example`, **`template`**, the toolkit skills and the docs evolve together, in one pull request. This skill catches the drift across a diff — and, in step 5, the one mirror that lives outside this repository: the projects built on the framework, which learn what they owe from `docs/migrations/` or not at all.
 
 ## Step 1. Collect the diff
 
@@ -96,7 +96,41 @@ dart run tool/self_check.dart --offline  # skip the check that needs pub.dev
 
 This is deliberately not in `tool/checks.sh`, and therefore not in CI: two of the three would be red on every runner by construction — a fresh clone has none of the git settings, and the carets are unsatisfied for as long as a release is pending. A gate that is red by design is a gate people stop reading.
 
-## Step 5. Report and fix
+## Step 5. Does a project on the framework have to change?
+
+The mirrors above keep this repository consistent with itself. This step is the only one addressed
+outward — to an application that is **behind**, and whose author will read what you write here
+weeks from now with none of today's context.
+
+**The test: would an application on the framework, doing nothing wrong, have to touch its own code
+because of this change?** If yes, the change is not finished until `docs/migrations/` holds a note
+saying what to do. If no, write nothing — a note that asks for nothing teaches people to skim the
+ones that do.
+
+Yes for: a public symbol renamed, removed or re-signatured; a required parameter added; a changed
+default that alters behaviour a project relies on; a new mandatory wiring or initialization step; a
+schema change a project inherits through `create-migration`; a package that has to be declared
+where it did not before.
+
+No for: a fix that only makes an existing call work; anything private; a new capability a project
+may adopt whenever it likes.
+
+**Why this is a step and not a habit.** The author of a change is the last person able to see it as
+a stranger would, and the only one who still knows what they broke — a week later that knowledge is
+gone from everywhere except the diff. Between 2026-08-22 and 2026-09-05 six changes needed a note
+and none was written; they were reconstructed afterwards out of the changelogs, which worked only
+because the changelogs happened to be unusually good.
+
+The form, and what `affects` means, is `docs/migrations/README.md`. Two things to get right:
+
+- **`affects` is the mechanism, not decoration.** It names each package with the version the change
+  lands in, quoted. That is what decides which projects are shown the note; a version that never
+  arrives is a migration that never becomes due, and `migration_notes_test.dart` fails on it.
+- **Write the edit, not the news.** The `CHANGELOG` entry says what happened and is written for a
+  reader; the note is read by someone who has to change a line and wants to know which one. They
+  are two texts, and the note is usually the shorter.
+
+## Step 6. Report and fix
 
 Give the drift as a list in the form `<API change> → <mirror> → <what exactly is stale or missing>`. If there is none, say so in one line.
 

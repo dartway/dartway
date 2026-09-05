@@ -54,6 +54,41 @@ void main() {
       expect(read.cliVersion, '0.9.0');
     });
 
+    test('the settings survive the round trip', () {
+      // The three settings that come from a flag are what `update` replays, so
+      // that a run given no arguments does not quietly reset a project's
+      // language, base branch and tracker to the defaults.
+      const withSettings = ToolkitProvenance(
+        source: 'https://github.com/dartway/dartway.git',
+        channel: 'stable',
+        commit: '0123456789abcdef',
+        cliVersion: '0.10.0',
+        installedAt: '2026-09-05T00:00:00.000Z',
+        settings: {
+          ToolkitProvenance.baseBranchSetting: 'develop',
+          ToolkitProvenance.languageSetting: 'Russian',
+          ToolkitProvenance.notesTrackerSetting: 'none',
+        },
+      );
+      withSettings.write(sandbox);
+      final read = ToolkitProvenance.read(sandbox)!;
+
+      expect(read.setting(ToolkitProvenance.baseBranchSetting), 'develop');
+      expect(read.setting(ToolkitProvenance.languageSetting), 'Russian');
+      expect(read.setting(ToolkitProvenance.notesTrackerSetting), 'none');
+    });
+
+    test('a manifest written before settings existed reads as none', () {
+      // Which is every project installed until now. It has to read as "nothing
+      // recorded" rather than as empty strings, or the next update would set a
+      // project's base branch to "".
+      fromChannel.write(sandbox);
+      final read = ToolkitProvenance.read(sandbox)!;
+
+      expect(read.settings, isEmpty);
+      expect(read.setting(ToolkitProvenance.languageSetting), isNull);
+    });
+
     test('a local checkout records no channel', () {
       // A working directory's branch says nothing about what a project should
       // follow, so recording one would invite a comparison that means nothing.
