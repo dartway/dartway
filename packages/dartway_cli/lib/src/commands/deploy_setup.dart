@@ -104,11 +104,18 @@ Future<int> runSetup(Command<int> command, ArgResults results) async {
   if (!await step(
     'Root privileges',
     () async {
+      // The marker is what separates "connected, and the user has no root"
+      // from "never connected at all". Without it an unreachable host, a
+      // rejected key or a wrong --identity would all be reported as a
+      // privilege problem, and the real reason — which ssh did print — would
+      // be thrown away.
+      const denied = 'dw-no-root';
       final result = await ssh.run(
         'if [ "\$(id -u)" = 0 ]; then echo root; '
-        'elif sudo -n true 2>/dev/null; then echo sudo; else exit 1; fi',
+        'elif sudo -n true 2>/dev/null; then echo sudo; '
+        'else echo $denied; exit 1; fi',
       );
-      if (result.ok) {
+      if (result.ok || !result.stdout.contains(denied)) {
         return result;
       }
       return DwSshResult(
@@ -356,6 +363,10 @@ set -e
 # like a configured one.
 if ! command -v ufw >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
+  # The index is refreshed here rather than trusted: the only other
+  # `apt-get update` in this run sits behind "Docker is absent", so on a host
+  # that came with Docker there may have been none at all.
+  apt-get update -qq
   apt-get install -y -qq ufw
 fi
 if command -v ufw >/dev/null 2>&1; then
