@@ -97,11 +97,45 @@ Future<int> runSetup(Command<int> command, ArgResults results) async {
     return true;
   }
 
+  // Provisioning is root's work, and the session is not always root: cloud
+  // images create an ordinary user with passwordless sudo and refuse a root
+  // login over SSH. Ask once, here, rather than let `apt-get` answer with
+  // "Permission denied" two steps down and leave the reader guessing.
+  if (!await step(
+    'Root privileges',
+    () async {
+      // The marker is what separates "connected, and the user has no root"
+      // from "never connected at all". Without it an unreachable host, a
+      // rejected key or a wrong --identity would all be reported as a
+      // privilege problem, and the real reason — which ssh did print — would
+      // be thrown away.
+      const denied = 'dw-no-root';
+      final result = await ssh.run(
+        'if [ "\$(id -u)" = 0 ]; then echo root; '
+        'elif sudo -n true 2>/dev/null; then echo sudo; '
+        'else echo $denied; exit 1; fi',
+      );
+      if (result.ok || !result.stdout.contains(denied)) {
+        return result;
+      }
+      return DwSshResult(
+        exitCode: result.exitCode,
+        stdout: '',
+        stderr:
+            '${ssh.target} is neither root nor allowed passwordless sudo. '
+            'Provisioning installs packages and creates the deployment user, '
+            'so it needs one of the two.',
+      );
+    },
+  )) {
+    return 1;
+  }
+
   // Base packages and Docker. Both are no-ops on a server that already has
   // them, which is the common case when setup is re-run for a template change.
   if (!await step(
     'Base packages and Docker',
-    () => ssh.run('''
+    () => ssh.runPrivileged('''
 set -e
 if ! command -v docker >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
@@ -117,7 +151,7 @@ systemctl enable --now docker >/dev/null 2>&1 || true
 
   if (!await step(
     'Deployment user',
-    () => ssh.run('''
+    () => ssh.runPrivileged('''
 set -e
 id -u '${target.deployUser}' >/dev/null 2>&1 || \\
   adduser --disabled-password --gecos "" '${target.deployUser}'
@@ -322,8 +356,19 @@ chmod 600 '${target.appDir}/.env'
 
   if (!await step(
     'Firewall',
-    () => ssh.run('''
+    () => ssh.runPrivileged('''
 set -e
+# Installed rather than skipped: Ubuntu images ship ufw, minimal Debian and
+# several cloud images do not, and a silently skipped firewall looks exactly
+# like a configured one.
+if ! command -v ufw >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  # The index is refreshed here rather than trusted: the only other
+  # `apt-get update` in this run sits behind "Docker is absent", so on a host
+  # that came with Docker there may have been none at all.
+  apt-get update -qq
+  apt-get install -y -qq ufw
+fi
 if command -v ufw >/dev/null 2>&1; then
   ufw allow OpenSSH >/dev/null
   ufw allow 80/tcp >/dev/null
