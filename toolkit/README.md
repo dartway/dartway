@@ -9,9 +9,10 @@ In client repos the harness is installed by a script and **committed** (`.claude
 ```
 CLAUDE.md                     # the generic methodology (the always-in-context "brain"): laws, naming,
                               #   the server/flutter/shared/client layers, the skill catalog; installed as .claude/CLAUDE.md
-skills/dartway-*/SKILL.md     # the DartWay methodology — 12 skills: requirements, plan, run,
+skills/dartway-*/SKILL.md     # the DartWay methodology — 15 skills: requirements, plan, run,
                               #   feature-scaffold, models, crud-config, data-layer, navigation,
-                              #   ui-kit, clean-code, push-delivery, finish
+                              #   ui-kit, clean-code, push-delivery, testing, on-device, finish,
+                              #   update
 commands/{commit,dartway-checkup}.md
 settings.json                 # default permissions, merged into .claude/settings.json
 ```
@@ -39,12 +40,17 @@ Installed by the CLI — the shell scripts it replaced are gone:
 
 ```bash
 dart pub global activate dartway_cli
-dartway setup-ai                      # in the project root
+dartway setup-ai                      # in the project root, the first time
 ```
 
 It clones or pulls the `dartway` monorepo (the **`stable`** branch by default — the last verified
 state), takes `toolkit/` from it, detects the packages, substitutes the tokens and fills `.claude/`.
 Commit `.claude/` afterwards: it is a generated-but-committed artifact, like the Serverpod client.
+
+**Afterwards the door is `dartway update`**, not `setup-ai` again: it installs the toolkit the same
+way — from the channel the project recorded, replaying the settings it was set up with — and then
+reports what else has moved, which packages are behind and which migration notes the project still
+owes an edit to. `dartway-update` is the skill that carries that list out.
 
 ## Developing the toolkit
 

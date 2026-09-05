@@ -2,7 +2,8 @@
 
 It is the front door and the toolbox: one command prints the whole setup instruction, one checks
 whether the machine can run any of it, one creates a project, one installs the agent toolkit into
-an existing one, two read your code back to you, and one deploys the server.
+an existing one, one carries a project onto a newer framework, two read your code back to you, and
+one deploys the server.
 
 ```bash
 dart pub global activate dartway_cli
@@ -234,6 +235,46 @@ generated-but-committed artifact, like the Serverpod client.
 | `--notes-tracker` | `owner/repo` where framework findings are filed as issues. Defaults to the framework's own tracker; `none` files nothing outside the project |
 | `--channel` | Monorepo branch to take the toolkit from. Default `stable`, or `DARTWAY_BRANCH` |
 | `--local-repo` | Use a local monorepo checkout instead of cloning |
+
+## `dartway update` — carry the project onto a newer framework
+
+```bash
+dartway update
+```
+
+`setup-ai` installs the toolkit. `update` does that and then answers the question nothing else in a
+project ever answers: **what else has moved.**
+
+It reports three things, and changes only the first:
+
+- **the toolkit**, installed — from the channel the project is already on. Unlike `setup-ai`, the
+  default here is the recorded channel rather than `stable`: "update" means move forward on my own
+  channel, and a project deliberately put on `master` must not be carried backwards by a command
+  run without arguments. The recorded `--language`, `--base-branch` and `--notes-tracker` are
+  replayed the same way; an explicit flag still wins over both.
+- **the framework packages** the project is behind on — the version it resolves against the version
+  the channel has, per `pubspec.lock`, with the instruction split by source. A hosted package moves
+  by raising a caret (under a `0.x` major a minor behaves like a major, so `^0.4.0` does not admit
+  `0.8.0`); a git one moves by `dart pub upgrade` naming it, because a git dependency is pinned when
+  it is added and shows no version anywhere a person reads.
+- **the migration notes still to apply** — the framework changes that ask this project to edit its
+  own code, read out of `docs/migrations/` in the channel and filtered by the versions this project
+  is actually on. See the synchronisation law, point 7.
+
+**It edits nothing but `.claude/`, deliberately.** The toolkit is a generated artifact whose whole
+update is a copy; a caret is one line but a changed API is not, and a command that half-applied the
+rest would leave a tree nobody can tell apart from a finished one. The `dartway-update` skill in the
+toolkit is what carries the list out — read the notes, make the edits, then move the versions, in
+that order.
+
+The versions come from the lock files rather than the pubspecs, which is what makes a project on git
+dependencies answerable at all: pub writes the pinned commit's own `version:` into the lock, so a
+project showing no version anywhere still states which release it is standing on. Where a project
+holds several copies of one package — a Flutter lock and a server lock — the **oldest** is the
+answer, because it is the oldest half that still owes the migrations.
+
+If the CLI itself is behind what the channel has, the run says so first: an old CLI installs an old
+idea of what a project needs, and it cannot replace itself mid-run.
 
 ## `dartway check` — the conventions, enforced
 
@@ -528,7 +569,7 @@ before and after a refactor, or on Friday, to see where the code went.
 
 | Variable | Meaning |
 |---|---|
-| `DARTWAY_BRANCH` | Default channel for `create` / `setup-ai` |
+| `DARTWAY_BRANCH` | Default channel for `create` / `setup-ai` / `update` (for `update`, only where the project has no recorded channel) |
 | `DARTWAY_MONOREPO_DIR` | Local monorepo checkout to use instead of cloning |
 | `DARTWAY_REPO_URL` | Override the monorepo git URL |
 

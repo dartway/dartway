@@ -2,6 +2,26 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+/// The project root: the repository, or the working directory when there is no
+/// repository around it.
+///
+/// Top-level because more than one command needs the same answer, and two
+/// commands resolving it apart would install into one directory what they
+/// report about another.
+Directory findProjectRoot() {
+  final gitResult = Process.runSync('git', [
+    'rev-parse',
+    '--show-toplevel',
+  ], runInShell: true);
+  if (gitResult.exitCode == 0) {
+    final gitRoot = (gitResult.stdout as String).trim();
+    if (gitRoot.isNotEmpty) {
+      return Directory(gitRoot);
+    }
+  }
+  return Directory.current;
+}
+
 /// DartWay project layout: sibling Dart packages in the project root whose
 /// role is defined by the directory name suffix (`*_server`, `*_client`,
 /// `*_flutter`, optional `*_shared`).

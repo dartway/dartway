@@ -31,7 +31,7 @@ worse than a missing one — the agent writes non-working code with full confide
 ```
 .claude/
   CLAUDE.md                    # the methodology, always in the agent's context
-  skills/dartway-*/SKILL.md    # 13 skills, loaded by relevance to the task
+  skills/dartway-*/SKILL.md    # 15 skills, loaded by relevance to the task
   commands/commit.md
   commands/dartway-checkup.md
 ```
@@ -60,7 +60,9 @@ So do not edit a `dartway-*` skill in place; the next `setup-ai` will drop your 
 floor. To customize, **copy the skill under a different name** and edit the copy. The source of
 truth is the toolkit in the monorepo, and there is no reverse sync.
 
-Updating is a deliberate act with a visible diff: run `setup-ai` again, read what changed, commit. What
+Updating is a deliberate act with a visible diff: run **`dartway update`**, read what changed, commit.
+It installs the toolkit the way `setup-ai` does and then reports what else has moved — which framework
+packages this project is behind on, and which migration notes it still owes an edit to. What
 was installed is written down beside it, in `.claude/dartway-toolkit.json` — repository, channel,
 commit, CLI version — because the files themselves do not say which channel they follow, and
 `--channel` defaults to `stable`. Update a project that had been moved to `master` with the plain
@@ -183,6 +185,11 @@ tested, and why there are no coverage thresholds.
 **`dartway-finish`** — the definition of done before a commit or PR: audits the diff against the
 contract, checks the feature's description for drift and the test coverage, then shows suggestions
 and applies only what you confirm.
+
+**`dartway-update`** — moving the project onto a newer framework, which is a job of its own rather
+than part of a task: run `dartway update`, read the framework's migration notes, make the edits they
+ask for, and only then move the package versions. That order is the whole point — moving the
+packages first turns a readable instruction into a screen of compile errors.
 
 Two commands come with them. `/commit` — one conventional-commit line in English, and nothing local
 decided for you: whether commits carry a ticket, and whether anything checks the message, belongs to
