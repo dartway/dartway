@@ -67,6 +67,12 @@ cannot be parsed at all.
 **Versions rather than commits**, because the CLI reads the monorepo from a shallow clone and has
 no history to diff — and because a version is what a project actually moves.
 
+**A change to `template/` alone is keyed to `dartway_cli`.** The skeleton has no version of its
+own, and a project keeps its copy of what it was created from — so a fix to `template/` reaches
+nobody, and the note is the whole delivery. `dartway_cli` is the right key because the template
+declares it as a dev dependency, which puts it in the lock of every project `dartway create`
+produces; name the version being released with the fix.
+
 **File name: `YYYY-MM-DD-slug.md`.** The notes are listed in file-name order, which is the order
 they are applied in by a project that has fallen several releases behind. Two notes landing on one
 day are ordered by their slug — so when one has to come after another, the slugs have to say so.
