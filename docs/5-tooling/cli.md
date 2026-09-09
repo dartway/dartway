@@ -483,11 +483,23 @@ Addresses, fully qualified names, `localhost`, nginx variables and aliases the f
 its own `upstream` block are not services and are not reported — a check that flagged them would be
 switched off within a week.
 
-`run` updates the checkout, writes the bridge, rebuilds, applies migrations, checks the upstreams and
-restarts, then polls every public URL. The bridge is written **after** the checkout update: it judges the revision this
+`run` updates the checkout, writes the bridge, rebuilds, applies migrations, checks the upstreams,
+issues the TLS certificate and restarts, then polls every public URL. The bridge is written **after** the checkout update: it judges the revision this
 deploy is applying, and a deploy that itself introduces the override must not be refused on a tree
 that does not have it yet. It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders
 infrastructure on every push turns a routine change into an infrastructure one.
+
+**The certificate is issued by the deploy, and it is the only place that can.** `setup` writes a
+one-day self-signed file so that Nginx starts, and the compose stack runs `certbot renew` — which
+renews lineages certbot already manages and knows nothing about a file openssl wrote. For a long
+time that left nobody issuing anything: a stand built exactly by the book served an expired
+self-signed certificate, and the smoke test failed on every endpoint while pointing at container
+logs that had nothing to say. The step sits after `up`, because the ACME challenge is answered by
+the Nginx this deploy has just started, and before the restart, which is what makes Nginx read what
+arrived. It asks one question — does certbot manage this lineage — and does nothing when the answer
+is yes, so a routine deploy does not spend a rate-limited issuance every time. One certificate
+covers every served name, because the rendered Nginx names a single certificate in all four of its
+`server` blocks.
 
 **The migration step prints what the container said, and fails on it.** It used to print its title
 and nothing else, because a step's output was shown only when its exit code was non-zero — and this

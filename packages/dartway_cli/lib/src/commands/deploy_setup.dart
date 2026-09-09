@@ -383,7 +383,8 @@ fi
 
   // Nginx will not start without a certificate file, and certbot cannot issue
   // one until Nginx answers the challenge. A one-day self-signed certificate
-  // breaks the circle; the real one replaces it on the first deploy.
+  // breaks the circle; the `certificate` step of `deploy run` replaces it with
+  // the real one, once the stack it needs is up.
   final certName = serverpod.apiServer.publicHost;
   if (!await step(
     'TLS bootstrap certificate',

@@ -2,6 +2,15 @@
 
 ## 0.10.1
 
+- **The deployment issues its TLS certificate.** `setup` wrote a one-day self-signed certificate so
+  that Nginx could start, and the compose stack ran `certbot renew`, which renews lineages certbot
+  already manages and knew nothing about that file — so nothing ever ran `certonly` and the real
+  certificate was never requested. A stand built exactly by the book served an expired self-signed
+  certificate, and the smoke test failed on all four endpoints with advice pointing at container
+  logs that had nothing to say. `deploy run` now issues it between starting the stack and restarting
+  the proxy, one certificate covering every served name, and does nothing when certbot already
+  manages the lineage.
+
 - **`dartway deploy setup` runs on a cloud image.** Its privileged steps — base packages, Docker,
   the deployment user, the firewall — went out as plain SSH commands, so the session had to *be*
   root. No cloud image is built that way: Yandex Cloud, AWS and GCP create an ordinary user with

@@ -159,6 +159,81 @@ class DwDeployRunner {
     );
   }
 
+  /// The certificate name every `server` block in the rendered nginx points
+  /// at, and the lineage certbot has to manage.
+  String? get _certName => serverpod.apiServer.publicHost;
+
+  /// Every domain that certificate has to cover.
+  ///
+  /// One certificate for four names: the rendered nginx names a single
+  /// `__CERTNAME__` in all of its `server` blocks, so a certificate listing
+  /// only the API host leaves three of them serving a name it does not carry.
+  List<String> get certificateDomains => {
+    for (final endpoint in serverpod.endpoints)
+      if (endpoint.publicHost != null) endpoint.publicHost!,
+    target.webAppDomain,
+  }.toList();
+
+  /// Asks Let's Encrypt for the real certificate, once.
+  ///
+  /// `deploy setup` writes a one-day self-signed certificate so that nginx can
+  /// start at all, and the compose stack runs `certbot renew` — which renews
+  /// lineages certbot already manages and knows nothing about that file. So
+  /// nothing ever issued anything: the stand served an expired self-signed
+  /// certificate, the smoke test failed on all four endpoints, and its advice
+  /// pointed at container logs that had nothing to say.
+  ///
+  /// Runs after the stack is up, because the ACME challenge is answered by the
+  /// nginx this deploy has just started, and before the proxy restart, which is
+  /// what makes nginx read the new certificate.
+  ///
+  /// The step asks one question — does certbot manage this lineage — and does
+  /// nothing when the answer is yes. That is what keeps a routine deploy from
+  /// spending a rate-limited issuance on every run.
+  Future<DwSshResult> issueCertificate() {
+    final certName = _certName;
+    if (certName == null) {
+      return Future.value(
+        const DwSshResult(
+          exitCode: 1,
+          stdout: '',
+          stderr:
+              'The Serverpod config gives apiServer no publicHost, so there is '
+              'no name to put on a certificate — and the rendered nginx points '
+              'at /etc/letsencrypt/live//fullchain.pem, which cannot exist. '
+              'Set apiServer.publicHost and render the server again with '
+              'dartway deploy setup.',
+        ),
+      );
+    }
+    final domains = certificateDomains.map((domain) => "-d '$domain'").join(' ');
+    return ssh.runAs(target.deployUser, '''
+set -e
+cd '$_appDir'
+${DwComposeFiles.selectFiles}
+# A renewal config is what certbot writes for a lineage it manages, and the
+# self-signed bootstrap certificate has none. `-s` rather than `-f`: a failed
+# attempt leaves that file behind empty, and certbot then issues under
+# `$certName-0001`, a path nginx never names — so the retry reports success and
+# changes nothing.
+if ${DwComposeFiles.invoke} run --rm -T --entrypoint sh certbot -c \\
+  "test -s /etc/letsencrypt/renewal/$certName.conf" </dev/null; then
+  exit 0
+fi
+${DwComposeFiles.invoke} run --rm -T --entrypoint sh certbot -c "
+  set -e
+  # certonly refuses to write into an existing live directory, and that
+  # directory is exactly what the bootstrap step created.
+  rm -rf /etc/letsencrypt/live/$certName \\
+         /etc/letsencrypt/archive/$certName \\
+         /etc/letsencrypt/renewal/$certName.conf
+  certbot certonly --webroot -w /var/www/certbot \\
+    --cert-name '$certName' $domains \\
+    --email '${target.sslEmail}' --agree-tos --no-eff-email -n
+" </dev/null
+''');
+  }
+
   Future<DwSshResult> up() =>
       ssh.runAs(target.deployUser, _compose('up -d --remove-orphans'));
 
@@ -210,6 +285,14 @@ class DwDeployRunner {
       title: 'Check nginx upstreams against the applied stack',
       run: checkUpstreams,
       verdict: upstreamVerdict,
+    ),
+    // After `up`, because the ACME challenge is answered by the nginx this
+    // deploy has just started, and before the restart, which is what makes
+    // nginx read what was issued.
+    DwDeployStep(
+      id: 'certificate',
+      title: 'Issue the TLS certificate',
+      run: issueCertificate,
     ),
     DwDeployStep(
       id: 'restart-proxy',
