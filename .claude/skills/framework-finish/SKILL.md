@@ -1,6 +1,6 @@
 ---
 name: framework-finish
-description: The synchronisation audit to run before committing a change to the DartWay framework — checks that a public API change is reflected in example/, template/, toolkit/skills/, docs/ and the CHANGELOG, that a change asking projects to edit their own code carries a migration note in docs/migrations/, and that a bumped package version still satisfies the carets stated for it in example/ and template/. Run it once the package code is done, before the commit or the PR.
+description: The synchronisation audit to run before committing a change to the DartWay framework — checks that a public API change is reflected in example/, template/, toolkit/skills/, docs/ and the CHANGELOG, that a change asking projects to edit their own code carries a migration note in docs/migrations/, and that a bumped package version still satisfies the carets stated for it in example/ and template/, and that the change carries no backward-compatibility scaffolding, which a 0.x framework does not keep. Run it once the package code is done, before the commit or the PR.
 ---
 
 # framework-finish — the monorepo synchronisation audit
@@ -49,6 +49,7 @@ The same applies to `docs/` and the site, but more gently — the site is a cons
 
 Quick additional checks:
 
+- **no compatibility scaffolding.** Read the diff for code whose only job is to keep an older shape alive: a deprecated alias next to its replacement, a second branch for the way it used to be, a check that recognises state written by a previous version and repairs it, a default chosen so that an existing installation keeps working. Under a zero major the framework promises nothing and therefore preserves nothing (root `CLAUDE.md`, "Zero major") — the change fixes the shape going forward, and what an existing project owes is a note in `docs/migrations/` for a human to act on, not a permanent second path in the code. This is a finding even when the scaffolding is three lines and even when it was added in good faith: it is written once and read forever;
 - **the toolkit invariant:** the diff under `toolkit/` carries no literals from a specific project, only `__*__` tokens. There is deliberately no grep for this: a pattern listing the projects we remember today will not catch the leak that arrives from the next one, and the previous grep found precisely its own documentation. Read it with your eyes — a name that means something in exactly one project has to be a token or an invented example;
 - **the skeleton invariant:** `template/` holds no domain models — `grep -riE 'club|booking|chat|news|fitness' template/ --include=*.dart --include=*.spy.yaml` comes back empty. Domain leaks into the skeleton unnoticed (a widget copied out of example brings `ClubSession` with it);
 - **the template's migrations and generated code are under version control** (`git ls-files template/dartway_starter_server/migrations/ | head -1` is not empty). They were in `.gitignore` once, and for months `dartway create` handed out a project that would not start: the folder was there locally and missing from the clone;
