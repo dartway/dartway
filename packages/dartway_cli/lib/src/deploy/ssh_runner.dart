@@ -91,6 +91,28 @@ class DwSshRunner {
     }
   }
 
+  /// Wraps [command] so it runs as root: unchanged when the session already
+  /// is root, through `sudo -n` when it is not.
+  ///
+  /// Cloud images are the reason this exists. Yandex Cloud, AWS and GCP all
+  /// create an ordinary user with passwordless sudo and refuse a root login
+  /// over SSH, so provisioning that insists on connecting as root cannot run
+  /// on any of them — and the failure surfaces as `Permission denied` from
+  /// `apt-get`, which names neither the cause nor the fix.
+  ///
+  /// `-n` keeps the promise the rest of this runner makes: nothing ever waits
+  /// for a password. A user without passwordless sudo fails immediately and
+  /// says so.
+  static String privilegedCommand(String command) {
+    final quoted = command.replaceAll("'", "'\\''");
+    return "if [ \"\$(id -u)\" = 0 ]; then sh -c '$quoted'; "
+        "else sudo -n sh -c '$quoted'; fi";
+  }
+
+  /// Runs [command] as root — see [privilegedCommand].
+  Future<DwSshResult> runPrivileged(String command) =>
+      run(privilegedCommand(command));
+
   /// Runs [command] as the deployment user via sudo, mirroring what the
   /// deployment itself does. Harmless when already connected as that user.
   Future<DwSshResult> runAs(String deployUser, String command) {

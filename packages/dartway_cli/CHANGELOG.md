@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.1
+
+- **`dartway deploy setup` runs on a cloud image.** Its privileged steps — base packages, Docker,
+  the deployment user, the firewall — went out as plain SSH commands, so the session had to *be*
+  root. No cloud image is built that way: Yandex Cloud, AWS and GCP create an ordinary user with
+  passwordless sudo and refuse a root login, and provisioning met them with `Permission denied`
+  from `apt-get`, a message that names neither the cause nor the fix. Those steps now go through
+  `sudo -n` when the session is not root, and setup asks for that privilege once, up front, instead
+  of discovering it missing two steps in.
+
+- **The firewall is installed rather than skipped.** The step was guarded by
+  `if command -v ufw`, and an image without `ufw` — minimal Debian, several cloud images — passed
+  it with an "ok" and no firewall. A silently skipped firewall is indistinguishable from a
+  configured one, which is the worst of the available outcomes.
+
 ## 0.10.0
 
 - **`dartway update` — the one command that carries a project onto a newer framework.**

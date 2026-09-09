@@ -11,8 +11,11 @@
 
 staging:
   # Where to connect and who to become. The first login provisions the machine
-  # (`dartway deploy setup`) and is usually root; everything afterwards runs as
-  # the deploy user, who owns the checkout and needs no privileges beyond it.
+  # (`dartway deploy setup`), which needs root — either by connecting as root
+  # or through passwordless sudo, which is what cloud images give their default
+  # user. Everything afterwards runs as the deploy user, who owns the checkout
+  # and needs no privileges beyond it; naming the same user in both lines is a
+  # normal arrangement on a cloud image, where root cannot log in at all.
   host: 203.0.113.10
   ssh_user: root
   deploy_user: your-project-admin

@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 /// A copy of what `pubspec.yaml` says, because a compiled or globally activated
 /// executable has no reliable way back to its own pubspec. It is a checked
 /// copy: `cli_version_test.dart` compares the two and goes red when they part.
-const dartwayCliVersion = '0.10.0';
+const dartwayCliVersion = '0.10.1';
 
 /// Where an installed harness came from.
 ///
