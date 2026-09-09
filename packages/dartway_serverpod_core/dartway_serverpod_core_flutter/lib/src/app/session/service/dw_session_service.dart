@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_serverpod_core_client/dartway_serverpod_core_client.dart';
 import 'package:flutter/foundation.dart';
 
@@ -112,6 +113,16 @@ class DwSessionService<UserProfileClass extends SerializableModel> {
 
       await keyManager.storeUserProfile(profile);
       _setCurrentUser(profile, id);
+    } on DwNotAuthenticated catch (error) {
+      // The server refused the stored key, which is an answer and not a
+      // failure: expired, revoked, a deleted account, another backend. Every
+      // one of them means the person is signed out — the state the app knows
+      // how to render — and this used to leave `initDwCore` by exception,
+      // before any UI existed, so the app started to nothing at all and only a
+      // reinstall recovered it.
+      debugPrint('[DwSessionService] the stored session is gone: $error');
+      await invalidateSession();
+      return;
     } catch (error) {
       // A connection-level failure is not an answer: with a cached profile we
       // start from it and keep working offline — fresh data arrives once

@@ -97,6 +97,50 @@ void main() {
       );
     });
 
+    test('a refused session is answered with DwNotAuthenticated', () {
+      expect(
+        () => DwRepository.processApiResponse<bool>(
+          const DwApiResponse<bool>.notAuthenticated(source: 'getOne'),
+          updateListeners: false,
+        ),
+        throwsA(
+          isA<DwNotAuthenticated>().having(
+            (e) => e.message,
+            'message',
+            'Authentication required (getOne)',
+          ),
+        ),
+      );
+    });
+
+    test('no session is neither a refusal nor a failure', () {
+      // The three answers are distinct on purpose: a rule saying no reaches
+      // the user as text, a bug is an incident, and a key the server does not
+      // know means the person is signed out.
+      const response = DwApiResponse<bool>.notAuthenticated(source: 'getAll');
+
+      expect(response.isRefusal, isFalse);
+      expect(response.isNotAuthenticated, isTrue);
+      expect(
+        () => DwRepository.processApiResponse<bool>(
+          response,
+          updateListeners: false,
+        ),
+        throwsA(isNot(isA<DwRefusal>())),
+      );
+    });
+
+    test('the flag survives the wire', () {
+      final wire = const DwApiResponse<bool>.notAuthenticated(
+        source: 'getOne',
+      ).toJson();
+      final back = DwApiResponse<bool>.fromJson(wire);
+
+      expect(wire['isNotAuthenticated'], isTrue);
+      expect(back.isNotAuthenticated, isTrue);
+      expect(back.isRefusal, isFalse);
+    });
+
     test('an older server, which marks nothing, still reports failures', () {
       // The flag absent from the JSON is what a server built before it looks
       // like: every error stays an incident, exactly as it did.

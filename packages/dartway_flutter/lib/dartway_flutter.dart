@@ -51,6 +51,7 @@ export 'src/ui/confirmation/dw_ui_confirmation.dart';
 export 'src/diagnostics/error_reporting/dw_error_report.dart';
 // The one error that is an answer rather than an incident — see DwRefusal.
 export 'src/diagnostics/error_reporting/dw_refusal.dart';
+export 'src/diagnostics/error_reporting/dw_not_authenticated.dart';
 
 // diagnostics/dw_feature: mark a widget as a product feature and discover the
 // mounted ones at runtime — feature catalogs, error context, Studio passports.

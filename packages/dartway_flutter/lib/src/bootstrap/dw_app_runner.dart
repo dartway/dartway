@@ -25,7 +25,9 @@ import 'widgets/dw_app_bootstrapper.dart';
 /// `init()` inside `appInitializers`.
 class DwAppRunner {
   /// Optional initialization steps, run in order before the app renders. Each
-  /// is awaited; an initializer that throws surfaces on the error screen.
+  /// is awaited; an initializer that throws surfaces on the error screen,
+  /// which is built from the error itself
+  /// ([DwAppLoadingOptions.errorScreenBuilder]).
   final List<FutureOr<void> Function()>? appInitializers;
 
   /// Loading/error screen configuration.
@@ -111,7 +113,7 @@ class DwAppRunner {
           appInitializers: initializers,
           useNativeSplash: appLoadingOptions.useNativeSplash,
           onError: effectiveOnError,
-          errorScreen: appLoadingOptions.errorScreen,
+          errorScreenBuilder: appLoadingOptions.errorScreenBuilder,
           loadingScreen: appLoadingOptions.loadingScreen,
           child: child,
         ),

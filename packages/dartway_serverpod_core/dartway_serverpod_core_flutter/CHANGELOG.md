@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.0
+
+- **A refused session restore no longer kills the app.** A stored key the server does not accept —
+  expired, revoked, a deleted account, a different backend — came back as
+  `Exception('Authentication required (getOne for UserProfile)')`, and `DwSessionService` had no
+  way to tell it from a bug, so it propagated out of `initDwCore`. Apps await that before any UI
+  exists: the app started to a black screen, every launch, and only a reinstall recovered it. The
+  server has always had a name for the case (`DwApiResponse.notAuthenticated`); the response now
+  carries it as `isNotAuthenticated`, `processApiResponse` raises a `DwNotAuthenticated`, and the
+  session service drops the stored key and starts signed out — the state the app already knows how
+  to render.
+
 ## 0.12.1
 
 - Version only: the four `dartway_serverpod_core_*` packages move in lockstep. The change is in

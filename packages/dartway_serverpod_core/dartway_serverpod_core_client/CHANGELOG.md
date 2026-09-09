@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0
+
+- The response carries `isNotAuthenticated`, so "there is no session" survives the trip to the
+  client as a fact rather than as a sentence inside a generic exception. The four
+  `dartway_serverpod_core_*` packages move in lockstep.
+
 ## 0.12.1
 
 - Version only: the four `dartway_serverpod_core_*` packages move in lockstep. The change is in

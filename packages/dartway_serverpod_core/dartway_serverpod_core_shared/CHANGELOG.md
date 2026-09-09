@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0
+
+- Version only: the four `dartway_serverpod_core_*` packages move in lockstep. The change is in
+  `dartway_serverpod_core_client` and `dartway_serverpod_core_flutter` — a refused session restore
+  is an answer now, not a failed launch.
+
 ## 0.12.1
 
 - Version only: the four `dartway_serverpod_core_*` packages move in lockstep. The change is in

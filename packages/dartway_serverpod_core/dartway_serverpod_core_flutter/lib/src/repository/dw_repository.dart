@@ -838,6 +838,14 @@ class DwRepository {
     // was written in, and the app's error policy can sort it out by type
     // instead of by matching the text.
     if (response.error != null) {
+      // "No session" is the third answer, and it is neither of the other two:
+      // a key the server does not know is not a rule saying no, and not a bug
+      // either. It reaches the caller as a type so that a session can be
+      // dropped and a sign-in screen shown, instead of a launch failing on a
+      // sentence.
+      if (response.isNotAuthenticated) {
+        throw DwNotAuthenticated(response.error!);
+      }
       throw response.isRefusal
           ? DwRefusal(response.error!)
           : Exception(response.error);
