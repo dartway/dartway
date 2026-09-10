@@ -121,6 +121,20 @@ void main() {
     expect(pubspec, contains('path: ../$vendorDirName/dartway_extra'));
   });
 
+  test('a package with no framework dependency is not touched', () {
+    final plain = Directory(p.join(project.path, 'shop_shared'))
+      ..createSync(recursive: true);
+    File(p.join(plain.path, 'pubspec.yaml')).writeAsStringSync('name: shop_shared\n');
+
+    final report = vendorFramework(project: project, monorepo: monorepo);
+
+    expect(
+      File(p.join(plain.path, 'pubspec.yaml')).readAsStringSync(),
+      isNot(contains('dependency_overrides')),
+    );
+    expect(report.join('\n'), isNot(contains('shop_shared')));
+  });
+
   test('a package the project does not reach is left alone', () {
     // `dart pub get` resolves an override whether or not anything depends on
     // it, so overriding the whole set puts `flutter: sdk` in front of the

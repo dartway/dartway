@@ -142,12 +142,16 @@ List<String> _overrideProjectPubspecs(
       dartwayDependenciesOf(content),
       dependenciesByPackage,
     );
-    pubspec.writeAsStringSync(
-      withOverrides(content, {
-        for (final name in reached)
-          if (vendored.containsKey(name)) name: vendored[name]!,
-      }),
-    );
+    final overrides = {
+      for (final name in reached)
+        if (vendored.containsKey(name)) name: vendored[name]!,
+    };
+    // A package with no framework dependency of its own — the shared package
+    // of the skeleton is one — gets nothing rather than an empty
+    // `dependency_overrides:` key and a report line saying work was done.
+    if (overrides.isEmpty) continue;
+
+    pubspec.writeAsStringSync(withOverrides(content, overrides));
     rewritten.add(p.relative(pubspec.path, from: project.path));
   }
   return rewritten;
