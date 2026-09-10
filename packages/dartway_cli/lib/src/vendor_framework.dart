@@ -38,7 +38,11 @@ List<String> vendorFramework({
   final vendored = _copyPackages(packagesDir, project);
   final report = <String>[
     'Vendored ${vendored.length} packages into $vendorDirName/',
-    for (final path in _overrideProjectPubspecs(project, vendored))
+    for (final path in _overrideProjectPubspecs(
+      project,
+      vendored,
+      _dependenciesByPackage(project),
+    ))
       '  overrode dependencies in $path',
   ];
   if (_admitVendorDirToDockerContext(project)) {
@@ -112,14 +116,19 @@ void _copyDirectory(Directory source, Directory destination) {
   }
 }
 
-/// Every package of the project gets an override for every dartway package.
+/// Every package of the project gets overrides for the framework packages it
+/// actually reaches, and for nothing else.
 ///
-/// The overrides of the entry package govern the whole resolution, so one
-/// block per project package is enough to reach the framework's own
-/// dependencies on each other — which carry the same unpublished carets.
+/// Not for all of them: an override is resolved whether or not anything
+/// depends on it, so overriding the whole set drags `dartway_telegram` — and
+/// its `flutter:` from the SDK — into the pure-Dart server image, where the
+/// Flutter SDK does not exist and `dart pub get` refuses the solve. The reach
+/// is transitive, because the framework's dependencies on each other carry the
+/// same unpublished carets as the project's own.
 List<String> _overrideProjectPubspecs(
   Directory project,
   Map<String, String> vendored,
+  Map<String, Set<String>> dependenciesByPackage,
 ) {
   final rewritten = <String>[];
   for (final entity in project.listSync()) {
@@ -128,8 +137,16 @@ List<String> _overrideProjectPubspecs(
     final pubspec = File(p.join(entity.path, 'pubspec.yaml'));
     if (!pubspec.existsSync()) continue;
 
+    final content = pubspec.readAsStringSync();
+    final reached = reachableFrom(
+      dartwayDependenciesOf(content),
+      dependenciesByPackage,
+    );
     pubspec.writeAsStringSync(
-      withOverrides(pubspec.readAsStringSync(), vendored),
+      withOverrides(content, {
+        for (final name in reached)
+          if (vendored.containsKey(name)) name: vendored[name]!,
+      }),
     );
     rewritten.add(p.relative(pubspec.path, from: project.path));
   }
@@ -247,4 +264,58 @@ String withVendorCopy(String dockerfile) {
 
   lines.insert(lastCopy + 1, 'COPY $vendorDirName/ $vendorDirName/');
   return lines.join('\n');
+}
+
+/// What each vendored package depends on, among the vendored ones.
+Map<String, Set<String>> _dependenciesByPackage(Directory project) {
+  final vendorDir = Directory(p.join(project.path, vendorDirName));
+  if (!vendorDir.existsSync()) return const {};
+
+  return {
+    for (final entity in vendorDir.listSync().whereType<Directory>())
+      if (File(p.join(entity.path, 'pubspec.yaml')).existsSync())
+        p.basename(entity.path): dartwayDependenciesOf(
+          File(p.join(entity.path, 'pubspec.yaml')).readAsStringSync(),
+        ),
+  };
+}
+
+/// The `dartway_*` packages [pubspec] names as dependencies of its own.
+///
+/// Read line by line rather than with a YAML parser: the question is which
+/// names appear as keys under a dependency section, and the answer survives
+/// the pubspecs this repository actually writes. `dependency_overrides` is
+/// skipped — it is what this script writes, and reading it back would make a
+/// second run inherit the first one's reach.
+Set<String> dartwayDependenciesOf(String pubspec) {
+  const sections = {'dependencies:', 'dev_dependencies:'};
+  final found = <String>{};
+  var inSection = false;
+  for (final line in pubspec.split('\n')) {
+    if (line.isNotEmpty && !line.startsWith(' ') && !line.startsWith('#')) {
+      inSection = sections.contains(line.trimRight());
+      continue;
+    }
+    if (!inSection) continue;
+    final match = RegExp(r'^  ([a-z0-9_]+):').firstMatch(line);
+    if (match != null && match.group(1)!.startsWith('dartway_')) {
+      found.add(match.group(1)!);
+    }
+  }
+  return found;
+}
+
+/// [roots] and everything they reach through [dependencies].
+Set<String> reachableFrom(
+  Set<String> roots,
+  Map<String, Set<String>> dependencies,
+) {
+  final reached = <String>{};
+  final pending = [...roots];
+  while (pending.isNotEmpty) {
+    final name = pending.removeLast();
+    if (!reached.add(name)) continue;
+    pending.addAll(dependencies[name] ?? const <String>{});
+  }
+  return reached;
 }

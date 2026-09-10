@@ -21,8 +21,12 @@ Directory _monorepo() {
     Directory(p.join(dir.path, '.dart_tool'))..createSync();
   }
 
-  package('dartway_core', '');
-  package('dartway_extra', 'dependencies:\n  dartway_core: ^0.13.0\n');
+  package('dartway_core', 'dependencies:\n  dartway_extra: ^0.13.0\n');
+  package('dartway_extra', '');
+  // Flutter-only, and nothing in the server package reaches it. An override is
+  // resolved whether or not anything depends on it, so this is what a
+  // whole-set override drags into a pure-Dart image.
+  package('dartway_telegram', 'dependencies:\n  flutter:\n    sdk: flutter\n');
   return root;
 }
 
@@ -115,6 +119,20 @@ void main() {
     // dependencies carry the same unpublished carets, and the entry package's
     // overrides are what govern the whole resolution.
     expect(pubspec, contains('path: ../$vendorDirName/dartway_extra'));
+  });
+
+  test('a package the project does not reach is left alone', () {
+    // `dart pub get` resolves an override whether or not anything depends on
+    // it, so overriding the whole set puts `flutter: sdk` in front of the
+    // pure-Dart server image and the solve fails with exit code 69.
+    vendorFramework(project: project, monorepo: monorepo);
+
+    expect(
+      File(
+        p.join(project.path, 'shop_server', 'pubspec.yaml'),
+      ).readAsStringSync(),
+      isNot(contains('dartway_telegram')),
+    );
   });
 
   test('running twice leaves one override block', () {
