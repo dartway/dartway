@@ -9,7 +9,7 @@ class DwAppBootstrapper extends ConsumerStatefulWidget {
   final bool useNativeSplash;
 
   final void Function(Object error, StackTrace stackTrace) onError;
-  final Widget errorScreen;
+  final Widget Function(Object error, StackTrace stackTrace) errorScreenBuilder;
   final Widget loadingScreen;
   final Widget child;
 
@@ -18,7 +18,7 @@ class DwAppBootstrapper extends ConsumerStatefulWidget {
     required this.appInitializers,
     required this.useNativeSplash,
     required this.onError,
-    required this.errorScreen,
+    required this.errorScreenBuilder,
     required this.loadingScreen,
     required this.child,
   });
@@ -29,7 +29,7 @@ class DwAppBootstrapper extends ConsumerStatefulWidget {
 
 class _DwAppBootstrapperState extends ConsumerState<DwAppBootstrapper> {
   bool _initialized = false;
-  bool _failed = false;
+  (Object, StackTrace)? _failure;
 
   @override
   void initState() {
@@ -50,9 +50,20 @@ class _DwAppBootstrapperState extends ConsumerState<DwAppBootstrapper> {
         setState(() => _initialized = true);
       }
     } catch (error, stack) {
-      widget.onError(error, stack);
+      // Reporting is attempted, and it is not allowed to decide whether the
+      // app gets a first frame. The handler runs against a core that has just
+      // failed to initialize — DwCore's own alerting talks to the server the
+      // start could not reach — and a throw in here used to leave `_failed`
+      // unset, so the app sat on the loading screen, which under a native
+      // splash is a `SizedBox.shrink()`: nothing at all, for good.
+      try {
+        widget.onError(error, stack);
+      } catch (reportingError, reportingStack) {
+        debugPrint('[DwAppBootstrapper] the error report itself failed: '
+            '$reportingError\n$reportingStack');
+      }
       if (mounted) {
-        setState(() => _failed = true);
+        setState(() => _failure = (error, stack));
       }
     } finally {
       if (widget.useNativeSplash) {
@@ -63,7 +74,10 @@ class _DwAppBootstrapperState extends ConsumerState<DwAppBootstrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (_failed) return widget.errorScreen;
+    final failure = _failure;
+    if (failure != null) {
+      return widget.errorScreenBuilder(failure.$1, failure.$2);
+    }
     if (!_initialized) return widget.loadingScreen;
 
     return widget.child;

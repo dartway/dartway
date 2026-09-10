@@ -126,6 +126,31 @@ An app can throw one itself for a rule of its own — `throw const DwRefusal('Th
 file is larger than 10 MB')` — and get the same treatment. Write the message for
 a user: it reaches the screen unedited.
 
+## No session is a third answer
+
+A stored key the server does not accept — expired, revoked, the account deleted,
+the app pointed at another backend — is neither a rule saying no nor something
+breaking. It means the person is signed out, which is a state the app already
+knows how to render.
+
+The server has always named the case (`DwApiResponse.notAuthenticated`); the
+response carries it as `isNotAuthenticated`, and `dw.repo` raises a
+**`DwNotAuthenticated`** for it. `DwSessionService` acts on it at startup: the
+stored key goes, and the app starts unauthenticated instead of failing to start
+at all. Before the type existed the refusal arrived as a sentence inside a
+generic exception, propagated out of `initDwCore` — which apps await before any
+UI is built — and the app opened to nothing at all, on every launch, until it
+was reinstalled.
+
+A custom policy sorts it out the same way it sorts out a refusal:
+
+```dart
+onErrorReport: (report) {
+  if (report.error is DwNotAuthenticated) return; // the session simply ended
+  mySentry.capture(report.error, report.stackTrace);
+},
+```
+
 Everything else is unchanged, and deliberately so: a `DatabaseException`, an
 exception the server's guard caught, or a call the server has no config for
 still arrive as ordinary exceptions and are still reported.

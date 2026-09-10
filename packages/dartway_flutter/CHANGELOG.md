@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.0
+
+- **A start that fails says so, and says what failed.** An initializer that threw was reported and
+  then the app was expected to render an error screen — but the reporting ran first and
+  unguarded, so a handler that threw in turn (DwCore's own alerting, talking to the server the
+  start could not reach) left the failure flag unset. The app stayed on the loading screen, which
+  under a native splash is a `SizedBox.shrink()`: nothing at all, on every launch, until the app
+  was reinstalled. Reporting is now attempted inside its own guard and cannot decide whether the
+  app gets a first frame.
+
+- **`DwAppLoadingOptions.errorScreen` becomes `errorScreenBuilder`.** The screen is built from the
+  error that failed the start, and the default one puts that text on it. A start can fail for
+  reasons only the failure names, and the person looking at the screen is usually the one who will
+  be asked what happened. **Breaking:** see `docs/migrations/2026-09-09-app-error-screen-builder.md`.
+
+- **`DwNotAuthenticated`** — the answer "there is no session", as a type. Raised by
+  `DwRepository.processApiResponse` for a response the server marked `isNotAuthenticated`, and
+  sorted out by an app's `onErrorReport` with one type check, the way `DwRefusal` already is.
+
 ## 0.8.0
 
 - **`DwKeyValueStorePlugin` — the role the framework asks for when it needs to keep a small value.**

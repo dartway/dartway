@@ -34,6 +34,7 @@ class DwApiResponse<T> implements SerializableModel {
     this.error,
     this.updatedModels,
     this.isRefusal = false,
+    this.isNotAuthenticated = false,
   });
 
   /// A rule on the server said no, and [message] is what it said.
@@ -46,7 +47,8 @@ class DwApiResponse<T> implements SerializableModel {
       error = message,
       warning = null,
       updatedModels = null,
-      isRefusal = true;
+      isRefusal = true,
+      isNotAuthenticated = false;
 
   const DwApiResponse.notConfigured()
     : isOk = false,
@@ -54,7 +56,8 @@ class DwApiResponse<T> implements SerializableModel {
       error = 'This action is not supported by the server',
       warning = null,
       updatedModels = null,
-      isRefusal = false;
+      isRefusal = false,
+      isNotAuthenticated = false;
 
   const DwApiResponse.forbidden()
     : isOk = false,
@@ -62,7 +65,8 @@ class DwApiResponse<T> implements SerializableModel {
       error = 'Not enough permissions',
       warning = null,
       updatedModels = null,
-      isRefusal = true;
+      isRefusal = true,
+      isNotAuthenticated = false;
 
   /// The caller is not signed in and the config did not opt into anonymous
   /// access. Distinct from [DwApiResponse.forbidden]: there the caller is
@@ -74,7 +78,8 @@ class DwApiResponse<T> implements SerializableModel {
       error = 'Authentication required${source != null ? ' ($source)' : ''}',
       warning = null,
       updatedModels = null,
-      isRefusal = false;
+      isRefusal = false,
+      isNotAuthenticated = true;
 
   final bool isOk;
   final T? value;
@@ -92,6 +97,22 @@ class DwApiResponse<T> implements SerializableModel {
   /// **False when the key is absent**, which is how a server older than the
   /// flag reads: every error stays an incident, exactly as before.
   final bool isRefusal;
+
+  /// Whether [error] means "there is no session", rather than a rule saying no
+  /// or something breaking.
+  ///
+  /// The twin of [isRefusal], and it exists for the same reason: the case has
+  /// a name on the server — [DwApiResponse.notAuthenticated] — and lost it on
+  /// the way to the client, arriving as a sentence inside a generic
+  /// `Exception`. A client cannot act on a sentence. It can act on this: an
+  /// expired key, a revoked one, a deleted account and a different backend all
+  /// mean the person is signed out, which is a state the app knows how to
+  /// render.
+  ///
+  /// `DwRepository.processApiResponse` raises a `DwNotAuthenticated` for it,
+  /// and `DwSessionService` drops the stored key and starts signed out instead
+  /// of failing the launch.
+  final bool isNotAuthenticated;
 
   static K? manualDeserialization<K>(Map<String, dynamic> jsonSerialization) {
     if (K == DwApiResponse<List<int>>) {
@@ -133,6 +154,8 @@ class DwApiResponse<T> implements SerializableModel {
                 )
                 .toList(),
       isRefusal: jsonSerialization['isRefusal'] as bool? ?? false,
+      isNotAuthenticated:
+          jsonSerialization['isNotAuthenticated'] as bool? ?? false,
     );
   }
 
@@ -144,6 +167,7 @@ class DwApiResponse<T> implements SerializableModel {
       if (warning != null) 'warning': warning,
       if (error != null) 'error': error,
       if (isRefusal) 'isRefusal': true,
+      if (isNotAuthenticated) 'isNotAuthenticated': true,
       if (updatedModels != null)
         'updatedModels': updatedModels?.toJson(valueToJson: (v) => v.toJson()),
     };

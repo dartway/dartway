@@ -59,6 +59,29 @@ void main() {
     expect(signedIn, [null]);
   });
 
+  test('starts signed out when the server refuses the stored key', () async {
+    // The other half of "no session", and the one that used to be fatal: the
+    // server answers with a refusal rather than an empty value — an expired or
+    // revoked key, a deleted account, another backend. It left initialize() by
+    // exception, and since apps await it before any UI exists the app started
+    // to nothing at all, on every launch, until it was reinstalled.
+    final keyManager = _FakeKeyManager((1, _FakeProfile(1)));
+    final signedIn = <int?>[];
+    final service = _buildService(
+      keyManager: keyManager,
+      fetchUserProfile: (_) async =>
+          throw const DwNotAuthenticated('Authentication required (getOne)'),
+      onUserChanged: (_, id) => signedIn.add(id),
+    );
+
+    await service.initialize();
+
+    expect(service.currentUserProfile, isNull);
+    expect(service.currentUserId, isNull);
+    expect(keyManager.removeCalls, 1);
+    expect(signedIn, [null]);
+  });
+
   test('drops a stored key that resolves to no user id', () async {
     final keyManager = _FakeKeyManager((null, null));
     var fetched = false;

@@ -365,6 +365,8 @@ dw.action(
 **What this means for your code:** write nothing. Do not catch `DwRefusal` to re-show it, do not
 add an `onErrorNotification` for the refusal case, and if the app has a custom
 `DwConfig.onErrorReport`, filter refusals there by type — `if (report.error is DwRefusal) return;` —
+and the same for `DwNotAuthenticated`, which is the answer "there is no session" rather than a bug:
+the framework has already dropped the stored key and the app is signed out —
 never by matching the message text.
 
 A rule of your own that lives on the client throws the same type:
