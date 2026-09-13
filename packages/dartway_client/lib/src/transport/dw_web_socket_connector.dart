@@ -41,6 +41,13 @@ final class _WebSocketConnection implements DwConnection {
   void send(String frame) => _channel.sink.add(frame);
 
   @override
-  Future<void> close() =>
-      _channel.sink.close().timeout(_closeTimeout, onTimeout: () {});
+  int? get closeCode => _channel.closeCode;
+
+  @override
+  String? get closeReason => _channel.closeReason;
+
+  @override
+  Future<void> close([int? code, String? reason]) => _channel.sink
+      .close(code, reason)
+      .timeout(_closeTimeout, onTimeout: () {});
 }

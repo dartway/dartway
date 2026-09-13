@@ -76,8 +76,9 @@ final class DwFakeConnection {
     }
   }
 
-  /// Drops the connection from the server side.
-  Future<void> close() => _end.close();
+  /// Drops the connection from the server side, with a WebSocket close
+  /// [code] and [reason] when given (`DwCloseCode.slowConsumer`, say).
+  Future<void> close({int? code, String? reason}) => _end.close(code, reason);
 }
 
 /// An in-memory DartWay server that speaks the wire protocol, for tests of
@@ -113,6 +114,11 @@ final class DwFakeServer {
   /// While false, connection attempts fail as against an unreachable server.
   bool acceptsConnections = true;
 
+  /// The wire version this server speaks. A client connecting with another
+  /// `v=` is closed with `DwCloseCode.unsupportedVersion`, as by a real
+  /// server — set it to test what an outdated app does.
+  int wireVersion = dwWireVersion;
+
   /// Every connection ever accepted, open or not.
   final List<DwFakeConnection> connections = [];
 
@@ -133,6 +139,13 @@ final class DwFakeServer {
   /// Decides a subscription: `null` allows it, a refusal refuses it.
   DwRefusal? Function(String channel, DwFakeConnection connection)?
   subscriptionRule;
+
+  /// Channels whose subscription check fails, as a throwing rule does on a
+  /// real server: answered as a failure with the incident
+  /// [subscriptionIncident], not as a refusal.
+  final Set<String> failingChannels = {};
+
+  static const String subscriptionIncident = 'fake-subscription-failed';
 
   final Map<String, int> _tokens = {};
   final Map<Type, DwFakeHandler<DwRequest<Object?>>> _requests = {};
@@ -225,15 +238,10 @@ final class DwFakeServer {
       .where((c) => c.subscriptions.contains(channel.wireName))
       .length;
 
-  /// Publishes [items] to every open connection subscribed to [channel],
-  /// except [except] (the author connection of a real command).
-  void publish(
-    DwChannel channel,
-    List<DwDto> items, {
-    DwFakeConnection? except,
-  }) {
+  /// Publishes [items] to every open connection subscribed to [channel] —
+  /// the author of a command included, as a real server does (D-018).
+  void publish(DwChannel channel, List<DwDto> items) {
     for (final connection in openConnections.toList()) {
-      if (connection == except) continue;
       if (!connection.subscriptions.contains(channel.wireName)) continue;
       connection.send(DwUpdateMessage(channel: channel.wireName, items: items));
     }
@@ -293,6 +301,16 @@ final class DwFakeServer {
         connection.subscriptions.clear();
       },
     );
+    if (endpoint.queryParameters['v'] != '$wireVersion') {
+      // Accepted and closed at once, as the real server upgrades and then
+      // closes: the client learns why from the close code.
+      unawaited(
+        connection.close(
+          code: DwCloseCode.unsupportedVersion,
+          reason: '${DwCloseCode.wireVersionReason}$wireVersion',
+        ),
+      );
+    }
   }
 
   void _onFrame(DwFakeConnection connection, String frame) {
@@ -317,9 +335,13 @@ final class DwFakeServer {
       case DwSubscribeMessage(:final channel):
         _subscribes[channel] = (_subscribes[channel] ?? 0) + 1;
         final refusal = subscriptionRule?.call(channel, connection);
-        if (refusal != null) {
+        if (failingChannels.contains(channel)) {
           connection.send(
-            DwSubscriptionRefusedMessage(channel, refusal: refusal),
+            DwSubscriptionRefusedMessage.failed(channel, subscriptionIncident),
+          );
+        } else if (refusal != null) {
+          connection.send(
+            DwSubscriptionRefusedMessage.refused(channel, refusal),
           );
         } else {
           connection.subscriptions.add(channel);
@@ -358,7 +380,9 @@ final class DwFakeServer {
     );
     final handler = _requests[message.request.runtimeType];
     final DwResultMessage answer;
-    if (handler == null) {
+    if (_invalid(message.id, message.request) case final refused?) {
+      answer = refused;
+    } else if (handler == null) {
       errors.add(
         StateError('No fake handler for ${message.request.runtimeType}'),
       );
@@ -404,7 +428,9 @@ final class DwFakeServer {
         _commands[command.runtimeType] ??
         (command is DwSignOut ? _signOut : null);
     final DwResultMessage answer;
-    if (handler == null) {
+    if (_invalid(message.id, command) case final refused?) {
+      answer = refused;
+    } else if (handler == null) {
       errors.add(StateError('No fake handler for ${command.runtimeType}'));
       answer = DwResultMessage(
         id: message.id,
@@ -437,6 +463,23 @@ final class DwFakeServer {
     _bind(author, null, null);
     revokeToken(token);
     return const DwOk<void>(null);
+  }
+
+  /// The refusal a real server answers before the handler for a DTO that
+  /// does not validate — reachable only by a client that skipped its own
+  /// check.
+  DwResultMessage? _invalid(int id, DwDto dto) {
+    if (dto case final DwValidatable validatable) {
+      final refusals = validatable.validate();
+      if (refusals.isNotEmpty) {
+        return DwResultMessage(
+          id: id,
+          status: DwResultStatus.refused,
+          refusal: refusals.first,
+        );
+      }
+    }
+    return null;
   }
 
   Future<DwResultMessage> _run(

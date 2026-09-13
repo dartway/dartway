@@ -364,6 +364,20 @@ final class TestApp {
         ctx.publish(const DwChannel(TestChannel.notes), note);
       },
     ),
+    DwHandler.command<RevokeSessions, void>(
+      access: DwAccess.signedIn,
+      handle: (ctx, command) async {
+        await ctx.accounts.revokeKeys(command.accountId);
+        if (command.ending == 'refuse') ctx.refuse(DwCoreRefusal.conflict);
+      },
+    ),
+    DwHandler.command<EnsureAccount, int>(
+      access: DwAccess.anonymous,
+      handle: (ctx, command) async => (await ctx.accounts.ensure(
+        DwIdentifierKind.email,
+        command.email,
+      )).accountId,
+    ),
     DwHandler.command<EnqueueJob, bool>(
       access: DwAccess.anonymous,
       handle: (ctx, command) async {
@@ -480,9 +494,11 @@ final class TestApp {
     List<DwJobDefinition>? jobs,
     List<DwRoute> routes = const [],
     List<DwMigration>? migrations,
+    DwProtocol? protocol,
+    DwSchema? schema,
   }) => DwServer(
-    protocol: testProtocol,
-    schema: DwSchema(const []),
+    protocol: protocol ?? testProtocol,
+    schema: schema,
     migrations: migrations ?? const [_AppMigration()],
     database: database,
     auth: auth ?? this.auth(),

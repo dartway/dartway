@@ -14,13 +14,24 @@ part of 'dw_client.dart';
 /// idempotent (replace by id, remove by id, insert only when absent), so
 /// applying an update the answer already contains changes nothing.
 sealed class _Entry {
-  _Entry(this.client, this.request)
-    : channels = List.unmodifiable({
-        for (final channel in request.channels) channel.wireName,
-      });
+  _Entry(DwClient client, DwRequest<Object?> request)
+    : this._(client, request, client._localRefusal(request));
+
+  _Entry._(this.client, this.request, this.localRefusal)
+    : channels = localRefusal != null
+          // Nothing will ever be fetched, so nothing is worth subscribing to.
+          ? const []
+          : List.unmodifiable({
+              for (final channel in request.channels) channel.wireName,
+            });
 
   final DwClient client;
   final DwRequest<Object?> request;
+
+  /// The first refusal of a request that does not validate. A request is a
+  /// value, so this is decided once: such an entry shows the refusal and
+  /// never sends anything, reconnects included.
+  final DwRefusal? localRefusal;
 
   /// Wire names of the channels the request declares, without repeats.
   final List<String> channels;
@@ -51,6 +62,28 @@ sealed class _Entry {
 
   /// Starts the operation that loads the entry from scratch.
   void run();
+
+  /// Ends an operation without a call when none can be made: the request does
+  /// not validate, or the server speaks another wire version. Returns whether
+  /// it did.
+  bool settledWithoutCall() {
+    final refusal = localRefusal;
+    if (refusal != null) {
+      fetched = true;
+      fetchedAs = client._connectionAccount;
+      showRefusal(refusal);
+    } else if (client._incompatible != null) {
+      // Reported once, when the client learned it.
+      failWith(dwClientIncidentId);
+    } else {
+      return false;
+    }
+    buffer = null;
+    finishOperation();
+    return true;
+  }
+
+  void showRefusal(DwRefusal refusal);
 
   void applyItems(List<DwDto> items);
 
@@ -175,6 +208,7 @@ final class _RequestEntry<R> extends _Entry {
 
   @override
   void run() {
+    if (settledWithoutCall()) return;
     buffer = [];
     final current = state;
     if (current is DwRequestData<R>) {
@@ -250,6 +284,9 @@ final class _RequestEntry<R> extends _Entry {
 
   @override
   void failWith(String incidentId) => _emit(DwRequestFailed<R>(incidentId));
+
+  @override
+  void showRefusal(DwRefusal refusal) => _emit(DwRequestRefused<R>(refusal));
 
   @override
   void applyItems(List<DwDto> items) {

@@ -8,34 +8,6 @@ import 'package:meta/meta.dart';
 
 import '../alerts/dw_logger.dart';
 
-/// Close codes the server sends on the app WebSocket. The client reads them to
-/// decide between reconnecting and giving up.
-abstract final class DwCloseCode {
-  /// The server is stopping; reconnect.
-  static const int serverStopping = 1001;
-
-  /// A frame that is not text.
-  static const int unsupportedData = 1003;
-
-  /// An inbound message over `DwServerSettings.maxInboundMessageBytes`.
-  static const int messageTooBig = 1009;
-
-  /// A message the server cannot parse as the wire protocol. A client bug:
-  /// reconnecting sends it again.
-  static const int protocolError = 4000;
-
-  /// More calls waiting for a slot than `DwServerSettings.maxWaitingCalls`.
-  static const int tooManyCalls = 4029;
-
-  /// The client speaks another wire version (`?v=` on the upgrade URL). The
-  /// reason names the server's version; do not reconnect.
-  static const int unsupportedVersion = 4001;
-
-  /// The client did not read its messages fast enough and the outbound queue
-  /// passed its ceiling. Reconnecting re-runs the active requests.
-  static const int slowConsumer = 4008;
-}
-
 /// One app WebSocket: its session, its subscriptions and its outbound queue.
 ///
 /// The outbound queue writes through `WebSocket.addStream`, whose future

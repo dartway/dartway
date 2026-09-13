@@ -224,6 +224,81 @@ void main() {
     await dw.dispose();
   });
 
+  testWidgets('an invalid command is refused in the app, shown through the '
+      'catalogue, and never sent', (tester) async {
+    final server = DwFakeServer(protocol: roomsProtocol)
+      ..onCommand<RenameRoom>(
+        (command, call) =>
+            DwOk(RoomView(id: command.roomId, name: command.name)),
+      );
+    final dw = buildCore(server);
+    await dw.init();
+    final notifications = _CapturingHandler();
+
+    await tester.pumpWidget(
+      app(
+        DwNotificationsListener(
+          handlers: {DwUiNotification: notifications},
+          child: DwActionBuilder(
+            action: dw.action<DwResult<RoomView>>(
+              (context) => dw.command(const RenameRoom(roomId: 1, name: '')),
+            ),
+            builder: (context, onPressed, busy) =>
+                TextButton(onPressed: onPressed, child: const Text('rename')),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('rename'));
+    await settle(tester);
+
+    expect(notifications.shown.single.message, 'Refused (dw.invalid)');
+    expect(server.receivedOf<DwCommandMessage>(), isEmpty);
+
+    await tester.pumpWidget(const SizedBox());
+    await dw.dispose();
+  });
+
+  testWidgets('a server on another wire version makes the connection status '
+      'incompatible and reports it once', (tester) async {
+    final server = DwFakeServer(protocol: roomsProtocol)
+      ..wireVersion = dwWireVersion + 1;
+    final dw = buildCore(server);
+    await dw.init();
+    DwConnectionStatus? status;
+    await tester.pumpWidget(
+      app(
+        Consumer(
+          builder: (context, ref, _) {
+            status = ref.watch(dw.connectionStatus);
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    await settle(tester);
+
+    // After the close the client awaits the cancellation of the ended
+    // stream, which pumping the fake clock does not complete; a moment of
+    // real time does.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
+    await settle(tester);
+
+    expect(status, DwConnectionStatus.incompatible);
+    expect(server.connections, hasLength(1));
+    expect(reports.map((r) => r.error), [
+      const DwWireVersionException(
+        clientVersion: dwWireVersion,
+        serverVersion: dwWireVersion + 1,
+      ),
+    ]);
+
+    await tester.pumpWidget(const SizedBox());
+    await dw.dispose();
+  });
+
   testWidgets('a not-authenticated answer in dw.action signs out quietly', (
     tester,
   ) async {

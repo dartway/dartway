@@ -83,6 +83,57 @@ final class DwProtocolException implements Exception {
       'DwProtocolException: $message${cause == null ? '' : ' ($cause)'}';
 }
 
+/// The server speaks another version of the wire protocol and closed the
+/// connection with `DwCloseCode.unsupportedVersion`.
+///
+/// Terminal: the client stops reconnecting, its status becomes
+/// `DwConnectionStatus.incompatible`, and every call — waiting or new — ends
+/// with this exception. Only another build of the app can talk to this
+/// server; an app shows "please update".
+final class DwWireVersionException implements Exception {
+  const DwWireVersionException({
+    required this.clientVersion,
+    required this.serverVersion,
+  });
+
+  /// `dwWireVersion` of this build.
+  final int clientVersion;
+
+  /// The version the server named in its close reason; `null` when the reason
+  /// did not name one.
+  final int? serverVersion;
+
+  @override
+  bool operator ==(Object other) =>
+      other is DwWireVersionException &&
+      other.clientVersion == clientVersion &&
+      other.serverVersion == serverVersion;
+
+  @override
+  int get hashCode => Object.hash(clientVersion, serverVersion);
+
+  @override
+  String toString() =>
+      'DwWireVersionException(client speaks v$clientVersion, server '
+      '${serverVersion == null ? 'another version' : 'v$serverVersion'})';
+}
+
+/// The server closed the connection because of what this client sent — a
+/// frame it could not parse, a binary frame, a message over its size limit
+/// (`DwCloseCode.protocolError`, `unsupportedData`, `messageTooBig`). A client
+/// bug: the client reconnects with growing backoff, and each such close is
+/// reported, since re-sending what caused it will close it again.
+final class DwConnectionRejectedException implements Exception {
+  const DwConnectionRejectedException(this.closeCode, this.closeReason);
+
+  final int closeCode;
+  final String? closeReason;
+
+  @override
+  String toString() =>
+      'DwConnectionRejectedException($closeCode ${closeReason ?? ''})';
+}
+
 /// The server refused a channel subscription because it does not declare the
 /// channel kind (`dw.unknownChannel`): a request names a channel the server was
 /// never taught. Reported to the client's `onError`; the request works, it just

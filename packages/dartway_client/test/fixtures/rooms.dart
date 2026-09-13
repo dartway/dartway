@@ -71,10 +71,18 @@ NoteView $NoteViewFromJson(Map<String, Object?> json) =>
     NoteView(id: json['id']! as int, text: json['text']! as String);
 
 /// Every room; new rooms at the head.
-final class ListRooms extends DwListRequest<RoomView> with _$ListRooms {
+final class ListRooms extends DwListRequest<RoomView>
+    with _$ListRooms
+    implements DwValidatable {
   const ListRooms({this.minRank});
 
   final int? minRank;
+
+  @override
+  List<DwRefusal> validate() => [
+    if (minRank != null && minRank! < 0)
+      DwRefusal(DwCoreRefusal.invalid, field: 'minRank', params: {'min': 0}),
+  ];
 
   @override
   List<DwChannel> get channels => const [DwChannel(AppChannel.rooms)];
@@ -270,11 +278,20 @@ mixin _$RoomHistory on DwCursorRequest<RoomView> {
 RoomHistory $RoomHistoryFromJson(Map<String, Object?> json) =>
     const RoomHistory();
 
-final class RenameRoom extends DwCommand<RoomView> with _$RenameRoom {
+final class RenameRoom extends DwCommand<RoomView>
+    with _$RenameRoom
+    implements DwValidatable {
   const RenameRoom({required this.roomId, required this.name});
 
   final int roomId;
   final String name;
+
+  @override
+  List<DwRefusal> validate() => [
+    if (name.isEmpty) DwRefusal(DwCoreRefusal.invalid, field: 'name'),
+    if (name.length > 40)
+      DwRefusal(DwCoreRefusal.invalid, field: 'name', params: {'max': 40}),
+  ];
 }
 
 mixin _$RenameRoom on DwCommand<RoomView> {

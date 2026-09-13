@@ -170,8 +170,8 @@ void main() {
 
   group('publishing', () {
     test(
-      'delivered after commit to other connections, the author\'s own '
-      'connection excluded, the author\'s other connections included',
+      'delivered after commit to every subscriber, the author\'s own '
+      'connection included (D-018): one message per channel per call',
       () async {
         final (author, session) = await harness().signedIn(
           'pub-author@example.com',
@@ -187,42 +187,57 @@ void main() {
         final result = await author.command(const CreateNote('hello'));
         final note = result.okCommandValue(const CreateNote(''), testProtocol);
 
-        for (final c in [authorOther, stranger]) {
+        for (final c in [author, authorOther, stranger]) {
           final update = await c.expect<DwUpdateMessage>();
           expect(update.channel, 'notes');
           expect(update.items, [note]);
         }
-        await author.expectSilence();
+        for (final c in [author, authorOther, stranger]) {
+          await c.expectSilence();
+        }
+        // The author's echo is one message, as everyone else's.
+        expect(
+          author.frames.where((f) => f.contains('"k":"upd"')),
+          hasLength(1),
+        );
         for (final c in [author, authorOther, stranger]) {
           await c.close();
         }
       },
     );
 
-    test('one message per channel per connection; the latest state of an '
-        'object travels once', () async {
+    test('one message per channel per connection, the author\'s included; '
+        'the latest state of an object travels once', () async {
       final (author, session) = await harness().signedIn('batch-a@example.com');
       final listener = await harness().connect();
       await listener.authenticate(session.token);
-      expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
-      expect(
-        await listener.subscribe('account:${session.id}'),
-        isA<DwSubscribedMessage>(),
-      );
-      final frames = listener.frames.length;
+      for (final c in [author, listener]) {
+        expect(await c.subscribe('notes'), isA<DwSubscribedMessage>());
+        expect(
+          await c.subscribe('account:${session.id}'),
+          isA<DwSubscribedMessage>(),
+        );
+      }
+      final listenerFrames = listener.frames.length;
+      final authorFrames = author.frames.length;
       await author.command(const CreateNote('batched', extraPublishes: 2));
-      final notes = await listener.expect<DwUpdateMessage>(
-        where: (m) => m.channel == 'notes',
-      );
-      final account = await listener.expect<DwUpdateMessage>(
-        where: (m) => m.channel == 'account:${session.id}',
-      );
-      expect(notes.items, hasLength(1));
-      expect((notes.items.single as NoteView).text, 'batched #1');
-      expect((account.items.single as NoteView).text, 'batched');
-      await listener.expectSilence();
-      expect(listener.frames.length - frames, 2);
-      final wire = jsonDecode(listener.frames[frames]) as Map<String, Object?>;
+      for (final c in [listener, author]) {
+        final notes = await c.expect<DwUpdateMessage>(
+          where: (m) => m.channel == 'notes',
+        );
+        final account = await c.expect<DwUpdateMessage>(
+          where: (m) => m.channel == 'account:${session.id}',
+        );
+        expect(notes.items, hasLength(1));
+        expect((notes.items.single as NoteView).text, 'batched #1');
+        expect((account.items.single as NoteView).text, 'batched');
+        await c.expectSilence();
+      }
+      expect(listener.frames.length - listenerFrames, 2);
+      // Two updates and the command's result.
+      expect(author.frames.length - authorFrames, 3);
+      final wire =
+          jsonDecode(listener.frames[listenerFrames]) as Map<String, Object?>;
       expect(wire.keys, unorderedEquals(['k', 'ch', 'items']));
       await author.close();
       await listener.close();

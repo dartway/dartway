@@ -26,65 +26,13 @@ const _refetch = _Refetch();
 ///
 /// **Values keep their reified types.** A list state is a `List<T>` built by
 /// the request's own decoder; every change copies it with `toList()`, which
-/// keeps `T`, and only ever inserts objects already shown to be `T`. The rules
-/// themselves see those lists as `List<DwDataObject>`, because one set of rules
-/// serves every item type.
+/// keeps `T`, and only ever inserts objects the request's `acceptsItem` has
+/// shown to be `T`. The rules themselves see those lists as
+/// `List<DwDataObject>`, because one set of rules serves every item type.
 final class _UpdateRules {
   _UpdateRules(this.protocol);
 
   final DwProtocol protocol;
-
-  /// Request type → object type → whether the object is the request's item
-  /// type. Both are runtime types of generated, non-generic classes, so the
-  /// answer never changes and is computed once per pair.
-  final Map<Type, Map<Type, bool>> _accepts = {};
-
-  /// Whether [object] is the item type `T` of [request]'s kind.
-  ///
-  /// `dartway_core`'s kinds keep `T` to themselves: nothing on a request says
-  /// what its item type is, and `object is T` can only be written where `T` is
-  /// in scope. What *does* know `T` is the request's own decoder, which calls
-  /// `protocol.decodeAs<T>`. So the question is put to it: decode a stub with a
-  /// protocol that registers exactly the object's class, and the decoder finds
-  /// an entry precisely when `T` is that class. Registration is by exact type,
-  /// which is also exactly what the real decoder accepts — a request can only
-  /// ever hold instances of a class registered as its `T`.
-  ///
-  /// A negative answer is a `StateError` thrown by `decodeAs`; explicit throws
-  /// survive every compiler mode, unlike implicit type checks, which dart2js
-  /// may omit in release builds. The cost is paid once per type pair.
-  bool accepts(DwRequest<Object?> request, DwDataObject object) =>
-      (_accepts[request.runtimeType] ??= {})[object.runtimeType] ??= _probe(
-        request,
-        object,
-      );
-
-  bool _probe(DwRequest<Object?> request, DwDataObject object) {
-    const stub = <String, Object?>{};
-    final Object json;
-    switch (request) {
-      case DwListRequest():
-        json = const [stub];
-      case DwSingleRequest() || DwMaybeRequest():
-        json = stub;
-      case DwPageRequest() || DwCursorRequest():
-        json = const {
-          'items': [stub],
-          'more': false,
-        };
-      default:
-        return false;
-    }
-    final probe = DwProtocol([
-      DwDtoEntry(object.runtimeType, object.dwTypeName, (_) => object),
-    ]);
-    try {
-      request.decodeResult(json, probe);
-      return true;
-    } on StateError {
-      return false;
-    }
-  }
 
   /// Applies [item] to the value of a whole-value request.
   _Outcome applyToValue(DwRequest<Object?> request, Object? value, DwDto item) {
@@ -171,7 +119,7 @@ final class _UpdateRules {
       // which is the state the screen has to show.
       return _isDeletionOf(item, current) ? _refetch : _unchanged;
     }
-    if (item is! DwDataObject || !accepts(request, item)) {
+    if (item is! DwDataObject || !request.acceptsItem(item)) {
       return _foreign(request, item, action);
     }
     return switch (action) {
@@ -196,7 +144,7 @@ final class _UpdateRules {
           ? const _Changed(null)
           : _unchanged;
     }
-    if (item is! DwDataObject || !accepts(request, item)) {
+    if (item is! DwDataObject || !request.acceptsItem(item)) {
       return _foreign(request, item, action);
     }
     switch (action) {
@@ -234,7 +182,7 @@ final class _UpdateRules {
       final index = items.indexWhere((e) => _isDeletionOf(item, e));
       return index < 0 ? _unchanged : _Changed(items.toList()..removeAt(index));
     }
-    if (item is! DwDataObject || !accepts(request, item)) {
+    if (item is! DwDataObject || !request.acceptsItem(item)) {
       return _foreign(request, item, action);
     }
     final index = items.indexWhere((e) => e.id == item.id);

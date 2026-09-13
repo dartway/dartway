@@ -10,16 +10,12 @@ export 'package:relic/relic.dart'
 export 'src/alerts/dw_alerts.dart'
     show DwAlerts, DwIncident, DwLogAlerts, DwTelegramAlerts;
 export 'src/alerts/dw_logger.dart';
+export 'src/auth/dw_accounts.dart' show DwAccounts, DwEnsuredAccount;
 export 'src/auth/dw_auth.dart';
 export 'src/channels/dw_channel_rule.dart' show DwChannelRule;
 export 'src/context/dw_context.dart' show DwContext;
 export 'src/handlers/dw_handler.dart'
-    show
-        DwAccess,
-        DwHandler,
-        DwNotAuthenticatedException,
-        DwPageInput,
-        DwValidatable;
+    show DwAccess, DwHandler, DwNotAuthenticatedException, DwPageInput;
 export 'src/jobs/dw_jobs.dart'
     show
         DwJobDefinition,
@@ -27,7 +23,6 @@ export 'src/jobs/dw_jobs.dart'
         DwQueuedJob,
         DwRecurringJob,
         dwDefaultJobBackoff;
-export 'src/protocol/dw_connection.dart' show DwCloseCode;
 export 'src/routes/dw_route.dart';
 export 'src/server/dw_server.dart';
 export 'src/server/dw_server_settings.dart';

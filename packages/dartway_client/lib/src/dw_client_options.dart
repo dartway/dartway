@@ -15,8 +15,11 @@ final class DwClientOptions {
   ///
   /// The same window decides that a connection is dead: when something was
   /// sent and **nothing at all** arrived for a whole window, the client drops
-  /// the socket and reconnects. Half-open TCP connections otherwise look alive
-  /// indefinitely (the server sends no pings).
+  /// the socket and reconnects. The server pings every connection, but only
+  /// to find dead clients: pongs are answered beneath the socket API — and in
+  /// a browser invisibly — so a client cannot learn from them that the server
+  /// is gone, and a half-open connection would otherwise look alive
+  /// indefinitely.
   ///
   /// Watches have no deadline: they belong to the connection, are re-run on
   /// every reconnect, and show their last data meanwhile.

@@ -74,11 +74,18 @@ mixin _$FeedRooms on DwPageRequest<RoomView> {
 
 FeedRooms $FeedRoomsFromJson(Map<String, Object?> json) => const FeedRooms();
 
-final class RenameRoom extends DwCommand<RoomView> with _$RenameRoom {
+final class RenameRoom extends DwCommand<RoomView>
+    with _$RenameRoom
+    implements DwValidatable {
   const RenameRoom({required this.roomId, required this.name});
 
   final int roomId;
   final String name;
+
+  @override
+  List<DwRefusal> validate() => [
+    if (name.isEmpty) DwRefusal(DwCoreRefusal.invalid, field: 'name'),
+  ];
 }
 
 mixin _$RenameRoom on DwCommand<RoomView> {

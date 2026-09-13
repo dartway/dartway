@@ -9,6 +9,7 @@ import 'package:meta/meta.dart';
 import '../context/dw_context.dart';
 import '../handlers/dw_handler.dart';
 import '../server/dw_runtime.dart';
+import 'dw_accounts.dart';
 import 'dw_auth.dart';
 
 /// A session a token resolved to.
@@ -146,10 +147,8 @@ final class DwAuthService {
       if (retryAt == null || resendAt.isAfter(retryAt)) retryAt = resendAt;
     }
     if (retryAt != null) {
-      final seconds = (retryAt.difference(now).inMilliseconds / 1000).ceil();
-      ctx.refuse(
-        DwServerRefusal.tooManyRequests,
-        params: {'retryAfter': seconds < 1 ? 1 : seconds},
+      throw DwRefusalException(
+        DwRefusal.tooManyRequests(retryAt.difference(now)),
       );
     }
 
@@ -221,43 +220,13 @@ final class DwAuthService {
         params: {'id': command.ticketId},
       );
 
-      final kind = DwIdentifierKind.values.byName(ticket.get<String>('kind'));
-      final identifier = ticket.get<String>('identifier');
-      // Two tickets of one identifier verified at once must create one
-      // account, not two.
-      await tx.advisoryLock(
-        DwLockSpace.identifier,
-        dwLockKey('${kind.name}:$identifier'),
+      final (:accountId, created: isNew) = await dwEnsureAccount(
+        ctx,
+        auth,
+        DwIdentifierKind.values.byName(ticket.get<String>('kind')),
+        ticket.get<String>('identifier'),
+        command.registration,
       );
-      final identities = await tx.query(
-        'SELECT account_id FROM dw_identity WHERE kind = @kind AND value = @value',
-        params: {'kind': kind.name, 'value': identifier},
-      );
-      final int accountId;
-      final isNew = identities.isEmpty;
-      if (isNew) {
-        accountId = (await tx.query(
-          'INSERT INTO dw_account DEFAULT VALUES RETURNING id',
-        )).single.get<int>('id');
-        await tx.execute(
-          'INSERT INTO dw_identity (account_id, kind, value) '
-          'VALUES (@account, @kind, @value)',
-          params: {
-            'account': accountId,
-            'kind': kind.name,
-            'value': identifier,
-          },
-        );
-        await auth.onAccountCreated?.call(
-          ctx,
-          accountId,
-          kind,
-          identifier,
-          command.registration,
-        );
-      } else {
-        accountId = identities.single.get<int>('account_id');
-      }
       final token = _randomToken(32);
       await tx.execute(
         'INSERT INTO dw_auth_key (account_id, token_hash) VALUES (@account, @hash)',
@@ -274,7 +243,7 @@ final class DwAuthService {
         field: 'code',
         params: {'attemptsLeft': attemptsLeft},
       ),
-      _ => ctx.refuse(DwServerRefusal.codeExpired, field: 'code'),
+      _ => ctx.refuse(DwCoreRefusal.codeExpired, field: 'code'),
     };
   }
 

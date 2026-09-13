@@ -30,6 +30,11 @@ enum DwConnectionStatus {
 
   /// Connected and authenticated: calls go out as they are made.
   connected,
+
+  /// The server speaks another wire version. Terminal: the client no longer
+  /// connects, and every call ends with `DwWireVersionException` (also
+  /// reported to `onError`). The app needs an update.
+  incompatible,
 }
 
 enum _Lifecycle { created, started, stopped }
@@ -62,13 +67,30 @@ final class DwClient {
        connector = connector ?? const DwWebSocketConnector(),
        _onError = onError,
        _random = random ?? Random.secure(),
-       _rules = _UpdateRules(protocol);
+       _rules = _UpdateRules(protocol),
+       _versionedEndpoint = _withWireVersion(endpoint);
 
   /// The DTOs this client and its server agree on.
   final DwProtocol protocol;
 
-  /// The server's app WebSocket, `…/dw`.
+  /// The server's app WebSocket, `…/dw`. The client connects to it with the
+  /// wire version appended to the query (`?v=1`) unless the query names one.
   final Uri endpoint;
+
+  final Uri _versionedEndpoint;
+
+  /// [endpoint] with `v=<dwWireVersion>` added to its query, the rest of the
+  /// query kept byte for byte. The server refuses a connection without it;
+  /// making every app spell it would make every app able to forget it.
+  static Uri _withWireVersion(Uri endpoint) {
+    if (endpoint.queryParametersAll.containsKey('v')) return endpoint;
+    final version = 'v=$dwWireVersion';
+    return endpoint.replace(
+      query: endpoint.hasQuery && endpoint.query.isNotEmpty
+          ? '${endpoint.query}&$version'
+          : version,
+    );
+  }
 
   final DwTokenStore tokenStore;
   final DwConnector connector;
@@ -96,6 +118,9 @@ final class DwClient {
   bool _ready = false;
 
   final _status = _Replay<DwConnectionStatus>(DwConnectionStatus.disconnected);
+
+  /// Set once the server refused this client's wire version; terminal.
+  DwWireVersionException? _incompatible;
   Timer? _sleepTimer;
   Completer<void>? _sleeping;
   Timer? _livenessTimer;
@@ -271,8 +296,12 @@ final class DwClient {
   ///
   /// Queued while disconnected and re-sent after a reconnect; completes with
   /// [DwTimeoutException] after `options.callTimeout`.
+  ///
+  /// A request that implements [DwValidatable] and does not validate answers
+  /// its first refusal at once, and nothing is sent.
   Future<DwResult<R>> fetch<R>(DwRequest<R> request, {DwPageParams? page}) =>
       _oneShot<R>(
+        dto: request,
         label: request.dwTypeName,
         build: (id) => DwRequestMessage(id: id, request: request, page: page),
         decode: (json) => request.decodeResult(json, protocol),
@@ -283,9 +312,14 @@ final class DwClient {
   /// The command carries an idempotency key generated for this call. A
   /// command re-sent after a reconnect carries the same key, so the server
   /// answers the stored outcome instead of running it twice.
+  ///
+  /// A command that implements [DwValidatable] and does not validate answers
+  /// its first refusal at once, and nothing is sent — the server would run
+  /// the same check and refuse the same way.
   Future<DwResult<R>> command<R>(DwCommand<R> command) {
     final key = _newIdempotencyKey();
     return _oneShot<R>(
+      dto: command,
       label: command.dwTypeName,
       build: (id) =>
           DwCommandMessage(id: id, idempotencyKey: key, command: command),
@@ -382,7 +416,7 @@ final class DwClient {
       _status.value = DwConnectionStatus.connecting;
       DwConnection? connection;
       try {
-        connection = await connector.connect(endpoint);
+        connection = await connector.connect(_versionedEndpoint);
       } catch (_) {
         // An unreachable server is an ordinary state for a client, visible as
         // the status and retried — not an error to report.
@@ -393,14 +427,57 @@ final class DwClient {
       }
       if (connection != null) {
         await _serve(connection);
-        // A connection that authenticated was a success; the next outage
-        // starts counting from the first delay again.
-        if (_readyGeneration == _generation) failures = 0;
+        if (_lifecycle != _Lifecycle.started) return;
+        switch (connection.closeCode) {
+          case DwCloseCode.unsupportedVersion:
+            _becomeIncompatible(connection.closeReason);
+            return;
+          case DwCloseCode.slowConsumer || DwCloseCode.tooManyCalls:
+            // The server shed this client under load; coming straight back
+            // would meet the same load, so the backoff keeps growing.
+            break;
+          case final int code &&
+              (DwCloseCode.protocolError ||
+                  DwCloseCode.unsupportedData ||
+                  DwCloseCode.messageTooBig):
+            // This client sent what closed it, and reconnecting re-sends it:
+            // loud, and backing off like a shed client.
+            _report(
+              DwConnectionRejectedException(code, connection.closeReason),
+              StackTrace.current,
+            );
+          default:
+            // A connection that authenticated was a success; the next outage
+            // starts counting from the first delay again.
+            if (_readyGeneration == _generation) failures = 0;
+        }
       }
       if (_lifecycle != _Lifecycle.started) return;
       _status.value = DwConnectionStatus.disconnected;
       failures++;
       await _sleep(_backoff(failures));
+    }
+  }
+
+  /// The server refused this client's wire version: stop for good, say so
+  /// through the status and `onError`, and end every waiting call — none of
+  /// them can be answered by this server.
+  void _becomeIncompatible(String? reason) {
+    final named =
+        reason != null && reason.startsWith(DwCloseCode.wireVersionReason)
+        ? int.tryParse(reason.substring(DwCloseCode.wireVersionReason.length))
+        : null;
+    final error = DwWireVersionException(
+      clientVersion: dwWireVersion,
+      serverVersion: named,
+    );
+    _incompatible = error;
+    _status.value = DwConnectionStatus.incompatible;
+    _report(error, StackTrace.current);
+    final calls = _pending.values.toList();
+    _pending.clear();
+    for (final call in calls) {
+      call.onAbort(error, StackTrace.current);
     }
   }
 
@@ -531,7 +608,7 @@ final class DwClient {
       case DwSubscribedMessage():
         _onSubscribed(message.channel);
       case DwSubscriptionRefusedMessage():
-        _onSubscriptionRefused(message.channel, message.refusal);
+        _onSubscriptionRefused(message);
       case DwChannelClosedMessage():
         _onChannelClosed(message.channel);
     }
@@ -780,12 +857,24 @@ final class DwClient {
   }
 
   Future<DwResult<R>> _oneShot<R>({
+    required DwDto dto,
     required String label,
     required DwClientMessage Function(int id) build,
     required R Function(Object? json) decode,
   }) {
     if (_lifecycle == _Lifecycle.stopped) {
       return Future.error(const DwClientStoppedException());
+    }
+    final DwRefusal? refusal;
+    try {
+      refusal = _localRefusal(dto);
+    } catch (error, stackTrace) {
+      // A throwing validate() is the DTO's bug; the caller hears it as such.
+      return Future.error(error, stackTrace);
+    }
+    if (refusal != null) return Future.value(DwRefused<R>(refusal));
+    if (_incompatible case final incompatible?) {
+      return Future.error(incompatible);
     }
     final completer = Completer<DwResult<R>>();
     Timer? deadline;
@@ -849,6 +938,16 @@ final class DwClient {
       case DwResultStatus.failed:
         return DwFailed<R>(message.incidentId ?? '');
     }
+  }
+
+  /// The first refusal of a [DwValidatable] DTO, or `null`: what the server
+  /// would answer before its handler, known without asking it.
+  DwRefusal? _localRefusal(DwDto dto) {
+    if (dto case final DwValidatable validatable) {
+      final refusals = validatable.validate();
+      if (refusals.isNotEmpty) return refusals.first;
+    }
+    return null;
   }
 
   /// 128 random bits as 32 hex digits, drawn 16 bits at a time: shifts and

@@ -100,7 +100,10 @@ final class DwSubscribeMessage extends DwClientMessage {
   final String channel;
 
   @override
-  Map<String, Object?> toJson(DwProtocol protocol) => {'k': 'sub', 'ch': channel};
+  Map<String, Object?> toJson(DwProtocol protocol) => {
+    'k': 'sub',
+    'ch': channel,
+  };
 }
 
 /// Releases a channel subscription.
@@ -151,12 +154,7 @@ sealed class DwServerMessage {
       ],
     ),
     'subok' => DwSubscribedMessage(json['ch']! as String),
-    'subno' => DwSubscriptionRefusedMessage(
-      json['ch']! as String,
-      refusal: json['r'] == null
-          ? null
-          : DwRefusal.fromJson(json['r']! as Map<String, Object?>),
-    ),
+    'subno' => DwSubscriptionRefusedMessage._fromJson(json),
     'closed' => DwChannelClosedMessage(json['ch']! as String),
     final kind => throw FormatException('Unknown server message kind "$kind"'),
   };
@@ -241,19 +239,63 @@ final class DwSubscribedMessage extends DwServerMessage {
   };
 }
 
-/// The subscription was refused. A `null` [refusal] means the connection is not
-/// authenticated for it.
+/// The subscription did not happen, for one of three reasons — the same
+/// three a call can end with short of success, encoded as a result message
+/// encodes them:
+///
+/// - [DwSubscriptionRefusedMessage.refused]: a [refusal] (`dw.forbidden`,
+///   `dw.unknownChannel`, `dw.invalid` on field `channel`);
+/// - [DwSubscriptionRefusedMessage.unauthenticated]: the connection has no
+///   account, and every subscription needs one;
+/// - [DwSubscriptionRefusedMessage.failed]: the server's check threw. An
+///   incident, not a refusal — see the note on `DwCoreRefusal`.
+///
+/// At most one of [refusal] and [incidentId] is set; the constructors are the
+/// only way to build the message, so no fourth state exists.
 final class DwSubscriptionRefusedMessage extends DwServerMessage {
-  const DwSubscriptionRefusedMessage(this.channel, {this.refusal});
+  const DwSubscriptionRefusedMessage.refused(
+    this.channel,
+    DwRefusal this.refusal,
+  ) : incidentId = null;
+
+  const DwSubscriptionRefusedMessage.unauthenticated(this.channel)
+    : refusal = null,
+      incidentId = null;
+
+  const DwSubscriptionRefusedMessage.failed(
+    this.channel,
+    String this.incidentId,
+  ) : refusal = null;
+
+  factory DwSubscriptionRefusedMessage._fromJson(Map<String, Object?> json) {
+    final channel = json['ch']! as String;
+    final refusal = json['r'];
+    final incident = json['x'];
+    return switch ((refusal, incident)) {
+      (null, null) => DwSubscriptionRefusedMessage.unauthenticated(channel),
+      (final Map<String, Object?> r, null) =>
+        DwSubscriptionRefusedMessage.refused(channel, DwRefusal.fromJson(r)),
+      (null, final String x) => DwSubscriptionRefusedMessage.failed(channel, x),
+      _ => throw FormatException(
+        'A subscription refusal carries either a refusal or an incident: $json',
+      ),
+    };
+  }
 
   final String channel;
   final DwRefusal? refusal;
+
+  /// What the operator finds the failed check by.
+  final String? incidentId;
+
+  bool get isUnauthenticated => refusal == null && incidentId == null;
 
   @override
   Map<String, Object?> toJson(DwProtocol protocol) => {
     'k': 'subno',
     'ch': channel,
     if (refusal != null) 'r': refusal!.toJson(),
+    if (incidentId != null) 'x': incidentId,
   };
 }
 

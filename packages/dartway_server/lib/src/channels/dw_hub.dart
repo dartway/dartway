@@ -114,7 +114,14 @@ final class DwHub {
   /// Delivers the effects of a committed call. Hooks (key revocations) and
   /// access revocations go first, so nothing published by the same call
   /// reaches a subscriber whose access it removed.
-  void deliver(DwEffects effects, {DwConnection? author}) {
+  ///
+  /// Publications reach every subscriber, the connection that made the call
+  /// included (D-018): a command publishes to channels its client cannot
+  /// predict — booking a session also changes the schedule — so without the
+  /// echo the author's own screens would be the only stale ones. The client
+  /// applies updates idempotently, so an update repeating the command result
+  /// changes nothing twice.
+  void deliver(DwEffects effects) {
     for (final hook in effects.hooks) {
       hook();
     }
@@ -139,18 +146,16 @@ final class DwHub {
     for (final MapEntry(key: name, value: items) in byChannel.entries) {
       final subscribers = _subscribers[name];
       if (subscribers == null) continue;
-      final targets = [
-        for (final connection in subscribers)
-          if (connection != author) connection,
-      ];
-      if (targets.isEmpty) continue;
+      // Encoded once for all subscribers.
       final frame = jsonEncode(
         DwUpdateMessage(
           channel: name,
           items: _latestPerObject(items),
         ).toJson(protocol),
       );
-      for (final connection in targets) {
+      // Iterated in place: `sendFrame` never changes subscriptions
+      // synchronously — a slow consumer's close leaves the hub on `done`.
+      for (final connection in subscribers) {
         connection.sendFrame(frame);
       }
     }

@@ -55,8 +55,7 @@ void main() {
         DwPatch<String>.set('late'),
         DwPatch<String>.clear(),
       ]) {
-        final decoded =
-            protocol.decodeTagged(wire(patch)) as RenameBooking;
+        final decoded = protocol.decodeTagged(wire(patch)) as RenameBooking;
         expect(decoded.note, patch);
       }
     });
@@ -121,6 +120,47 @@ void main() {
       }
     });
 
+    test('a subscription refusal is refused, unauthenticated or failed', () {
+      DwSubscriptionRefusedMessage back(DwSubscriptionRefusedMessage message) =>
+          DwServerMessage.fromJson(
+                roundTrip(message.toJson(protocol))! as Map<String, Object?>,
+                protocol,
+              )
+              as DwSubscriptionRefusedMessage;
+
+      final refused = back(
+        DwSubscriptionRefusedMessage.refused(
+          'chat:7',
+          DwRefusal(DwCoreRefusal.forbidden),
+        ),
+      );
+      expect(refused.refusal, DwRefusal(DwCoreRefusal.forbidden));
+      expect(refused.incidentId, isNull);
+      expect(refused.isUnauthenticated, isFalse);
+
+      final anonymous = back(
+        const DwSubscriptionRefusedMessage.unauthenticated('chat:7'),
+      );
+      expect(anonymous.isUnauthenticated, isTrue);
+
+      final failed = back(
+        const DwSubscriptionRefusedMessage.failed('chat:7', 'inc-1'),
+      );
+      expect(failed.incidentId, 'inc-1');
+      expect(failed.refusal, isNull);
+      expect(failed.isUnauthenticated, isFalse);
+
+      expect(
+        () => DwServerMessage.fromJson({
+          'k': 'subno',
+          'ch': 'chat:7',
+          'r': {'code': 'dw.forbidden'},
+          'x': 'inc-1',
+        }, protocol),
+        throwsFormatException,
+      );
+    });
+
     test('an update carries data objects and deletions tagged', () {
       final message = DwUpdateMessage(
         channel: 'myBookings:3',
@@ -149,8 +189,178 @@ void main() {
     });
   });
 
+  group('refusal codes', () {
+    test('tooManyRequests carries whole seconds, rounded up, at least one', () {
+      final refusal = DwRefusal.tooManyRequests(
+        const Duration(milliseconds: 2001),
+      );
+      expect(refusal.code, 'dw.tooManyRequests');
+      expect(refusal.params, {'retryAfter': '3'});
+      final back = DwRefusal.fromJson(
+        roundTrip(refusal.toJson())! as Map<String, Object?>,
+      );
+      expect(back.retryAfter, const Duration(seconds: 3));
+      expect(
+        DwRefusal.tooManyRequests(Duration.zero).retryAfter,
+        const Duration(seconds: 1),
+      );
+    });
+
+    test('retryAfter belongs to tooManyRequests only', () {
+      expect(
+        DwRefusal(DwCoreRefusal.invalid, params: {'retryAfter': 5}).retryAfter,
+        isNull,
+      );
+      expect(
+        DwRefusal(DwCoreRefusal.codeExpired, field: 'code').code,
+        'dw.codeExpired',
+      );
+    });
+  });
+
+  group('validation', () {
+    test('a validatable DTO answers its refusals', () {
+      expect(const _Rating(3).validate(), isEmpty);
+      expect(const _Rating(9).validate(), [
+        DwRefusal(DwCoreRefusal.invalid, field: 'stars', params: {'max': 5}),
+      ]);
+    });
+  });
+
+  group('protocol enumeration', () {
+    test('every entry is listed once with its kind, core entries first', () {
+      final kinds = {
+        for (final entry in protocol.entries) entry.name: entry.kind,
+      };
+      expect(protocol.entries.map((e) => e.name), [
+        'DwDeleted',
+        'DwRequestCode',
+        'DwCodeTicket',
+        'DwVerifyCode',
+        'DwSession',
+        'DwSignOut',
+        'BookingView',
+        'ListMyBookings',
+        'RenameBooking',
+      ]);
+      expect(kinds, {
+        'DwDeleted': DwDtoKind.other,
+        'DwRequestCode': DwDtoKind.command,
+        'DwCodeTicket': DwDtoKind.dataObject,
+        'DwVerifyCode': DwDtoKind.command,
+        'DwSession': DwDtoKind.dataObject,
+        'DwSignOut': DwDtoKind.command,
+        'BookingView': DwDtoKind.dataObject,
+        'ListMyBookings': DwDtoKind.request,
+        'RenameBooking': DwDtoKind.command,
+      });
+    });
+
+    test('a kind is read from the factory of every request kind', () {
+      final entries = [
+        DwDtoEntry(_One, '_One', (json) => const _One()),
+        DwDtoEntry(_Maybe, '_Maybe', (json) => const _Maybe()),
+        DwDtoEntry(_Pages, '_Pages', (json) => const _Pages()),
+        DwDtoEntry(_Older, '_Older', (json) => const _Older()),
+      ];
+      expect(entries.map((e) => e.kind), everyElement(DwDtoKind.request));
+    });
+  });
+
+  group('acceptsItem', () {
+    final other = _Other();
+    test('each request kind accepts exactly its item type', () {
+      for (final request in <DwRequest<Object?>>[
+        const ListMyBookings(),
+        const _One(),
+        const _Maybe(),
+        const _Pages(),
+        const _Older(),
+      ]) {
+        expect(request.acceptsItem(view), isTrue, reason: '$request');
+        expect(request.acceptsItem(other), isFalse, reason: '$request');
+        expect(request.acceptsItem(null), isFalse, reason: '$request');
+      }
+    });
+  });
+
   test('channel wire names', () {
     expect(dwParseChannelName('chat:7'), (kind: 'chat', key: '7'));
     expect(dwParseChannelName('news'), (kind: 'news', key: null));
   });
+}
+
+final class _Rating extends DwCommand<void> implements DwValidatable {
+  const _Rating(this.stars);
+
+  final int stars;
+
+  @override
+  List<DwRefusal> validate() => [
+    if (stars > 5)
+      DwRefusal(DwCoreRefusal.invalid, field: 'stars', params: {'max': 5}),
+  ];
+
+  @override
+  String get dwTypeName => '_Rating';
+
+  @override
+  Map<String, Object?> toJson() => {'stars': stars};
+}
+
+final class _Other extends DwDataObject {
+  @override
+  Object get id => 1;
+
+  @override
+  String get dwTypeName => '_Other';
+
+  @override
+  Map<String, Object?> toJson() => const {'id': 1};
+}
+
+final class _One extends DwSingleRequest<BookingView> {
+  const _One();
+
+  @override
+  String get dwTypeName => '_One';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+}
+
+final class _Maybe extends DwMaybeRequest<BookingView> {
+  const _Maybe();
+
+  @override
+  String get dwTypeName => '_Maybe';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+}
+
+final class _Pages extends DwPageRequest<BookingView> {
+  const _Pages();
+
+  @override
+  int get pageSize => 10;
+
+  @override
+  String get dwTypeName => '_Pages';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+}
+
+final class _Older extends DwCursorRequest<BookingView> {
+  const _Older();
+
+  @override
+  int get pageSize => 10;
+
+  @override
+  String get dwTypeName => '_Older';
+
+  @override
+  Map<String, Object?> toJson() => const {};
 }

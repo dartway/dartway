@@ -38,6 +38,15 @@ abstract class DwRequest<R> extends DwDto {
   /// [DwUpdate.auto] applies the default of the request kind.
   DwUpdate onUpdate(DwDto update) => DwUpdate.auto;
 
+  /// Whether [item] is an instance of this request's item type — the object
+  /// type of a single, maybe, list, page or cursor request. A request that
+  /// extends no kind has no item type and accepts nothing.
+  ///
+  /// Only the kind knows its type argument, so the question is put here
+  /// rather than probed from outside. An explicit `is` test is kept by every
+  /// compiler mode, including dart2js with implicit checks omitted.
+  bool acceptsItem(Object? item) => false;
+
   /// Encodes a result of this request for the wire (server side).
   Object? encodeResult(R result, DwProtocol protocol);
 
@@ -52,6 +61,9 @@ abstract class DwRequest<R> extends DwDto {
 /// [DwDeleted] for it makes the request refetch (and so answer not-found).
 abstract class DwSingleRequest<T extends DwDataObject> extends DwRequest<T> {
   const DwSingleRequest();
+
+  @override
+  bool acceptsItem(Object? item) => item is T;
 
   @override
   Object? encodeResult(T result, DwProtocol protocol) => result.toJson();
@@ -70,6 +82,9 @@ abstract class DwSingleRequest<T extends DwDataObject> extends DwRequest<T> {
 abstract class DwMaybeRequest<T extends DwDataObject> extends DwRequest<T?> {
   const DwMaybeRequest();
 
+  @override
+  bool acceptsItem(Object? item) => item is T;
+
   /// Whether a newly arrived object is the one this request asks for.
   bool matches(T object) => false;
 
@@ -86,8 +101,12 @@ abstract class DwMaybeRequest<T extends DwDataObject> extends DwRequest<T?> {
 /// Default update: an object with an id in the list is replaced in place and
 /// never moved; a new object for which [matches] is true is inserted by [sort]
 /// when declared, otherwise at the head; a [DwDeleted] removes.
-abstract class DwListRequest<T extends DwDataObject> extends DwRequest<List<T>> {
+abstract class DwListRequest<T extends DwDataObject>
+    extends DwRequest<List<T>> {
   const DwListRequest();
+
+  @override
+  bool acceptsItem(Object? item) => item is T;
 
   /// Whether a newly arrived object belongs to this list. By default every
   /// object of type [T] on the request's channels does.
@@ -127,6 +146,9 @@ abstract class DwPageRequest<T extends DwDataObject>
     extends DwRequest<DwPage<T>> {
   const DwPageRequest();
 
+  @override
+  bool acceptsItem(Object? item) => item is T;
+
   /// Rows per page. Decided by the request, not by the caller: the server
   /// reads it from the same class.
   int get pageSize;
@@ -144,13 +166,10 @@ abstract class DwPageRequest<T extends DwDataObject>
   @override
   DwPage<T> decodeResult(Object? json, DwProtocol protocol) {
     final map = json! as Map<String, Object?>;
-    return DwPage(
-      [
-        for (final item in map['items']! as List<Object?>)
-          protocol.decodeAs<T>(item),
-      ],
-      hasMore: map['more']! as bool,
-    );
+    return DwPage([
+      for (final item in map['items']! as List<Object?>)
+        protocol.decodeAs<T>(item),
+    ], hasMore: map['more']! as bool);
   }
 }
 
@@ -162,6 +181,9 @@ abstract class DwPageRequest<T extends DwDataObject>
 abstract class DwCursorRequest<T extends DwDataObject>
     extends DwRequest<DwPage<T>> {
   const DwCursorRequest();
+
+  @override
+  bool acceptsItem(Object? item) => item is T;
 
   int get pageSize;
 
@@ -176,13 +198,10 @@ abstract class DwCursorRequest<T extends DwDataObject>
   @override
   DwPage<T> decodeResult(Object? json, DwProtocol protocol) {
     final map = json! as Map<String, Object?>;
-    return DwPage(
-      [
-        for (final item in map['items']! as List<Object?>)
-          protocol.decodeAs<T>(item),
-      ],
-      hasMore: map['more']! as bool,
-    );
+    return DwPage([
+      for (final item in map['items']! as List<Object?>)
+        protocol.decodeAs<T>(item),
+    ], hasMore: map['more']! as bool);
   }
 }
 

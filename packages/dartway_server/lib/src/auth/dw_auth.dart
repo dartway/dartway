@@ -2,21 +2,6 @@ import 'package:dartway_core/dartway_core.dart';
 
 import '../context/dw_context.dart';
 
-/// Refusal codes of the server's built-in handlers that `DwCoreRefusal` does
-/// not declare yet. They belong in `dartway_core` (the client renders them);
-/// they live here until the core carries them. The wire codes are final.
-enum DwServerRefusal implements DwRefusalCode {
-  /// Too many code requests for an identifier; `retryAfter` holds seconds.
-  tooManyRequests,
-
-  /// The ticket is unknown, used, expired or out of attempts: request a new
-  /// code.
-  codeExpired;
-
-  @override
-  String get code => 'dw.$name';
-}
-
 /// Sign-in by one-time code, configured by the project.
 ///
 /// The framework owns accounts, identities and session keys; the project owns

@@ -44,6 +44,10 @@ void main() {
       final found = await problems(
         app.server(
           unused,
+          protocol: DwProtocol([
+            DwDtoEntry(OrphanRequest, 'OrphanRequest', OrphanRequest.fromJson),
+            DwDtoEntry(OrphanCommand, 'OrphanCommand', OrphanCommand.fromJson),
+          ], include: testProtocol),
           handlers: [
             ...app.handlers().where((h) => h.type != NoteHistory),
             DwHandler.request<ListNotes, List<NoteView>>(
@@ -93,6 +97,8 @@ void main() {
             'does not know',
         'NoteHistory is paginated: register it with DwHandler.page',
         'DwSignOut has a built-in handler and cannot have another',
+        'OrphanRequest is a registered request without a handler',
+        'OrphanCommand is a registered command without a handler',
         'channel kind "notes" has more than one rule',
         'job "dw.mine": names starting with "dw." are the framework\'s',
         'job "twin" is declared more than once',
@@ -163,6 +169,57 @@ void main() {
       } finally {
         await opened.close();
       }
+    });
+
+    test('a declared schema must exist after migrating: missing tables and '
+        'columns stop the start, everything else is not the server\'s '
+        'business', () async {
+      DwSchema schema(List<DwTableSchema> tables) =>
+          DwSchema.fromTables(tables);
+      final note = DwTableSchema(
+        'note',
+        columns: [
+          DwColumnSchema.primaryKey(),
+          // Declared as a varchar: a type difference does not fail the start.
+          DwColumnSchema('text', 'character varying'),
+          DwColumnSchema('owner_id', 'bigint', nullable: true),
+        ],
+      );
+
+      final missing = app.server(
+        database.config,
+        schema: schema([
+          note,
+          DwTableSchema(
+            'profile',
+            columns: [
+              DwColumnSchema('account_id', 'bigint'),
+              DwColumnSchema('name', 'text'),
+              DwColumnSchema('avatar_url', 'text', nullable: true),
+            ],
+          ),
+          DwTableSchema('invoice', columns: [DwColumnSchema.primaryKey()]),
+        ]),
+      );
+      await expectLater(
+        DwTestServer.start(missing),
+        throwsA(
+          isA<DwStartupException>().having((e) => e.problems, 'problems', [
+            'table "invoice" is declared in the schema and missing from the '
+                'database: is its migration registered?',
+            'column "profile.avatar_url" is declared in the schema and '
+                'missing from the database: is its migration registered?',
+          ]),
+        ),
+      );
+      expect(() => missing.boundPort, throwsStateError);
+
+      // Present tables with extra columns (profile.identifier), extra tables
+      // (counter, the framework's) and other types: the start goes on.
+      final present = await DwTestServer.start(
+        app.server(database.config, schema: schema([note])),
+      );
+      await present.stop();
     });
 
     test(

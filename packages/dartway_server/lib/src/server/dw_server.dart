@@ -10,6 +10,7 @@ import 'package:relic/relic.dart';
 
 import '../alerts/dw_alerts.dart';
 import '../alerts/dw_logger.dart';
+import '../auth/dw_accounts.dart';
 import '../auth/dw_auth.dart';
 import '../auth/dw_auth_service.dart';
 import '../channels/dw_channel_rule.dart';
@@ -47,7 +48,7 @@ final class DwStartupException implements Exception {
 final class DwServer {
   DwServer({
     required this.protocol,
-    required this.schema,
+    this.schema,
     required this.migrations,
     required this.database,
     required this.auth,
@@ -69,10 +70,16 @@ final class DwServer {
 
   final DwProtocol protocol;
 
-  /// The project's target schema. The server does not read it at runtime; it
-  /// is declared here so the migration tooling of a server and its schema
-  /// are one object.
-  final DwSchema schema;
+  /// The project's target schema (the generated `appSchema`).
+  ///
+  /// When given, [start] checks after migrating that every table and column
+  /// it declares exists, and refuses to start otherwise: a migration missing
+  /// from the list would make handlers fail on their first query instead.
+  /// Only absences fail — extra tables, extra columns and differences in
+  /// types, defaults or constraints are the migrations' business, checked by
+  /// `migrate check` in CI, and a server must not refuse to start over an
+  /// index an operator added by hand.
+  final DwSchema? schema;
   final List<DwMigration> migrations;
   final DwDatabaseConfig database;
   final DwAuth auth;
@@ -94,6 +101,11 @@ final class DwServer {
 
   /// The database, once started.
   DwDb get db => _require.database.db;
+
+  /// Accounts by identifier, once started — for a bootstrap that creates or
+  /// promotes an admin after [start]. Sessions it revokes close on this
+  /// server's connections.
+  DwAccounts get accounts => DwAccounts.ofRuntime(_require.runtime);
 
   _DwRunning get _require =>
       _running ?? (throw StateError('The server is not running'));
@@ -126,6 +138,10 @@ final class DwServer {
           'app': migrations,
         },
       ).apply();
+      if (schema case final declared?) {
+        final missing = await _missingFromDatabase(declared, openedDatabase.db);
+        if (missing.isNotEmpty) throw DwStartupException(missing);
+      }
 
       final hub = DwHub(protocol);
       final gate = DwAlertGate(
@@ -137,6 +153,7 @@ final class DwServer {
       late final DwJobRunner runner;
       final runtime = DwRuntime(
         protocol: protocol,
+        auth: auth,
         db: openedDatabase.db,
         hub: hub,
         alerts: gate,
@@ -257,6 +274,20 @@ final class DwServer {
         problems.add('$type is paginated: register it with DwHandler.page');
       }
     }
+    // The other direction: a registered request or command nobody answers
+    // would fail every call at runtime, found by the first user to press the
+    // button. `seen` holds only handlers of registered types, so a type with
+    // two handlers is reported once, above.
+    for (final entry in protocol.entries) {
+      final kind = entry.kind;
+      if (kind != DwDtoKind.request && kind != DwDtoKind.command) continue;
+      if (DwAuthService.builtInTypes.contains(entry.type)) continue;
+      if (!seen.contains(entry.type)) {
+        problems.add(
+          '${entry.type} is a registered ${kind.name} without a handler',
+        );
+      }
+    }
     final kinds = <String>{};
     for (final rule in channels) {
       final name = rule.kind.channelName;
@@ -294,6 +325,32 @@ final class DwServer {
       if (!routeKeys.add(key)) problems.add('route $key is declared twice');
     }
     return problems;
+  }
+
+  /// Tables and columns of [declared] that the database does not have.
+  ///
+  /// The introspection covers the whole database schema (its catalog queries
+  /// have no table filter to narrow them by), but the diff is taken against
+  /// the declared tables only, so nothing else can make the check fail.
+  static Future<List<String>> _missingFromDatabase(
+    DwSchema declared,
+    DwDb db,
+  ) async {
+    if (declared.tables.isEmpty) return const [];
+    final names = {for (final table in declared.tables) table.name};
+    final introspected = await DwIntrospector.read(db);
+    final present = DwSchema.fromTables(
+      introspected.schema.tables.where((table) => names.contains(table.name)),
+    );
+    return [
+      for (final change in DwSchemaDiff.compare(from: present, to: declared))
+        if (change case DwCreateTable(:final table))
+          'table "$table" is declared in the schema and missing from the '
+              'database: is its migration registered?'
+        else if (change case DwAddColumn(:final table, :final column))
+          'column "$table.${column.name}" is declared in the schema and '
+              'missing from the database: is its migration registered?',
+    ];
   }
 
   DwRecurringJob _cleanupJob() {
@@ -452,7 +509,7 @@ final class DwServer {
       unawaited(
         connection.close(
           DwCloseCode.unsupportedVersion,
-          'dw.wireVersion:$dwWireVersion',
+          '${DwCloseCode.wireVersionReason}$dwWireVersion',
         ),
       );
       return;
@@ -558,7 +615,7 @@ final class DwServer {
         stackTrace: stackTrace,
       );
       hub.authenticate(connection, null, null);
-      await connection.close(1011, 'dw.failed:$incident');
+      await connection.close(DwCloseCode.internalError, 'dw.failed:$incident');
     }
   }
 
@@ -650,15 +707,17 @@ final class DwServer {
   ) async {
     if (connection.isClosing) return;
     final hub = running.runtime.hub;
-    void refuse(DwRefusal? refusal) =>
-        connection.send(DwSubscriptionRefusedMessage(name, refusal: refusal));
+    void refuse(DwRefusal refusal) =>
+        connection.send(DwSubscriptionRefusedMessage.refused(name, refusal));
+    void unauthenticated() =>
+        connection.send(DwSubscriptionRefusedMessage.unauthenticated(name));
 
     final parsed = dwParseChannelName(name);
     final rule = running.channelRules[parsed.kind];
     if (rule == null) {
       return refuse(DwRefusal(DwCoreRefusal.unknownChannel));
     }
-    if (connection.accountId == null) return refuse(null);
+    if (connection.accountId == null) return unauthenticated();
     if (connection.subscriptions.contains(name)) {
       return connection.send(DwSubscribedMessage(name));
     }
@@ -690,7 +749,9 @@ final class DwServer {
         stackTrace: stackTrace,
         accountId: connection.accountId,
       );
-      return refuse(DwRefusal.raw('dw.failed', params: {'incident': incident}));
+      return connection.send(
+        DwSubscriptionRefusedMessage.failed(name, incident),
+      );
     } finally {
       running.runtime.deliver(ctx);
     }
@@ -698,7 +759,7 @@ final class DwServer {
     // The session changed while the check ran: it was a check for someone
     // else.
     if (connection.authEpoch != epoch || connection.accountId == null) {
-      return refuse(null);
+      return unauthenticated();
     }
     if (!allowed) return refuse(DwRefusal(DwCoreRefusal.forbidden));
     hub.subscribe(connection, name);

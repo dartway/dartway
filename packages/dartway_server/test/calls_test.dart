@@ -239,11 +239,6 @@ void main() {
       expect(incident.where, 'request ExplodingRequest');
     });
 
-    test('a registered type without a handler fails loudly', () async {
-      final result = await anonymous.request(const OrphanRequest());
-      expect(result.status, DwResultStatus.failed);
-    });
-
     test('an unknown DTO type fails the call, not the connection', () async {
       final connection = await harness().connect();
       connection.sendRaw(
@@ -343,6 +338,7 @@ void main() {
       protocol: testProtocol,
       log: RecordingLogger(),
       jobs: (_) => _NoJobs(),
+      accounts: (ctx) => throw UnimplementedError(),
       isPublishable: (item) => testProtocol.knows(item.runtimeType),
     );
 

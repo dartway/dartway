@@ -1,8 +1,25 @@
 import '../auth/dw_auth_dtos.dart';
+import '../dto/dw_command.dart';
 import '../dto/dw_dto.dart';
+import '../dto/dw_request.dart';
 
 /// Builds a DTO from its JSON fields.
 typedef DwDtoFactory = DwDto Function(Map<String, Object?> json);
+
+/// Which of the DTO kinds a registered class is.
+enum DwDtoKind {
+  /// A `DwDataObject`.
+  dataObject,
+
+  /// A `DwRequest` of any request kind.
+  request,
+
+  /// A `DwCommand`.
+  command,
+
+  /// Anything else that travels — `DwDeleted`, a nested value DTO.
+  other,
+}
 
 /// One registered DTO class: its wire name and its factory.
 final class DwDtoEntry {
@@ -10,7 +27,28 @@ final class DwDtoEntry {
 
   final Type type;
   final String name;
+
+  /// The class's own factory — `$NameFromJson`, or a static `fromJson`. Its
+  /// declared return type is the class, which is what [kind] reads.
   final DwDtoFactory fromJson;
+
+  /// The kind of [type], read from the function type of [fromJson].
+  ///
+  /// A `Type` object cannot be asked about subtyping, but a function's
+  /// reified type can: a factory returning `Foo` passes the type test for
+  /// "returns a `DwRequest`" exactly when `Foo` is a request. The generator's factories
+  /// return their class, so the kind needs no field of its own and generated
+  /// registries stay as they are. A factory declared to return a mere `DwDto`
+  /// reads as [DwDtoKind.other].
+  DwDtoKind get kind => switch (fromJson) {
+    DwRequest<Object?> Function(Map<String, Object?>) _ => DwDtoKind.request,
+    DwCommand<Object?> Function(Map<String, Object?>) _ => DwDtoKind.command,
+    DwDataObject Function(Map<String, Object?>) _ => DwDtoKind.dataObject,
+    _ => DwDtoKind.other,
+  };
+
+  @override
+  String toString() => 'DwDtoEntry($name, ${kind.name})';
 }
 
 /// The set of DTO classes a server and its clients agree on.
@@ -50,6 +88,9 @@ final class DwProtocol {
     DwDtoEntry(DwDeleted, 'DwDeleted', DwDeleted.fromJson),
     ...dwAuthDtoEntries,
   ]);
+
+  /// Every registered class, the included protocol's first, each once.
+  Iterable<DwDtoEntry> get entries => _byName.values;
 
   /// Whether [type] is registered.
   bool knows(Type type) => _byType.containsKey(type);

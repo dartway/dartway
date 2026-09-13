@@ -5,6 +5,7 @@ import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
 import '../alerts/dw_logger.dart';
+import '../auth/dw_accounts.dart';
 import '../handlers/dw_handler.dart';
 import '../jobs/dw_jobs.dart';
 import '../protocol/dw_connection.dart';
@@ -40,7 +41,8 @@ abstract class DwContext {
   /// Sends [item] (a data object or a `DwDeleted`) to the subscribers of
   /// [channel] once the enclosing transaction commits (or when the call ends,
   /// outside a transaction). Batched per channel into one message per
-  /// connection; the connection that made the call does not receive it.
+  /// connection, delivered to every subscriber — the connection that made the
+  /// call included (D-018).
   void publish(DwChannel channel, DwDto item);
 
   /// Closes [accountId]'s subscriptions to [channel], after commit.
@@ -55,6 +57,10 @@ abstract class DwContext {
 
   /// Background jobs; an enqueue joins the enclosing transaction.
   DwJobs get jobs;
+
+  /// Accounts by identifier, bound to this context: writes join its
+  /// transaction, and revoked sessions close after it commits.
+  DwAccounts get accounts;
 
   DwLogger get log;
 
@@ -104,12 +110,14 @@ final class DwCallContext extends DwContext {
     required this.protocol,
     required this.log,
     required DwJobs Function(DwCallContext ctx) jobs,
+    required DwAccounts Function(DwCallContext ctx) accounts,
     required bool Function(Object item) isPublishable,
     this.accountId,
     this.keyId,
     this.connection,
   }) : _root = _Scope(db),
-       _isPublishable = isPublishable {
+       _isPublishable = isPublishable,
+       _accounts = accounts {
     this.jobs = jobs(this);
   }
 
@@ -117,6 +125,7 @@ final class DwCallContext extends DwContext {
   final Object _zoneKey = Object();
   final Map<Object, Object?> _memo = {};
   final bool Function(Object item) _isPublishable;
+  final DwAccounts Function(DwCallContext ctx) _accounts;
 
   @override
   final int? accountId;
@@ -124,8 +133,7 @@ final class DwCallContext extends DwContext {
   /// The session key the connection authenticated with, for sign-out.
   final int? keyId;
 
-  /// The connection that made the call; `null` for jobs and routes. Its
-  /// subscriptions do not receive what this call publishes.
+  /// The connection that made the call; `null` for jobs and routes.
   final DwConnection? connection;
 
   @override
@@ -136,6 +144,10 @@ final class DwCallContext extends DwContext {
 
   @override
   late final DwJobs jobs;
+
+  // Built on first use: most calls never touch accounts.
+  @override
+  late final DwAccounts accounts = _accounts(this);
 
   _Scope get _current => (Zone.current[_zoneKey] as _Scope?) ?? _root;
 

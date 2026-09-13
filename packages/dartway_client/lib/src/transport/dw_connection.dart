@@ -16,8 +16,18 @@ abstract interface class DwConnection {
   /// Sends a frame. Throws when the connection is already closed.
   void send(String frame);
 
-  /// Ends the connection. [messages] completes.
-  Future<void> close();
+  /// The close code the other side ended the connection with, once
+  /// [messages] is done; `null` while open, and when the connection ended
+  /// without one (a dropped network). The client decides by it whether to
+  /// reconnect — see `DwCloseCode`.
+  int? get closeCode;
+
+  /// The reason that came with [closeCode].
+  String? get closeReason;
+
+  /// Ends the connection, with [code] and [reason] when given (a server end
+  /// closing as the server would). [messages] completes.
+  Future<void> close([int? code, String? reason]);
 }
 
 /// A connector whose connections never leave the process.
@@ -51,6 +61,12 @@ final class _MemoryEnd implements DwConnection {
   bool _closed = false;
 
   @override
+  int? closeCode;
+
+  @override
+  String? closeReason;
+
+  @override
   Stream<String> get messages => _incoming.stream;
 
   @override
@@ -66,7 +82,15 @@ final class _MemoryEnd implements DwConnection {
   }
 
   @override
-  Future<void> close() async {
+  Future<void> close([int? code, String? reason]) async {
+    if (_closed) return;
+    // Both ends learn the code, as both sides of a WebSocket closing
+    // handshake do.
+    for (final end in [this, _peer]) {
+      end
+        ..closeCode ??= code
+        ..closeReason ??= reason;
+    }
     _shutdown();
     _peer._shutdown();
   }

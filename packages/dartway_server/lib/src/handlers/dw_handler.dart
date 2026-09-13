@@ -3,16 +3,6 @@ import 'package:meta/meta.dart';
 
 import '../context/dw_context.dart';
 
-/// A DTO that can check its own input.
-///
-/// The server runs [validate] before the handler and answers the first
-/// refusal. It belongs in `dartway_core` — the client must run the same code
-/// before sending — and lives here only until the core exposes it.
-abstract interface class DwValidatable {
-  /// Every problem with the input; empty when the input is acceptable.
-  List<DwRefusal> validate();
-}
-
 /// Thrown when a call needs a signed-in account and the connection has none.
 /// The framework answers `DwNotAuthenticated`.
 final class DwNotAuthenticatedException implements Exception {

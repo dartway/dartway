@@ -20,7 +20,7 @@ void main() {
     final connection = await harness().connect();
     final answer = await connection.subscribe('notes');
     expect(answer, isA<DwSubscriptionRefusedMessage>());
-    expect((answer as DwSubscriptionRefusedMessage).refusal, isNull);
+    expect((answer as DwSubscriptionRefusedMessage).isUnauthenticated, isTrue);
     await connection.close();
   });
 
@@ -63,8 +63,9 @@ void main() {
       final (connection, _) = await harness().signedIn('broken@example.com');
       final answer =
           await connection.subscribe('broken') as DwSubscriptionRefusedMessage;
-      expect(answer.refusal!.code, 'dw.failed');
-      final incident = answer.refusal!.params['incident'];
+      expect(answer.refusal, isNull);
+      final incident = answer.incidentId;
+      expect(incident, isNotNull);
       await eventually(
         () => harness().app.alerts.incidents.any((i) => i.id == incident),
       );

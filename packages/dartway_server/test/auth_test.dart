@@ -130,11 +130,8 @@ void main() {
     const id = 'limited@example.com';
     expect((await requestCode(id)).status, DwResultStatus.ok);
     final early = await requestCode(id);
-    expect(early.refusal!.code, 'dw.tooManyRequests');
-    expect(
-      int.parse(early.refusal!.params['retryAfter']!),
-      inInclusiveRange(28, 30),
-    );
+    expect(early.refusal!.isCode(DwCoreRefusal.tooManyRequests), isTrue);
+    expect(early.refusal!.retryAfter!.inSeconds, inInclusiveRange(28, 30));
     await age(id, const Duration(seconds: 31));
     expect((await requestCode(id)).status, DwResultStatus.ok);
     await age(id, const Duration(seconds: 31));

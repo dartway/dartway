@@ -250,7 +250,7 @@ Future<void> main(List<String> args) => DwMigrationCli(
 Future<void> main() async {
   final server = DwServer(
     protocol: dartwayExampleProtocol,
-    schema: dartwayExampleSchema,
+    schema: dartwayExampleSchema,             // optional: startup fails when a declared table or column is missing
     migrations: appMigrations,
     database: DwDatabaseConfig.fromEnvironment(Platform.environment),
     auth: exampleAuth,
@@ -297,7 +297,7 @@ abstract class DwContext {
   int get requireAccountId;                         // DwNotAuthenticated when absent
   DwDb get db;                                       // the transaction in a transactional command
   Future<T> transaction<T>(Future<T> Function(DwDb tx) body);
-  void publish(DwChannel channel, DwDto item);       // delivered after commit, batched per channel, no echo to the author connection
+  void publish(DwChannel channel, DwDto item);       // delivered after commit, batched per channel, to every subscribed connection including the author's (D-018)
   void revoke(DwChannel channel, int accountId);     // closes that account's subscriptions to the channel
   Never refuse(DwRefusalCode code, {Map<String, Object?> params, String? field});
   DwJobs get jobs;                                    // enqueue in the same transaction

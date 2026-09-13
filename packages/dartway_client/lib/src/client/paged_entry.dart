@@ -49,6 +49,7 @@ final class _PagedEntry<T extends DwDataObject> extends _Entry {
 
   @override
   void run() {
+    if (settledWithoutCall()) return;
     buffer = [];
     final current = data;
     target = current?.items.length ?? 0;
@@ -68,6 +69,16 @@ final class _PagedEntry<T extends DwDataObject> extends _Entry {
   Future<void> loadMore() {
     final current = data;
     if (disposed || current == null || !current.hasMore) return Future.value();
+    if (client._incompatible case final incompatible?) {
+      _emitData(
+        DwPagedData(
+          current.items,
+          hasMore: current.hasMore,
+          loadMoreError: incompatible,
+        ),
+      );
+      return Future.value();
+    }
     final waiter = Completer<void>();
     currentWaiters.add(waiter);
     // Idempotent while anything is in flight: the caller waits for it.
@@ -236,6 +247,9 @@ final class _PagedEntry<T extends DwDataObject> extends _Entry {
 
   @override
   void failWith(String incidentId) => _emit(DwRequestFailed(incidentId));
+
+  @override
+  void showRefusal(DwRefusal refusal) => _emit(DwRequestRefused(refusal));
 
   @override
   void onAbort(Object error, StackTrace stackTrace, _Call call) {

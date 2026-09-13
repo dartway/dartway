@@ -4,6 +4,8 @@ import 'package:meta/meta.dart';
 
 import '../alerts/dw_alerts.dart';
 import '../alerts/dw_logger.dart';
+import '../auth/dw_accounts.dart';
+import '../auth/dw_auth.dart';
 import '../channels/dw_hub.dart';
 import '../context/dw_context.dart';
 import '../jobs/dw_jobs.dart';
@@ -15,6 +17,7 @@ import '../protocol/dw_connection.dart';
 final class DwRuntime {
   DwRuntime({
     required this.protocol,
+    required this.auth,
     required this.db,
     required this.hub,
     required this.alerts,
@@ -23,6 +26,7 @@ final class DwRuntime {
   });
 
   final DwProtocol protocol;
+  final DwAuth auth;
   final DwDb db;
   final DwHub hub;
   final DwAlertGate alerts;
@@ -40,6 +44,7 @@ final class DwRuntime {
     protocol: protocol,
     log: log.scoped(scope),
     jobs: jobsFor,
+    accounts: (ctx) => DwAccounts.ofContext(ctx, auth, hub),
     isPublishable: (item) => protocol.knows(item.runtimeType),
     accountId: accountId,
     keyId: keyId,
@@ -49,7 +54,7 @@ final class DwRuntime {
   /// Delivers the committed effects of [ctx].
   void deliver(DwCallContext ctx) {
     if (ctx.rootEffects.isEmpty) return;
-    hub.deliver(ctx.rootEffects, author: ctx.connection);
+    hub.deliver(ctx.rootEffects);
     ctx.rootEffects.clear();
   }
 }

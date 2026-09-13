@@ -215,10 +215,13 @@ final class DwDispatcher {
     }
   }
 
+  /// The client ran the same check before sending; running it again is what
+  /// makes it a rule rather than a courtesy of well-behaved clients.
   void _validate(DwDto dto) {
-    if (dto is! DwValidatable) return;
-    final refusals = (dto as DwValidatable).validate();
-    if (refusals.isNotEmpty) throw DwRefusalException(refusals.first);
+    if (dto case final DwValidatable validatable) {
+      final refusals = validatable.validate();
+      if (refusals.isNotEmpty) throw DwRefusalException(refusals.first);
+    }
   }
 
   DwPageInput _pageInput(

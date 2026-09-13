@@ -175,7 +175,7 @@ Rules:
 1. **Subscriptions are reference-counted** on the client: three widgets watching one chat hold one server subscription; it is released when the last one goes.
 2. **Publishing happens after commit.** A rolled-back transaction publishes nothing.
 3. **One command, one message per connection.** Everything a command publishes to a channel is batched.
-4. **No echo to the author connection.** The author already has the command result; the user's other connections receive the update.
+4. **Updates reach the author's connection too** (D-018 reversed the earlier "no echo"): a command publishes to channels the author's client cannot know, so without it the author's own screens stay stale. The client applies updates idempotently.
 5. **Access is checked once, at subscription.** Therefore everything published to a channel must be readable by every subscriber of it; audiences that may see different things are different channel kinds.
 6. **Revocation is explicit.** A command that removes someone's access closes the subscription: `ctx.revoke(channel, userId)`. The framework itself closes all of a user's subscriptions on sign-out and key revocation. No access re-check per publish.
 7. **Deletion is an update:** `DwDeleted<T>(id)`.

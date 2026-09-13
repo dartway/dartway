@@ -68,16 +68,26 @@ extension on DwClient {
     }
   }
 
-  void _onSubscriptionRefused(String name, DwRefusal? refusal) {
+  void _onSubscriptionRefused(DwSubscriptionRefusedMessage message) {
+    final name = message.channel;
     final record = _channels[name];
     if (record == null || record.state != _SubState.subscribing) return;
     record.state = _SubState.refused;
+    final refusal = message.refusal;
     // A refusal for access is the ordinary answer to a user without it, and
     // the request's own fetch tells that story. An unknown channel is the
     // server never having been taught a kind a request names: a wiring
-    // mistake, and silent unless reported.
+    // mistake, and silent unless reported. A failed check is an incident the
+    // operator was alerted to; reported here too, because the data it leaves
+    // behind silently stops being live. Both retry on the next connection or
+    // account, as any refusal does.
     if (refusal != null && refusal.isCode(DwCoreRefusal.unknownChannel)) {
       _report(DwChannelRefusedException(name, refusal), StackTrace.current);
+    } else if (message.incidentId case final incident?) {
+      _report(
+        DwFailedException(incident, call: 'subscribe $name'),
+        StackTrace.current,
+      );
     }
     for (final entry in record.entries.toList()) {
       entry.syncLive();

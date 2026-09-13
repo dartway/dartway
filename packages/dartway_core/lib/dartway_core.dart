@@ -8,6 +8,8 @@ export 'src/dto/dw_command.dart';
 export 'src/dto/dw_dto.dart';
 export 'src/dto/dw_patch.dart';
 export 'src/dto/dw_request.dart';
+export 'src/dto/dw_validatable.dart';
+export 'src/protocol/dw_close_code.dart';
 export 'src/protocol/dw_json.dart';
 export 'src/protocol/dw_protocol.dart';
 export 'src/protocol/dw_wire.dart';

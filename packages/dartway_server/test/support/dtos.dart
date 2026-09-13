@@ -184,7 +184,7 @@ final class SlowRequest extends DwListRequest<NoteView> {
       SlowRequest(json['millis']! as int);
 }
 
-/// Registered in the protocol, deliberately without a handler.
+/// Without a handler; registered only by the startup test's protocol.
 final class OrphanRequest extends DwListRequest<NoteView> {
   const OrphanRequest();
 
@@ -196,6 +196,56 @@ final class OrphanRequest extends DwListRequest<NoteView> {
 
   static OrphanRequest fromJson(Map<String, Object?> json) =>
       const OrphanRequest();
+}
+
+/// Without a handler, like [OrphanRequest].
+final class OrphanCommand extends DwCommand<void> {
+  const OrphanCommand();
+
+  @override
+  String get dwTypeName => 'OrphanCommand';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static OrphanCommand fromJson(Map<String, Object?> json) =>
+      const OrphanCommand();
+}
+
+/// Revokes every session of [accountId] through `ctx.accounts`, then ends as
+/// [ending]: `ok` or `refuse` (rolling the revocation back).
+final class RevokeSessions extends DwCommand<void> {
+  const RevokeSessions(this.accountId, {this.ending = 'ok'});
+
+  final int accountId;
+  final String ending;
+
+  @override
+  String get dwTypeName => 'RevokeSessions';
+
+  @override
+  Map<String, Object?> toJson() => {'accountId': accountId, 'ending': ending};
+
+  static RevokeSessions fromJson(Map<String, Object?> json) => RevokeSessions(
+    json['accountId']! as int,
+    ending: json['ending']! as String,
+  );
+}
+
+/// `ctx.accounts.ensure` for an e-mail, answering the account id.
+final class EnsureAccount extends DwCommand<int> {
+  const EnsureAccount(this.email);
+
+  final String email;
+
+  @override
+  String get dwTypeName => 'EnsureAccount';
+
+  @override
+  Map<String, Object?> toJson() => {'email': email};
+
+  static EnsureAccount fromJson(Map<String, Object?> json) =>
+      EnsureAccount(json['email']! as String);
 }
 
 /// Not registered in the protocol at all.
@@ -430,7 +480,8 @@ final DwProtocol testProtocol = DwProtocol([
   DwDtoEntry(NoteHistory, 'NoteHistory', NoteHistory.fromJson),
   DwDtoEntry(ExplodingRequest, 'ExplodingRequest', ExplodingRequest.fromJson),
   DwDtoEntry(SlowRequest, 'SlowRequest', SlowRequest.fromJson),
-  DwDtoEntry(OrphanRequest, 'OrphanRequest', OrphanRequest.fromJson),
+  DwDtoEntry(RevokeSessions, 'RevokeSessions', RevokeSessions.fromJson),
+  DwDtoEntry(EnsureAccount, 'EnsureAccount', EnsureAccount.fromJson),
   DwDtoEntry(CreateNote, 'CreateNote', CreateNote.fromJson),
   DwDtoEntry(PublishAndEnd, 'PublishAndEnd', PublishAndEnd.fromJson),
   DwDtoEntry(Count, 'Count', Count.fromJson),

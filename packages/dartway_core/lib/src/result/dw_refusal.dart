@@ -31,7 +31,23 @@ enum DwCoreRefusal implements DwRefusalCode {
   invalid,
 
   /// A subscription to a channel kind the server does not declare.
-  unknownChannel;
+  unknownChannel,
+
+  /// Asked too often. `retryAfter` holds whole seconds until asking again
+  /// can succeed; build it with [DwRefusal.tooManyRequests] and read it with
+  /// [DwRefusal.retryAfter].
+  tooManyRequests,
+
+  /// A one-time code can no longer be verified — its ticket is unknown, used,
+  /// expired or out of attempts; [DwRefusal.field] is `code`. The user needs
+  /// a new code, not another try.
+  codeExpired;
+
+  // There is deliberately no `failed` code. A refusal is an answer for the
+  // user and never alerts; a failure is an incident with no detail. A
+  // subscription whose check threw is a failure, so it travels as one —
+  // `DwSubscriptionRefusedMessage.failed` with an incident id — rather than
+  // as a refusal a screen would render as the user's fault.
 
   @override
   String get code => 'dw.$name';
@@ -54,6 +70,20 @@ final class DwRefusal {
 
   const DwRefusal.raw(this.code, {this.params = const {}, this.field});
 
+  /// [DwCoreRefusal.tooManyRequests], asking to wait [retryAfter]: rounded up
+  /// to whole seconds, and at least one — "retry in 0 s" would invite the
+  /// request it refuses.
+  factory DwRefusal.tooManyRequests(Duration retryAfter) {
+    final seconds = (retryAfter.inMicroseconds / Duration.microsecondsPerSecond)
+        .ceil();
+    return DwRefusal(
+      DwCoreRefusal.tooManyRequests,
+      params: {_retryAfterParam: seconds < 1 ? 1 : seconds},
+    );
+  }
+
+  static const String _retryAfterParam = 'retryAfter';
+
   /// The code on the wire: the project's enum value name, or `dw.*`.
   final String code;
 
@@ -66,6 +96,15 @@ final class DwRefusal {
   /// Whether this refusal carries [candidate].
   bool isCode(DwRefusalCode candidate) => code == candidate.code;
 
+  /// How long to wait before asking again: set on
+  /// [DwCoreRefusal.tooManyRequests], `null` on every other refusal (and on
+  /// one whose parameter does not read as seconds).
+  Duration? get retryAfter {
+    if (!isCode(DwCoreRefusal.tooManyRequests)) return null;
+    final seconds = int.tryParse(params[_retryAfterParam] ?? '');
+    return seconds == null ? null : Duration(seconds: seconds);
+  }
+
   Map<String, Object?> toJson() => {
     'code': code,
     if (params.isNotEmpty) 'params': params,
@@ -74,7 +113,8 @@ final class DwRefusal {
 
   static DwRefusal fromJson(Map<String, Object?> json) => DwRefusal.raw(
     json['code']! as String,
-    params: (json['params'] as Map<String, Object?>?)?.map(
+    params:
+        (json['params'] as Map<String, Object?>?)?.map(
           (key, value) => MapEntry(key, value! as String),
         ) ??
         const {},
@@ -92,7 +132,9 @@ final class DwRefusal {
   int get hashCode => Object.hash(
     code,
     field,
-    Object.hashAllUnordered(params.entries.map((e) => Object.hash(e.key, e.value))),
+    Object.hashAllUnordered(
+      params.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
   );
 
   @override
