@@ -1,34 +1,27 @@
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/news/widgets/news_post_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/shared/placeholder_views.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+/// The news feed, newest first and live: a post published anywhere is
+/// inserted in its place by the request's own sort, a removed one disappears.
 class NewsPostList extends ConsumerWidget {
   const NewsPostList({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Named once and used twice: watched below, and thrown away again by the
-    // retry inside the error state. Writing the expression out a second time is
-    // how a retry ends up refreshing a different provider than the one that
-    // failed.
-    final newsPosts = dw.repo.modelList<NewsPost>();
-
     return ref
-        .watch(newsPosts)
-        .dwBuildListAsync(
-          loadingItemsCount: 5,
-          // The feed is the whole point of this screen, so its failure gets a
-          // picture of its own — "nothing was published" and "we could not ask"
-          // must not look the same (dartway-clean-code §1.5a).
-          errorBuilder: (_, _) => LoadFailedMessage(
-            onRetry: dw.action((_) => ref.invalidate(newsPosts)),
-          ),
-          childBuilder: (posts) {
+        .watch(dw.request(const ListNews()))
+        .section(
+          loadingValue: PlaceholderViews.listOf(PlaceholderViews.newsPost, 5),
+          onRetry: () =>
+              ref.read(dw.request(const ListNews()).notifier).refetch(),
+          builder: (posts) {
             if (posts.isEmpty) {
               return Center(child: AppText.body(context.l10n.noNewsYet));
             }

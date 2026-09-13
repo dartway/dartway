@@ -8,25 +8,18 @@ import '../l10n/gen/app_localizations.dart';
 
 export '../l10n/gen/app_localizations.dart';
 
-/// Current translations for code that runs outside the widget tree (error
-/// toasts, background notifications). Kept in sync by [AppLocaleController];
-/// widgets use `context.l10n` instead.
+/// Current translations for code that runs outside the widget tree (refusal
+/// texts and error toasts, which the core renders). Kept in sync by
+/// [AppLocaleController]; widgets use `context.l10n` instead.
 AppLocalizations appL10n = lookupAppLocalizations(const Locale('en'));
 
-/// The app UI locale: defaults to the system language (when supported) and is
-/// switchable at runtime — by the user or by DartWay Studio over the bridge.
+/// The app UI locale: the system language when supported, English otherwise.
 class AppLocaleController extends Notifier<Locale> {
   @override
   Locale build() {
     final locale = _supportedOrDefault(PlatformDispatcher.instance.locale);
     _apply(locale);
     return locale;
-  }
-
-  void selectLanguageCode(String languageCode) {
-    final locale = _supportedOrDefault(Locale(languageCode));
-    _apply(locale);
-    state = locale;
   }
 
   static Locale _supportedOrDefault(Locale wanted) =>

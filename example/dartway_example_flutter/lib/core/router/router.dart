@@ -1,3 +1,4 @@
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_router/dartway_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -20,12 +21,15 @@ part 'navigation_zones/admin_navigation_zone.dart';
 part 'navigation_zones/app_navigation_zone.dart';
 part 'navigation_zones/auth_navigation_zone.dart';
 
-final appRouterStateProvider = Provider<AppRouterState>(
-  (ref) => AppRouterState(ref),
-);
+final appRouterStateProvider = Provider<AppRouterState>((ref) {
+  final state = AppRouterState(ref);
+  ref.onDispose(state.dispose);
+  return state;
+});
 
-/// The app router: two zones (app + auth) with cross-redirect guards. Signed-out
-/// users are redirected to the auth zone; signed-in users are kept out of it.
+/// The app router: three zones (app, admin, auth) with cross-redirect guards.
+/// Signed-out users are redirected to the auth zone; signed-in users are kept
+/// out of it, and non-admins out of the admin zone.
 final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
   final routerState = ref.watch(appRouterStateProvider);
   final router = DwRouter<AppRouterState>(
@@ -49,5 +53,6 @@ final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
     return configuration.isEmpty ? '/' : configuration.uri.path;
   });
 
+  ref.onDispose(router.router.dispose);
   return router;
 });

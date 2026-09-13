@@ -16,6 +16,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get retry => 'Try again';
 
   @override
+  String get actionFailed => 'Something went wrong. Please try again.';
+
+  @override
+  String get connectionOnline => 'online';
+
+  @override
+  String get connectionConnecting => 'connecting';
+
+  @override
+  String get connectionOffline => 'offline';
+
+  @override
+  String get connectionIncompatible => 'update the app';
+
+  @override
   String get tabSchedule => 'Schedule';
 
   @override
@@ -39,9 +54,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noUpcomingSessions => 'No upcoming sessions yet';
 
   @override
-  String get sessionFallbackTitle => 'Session';
-
-  @override
   String minutesShort(int minutes) {
     return '$minutes min';
   }
@@ -52,9 +64,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String upToPeople(int count) {
-    return 'up to $count people';
+  String spotsLeft(int left, int capacity) {
+    return '$left of $capacity spots left';
   }
+
+  @override
+  String get sessionFull => 'Full';
 
   @override
   String get book => 'Book';
@@ -197,12 +212,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileUpdated => 'Profile updated successfully!';
 
   @override
-  String get profilePhotoUpdated => 'Photo updated';
-
-  @override
-  String get profilePhotoHint => 'Tap to change your photo';
-
-  @override
   String authStepTitle(String step) {
     String _temp0 = intl.Intl.selectLogic(step, {
       'greeting': 'Welcome!',
@@ -232,7 +241,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nameLabel => 'Name';
 
   @override
+  String get phoneLabel => 'Phone';
+
+  @override
   String get requiredField => 'Required field';
+
+  @override
+  String get invalidPhoneNumber => 'Invalid number';
 
   @override
   String get youMustAgree => 'You must agree';
@@ -288,6 +303,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get whatIsYourName => 'What is your name?';
+
+  @override
+  String get whatIsYourNameHint => 'The club team will see it on your bookings';
+
+  @override
   String get adminDashboard => 'Dashboard';
 
   @override
@@ -301,13 +322,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get countersLiveHint =>
-      'Each counter is a typed live list — one line of dw.repo.modelList, no fetch code. It refreshes when this admin reloads the data.';
+      'The server counts these, and they change live as the club does — no reload.';
 
   @override
   String get countMembers => 'Members';
 
   @override
-  String get countSessions => 'Sessions';
+  String get countSessions => 'Upcoming sessions';
 
   @override
   String get countNews => 'News';
@@ -347,10 +368,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clubSettings => 'Club settings';
 
   @override
-  String get signUpEnabledLabel => 'Sign-up enabled';
+  String get clubNameLabel => 'Club name';
 
   @override
-  String get clubNameLabel => 'Club name';
+  String get bookingEnabledLabel => 'Booking open';
+
+  @override
+  String get supportPhoneLabel => 'Support phone';
 
   @override
   String get saveAction => 'Save';
@@ -359,8 +383,96 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSaved => 'Settings saved';
 
   @override
-  String get noSettingsConfigured => 'No settings configured.';
+  String get refusalGeneric => 'The request was refused.';
 
   @override
-  String get networkErrorTryAgain => 'Network error. Please try again.';
+  String get refusalTitleRequired => 'Add a title.';
+
+  @override
+  String get refusalTextRequired => 'Add the text.';
+
+  @override
+  String get refusalDurationNotPositive =>
+      'The duration must be longer than zero.';
+
+  @override
+  String get refusalPriceNegative => 'The price cannot be negative.';
+
+  @override
+  String get refusalCapacityTooSmall => 'A session needs at least one spot.';
+
+  @override
+  String get refusalSessionInPast =>
+      'A session cannot be scheduled in the past.';
+
+  @override
+  String get refusalSessionStarted => 'This session has already started.';
+
+  @override
+  String get refusalNoSpotsLeft => 'No spots left on this session.';
+
+  @override
+  String get refusalAlreadyBooked => 'You are already booked on this session.';
+
+  @override
+  String get refusalBookingNotActive => 'This booking is no longer active.';
+
+  @override
+  String get refusalRatingOutOfRange => 'Pick a rating from 1 to 5.';
+
+  @override
+  String get refusalReviewNeedsAttendance =>
+      'A visit can be reviewed once it has taken place.';
+
+  @override
+  String get refusalAlreadyReviewed => 'You have already reviewed this visit.';
+
+  @override
+  String get refusalMessageEmpty => 'The message is empty.';
+
+  @override
+  String get refusalSettingKeyUnknown => 'This setting does not exist.';
+
+  @override
+  String get refusalFirstNameRequired => 'Enter your name.';
+
+  @override
+  String get refusalForbidden => 'You are not allowed to do this.';
+
+  @override
+  String get refusalNotFound => 'It no longer exists.';
+
+  @override
+  String get refusalConflict => 'This changed a moment ago — please try again.';
+
+  @override
+  String get refusalInvalid => 'Check what you entered.';
+
+  @override
+  String get refusalInvalidPhone => 'Enter a valid phone number.';
+
+  @override
+  String get refusalWrongCode => 'Wrong code.';
+
+  @override
+  String refusalWrongCodeAttemptsLeft(int attemptsLeft) {
+    return 'Wrong code. Attempts left: $attemptsLeft';
+  }
+
+  @override
+  String get refusalCodeExpired =>
+      'This code no longer works — request a new one.';
+
+  @override
+  String get refusalTooManyRequests =>
+      'Too many attempts. Please wait a little.';
+
+  @override
+  String refusalTooManyRequestsRetryIn(int seconds) {
+    return 'Too many attempts. Try again in $seconds s.';
+  }
+
+  @override
+  String get refusalUnknownChannel =>
+      'This version of the app does not match the server — please update it.';
 }

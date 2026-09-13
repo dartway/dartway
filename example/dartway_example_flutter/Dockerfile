@@ -1,20 +1,20 @@
 # Built from the **project root** by the compose file `dartway deploy setup`
-# renders: the client package is a path dependency of this one, so a context
-# narrower than the root cannot resolve it. Every path below is relative to the
-# root.
+# renders: the shared contract package is a path dependency of this one, so a
+# context narrower than the root cannot resolve it. Every path below is relative
+# to the root.
 FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
 
 WORKDIR /workspace
-COPY dartway_example_client/ dartway_example_client/
+COPY dartway_example_shared/ dartway_example_shared/
 COPY dartway_example_flutter/ dartway_example_flutter/
 
 WORKDIR /workspace/dartway_example_flutter
 RUN flutter pub get
 
-# A web build compiles the API address into itself, so it has to be given one.
-# The deploy passes the domain from the Serverpod configuration, which is what
-# keeps it declared in a single place — do not hardcode it here or in the app.
-# Building this image by hand means passing the argument by hand.
+# A web build compiles the server address into itself, so it has to be given
+# one: the app's WebSocket, `wss://<api domain>/dw`. The deploy passes it, which
+# is what keeps it declared in a single place — do not hardcode it here or in
+# the app. Building this image by hand means passing the argument by hand.
 ARG DW_BACKEND_URL
 RUN test -n "$DW_BACKEND_URL"
 RUN flutter build web --release \

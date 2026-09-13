@@ -9,40 +9,41 @@ enum AppSettingType { toggle, number, text }
 /// falls back to.
 ///
 /// The catalogue is the enum itself: open this file and you see the whole list.
-/// Before it, a setting was found by comparing `settingKey` to a string literal
-/// at each read site — the key was duplicated, the value arrived as a `String`
-/// whatever it meant, and a row missing from the database made every screen
-/// invent its own fallback.
+/// The server holds the same set of keys and refuses any other
+/// (`settingKeyUnknown`), so a key is added in both places.
 ///
-/// The type argument is what makes a read typed: `settings.valueOf(appName)`
-/// returns a `String` and `valueOf(signUpEnabled)` a `bool`, checked at compile
-/// time. [type] is a separate question — it answers *how to edit this*, which
-/// only the admin panel asks, and only at runtime.
+/// The type argument is what makes a read typed: `valueOf(clubName)` returns a
+/// `String` and `valueOf(bookingEnabled)` a `bool`, checked at compile time.
+/// [type] is a separate question — it answers *how to edit this*, which only
+/// the admin panel asks, and only at runtime.
 enum AppSettingKey<T> {
-  /// Shown in the app bar and on the greeting screen.
+  /// The club's name.
   clubName<String>(
     'clubName',
     AppSettingType.text,
     defaultValue: 'DartWay Fitness',
   ),
 
-  /// Whether a new visitor may create an account.
-  signUpEnabled<bool>(
-    'signUpEnabled',
+  /// Whether the schedule is open for booking.
+  bookingEnabled<bool>(
+    'bookingEnabled',
     AppSettingType.toggle,
     defaultValue: true,
-  );
+  ),
+
+  /// The phone members call when something goes wrong.
+  supportPhone<String>('supportPhone', AppSettingType.text, defaultValue: '');
 
   const AppSettingKey(this.key, this.type, {required this.defaultValue});
 
-  /// Storage key — the `AppSetting.settingKey` of the row holding this value.
-  /// A contract: renaming it orphans the row that is already in the database.
+  /// The setting's key on the wire and in the database — `AppSettingView.id`.
+  /// A contract: renaming it orphans the value that is already stored.
   final String key;
 
   final AppSettingType type;
 
-  /// Used when no row exists yet, and when the stored text cannot be read as
-  /// [T]. A setting nobody has touched must not be able to break a screen, so
+  /// Used while nothing is stored yet, and when the stored text cannot be read
+  /// as [T]. A setting nobody has touched must not be able to break a screen, so
   /// there is no failure path here at all.
   final T defaultValue;
 
@@ -66,7 +67,7 @@ enum AppSettingKey<T> {
     return parsed is T ? parsed : defaultValue;
   }
 
-  /// Serialises a value back into the single text column.
+  /// Serialises a value back into the stored text.
   String format(T value) => value.toString();
 
   /// Accepts what a checkbox, a config file and a hand edit each tend to write.

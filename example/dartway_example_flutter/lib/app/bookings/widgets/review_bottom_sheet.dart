@@ -1,21 +1,22 @@
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-/// The server validates the business rule (own attended booking, one review
-/// per visit) in the SessionReview CRUD config — the sheet only collects input.
-class ReviewBottomSheet extends HookConsumerWidget {
+/// Collects a review of an attended visit. The rules — the caller's own
+/// attended booking, one review per visit, a rating from 1 to 5 — are the
+/// server's; a refusal is shown in the user's language and keeps the sheet
+/// open.
+class ReviewBottomSheet extends HookWidget {
   const ReviewBottomSheet({required this.booking, super.key});
 
-  final SessionBooking booking;
+  final BookingView booking;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final rating = useState(5);
     final reviewText = useState('');
@@ -40,19 +41,21 @@ class ReviewBottomSheet extends HookConsumerWidget {
         const Gap(24),
         AppButton.primary(
           l10n.submitReview,
-          onTap: dw.action((context) async {
-            await dw.repo.saveModel(
-              SessionReview(
-                bookingId: booking.id!,
-                rating: rating.value,
-                reviewText: reviewText.value.trim().isEmpty
-                    ? null
-                    : reviewText.value.trim(),
-                createdAt: DateTime.now(),
-              ),
-            );
-            if (context.mounted) Navigator.of(context).pop();
-          }, onSuccessNotification: l10n.thanksForFeedback),
+          onTap: dw.action(
+            (_) {
+              final text = reviewText.value.trim();
+              return dw.command(
+                ReviewVisit(
+                  bookingId: booking.id,
+                  rating: rating.value,
+                  text: text.isEmpty ? null : text,
+                ),
+              );
+            },
+            onSuccessNotification: l10n.thanksForFeedback,
+            followUpIfMountedAction: (context, _) =>
+                Navigator.of(context).pop(),
+          ),
         ),
       ],
     );

@@ -1,17 +1,18 @@
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_composer.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_list.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/core/user_profile_provider.dart';
-import 'package:dartway_example_flutter/core/user_profile_roles.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/core/profile/my_profile.dart';
+import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
+import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Staff-only chat. The UI hides the tab for clients, but the real protection
-/// is the staff-only access filter in the server CRUD configs.
+/// Staff-only chat. The UI hides the tab for clients; the real protection is
+/// the server: the requests refuse a client, and so does the channel.
 class StaffChatPage extends ConsumerWidget implements DwFeature {
   const StaffChatPage({super.key});
 
@@ -30,45 +31,47 @@ class StaffChatPage extends ConsumerWidget implements DwFeature {
     ],
     requirements: [
       'Clients never receive staff messages. The hidden tab and the notice '
-          'above are convenience; the staff-only access filter on the server '
-          'is the enforcement.',
+          'above are convenience; the server refuses the reads and the '
+          'channel subscription to anyone but staff.',
     ],
   );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watchUserProfile.isStaffMember) {
+    final l10n = context.l10n;
+    if (!context.profile.isStaffMember) {
       return AppScaffold.main(
-        body: Center(child: AppText.body(context.l10n.staffOnlyArea)),
+        body: Center(child: AppText.body(l10n.staffOnlyArea)),
       );
     }
 
-    return ref
-        .watch(dw.repo.modelList<ChatChannel>())
-        .dwBuildListAsync(
-          loadingItemsCount: 1,
-          childBuilder: (channels) {
-            if (channels.isEmpty) {
-              return AppScaffold.main(
-                body: Center(child: AppText.body(context.l10n.noChatChannels)),
-              );
-            }
+    final channels = ref.watch(dw.request(const ListChatChannels()));
+    final channel = channels.value?.firstOrNull;
 
-            final channel = channels.first;
-            return AppScaffold.main(
-              appBar: AppBar(
-                title: AppText.title(channel.title),
-                actions: const [ConnectionStatusIndicator()],
-              ),
-              bodyInsets: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              body: Column(
-                children: [
-                  Expanded(child: ChatMessageList(channel: channel)),
-                  ChatMessageComposer(channel: channel),
-                ],
-              ),
-            );
-          },
-        );
+    return AppScaffold.main(
+      appBar: AppBar(
+        title: AppText.title(channel?.title ?? l10n.tabChat),
+        actions: const [ConnectionStatusIndicator()],
+      ),
+      bodyInsets: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      body: channels.section(
+        // A skeleton of the chat would be a message list, and that list reads
+        // the messages of a channel — there is none to read yet.
+        loadingWidget: const Center(child: CircularProgressIndicator()),
+        onRetry: () =>
+            ref.read(dw.request(const ListChatChannels()).notifier).refetch(),
+        builder: (channels) {
+          if (channels.isEmpty) {
+            return Center(child: AppText.body(l10n.noChatChannels));
+          }
+          return Column(
+            children: [
+              Expanded(child: ChatMessageList(channel: channels.first)),
+              ChatMessageComposer(channel: channels.first),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

@@ -16,6 +16,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get retry => 'Повторить';
 
   @override
+  String get actionFailed => 'Что-то пошло не так. Попробуйте ещё раз.';
+
+  @override
+  String get connectionOnline => 'онлайн';
+
+  @override
+  String get connectionConnecting => 'подключение';
+
+  @override
+  String get connectionOffline => 'офлайн';
+
+  @override
+  String get connectionIncompatible => 'обновите приложение';
+
+  @override
   String get tabSchedule => 'Расписание';
 
   @override
@@ -39,9 +54,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noUpcomingSessions => 'Пока нет предстоящих занятий';
 
   @override
-  String get sessionFallbackTitle => 'Занятие';
-
-  @override
   String minutesShort(int minutes) {
     return '$minutes мин';
   }
@@ -52,9 +64,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String upToPeople(int count) {
-    return 'до $count чел.';
+  String spotsLeft(int left, int capacity) {
+    return 'Свободно $left из $capacity';
   }
+
+  @override
+  String get sessionFull => 'Мест нет';
 
   @override
   String get book => 'Записаться';
@@ -197,12 +212,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileUpdated => 'Профиль обновлён!';
 
   @override
-  String get profilePhotoUpdated => 'Фото обновлено';
-
-  @override
-  String get profilePhotoHint => 'Нажмите, чтобы изменить фото';
-
-  @override
   String authStepTitle(String step) {
     String _temp0 = intl.Intl.selectLogic(step, {
       'greeting': 'Добро пожаловать!',
@@ -232,7 +241,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get nameLabel => 'Имя';
 
   @override
+  String get phoneLabel => 'Телефон';
+
+  @override
   String get requiredField => 'Обязательное поле';
+
+  @override
+  String get invalidPhoneNumber => 'Некорректный номер';
 
   @override
   String get youMustAgree => 'Нужно согласие';
@@ -287,6 +302,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get whatIsYourName => 'Как вас зовут?';
+
+  @override
+  String get whatIsYourNameHint => 'Имя увидит команда клуба в ваших записях';
+
+  @override
   String get adminDashboard => 'Дашборд';
 
   @override
@@ -300,13 +321,13 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get countersLiveHint =>
-      'Каждый счётчик — типизированный живой список: одна строка watchModelList, без кода загрузки. Обновляется, когда админ перезагружает данные.';
+      'Счётчики считает сервер, и они меняются вживую вместе с клубом — без перезагрузки.';
 
   @override
   String get countMembers => 'Участники';
 
   @override
-  String get countSessions => 'Занятия';
+  String get countSessions => 'Предстоящие занятия';
 
   @override
   String get countNews => 'Новости';
@@ -346,10 +367,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get clubSettings => 'Настройки клуба';
 
   @override
-  String get signUpEnabledLabel => 'Регистрация разрешена';
+  String get clubNameLabel => 'Название клуба';
 
   @override
-  String get clubNameLabel => 'Название клуба';
+  String get bookingEnabledLabel => 'Запись открыта';
+
+  @override
+  String get supportPhoneLabel => 'Телефон поддержки';
 
   @override
   String get saveAction => 'Сохранить';
@@ -358,8 +382,97 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsSaved => 'Настройки сохранены';
 
   @override
-  String get noSettingsConfigured => 'Настройки не заданы.';
+  String get refusalGeneric => 'Запрос отклонён.';
 
   @override
-  String get networkErrorTryAgain => 'Ошибка сети. Попробуйте снова.';
+  String get refusalTitleRequired => 'Добавьте заголовок.';
+
+  @override
+  String get refusalTextRequired => 'Добавьте текст.';
+
+  @override
+  String get refusalDurationNotPositive =>
+      'Длительность должна быть больше нуля.';
+
+  @override
+  String get refusalPriceNegative => 'Цена не может быть отрицательной.';
+
+  @override
+  String get refusalCapacityTooSmall =>
+      'На занятии должно быть хотя бы одно место.';
+
+  @override
+  String get refusalSessionInPast => 'Нельзя назначить занятие в прошлом.';
+
+  @override
+  String get refusalSessionStarted => 'Занятие уже началось.';
+
+  @override
+  String get refusalNoSpotsLeft => 'Мест на занятии не осталось.';
+
+  @override
+  String get refusalAlreadyBooked => 'Вы уже записаны на это занятие.';
+
+  @override
+  String get refusalBookingNotActive => 'Эта запись уже неактивна.';
+
+  @override
+  String get refusalRatingOutOfRange => 'Выберите оценку от 1 до 5.';
+
+  @override
+  String get refusalReviewNeedsAttendance =>
+      'Отзыв можно оставить после посещения.';
+
+  @override
+  String get refusalAlreadyReviewed =>
+      'Вы уже оставили отзыв об этом посещении.';
+
+  @override
+  String get refusalMessageEmpty => 'Сообщение пустое.';
+
+  @override
+  String get refusalSettingKeyUnknown => 'Такой настройки нет.';
+
+  @override
+  String get refusalFirstNameRequired => 'Введите имя.';
+
+  @override
+  String get refusalForbidden => 'У вас нет прав на это действие.';
+
+  @override
+  String get refusalNotFound => 'Этого больше не существует.';
+
+  @override
+  String get refusalConflict =>
+      'Данные только что изменились — попробуйте ещё раз.';
+
+  @override
+  String get refusalInvalid => 'Проверьте введённые данные.';
+
+  @override
+  String get refusalInvalidPhone => 'Введите корректный номер телефона.';
+
+  @override
+  String get refusalWrongCode => 'Неверный код.';
+
+  @override
+  String refusalWrongCodeAttemptsLeft(int attemptsLeft) {
+    return 'Неверный код. Осталось попыток: $attemptsLeft';
+  }
+
+  @override
+  String get refusalCodeExpired => 'Код больше не действует — запросите новый.';
+
+  @override
+  String get refusalTooManyRequests =>
+      'Слишком много попыток. Подождите немного.';
+
+  @override
+  String refusalTooManyRequestsRetryIn(int seconds) {
+    return 'Слишком много попыток. Повторите через $seconds с.';
+  }
+
+  @override
+  String get refusalUnknownChannel =>
+      'Версия приложения не совпадает с сервером — обновите приложение.';
 }

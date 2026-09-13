@@ -1,19 +1,21 @@
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/app/schedule/logic/today_provider.dart';
 import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
-import 'package:dartway_example_flutter/core/app_backend_filters.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/core/profile/my_profile.dart';
+import 'package:dartway_example_flutter/shared/placeholder_views.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Upcoming sessions grouped by day. Each list is live to *your own* writes:
-/// book or cancel and the card updates with no refresh code. A change another
-/// user makes shows on the next fetch — pushing it live to everyone needs a
-/// named channel (`DwChannelSubscriptionWidget` + `postMessage`), which this
-/// screen does not set up.
+typedef _Schedule = ({List<ClubSessionView> sessions, List<BookingView> mine});
+
+/// Upcoming sessions grouped by day, each card knowing whether you hold a
+/// place on it. Both reads are live: a place someone else takes changes the
+/// spots left on every screen, and your own booking or cancellation flips the
+/// card — with no refresh code here.
 class ScheduleSessionList extends ConsumerWidget implements DwFeature {
   const ScheduleSessionList({super.key});
 
@@ -25,109 +27,93 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
         'A club member sees what is on in the coming days and books a place '
         'without leaving the list.',
     behaviors: [
-      'Upcoming sessions are grouped by day, nearest day first.',
-      'Booking or cancelling updates the card without a manual refresh.',
-      'A session at capacity is shown as full and cannot be booked.',
-      'While the first page loads, five placeholder cards are shown.',
+      'Sessions from the start of today on are grouped by day, nearest first.',
+      'Each card shows the spots left, and they change live as anyone books '
+          'or cancels.',
+      'Booking or cancelling flips the card without a manual refresh.',
+      'A full session cannot be booked; one that has started offers nothing.',
+      'While the reads load, five placeholder cards are shown.',
       'A failed read says so and offers a retry, rather than looking like a '
           'week with nothing on.',
     ],
     requirements: [
-      'Only sessions in the future are listed — the backend filter decides, '
-          'not the widget.',
-      'A member sees only their own bookings on the cards.',
+      'A member sees only their own bookings on the cards — the server '
+          'refuses anyone else\'s.',
+      'Booking rules (capacity, a started session, a second booking) are the '
+          'server\'s: a refused booking shows why.',
     ],
     implementationNotes: [
-      'Live to your own writes only. Another member booking the last seat '
-          'shows on the next fetch — pushing it to everyone needs a named '
-          'channel, which this screen deliberately does not set up.',
-      'The bookings read degrades on purpose: if it fails, cards render as '
-          'not booked. The sessions read is the one this screen exists for, '
-          'and it is the one that renders its failure.',
+      'The list waits for both reads. A card drawn before your bookings arrive '
+          'would offer "Book" on a session you already hold.',
+      'The day the list starts from is one stable value per day, because a '
+          'request is its own cache key.',
     ],
   );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // A stated degradation, not an oversight: `.value ?? []` collapses loading
-    // and failure into "nothing booked", which this overlay can live with. The
-    // session list below cannot — see the passport.
-    final myBookings =
-        ref
-            .watch(
-              dw.repo.modelList<SessionBooking>(
-                backendFilter: AppBackendFilters.clientBookings(
-                  ref.watchUserProfile.id!,
-                ),
-              ),
-            )
-            .value ??
-        [];
-
-    // Named once, used twice: watched, and thrown away by the retry.
-    final upcomingSessions = dw.repo.modelList<ClubSession>(
-      backendFilter: AppBackendFilters.upcomingSessions(),
+    final sessionsRequest = ListUpcomingSessions(
+      from: ref.watch(todayProvider),
     );
+    final bookingsRequest = ListMyBookings(profileId: context.profile.id);
+    final sessions = ref.watch(dw.request(sessionsRequest));
+    final bookings = ref.watch(dw.request(bookingsRequest));
 
-    return ref
-        .watch(upcomingSessions)
-        .dwBuildListAsync(
-          loadingItemsCount: 5,
-          errorBuilder: (_, _) => LoadFailedMessage(
-            onRetry: dw.action((_) => ref.invalidate(upcomingSessions)),
-          ),
-          childBuilder: (sessions) {
-            if (sessions.isEmpty) {
-              return Center(
-                child: AppText.body(context.l10n.noUpcomingSessions),
-              );
-            }
+    final AsyncValue<_Schedule> schedule = switch ((sessions, bookings)) {
+      (AsyncError(:final error, :final stackTrace), _) ||
+      (
+        _,
+        AsyncError(:final error, :final stackTrace),
+      ) => AsyncError(error, stackTrace),
+      (AsyncData(value: final sessions), AsyncData(value: final mine)) =>
+        AsyncData((sessions: sessions, mine: mine)),
+      _ => const AsyncLoading(),
+    };
 
-            return ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: _groupedByDay(sessions, myBookings),
-            );
-          },
+    return schedule.section(
+      loadingValue: (
+        sessions: PlaceholderViews.listOf(PlaceholderViews.session, 5),
+        mine: const [],
+      ),
+      onRetry: () => Future.wait([
+        if (sessions.hasError)
+          ref.read(dw.request(sessionsRequest).notifier).refetch(),
+        if (bookings.hasError)
+          ref.read(dw.request(bookingsRequest).notifier).refetch(),
+      ]),
+      builder: (schedule) {
+        if (schedule.sessions.isEmpty) {
+          return Center(child: AppText.body(context.l10n.noUpcomingSessions));
+        }
+
+        // A cancelled booking stays in the list with its status; only an
+        // active one holds a place.
+        final activeBySession = {
+          for (final booking in schedule.mine)
+            if (booking.status == BookingStatus.booked)
+              booking.session.id: booking,
+        };
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            for (final (index, session) in schedule.sessions.indexed) ...[
+              if (index == 0 ||
+                  !session.startsAt.isSameDayAs(
+                    schedule.sessions[index - 1].startsAt,
+                  ))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                  child: AppText.caption(session.startsAt.dayLabel),
+                ),
+              SessionCard(
+                session: session,
+                activeBooking: activeBySession[session.id],
+              ),
+            ],
+          ],
         );
-  }
-
-  List<Widget> _groupedByDay(
-    List<ClubSession> sessions,
-    List<SessionBooking> myBookings,
-  ) {
-    final items = <Widget>[];
-    DateTime? shownDay;
-
-    for (final session in sessions) {
-      if (shownDay == null || !session.startsAt.isSameDayAs(shownDay)) {
-        shownDay = session.startsAt;
-        items.add(
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-            child: AppText.caption(session.startsAt.dayLabel),
-          ),
-        );
-      }
-      items.add(
-        SessionCard(
-          session: session,
-          activeBooking: _activeBookingFor(session, myBookings),
-        ),
-      );
-    }
-    return items;
-  }
-
-  SessionBooking? _activeBookingFor(
-    ClubSession session,
-    List<SessionBooking> myBookings,
-  ) {
-    for (final booking in myBookings) {
-      if (booking.clubSessionId == session.id &&
-          booking.status == BookingStatus.booked) {
-        return booking;
-      }
-    }
-    return null;
+      },
+    );
   }
 }

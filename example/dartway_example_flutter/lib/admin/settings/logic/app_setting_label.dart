@@ -10,6 +10,7 @@ import 'package:dartway_example_flutter/core/app_settings/app_setting_key.dart';
 extension AppSettingLabel on AppSettingKey<Object?> {
   String label(AppLocalizations l10n) => switch (this) {
     AppSettingKey.clubName => l10n.clubNameLabel,
-    AppSettingKey.signUpEnabled => l10n.signUpEnabledLabel,
+    AppSettingKey.bookingEnabled => l10n.bookingEnabledLabel,
+    AppSettingKey.supportPhone => l10n.supportPhoneLabel,
   };
 }

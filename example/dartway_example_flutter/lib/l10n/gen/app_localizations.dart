@@ -110,6 +110,36 @@ abstract class AppLocalizations {
   /// **'Try again'**
   String get retry;
 
+  /// No description provided for @actionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get actionFailed;
+
+  /// No description provided for @connectionOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'online'**
+  String get connectionOnline;
+
+  /// No description provided for @connectionConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'connecting'**
+  String get connectionConnecting;
+
+  /// No description provided for @connectionOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'offline'**
+  String get connectionOffline;
+
+  /// No description provided for @connectionIncompatible.
+  ///
+  /// In en, this message translates to:
+  /// **'update the app'**
+  String get connectionIncompatible;
+
   /// No description provided for @tabSchedule.
   ///
   /// In en, this message translates to:
@@ -152,12 +182,6 @@ abstract class AppLocalizations {
   /// **'No upcoming sessions yet'**
   String get noUpcomingSessions;
 
-  /// No description provided for @sessionFallbackTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Session'**
-  String get sessionFallbackTitle;
-
   /// No description provided for @minutesShort.
   ///
   /// In en, this message translates to:
@@ -170,11 +194,17 @@ abstract class AppLocalizations {
   /// **'with {name}'**
   String withCoach(String name);
 
-  /// No description provided for @upToPeople.
+  /// No description provided for @spotsLeft.
   ///
   /// In en, this message translates to:
-  /// **'up to {count} people'**
-  String upToPeople(int count);
+  /// **'{left} of {capacity} spots left'**
+  String spotsLeft(int left, int capacity);
+
+  /// No description provided for @sessionFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Full'**
+  String get sessionFull;
 
   /// No description provided for @book.
   ///
@@ -422,18 +452,6 @@ abstract class AppLocalizations {
   /// **'Profile updated successfully!'**
   String get profileUpdated;
 
-  /// No description provided for @profilePhotoUpdated.
-  ///
-  /// In en, this message translates to:
-  /// **'Photo updated'**
-  String get profilePhotoUpdated;
-
-  /// No description provided for @profilePhotoHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to change your photo'**
-  String get profilePhotoHint;
-
   /// No description provided for @authStepTitle.
   ///
   /// In en, this message translates to:
@@ -470,11 +488,23 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get nameLabel;
 
+  /// No description provided for @phoneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get phoneLabel;
+
   /// No description provided for @requiredField.
   ///
   /// In en, this message translates to:
   /// **'Required field'**
   String get requiredField;
+
+  /// No description provided for @invalidPhoneNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid number'**
+  String get invalidPhoneNumber;
 
   /// No description provided for @youMustAgree.
   ///
@@ -572,6 +602,18 @@ abstract class AppLocalizations {
   /// **'Sent 6-digit code to number\n{phone}'**
   String sentCodeToNumber(String phone);
 
+  /// No description provided for @whatIsYourName.
+  ///
+  /// In en, this message translates to:
+  /// **'What is your name?'**
+  String get whatIsYourName;
+
+  /// No description provided for @whatIsYourNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The club team will see it on your bookings'**
+  String get whatIsYourNameHint;
+
   /// No description provided for @adminDashboard.
   ///
   /// In en, this message translates to:
@@ -599,7 +641,7 @@ abstract class AppLocalizations {
   /// No description provided for @countersLiveHint.
   ///
   /// In en, this message translates to:
-  /// **'Each counter is a typed live list — one line of dw.repo.modelList, no fetch code. It refreshes when this admin reloads the data.'**
+  /// **'The server counts these, and they change live as the club does — no reload.'**
   String get countersLiveHint;
 
   /// No description provided for @countMembers.
@@ -611,7 +653,7 @@ abstract class AppLocalizations {
   /// No description provided for @countSessions.
   ///
   /// In en, this message translates to:
-  /// **'Sessions'**
+  /// **'Upcoming sessions'**
   String get countSessions;
 
   /// No description provided for @countNews.
@@ -668,17 +710,23 @@ abstract class AppLocalizations {
   /// **'Club settings'**
   String get clubSettings;
 
-  /// No description provided for @signUpEnabledLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign-up enabled'**
-  String get signUpEnabledLabel;
-
   /// No description provided for @clubNameLabel.
   ///
   /// In en, this message translates to:
   /// **'Club name'**
   String get clubNameLabel;
+
+  /// No description provided for @bookingEnabledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking open'**
+  String get bookingEnabledLabel;
+
+  /// No description provided for @supportPhoneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Support phone'**
+  String get supportPhoneLabel;
 
   /// No description provided for @saveAction.
   ///
@@ -692,17 +740,173 @@ abstract class AppLocalizations {
   /// **'Settings saved'**
   String get settingsSaved;
 
-  /// No description provided for @noSettingsConfigured.
+  /// No description provided for @refusalGeneric.
   ///
   /// In en, this message translates to:
-  /// **'No settings configured.'**
-  String get noSettingsConfigured;
+  /// **'The request was refused.'**
+  String get refusalGeneric;
 
-  /// No description provided for @networkErrorTryAgain.
+  /// No description provided for @refusalTitleRequired.
   ///
   /// In en, this message translates to:
-  /// **'Network error. Please try again.'**
-  String get networkErrorTryAgain;
+  /// **'Add a title.'**
+  String get refusalTitleRequired;
+
+  /// No description provided for @refusalTextRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add the text.'**
+  String get refusalTextRequired;
+
+  /// No description provided for @refusalDurationNotPositive.
+  ///
+  /// In en, this message translates to:
+  /// **'The duration must be longer than zero.'**
+  String get refusalDurationNotPositive;
+
+  /// No description provided for @refusalPriceNegative.
+  ///
+  /// In en, this message translates to:
+  /// **'The price cannot be negative.'**
+  String get refusalPriceNegative;
+
+  /// No description provided for @refusalCapacityTooSmall.
+  ///
+  /// In en, this message translates to:
+  /// **'A session needs at least one spot.'**
+  String get refusalCapacityTooSmall;
+
+  /// No description provided for @refusalSessionInPast.
+  ///
+  /// In en, this message translates to:
+  /// **'A session cannot be scheduled in the past.'**
+  String get refusalSessionInPast;
+
+  /// No description provided for @refusalSessionStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'This session has already started.'**
+  String get refusalSessionStarted;
+
+  /// No description provided for @refusalNoSpotsLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'No spots left on this session.'**
+  String get refusalNoSpotsLeft;
+
+  /// No description provided for @refusalAlreadyBooked.
+  ///
+  /// In en, this message translates to:
+  /// **'You are already booked on this session.'**
+  String get refusalAlreadyBooked;
+
+  /// No description provided for @refusalBookingNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking is no longer active.'**
+  String get refusalBookingNotActive;
+
+  /// No description provided for @refusalRatingOutOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a rating from 1 to 5.'**
+  String get refusalRatingOutOfRange;
+
+  /// No description provided for @refusalReviewNeedsAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'A visit can be reviewed once it has taken place.'**
+  String get refusalReviewNeedsAttendance;
+
+  /// No description provided for @refusalAlreadyReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'You have already reviewed this visit.'**
+  String get refusalAlreadyReviewed;
+
+  /// No description provided for @refusalMessageEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The message is empty.'**
+  String get refusalMessageEmpty;
+
+  /// No description provided for @refusalSettingKeyUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'This setting does not exist.'**
+  String get refusalSettingKeyUnknown;
+
+  /// No description provided for @refusalFirstNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your name.'**
+  String get refusalFirstNameRequired;
+
+  /// No description provided for @refusalForbidden.
+  ///
+  /// In en, this message translates to:
+  /// **'You are not allowed to do this.'**
+  String get refusalForbidden;
+
+  /// No description provided for @refusalNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'It no longer exists.'**
+  String get refusalNotFound;
+
+  /// No description provided for @refusalConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'This changed a moment ago — please try again.'**
+  String get refusalConflict;
+
+  /// No description provided for @refusalInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check what you entered.'**
+  String get refusalInvalid;
+
+  /// No description provided for @refusalInvalidPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid phone number.'**
+  String get refusalInvalidPhone;
+
+  /// No description provided for @refusalWrongCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong code.'**
+  String get refusalWrongCode;
+
+  /// No description provided for @refusalWrongCodeAttemptsLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong code. Attempts left: {attemptsLeft}'**
+  String refusalWrongCodeAttemptsLeft(int attemptsLeft);
+
+  /// No description provided for @refusalCodeExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This code no longer works — request a new one.'**
+  String get refusalCodeExpired;
+
+  /// No description provided for @refusalTooManyRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Please wait a little.'**
+  String get refusalTooManyRequests;
+
+  /// No description provided for @refusalTooManyRequestsRetryIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Try again in {seconds} s.'**
+  String refusalTooManyRequestsRetryIn(int seconds);
+
+  /// No description provided for @refusalUnknownChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app does not match the server — please update it.'**
+  String get refusalUnknownChannel;
 }
 
 class _AppLocalizationsDelegate

@@ -1,21 +1,21 @@
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/shared/placeholder_views.dart';
+import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-/// Users table over the generic CRUD: lists every profile (admin-only list
-/// access on the server) and edits the role inline. The server privilege guard
-/// blocks non-admins from role changes, so this UI stays simple. Search and
-/// role filtering are client-side over the live list.
+/// Every profile, with the role editable inline. Search and role filtering
+/// are client-side over the live list.
 class AdminUsersTable extends ConsumerWidget {
   const AdminUsersTable({super.key, this.searchQuery = '', this.roleFilter});
 
   final String searchQuery;
   final UserRole? roleFilter;
 
-  bool _matches(UserProfile user) {
+  bool _matches(ProfileView user) {
     if (roleFilter != null && user.role != roleFilter) return false;
     final query = searchQuery.trim().toLowerCase();
     if (query.isEmpty) return true;
@@ -28,10 +28,12 @@ class AdminUsersTable extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ref
-        .watch(dw.repo.modelList<UserProfile>())
-        .dwBuildListAsync(
-          loadingItemsCount: 4,
-          childBuilder: (users) {
+        .watch(dw.request(const ListProfiles()))
+        .section(
+          loadingValue: PlaceholderViews.listOf(PlaceholderViews.profile, 4),
+          onRetry: () =>
+              ref.read(dw.request(const ListProfiles()).notifier).refetch(),
+          builder: (users) {
             final visible = [
               for (final user in users)
                 if (_matches(user)) user,
@@ -54,7 +56,7 @@ class AdminUsersTable extends ConsumerWidget {
 class _UserRow extends StatelessWidget {
   const _UserRow({required this.user});
 
-  final UserProfile user;
+  final ProfileView user;
 
   @override
   Widget build(BuildContext context) {
@@ -69,10 +71,10 @@ class _UserRow extends StatelessWidget {
         underline: const SizedBox.shrink(),
         onChanged: (role) {
           if (role == null || role == user.role) return;
-          // Changing someone's role is a rights change — confirm it. The
-          // confirmation + label ride on the standard DwUiAction.
+          // Changing someone's role is a rights change — confirm it. The row
+          // changes when the server publishes the updated profile.
           dw.action(
-            (_) => dw.repo.saveModel(user.copyWith(role: role)),
+            (_) => dw.command(ChangeRole(profileId: user.id, role: role)),
             label: 'changeUserRole',
             confirmation: DwUiConfirmation(
               context.l10n.confirmChangeRole(

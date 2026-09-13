@@ -1,15 +1,27 @@
 # dartway_example_flutter
 
-A new Flutter project with Serverpod.
+The DartWay example app — a fitness club — on DartWay 1.0. It speaks to
+`../dartway_example_server` over one WebSocket, in the DTOs declared in
+`../dartway_example_shared`.
 
-## Getting Started
+## Running
 
-This project is a starting point for a Flutter application that is using
-Serverpod.
+Start the server first (see `../dartway_example_server`), then:
 
-A great starting point for learning Serverpod is our documentation site at:
-[https://docs.serverpod.dev](https://docs.serverpod.dev).
+    flutter run -d chrome
 
-To run the project, first make sure that the server is running, then do:
+The app connects to `ws://localhost:8080/dw` (`ws://10.0.2.2:8080/dw` on the
+Android emulator). Another address is compiled in:
 
-    flutter run
+    flutter run --dart-define=DW_BACKEND_URL=ws://localhost:18080/dw
+
+With the development seed, the personas `+7 999 000-00-01` (admin), `…02`
+(staff) and `…03` (client) sign in with the code `111111`.
+
+## Tests
+
+    flutter test
+
+Widget tests pump the whole app against `DwFakeServer` — an in-memory server
+speaking the real wire protocol — with a core built per test
+(`test/support/example_test_app.dart`).

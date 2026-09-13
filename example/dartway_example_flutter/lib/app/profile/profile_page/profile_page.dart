@@ -1,17 +1,16 @@
+import 'package:dartway_example_flutter/app/profile/profile_page/widgets/profile_settings_widget.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/core/profile/my_profile.dart';
+import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
+import 'package:dartway_example_flutter/core/router/router.dart';
+import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/app/profile/profile_page/widgets/profile_settings_widget.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/core/router/router.dart';
-import 'package:dartway_example_flutter/core/user_profile_provider.dart';
-import 'package:dartway_example_flutter/core/user_profile_roles.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-class ProfilePage extends ConsumerWidget implements DwFeature {
+class ProfilePage extends StatelessWidget implements DwFeature {
   const ProfilePage({super.key});
 
   @override
@@ -26,12 +25,12 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
     ],
     requirements: [
       'The admin button is convenience, not access: the route guard and the '
-          'server access filters decide who actually gets in.',
+          'server\'s access rules decide who actually gets in.',
     ],
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
 
     return AppScaffold.main(
@@ -41,7 +40,7 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
           children: [
             const ProfileSettingsWidget(),
             const Gap(24),
-            if (ref.watchUserProfile.isClubAdmin) ...[
+            if (context.profile.isClubAdmin) ...[
               AppButton.secondary(
                 l10n.adminPanel,
                 onTap: dw.action(
@@ -63,9 +62,9 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
             const Gap(24),
             AppButton.text(
               l10n.signOutAction,
-              onTap: dw.action(
-                (context) => ref.read(dw.sessionProvider!.notifier).signOut(),
-              ),
+              // The router takes it from here: signed out, the guards send
+              // every zone but auth to the sign-in screen.
+              onTap: dw.action((_) => dw.signOut()),
             ),
           ],
         ),

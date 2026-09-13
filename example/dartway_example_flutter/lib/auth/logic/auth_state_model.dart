@@ -70,25 +70,4 @@ class AuthStateModel {
 
   /// Normalized code: only digits
   String get otpDigits => otpRaw.replaceAll(RegExp(r'\D'), '');
-
-  /// Simple phone check (10–15 digits)
-  bool get isPhoneValid => phoneDigits.length >= 10 && phoneDigits.length <= 15;
-
-  /// Requirements for requesting code on the registration step
-  bool get registrationPrerequisitesOk =>
-      firstName.trim().isNotEmpty && allDocumentsAccepted;
-
-  /// Can we request OTP right now
-  bool get canRequestOtp {
-    if (!isPhoneValid) return false;
-    if (currentStep == AuthStep.registration && !registrationPrerequisitesOk) {
-      return false;
-    }
-    return true;
-    // !isRequestingOtp && !isVerifyingOtp;
-  }
-
-  /// Can we verify the code
-  bool get canVerifyOtp =>
-      otpDigits.isNotEmpty; // && !isRequestingOtp && !isVerifyingOtp;
 }

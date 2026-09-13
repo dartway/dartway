@@ -8,13 +8,8 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 import '../logic/auth_state.dart';
 
-class PhoneEntryBlock extends HookConsumerWidget {
-  const PhoneEntryBlock({
-    super.key,
-    // required this.isAdminShadowMode,
-  });
-
-  // final bool isAdminShadowMode;
+class PhoneEntryBlock extends ConsumerWidget {
+  const PhoneEntryBlock({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,6 +41,7 @@ class PhoneEntryBlock extends HookConsumerWidget {
             ),
           ),
         PhoneTextField(
+          labelText: l10n.phoneLabel,
           value: state.phoneRaw,
           onChanged: (value) =>
               ref.read(authStateProvider.notifier).update(phoneRaw: value),
@@ -116,9 +112,9 @@ class PhoneEntryBlock extends HookConsumerWidget {
         AppButton.primary(
           l10n.continueAction,
           requireValidation: true,
-          onTap: dw.action((_) async {
-            await ref.read(authStateProvider.notifier).requestOtp();
-          }),
+          onTap: dw.action(
+            (_) => ref.read(authStateProvider.notifier).requestCode(),
+          ),
         ),
         const Gap(24),
         isRegistration

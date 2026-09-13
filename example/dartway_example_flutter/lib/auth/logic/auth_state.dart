@@ -1,17 +1,21 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../core/dw_core.dart';
 import 'auth_state_model.dart';
 import 'auth_step.dart';
 
-/// Drives the phone-based auth flow on top of the DartWay framework auth:
-/// a [DwAuthRequest] (login/register, phone provider) is sent, the server
-/// replies `pendingVerification`, the user enters the code, and a
-/// [DwAuthVerification] exchanges it for an access token that completes the
-/// request and signs the user in.
+/// Drives the phone sign-in on DartWay auth: [requestCode] sends
+/// `DwRequestCode` and keeps the ticket the server answers with; [verifyCode]
+/// sends the typed code against that ticket as `DwVerifyCode`, and the session
+/// it answers with is adopted by `dw.signIn` — which is what moves the router
+/// out of the auth zone.
+///
+/// Both return the command's result, so that `dw.action` shows a refusal (an
+/// invalid phone, a wrong or expired code, too many attempts) in the user's
+/// language without any code here.
 class AuthState extends Notifier<AuthStateModel> {
-  DwAuthRequest? _pendingRequest;
+  DwCodeTicket? _ticket;
 
   @override
   AuthStateModel build() {
@@ -45,71 +49,53 @@ class AuthState extends Notifier<AuthStateModel> {
     );
   }
 
-  /// Requests a one-time code for the entered phone number.
-  Future<void> requestOtp() async {
-    final isRegistration = state.currentStep == AuthStep.registration;
-
-    final result = await dw.repo.saveModel(
-      DwAuthRequest(
-        requestType: isRegistration
-            ? DwAuthRequestType.register
-            : DwAuthRequestType.login,
-        userIdentifier: state.phoneDigits,
-        authProvider: DwAuthProvider.phone,
-        extraData: isRegistration
-            ? {
-                'firstName': state.firstName,
-                'agreedForMarketingCommunications': state.marketingAgreed
-                    .toString(),
-              }
-            : null,
+  /// Asks the server to send a one-time code to the entered phone.
+  Future<DwResult<DwCodeTicket>> requestCode() async {
+    final result = await dw.command(
+      DwRequestCode(
+        kind: DwIdentifierKind.phone,
+        identifier: state.phoneDigits,
       ),
-      apiGroupOverride: DwCoreConst.dartwayInternalApi,
     );
-
-    if (result.status == DwAuthRequestStatus.failed) {
-      dw.notify.error('Could not send the code. Please try again.');
-      return;
+    if (result case DwOk(value: final ticket)) {
+      _ticket = ticket;
+      state = state.copyWith(
+        currentStep: state.currentStep.requestOtpNextStep,
+        otpRaw: '',
+      );
     }
-
-    _pendingRequest = result;
-    state = state.copyWith(currentStep: state.currentStep.requestOtpNextStep);
+    return result;
   }
 
-  /// Confirms the entered code and completes sign-in.
-  Future<bool> verifyOtp() async {
-    final pending = _pendingRequest;
-    if (pending == null) {
-      dw.notify.error('No pending verification request');
-      return false;
-    }
-
-    final verification = await dw.repo.saveModel(
-      DwAuthVerification(
-        dwAuthRequestId: pending.id!,
-        verificationCode: state.otpDigits,
+  /// Verifies the entered code and signs in.
+  ///
+  /// The registration step sends what it collected; the server hands it to
+  /// the account-created hook and ignores it for an account that exists. A
+  /// login with a phone that has no account creates one without a name, and
+  /// `SignedInGate` asks for it.
+  Future<DwResult<DwSession>> verifyCode() async {
+    // The code step is only ever entered by a successful [requestCode].
+    final ticket =
+        _ticket ?? (throw StateError('verifyCode ran before requestCode'));
+    final result = await dw.command(
+      DwVerifyCode(
+        ticketId: ticket.id,
+        code: state.otpDigits,
+        registration: state.currentStep == AuthStep.registrationConfirmation
+            ? {
+                'firstName': state.firstName.trim(),
+                'marketing': state.marketingAgreed.toString(),
+              }
+            : const {},
       ),
-      apiGroupOverride: DwCoreConst.dartwayInternalApi,
     );
-
-    final accessToken = verification.accessToken;
-    if (accessToken == null) {
-      dw.notify.error('Invalid or expired code. Please try again.');
-      return false;
+    if (result case DwOk(value: final session)) {
+      await dw.signIn(session);
+      // Signed in: the flow starts from the beginning next time, and the
+      // phone and code typed here do not outlive it.
+      ref.invalidateSelf();
     }
-
-    final result = await dw.repo.saveModel(
-      pending.copyWith(accessToken: accessToken),
-      apiGroupOverride: DwCoreConst.dartwayInternalApi,
-    );
-
-    final success =
-        result.status == DwAuthRequestStatus.completed ||
-        result.status == DwAuthRequestStatus.verified;
-    if (!success) {
-      dw.notify.error('Could not complete sign-in. Please try again.');
-    }
-    return success;
+    return result;
   }
 }
 

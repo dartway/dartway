@@ -1,18 +1,16 @@
-import 'package:dartway_example_client/dartway_example_client.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/shared/widgets/admin_scaffold.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
-import 'package:dartway_example_flutter/shared/widgets/admin_scaffold.dart';
 import 'widgets/admin_users_table.dart';
 
-/// Member management: search, role filter and inline role editing over the
-/// generic CRUD (admin-only list access; the server privilege guard blocks
-/// non-admin role changes).
-class AdminUsersPage extends HookConsumerWidget implements DwFeature {
+/// Member management: search, role filter and inline role editing. Listing
+/// profiles and changing a role are both admin-only on the server.
+class AdminUsersPage extends HookWidget implements DwFeature {
   const AdminUsersPage({super.key});
 
   @override
@@ -25,21 +23,23 @@ class AdminUsersPage extends HookConsumerWidget implements DwFeature {
       'The role chips narrow it further; "all roles" clears that filter.',
       'A role is changed inline in the table, without opening a form, and the '
           'change is confirmed before it is applied.',
+      'A role changed or a profile edited — here, by another admin or by the '
+          'member — updates its row live.',
     ],
     requirements: [
-      'Only an admin lists profiles at all — everyone else gets an empty '
-          'result from the server, not a hidden screen.',
-      'Only an admin changes a role: the server rejects the save even if the '
-          'request comes from somewhere other than this table.',
+      'Only an admin lists profiles at all — the server refuses everyone '
+          'else, whatever screen they reach.',
+      'Only an admin changes a role: the server refuses the command even if '
+          'it comes from somewhere other than this table.',
     ],
     implementationNotes: [
-      'Search and role narrowing happen client-side: the server has already '
-          'restricted the list, so a backend filter would buy nothing.',
+      'Search and role narrowing happen client-side over the one live list: '
+          'a request per keystroke would buy a club-sized table nothing.',
     ],
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final searchQuery = useState('');
     final roleFilter = useState<UserRole?>(null);

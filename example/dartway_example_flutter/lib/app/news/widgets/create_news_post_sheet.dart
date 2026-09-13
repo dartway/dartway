@@ -1,18 +1,19 @@
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/core/user_profile_provider.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-class CreateNewsPostSheet extends HookConsumerWidget {
+/// Publishes a post under the signed-in staff member's name. The author is not
+/// sent: the server takes it from the connection. A refusal — not staff, an
+/// empty field — is shown in the user's language and keeps the sheet open.
+class CreateNewsPostSheet extends HookWidget {
   const CreateNewsPostSheet({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final title = useState('');
     final text = useState('');
@@ -44,17 +45,17 @@ class CreateNewsPostSheet extends HookConsumerWidget {
         AppButton.primary(
           l10n.publish,
           onTap: isFormValid
-              ? dw.action((context) async {
-                  await dw.repo.saveModel(
-                    NewsPost(
-                      authorProfileId: ref.readUserProfile.id!,
+              ? dw.action(
+                  (_) => dw.command(
+                    PublishNews(
                       title: title.value.trim(),
                       text: text.value.trim(),
-                      createdAt: DateTime.now(),
                     ),
-                  );
-                  if (context.mounted) Navigator.of(context).pop();
-                }, onSuccessNotification: l10n.postPublished)
+                  ),
+                  onSuccessNotification: l10n.postPublished,
+                  followUpIfMountedAction: (context, _) =>
+                      Navigator.of(context).pop(),
+                )
               : null,
         ),
       ],

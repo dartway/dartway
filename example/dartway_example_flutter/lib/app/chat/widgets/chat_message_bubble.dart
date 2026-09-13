@@ -1,17 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
-import 'package:dartway_example_flutter/core/user_profile_provider.dart';
+import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:flutter/material.dart';
 
-class ChatMessageBubble extends ConsumerWidget {
+class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({required this.message, super.key});
 
-  final ChatMessage message;
+  final ChatMessageView message;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isMine = message.authorProfileId == ref.watchUserProfile.id;
+  Widget build(BuildContext context) {
+    final isMine = message.author.id == context.profile.id;
 
     return ChatBubbleContainer(
       isMine: isMine,
@@ -19,9 +18,8 @@ class ChatMessageBubble extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!isMine)
-            AppText.caption(message.authorProfile?.firstName ?? 'Teammate'),
-          AppText.body(message.messageText),
+          if (!isMine) AppText.caption(message.author.firstName),
+          AppText.body(message.text),
           AppText.caption(message.createdAt.timeLabel),
         ],
       ),

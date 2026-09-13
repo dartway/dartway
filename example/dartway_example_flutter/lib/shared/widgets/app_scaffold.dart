@@ -1,15 +1,14 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/profile/my_profile.dart';
+import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
-import 'package:dartway_example_flutter/core/user_profile_provider.dart';
-import 'package:dartway_example_flutter/core/user_profile_roles.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 /// App page scaffold. Pages live in the app navigation zone, which is only
 /// reachable when signed in (see the router redirect guards), so no per-page
-/// auth gating is needed here — the root [DwUserAsyncScope] loads the profile.
+/// auth gating is needed here — `SignedInGate` loads the profile first.
 class AppScaffold extends StatelessWidget {
   const AppScaffold.main({
     super.key,
@@ -56,14 +55,14 @@ class AppScaffold extends StatelessWidget {
   }
 }
 
-class _AppBottomNavigationBar extends ConsumerWidget {
+class _AppBottomNavigationBar extends StatelessWidget {
   const _AppBottomNavigationBar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // The chat tab is staff-only in the UI; the server-side access filter is
-    // the real protection.
-    final isStaffMember = ref.watchUserProfile.isStaffMember;
+  Widget build(BuildContext context) {
+    // The chat tab is staff-only in the UI; the server's access rules are the
+    // real protection.
+    final isStaffMember = context.profile.isStaffMember;
 
     final tabs = [
       (route: AppNavigationZone.schedule, icon: Icons.calendar_month),

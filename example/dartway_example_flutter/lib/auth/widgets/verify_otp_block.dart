@@ -7,7 +7,7 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 import '../logic/auth_state.dart';
 
-class VerifyOtpBlock extends HookConsumerWidget {
+class VerifyOtpBlock extends ConsumerWidget {
   const VerifyOtpBlock({super.key});
 
   @override
@@ -43,15 +43,6 @@ class VerifyOtpBlock extends HookConsumerWidget {
               ),
             ),
           ),
-          // const Gap(14),
-          // Padding(
-          //   padding: const EdgeInsets.symmetric(horizontal: 16),
-          //   child: ResendCodeButton(onPressed: () async {
-          //     await ref.read(authStateProvider.notifier).requestOtp(
-          //           isAdminMode: isAdminShadowMode,
-          //         );
-          //   }),
-          // ),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -59,33 +50,10 @@ class VerifyOtpBlock extends HookConsumerWidget {
               context.l10n.continueAction,
               requireValidation: true,
               onTap: dw.action(
-                (_) => ref.read(authStateProvider.notifier).verifyOtp(),
+                (_) => ref.read(authStateProvider.notifier).verifyCode(),
               ),
             ),
           ),
-          // if (keyboardHeight.value > 10) ...[
-          //   const Gap(16),
-          //   AppDecoratedBox.grayWithOnlyTopBorder(
-          //     child: Padding(
-          //       padding: const EdgeInsets.symmetric(
-          //         vertical: 13,
-          //         horizontal: 12,
-          //       ),
-          //       child: Row(
-          //         mainAxisAlignment: MainAxisAlignment.end,
-          //         children: [
-          //           InkWell(
-          //             onTap: () => focusNode.unfocus(),
-          //             child: const ZAppText.sFProBodyRegularBlue(
-          //               'Done',
-          //             ),
-          //           ),
-          //         ],
-          //       ),
-          //     ),
-          //   ),
-          // ] else
-          //   Gap(24 + MediaQuery.paddingOf(context).bottom),
         ],
       ),
     );

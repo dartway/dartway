@@ -1,11 +1,13 @@
+import 'package:dartway_example_flutter/app/services/widgets/service_card.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/shared/placeholder_views.dart';
+import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
-import 'package:dartway_example_flutter/app/services/widgets/service_card.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 class ServicesPage extends ConsumerWidget implements DwFeature {
   const ServicesPage({super.key});
@@ -18,13 +20,12 @@ class ServicesPage extends ConsumerWidget implements DwFeature {
         'A member sees what the club offers and what it costs without having '
         'to ask at the desk.',
     behaviors: [
-      'Services are listed as cards, in the order the backend returns them.',
+      'Services are listed as cards, alphabetically.',
+      'A service an admin edits changes in place, and one they add appears at '
+          'the top, without a refresh.',
       'An empty price list shows a "coming soon" message, not a blank screen.',
       'While the list loads, four placeholder cards are shown.',
-    ],
-    implementationNotes: [
-      'Nothing is narrowed here: the price list is readable by anyone signed '
-          'in, so there is no filter to write.',
+      'A failed read says so and offers a retry.',
     ],
   );
 
@@ -33,10 +34,13 @@ class ServicesPage extends ConsumerWidget implements DwFeature {
     return AppScaffold.inner(
       appBar: AppBar(title: AppText.title(context.l10n.ourServices)),
       body: ref
-          .watch(dw.repo.modelList<ClubService>())
-          .dwBuildListAsync(
-            loadingItemsCount: 4,
-            childBuilder: (services) {
+          .watch(dw.request(const ListClubServices()))
+          .section(
+            loadingValue: PlaceholderViews.listOf(PlaceholderViews.service, 4),
+            onRetry: () => ref
+                .read(dw.request(const ListClubServices()).notifier)
+                .refetch(),
+            builder: (services) {
               if (services.isEmpty) {
                 return Center(
                   child: AppText.body(context.l10n.priceListComingSoon),

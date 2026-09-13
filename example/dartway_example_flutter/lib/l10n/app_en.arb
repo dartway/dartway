@@ -3,6 +3,12 @@
 
   "loadFailed": "Could not load this — check your connection and try again.",
   "retry": "Try again",
+  "actionFailed": "Something went wrong. Please try again.",
+
+  "connectionOnline": "online",
+  "connectionConnecting": "connecting",
+  "connectionOffline": "offline",
+  "connectionIncompatible": "update the app",
 
   "tabSchedule": "Schedule",
   "tabBookings": "My bookings",
@@ -17,7 +23,6 @@
     }
   },
   "noUpcomingSessions": "No upcoming sessions yet",
-  "sessionFallbackTitle": "Session",
   "minutesShort": "{minutes} min",
   "@minutesShort": {
     "placeholders": {
@@ -30,12 +35,14 @@
       "name": {"type": "String"}
     }
   },
-  "upToPeople": "up to {count} people",
-  "@upToPeople": {
+  "spotsLeft": "{left} of {capacity} spots left",
+  "@spotsLeft": {
     "placeholders": {
-      "count": {"type": "int"}
+      "left": {"type": "int"},
+      "capacity": {"type": "int"}
     }
   },
+  "sessionFull": "Full",
   "book": "Book",
   "cancel": "Cancel",
   "youAreBooked": "You are booked!",
@@ -98,8 +105,6 @@
   },
   "saveChanges": "Save Changes",
   "profileUpdated": "Profile updated successfully!",
-  "profilePhotoUpdated": "Photo updated",
-  "profilePhotoHint": "Tap to change your photo",
 
   "authStepTitle": "{step, select, greeting{Welcome!} registration{Step 1 of 3} login{Step 1 of 2} registrationConfirmation{Step 2 of 3} loginConfirmation{Step 2 of 2} other{}}",
   "@authStepTitle": {
@@ -112,7 +117,9 @@
   "loginAction": "Login",
   "fillRegistrationData": "Fill registration data",
   "nameLabel": "Name",
+  "phoneLabel": "Phone",
   "requiredField": "Required field",
+  "invalidPhoneNumber": "Invalid number",
   "youMustAgree": "You must agree",
   "agreeTermsPrefix": "I am familiar with and agree to the terms of the",
   "offerLink": "offer,",
@@ -134,14 +141,16 @@
       "phone": {"type": "String"}
     }
   },
+  "whatIsYourName": "What is your name?",
+  "whatIsYourNameHint": "The club team will see it on your bookings",
 
   "adminDashboard": "Dashboard",
   "adminUsers": "Users",
   "adminSettings": "Settings",
   "backToApp": "Back to the app",
-  "countersLiveHint": "Each counter is a typed live list — one line of dw.repo.modelList, no fetch code. It refreshes when this admin reloads the data.",
+  "countersLiveHint": "The server counts these, and they change live as the club does — no reload.",
   "countMembers": "Members",
-  "countSessions": "Sessions",
+  "countSessions": "Upcoming sessions",
   "countNews": "News",
   "searchLabel": "Search",
   "searchHint": "Name or phone",
@@ -162,11 +171,48 @@
     }
   },
   "clubSettings": "Club settings",
-  "signUpEnabledLabel": "Sign-up enabled",
   "clubNameLabel": "Club name",
+  "bookingEnabledLabel": "Booking open",
+  "supportPhoneLabel": "Support phone",
   "saveAction": "Save",
   "settingsSaved": "Settings saved",
-  "noSettingsConfigured": "No settings configured.",
 
-  "networkErrorTryAgain": "Network error. Please try again."
+  "refusalGeneric": "The request was refused.",
+  "refusalTitleRequired": "Add a title.",
+  "refusalTextRequired": "Add the text.",
+  "refusalDurationNotPositive": "The duration must be longer than zero.",
+  "refusalPriceNegative": "The price cannot be negative.",
+  "refusalCapacityTooSmall": "A session needs at least one spot.",
+  "refusalSessionInPast": "A session cannot be scheduled in the past.",
+  "refusalSessionStarted": "This session has already started.",
+  "refusalNoSpotsLeft": "No spots left on this session.",
+  "refusalAlreadyBooked": "You are already booked on this session.",
+  "refusalBookingNotActive": "This booking is no longer active.",
+  "refusalRatingOutOfRange": "Pick a rating from 1 to 5.",
+  "refusalReviewNeedsAttendance": "A visit can be reviewed once it has taken place.",
+  "refusalAlreadyReviewed": "You have already reviewed this visit.",
+  "refusalMessageEmpty": "The message is empty.",
+  "refusalSettingKeyUnknown": "This setting does not exist.",
+  "refusalFirstNameRequired": "Enter your name.",
+  "refusalForbidden": "You are not allowed to do this.",
+  "refusalNotFound": "It no longer exists.",
+  "refusalConflict": "This changed a moment ago — please try again.",
+  "refusalInvalid": "Check what you entered.",
+  "refusalInvalidPhone": "Enter a valid phone number.",
+  "refusalWrongCode": "Wrong code.",
+  "refusalWrongCodeAttemptsLeft": "Wrong code. Attempts left: {attemptsLeft}",
+  "@refusalWrongCodeAttemptsLeft": {
+    "placeholders": {
+      "attemptsLeft": {"type": "int"}
+    }
+  },
+  "refusalCodeExpired": "This code no longer works — request a new one.",
+  "refusalTooManyRequests": "Too many attempts. Please wait a little.",
+  "refusalTooManyRequestsRetryIn": "Too many attempts. Try again in {seconds} s.",
+  "@refusalTooManyRequestsRetryIn": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "refusalUnknownChannel": "This version of the app does not match the server — please update it."
 }

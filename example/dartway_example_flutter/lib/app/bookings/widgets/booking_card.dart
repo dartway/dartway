@@ -1,26 +1,21 @@
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/app/bookings/widgets/review_bottom_sheet.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
 
 class BookingCard extends StatelessWidget {
-  const BookingCard({
-    required this.booking,
-    required this.isReviewed,
-    super.key,
-  });
+  const BookingCard({required this.booking, super.key});
 
-  final SessionBooking booking;
-  final bool isReviewed;
+  final BookingView booking;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final clubSession = booking.clubSession;
-    final startsAt = clubSession?.startsAt;
+    final session = booking.session;
+    final startsAt = session.startsAt;
 
     return Card(
       elevation: 2,
@@ -33,7 +28,7 @@ class BookingCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: AppText.body(
-                    clubSession?.service?.title ?? l10n.sessionFallbackTitle,
+                    session.service.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -41,37 +36,31 @@ class BookingCard extends StatelessWidget {
                 AppText.caption(l10n.bookingStatus(booking.status.name)),
               ],
             ),
-            if (startsAt != null)
-              AppText.caption('${startsAt.dayLabel} · ${startsAt.timeLabel}'),
+            AppText.caption('${startsAt.dayLabel} · ${startsAt.timeLabel}'),
             const Gap(12),
-            if (_canCancel(startsAt))
+            if (booking.status == BookingStatus.booked &&
+                startsAt.isAfter(DateTime.now()))
               AppButton.secondary(
                 l10n.cancelBooking,
                 onTap: dw.action(
-                  (context) => dw.repo.saveModel(
-                    booking.copyWith(status: BookingStatus.cancelled),
-                  ),
+                  (_) => dw.command(CancelBooking(bookingId: booking.id)),
                   onSuccessNotification: l10n.bookingCancelled,
                 ),
               ),
-            if (booking.status == BookingStatus.attended && !isReviewed)
-              AppButton.primary(
-                l10n.leaveReview,
-                onTap: dw.action(
-                  (context) => context.showAppBottomSheet(
-                    child: ReviewBottomSheet(booking: booking),
-                  ),
-                ),
-              ),
-            if (booking.status == BookingStatus.attended && isReviewed)
-              AppText.caption(l10n.thanksForReview),
+            if (booking.status == BookingStatus.attended)
+              booking.review == null
+                  ? AppButton.primary(
+                      l10n.leaveReview,
+                      onTap: dw.action(
+                        (context) => context.showAppBottomSheet(
+                          child: ReviewBottomSheet(booking: booking),
+                        ),
+                      ),
+                    )
+                  : AppText.caption(l10n.thanksForReview),
           ],
         ),
       ),
     );
   }
-
-  bool _canCancel(DateTime? startsAt) =>
-      booking.status == BookingStatus.booked &&
-      (startsAt?.isAfter(DateTime.now()) ?? false);
 }

@@ -6,8 +6,8 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_flutter/shared/widgets/admin_scaffold.dart';
 import 'widgets/admin_settings_form.dart';
 
-/// Application settings backed by the AppSetting model — write access is
-/// admin-only on the server. New settings appear here as the model grows.
+/// Application settings, one row per key the app declares — write access is
+/// admin-only on the server. A key added to `AppSettingKey` appears here.
 class AdminSettingsPage extends StatelessWidget implements DwFeature {
   const AdminSettingsPage({super.key});
 
@@ -19,20 +19,19 @@ class AdminSettingsPage extends StatelessWidget implements DwFeature {
         'An admin changes what the app says about the club without waiting '
         'for a release.',
     behaviors: [
-      'The club name is editable here and nothing else yet.',
-      'Saving is offered only once the value has actually changed and is not '
-          'blank.',
-      'With no settings row in the database the screen says so instead of '
-          'showing an empty form.',
+      'Every setting the app declares has a row, stored or not: an unstored '
+          'one shows its default.',
+      'A text setting offers saving only once its value has actually changed '
+          'and is not blank; a toggle saves as it is flipped.',
+      'A setting another admin saves changes here live.',
     ],
     requirements: [
       'Everyone signed in reads the settings; only an admin writes them, and '
           'the server is what enforces it.',
     ],
     implementationNotes: [
-      'The form names its setting keys by hand. A settings screen driven by '
-          'the AppSetting rows themselves is the obvious next step and is '
-          'deliberately not taken here — one field keeps the example readable.',
+      'Each setting saves on its own, so two admins editing different '
+          'settings cannot overwrite each other.',
     ],
   );
 

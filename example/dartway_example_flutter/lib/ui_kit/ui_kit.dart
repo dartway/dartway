@@ -2,14 +2,16 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:device_frame/device_frame.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -39,6 +41,8 @@ part 'utils/conditional_parent.dart';
 part 'utils/date_labels.dart';
 part 'utils/formatters.dart';
 
-DwUiAction wipProgressNotificationCallback = dw.action(
-  (context) => dw.notify.success('Not implemented yet'),
-);
+/// For links whose destination does not exist yet. A getter, not a stored
+/// action: an action is bound to the core it was built on, and a test builds
+/// a new core per test.
+DwUiAction<void> get wipProgressNotificationCallback =>
+    dw.action((context) => dw.notify.success('Not implemented yet'));

@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
-import 'package:dartway_example_client/dartway_example_client.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
 
 class ServiceCard extends StatelessWidget {
   const ServiceCard({required this.service, super.key});
 
-  final ClubService service;
+  final ClubServiceView service;
 
   @override
   Widget build(BuildContext context) {

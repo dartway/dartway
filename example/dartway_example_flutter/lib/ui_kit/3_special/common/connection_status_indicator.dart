@@ -1,42 +1,39 @@
 part of '../../ui_kit.dart';
 
-/// Live realtime-connection indicator built directly on the framework's public
-/// `DwSocketService.statusNotifier`. Reacts to reconnects without leaking
-/// connection errors into the app's error handler.
-class ConnectionStatusIndicator extends StatelessWidget {
+/// Live connection indicator over `dw.connectionStatus`. Data on screen
+/// follows the server only while it reads "online"; meanwhile it shows what
+/// was last loaded, and every watched read runs again on reconnect. A server
+/// on another wire version is not coming back for this build: it says so.
+class ConnectionStatusIndicator extends ConsumerWidget {
   const ConnectionStatusIndicator({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final socket = dw.socketService;
-    if (socket == null) return const SizedBox.shrink();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(dw.connectionStatus);
+    final l10n = context.l10n;
 
-    return ValueListenableBuilder<DwSocketStatus>(
-      valueListenable: socket.statusNotifier,
-      builder: (context, status, _) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.circle, size: 10, color: _statusColor(status)),
-            const SizedBox(width: 6),
-            Text(_statusLabel(status)),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 10, color: _statusColor(status)),
+          const SizedBox(width: 6),
+          Text(switch (status) {
+            DwConnectionStatus.connected => l10n.connectionOnline,
+            DwConnectionStatus.connecting => l10n.connectionConnecting,
+            DwConnectionStatus.disconnected => l10n.connectionOffline,
+            DwConnectionStatus.incompatible => l10n.connectionIncompatible,
+          }),
+        ],
       ),
     );
   }
 
-  Color _statusColor(DwSocketStatus status) => switch (status) {
-    DwSocketStatus.connected => Colors.green,
-    DwSocketStatus.waitingToRetry => Colors.orange,
-    // Nothing is subscribed, so there is nothing to be offline about.
-    DwSocketStatus.idle => Colors.grey,
-  };
-
-  String _statusLabel(DwSocketStatus status) => switch (status) {
-    DwSocketStatus.connected => 'online',
-    DwSocketStatus.waitingToRetry => 'reconnecting',
-    DwSocketStatus.idle => 'idle',
+  Color _statusColor(DwConnectionStatus status) => switch (status) {
+    DwConnectionStatus.connected => Colors.green,
+    DwConnectionStatus.connecting => Colors.orange,
+    DwConnectionStatus.disconnected ||
+    DwConnectionStatus.incompatible => Colors.red,
   };
 }
