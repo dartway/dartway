@@ -120,7 +120,8 @@ mixin _$RenameBooking on DwCommand<BookingView> {
   int get hashCode => Object.hash(RenameBooking, _self.bookingId, _self.note);
 }
 
-RenameBooking $RenameBookingFromJson(Map<String, Object?> json) => RenameBooking(
-  bookingId: json['bookingId']! as int,
-  note: DwJson.readPatch(json, 'note', (v) => v! as String),
-);
+RenameBooking $RenameBookingFromJson(Map<String, Object?> json) =>
+    RenameBooking(
+      bookingId: json['bookingId']! as int,
+      note: DwJson.readPatch(json, 'note', (v) => v! as String),
+    );

@@ -6,11 +6,17 @@ license: Apache-2.0
 publish_to: none
 environment:
   sdk: ^3.11.0
+
+executables:
+  dartway_generator:
+
 dependencies:
   analyzer: ^14.4.0
   args: ^2.7.0
-  dart_style: any
+  dart_style: ^3.1.13
   path: ^1.9.1
+  pub_semver: ^2.2.0
+  yaml: ^3.1.2
 dev_dependencies:
   dartway_core:
     path: ../dartway_core

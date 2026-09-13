@@ -5,6 +5,7 @@ import 'package:dartway_cli/src/commands/check_command.dart';
 import 'package:dartway_cli/src/commands/create_command.dart';
 import 'package:dartway_cli/src/commands/deploy_command.dart';
 import 'package:dartway_cli/src/commands/doctor_command.dart';
+import 'package:dartway_cli/src/commands/generate_command.dart';
 import 'package:dartway_cli/src/commands/quickstart_command.dart';
 import 'package:dartway_cli/src/commands/setup_ai_command.dart';
 import 'package:dartway_cli/src/commands/stats_command.dart';
@@ -23,6 +24,7 @@ Future<void> main(List<String> args) async {
         ..addCommand(CreateCommand())
         ..addCommand(SetupAiCommand())
         ..addCommand(UpdateCommand())
+        ..addCommand(GenerateCommand())
         ..addCommand(CheckCommand())
         ..addCommand(DeployCommand())
         ..addCommand(StatsCommand())

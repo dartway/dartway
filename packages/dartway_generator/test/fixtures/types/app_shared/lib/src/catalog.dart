@@ -1,0 +1,214 @@
+import 'dart:typed_data';
+
+import 'package:dartway_core/dartway_core.dart';
+
+import 'units.dart' as units;
+
+part 'catalog.dw.dart';
+
+enum Color { red, green, blue }
+
+/// An abstract base: not generated itself, its fields are inherited.
+abstract class Named extends DwDataObject {
+  const Named({required this.title});
+
+  final String title;
+}
+
+final class Item extends Named with _$Item {
+  const Item({
+    required this.id,
+    required super.title,
+    required this.price,
+    this.discount,
+    required this.duration,
+    this.timeout,
+    required this.image,
+    this.thumbnail,
+    required this.color,
+    this.colors = const [],
+    this.labels = const {},
+    required this.createdAt,
+    this.updatedAt,
+    this.weight = 0,
+    required this.unit,
+    this.parent,
+    this.children = const [],
+    required this.ratings,
+    this.scores,
+    this.history = const {},
+    this.maybeColors = const <Color?>[],
+    required this.dimensions,
+    this.allDimensions = const [],
+  });
+
+  @override
+  final int id;
+  final int price;
+  final double? discount;
+  final Duration duration;
+  final Duration? timeout;
+  final Uint8List image;
+  final Uint8List? thumbnail;
+  final Color color;
+  final List<Color> colors;
+  final Map<String, String> labels;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final int weight;
+  final units.Unit unit;
+  final Item? parent;
+  final List<Item> children;
+  final List<double> ratings;
+  final Map<String, int>? scores;
+  final Map<String, DateTime?> history;
+  final List<Color?> maybeColors;
+  final units.Dimensions dimensions;
+  final List<units.Dimensions?> allDimensions;
+
+  /// Not serialised: a getter.
+  bool get isDiscounted => discount != null;
+
+  /// Not serialised: initialised at the declaration.
+  static const kind = 'item';
+
+  final String cacheKey = 'item';
+}
+
+/// A singleton view: its id is a getter.
+final class Stats extends DwDataObject with _$Stats {
+  const Stats({required this.count});
+
+  @override
+  String get id => 'stats';
+
+  final int count;
+}
+
+/// Only an id.
+final class Ref extends DwDataObject with _$Ref {
+  const Ref({required this.id});
+
+  @override
+  final String id;
+}
+
+/// A framework DTO nested in a project one.
+final class SessionHolder extends DwDataObject with _$SessionHolder {
+  const SessionHolder({required this.id, required this.session, this.previous});
+
+  @override
+  final int id;
+  final DwSession session;
+  final DwSession? previous;
+}
+
+final class GetItem extends DwSingleRequest<Item> with _$GetItem {
+  const GetItem({required this.id});
+
+  final int id;
+}
+
+final class FindItem extends DwMaybeRequest<Item> with _$FindItem {
+  const FindItem({this.title, this.colors = const []});
+
+  final String? title;
+  final List<Color> colors;
+}
+
+final class ListItems extends DwPageRequest<Item> with _$ListItems {
+  const ListItems({this.color, this.since, this.labels});
+
+  final Color? color;
+  final DateTime? since;
+  final Map<String, String>? labels;
+
+  @override
+  int get pageSize => 20;
+}
+
+final class FeedItems extends DwCursorRequest<Item> with _$FeedItems {
+  const FeedItems();
+
+  @override
+  int get pageSize => 40;
+}
+
+final class EditItem extends DwCommand<Item> with _$EditItem {
+  const EditItem({
+    required this.itemId,
+    this.title = const DwPatch.keep(),
+    this.updatedAt = const DwPatch.keep(),
+    this.color = const DwPatch.keep(),
+    this.dimensions = const DwPatch.keep(),
+    this.discount = const DwPatch.keep(),
+    this.timeout = const DwPatch.keep(),
+    this.tags = const [],
+  });
+
+  final int itemId;
+  final DwPatch<String> title;
+  final DwPatch<DateTime> updatedAt;
+  final DwPatch<Color> color;
+  final DwPatch<units.Dimensions> dimensions;
+  final DwPatch<double> discount;
+  final DwPatch<Duration> timeout;
+  final List<String> tags;
+}
+
+final class OnlyPatches extends DwCommand<void> with _$OnlyPatches {
+  const OnlyPatches({this.note = const DwPatch.keep()});
+
+  final DwPatch<String> note;
+}
+
+final class RemoveItem extends DwCommand<void> with _$RemoveItem {
+  const RemoveItem();
+}
+
+/// More fields than `Object.hash` takes.
+final class WideRequest extends DwListRequest<Item> with _$WideRequest {
+  const WideRequest({
+    this.a1 = 0,
+    this.a2 = 0,
+    this.a3 = 0,
+    this.a4 = 0,
+    this.a5 = 0,
+    this.a6 = 0,
+    this.a7 = 0,
+    this.a8 = 0,
+    this.a9 = 0,
+    this.a10 = 0,
+    this.a11 = 0,
+    this.a12 = 0,
+    this.a13 = 0,
+    this.a14 = 0,
+    this.a15 = 0,
+    this.a16 = 0,
+    this.a17 = 0,
+    this.a18 = 0,
+    this.a19 = 0,
+    this.a20 = 0,
+  });
+
+  final int a1;
+  final int a2;
+  final int a3;
+  final int a4;
+  final int a5;
+  final int a6;
+  final int a7;
+  final int a8;
+  final int a9;
+  final int a10;
+  final int a11;
+  final int a12;
+  final int a13;
+  final int a14;
+  final int a15;
+  final int a16;
+  final int a17;
+  final int a18;
+  final int a19;
+  final int a20;
+}

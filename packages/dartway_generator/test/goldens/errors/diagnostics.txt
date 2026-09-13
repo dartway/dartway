@@ -1,0 +1,32 @@
+app_shared/lib/src/clash_a.dart:5:13: `Tag` is also exported by `package:app_shared/src/clash_b.dart`, so the generated protocol registry cannot name it unambiguously; rename one of them
+app_shared/lib/src/constructor.dart:8:13: field `value` of `Positional` is serialised but the constructor has a positional, not a named parameter `value`; declare it as `{required this.value}` (or give the field an initializer to keep it off the wire)
+app_shared/lib/src/constructor.dart:12:39: constructor parameter `raw` of `InitializerList` is required but is not a serialised field, so the generated code cannot supply it
+app_shared/lib/src/constructor.dart:14:13: field `value` of `InitializerList` is serialised but the constructor has no named parameter `value`; declare it as `{required this.value}` (or give the field an initializer to keep it off the wire)
+app_shared/lib/src/constructor.dart:18:61: constructor parameter `unused` of `ExtraRequired` is required but is not a serialised field, so the generated code cannot supply it
+app_shared/lib/src/constructor.dart:26:7: field `value` of `NotFinal` must be final: generated equality and hashing assume a value that does not change
+app_shared/lib/src/constructor.dart:29:13: `NoUnnamedConstructor` needs an unnamed generative constructor: the generated code rebuilds it as `NoUnnamedConstructor(field: …)`
+app_shared/lib/src/declaration.dart:5:13: `NoMixin` must mix in its generated code: declare it as `class NoMixin extends … with _$NoMixin`
+app_shared/lib/src/declaration.dart:15:13: `Generic` is generic; a DTO class cannot have type parameters, because its decoder cannot know them
+app_shared/lib/src/declaration.dart:19:13: `Bare` extends DwDto directly; extend DwDataObject, a DwRequest kind or DwCommand
+app_shared/lib/src/declaration.dart:23:13: `Implements` must extend its DTO kind (`extends DwDataObject`, a DwRequest kind or DwCommand); implementing or mixing it in is not supported
+app_shared/lib/src/declaration.dart:27:13: `_Private` is private, but the generated protocol registry lives in another library and must name it; make the class public
+app_shared/lib/src/duplicates_a.dart:5:13: DTO name `Twice` is declared more than once (also at duplicates_b.dart:5:13); wire names must be unique across the project
+app_shared/lib/src/duplicates_a.dart:10:13: DTO name `DwSession` is already taken by a dartway_core DTO; wire names must be unique, rename the class
+app_shared/lib/src/duplicates_b.dart:5:13: DTO name `Twice` is declared more than once (also at duplicates_a.dart:5:13); wire names must be unique across the project
+app_shared/lib/src/hidden.dart:10:17: field `visible` of `UsesHidden` cannot be serialised: `$VisibleFromJson` is not visible in this library: the import that brings in `Visible` hides it — add it to the `show` list
+app_shared/lib/src/ids.dart:9:16: the id of data object `DoubleId` must be `int` or `String`, not `double`
+app_shared/lib/src/ids.dart:16:14: the id of data object `NullableId` must be `int` or `String`, not `int?`
+app_shared/lib/src/ids.dart:19:13: data object `NoId` declares no `id`; add `@override final int id;` (or a String) or an `id` getter
+app_shared/lib/src/inherited.dart:7:13: field `unit` of `Parcel` cannot be serialised: `Unit` is not imported by this library, and the generated part can only use the library's imports
+app_shared/lib/src/no_part.dart:3:13: `no_part.dart` declares generated classes but not their part: add `part 'no_part.dw.dart';` after the imports
+app_shared/lib/src/unsupported_types.dart:25:18: field `set` of `Unsupported` cannot be serialised: `Set<int>` cannot be serialised; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, a DTO class, List<T>, Map<String, T>, DwPatch<T>, or a nullable one of these
+app_shared/lib/src/unsupported_types.dart:26:25: field `nested` of `Unsupported` cannot be serialised: `List<int>` cannot be a list element or map value: equality would compare the inner collection by identity
+app_shared/lib/src/unsupported_types.dart:27:26: field `intKeys` of `Unsupported` cannot be serialised: `Map<int, String>` has keys of type `int`; JSON object keys are strings, so a map must be Map<String, T>
+app_shared/lib/src/unsupported_types.dart:28:26: field `nullablePatch` of `Unsupported` cannot be serialised: `DwPatch<String>?` cannot be nullable: an absent patch is already `DwPatch.keep()`
+app_shared/lib/src/unsupported_types.dart:29:26: field `patchOfNullable` of `Unsupported` cannot be serialised: `DwPatch<String?>` patches a nullable type; clearing is `DwPatch.clear()`, so write `DwPatch<String>`
+app_shared/lib/src/unsupported_types.dart:30:28: field `patchOfList` of `Unsupported` cannot be serialised: `List<int>` cannot be the value of a DwPatch: equality would compare the inner collection by identity
+app_shared/lib/src/unsupported_types.dart:31:25: field `bytesList` of `Unsupported` cannot be serialised: `Uint8List` cannot be a list element or map value: equality would compare the bytes by identity
+app_shared/lib/src/unsupported_types.dart:32:22: field `abstractView` of `Unsupported` cannot be serialised: `AbstractView` is abstract; a field must name a concrete DTO class so it can be decoded
+app_shared/lib/src/unsupported_types.dart:33:13: field `number` of `Unsupported` cannot be serialised: `num` cannot be serialised; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, a DTO class, List<T>, Map<String, T>, DwPatch<T>, or a nullable one of these
+app_shared/lib/src/unsupported_types.dart:34:16: field `object` of `Unsupported` cannot be serialised: `Object` cannot be serialised; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, a DTO class, List<T>, Map<String, T>, DwPatch<T>, or a nullable one of these
+app_shared/lib/src/wrong_part.dart:3:1: the generated part of `wrong_part.dart` must be `part 'wrong_part.dw.dart';`, not `part 'other_name.dw.dart';`

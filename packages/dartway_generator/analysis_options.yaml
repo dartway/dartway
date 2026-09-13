@@ -1,1 +1,8 @@
 include: package:lints/recommended.yaml
+
+analyzer:
+  # Fixture projects and goldens are the generator's input and output: they
+  # only compile inside the temporary projects the tests build around them.
+  exclude:
+    - test/fixtures/**
+    - test/goldens/**
