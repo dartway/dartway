@@ -1,0 +1,23 @@
+# DartWay 1.0 — decisions taken during the build
+
+The owner delegated every unclear or contested point to the implementer on 2026-09-13 ("do them at your discretion and record them"). Each entry is one decision, why, and whether it waits for the owner's review (`review: yes` entries are also listed in `MORNING.md`). Newest last.
+
+| # | Decision | Why | Review |
+|---|---|---|---|
+| D-001 | One WebSocket per client carries requests, commands, subscriptions and updates; HTTP only for external doors. | Owner: "DTO and WebSocket are the only mechanism". One authentication per connection, no per-call HTTP overhead. | no |
+| D-002 | JSON on the wire. DTOs carry a type tag only where the receiver cannot know the type statically (updates, command results); request results and nested DTOs are untagged. | Debuggable, zero dependencies; tags cost bytes only where they carry information. A binary codec can replace JSON behind `DwProtocol` later. | yes |
+| D-003 | `DateTime` travels as UTC microseconds, `Duration` as microseconds. | Exact and compact; no time-zone text to misparse. | no |
+| D-004 | Stack: relic `2.0.0-rc.1`, postgres `3.5.12`, analyzer 14 (generator only). Pitfalls recorded in `CONTRACTS.md`. | relic 2.0 is not final; 1.x would mean a migration soon. | yes |
+| D-005 | Request kinds: `DwSingleRequest` (absent ⇒ `dw.notFound` refusal), `DwMaybeRequest` (absent is a value), `DwListRequest`, `DwPageRequest` (offset), `DwCursorRequest` (before id). Page size is a getter of the request class; the server reads it from the same class, the client cannot ask for more. | Exactly the shapes used by U90/Molodey (`model`, `maybeModel`, lists, offset and cursor pagination). A caller-chosen limit is a way to ask the server for everything. | yes |
+| D-006 | A command result is one value (DTO, primitive or null); collections are wrapped in a DTO. | Decoding a generic `List<T>` from an erased type parameter needs per-type code; no active project needs a list result without a wrapper. | no |
+| D-007 | The framework owns accounts and identities (`dw_account`, `dw_identity`, keys, code tickets); the project's profile table references the account id. The auth DTOs live in `dartway_core`. | "The framework knows no domain": it knows that someone signed in, not who they are to the project. Molodey needed two identifiers per account and got them by hooks; a separate identity table makes that the default. | yes |
+| D-008 | Enums are stored as `text` (their name), never as native Postgres enum types. | `postgres` 3.5 decodes custom enum types as raw bytes; text needs no migration to add a value. | no |
+| D-009 | `dartway_generator` is not a workspace member. | It pins analyzer 14; `dartway_lints` (custom_lint) pins analyzer 8. | no |
+| D-010 | Removed from the branch until ported: `dartway_push_*`, `dartway_studio_binding`. The offline family is postponed (owner). | They depend on the Serverpod core; the first goal is `example/` running. Push is needed by U90 and is ported right after. | no |
+| D-011 | No joins or includes in the 1.0 ORM: related rows load with `findByIds`, one query per relation. | Typed joins are the largest part of any ORM; batch loading has no N+1 and covers every include in active projects (max depth 2). | yes |
+| D-012 | Entities are annotated Dart classes in the server package, not YAML. | One language; the analyzer checks declarations; agents read Dart better than a bespoke format. | no |
+| D-013 | Command outcomes (ok and refused) are kept 7 days for idempotency; failures are not recorded. | A refused intent answers the same on retry; a failure must be retryable. | no |
+| D-014 | The server runs a single isolate; scale-out is processes plus LISTEN/NOTIFY later. | relic's multi-isolate mode silently duplicates in-memory subscription state. | no |
+| D-015 | Validation: a DTO implementing `DwValidatable` runs `validate()` on the client before sending and on the server before the handler. | Owner wanted validation and permission refusals unified and not duplicated. | no |
+| D-016 | Job payloads are JSON maps. | Server-only DTOs would need a second registry for no gain. | no |
+| D-017 | First milestone (example runs) does not include file uploads, push or the editable string catalogue; they follow in the next milestones in that order after push. | Scope of the first goal set by the owner; each is a separate subsystem. | no |

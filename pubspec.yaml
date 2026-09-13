@@ -4,7 +4,21 @@ environment:
   flutter: ^3.41.0
 
 workspace:
-  - packages/*
+  - packages/dartway_cli
+  - packages/dartway_client
+  - packages/dartway_core
+  - packages/dartway_flutter
+  - packages/dartway_lints
+  - packages/dartway_orm
+  - packages/dartway_router
+  - packages/dartway_server
+  - packages/dartway_shared_preferences
+  - packages/dartway_studio_bridge
+  - packages/dartway_telegram
+
+# `packages/dartway_generator` is deliberately NOT a workspace member: it pins
+# `analyzer` at the version it is written against, and `dartway_lints` (through
+# custom_lint) pins an older one. A tool resolves on its own.
 
 # `packages/dartway_lints/example` is deliberately NOT a workspace member: a
 # member has no `.dart_tool/package_config.json` of its own (the workspace root
