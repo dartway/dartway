@@ -26,9 +26,16 @@ class _FeatureBox extends StatelessWidget implements DwFeature {
 void main() {
   final reports = <DwErrorReport>[];
 
-  // One DwFlutter per test process — the singleton forbids re-creation.
+  // One core for the whole file: nothing here disposes it.
   final dwInstance = DwFlutter(
-    config: DwConfig(appVersion: '1.2.3', onErrorReport: reports.add),
+    config: DwConfig(
+      appVersion: '1.2.3',
+      onErrorReport: reports.add,
+      refusalText: (refusal) => switch (refusal.code) {
+        'messageDeleted' => 'This message was already deleted',
+        _ => 'Refused: ${refusal.code}',
+      },
+    ),
   );
 
   setUp(() {
@@ -130,14 +137,14 @@ void main() {
       final context = await pumpApp(tester);
 
       final action = dwInstance.action<void>(
-        (_) => throw const DwRefusal('This message was already deleted'),
+        (_) => throw DwRefusalException(DwRefusal(_Refusal.messageDeleted)),
         onErrorNotification: 'Could not delete',
       );
       await action(context);
       await tester.pump();
 
-      // The rule's text wins over the action's generic one: it was written
-      // for this case, and the generic one for every case.
+      // The catalogue's text for the refusal wins over the action's generic
+      // one: it was written for this case, and the generic one for every case.
       expect(
         notifications.shown.single.message,
         'This message was already deleted',
@@ -160,28 +167,54 @@ void main() {
       expect(notifications.shown.single.message, 'Could not delete');
     });
 
-    testWidgets('still reaches the error policy, as a DwRefusal', (
+    testWidgets('a refused result is shown the same way, without unwrapping', (
+      tester,
+    ) async {
+      final context = await pumpApp(tester);
+
+      final value = await dwInstance.action<DwResult<int>>(
+        (_) async => DwRefused<int>(DwRefusal(_Refusal.messageDeleted)),
+        onSuccessNotification: 'Deleted',
+      )(context);
+      await tester.pump();
+
+      expect(value, isNull);
+      expect(
+        notifications.shown.single.message,
+        'This message was already deleted',
+      );
+    });
+
+    testWidgets('a failed result shows the action text and names the call', (
+      tester,
+    ) async {
+      final context = await pumpApp(tester);
+
+      await dwInstance.action<DwResult<int>>(
+        (_) async => const DwFailed<int>('incident-9'),
+        onErrorNotification: 'Could not delete',
+      )(context);
+      await tester.pump();
+
+      expect(notifications.shown.single.message, 'Could not delete');
+      expect(reports.single.error, const DwFailedException('incident-9'));
+    });
+
+    testWidgets('still reaches the error policy, as a DwRefusalException', (
       tester,
     ) async {
       final context = await pumpApp(tester);
 
       await dwInstance.action<void>(
-        (_) => throw const DwRefusal('You have no access to this track'),
+        (_) => throw DwRefusalException(DwRefusal(_Refusal.noAccess)),
       )(context);
 
       // The app decides what to do with it — the point of the type is that
-      // one check is enough: `if (report.error is DwRefusal) return;`
-      expect(reports.single.error, isA<DwRefusal>());
+      // one check is enough: `if (report.error is DwRefusalException) return;`
+      expect(reports.single.error, isA<DwRefusalException>());
       expect(
-        (reports.single.error as DwRefusal).message,
-        'You have no access to this track',
-      );
-    });
-
-    test('reads as its message, so a report title says something', () {
-      expect(
-        const DwRefusal('This booking is gone').toString(),
-        'This booking is gone',
+        (reports.single.error as DwRefusalException).refusal.code,
+        'noAccess',
       );
     });
   });
@@ -243,3 +276,5 @@ void main() {
     });
   });
 }
+
+enum _Refusal with DwRefusalCodes { messageDeleted, noAccess }

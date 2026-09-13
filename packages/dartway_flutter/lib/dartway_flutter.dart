@@ -11,9 +11,25 @@
 // `DwUiAction` behind any tappable widget, and `dwBuildAsync` renders
 // loading/error/data uniformly. See DESIGN.md for the design principles.
 //
-// lib/src is grouped into: core (the ambient dw + config + plugins), bootstrap
-// (app runner), ui (actions, async_ui, notifications, confirmation) and
-// diagnostics (error reporting, feature declarations).
+// lib/src is grouped into: data (DwCore and the Riverpod bindings over the
+// client), core (the ambient dw + config + plugins), bootstrap (app runner), ui
+// (actions, async_ui, notifications, confirmation) and diagnostics (error
+// reporting, feature declarations).
+
+// The client and the shared contract (DTO kinds, results, refusals, channels):
+// an app on the data layer imports this package and nothing else of ours.
+export 'package:dartway_client/dartway_client.dart';
+
+// data: DwCore — the toolbox plus the client and its Riverpod bindings
+// (`dw.request`, `dw.pages`, `dw.command`, `dw.accountId`).
+export 'src/data/dw_core.dart';
+export 'src/data/dw_request_notifiers.dart'
+    show
+        DwPagesNotifier,
+        DwPagesProvider,
+        DwRequestNotifier,
+        DwRequestProvider,
+        DwValueProvider;
 
 // core: the ambient app root, its config, and the plugin registry
 // (`dw.plugins.<name>`).
@@ -49,9 +65,6 @@ export 'src/ui/confirmation/dw_ui_confirmation.dart';
 // diagnostics/error_reporting: app-state context captured into every report.
 // dw_error_report re-exports the source enum and the context snapshot.
 export 'src/diagnostics/error_reporting/dw_error_report.dart';
-// The one error that is an answer rather than an incident — see DwRefusal.
-export 'src/diagnostics/error_reporting/dw_refusal.dart';
-export 'src/diagnostics/error_reporting/dw_not_authenticated.dart';
 
 // diagnostics/dw_feature: mark a widget as a product feature and discover the
 // mounted ones at runtime — feature catalogs, error context, Studio passports.

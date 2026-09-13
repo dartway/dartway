@@ -1,3 +1,4 @@
+import 'package:dartway_client/dartway_client.dart';
 import 'package:flutter/material.dart';
 
 import '../../diagnostics/error_reporting/dw_error_report.dart';
@@ -9,7 +10,16 @@ class DwConfig {
     this.appVersion,
     this.confirmDialogBuilder,
     this.defaultModelGetter,
+    this.refusalText,
   });
+
+  /// Renders a refusal for the user: the project's catalogue, from the code
+  /// and parameters the server sent (`DwRefusal` carries no sentence).
+  ///
+  /// `dw.action` shows it when an action is refused — a refused result or a
+  /// thrown `DwRefusalException`. Required by `DwCore`, which cannot talk to a
+  /// server whose refusals it cannot show; optional for the toolbox alone.
+  final String Function(DwRefusal refusal)? refusalText;
 
   /// Called for every reported error with its full [DwErrorReport] — the error
   /// itself plus the app-state context snapshot (route, mounted features,

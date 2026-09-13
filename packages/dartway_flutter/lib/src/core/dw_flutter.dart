@@ -8,13 +8,17 @@ import 'package:flutter/material.dart';
 part 'logic/dw_notifications.dart';
 
 class DwFlutter {
-  DwFlutter({required DwConfig config, List<DwPlugin> plugins = const []})
-    : _config = config,
-      plugins = DwPlugins(plugins) {
-    setDwInstance(this);
+  /// Builds the core and makes it the live one. Nothing runs yet: [init] does
+  /// that, and [dispose] ends it.
+  DwFlutter({required this.config, List<DwPlugin> plugins = const []})
+    : plugins = DwPlugins(plugins) {
+    attachDwInstance(this);
   }
 
-  final DwConfig _config;
+  /// What the app configured.
+  final DwConfig config;
+
+  DwConfig get _config => config;
 
   /// The integrations the app connected, reached as `dw.plugins.<name>` — kept
   /// apart from the core's own services. An integration package adds its named
@@ -29,6 +33,13 @@ class DwFlutter {
 
   Future<void> init() async {
     await plugins.initAll(this);
+  }
+
+  /// Ends this core and releases the live slot, so another can be built — a
+  /// test builds and disposes one per test. A disposed core is not reused.
+  @mustCallSuper
+  Future<void> dispose() async {
+    detachDwInstance(this);
   }
 
   /// Reports an error through the framework pipeline: captures the app-state

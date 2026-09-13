@@ -1,0 +1,503 @@
+import 'package:collection/collection.dart';
+import 'package:postgres/postgres.dart' as pg;
+
+import '../db/dw_db.dart';
+import 'dw_migration.dart';
+import 'dw_migration_errors.dart';
+
+/// Applies and rolls back migrations of several namespaces against one
+/// database, keeping the set of applied migrations in `dw_migrations`
+/// (SPEC §6).
+///
+/// The migrator owns only the namespaces it is given: ledger rows of other
+/// namespaces are neither validated nor touched, so a module's migrations and
+/// the application's can be run by different entry points.
+final class DwMigrator {
+  DwMigrator(this._db, {required Map<String, List<DwMigration>> migrations})
+    : _migrations = {
+        for (final MapEntry(key: namespace, value: list) in migrations.entries)
+          namespace: List.unmodifiable(list),
+      };
+
+  static const ledgerTable = 'dw_migrations';
+
+  /// The session advisory lock serialising migrators across processes:
+  /// "dwMigrat" in ASCII.
+  static const lockKey = 0x64774d6967726174;
+
+  final DwDb _db;
+  final Map<String, List<DwMigration>> _migrations;
+
+  /// Applies every pending migration as one batch and returns them in the
+  /// order applied.
+  ///
+  /// Throws [DwMigrationRefused] without applying anything when the ledger
+  /// and the code disagree, and [DwMigrationFailed] when a migration throws —
+  /// the migrations before it stay applied.
+  Future<DwMigrationRun> apply() => _locked((db) async {
+    final ledger = await _readLedger(db);
+    final registered = _registered();
+    _refuseOn([
+      ..._checkRegistration(registered, ledger),
+      ..._checkLedger(registered, ledger),
+    ]);
+
+    final pending = _order([
+      for (final migration in registered.values)
+        if (!ledger.containsKey(migration.ref)) migration,
+    ], satisfied: ledger.keys.toSet());
+    if (pending.isEmpty) return const DwMigrationRun(null, []);
+
+    final batch = (ledger.values.map((row) => row.batch).maxOrNull ?? 0) + 1;
+    for (final migration in pending) {
+      await _applyOne(db, migration, batch);
+    }
+    return DwMigrationRun(batch, [
+      for (final migration in pending) migration.ref,
+    ]);
+  });
+
+  /// Rolls back a batch (the last one by default) or a single migration, in
+  /// reverse order of application.
+  ///
+  /// When every migration in the set is transactional the whole rollback is
+  /// one transaction: an irreversible migration in the middle leaves the
+  /// database exactly as it was.
+  Future<DwMigrationRun> rollback({int? batch, DwMigrationRef? id}) {
+    if (batch != null && id != null) {
+      throw ArgumentError(
+        'roll back either a batch or a migration id, not both',
+      );
+    }
+    return _locked((db) async {
+      final ledger = await _readLedger(db);
+      final registered = _registered();
+      _refuseOn(_checkLedger(registered, ledger));
+
+      final List<_LedgerRow> targets;
+      if (id != null) {
+        final row = ledger[id];
+        if (row == null) {
+          throw DwMigrationRefused([
+            DwRollbackTargetInvalid(id, 'it is not applied'),
+          ]);
+        }
+        targets = [row];
+      } else {
+        final number = batch ?? ledger.values.map((row) => row.batch).maxOrNull;
+        if (number == null) return const DwMigrationRun(null, []);
+        targets = [
+          for (final row in ledger.values)
+            if (row.batch == number) row,
+        ];
+        if (targets.isEmpty) {
+          throw DwMigrationRefused([
+            DwRollbackTargetInvalid(
+              DwMigrationRef('*', 'batch $number'),
+              'no migration was applied in batch $number',
+            ),
+          ]);
+        }
+      }
+
+      final targetRefs = {for (final row in targets) row.ref};
+      final problems = <DwMigrationProblem>[
+        for (final row in targets)
+          if (!_migrations.containsKey(row.ref.namespace))
+            DwRollbackTargetInvalid(
+              row.ref,
+              'namespace "${row.ref.namespace}" is not given to this migrator',
+            ),
+        for (final row in ledger.values)
+          if (!targetRefs.contains(row.ref))
+            for (final dependency
+                in registered[row.ref]?.migration.dependsOn ??
+                    const <DwMigrationRef>[])
+              if (targetRefs.contains(dependency))
+                DwDependentApplied(dependency, row.ref),
+      ];
+      _refuseOn(problems);
+
+      final ordered = [
+        for (final row in targets.sortedBy<num>((row) => -row.seq))
+          registered[row.ref]!,
+      ];
+      if (ordered.every((entry) => entry.migration.transactional)) {
+        await db.transaction((tx) async {
+          for (final entry in ordered) {
+            await _run(
+              entry,
+              'down',
+              () => entry.migration.down(DwMigrationContext(tx)),
+            );
+            await _deleteRow(tx, entry.ref);
+          }
+        });
+      } else {
+        for (final entry in ordered) {
+          await _rollbackOne(db, entry);
+        }
+      }
+      return DwMigrationRun(targets.first.batch, [
+        for (final entry in ordered) entry.ref,
+      ]);
+    });
+  }
+
+  /// Every registered and every applied migration of the owned namespaces,
+  /// without taking the lock or changing anything.
+  Future<List<DwMigrationStatus>> status() async {
+    final ledger = await _readLedger(_db, create: false);
+    final registered = _registered();
+    final entries = <DwMigrationStatus>[
+      for (final entry in registered.values)
+        switch (ledger[entry.ref]) {
+          null => DwMigrationStatus(entry.ref, DwMigrationState.pending),
+          final row when row.dirty => DwMigrationStatus(
+            entry.ref,
+            DwMigrationState.dirty,
+            batch: row.batch,
+            appliedAt: row.appliedAt,
+          ),
+          final row when row.checksum != entry.migration.checksum =>
+            DwMigrationStatus(
+              entry.ref,
+              DwMigrationState.changed,
+              batch: row.batch,
+              appliedAt: row.appliedAt,
+            ),
+          final row => DwMigrationStatus(
+            entry.ref,
+            DwMigrationState.applied,
+            batch: row.batch,
+            appliedAt: row.appliedAt,
+          ),
+        },
+      for (final row in ledger.values)
+        if (_migrations.containsKey(row.ref.namespace) &&
+            !registered.containsKey(row.ref))
+          DwMigrationStatus(
+            row.ref,
+            DwMigrationState.missing,
+            batch: row.batch,
+            appliedAt: row.appliedAt,
+          ),
+    ];
+    return entries.sorted(
+      (a, b) => a.ref.namespace != b.ref.namespace
+          ? a.ref.namespace.compareTo(b.ref.namespace)
+          : a.ref.id.compareTo(b.ref.id),
+    );
+  }
+
+  Future<T> _locked<T>(Future<T> Function(DwDb db) body) =>
+      _db.pinned((db) async {
+        // Waits for a concurrent migrator; everything after this point sees the
+        // ledger it left behind.
+        await db.run(
+          'SELECT pg_advisory_lock(\$1)',
+          const [pg.Type.bigInteger],
+          const [lockKey],
+        );
+        try {
+          return await body(db);
+        } finally {
+          await db.run(
+            'SELECT pg_advisory_unlock(\$1)',
+            const [pg.Type.bigInteger],
+            const [lockKey],
+          );
+        }
+      });
+
+  Future<Map<DwMigrationRef, _LedgerRow>> _readLedger(
+    DwDb db, {
+    bool create = true,
+  }) async {
+    if (create) {
+      await db.execute('''
+CREATE TABLE IF NOT EXISTS "$ledgerTable" (
+  "namespace" text NOT NULL,
+  "id" text NOT NULL,
+  "checksum" text NOT NULL,
+  "batch" integer NOT NULL,
+  "seq" bigserial NOT NULL,
+  "state" text NOT NULL CHECK ("state" IN ('applied', 'dirty')),
+  "applied_at" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("namespace", "id")
+)''');
+    } else {
+      final exists = await db.query(
+        "SELECT to_regclass('\"$ledgerTable\"') IS NOT NULL AS present",
+      );
+      if (!exists.first.get<bool>('present')) return const {};
+    }
+    final rows = await db.query(
+      'SELECT "namespace", "id", "checksum", "batch", "seq", "state", "applied_at" '
+      'FROM "$ledgerTable" ORDER BY "seq"',
+    );
+    return {
+      for (final row in rows)
+        DwMigrationRef(
+          row.get<String>('namespace'),
+          row.get<String>('id'),
+        ): _LedgerRow(
+          DwMigrationRef(row.get<String>('namespace'), row.get<String>('id')),
+          checksum: row.get<String>('checksum'),
+          batch: row.get<int>('batch'),
+          seq: row.get<int>('seq'),
+          dirty: row.get<String>('state') == 'dirty',
+          appliedAt: row.get<DateTime>('applied_at'),
+        ),
+    };
+  }
+
+  Map<DwMigrationRef, _Registered> _registered() {
+    final registered = <DwMigrationRef, _Registered>{};
+    for (final MapEntry(key: namespace, value: list) in _migrations.entries) {
+      for (final migration in list) {
+        final ref = DwMigrationRef(namespace, migration.id);
+        registered.putIfAbsent(ref, () => _Registered(ref, migration));
+      }
+    }
+    return registered;
+  }
+
+  List<DwMigrationProblem> _checkRegistration(
+    Map<DwMigrationRef, _Registered> registered,
+    Map<DwMigrationRef, _LedgerRow> ledger,
+  ) {
+    final problems = <DwMigrationProblem>[];
+    for (final MapEntry(key: namespace, value: list) in _migrations.entries) {
+      final seen = <String>{};
+      for (final migration in list) {
+        if (!seen.add(migration.id)) {
+          problems.add(
+            DwDuplicateMigration(DwMigrationRef(namespace, migration.id)),
+          );
+        }
+      }
+    }
+    for (final entry in registered.values) {
+      for (final dependency in entry.migration.dependsOn) {
+        if (!registered.containsKey(dependency) &&
+            !ledger.containsKey(dependency)) {
+          problems.add(DwUnknownDependency(entry.ref, dependency));
+        }
+      }
+    }
+    // Depth-first search over registered dependencies; a back edge is a cycle.
+    final visiting = <DwMigrationRef>[];
+    final done = <DwMigrationRef>{};
+    void visit(_Registered entry) {
+      if (done.contains(entry.ref)) return;
+      final start = visiting.indexOf(entry.ref);
+      if (start >= 0) {
+        final cycle = [...visiting.sublist(start), entry.ref];
+        problems.add(DwDependencyCycle(entry.ref, cycle));
+        return;
+      }
+      visiting.add(entry.ref);
+      for (final dependency in entry.migration.dependsOn) {
+        if (registered[dependency] case final next?) visit(next);
+      }
+      visiting.removeLast();
+      done.add(entry.ref);
+    }
+
+    registered.values.forEach(visit);
+    return problems;
+  }
+
+  List<DwMigrationProblem> _checkLedger(
+    Map<DwMigrationRef, _Registered> registered,
+    Map<DwMigrationRef, _LedgerRow> ledger,
+  ) {
+    DwMigrationProblem? check(_LedgerRow row) {
+      if (row.dirty) return DwDirtyMigration(row.ref);
+      final entry = registered[row.ref];
+      if (entry == null) return DwMissingMigration(row.ref);
+      if (entry.migration.checksum != row.checksum) {
+        return DwChangedMigration(
+          row.ref,
+          applied: row.checksum,
+          current: entry.migration.checksum,
+        );
+      }
+      return null;
+    }
+
+    return [
+      for (final row in ledger.values)
+        if (_migrations.containsKey(row.ref.namespace)) ?check(row),
+    ];
+  }
+
+  void _refuseOn(List<DwMigrationProblem> problems) {
+    if (problems.isNotEmpty) throw DwMigrationRefused(problems);
+  }
+
+  /// Dependencies first; among migrations free to run, by id, then namespace.
+  List<_Registered> _order(
+    List<_Registered> pending, {
+    required Set<DwMigrationRef> satisfied,
+  }) {
+    final done = {...satisfied};
+    final remaining = pending.sorted(_byId);
+    final ordered = <_Registered>[];
+    while (remaining.isNotEmpty) {
+      final next = remaining.firstWhere(
+        (entry) => entry.migration.dependsOn.every(done.contains),
+      );
+      remaining.remove(next);
+      done.add(next.ref);
+      ordered.add(next);
+    }
+    return ordered;
+  }
+
+  static int _byId(_Registered a, _Registered b) {
+    final byId = a.ref.id.compareTo(b.ref.id);
+    return byId != 0 ? byId : a.ref.namespace.compareTo(b.ref.namespace);
+  }
+
+  Future<void> _applyOne(DwDb db, _Registered entry, int batch) async {
+    final migration = entry.migration;
+    if (migration.transactional) {
+      await db.transaction((tx) async {
+        await _run(entry, 'up', () => migration.up(DwMigrationContext(tx)));
+        await _insertRow(tx, entry, batch, 'applied');
+      });
+    } else {
+      await _insertRow(db, entry, batch, 'dirty');
+      await _run(entry, 'up', () => migration.up(DwMigrationContext(db)));
+      await db.execute(
+        'UPDATE "$ledgerTable" SET "state" = \'applied\' '
+        'WHERE "namespace" = @namespace AND "id" = @id',
+        params: {'namespace': entry.ref.namespace, 'id': entry.ref.id},
+      );
+    }
+  }
+
+  Future<void> _rollbackOne(DwDb db, _Registered entry) async {
+    final migration = entry.migration;
+    if (migration.transactional) {
+      await db.transaction((tx) async {
+        await _run(entry, 'down', () => migration.down(DwMigrationContext(tx)));
+        await _deleteRow(tx, entry.ref);
+      });
+    } else {
+      await db.execute(
+        'UPDATE "$ledgerTable" SET "state" = \'dirty\' '
+        'WHERE "namespace" = @namespace AND "id" = @id',
+        params: {'namespace': entry.ref.namespace, 'id': entry.ref.id},
+      );
+      await _run(entry, 'down', () => migration.down(DwMigrationContext(db)));
+      await _deleteRow(db, entry.ref);
+    }
+  }
+
+  /// Runs one direction of a migration, turning whatever it throws into
+  /// [DwMigrationFailed] with the migration named.
+  Future<void> _run(
+    _Registered entry,
+    String direction,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } on DwMigrationException {
+      rethrow;
+    } catch (error, stackTrace) {
+      throw DwMigrationFailed(entry.ref, direction, error, stackTrace);
+    }
+  }
+
+  Future<void> _insertRow(
+    DwDb db,
+    _Registered entry,
+    int batch,
+    String state,
+  ) => db.execute(
+    'INSERT INTO "$ledgerTable" ("namespace", "id", "checksum", "batch", "state") '
+    'VALUES (@namespace, @id, @checksum, @batch, @state)',
+    params: {
+      'namespace': entry.ref.namespace,
+      'id': entry.ref.id,
+      'checksum': entry.migration.checksum,
+      'batch': batch,
+      'state': state,
+    },
+  );
+
+  Future<void> _deleteRow(DwDb db, DwMigrationRef ref) => db.execute(
+    'DELETE FROM "$ledgerTable" WHERE "namespace" = @namespace AND "id" = @id',
+    params: {'namespace': ref.namespace, 'id': ref.id},
+  );
+}
+
+/// The outcome of `apply` or `rollback`: the batch and the migrations, in the
+/// order they ran. An empty run has no batch.
+final class DwMigrationRun {
+  const DwMigrationRun(this.batch, this.migrations);
+
+  final int? batch;
+  final List<DwMigrationRef> migrations;
+
+  bool get isEmpty => migrations.isEmpty;
+
+  @override
+  String toString() => 'DwMigrationRun(batch: $batch, $migrations)';
+}
+
+enum DwMigrationState {
+  applied,
+  pending,
+
+  /// A non-transactional migration started and did not finish.
+  dirty,
+
+  /// Applied, and its source changed since.
+  changed,
+
+  /// Applied, and no longer registered.
+  missing,
+}
+
+final class DwMigrationStatus {
+  const DwMigrationStatus(this.ref, this.state, {this.batch, this.appliedAt});
+
+  final DwMigrationRef ref;
+  final DwMigrationState state;
+  final int? batch;
+  final DateTime? appliedAt;
+
+  @override
+  String toString() =>
+      '$ref ${state.name}${batch == null ? '' : ' (batch $batch, $appliedAt)'}';
+}
+
+final class _Registered {
+  const _Registered(this.ref, this.migration);
+
+  final DwMigrationRef ref;
+  final DwMigration migration;
+}
+
+final class _LedgerRow {
+  const _LedgerRow(
+    this.ref, {
+    required this.checksum,
+    required this.batch,
+    required this.seq,
+    required this.dirty,
+    required this.appliedAt,
+  });
+
+  final DwMigrationRef ref;
+  final String checksum;
+  final int batch;
+  final int seq;
+  final bool dirty;
+  final DateTime appliedAt;
+}

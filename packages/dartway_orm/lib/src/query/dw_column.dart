@@ -1,0 +1,282 @@
+import 'package:meta/meta.dart';
+import 'package:postgres/postgres.dart' as pg;
+
+import '../entity/dw_annotations.dart';
+import '../entity/dw_type.dart';
+import '../schema/dw_schema.dart';
+
+/// A column of an entity table, typed by the Dart value it holds.
+///
+/// A column is the single declaration of everything about one field: its SQL
+/// name, how its values are stored, and its schema (nullability comes from
+/// `T` itself). Queries, codecs and the schema all read the same object.
+///
+/// Expressions that make sense only for some types are extensions constrained
+/// on `T` (see [DwComparableColumn], [DwStringColumn]), so `gt` on a `bool` or
+/// `like` on a `DateTime` does not compile.
+final class DwColumn<T> {
+  const DwColumn(
+    this.name,
+    this.type, {
+    this.unique = false,
+    this.defaultValue,
+    this.references,
+  }) : primaryKey = false;
+
+  const DwColumn._primaryKey(this.name, this.type)
+    : primaryKey = true,
+      unique = false,
+      defaultValue = null,
+      references = null;
+
+  /// The `id bigserial primary key` every entity table has.
+  static const DwColumn<int> id = DwColumn<int>._primaryKey(
+    'id',
+    DwType.bigint,
+  );
+
+  final String name;
+  final DwType<T> type;
+  final bool primaryKey;
+  final bool unique;
+  final DwDefault? defaultValue;
+  final DwReferences? references;
+
+  bool get nullable => null is T;
+
+  DwColumnSchema get schema => DwColumnSchema(
+    name,
+    type.sqlType,
+    nullable: nullable,
+    primaryKey: primaryKey,
+    unique: unique,
+    defaultSql: defaultValue?.sql,
+    references: references,
+  );
+
+  /// `null` matches rows where the column is null.
+  DwExpression equals(T value) => value == null
+      ? _DwNullTest(this, isNull: true)
+      : _DwComparison(this, '=', value);
+
+  /// Dart semantics: a null cell is not equal to any value, so it matches.
+  DwExpression notEquals(T value) => value == null
+      ? _DwNullTest(this, isNull: false)
+      : _DwComparison(this, nullable ? 'IS DISTINCT FROM' : '<>', value);
+
+  DwExpression isNull() => _DwNullTest(this, isNull: true);
+
+  DwExpression isNotNull() => _DwNullTest(this, isNull: false);
+
+  DwOrder asc() => DwOrder._(this, descending: false);
+
+  DwOrder desc() => DwOrder._(this, descending: true);
+
+  /// An assignment for `updateWhere`.
+  DwAssignment<T> set(T value) => DwAssignment._(this, value);
+
+  @internal
+  String get sql => dwQuote(name);
+
+  @internal
+  String encodeParameter(DwSqlWriter writer, T value) => value == null
+      ? writer.parameter(null, type.parameterType)
+      : writer.parameter(type.encode(value), type.parameterType);
+
+  @override
+  String toString() => 'DwColumn<$T>($name)';
+}
+
+/// Membership tests. The values are non-null by type: SQL `IN` never matches a
+/// null, so accepting one would read as a filter and silently match nothing.
+extension DwColumnMembership<T extends Object> on DwColumn<T?> {
+  /// One array parameter whatever the length, so the statement is prepared
+  /// once and reused for every list size.
+  DwExpression inList(Iterable<T> values) =>
+      _DwMembership(this, values.toList(growable: false), negated: false);
+
+  DwExpression notInList(Iterable<T> values) =>
+      _DwMembership(this, values.toList(growable: false), negated: true);
+}
+
+/// Ordering comparisons, for types whose Dart ordering matches the SQL one.
+extension DwComparableColumn<T extends Comparable<Object?>> on DwColumn<T?> {
+  DwExpression gt(T value) => _DwComparison(this, '>', value);
+
+  DwExpression gte(T value) => _DwComparison(this, '>=', value);
+
+  DwExpression lt(T value) => _DwComparison(this, '<', value);
+
+  DwExpression lte(T value) => _DwComparison(this, '<=', value);
+
+  /// Inclusive on both ends, as SQL `BETWEEN`.
+  DwExpression between(T low, T high) => _DwBetween(this, low, high);
+}
+
+extension DwStringColumn on DwColumn<String?> {
+  DwExpression like(String pattern) => _DwComparison(this, 'LIKE', pattern);
+
+  DwExpression ilike(String pattern) => _DwComparison(this, 'ILIKE', pattern);
+}
+
+/// A boolean condition over one table's columns.
+///
+/// Values are always bound parameters; nothing a caller passes is ever spliced
+/// into SQL text.
+///
+/// Null follows Dart, not SQL three-valued logic: a comparison against a null
+/// cell is false, and [not] of it is true. `NOT` is therefore written as
+/// `IS NOT TRUE`, which is exactly that.
+sealed class DwExpression {
+  const DwExpression();
+
+  DwExpression operator &(DwExpression other) =>
+      _DwJunction(this, 'AND', other);
+
+  DwExpression operator |(DwExpression other) => _DwJunction(this, 'OR', other);
+
+  DwExpression not() => _DwNot(this);
+
+  @internal
+  void write(DwSqlWriter writer);
+}
+
+final class _DwComparison<T> extends DwExpression {
+  const _DwComparison(this.column, this.operator, this.value);
+
+  final DwColumn<T> column;
+  final String operator;
+  final T value;
+
+  @override
+  void write(DwSqlWriter writer) => writer.write(
+    '${column.sql} $operator ${column.encodeParameter(writer, value)}',
+  );
+}
+
+final class _DwBetween<T> extends DwExpression {
+  const _DwBetween(this.column, this.low, this.high);
+
+  final DwColumn<T> column;
+  final T low;
+  final T high;
+
+  @override
+  void write(DwSqlWriter writer) {
+    final low = column.encodeParameter(writer, this.low);
+    final high = column.encodeParameter(writer, this.high);
+    writer.write('${column.sql} BETWEEN $low AND $high');
+  }
+}
+
+final class _DwNullTest extends DwExpression {
+  const _DwNullTest(this.column, {required this.isNull});
+
+  final DwColumn<Object?> column;
+  final bool isNull;
+
+  @override
+  void write(DwSqlWriter writer) =>
+      writer.write('${column.sql} ${isNull ? 'IS NULL' : 'IS NOT NULL'}');
+}
+
+final class _DwMembership<T extends Object> extends DwExpression {
+  const _DwMembership(this.column, this.values, {required this.negated});
+
+  final DwColumn<T?> column;
+  final List<T> values;
+  final bool negated;
+
+  @override
+  void write(DwSqlWriter writer) {
+    final type = column.type;
+    final parameter = writer.parameter([
+      for (final value in values) type.encodeArrayElement(value),
+    ], type.arrayParameterType);
+    final cast = type.arrayElementCast;
+    final array = cast == null ? parameter : 'CAST($parameter AS $cast[])';
+    final test = '${column.sql} = ANY($array)';
+    writer.write(negated ? '($test) IS NOT TRUE' : test);
+  }
+}
+
+final class _DwJunction extends DwExpression {
+  const _DwJunction(this.left, this.operator, this.right);
+
+  final DwExpression left;
+  final String operator;
+  final DwExpression right;
+
+  @override
+  void write(DwSqlWriter writer) {
+    writer.write('(');
+    left.write(writer);
+    writer.write(' $operator ');
+    right.write(writer);
+    writer.write(')');
+  }
+}
+
+final class _DwNot extends DwExpression {
+  const _DwNot(this.inner);
+
+  final DwExpression inner;
+
+  @override
+  void write(DwSqlWriter writer) {
+    writer.write('(');
+    inner.write(writer);
+    writer.write(') IS NOT TRUE');
+  }
+}
+
+/// One `ORDER BY` term.
+final class DwOrder {
+  const DwOrder._(this.column, {required this.descending});
+
+  final DwColumn<Object?> column;
+  final bool descending;
+
+  @internal
+  String get sql => descending ? '${column.sql} DESC' : column.sql;
+}
+
+/// One `SET column = value` of `updateWhere`.
+final class DwAssignment<T> {
+  const DwAssignment._(this.column, this.value);
+
+  final DwColumn<T> column;
+  final T value;
+
+  @internal
+  void write(DwSqlWriter writer) =>
+      writer.write('${column.sql} = ${column.encodeParameter(writer, value)}');
+}
+
+/// Accumulates a statement's text with its positional parameters and their
+/// types.
+///
+/// Types travel with the statement, so the server never infers them and a
+/// prepared statement stays valid for every later value of the same shape.
+@internal
+final class DwSqlWriter {
+  final StringBuffer _sql = StringBuffer();
+  final List<Object?> values = [];
+  final List<pg.Type<Object>> types = [];
+
+  void write(String text) => _sql.write(text);
+
+  /// Registers a parameter and returns its placeholder.
+  String parameter(Object? value, pg.Type<Object> type) {
+    values.add(value);
+    types.add(type);
+    return '\$${values.length}';
+  }
+
+  String get sql => _sql.toString();
+}
+
+/// Quotes an SQL identifier. Every identifier the ORM writes is quoted, so a
+/// column called `key`, `order` or `user` needs no special handling.
+@internal
+String dwQuote(String identifier) => '"${identifier.replaceAll('"', '""')}"';

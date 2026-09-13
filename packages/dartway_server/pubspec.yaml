@@ -10,6 +10,9 @@ environment:
 dependencies:
   collection: ^1.19.0
   crypto: ^3.0.6
+  # For `DwTestServer.connectClient` in `package:dartway_server/testing.dart`
+  # only; production code never imports it.
+  dartway_client: ^1.0.0-dev.1
   dartway_core: ^1.0.0-dev.1
   dartway_orm: ^1.0.0-dev.1
   http: ^1.4.0
@@ -17,6 +20,5 @@ dependencies:
   relic: 2.0.0-rc.1
   web_socket: ^1.0.1
 dev_dependencies:
-  dartway_client: ^1.0.0-dev.1
   lints: ^6.0.0
   test: ^1.26.0

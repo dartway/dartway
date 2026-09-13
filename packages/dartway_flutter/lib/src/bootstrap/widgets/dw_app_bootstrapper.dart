@@ -59,8 +59,10 @@ class _DwAppBootstrapperState extends ConsumerState<DwAppBootstrapper> {
       try {
         widget.onError(error, stack);
       } catch (reportingError, reportingStack) {
-        debugPrint('[DwAppBootstrapper] the error report itself failed: '
-            '$reportingError\n$reportingStack');
+        debugPrint(
+          '[DwAppBootstrapper] the error report itself failed: '
+          '$reportingError\n$reportingStack',
+        );
       }
       if (mounted) {
         setState(() => _failure = (error, stack));

@@ -6,11 +6,18 @@ import 'package:flutter/material.dart';
 /// A UI-aware async action: confirmation → run → notify → follow-up → error
 /// report, all in one value.
 ///
-/// A [DwRefusal] thrown inside it — by the repository, on a server response a
-/// rule refused, or by the app's own code — is shown to the user in its own
-/// words rather than as the action's generic error text. It still travels
-/// through `dw.handleError`, so an app's error policy sees everything and
-/// decides for itself; the framework's built-in policy does not alert it.
+/// **Results are understood.** An action that returns a [DwResult] — as
+/// `(context) => dw.command(...)` does — succeeds only on [DwOk]; any other
+/// result is treated as its exception (`valueOrThrow`) and handled below. The
+/// caller never has to unwrap a result to get the refusal shown.
+///
+/// A refusal — a [DwRefused] result, or a [DwRefusalException] thrown by the
+/// app's own code — is shown to the user through [DwConfig.refusalText], the
+/// project's catalogue, rather than as the action's generic error text. A
+/// not-authenticated answer shows nothing and signs out: the session is over,
+/// and the sign-in screen is the message. Both still travel through
+/// `dw.handleError`, so an app's error policy sees everything and sorts them
+/// out by type.
 ///
 /// Create one through [DwFlutter.action] — `dw.action(...)` — never directly:
 /// the action's work is woven into the ambient `dw` services (it calls
@@ -49,6 +56,8 @@ extension DwActionExtension on DwFlutter {
 
       try {
         final value = await action(context);
+        // A result that is not a success is the exception it stands for.
+        if (value is DwResult && value is! DwOk) value.valueOrThrow;
 
         if (onSuccessNotification != null) {
           notify.success(onSuccessNotification);
@@ -67,14 +76,30 @@ extension DwActionExtension on DwFlutter {
 
         return value;
       } catch (error, stackTrace) {
-        // A refusal speaks for itself: it carries the text whoever wrote the
-        // rule wrote, about this call and this user, so it wins over the
-        // action's [onErrorNotification] — which was written once, for every
-        // way the action could fail.
-        if (error is DwRefusal) {
-          notify.error(error.message);
-        } else if (onErrorNotification != null) {
-          notify.error(onErrorNotification);
+        // A refusal speaks for itself: its code and parameters name this
+        // call and this user, and the catalogue renders them — so it wins
+        // over the action's [onErrorNotification], which was written once,
+        // for every way the action could fail.
+        switch (error) {
+          case DwRefusalException(:final refusal):
+            final text = config.refusalText?.call(refusal);
+            if (text != null) {
+              notify.error(text);
+            } else if (onErrorNotification != null) {
+              notify.error(onErrorNotification);
+            }
+          case DwNotAuthenticatedException():
+            // Usually already over: the client drops the session on the
+            // answer itself. This covers the exception thrown by app code.
+            if (this case final DwCore core) {
+              try {
+                await core.signOut();
+              } catch (signOutError, signOutStackTrace) {
+                handleError(signOutError, signOutStackTrace);
+              }
+            }
+          default:
+            if (onErrorNotification != null) notify.error(onErrorNotification);
         }
         onError?.call(error, stackTrace);
         handleError(
@@ -84,6 +109,10 @@ extension DwActionExtension on DwFlutter {
           // Actions rarely get explicit labels — the notification texts make
           // a meaningful fallback name in error reports.
           actionLabel: label ?? onErrorNotification ?? onSuccessNotification,
+          failedCall: switch (error) {
+            DwFailedException(:final call) => call,
+            _ => null,
+          },
         );
         return null;
       }

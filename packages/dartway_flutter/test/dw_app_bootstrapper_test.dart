@@ -30,9 +30,7 @@ void main() {
 
   testWidgets('a failed start says so, and says what failed', (tester) async {
     await tester.pumpWidget(
-      _bootstrapper(
-        initializers: [() async => throw Exception('no database')],
-      ),
+      _bootstrapper(initializers: [() async => throw Exception('no database')]),
     );
     await tester.pumpAndSettle();
 
@@ -43,9 +41,7 @@ void main() {
     expect(find.textContaining('no database'), findsOneWidget);
   });
 
-  testWidgets('a reporter that throws does not eat the screen', (
-    tester,
-  ) async {
+  testWidgets('a reporter that throws does not eat the screen', (tester) async {
     // The handler runs against a core that has just failed to start, and its
     // out-of-the-box alerting talks to the server the start could not reach.
     // A throw in there used to leave the app on the loading screen — under a

@@ -60,23 +60,23 @@ void main() {
       expect(later.initialized, isFalse);
     });
 
-    test('is reported once, by whoever catches it — not here as well', () async {
-      await DwPlugins([
-        _FailingPlugin(),
-      ]).initAll(core).catchError((Object _) {});
+    test(
+      'is reported once, by whoever catches it — not here as well',
+      () async {
+        await DwPlugins([
+          _FailingPlugin(),
+        ]).initAll(core).catchError((Object _) {});
 
-      expect(reports, isEmpty);
-    });
+        expect(reports, isEmpty);
+      },
+    );
   });
 
   group('a plugin that does not block startup', () {
     test('costs its own feature and nothing else', () async {
       final later = _LaterPlugin();
 
-      await DwPlugins([
-        _FailingPlugin(blocking: false),
-        later,
-      ]).initAll(core);
+      await DwPlugins([_FailingPlugin(blocking: false), later]).initAll(core);
 
       expect(later.initialized, isTrue);
     });
@@ -113,14 +113,17 @@ void main() {
       );
     });
 
-    test('does not hold its role: maybeOf answers that nobody took it', () async {
-      // The framework asking whether anybody took a job gets the honest
-      // answer. The failure was already reported at init, so this is not a
-      // silence — it is the degradation the app asked for.
-      final plugins = DwPlugins([_FailingPlugin(blocking: false)]);
-      await plugins.initAll(core);
+    test(
+      'does not hold its role: maybeOf answers that nobody took it',
+      () async {
+        // The framework asking whether anybody took a job gets the honest
+        // answer. The failure was already reported at init, so this is not a
+        // silence — it is the degradation the app asked for.
+        final plugins = DwPlugins([_FailingPlugin(blocking: false)]);
+        await plugins.initAll(core);
 
-      expect(plugins.maybeOf<_FailingPlugin>(), isNull);
-    });
+        expect(plugins.maybeOf<_FailingPlugin>(), isNull);
+      },
+    );
   });
 }

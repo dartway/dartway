@@ -25,6 +25,6 @@ class DwErrorReport {
   /// Label of the `DwUiAction` that failed.
   final String? actionLabel;
 
-  /// `endpointName.methodName` of the failed server call.
+  /// The wire name of the request or command that failed.
   final String? failedCall;
 }

@@ -20,3 +20,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# The 1.0 client is not published yet; the tour resolves it from the monorepo.
+dependency_overrides:
+  dartway_client:
+    path: ../../dartway_client
+  dartway_core:
+    path: ../../dartway_core

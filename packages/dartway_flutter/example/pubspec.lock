@@ -121,6 +121,20 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
+  dartway_client:
+    dependency: "direct overridden"
+    description:
+      path: "../../dartway_client"
+      relative: true
+    source: path
+    version: "1.0.0-dev.1"
+  dartway_core:
+    dependency: "direct overridden"
+    description:
+      path: "../../dartway_core"
+      relative: true
+    source: path
+    version: "1.0.0-dev.1"
   dartway_flutter:
     dependency: "direct main"
     description:
