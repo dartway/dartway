@@ -12,6 +12,15 @@ Toolchain: Flutter 3.44.0 / Dart 3.12 (`/Users/eugen/fvm/versions/3.44.0/bin`).
 
 ---
 
+## As built (2026-09-14)
+
+The sections below were written before the packages; these are the differences the build settled on, each justified in the package sources:
+
+- **orm** — `tryInsert` (nullable result) instead of `insert(onConflict:)`; tables expose `columns` (the schema is derived); statements list columns explicitly, never `*` (cached plans break on `ADD COLUMN`); the ORM runs its own pool and caches prepared statements per connection (1 round trip per repeated statement instead of 3); transactions are driven with `BEGIN`/`SAVEPOINT`; `DwMigration.checksum` is written into the file (SHA of the source without whitespace) and re-sealed by `rehash`; migration files are `m<id>.dart`; decisions in a draft are a compile error (`decisionRequired(...)`); `DwMigrationCli` takes `modules` (other namespaces replayed first, e.g. `dw`).
+- **server** — the app WebSocket is served through a relic hijack with `dart:io` WebSocket (needed to measure unread outbound bytes for the slow-consumer ceiling); version is the `v` query parameter (`/dw?v=1`), a mismatch closes with 4001; the server pings every 20 s; `DwServerSettings` holds limits; page handlers receive `DwPageInput`; every channel subscription requires sign-in (D-020); updates reach the author's connection too (D-018); `DwAccounts` creates or finds accounts outside the sign-in flow (seeds, admin bootstrap).
+- **client** — `DwTokenStore` stores the whole `DwSession`; `watch` serves single/maybe/list requests and `watchPages` paginated ones; `DwRequestData` carries `refreshing` and `live`; calls time out after `callTimeout` counted from the call, queueing included.
+- **flutter** — `DwCore extends DwFlutter` builds its own client; the toolbox's text `DwRefusal`/`DwNotAuthenticated` exceptions are gone in favour of core results.
+
 ## Packages
 
 | Package | Kind | Depends on | Holds |
@@ -161,7 +170,7 @@ final class ClubSessionTable extends DwTableDef<ClubSession> {
   DwColumn<DateTime> get startsAt => …;
   DwColumn<int> get capacity => …;
 
-  @override List<DwColumnSchema> get columnSchemas => […];   // sql type, nullability, default, references
+  @override List<DwColumn<Object?>> get columns => […];      // id first; each column carries type, nullability, default, unique, references
   @override List<DwIndexSchema> get indexSchemas => […];
   @override ClubSession fromRow(DwRow row) => …;
   @override Map<String, Object?> toRow(ClubSession entity) => …;   // without id when null
@@ -184,7 +193,7 @@ await repo.findByIds(ids);                         // List<Entity>, one query
 await repo.count(where:);  await repo.exists(where:);
 await repo.insert(entity);                         // returns the entity with id
 await repo.insertAll(entities);
-await repo.insert(entity, onConflict: DwOnConflict.doNothing([t.x]));   // Entity? (null when skipped)
+await repo.tryInsert(entity, onConflict: DwOnConflict.doNothing((t) => [t.x]));   // Entity? (null when skipped)
 await repo.update(entity);                         // by id, all columns; returns entity
 await repo.updateWhere(where:, set: (t) => [t.capacity.set(5)]);         // int count
 await repo.delete(id);  await repo.deleteWhere(where:);                  // int count
@@ -213,6 +222,7 @@ Errors are mapped: `DwUniqueViolation(constraint)`, `DwForeignKeyViolation(const
 ```dart
 final class M20260914Initial extends DwMigration {
   @override String get id => '20260914_000000_initial';
+  @override String get checksum => '…';        // written by `create`, re-sealed by `rehash`
   @override Future<void> up(DwMigrationContext m) async { await m.createTable(…); await m.sql('…'); }
   @override Future<void> down(DwMigrationContext m) async => m.dropTable('…');
 }
@@ -227,7 +237,7 @@ Project entry point `app_server/bin/migrate.dart`:
 ```dart
 Future<void> main(List<String> args) => DwMigrationCli(
   schema: appSchema, migrations: appMigrations, directory: 'lib/src/migrations',
-).run(args);   // apply | rollback [--batch|--id] | status | create <name> | check
+).run(args);   // apply | rollback [--batch|--id] | status | create <name> | check | rehash
 ```
 
 `create` replays all migrations on a scratch database, introspects, diffs against `schema`, and writes a draft migration file plus its registration in `lib/src/migrations/migrations.dart` (`final List<DwMigration> appMigrations = […]`). Renames and destructive changes stop the draft with a marked decision.
