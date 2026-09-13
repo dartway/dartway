@@ -1,6 +1,0 @@
-enum: UserRole
-serialized: byName
-values:
-  - client
-  - staff
-  - admin

@@ -1,5 +1,0 @@
-class: ChatChannel
-table: chat_channel
-fields:
-  title: String
-  createdAt: DateTime

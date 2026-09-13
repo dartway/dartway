@@ -1,0 +1,19 @@
+name: dartway_example_shared
+description: The contract between the example server and app — DTOs, channels, refusal codes.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  dartway_core: ^1.0.0-dev.1
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.26.0
+
+# The example lives in the framework repository and builds against this tree.
+dependency_overrides:
+  dartway_core:
+    path: ../../packages/dartway_core

@@ -1,9 +1,0 @@
-class: AppSetting
-table: app_setting
-fields:
-  settingKey: String
-  settingValue: String
-indexes:
-  app_setting_key_unique_idx:
-    fields: settingKey
-    unique: true

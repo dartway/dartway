@@ -1,8 +1,0 @@
-class: ClubService
-table: club_service
-fields:
-  title: String
-  description: String
-  durationMinutes: int
-  price: int
-  imageUrl: String?

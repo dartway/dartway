@@ -1,38 +1,28 @@
 name: dartway_example_server
-description: Starting point for a Serverpod server.
-# version: 1.0.0
-# homepage: https://www.example.com
+description: The DartWay example — a fitness club server.
+publish_to: none
 
 environment:
-  sdk: '>=3.11.0 <4.0.0'
+  sdk: ^3.11.0
 
 dependencies:
-  serverpod: 3.4.11
-
-  dartway_serverpod_core_server: ^0.13.0
-  # Optional push delivery module. An app that does not need push simply omits
-  # this dependency and gets none of the dw_push_* tables.
-  dartway_push_server: ^0.4.0
-
-  http: ^1.5.0
-
-
+  dartway_example_shared:
+    path: ../dartway_example_shared
+  dartway_orm: ^1.0.0-dev.1
+  dartway_server: ^1.0.0-dev.1
 
 dev_dependencies:
+  dartway_client: ^1.0.0-dev.1
   lints: ^6.0.0
-  test: '^1.24.2'
-  serverpod_test: 3.4.11
-  # Only the integration suite needs it: the fake "old backend" whose hashes the
-  # legacy-verifier test migrates away from.
-  crypto: ^3.0.0
+  test: ^1.26.0
 
-# Inside the monorepo the example builds against the LOCAL framework packages.
-# Copied out into a standalone project — drop the whole dependency_overrides block
-# (the dependencies then come from the git references declared above).
+# The example builds against this tree of the framework.
 dependency_overrides:
-  dartway_serverpod_core_server:
-    path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_server
-  dartway_serverpod_core_shared:
-    path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_shared
-  dartway_push_server:
-    path: ../../packages/dartway_push/dartway_push_server
+  dartway_client:
+    path: ../../packages/dartway_client
+  dartway_core:
+    path: ../../packages/dartway_core
+  dartway_orm:
+    path: ../../packages/dartway_orm
+  dartway_server:
+    path: ../../packages/dartway_server
