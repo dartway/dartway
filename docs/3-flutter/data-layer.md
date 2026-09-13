@@ -47,6 +47,13 @@ Pick by whether absence is a normal state of your screen. A profile screen opene
 because a missing profile is a bug you want reported. "Has this booking been reviewed yet?":
 `maybeModel`, because `null` is the answer, not a failure.
 
+**`null` is an answer about now, not a promise that the row will never exist.** A `maybeModel` that
+resolved to `null` takes the first row that later arrives and passes its filter (or has its `id`) —
+so "save, then read the provider" works for a model you just created, exactly as it does for a
+list. Until #242 it did not: an empty single-model read stopped listening the moment it answered,
+the screen stayed on a legitimate-looking empty state, and a `if (model == null) return;` behind it
+skipped its work with nothing anywhere saying so.
+
 One consequence catches people out. `model` is a **derived** provider — a throwing view over
 `maybeModel`, not its own fetch. So `ref.refresh(dw.repo.model<T>(...).future)` only recomputes the
 wrapper and returns the same cached value; to force a fresh fetch, refresh the provider that

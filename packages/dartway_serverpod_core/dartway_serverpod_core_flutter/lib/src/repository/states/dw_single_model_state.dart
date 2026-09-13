@@ -83,7 +83,29 @@ class DwSingleModelState<Model extends SerializableModel>
 
   void _updatesListener(List<DwModelWrapper> wrappedModelUpdates) async {
     return await future.then((currentState) async {
-      if (currentState == null) return;
+      if (currentState == null) {
+        // An empty answer is an answer about *now*, not a promise that the
+        // row will never exist. This used to return here, so a state that had
+        // once resolved to null was deaf to every update after it: a feature
+        // saved the model, read the provider back and was told the row did
+        // not exist — a legitimate-looking empty screen, and a
+        // `if (model == null) return;` that quietly skipped the work behind
+        // it. A list state has always taken new rows through the same filter;
+        // this is the single-model half of that promise.
+        final arrived = wrappedModelUpdates.firstWhereOrNull(
+          (e) =>
+              !e.isDeleted &&
+              config.backendFilter.filterUpdate(e.jsonSerialization),
+        );
+        if (arrived != null) {
+          debugPrint(
+            "Filling empty singleState ${DwRepository.typeName<Model>()} "
+            "with id ${arrived.modelId}",
+          );
+          state = AsyncValue.data(arrived.model as Model);
+        }
+        return;
+      }
 
       final currentId = (currentState as dynamic).id;
       final match = wrappedModelUpdates.firstWhereOrNull(

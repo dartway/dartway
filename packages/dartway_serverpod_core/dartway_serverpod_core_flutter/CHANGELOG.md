@@ -2,6 +2,14 @@
 
 ## 0.13.0
 
+- **A `maybeModel` that answered `null` hears about the row once it exists.** Its update listener
+  returned on an empty state, so a single-model read that had once resolved to `null` was deaf to
+  every update after it: a feature saved a model, read the provider back and was told the row did
+  not exist. A list state has always taken new rows through its filter; the single-model state now
+  does the same, with the filter it already carries (an `id:` read folds into one). Projects that
+  threaded `saveModel`'s return value around or invalidated the provider to work around it can drop
+  that.
+
 - **A refused session restore no longer kills the app.** A stored key the server does not accept —
   expired, revoked, a deleted account, a different backend — came back as
   `Exception('Authentication required (getOne for UserProfile)')`, and `DwSessionService` had no
