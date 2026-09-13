@@ -2,6 +2,14 @@
 
 ## 0.10.1
 
+- **The image check builds against the tree it is checking.** A created project resolves from
+  pub.dev, which is right for a stranger and wrong for CI: between a version bump and its release
+  the skeleton asks for something that does not exist there, and the build failed inside `pub get`
+  while saying nothing about images. `vendor_framework.dart` puts the checkout's packages into the
+  created project, overrides onto them, admits them to the build context and teaches the
+  Dockerfiles to copy them in. Whether the last release is installable stays `caret_check`'s
+  question.
+
 - **The deployment issues its TLS certificate.** `setup` wrote a one-day self-signed certificate so
   that Nginx could start, and the compose stack ran `certbot renew`, which renews lineages certbot
   already manages and knew nothing about that file — so nothing ever ran `certonly` and the real

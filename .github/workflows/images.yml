@@ -6,10 +6,25 @@ name: Images
 # The distinction is the whole point. `template/` in this repository carries
 # `dependency_overrides` pointing at `../../packages/...`, outside any build
 # context a Dockerfile can have; `dartway create` strips that block on the way
-# out, and the carets underneath it are read for the first time in a stranger's
-# tree. So `docker build` on `template/` fails inside `dart pub get` for a
+# out. So `docker build` on `template/` fails inside `dart pub get` for a
 # reason that has nothing to do with images, and proves nothing about the
 # artefact anyone receives.
+#
+# What the build then resolves against is a second question, and for a while it
+# shared this job with the first one. The images were built from pub.dev, which
+# made every run also an answer to "is the last release installable" — and made
+# the job red by construction for the whole window between a version bump and
+# its release. A minor bump under a zero major puts the skeleton's carets past
+# anything published (`^0.13.0` against `0.12.1`), so the build cannot resolve
+# and says nothing about images while it is red. That is a gate red by design,
+# which is why `self_check` is deliberately kept out of CI.
+#
+# So the questions are split. This job answers "does *this tree* produce a
+# project whose images build": `tool/vendor_framework.dart` puts this commit's
+# packages inside the created project and overrides onto them, exactly as a
+# project developed against a local checkout does. "Is what a stranger receives
+# installable" belongs to `tool/caret_check.dart`, which asks pub.dev directly
+# and is the only thing that should go red when a release lags (#143, #255).
 #
 # Why a build at all, when `dartway deploy check` already compares the three
 # copies of the package list: a static comparison is not a build. #177 was a
@@ -44,11 +59,12 @@ on:
       - 'template/**'
       - 'packages/dartway_cli/**'
       - '.github/workflows/images.yml'
-  # The build resolves from pub.dev, so it can go red without this repository
-  # changing at all — a published version lagging the carets the skeleton states
-  # is exactly what breaks `dartway create` for a stranger (#143). A daily run
-  # is what turns that from something a person discovers during a promotion into
-  # something we are told about.
+  # A daily run: the images are built from base images and a toolchain that
+  # move without this repository changing at all, and a build that stopped
+  # working is worth hearing about on the day rather than during a promotion.
+  # It no longer doubles as the pub.dev check — that is `tool/caret_check.dart`,
+  # which asks the question directly instead of inferring it from a failed
+  # `pub get`.
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
@@ -96,6 +112,16 @@ jobs:
           mkdir -p "$RUNNER_TEMP/create"
           cd "$RUNNER_TEMP/create"
           dartway create imagecheck --local-repo "$GITHUB_WORKSPACE" --no-git
+
+      - name: Build the project against this commit, not against pub.dev
+        # The created project asks for the versions this tree declares, and
+        # between a bump and its release those do not exist on pub.dev. The
+        # packages travel into the project so the image is built from the code
+        # under test — which is what this job is for.
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          dart run tool/vendor_framework.dart \
+            "$RUNNER_TEMP/create/imagecheck" "$GITHUB_WORKSPACE"
 
       # Kept as instrumentation, not ceremony: see the note on the matrix.
       - name: Disk before the build
