@@ -125,7 +125,7 @@ final bookingHandlers = <DwHandler>[
       if (booking.status != BookingStatus.attended) {
         ctx.refuse(ExampleRefusal.reviewNeedsAttendance);
       }
-      final inserted = await ctx.db.sessionReviews.insert(
+      final inserted = await ctx.db.sessionReviews.tryInsert(
         SessionReview(
           bookingId: booking.id!,
           rating: command.rating,

@@ -2,7 +2,6 @@
 library;
 
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_orm/dartway_orm.dart';
 import 'package:dartway_server/dartway_server.dart';
 
 import 'generated/dw_schema.dart';
@@ -16,18 +15,20 @@ import 'src/handlers/schedule_handlers.dart';
 import 'src/migrations/migrations.dart';
 
 export 'generated/dw_schema.dart';
+export 'src/example_auth.dart' show exampleAuth;
 
 /// Builds the example server. `bin/server.dart` starts it; tests start it on a
 /// free port against their own database.
 DwServer buildExampleServer({
   required DwDatabaseConfig database,
   int port = 8080,
+  DwAuth? auth,
 }) => DwServer(
   protocol: dartwayExampleProtocol,
   schema: dartwayExampleSchema,
   migrations: appMigrations,
   database: database,
-  auth: exampleAuth,
+  auth: auth ?? exampleAuth,
   handlers: [
     ...profileHandlers,
     ...scheduleHandlers,

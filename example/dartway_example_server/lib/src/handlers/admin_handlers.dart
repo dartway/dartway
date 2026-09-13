@@ -2,6 +2,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_server/dartway_server.dart';
 
 import '../../generated/dw_schema.dart';
+import '../entities/people.dart';
 import '../example_context.dart';
 import '../projections.dart';
 

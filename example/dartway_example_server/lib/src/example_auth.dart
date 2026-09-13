@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_server/dartway_server.dart';
 
 import '../generated/dw_schema.dart';
