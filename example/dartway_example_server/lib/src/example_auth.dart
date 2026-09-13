@@ -31,17 +31,26 @@ final exampleAuth = DwAuth(
   // The profile is created with the account, in the same transaction: a
   // signed-in account without a profile cannot exist.
   onAccountCreated: (ctx, accountId, kind, identifier, registration) async {
-    await ctx.db.userProfiles.insert(
-      UserProfile(
-        accountId: accountId,
-        phone: identifier,
-        firstName: registration['firstName']?.trim() ?? '',
-        agreedForMarketing: registration['marketing'] == 'true',
-        conditionsAcceptedAt: DateTime.now(),
-      ),
-    );
+    await createProfile(ctx.db, accountId, identifier, registration);
     await publishAdminCounters(ctx);
   },
+);
+
+/// The profile a new account starts with. Separate from the hook so tools that
+/// create accounts without a running server (the dev seed) create the same row.
+Future<UserProfile> createProfile(
+  DwDb db,
+  int accountId,
+  String phone,
+  Map<String, String> registration,
+) => db.userProfiles.insert(
+  UserProfile(
+    accountId: accountId,
+    phone: phone,
+    firstName: registration['firstName']?.trim() ?? '',
+    agreedForMarketing: registration['marketing'] == 'true',
+    conditionsAcceptedAt: DateTime.now(),
+  ),
 );
 
 /// Digits only; a Russian trunk prefix `8` becomes `7`. `null` for anything

@@ -4,7 +4,7 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/entities/club.dart';
 import 'package:dartway_example_server/src/entities/content.dart';
 import 'package:dartway_example_server/src/entities/people.dart';
-import 'package:dartway_example_server/src/example_auth.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_server/dartway_server.dart';
 
 /// Development data: three personas who sign in with the code `111111`, a
@@ -22,7 +22,17 @@ Future<void> main() async {
         stdout.writeln('Already seeded.');
         return;
       }
-      final accounts = DwAccounts(db, exampleAuth);
+      // No server runs during seeding, so nobody is subscribed: the seed's
+      // auth creates the profile without publishing anything.
+      final accounts = DwAccounts(
+        db,
+        DwAuth(
+          normalize: exampleAuth.normalize,
+          deliverCode: exampleAuth.deliverCode,
+          onAccountCreated: (ctx, accountId, kind, identifier, registration) =>
+              createProfile(ctx.db, accountId, identifier, registration),
+        ),
+      );
 
       Future<UserProfile> persona(String phone, String name, UserRole role) async {
         final account = await accounts.ensure(DwIdentifierKind.phone, phone);

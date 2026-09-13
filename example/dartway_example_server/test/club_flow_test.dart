@@ -1,6 +1,8 @@
 import 'package:dartway_client/dartway_client.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_example_server/src/entities/club.dart';
+import 'package:dartway_server/dartway_server.dart' hide DwNotAuthenticatedException;
 import 'package:dartway_server/testing.dart';
 import 'package:test/test.dart';
 

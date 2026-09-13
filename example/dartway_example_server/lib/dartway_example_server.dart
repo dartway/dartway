@@ -15,7 +15,7 @@ import 'src/handlers/schedule_handlers.dart';
 import 'src/migrations/migrations.dart';
 
 export 'generated/dw_schema.dart';
-export 'src/example_auth.dart' show exampleAuth;
+export 'src/example_auth.dart' show createProfile, exampleAuth;
 
 /// Builds the example server. `bin/server.dart` starts it; tests start it on a
 /// free port against their own database.
