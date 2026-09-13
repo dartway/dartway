@@ -2,6 +2,7 @@ import 'package:dartway_client/dartway_client.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_example_server/src/entities/club.dart';
+import 'package:dartway_example_server/src/entities/people.dart';
 import 'package:dartway_server/dartway_server.dart' hide DwNotAuthenticatedException;
 import 'package:dartway_server/testing.dart';
 import 'package:test/test.dart';
@@ -139,6 +140,26 @@ void main() {
     veraBookings.close();
     await vera.stop();
     await oleg.stop();
+  });
+
+  test('a new member appears in the admin users table live', () async {
+    final (admin, adminProfile) = await member('79990000014', 'Anna');
+    final row = (await server.db.userProfiles.findById(adminProfile.id))!;
+    await server.db.userProfiles.update(row.copyWith(role: UserRole.admin));
+
+    final users = admin.watch(const ListProfiles());
+    List<ProfileView>? live() {
+      final s = users.state;
+      return s is DwRequestData<List<ProfileView>> && s.live ? s.value : null;
+    }
+
+    expect((await eventually(live)).map((p) => p.firstName), ['Anna']);
+    final (newcomer, _) = await member('79990000015', 'Oleg');
+    await eventually(() => live()?.length == 2 ? true : null);
+
+    users.close();
+    await admin.stop();
+    await newcomer.stop();
   });
 
   test('a client cannot read another member\'s bookings or the staff chat',

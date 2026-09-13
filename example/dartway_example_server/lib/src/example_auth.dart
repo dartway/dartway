@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_server/dartway_server.dart';
 
 import '../generated/dw_schema.dart';
 import 'entities/people.dart';
+import 'projections.dart';
 import 'handlers/admin_handlers.dart';
 
 /// Sign-in by a one-time code to a phone number.
@@ -31,7 +33,14 @@ final exampleAuth = DwAuth(
   // The profile is created with the account, in the same transaction: a
   // signed-in account without a profile cannot exist.
   onAccountCreated: (ctx, accountId, kind, identifier, registration) async {
-    await createProfile(ctx.db, accountId, identifier, registration);
+    final profile = await createProfile(
+      ctx.db,
+      accountId,
+      identifier,
+      registration,
+    );
+    // The admin users table and the counters learn about the new member.
+    ctx.publish(const DwChannel(ExampleChannel.admin), Views.profile(profile));
     await publishAdminCounters(ctx);
   },
 );

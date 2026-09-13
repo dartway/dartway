@@ -23,6 +23,7 @@ DwServer buildExampleServer({
   required DwDatabaseConfig database,
   int port = 8080,
   DwAuth? auth,
+  Set<String> allowedOrigins = const {},
 }) => DwServer(
   protocol: dartwayExampleProtocol,
   schema: dartwayExampleSchema,
@@ -38,4 +39,5 @@ DwServer buildExampleServer({
   ],
   channels: exampleChannels,
   port: port,
+  settings: DwServerSettings(allowedOrigins: allowedOrigins),
 );
