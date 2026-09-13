@@ -1,3 +1,0 @@
-class: DwUpdatesTransport
-fields:
-    wrappedModelUpdates: List<DwModelWrapper>

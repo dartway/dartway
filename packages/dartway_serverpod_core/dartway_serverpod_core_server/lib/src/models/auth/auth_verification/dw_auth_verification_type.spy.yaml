@@ -1,7 +1,0 @@
-enum: DwAuthVerificationType
-serialized: byIndex
-values:
-  - code
-  - link
-  - oauth
-  - biometric
