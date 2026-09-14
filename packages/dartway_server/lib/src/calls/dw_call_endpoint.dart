@@ -267,6 +267,7 @@ final class DwCallEndpoint {
     return DwApiResponse.ok(
       response.result,
       updates: runtime.deliver(ctx, author: author),
+      replayed: response.replayed,
     );
   }
 
@@ -380,7 +381,7 @@ final class DwCallEndpoint {
       );
     }
     return stored.status == 'ok'
-        ? DwApiResponse.ok(stored.result)
+        ? DwApiResponse.ok(stored.result, replayed: true)
         : _refused(DwCallRefusal.fromJson(stored.result));
   }
 

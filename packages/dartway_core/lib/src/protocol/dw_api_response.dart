@@ -42,8 +42,11 @@ sealed class DwApiResponse {
 
   /// Success: the call's [result], already encoded by its class, and the
   /// [updates] the call published that the caller should apply.
-  const factory DwApiResponse.ok(Object? result, {DwUpdateTransport updates}) =
-      DwApiOk;
+  const factory DwApiResponse.ok(
+    Object? result, {
+    DwUpdateTransport updates,
+    bool replayed,
+  }) = DwApiOk;
 
   /// Refused by a rule or validation. Throws [ArgumentError] for an
   /// incompatibility code, which answers [DwApiResponse.incompatible].
@@ -71,13 +74,23 @@ sealed class DwApiResponse {
     DwCallRefusal refusal() => DwCallRefusal.fromJson(map['refusal']);
     switch (status) {
       case _ok:
-        dwRejectUnknownKeys(map, const {'status', 'result', 'updates'}, what);
+        dwRejectUnknownKeys(map, const {
+          'status',
+          'result',
+          'updates',
+          'replayed',
+        }, what);
         final updates = map['updates'];
+        final replayed = map['replayed'];
+        if (replayed != null && replayed != true) {
+          throw FormatException('$what has a malformed "replayed": $replayed');
+        }
         return DwApiOk(
           map['result'],
           updates: updates == null
               ? DwUpdateTransport.empty
               : DwUpdateTransport.fromJson(updates, protocol),
+          replayed: replayed == true,
         );
       case _refused:
         dwRejectUnknownKeys(map, const {'status', 'refusal'}, what);
@@ -172,7 +185,11 @@ sealed class DwApiResponse {
 
 /// See [DwApiResponse.ok].
 final class DwApiOk extends DwApiResponse {
-  const DwApiOk(this.result, {this.updates = DwUpdateTransport.empty});
+  const DwApiOk(
+    this.result, {
+    this.updates = DwUpdateTransport.empty,
+    this.replayed = false,
+  });
 
   /// The call's result, encoded by its class; `null` for an absent maybe or
   /// a `void` command.
@@ -180,11 +197,19 @@ final class DwApiOk extends DwApiResponse {
 
   final DwUpdateTransport updates;
 
+  /// The stored outcome of an earlier execution of the same command, answered
+  /// again for a repeated idempotency key. It carries no updates — the first
+  /// execution's updates went out when it ran, possibly while the caller's
+  /// answer was lost — so a client receiving a replay re-reads its live state
+  /// instead of trusting it (rare: it takes a lost response).
+  final bool replayed;
+
   @override
   Map<String, Object?> toJson() => {
     'status': DwApiResponse._ok,
     if (result != null) 'result': result,
     if (updates.isNotEmpty) 'updates': updates.toJson(),
+    if (replayed) 'replayed': true,
   };
 
   @override

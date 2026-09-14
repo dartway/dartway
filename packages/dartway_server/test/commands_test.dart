@@ -364,6 +364,9 @@ void main() {
       );
       expect(again.updates.isEmpty, isTrue);
       expect(jsonDecode(again.text), isNot(contains('updates')));
+      // The replay says so, and the first execution does not.
+      expect(jsonDecode(again.text), containsPair('replayed', true));
+      expect(jsonDecode(first.text), isNot(contains('replayed')));
     });
   });
 }
