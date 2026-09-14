@@ -63,7 +63,7 @@ final class NewsPostTable extends DwTableDef<NewsPostRow> {
       const DwTableColumn('created_at', DwColumnType.timestamptz);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     authorProfileId,
     title,
@@ -136,7 +136,7 @@ final class AppSettingTable extends DwTableDef<AppSettingRow> {
       const DwTableColumn('value', DwColumnType.text);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [id, key, value];
+  List<DwTableColumn<Object?>> get tableColumns => [id, key, value];
 
   @override
   AppSettingRow fromRow(DwResultRow row) => AppSettingRow(

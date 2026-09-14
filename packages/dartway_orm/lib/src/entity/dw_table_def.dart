@@ -6,26 +6,31 @@ import 'dw_table_row.dart';
 /// The generated description of a row class's table: its columns, its
 /// schema and the codec between result rows and row objects.
 ///
-/// A row class `<Name>Row` declares `static const table = <Name>Table();`;
+/// A row class `<Name>Row` declares `static const tableDef = <Name>Table();`;
 /// the subclass is written by `dartway generate` into the row class's part
 /// file. Instances are `const`, so each table is one canonical object the ORM
 /// can attach its prepared SQL to.
+///
+/// The generated subclass adds one getter per column, named like the row
+/// field, so the members declared here are named the way no row field would
+/// want to be (`tableName`, not `name`): a field cannot take a member's name.
 abstract class DwTableDef<R extends DwTableRow> {
-  const DwTableDef(this.name);
+  const DwTableDef(this.tableName);
 
-  final String name;
+  /// The SQL table name.
+  final String tableName;
 
   /// The primary key every table has.
   DwTableColumn<int> get id => DwTableColumn.id;
 
   /// Every column in declaration order, [id] first.
-  List<DwTableColumn<Object?>> get columns;
+  List<DwTableColumn<Object?>> get tableColumns;
 
   List<DwIndexSchema> get indexSchemas => const [];
 
-  DwTableSchema get schema => DwTableSchema(
-    name,
-    columns: [for (final column in columns) column.schema],
+  DwTableSchema get tableSchema => DwTableSchema(
+    tableName,
+    columns: [for (final column in tableColumns) column.schema],
     indexes: indexSchemas,
   );
 
@@ -36,5 +41,5 @@ abstract class DwTableDef<R extends DwTableRow> {
   Map<String, Object?> toRow(R row);
 
   @override
-  String toString() => 'DwTableDef($name)';
+  String toString() => 'DwTableDef($tableName)';
 }

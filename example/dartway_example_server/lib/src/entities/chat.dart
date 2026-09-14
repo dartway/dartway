@@ -11,7 +11,7 @@ final class ChatChannelRow extends DwTableRow with _$ChatChannelRow {
   final int? id;
   final String title;
 
-  static const table = ChatChannelTable();
+  static const tableDef = ChatChannelTable();
 }
 
 /// One message of a channel. Deleting it only sets [deletedAt]: replies keep
@@ -73,7 +73,7 @@ final class ChatMessageRow extends DwTableRow with _$ChatMessageRow {
 
   bool get isDeleted => deletedAt != null;
 
-  static const table = ChatMessageTable();
+  static const tableDef = ChatMessageTable();
 }
 
 /// A stored file attached to a message, in the message's order. A file is
@@ -111,7 +111,7 @@ final class ChatMessageAttachmentRow extends DwTableRow
   final int? width;
   final int? height;
 
-  static const table = ChatMessageAttachmentTable();
+  static const tableDef = ChatMessageAttachmentTable();
 }
 
 /// One member's reaction to a message. The unique pair is what makes "one
@@ -142,7 +142,7 @@ final class ChatMessageReactionRow extends DwTableRow
 
   final ChatReaction reaction;
 
-  static const table = ChatMessageReactionTable();
+  static const tableDef = ChatMessageReactionTable();
 }
 
 /// How far one member has read one channel: the last message seen, as the
@@ -177,5 +177,5 @@ final class ChatReadPositionRow extends DwTableRow with _$ChatReadPositionRow {
 
   final DateTime sentAt;
 
-  static const table = ChatReadPositionTable();
+  static const tableDef = ChatReadPositionTable();
 }

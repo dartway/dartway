@@ -8,7 +8,7 @@ final class DtoField implements ValueField {
     required this.name,
     required this.type,
     required this.spelling,
-    required this.omitWhenEmpty,
+    this.defaultValue,
   });
 
   @override
@@ -18,9 +18,21 @@ final class DtoField implements ValueField {
   @override
   final String spelling;
 
-  /// A collection whose constructor default is empty: an empty value is left
-  /// off the wire, because the decoder restores the same default.
-  final bool omitWhenEmpty;
+  /// The non-null constructor default (D-041): an absent field decodes to it,
+  /// and a value equal to it is left off the wire. `null` for a field without
+  /// one and for a patch, whose absence is already `DwFieldPatch.keep()`.
+  final DtoDefault? defaultValue;
+}
+
+/// A constructor default, written as a Dart expression.
+final class DtoDefault {
+  const DtoDefault(this.expression, {required this.isEmptyCollection});
+
+  /// Constant wherever the value can be (`const <int>[1, 2]`, `Color.red`).
+  final String expression;
+
+  /// `const []` or `const {}`: emptiness is tested without the literal.
+  final bool isEmptyCollection;
 }
 
 /// A DTO class the generator writes a mixin, a decoder and (for data objects)

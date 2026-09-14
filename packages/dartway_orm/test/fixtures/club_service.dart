@@ -45,5 +45,5 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   @DwDefaultValue('true')
   final bool active;
 
-  static const table = ClubServiceTable();
+  static const tableDef = ClubServiceTable();
 }

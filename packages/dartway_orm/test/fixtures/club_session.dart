@@ -42,5 +42,5 @@ final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
 
   final List<String>? labels;
 
-  static const table = ClubSessionTable();
+  static const tableDef = ClubSessionTable();
 }

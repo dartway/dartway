@@ -15,6 +15,51 @@ void main() {
       expect(protocol.decodeNamed('ClubBooking', roundTrip(json)), booking);
     });
 
+    test('a defaulted field may be absent: decoded to its default, and a '
+        'value equal to it is omitted (D-041)', () {
+      final json = booking.toJson();
+      expect(json.containsKey('seats'), isFalse);
+      expect(
+        protocol.decodeAs<ClubBooking>(roundTrip(json)).seats,
+        booking.seats,
+      );
+      final twoSeats = ClubBooking(
+        id: 8,
+        status: BookingStatus.booked,
+        startsAt: DateTime.utc(2026, 9, 14),
+        seats: 2,
+      );
+      expect(twoSeats.toJson()['seats'], 2);
+      expect(
+        protocol.decodeAs<ClubBooking>(roundTrip(twoSeats.toJson())),
+        twoSeats,
+      );
+
+      expect(const ListMyBookings().toJson(), isEmpty);
+      expect(
+        protocol.decodeAs<ListMyBookings>(<String, Object?>{}),
+        const ListMyBookings(),
+      );
+      expect(const ListMyBookings(includePast: true).toJson(), {
+        'includePast': true,
+      });
+      expect(
+        protocol.decodeAs<ListMyBookings>(
+          roundTrip(const ListMyBookings(includePast: true).toJson()),
+        ),
+        const ListMyBookings(includePast: true),
+      );
+
+      // A required field without a default stays required.
+      expect(
+        () => protocol.decodeAs<ClubBooking>(<String, Object?>{
+          'id': 1,
+          'startsAt': 0,
+        }),
+        throwsA(anything),
+      );
+    });
+
     test('a request is a value: equal fields are an equal state key', () {
       expect(
         const ListMyBookings(status: BookingStatus.booked),

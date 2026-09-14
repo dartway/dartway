@@ -9,5 +9,5 @@ final class PrefixedRow extends orm.DwTableRow with _$PrefixedRow {
   @override
   final int? id;
 
-  static const table = PrefixedTable();
+  static const tableDef = PrefixedTable();
 }

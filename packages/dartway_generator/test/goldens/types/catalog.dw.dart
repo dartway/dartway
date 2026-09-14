@@ -26,7 +26,7 @@ mixin _$Item on Named {
     'createdAt': DwJsonCodec.encodeDateTime(_self.createdAt),
     if (_self.updatedAt != null)
       'updatedAt': DwJsonCodec.encodeDateTime(_self.updatedAt!),
-    'weight': _self.weight,
+    if (_self.weight != 0) 'weight': _self.weight,
     'unit': _self.unit.name,
     if (_self.parent != null) 'parent': _self.parent!.toJson(),
     if (_self.children.isNotEmpty)
@@ -141,7 +141,7 @@ Item $ItemFromJson(Map<String, Object?> json) => Item(
   updatedAt: json['updatedAt'] == null
       ? null
       : DwJsonCodec.decodeDateTime(json['updatedAt']),
-  weight: json['weight']! as int,
+  weight: json['weight'] == null ? 0 : json['weight']! as int,
   unit: DwJsonCodec.decodeEnum(json['unit'], units.Unit.values),
   parent: json['parent'] == null
       ? null
@@ -503,8 +503,8 @@ mixin _$ItemTable on DwTableRequest<Item> {
 
   @override
   Map<String, Object?> toJson() => {
-    'page': _self.page,
-    'pageSize': _self.pageSize,
+    if (_self.page != 1) 'page': _self.page,
+    if (_self.pageSize != 25) 'pageSize': _self.pageSize,
     if (_self.color != null) 'color': _self.color!.name,
   };
 
@@ -526,8 +526,8 @@ mixin _$ItemTable on DwTableRequest<Item> {
 }
 
 ItemTable $ItemTableFromJson(Map<String, Object?> json) => ItemTable(
-  page: json['page']! as int,
-  pageSize: json['pageSize']! as int,
+  page: json['page'] == null ? 1 : json['page']! as int,
+  pageSize: json['pageSize'] == null ? 25 : json['pageSize']! as int,
   color: json['color'] == null
       ? null
       : DwJsonCodec.decodeEnum(json['color'], Color.values),
@@ -703,26 +703,26 @@ mixin _$WideRequest on DwListRequest<Item> {
 
   @override
   Map<String, Object?> toJson() => {
-    'a1': _self.a1,
-    'a2': _self.a2,
-    'a3': _self.a3,
-    'a4': _self.a4,
-    'a5': _self.a5,
-    'a6': _self.a6,
-    'a7': _self.a7,
-    'a8': _self.a8,
-    'a9': _self.a9,
-    'a10': _self.a10,
-    'a11': _self.a11,
-    'a12': _self.a12,
-    'a13': _self.a13,
-    'a14': _self.a14,
-    'a15': _self.a15,
-    'a16': _self.a16,
-    'a17': _self.a17,
-    'a18': _self.a18,
-    'a19': _self.a19,
-    'a20': _self.a20,
+    if (_self.a1 != 0) 'a1': _self.a1,
+    if (_self.a2 != 0) 'a2': _self.a2,
+    if (_self.a3 != 0) 'a3': _self.a3,
+    if (_self.a4 != 0) 'a4': _self.a4,
+    if (_self.a5 != 0) 'a5': _self.a5,
+    if (_self.a6 != 0) 'a6': _self.a6,
+    if (_self.a7 != 0) 'a7': _self.a7,
+    if (_self.a8 != 0) 'a8': _self.a8,
+    if (_self.a9 != 0) 'a9': _self.a9,
+    if (_self.a10 != 0) 'a10': _self.a10,
+    if (_self.a11 != 0) 'a11': _self.a11,
+    if (_self.a12 != 0) 'a12': _self.a12,
+    if (_self.a13 != 0) 'a13': _self.a13,
+    if (_self.a14 != 0) 'a14': _self.a14,
+    if (_self.a15 != 0) 'a15': _self.a15,
+    if (_self.a16 != 0) 'a16': _self.a16,
+    if (_self.a17 != 0) 'a17': _self.a17,
+    if (_self.a18 != 0) 'a18': _self.a18,
+    if (_self.a19 != 0) 'a19': _self.a19,
+    if (_self.a20 != 0) 'a20': _self.a20,
   };
 
   @override
@@ -781,24 +781,24 @@ mixin _$WideRequest on DwListRequest<Item> {
 }
 
 WideRequest $WideRequestFromJson(Map<String, Object?> json) => WideRequest(
-  a1: json['a1']! as int,
-  a2: json['a2']! as int,
-  a3: json['a3']! as int,
-  a4: json['a4']! as int,
-  a5: json['a5']! as int,
-  a6: json['a6']! as int,
-  a7: json['a7']! as int,
-  a8: json['a8']! as int,
-  a9: json['a9']! as int,
-  a10: json['a10']! as int,
-  a11: json['a11']! as int,
-  a12: json['a12']! as int,
-  a13: json['a13']! as int,
-  a14: json['a14']! as int,
-  a15: json['a15']! as int,
-  a16: json['a16']! as int,
-  a17: json['a17']! as int,
-  a18: json['a18']! as int,
-  a19: json['a19']! as int,
-  a20: json['a20']! as int,
+  a1: json['a1'] == null ? 0 : json['a1']! as int,
+  a2: json['a2'] == null ? 0 : json['a2']! as int,
+  a3: json['a3'] == null ? 0 : json['a3']! as int,
+  a4: json['a4'] == null ? 0 : json['a4']! as int,
+  a5: json['a5'] == null ? 0 : json['a5']! as int,
+  a6: json['a6'] == null ? 0 : json['a6']! as int,
+  a7: json['a7'] == null ? 0 : json['a7']! as int,
+  a8: json['a8'] == null ? 0 : json['a8']! as int,
+  a9: json['a9'] == null ? 0 : json['a9']! as int,
+  a10: json['a10'] == null ? 0 : json['a10']! as int,
+  a11: json['a11'] == null ? 0 : json['a11']! as int,
+  a12: json['a12'] == null ? 0 : json['a12']! as int,
+  a13: json['a13'] == null ? 0 : json['a13']! as int,
+  a14: json['a14'] == null ? 0 : json['a14']! as int,
+  a15: json['a15'] == null ? 0 : json['a15']! as int,
+  a16: json['a16'] == null ? 0 : json['a16']! as int,
+  a17: json['a17'] == null ? 0 : json['a17']! as int,
+  a18: json['a18'] == null ? 0 : json['a18']! as int,
+  a19: json['a19'] == null ? 0 : json['a19']! as int,
+  a20: json['a20'] == null ? 0 : json['a20']! as int,
 );

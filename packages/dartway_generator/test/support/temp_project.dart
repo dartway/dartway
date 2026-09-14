@@ -217,3 +217,16 @@ void expectGolden(String actual, String name) {
   );
   expect(actual, file.readAsStringSync(), reason: 'golden $name');
 }
+
+/// Compares [actual] with the framework reference file at [path] (a fixture
+/// of another package that the generator must reproduce byte for byte).
+/// `DW_UPDATE_GOLDENS=1` rewrites the reference instead — review the diff.
+void expectReference(String actual, String path) {
+  final file = File(path);
+  if (Platform.environment['DW_UPDATE_GOLDENS'] == '1') {
+    file.parent.createSync(recursive: true);
+    file.writeAsStringSync(actual);
+    return;
+  }
+  expect(actual, file.readAsStringSync(), reason: path);
+}

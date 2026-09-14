@@ -22,7 +22,7 @@ abstract final class SchemaEmitter {
       ..writeln()
       ..writeln(
         'final DwDatabaseSchema ${camelCase(baseName)}Schema = DwDatabaseSchema(['
-        '${sorted.map((entity) => '${entity.name}.table').join(', ')}]);',
+        '${sorted.map((entity) => '${entity.name}.$tableDefMember').join(', ')}]);',
       )
       ..writeln()
       ..write('extension ${pascalCase(baseName)}Db on DwDatabaseHandle {');
@@ -31,7 +31,7 @@ abstract final class SchemaEmitter {
           .map(
             (entity) =>
                 '\nDwTableRepository<${entity.name}, ${entity.tableClass}> get '
-                '${entity.repositoryGetter} => repository(${entity.name}.table);\n',
+                '${entity.repositoryGetter} => repository(${entity.name}.$tableDefMember);\n',
           )
           .join(),
     );

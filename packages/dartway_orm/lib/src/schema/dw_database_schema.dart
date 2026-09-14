@@ -12,7 +12,7 @@ import '../entity/dw_table_def.dart';
 /// value type so they compare with `==` and diff with one function.
 final class DwDatabaseSchema {
   DwDatabaseSchema(Iterable<DwTableDef> tables)
-    : this.fromTables([for (final table in tables) table.schema]);
+    : this.fromTables([for (final table in tables) table.tableSchema]);
 
   DwDatabaseSchema.fromTables(Iterable<DwTableSchema> tables)
     : tables = List.unmodifiable(tables.sortedBy((table) => table.name)) {

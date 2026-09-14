@@ -172,7 +172,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
       ],
       [for (final column in columns) _encode(column, values[column.name]), id],
     );
-    if (result.isEmpty) throw DwRowNotFound(table.name, id);
+    if (result.isEmpty) throw DwRowNotFound(table.tableName, id);
     return _decode(result).first;
   }
 
@@ -225,7 +225,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     for (final column in _sql.insertColumns(withId: row.id != null)) {
       if (!values.containsKey(column.name)) {
         throw StateError(
-          '${table.name}.toRow has no value for "${column.name}"; regenerate the table',
+          '${table.tableName}.toRow has no value for "${column.name}"; regenerate the table',
         );
       }
     }
@@ -238,7 +238,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   void _checkLock(DwRowLock? lock) {
     if (lock != null && !_db.inTransaction) {
       throw StateError(
-        '${lock.name} on "${table.name}" needs a transaction: outside one the '
+        '${lock.name} on "${table.tableName}" needs a transaction: outside one the '
         'row lock ends with the statement',
       );
     }
@@ -258,17 +258,19 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   ];
 
   @override
-  String toString() => 'DwTableRepository(${table.name})';
+  String toString() => 'DwTableRepository(${table.tableName})';
 }
 
 /// Statement text of a table that does not depend on a call, built once per
 /// table object.
 final class _DwTableSql {
   _DwTableSql(DwTableDef table)
-    : table = dwQuoteIdentifier(table.name),
-      columns = List.unmodifiable(table.columns) {
+    : table = dwQuoteIdentifier(table.tableName),
+      columns = List.unmodifiable(table.tableColumns) {
     if (columns.isEmpty || !columns.first.primaryKey) {
-      throw StateError('${table.name}.columns must start with the id column');
+      throw StateError(
+        '${table.tableName}.tableColumns must start with the id column',
+      );
     }
     final list = columns.map((column) => column.sql).join(', ');
     returning = ' RETURNING $list';

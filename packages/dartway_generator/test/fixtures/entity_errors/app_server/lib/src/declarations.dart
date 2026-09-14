@@ -8,7 +8,7 @@ final class NoTableRow extends DwTableRow with _$NoTableRow {
   @override
   final int? id;
 
-  static const table = NoTableTable();
+  static const tableDef = NoTableTable();
 }
 
 @DwSqlTable('no_static_table')
@@ -26,19 +26,33 @@ final class WrongIdRow extends DwTableRow with _$WrongIdRow {
   @override
   final int id;
 
-  static const table = WrongIdTable();
+  static const tableDef = WrongIdTable();
 }
 
 @DwSqlTable('shadowing')
 final class ShadowingRow extends DwTableRow with _$ShadowingRow {
-  const ShadowingRow({this.id, required this.name, required this.columns});
+  const ShadowingRow({
+    this.id,
+    required this.tableName,
+    required this.tableColumns,
+  });
 
   @override
   final int? id;
-  final String name;
-  final int columns;
+  final String tableName;
+  final int tableColumns;
 
-  static const table = ShadowingTable();
+  static const tableDef = ShadowingTable();
+}
+
+/// A field cannot take the name of the static table definition.
+@DwSqlTable('table_def_field')
+final class TableDefFieldRow extends DwTableRow with _$TableDefFieldRow {
+  const TableDefFieldRow({this.id, required this.tableDef});
+
+  @override
+  final int? id;
+  final int tableDef;
 }
 
 /// The table and repository names derive from the name without `Row`.
@@ -49,7 +63,7 @@ final class ClubSession extends DwTableRow with _$ClubSession {
   @override
   final int? id;
 
-  static const table = ClubSessionTable();
+  static const tableDef = ClubSessionTable();
 }
 
 /// Nothing before the suffix.
@@ -60,5 +74,5 @@ final class Row extends DwTableRow with _$Row {
   @override
   final int? id;
 
-  static const table = RowTable();
+  static const tableDef = RowTable();
 }

@@ -32,7 +32,7 @@ final class ChatChannelTable extends DwTableDef<ChatChannelRow> {
       const DwTableColumn('title', DwColumnType.text);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [id, title];
+  List<DwTableColumn<Object?>> get tableColumns => [id, title];
 
   @override
   ChatChannelRow fromRow(DwResultRow row) =>
@@ -151,7 +151,7 @@ final class ChatMessageTable extends DwTableDef<ChatMessageRow> {
       const DwTableColumn('deleted_at', DwColumnType.timestamptz);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     channelId,
     authorProfileId,
@@ -276,7 +276,7 @@ final class ChatMessageAttachmentTable
       const DwTableColumn('height', DwColumnType.bigint);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     messageId,
     fileId,
@@ -369,7 +369,7 @@ final class ChatMessageReactionTable
       const DwTableColumn('reaction', DwEnumType(ChatReaction.values));
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     messageId,
     profileId,
@@ -469,7 +469,7 @@ final class ChatReadPositionTable extends DwTableDef<ChatReadPositionRow> {
       const DwTableColumn('sent_at', DwColumnType.timestamptz);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     profileId,
     channelId,

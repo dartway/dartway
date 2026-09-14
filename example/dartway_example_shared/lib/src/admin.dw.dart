@@ -79,9 +79,9 @@ mixin _$ListUserProfiles on DwTableRequest<UserProfile> {
 
   @override
   Map<String, Object?> toJson() => {
-    'page': _self.page,
-    'pageSize': _self.pageSize,
-    'search': _self.search,
+    if (_self.page != 1) 'page': _self.page,
+    if (_self.pageSize != 10) 'pageSize': _self.pageSize,
+    if (_self.search != '') 'search': _self.search,
     if (_self.role != null) 'role': _self.role!.name,
   };
 
@@ -110,9 +110,9 @@ mixin _$ListUserProfiles on DwTableRequest<UserProfile> {
 
 ListUserProfiles $ListUserProfilesFromJson(Map<String, Object?> json) =>
     ListUserProfiles(
-      page: json['page']! as int,
-      pageSize: json['pageSize']! as int,
-      search: json['search']! as String,
+      page: json['page'] == null ? 1 : json['page']! as int,
+      pageSize: json['pageSize'] == null ? 10 : json['pageSize']! as int,
+      search: json['search'] == null ? '' : json['search']! as String,
       role: json['role'] == null
           ? null
           : DwJsonCodec.decodeEnum(json['role'], UserRole.values),

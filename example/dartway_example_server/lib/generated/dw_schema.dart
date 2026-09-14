@@ -7,54 +7,54 @@ import '../src/entities/content.dart';
 import '../src/entities/people.dart';
 
 final DwDatabaseSchema dartwayExampleSchema = DwDatabaseSchema([
-  AppSettingRow.table,
-  ChatChannelRow.table,
-  ChatMessageAttachmentRow.table,
-  ChatMessageReactionRow.table,
-  ChatMessageRow.table,
-  ChatReadPositionRow.table,
-  ClubServiceRow.table,
-  ClubSessionRow.table,
-  NewsPostRow.table,
-  SessionBookingRow.table,
-  SessionReviewRow.table,
-  UserProfileRow.table,
+  AppSettingRow.tableDef,
+  ChatChannelRow.tableDef,
+  ChatMessageAttachmentRow.tableDef,
+  ChatMessageReactionRow.tableDef,
+  ChatMessageRow.tableDef,
+  ChatReadPositionRow.tableDef,
+  ClubServiceRow.tableDef,
+  ClubSessionRow.tableDef,
+  NewsPostRow.tableDef,
+  SessionBookingRow.tableDef,
+  SessionReviewRow.tableDef,
+  UserProfileRow.tableDef,
 ]);
 
 extension DartwayExampleDb on DwDatabaseHandle {
   DwTableRepository<AppSettingRow, AppSettingTable> get appSettings =>
-      repository(AppSettingRow.table);
+      repository(AppSettingRow.tableDef);
 
   DwTableRepository<ChatChannelRow, ChatChannelTable> get chatChannels =>
-      repository(ChatChannelRow.table);
+      repository(ChatChannelRow.tableDef);
 
   DwTableRepository<ChatMessageAttachmentRow, ChatMessageAttachmentTable>
-  get chatMessageAttachments => repository(ChatMessageAttachmentRow.table);
+  get chatMessageAttachments => repository(ChatMessageAttachmentRow.tableDef);
 
   DwTableRepository<ChatMessageReactionRow, ChatMessageReactionTable>
-  get chatMessageReactions => repository(ChatMessageReactionRow.table);
+  get chatMessageReactions => repository(ChatMessageReactionRow.tableDef);
 
   DwTableRepository<ChatMessageRow, ChatMessageTable> get chatMessages =>
-      repository(ChatMessageRow.table);
+      repository(ChatMessageRow.tableDef);
 
   DwTableRepository<ChatReadPositionRow, ChatReadPositionTable>
-  get chatReadPositions => repository(ChatReadPositionRow.table);
+  get chatReadPositions => repository(ChatReadPositionRow.tableDef);
 
   DwTableRepository<ClubServiceRow, ClubServiceTable> get clubServices =>
-      repository(ClubServiceRow.table);
+      repository(ClubServiceRow.tableDef);
 
   DwTableRepository<ClubSessionRow, ClubSessionTable> get clubSessions =>
-      repository(ClubSessionRow.table);
+      repository(ClubSessionRow.tableDef);
 
   DwTableRepository<NewsPostRow, NewsPostTable> get newsPosts =>
-      repository(NewsPostRow.table);
+      repository(NewsPostRow.tableDef);
 
   DwTableRepository<SessionBookingRow, SessionBookingTable>
-  get sessionBookings => repository(SessionBookingRow.table);
+  get sessionBookings => repository(SessionBookingRow.tableDef);
 
   DwTableRepository<SessionReviewRow, SessionReviewTable> get sessionReviews =>
-      repository(SessionReviewRow.table);
+      repository(SessionReviewRow.tableDef);
 
   DwTableRepository<UserProfileRow, UserProfileTable> get userProfiles =>
-      repository(UserProfileRow.table);
+      repository(UserProfileRow.tableDef);
 }

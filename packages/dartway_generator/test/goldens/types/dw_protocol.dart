@@ -2,6 +2,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import '../src/catalog.dart';
+import '../src/defaults.dart';
 import '../src/units.dart';
 
 final DwWireProtocol appProtocol = DwWireProtocol([
@@ -15,10 +16,14 @@ final DwWireProtocol appProtocol = DwWireProtocol([
   DwProtocolEntry<ItemTable>('ItemTable', $ItemTableFromJson),
   DwProtocolEntry<ListItems>('ListItems', $ListItemsFromJson),
   DwProtocolEntry<ListPinnedItems>('ListPinnedItems', $ListPinnedItemsFromJson),
+  DwProtocolEntry<Loose>('Loose', $LooseFromJson),
   DwProtocolEntry<OnlyPatches>('OnlyPatches', $OnlyPatchesFromJson),
   DwProtocolEntry<Ref>('Ref', $RefFromJson),
   DwProtocolEntry<RemoveItem>('RemoveItem', $RemoveItemFromJson),
+  DwProtocolEntry<SearchItems>('SearchItems', $SearchItemsFromJson),
   DwProtocolEntry<SessionHolder>('SessionHolder', $SessionHolderFromJson),
+  DwProtocolEntry<Settings>('Settings', $SettingsFromJson),
   DwProtocolEntry<Stats>('Stats', $StatsFromJson),
+  DwProtocolEntry<UpdateSettings>('UpdateSettings', $UpdateSettingsFromJson),
   DwProtocolEntry<WideRequest>('WideRequest', $WideRequestFromJson),
 ], include: DwWireProtocol.core);

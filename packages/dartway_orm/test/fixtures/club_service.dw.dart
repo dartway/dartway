@@ -101,7 +101,7 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
   );
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     title,
     kind,

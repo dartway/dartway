@@ -22,7 +22,7 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   final int price;
   final String? imageUrl;
 
-  static const table = ClubServiceTable();
+  static const tableDef = ClubServiceTable();
 }
 
 @DwSqlTable(
@@ -58,7 +58,7 @@ final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
   /// per read.
   final int bookedCount;
 
-  static const table = ClubSessionTable();
+  static const tableDef = ClubSessionTable();
 }
 
 @DwSqlTable(
@@ -89,7 +89,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
   final BookingStatus status;
   final DateTime createdAt;
 
-  static const table = SessionBookingTable();
+  static const tableDef = SessionBookingTable();
 }
 
 @DwSqlTable('session_review')
@@ -114,5 +114,5 @@ final class SessionReviewRow extends DwTableRow with _$SessionReviewRow {
   final String? text;
   final DateTime createdAt;
 
-  static const table = SessionReviewTable();
+  static const tableDef = SessionReviewTable();
 }

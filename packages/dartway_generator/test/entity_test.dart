@@ -32,23 +32,44 @@ void main() {
 
     for (final name in entities) {
       test('$name.dw.dart is reproduced', () {
-        expect(
+        expectReference(
           project.readFile('fixture_server/lib/$name.dw.dart'),
-          File(p.join(ormFixtures, '$name.dw.dart')).readAsStringSync(),
+          p.join(ormFixtures, '$name.dw.dart'),
         );
       });
     }
 
     test('generated/dw_schema.dart is reproduced', () {
-      expect(
+      expectReference(
         project.readFile('fixture_server/lib/generated/dw_schema.dart'),
-        File(
-          p.join(ormFixtures, 'generated', 'dw_schema.dart'),
-        ).readAsStringSync(),
+        p.join(ormFixtures, 'generated', 'dw_schema.dart'),
       );
     });
 
     test('generated code is clean under strict analysis', () async {
+      expect(await project.analyze('fixture_server'), isNull);
+    });
+  });
+
+  group('row fields named like table members (D-040)', () {
+    late TempProject project;
+    final fixture = p.join(ormFixtures, 'field_names');
+
+    setUp(() async {
+      project = TempProject.create(['fixture_server']);
+      project.writeFile(
+        'fixture_server/lib/catalog_entry.dart',
+        File(p.join(fixture, 'catalog_entry.dart')).readAsStringSync(),
+      );
+      await project.generateClean();
+    });
+
+    test('name, columns, schema, table, row, where and order are legal '
+        'fields; the part is the ORM fixture', () async {
+      expectReference(
+        project.readFile('fixture_server/lib/catalog_entry.dw.dart'),
+        p.join(fixture, 'catalog_entry.dw.dart'),
+      );
       expect(await project.analyze('fixture_server'), isNull);
     });
   });
@@ -72,7 +93,7 @@ final class MemoRow extends DwTableRow with _\$MemoRow {
 
   final String text;
 
-  static const table = MemoTable();
+  static const tableDef = MemoTable();
 }
 ''');
     await project.generateClean();

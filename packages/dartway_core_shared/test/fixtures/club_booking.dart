@@ -13,6 +13,7 @@ final class ClubBooking extends DwDataObject with _$ClubBooking {
     required this.startsAt,
     this.note,
     this.tags = const [],
+    this.seats = 1,
   });
 
   @override
@@ -21,13 +22,15 @@ final class ClubBooking extends DwDataObject with _$ClubBooking {
   final DateTime startsAt;
   final String? note;
   final List<String> tags;
+  final int seats;
 }
 
 final class ListMyBookings extends DwListRequest<ClubBooking>
     with _$ListMyBookings {
-  const ListMyBookings({this.status});
+  const ListMyBookings({this.status, this.includePast = false});
 
   final BookingStatus? status;
+  final bool includePast;
 
   @override
   bool matches(ClubBooking item) => status == null || item.status == status;

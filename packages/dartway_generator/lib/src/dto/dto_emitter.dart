@@ -46,20 +46,25 @@ abstract final class DtoEmitter {
       final key = dartString(field.name);
       final self = '_self.${field.name}';
       final type = field.type;
+      final defaultValue = field.defaultValue;
       if (type is PatchWire) {
         final encode = JsonCodecWriter.encodeValue(type.inner, 'v');
         patches.add(
           'DwJsonCodec.writePatch(json, $key, $self, (v) => $encode);',
         );
+      } else if (defaultValue != null) {
+        // Left off the wire when equal to its default, which the decoder
+        // restores (D-041). A nullable field with a non-null default writes
+        // its null out: absent would mean the default.
+        final value = type.nullable
+            ? _encodeNullable(type, self)
+            : JsonCodecWriter.encodeValue(type, self);
+        entries.add('if (${_differs(field, defaultValue)}) $key: $value');
       } else if (type.nullable) {
         final value = type.isIdentity
             ? self
             : JsonCodecWriter.encodeValue(type, '$self!');
         entries.add('if ($self != null) $key: $value');
-      } else if (field.omitWhenEmpty) {
-        entries.add(
-          'if ($self.isNotEmpty) $key: ${JsonCodecWriter.encodeValue(type, self)}',
-        );
       } else {
         entries.add('$key: ${JsonCodecWriter.encodeValue(type, self)}');
       }
@@ -74,6 +79,33 @@ abstract final class DtoEmitter {
         '${patches.join('\n')}\n'
         'return json;\n'
         '}';
+  }
+
+  /// Whether the field's value differs from its [defaultValue].
+  static String _differs(DtoField field, DtoDefault defaultValue) {
+    final self = '_self.${field.name}';
+    if (defaultValue.isEmptyCollection && !field.type.nullable) {
+      return '$self.isNotEmpty';
+    }
+    final expression = defaultValue.expression;
+    return switch (field.type) {
+      ScalarWire(dartName: 'bool', nullable: false) =>
+        expression == 'true' ? '!$self' : self,
+      ListWire() => '!dwListEquals($self, $expression)',
+      MapWire() => '!dwMapEquals($self, $expression)',
+      _ => '$self != $expression',
+    };
+  }
+
+  /// Encodes [self], a getter of the nullable [type], null included.
+  static String _encodeNullable(WireType type, String self) {
+    if (type.isIdentity) return self;
+    return switch (type) {
+      EnumWire() => '$self?.name',
+      DtoWire() => '$self?.toJson()',
+      _ =>
+        '$self == null ? null : ${JsonCodecWriter.encodeValue(type, '$self!')}',
+    };
   }
 
   static String _fromJson(DtoClass dto) {
@@ -95,10 +127,16 @@ abstract final class DtoEmitter {
       final decode = JsonCodecWriter.decodeValue(type.inner, 'v');
       return 'DwJsonCodec.readPatch(json, $key, (v) => $decode)';
     }
-    if (field.omitWhenEmpty && !type.nullable) {
-      final empty = type is MapWire ? 'const {}' : 'const []';
-      return '$json == null ? $empty : ${JsonCodecWriter.decodeValue(type, json)}';
+    final defaultValue = field.defaultValue;
+    if (defaultValue == null) return JsonCodecWriter.decode(type, json);
+    if (type.nullable) {
+      // Present null is null; only an absent key means the default.
+      final decoded = JsonCodecWriter.decode(type, json);
+      return 'json.containsKey($key) ? ($decoded) : ${defaultValue.expression}';
     }
-    return JsonCodecWriter.decode(type, json);
+    final fallback = defaultValue.isEmptyCollection
+        ? (type is MapWire ? 'const {}' : 'const []')
+        : defaultValue.expression;
+    return '$json == null ? $fallback : ${JsonCodecWriter.decodeValue(type, json)}';
   }
 }

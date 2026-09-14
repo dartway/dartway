@@ -49,5 +49,5 @@ final class UserProfileRow extends DwTableRow with _$UserProfileRow {
   /// the server: no data object carries it.
   final String? testVerificationCode;
 
-  static const table = UserProfileTable();
+  static const tableDef = UserProfileTable();
 }

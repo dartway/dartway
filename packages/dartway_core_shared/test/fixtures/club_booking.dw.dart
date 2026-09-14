@@ -14,6 +14,7 @@ mixin _$ClubBooking on DwDataObject {
     'startsAt': DwJsonCodec.encodeDateTime(_self.startsAt),
     if (_self.note != null) 'note': _self.note,
     if (_self.tags.isNotEmpty) 'tags': _self.tags,
+    if (_self.seats != 1) 'seats': _self.seats,
   };
 
   @override
@@ -24,7 +25,8 @@ mixin _$ClubBooking on DwDataObject {
           other.status == _self.status &&
           other.startsAt == _self.startsAt &&
           other.note == _self.note &&
-          dwListEquals(other.tags, _self.tags);
+          dwListEquals(other.tags, _self.tags) &&
+          other.seats == _self.seats;
 
   @override
   int get hashCode => Object.hash(
@@ -33,11 +35,12 @@ mixin _$ClubBooking on DwDataObject {
     _self.startsAt,
     _self.note,
     Object.hashAll(_self.tags),
+    _self.seats,
   );
 
   @override
   String toString() =>
-      'ClubBooking(id: ${_self.id}, status: ${_self.status}, startsAt: ${_self.startsAt}, note: ${_self.note}, tags: ${_self.tags})';
+      'ClubBooking(id: ${_self.id}, status: ${_self.status}, startsAt: ${_self.startsAt}, note: ${_self.note}, tags: ${_self.tags}, seats: ${_self.seats})';
 }
 
 ClubBooking $ClubBookingFromJson(Map<String, Object?> json) => ClubBooking(
@@ -48,6 +51,7 @@ ClubBooking $ClubBookingFromJson(Map<String, Object?> json) => ClubBooking(
   tags: json['tags'] == null
       ? const []
       : DwJsonCodec.decodeList(json['tags'], (e) => e! as String),
+  seats: json['seats'] == null ? 1 : json['seats']! as int,
 );
 
 extension ClubBookingCopyWith on ClubBooking {
@@ -57,12 +61,14 @@ extension ClubBookingCopyWith on ClubBooking {
     DateTime? startsAt,
     DwFieldPatch<String> note = const DwFieldPatch.keep(),
     List<String>? tags,
+    int? seats,
   }) => ClubBooking(
     id: id ?? this.id,
     status: status ?? this.status,
     startsAt: startsAt ?? this.startsAt,
     note: note.apply(this.note),
     tags: tags ?? this.tags,
+    seats: seats ?? this.seats,
   );
 }
 
@@ -75,18 +81,23 @@ mixin _$ListMyBookings on DwListRequest<ClubBooking> {
   @override
   Map<String, Object?> toJson() => {
     if (_self.status != null) 'status': _self.status!.name,
+    if (_self.includePast) 'includePast': _self.includePast,
   };
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ListMyBookings && other.status == _self.status;
+      other is ListMyBookings &&
+          other.status == _self.status &&
+          other.includePast == _self.includePast;
 
   @override
-  int get hashCode => Object.hash(ListMyBookings, _self.status);
+  int get hashCode =>
+      Object.hash(ListMyBookings, _self.status, _self.includePast);
 
   @override
-  String toString() => 'ListMyBookings(status: ${_self.status})';
+  String toString() =>
+      'ListMyBookings(status: ${_self.status}, includePast: ${_self.includePast})';
 }
 
 ListMyBookings $ListMyBookingsFromJson(Map<String, Object?> json) =>
@@ -94,6 +105,9 @@ ListMyBookings $ListMyBookingsFromJson(Map<String, Object?> json) =>
       status: json['status'] == null
           ? null
           : DwJsonCodec.decodeEnum(json['status'], BookingStatus.values),
+      includePast: json['includePast'] == null
+          ? false
+          : json['includePast']! as bool,
     );
 
 mixin _$RenameBooking on DwActionCommand<ClubBooking> {

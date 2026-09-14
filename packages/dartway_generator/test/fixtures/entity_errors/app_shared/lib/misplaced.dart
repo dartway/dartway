@@ -9,5 +9,5 @@ final class MisplacedRow extends DwTableRow with _$MisplacedRow {
   @override
   final int? id;
 
-  static const table = MisplacedTable();
+  static const tableDef = MisplacedTable();
 }

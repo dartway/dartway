@@ -27,7 +27,7 @@ final class NewsPostRow extends DwTableRow with _$NewsPostRow {
   final String text;
   final DateTime createdAt;
 
-  static const table = NewsPostTable();
+  static const tableDef = NewsPostTable();
 }
 
 @DwSqlTable('app_setting')
@@ -42,5 +42,5 @@ final class AppSettingRow extends DwTableRow with _$AppSettingRow {
 
   final String value;
 
-  static const table = AppSettingTable();
+  static const tableDef = AppSettingTable();
 }

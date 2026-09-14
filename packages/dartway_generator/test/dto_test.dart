@@ -23,12 +23,33 @@ void main() {
 
       // The reference is hand-written in `dart format` output, so the
       // generator must reproduce it byte for byte.
-      expect(
+      expectReference(
         project.readFile('app_shared/lib/src/club_booking.dw.dart'),
-        File(p.join(fixtures, 'club_booking.dw.dart')).readAsStringSync(),
+        p.join(fixtures, 'club_booking.dw.dart'),
       );
       expect(await project.analyze('app_shared'), isNull);
     });
+  });
+
+  test('dartway_core_server defaults fixture is reproduced (D-041)', () async {
+    // The server suite calls these DTOs over real HTTP with the defaulted
+    // fields left out; their part must be exactly what the generator writes.
+    final project = TempProject.create(['app_shared']);
+    final support = p.join(
+      frameworkPackages,
+      'dartway_core_server',
+      'test',
+      'support',
+    );
+    project.writeFile(
+      'app_shared/lib/src/defaults.dart',
+      File(p.join(support, 'defaults.dart')).readAsStringSync(),
+    );
+    await project.generateClean();
+    expectReference(
+      project.readFile('app_shared/lib/src/defaults.dw.dart'),
+      p.join(support, 'defaults.dw.dart'),
+    );
   });
 
   group('every supported type', () {
@@ -41,7 +62,7 @@ void main() {
     });
 
     test('parts and registry match the goldens', () {
-      for (final name in ['catalog', 'units', 'empty']) {
+      for (final name in ['catalog', 'defaults', 'units', 'empty']) {
         expectGolden(
           project.readFile('app_shared/lib/src/$name.dw.dart'),
           'types/$name.dw.dart',
@@ -72,7 +93,7 @@ void main() {
       final project = TempProject.create(['app_shared']);
       project.copyFixture('types');
       final first = await project.generateClean();
-      expect(first.written, hasLength(4));
+      expect(first.written, hasLength(5));
       final stamps = {
         for (final path in first.written) path: File(path).lastModifiedSync(),
       };
@@ -86,7 +107,7 @@ void main() {
       }
       expect(
         second.summary,
-        startsWith('dartway generate: 0 written, 4 unchanged, 0 removed'),
+        startsWith('dartway generate: 0 written, 5 unchanged, 0 removed'),
       );
     });
 
@@ -109,7 +130,7 @@ void main() {
       final dryRun = await project.generate(check: true);
       expect(dryRun.diagnostics, isEmpty);
       expect(dryRun.isUpToDate, isFalse);
-      expect(dryRun.written, hasLength(4));
+      expect(dryRun.written, hasLength(5));
       expect(project.exists('app_shared/lib/src/catalog.dw.dart'), isFalse);
 
       await project.generateClean();

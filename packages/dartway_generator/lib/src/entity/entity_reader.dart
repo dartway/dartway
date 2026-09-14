@@ -75,12 +75,16 @@ final class EntityReader {
     }
 
     var valid = _checkIdentifier(element, tableName, 'table name');
-    if (!_declaresTable(element)) {
+    if (element.getField(tableDefMember) case final field?
+        when !field.isStatic) {
+      // Reported at the field: it takes the name the declaration needs.
+      valid = false;
+    } else if (!_declaresTable(element)) {
       diagnostics.add(
         DwGenerationDiagnostic.at(
           element,
           'row class `$name` must declare its table: add '
-          '`static const table = ${entityName}Table();`',
+          '`static const $tableDefMember = ${entityName}Table();`',
         ),
       );
       valid = false;
@@ -125,6 +129,19 @@ final class EntityReader {
             column: null,
           ),
         );
+        continue;
+      }
+
+      if (fieldName == tableDefMember) {
+        diagnostics.add(
+          DwGenerationDiagnostic.at(
+            location,
+            'field `$fieldName` of row class `$name` would clash with the '
+            '`static const $tableDefMember` every row class declares; rename '
+            "the field (the column can keep its name with `@DwColumnName('...')`)",
+          ),
+        );
+        valid = false;
         continue;
       }
 
@@ -383,7 +400,7 @@ final class EntityReader {
   }
 
   static bool _declaresTable(ClassElement element) {
-    final field = element.getField('table');
+    final field = element.getField(tableDefMember);
     return field != null && field.isStatic && field.isConst;
   }
 
@@ -412,10 +429,10 @@ final class EntityReader {
       }
     } else {
       reserved.addAll(const [
-        'name',
-        'columns',
+        'tableName',
+        'tableColumns',
         'indexSchemas',
-        'schema',
+        'tableSchema',
         'fromRow',
         'toRow',
       ]);

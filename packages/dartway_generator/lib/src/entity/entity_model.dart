@@ -96,6 +96,11 @@ final class EntityClass {
   String get repositoryGetter => pluralCamelCase(entityName);
 }
 
+/// The static member every row class declares its table definition in:
+/// `static const tableDef = <Entity>Table();`. Named so that no row field
+/// wants it (a field `table` is common: a restaurant booking has one).
+const tableDefMember = 'tableDef';
+
 /// The suffix every row class name carries.
 const rowSuffix = 'Row';
 

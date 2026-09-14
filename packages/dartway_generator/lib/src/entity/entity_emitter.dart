@@ -33,13 +33,13 @@ abstract final class EntityEmitter {
     final members = <String>[
       'const ${entity.tableClass}() : super(${dartString(entity.tableName)});',
       for (final field in columns) _columnGetter(field),
-      '@override\nList<DwTableColumn<Object?>> get columns => '
+      '@override\nList<DwTableColumn<Object?>> get tableColumns => '
           '[id, ${columns.map((field) => field.name).join(', ')}];',
       if (entity.indexes.isNotEmpty)
         '@override\nList<DwIndexSchema> get indexSchemas => ['
             '${entity.indexes.map(_index).join(', ')}];',
       '@override\n$name fromRow(DwResultRow row) => $name('
-          '${entity.fields.map((field) => '${field.name}: row.decode(${field.name})').join(', ')});',
+          '${entity.fields.map((field) => '${field.name}: row.decode(${_column(field)})').join(', ')});',
       '@override\nMap<String, Object?> toRow($name row) => {'
           '${[
             // Absent before insert: the database assigns it.
@@ -51,6 +51,11 @@ abstract final class EntityEmitter {
         '${members.join('\n\n')}\n'
         '}';
   }
+
+  /// The column getter of [field] inside `fromRow`, whose parameter is `row`:
+  /// a field named `row` reaches its getter through `this`.
+  static String _column(EntityField field) =>
+      field.name == 'row' ? 'this.row' : field.name;
 
   static String _columnGetter(EntityField field) {
     final column = field.column!;

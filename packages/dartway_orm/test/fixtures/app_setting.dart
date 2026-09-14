@@ -35,5 +35,5 @@ final class AppSettingRow extends DwTableRow with _$AppSettingRow {
   @DwDefaultValue.now()
   final DateTime updatedAt;
 
-  static const table = AppSettingTable();
+  static const tableDef = AppSettingTable();
 }

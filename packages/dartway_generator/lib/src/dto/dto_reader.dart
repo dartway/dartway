@@ -8,15 +8,19 @@ import '../analysis/framework.dart';
 import '../analysis/library_names.dart';
 import '../analysis/wire_type.dart';
 import '../diagnostic.dart';
+import 'default_value_writer.dart';
 import 'dto_model.dart';
 
 /// Reads one concrete DTO class into a [DtoClass], reporting everything that
 /// stops it from being generated.
 final class DtoReader {
-  DtoReader(this.names, this.diagnostics) : types = WireTypeReader(names);
+  DtoReader(this.names, this.diagnostics)
+    : types = WireTypeReader(names),
+      defaults = DefaultValueWriter(names);
 
   final LibraryNames names;
   final WireTypeReader types;
+  final DefaultValueWriter defaults;
   final List<DwGenerationDiagnostic> diagnostics;
 
   DtoClass? read(
@@ -93,15 +97,33 @@ final class DtoReader {
         valid = false;
         continue;
       }
+      DtoDefault? defaultValue;
+      final parameter = field.parameter;
+      if (type is! PatchWire && parameter.hasDefaultValue) {
+        final value = parameter.computeConstantValue();
+        try {
+          defaultValue = value == null
+              ? throw const UnsupportedDefault('it does not evaluate')
+              : defaults.write(value);
+        } on UnsupportedDefault catch (problem) {
+          diagnostics.add(
+            DwGenerationDiagnostic.at(
+              location,
+              'the default of field `${field.name}` of `$name` cannot be '
+              'written into the generated decoder, which applies it to an '
+              'absent field: ${problem.reason}',
+            ),
+          );
+          valid = false;
+          continue;
+        }
+      }
       fields.add(
         DtoField(
           name: field.name,
           type: type,
           spelling: spelling,
-          omitWhenEmpty:
-              !type.nullable &&
-              (type is ListWire || type is MapWire) &&
-              _defaultsToEmpty(field.parameter),
+          defaultValue: defaultValue,
         ),
       );
     }
@@ -187,18 +209,5 @@ final class DtoReader {
       }
     }
     return false;
-  }
-
-  /// Whether the constructor default of [parameter] is an empty collection —
-  /// the only case in which an empty value can be left off the wire and still
-  /// decode to an equal object.
-  static bool _defaultsToEmpty(FormalParameterElement parameter) {
-    if (!parameter.hasDefaultValue) return false;
-    final value = parameter.computeConstantValue();
-    if (value == null) return false;
-    final list = value.toListValue();
-    if (list != null) return list.isEmpty;
-    final map = value.toMapValue();
-    return map != null && map.isEmpty;
   }
 }

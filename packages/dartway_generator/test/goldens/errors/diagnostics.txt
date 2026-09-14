@@ -10,6 +10,7 @@ app_shared/lib/src/declaration.dart:15:13: `Generic` is generic; a DTO class can
 app_shared/lib/src/declaration.dart:19:13: `Bare` extends DwWireObject directly; extend DwDataObject, a DwDataRequest kind or DwActionCommand
 app_shared/lib/src/declaration.dart:23:13: `Implements` must extend its DTO kind (`extends DwDataObject`, a DwDataRequest kind or DwActionCommand); implementing or mixing it in is not supported
 app_shared/lib/src/declaration.dart:29:13: `_Private` is private, but the generated protocol registry lives in another library and must name it; make the class public
+app_shared/lib/src/defaults.dart:13:23: the default of field `session` of `WithFrameworkDefault` cannot be written into the generated decoder, which applies it to an absent field: `DwAuthSession` is a framework DTO, whose fields the generator does not read
 app_shared/lib/src/duplicates_a.dart:5:13: DTO name `Twice` is declared more than once (also at duplicates_b.dart:5:13); wire names must be unique across the project
 app_shared/lib/src/duplicates_a.dart:10:13: DTO name `DwAuthSession` is already taken by a dartway_core_shared DTO; wire names must be unique, rename the class
 app_shared/lib/src/duplicates_b.dart:5:13: DTO name `Twice` is declared more than once (also at duplicates_a.dart:5:13); wire names must be unique across the project

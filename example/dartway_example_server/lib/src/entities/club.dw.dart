@@ -67,7 +67,7 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
       const DwTableColumn('image_url', DwColumnType.text);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     title,
     description,
@@ -169,7 +169,7 @@ final class ClubSessionTable extends DwTableDef<ClubSessionRow> {
       const DwTableColumn('booked_count', DwColumnType.bigint);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     serviceId,
     coachProfileId,
@@ -269,7 +269,7 @@ final class SessionBookingTable extends DwTableDef<SessionBookingRow> {
       const DwTableColumn('created_at', DwColumnType.timestamptz);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     sessionId,
     clientProfileId,
@@ -371,7 +371,7 @@ final class SessionReviewTable extends DwTableDef<SessionReviewRow> {
       const DwTableColumn('created_at', DwColumnType.timestamptz);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     bookingId,
     rating,

@@ -118,7 +118,11 @@ void main() {
     check(!minimalJson.containsKey(absent), 'Item omits empty/null $absent');
   }
   check(minimalJson.containsKey('ratings'), 'a list without default is kept');
-  check(minimalJson['weight'] == 0, 'a scalar default is still written');
+  check(!minimalJson.containsKey('weight'), 'a scalar default is omitted');
+  check(
+    full.toJson()['weight'] == 3,
+    'a scalar differing from its default is written',
+  );
   check(
     full != minimal && full.hashCode != minimal.hashCode,
     'different items differ',
@@ -218,6 +222,137 @@ void main() {
   );
   roundTrip(const OnlyPatches(note: DwFieldPatch.set('n')));
   roundTrip(const RemoveItem());
+
+  // Defaults (D-041): an absent field decodes to its default, a value equal
+  // to its default stays off the wire.
+  final created = DateTime.utc(2026, 9, 14);
+  final defaults = Settings(id: 1, createdAt: created);
+  final defaultsJson = wire(defaults.toJson())! as Map<String, Object?>;
+  check(
+    defaultsJson.keys.toList().join(',') == 'id,createdAt',
+    'defaults are omitted, got ${defaultsJson.keys}',
+  );
+  roundTrip(defaults);
+  check(
+    appProtocol.decodeAs<Settings>(<String, Object?>{
+          'id': 1,
+          'createdAt': DwJsonCodec.encodeDateTime(created),
+        }) ==
+        defaults,
+    'a JSON without defaulted fields decodes to the defaults',
+  );
+  final decodedDefaults = appProtocol.decodeAs<Settings>(defaultsJson);
+  check(
+    decodedDefaults.count == 3 &&
+        decodedDefaults.offset == -1 &&
+        decodedDefaults.enabled &&
+        decodedDefaults.title == defaultTitle &&
+        decodedDefaults.escaped == 'it\'s \$5\n\\' &&
+        decodedDefaults.ratio == 1 &&
+        decodedDefaults.color == Color.green &&
+        decodedDefaults.unit == Unit.kg &&
+        decodedDefaults.timeout == const Duration(seconds: 30) &&
+        decodedDefaults.label == 'none' &&
+        decodedDefaults.maybeColor == Color.red &&
+        decodedDefaults.note == null &&
+        decodedDefaults.startsAt == null &&
+        decodedDefaults.tags.join(',') == 'a,b' &&
+        decodedDefaults.empty.isEmpty &&
+        decodedDefaults.limits['max'] == 10 &&
+        decodedDefaults.noLimits.isEmpty &&
+        decodedDefaults.maybeTags!.single == 'x' &&
+        decodedDefaults.dimensions ==
+            const Dimensions(id: 'default', width: 1) &&
+        decodedDefaults.shelf.single.height == 0.5 &&
+        decodedDefaults.ref == Settings.fallbackRef &&
+        decodedDefaults.loose == const Loose.fixed(),
+    'every default is applied',
+  );
+  final changed = Settings(
+    id: 2,
+    count: 0,
+    offset: 0,
+    enabled: false,
+    title: '',
+    escaped: '',
+    ratio: 0.5,
+    color: Color.red,
+    unit: Unit.pcs,
+    timeout: Duration.zero,
+    label: null,
+    maybeColor: null,
+    note: 'n',
+    createdAt: created,
+    startsAt: created,
+    tags: const [],
+    empty: const [1],
+    limits: const {'max': 10},
+    noLimits: const {'x': true},
+    maybeTags: null,
+    dimensions: const Dimensions(id: 'default', width: 1, height: 2),
+    shelf: const [],
+    ref: const Ref(id: 'other'),
+    loose: Loose(id: 'loose'),
+  );
+  final changedBack = roundTrip(changed);
+  final changedJson = wire(changed.toJson())! as Map<String, Object?>;
+  check(changedJson.length == 24, 'every changed field is written');
+  check(
+    changedJson.containsKey('label') && changedJson['label'] == null,
+    'null differing from a non-null default is an explicit null',
+  );
+  check(
+    changedBack.label == null &&
+        changedBack.maybeColor == null &&
+        changedBack.maybeTags == null,
+    'an explicit null decodes to null, not to the default',
+  );
+  check(
+    appProtocol.decodeAs<Settings>({
+          ...changedJson,
+          'count': null,
+          'tags': null,
+        }).count ==
+        3,
+    'a null non-nullable defaulted field decodes to its default',
+  );
+
+  roundTrip(const SearchItems());
+  check(
+    const SearchItems().toJson().isEmpty,
+    'a request with only defaults is empty on the wire',
+  );
+  check(
+    appProtocol.decodeAs<SearchItems>(const <String, Object?>{}) ==
+        const SearchItems(),
+    'an empty request body decodes to the defaults',
+  );
+  roundTrip(
+    SearchItems(query: 'q', limit: 1, colors: const [], since: created),
+  );
+  check(
+    const UpdateSettings(settingsId: 1).toJson().keys.join(',') == 'settingsId',
+    'a command omits a kept patch and a default',
+  );
+  roundTrip(
+    const UpdateSettings(
+      settingsId: 1,
+      title: DwFieldPatch.clear(),
+      notify: false,
+    ),
+  );
+  check(
+    appProtocol.decodeAs<UpdateSettings>(const {'settingsId': 1}) ==
+        const UpdateSettings(settingsId: 1),
+    'a command without defaulted fields decodes',
+  );
+  var missingRequired = false;
+  try {
+    appProtocol.decodeAs<Settings>(const {'id': 1});
+  } on Object {
+    missingRequired = true;
+  }
+  check(missingRequired, 'a required field without default stays required');
 
   if (failures.isEmpty) {
     print('ok');

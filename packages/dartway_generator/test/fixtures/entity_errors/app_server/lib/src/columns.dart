@@ -39,7 +39,7 @@ final class ColumnsRow extends DwTableRow with _$ColumnsRow {
   @DwColumnName('same')
   final int alsoSame;
 
-  static const table = ColumnsTable();
+  static const tableDef = ColumnsTable();
 }
 
 @DwSqlTable('shared_name')
@@ -49,7 +49,7 @@ final class SameTableARow extends DwTableRow with _$SameTableARow {
   @override
   final int? id;
 
-  static const table = SameTableATable();
+  static const tableDef = SameTableATable();
 }
 
 @DwSqlTable('shared_name')
@@ -59,7 +59,7 @@ final class SameTableBRow extends DwTableRow with _$SameTableBRow {
   @override
   final int? id;
 
-  static const table = SameTableBTable();
+  static const tableDef = SameTableBTable();
 }
 
 @DwSqlTable(
@@ -71,5 +71,5 @@ final class LongNameRow extends DwTableRow with _$LongNameRow {
   @override
   final int? id;
 
-  static const table = LongNameTable();
+  static const tableDef = LongNameTable();
 }

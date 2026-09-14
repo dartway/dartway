@@ -107,7 +107,7 @@ mixin _$ChatMessageQuote on DwDataObject {
     'authorName': _self.authorName,
     'text': _self.text,
     'isDeleted': _self.isDeleted,
-    'hasAttachments': _self.hasAttachments,
+    if (_self.hasAttachments) 'hasAttachments': _self.hasAttachments,
   };
 
   @override
@@ -143,7 +143,9 @@ ChatMessageQuote $ChatMessageQuoteFromJson(Map<String, Object?> json) =>
       authorName: json['authorName']! as String,
       text: json['text']! as String,
       isDeleted: json['isDeleted']! as bool,
-      hasAttachments: json['hasAttachments']! as bool,
+      hasAttachments: json['hasAttachments'] == null
+          ? false
+          : json['hasAttachments']! as bool,
     );
 
 extension ChatMessageQuoteCopyWith on ChatMessageQuote {

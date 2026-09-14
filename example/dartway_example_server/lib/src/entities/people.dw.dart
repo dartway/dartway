@@ -106,7 +106,7 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
       const DwTableColumn('test_verification_code', DwColumnType.text);
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     accountId,
     phone,

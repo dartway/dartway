@@ -315,7 +315,7 @@ final class ClubSession extends DwEntity with _$ClubSession {
   final DateTime startsAt;
   final int capacity;
 
-  static const table = ClubSessionTable();         // declared by the author, typed by the generator
+  static const tableDef = ClubSessionTable();      // declared by the author, typed by the generator (D-040)
 }
 ```
 

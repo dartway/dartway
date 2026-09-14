@@ -80,7 +80,7 @@ final class ClubSessionTable extends DwTableDef<ClubSessionRow> {
       const DwTableColumn('labels', DwJsonListType<String>());
 
   @override
-  List<DwTableColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get tableColumns => [
     id,
     serviceId,
     previousSessionId,
