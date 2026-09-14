@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({required this.message, super.key});
 
-  final ChatMessageView message;
+  final ChatMessage message;
 
   @override
   Widget build(BuildContext context) {

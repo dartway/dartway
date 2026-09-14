@@ -1,5 +1,5 @@
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_router/dartway_router.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../dw_core.dart';

@@ -8,8 +8,9 @@ import 'package:gap/gap.dart';
 
 import 'widgets/admin_users_table.dart';
 
-/// Member management: search, role filter and inline role editing. Listing
-/// profiles and changing a role are both admin-only on the server.
+/// Member management: search, role filter, numbered pages and inline role
+/// editing. Listing profiles and changing a role are both admin-only on the
+/// server.
 class AdminUsersPage extends HookWidget implements DwFeature {
   const AdminUsersPage({super.key});
 
@@ -19,12 +20,15 @@ class AdminUsersPage extends HookWidget implements DwFeature {
     title: 'Members',
     purpose: 'An admin finds a person and changes what they are allowed to do.',
     behaviors: [
-      'Typing in the search field narrows the table as you type.',
-      'The role chips narrow it further; "all roles" clears that filter.',
+      'Members are listed by name, ten to a page, with the page and the total '
+          'under the table; the arrows switch pages.',
+      'Typing in the search field narrows the table once typing pauses; the '
+          'role chips narrow it further. Either returns to the first page.',
       'A role is changed inline in the table, without opening a form, and the '
           'change is confirmed before it is applied.',
       'A role changed or a profile edited — here, by another admin or by the '
-          'member — updates its row live.',
+          'member — updates its row live; a member signing up anywhere updates '
+          'the page and the total.',
     ],
     requirements: [
       'Only an admin lists profiles at all — the server refuses everyone '
@@ -33,16 +37,25 @@ class AdminUsersPage extends HookWidget implements DwFeature {
           'it comes from somewhere other than this table.',
     ],
     implementationNotes: [
-      'Search and role narrowing happen client-side over the one live list: '
-          'a request per keystroke would buy a club-sized table nothing.',
+      'Search, role and page are fields of the table request, so the server '
+          'pages and counts; the client holds one page at a time.',
+      'A pause in typing, not every keystroke, becomes a request.',
     ],
   );
+
+  static const _searchPause = Duration(milliseconds: 350);
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final searchQuery = useState('');
-    final roleFilter = useState<UserRole?>(null);
+    final searchInput = useState('');
+    final search = (useDebounced(searchInput.value, _searchPause) ?? '').trim();
+    final role = useState<UserRole?>(null);
+    // The page belongs to the filter it was chosen under: another filter
+    // starts from its first page, without asking for the old page first.
+    final filter = (search, role.value);
+    final chosenPage = useState((filter: filter, page: 1));
+    final page = chosenPage.value.filter == filter ? chosenPage.value.page : 1;
 
     return AdminScaffold(
       title: l10n.adminUsers,
@@ -50,8 +63,8 @@ class AdminUsersPage extends HookWidget implements DwFeature {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppTextFormField(
-            value: searchQuery.value,
-            onChanged: (value) => searchQuery.value = value,
+            value: searchInput.value,
+            onChanged: (value) => searchInput.value = value,
             labelText: l10n.searchLabel,
             hintText: l10n.searchHint,
           ),
@@ -61,22 +74,26 @@ class AdminUsersPage extends HookWidget implements DwFeature {
             children: [
               FilterChip(
                 label: Text(l10n.allRoles),
-                selected: roleFilter.value == null,
-                onSelected: (_) => roleFilter.value = null,
+                selected: role.value == null,
+                onSelected: (_) => role.value = null,
               ),
-              for (final role in UserRole.values)
+              for (final value in UserRole.values)
                 FilterChip(
-                  label: Text(l10n.roleName(role.name)),
-                  selected: roleFilter.value == role,
-                  onSelected: (_) => roleFilter.value = role,
+                  label: Text(l10n.roleName(value.name)),
+                  selected: role.value == value,
+                  onSelected: (_) => role.value = value,
                 ),
             ],
           ),
           const Gap(12),
           Expanded(
             child: AdminUsersTable(
-              searchQuery: searchQuery.value,
-              roleFilter: roleFilter.value,
+              request: ListUserProfiles(
+                page: page,
+                search: search,
+                role: role.value,
+              ),
+              onPage: (next) => chosenPage.value = (filter: filter, page: next),
             ),
           ),
         ],

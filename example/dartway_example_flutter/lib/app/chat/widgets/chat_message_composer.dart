@@ -7,9 +7,16 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 
 class ChatMessageComposer extends HookWidget implements DwFeature {
-  const ChatMessageComposer({required this.channel, super.key});
+  const ChatMessageComposer({
+    required this.channel,
+    required this.onSent,
+    super.key,
+  });
 
-  final ChatChannelView channel;
+  final ChatChannel channel;
+
+  /// The server accepted the message.
+  final VoidCallback onSent;
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
@@ -19,10 +26,11 @@ class ChatMessageComposer extends HookWidget implements DwFeature {
       'Sending clears the input once the server has accepted the message.',
       'An empty or whitespace-only message is not sent.',
       'The send button is disabled while a message is on its way.',
+      'After sending, the chat shows the newest messages.',
     ],
     implementationNotes: [
-      'The sent message is not added here: it comes back on the channel, like '
-          'everyone else\'s.',
+      'The sent message is not added here: it arrives in the answer to the '
+          'command, and on the channel for everyone else.',
     ],
   );
 
@@ -51,9 +59,13 @@ class ChatMessageComposer extends HookWidget implements DwFeature {
                   (_) => dw.command(
                     SendChatMessage(channelId: channel.id, text: text),
                   ),
-                  followUpIfMountedAction: (_, _) => draftText.value = '',
+                  followUpIfMountedAction: (_, _) {
+                    draftText.value = '';
+                    onSent();
+                  },
                 ),
           builder: (context, onPressed, busy) => IconButton.filled(
+            tooltip: context.l10n.sendMessage,
             onPressed: onPressed,
             icon: const Icon(Icons.send),
           ),

@@ -1,41 +1,47 @@
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 import 'app_l10n.dart';
 import 'refusal_text.dart';
+import 'update_required_page.dart';
 
-/// The app's DartWay core: `dw.request`, `dw.pages`, `dw.command`,
-/// `dw.action`, `dw.notify` — reachable from anywhere in the app.
+/// The app's DartWay core: `dw.request`, `dw.table`, `dw.window`,
+/// `dw.command`, `dw.action`, `dw.notify` — reachable from anywhere in the app.
 ///
 /// Assigned by [createExampleDwCore]: once by the app bootstrap, and once per
 /// test by a widget test, which disposes it in `tearDown`. It is not `final`
 /// for exactly that reason — the core holds no static state, so a test builds
 /// a fresh one against its own fake server rather than sharing the app's.
-late DwCore dw;
+late DwFlutterCore dw;
 
 /// Builds the core and makes it [dw]. Nothing connects until `dw.init()`.
 ///
-/// The app passes [endpoint] and keeps the session through the
+/// The app passes [baseUrl] and keeps the session through the
 /// shared-preferences plugin. A widget test passes the fake server's
-/// [connector], an in-memory [tokenStore] and short [clientOptions] instead —
-/// and with a token store of its own the core needs no storage plugin at all.
-DwCore createExampleDwCore({
-  required Uri endpoint,
-  String appVersion = 'local',
-  DwConnector? connector,
+/// [httpTransport] and [liveConnector], an in-memory [tokenStore] and short
+/// [clientOptions] instead — and with a token store of its own the core needs
+/// no storage plugin at all.
+DwFlutterCore createExampleDwCore({
+  required Uri baseUrl,
+  required String appVersion,
+  DwHttpTransport? httpTransport,
+  DwLiveConnector? liveConnector,
   DwTokenStore? tokenStore,
   DwClientOptions clientOptions = const DwClientOptions(),
-}) => dw = DwCore(
+}) => dw = DwFlutterCore(
   config: DwConfig(
     appVersion: appVersion,
     refusalText: (refusal) => refusalText(appL10n, refusal),
+    updateRequiredScreen: (context, refusal) =>
+        UpdateRequiredPage(refusal: refusal),
     onErrorReport: _onErrorReport,
   ),
   protocol: dartwayExampleProtocol,
-  endpoint: endpoint,
-  connector: connector,
+  baseUrl: baseUrl,
+  httpTransport: httpTransport,
+  liveConnector: liveConnector,
   tokenStore: tokenStore,
   clientOptions: clientOptions,
   plugins: [if (tokenStore == null) DwSharedPreferences()],

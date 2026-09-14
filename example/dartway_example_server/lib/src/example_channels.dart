@@ -1,14 +1,15 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_server/dartway_server.dart';
 
 import 'example_context.dart';
 
-/// Who may listen to what. Checked once, at subscription: everything published
-/// to a channel is readable by every subscriber of it.
+/// Who may listen to what. Checked once, at subscription — and only for a
+/// signed-in connection, which every subscription requires: everything
+/// published to a channel is readable by every subscriber of it.
 final exampleChannels = <DwChannelRule>[
-  DwChannelRule.single(ExampleChannel.schedule, canSubscribe: _signedIn),
-  DwChannelRule.single(ExampleChannel.news, canSubscribe: _signedIn),
-  DwChannelRule.single(ExampleChannel.settings, canSubscribe: _signedIn),
+  DwChannelRule.single(ExampleChannel.schedule, canSubscribe: _anyMember),
+  DwChannelRule.single(ExampleChannel.news, canSubscribe: _anyMember),
+  DwChannelRule.single(ExampleChannel.settings, canSubscribe: _anyMember),
   DwChannelRule.single(
     ExampleChannel.staffChannels,
     canSubscribe: (ctx) => ctx.isStaff,
@@ -21,15 +22,20 @@ final exampleChannels = <DwChannelRule>[
   DwChannelRule.keyed<int>(
     ExampleChannel.bookings,
     parseKey: int.parse,
-    canSubscribe: (ctx, profileId) async =>
-        (await ctx.profile).id == profileId || await ctx.isStaff,
+    canSubscribe: _ownAccount,
   ),
   DwChannelRule.keyed<int>(
     ExampleChannel.profile,
     parseKey: int.parse,
-    canSubscribe: (ctx, accountId) async => ctx.accountId == accountId,
+    canSubscribe: _ownAccount,
   ),
-  DwChannelRule.single(ExampleChannel.admin, canSubscribe: (ctx) => ctx.isAdmin),
+  DwChannelRule.single(
+    ExampleChannel.admin,
+    canSubscribe: (ctx) => ctx.isAdmin,
+  ),
 ];
 
-Future<bool> _signedIn(DwContext ctx) async => ctx.accountId != null;
+Future<bool> _anyMember(DwCallContext ctx) async => true;
+
+Future<bool> _ownAccount(DwCallContext ctx, int accountId) async =>
+    ctx.accountId == accountId;

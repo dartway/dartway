@@ -2,7 +2,7 @@ import 'package:dartway_example_flutter/app/bookings/widgets/booking_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';
-import 'package:dartway_example_flutter/shared/placeholder_views.dart';
+import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -42,14 +42,17 @@ class MyBookingsPage extends ConsumerWidget implements DwFeature {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final request = ListMyBookings(profileId: context.profile.id);
+    final request = ListMyBookings(accountId: context.profile.accountId);
 
     return AppScaffold.main(
       appBar: AppBar(title: AppText.title(context.l10n.tabBookings)),
       body: ref
           .watch(dw.request(request))
           .section(
-            loadingValue: PlaceholderViews.listOf(PlaceholderViews.booking, 3),
+            loadingValue: PlaceholderObjects.listOf(
+              PlaceholderObjects.booking,
+              3,
+            ),
             onRetry: () => ref.read(dw.request(request).notifier).refetch(),
             builder: (bookings) {
               if (bookings.isEmpty) {

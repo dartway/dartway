@@ -12,9 +12,10 @@ WORKDIR /workspace/dartway_example_flutter
 RUN flutter pub get
 
 # A web build compiles the server address into itself, so it has to be given
-# one: the app's WebSocket, `wss://<api domain>/dw`. The deploy passes it, which
-# is what keeps it declared in a single place — do not hardcode it here or in
-# the app. Building this image by hand means passing the argument by hand.
+# one: the origin its calls go to — the web app's own host, where `/dw/` and
+# `/health` are proxied to the server (`https://app.example.com`). The deploy
+# passes it, which keeps it declared in a single place — do not hardcode it
+# here or in the app. Building this image by hand means passing it by hand.
 ARG DW_BACKEND_URL
 RUN test -n "$DW_BACKEND_URL"
 RUN flutter build web --release \

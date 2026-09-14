@@ -17,7 +17,7 @@ final Map<String, DwRefusalCode> _codes = {
 /// Both switches below are exhaustive, so a code added to [ExampleRefusal] or
 /// to the framework's [DwCoreRefusal] does not compile until it has a text.
 /// A code neither knows — a newer server — still gets a sentence.
-String refusalText(AppLocalizations l10n, DwRefusal refusal) =>
+String refusalText(AppLocalizations l10n, DwCallRefusal refusal) =>
     switch (_codes[refusal.code]) {
       final ExampleRefusal code => _exampleText(l10n, code),
       final DwCoreRefusal code => _coreText(l10n, code, refusal),
@@ -47,7 +47,7 @@ String _exampleText(AppLocalizations l10n, ExampleRefusal code) =>
 String _coreText(
   AppLocalizations l10n,
   DwCoreRefusal code,
-  DwRefusal refusal,
+  DwCallRefusal refusal,
 ) => switch (code) {
   DwCoreRefusal.forbidden => l10n.refusalForbidden,
   DwCoreRefusal.notFound => l10n.refusalNotFound,
@@ -67,4 +67,8 @@ String _coreText(
     null => l10n.refusalTooManyRequests,
   },
   DwCoreRefusal.codeExpired => l10n.refusalCodeExpired,
+  // Shown by the update page over the whole app; this text is for a place
+  // that renders a refusal on its own.
+  DwCoreRefusal.updateRequired => l10n.updateRequiredBody,
+  DwCoreRefusal.protocolUnsupported => l10n.serverMismatchBody,
 };

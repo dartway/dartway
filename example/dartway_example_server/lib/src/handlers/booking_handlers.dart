@@ -1,37 +1,38 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_server/dartway_server.dart';
 
 import '../../generated/dw_schema.dart';
+import '../club_objects.dart';
 import '../entities/club.dart';
+import '../entities/people.dart';
 import '../example_context.dart';
-import '../projections.dart';
+import 'schedule_handlers.dart';
 
-final bookingHandlers = <DwHandler>[
-  DwHandler.request<ListMyBookings, List<BookingView>>(
-    access: DwAccess.signedIn,
+final bookingHandlers = <DwCallHandler>[
+  DwCallHandler.list<ListMyBookings, SessionBooking>(
+    access: ExampleAccess.ownAccount<ListMyBookings>((r) => r.accountId),
     handle: (ctx, request) async {
-      if ((await ctx.profile).id != request.profileId) {
-        ctx.refuse(DwCoreRefusal.forbidden);
-      }
-      return Views.bookings(
+      final me = await ctx.profile;
+      return ClubObjects.bookings(
         ctx.db,
         await ctx.db.sessionBookings.find(
-          where: (t) => t.clientProfileId.equals(request.profileId),
+          where: (t) => t.clientProfileId.equals(me.id!),
           orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
         ),
+        client: me,
       );
     },
   ),
 
-  DwHandler.command<BookSession, BookingView>(
-    access: DwAccess.signedIn,
+  DwCallHandler.command<BookSession, SessionBooking>(
+    access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       // The session row is the lock every booking of it queues on: the count
-      // and the insert below cannot interleave with another client's.
+      // and the insert below cannot interleave with another member's.
       final session = await ctx.db.clubSessions.findById(
         command.sessionId,
-        lock: DwLock.forUpdate,
+        lock: DwRowLock.forUpdate,
       );
       if (session == null) ctx.refuse(DwCoreRefusal.notFound);
       if (session.startsAt.isBefore(DateTime.now())) {
@@ -49,7 +50,7 @@ final bookingHandlers = <DwHandler>[
       if (alreadyBooked) ctx.refuse(ExampleRefusal.alreadyBooked);
 
       final booking = await ctx.db.sessionBookings.insert(
-        SessionBooking(
+        SessionBookingRow(
           sessionId: session.id!,
           clientProfileId: me.id!,
           status: BookingStatus.booked,
@@ -59,18 +60,19 @@ final bookingHandlers = <DwHandler>[
       final updated = await ctx.db.clubSessions.update(
         session.copyWith(bookedCount: session.bookedCount + 1),
       );
-      return _publishBookingChange(ctx, booking, updated);
+      return _publishBookingChange(ctx, booking, updated, me);
     },
   ),
 
-  DwHandler.command<CancelBooking, BookingView>(
-    access: DwAccess.signedIn,
+  DwCallHandler.command<CancelBooking, SessionBooking>(
+    access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final booking = await ctx.db.sessionBookings.findById(
         command.bookingId,
-        lock: DwLock.forUpdate,
+        lock: DwRowLock.forUpdate,
       );
+      // Someone else's booking does not exist for the caller.
       if (booking == null || booking.clientProfileId != me.id) {
         ctx.refuse(DwCoreRefusal.notFound);
       }
@@ -79,7 +81,7 @@ final bookingHandlers = <DwHandler>[
       }
       final session = (await ctx.db.clubSessions.findById(
         booking.sessionId,
-        lock: DwLock.forUpdate,
+        lock: DwRowLock.forUpdate,
       ))!;
       final cancelled = await ctx.db.sessionBookings.update(
         booking.copyWith(status: BookingStatus.cancelled),
@@ -87,16 +89,16 @@ final bookingHandlers = <DwHandler>[
       final updated = await ctx.db.clubSessions.update(
         session.copyWith(bookedCount: session.bookedCount - 1),
       );
-      return _publishBookingChange(ctx, cancelled, updated);
+      return _publishBookingChange(ctx, cancelled, updated, me);
     },
   ),
 
-  DwHandler.command<MarkAttended, BookingView>(
+  DwCallHandler.command<MarkAttended, SessionBooking>(
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
       final booking = await ctx.db.sessionBookings.findById(
         command.bookingId,
-        lock: DwLock.forUpdate,
+        lock: DwRowLock.forUpdate,
       );
       if (booking == null) ctx.refuse(DwCoreRefusal.notFound);
       if (booking.status != BookingStatus.booked) {
@@ -105,18 +107,15 @@ final bookingHandlers = <DwHandler>[
       final attended = await ctx.db.sessionBookings.update(
         booking.copyWith(status: BookingStatus.attended),
       );
-      final view = await Views.booking(ctx.db, attended);
-      ctx.publish(DwChannel(ExampleChannel.bookings, attended.clientProfileId), view);
-      return view;
+      final object = (await ClubObjects.bookings(ctx.db, [attended])).single;
+      ctx.publish(_bookingsOf(object.accountId), object);
+      return object;
     },
   ),
 
-  DwHandler.command<ReviewVisit, BookingView>(
-    access: DwAccess.signedIn,
+  DwCallHandler.command<ReviewVisit, SessionBooking>(
+    access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
-      if (command.rating < 1 || command.rating > 5) {
-        ctx.refuse(ExampleRefusal.ratingOutOfRange, field: 'rating');
-      }
       final me = await ctx.profile;
       final booking = await ctx.db.sessionBookings.findById(command.bookingId);
       if (booking == null || booking.clientProfileId != me.id) {
@@ -126,7 +125,7 @@ final bookingHandlers = <DwHandler>[
         ctx.refuse(ExampleRefusal.reviewNeedsAttendance);
       }
       final inserted = await ctx.db.sessionReviews.tryInsert(
-        SessionReview(
+        SessionReviewRow(
           bookingId: booking.id!,
           rating: command.rating,
           text: command.text,
@@ -135,21 +134,35 @@ final bookingHandlers = <DwHandler>[
         onConflict: DwOnConflict.doNothing((t) => [t.bookingId]),
       );
       if (inserted == null) ctx.refuse(ExampleRefusal.alreadyReviewed);
-      final view = await Views.booking(ctx.db, booking);
-      ctx.publish(DwChannel(ExampleChannel.bookings, me.id!), view);
-      return view;
+      final object = (await ClubObjects.bookings(ctx.db, [
+        booking,
+      ], client: me)).single;
+      ctx.publish(_bookingsOf(me.accountId), object);
+      return object;
     },
   ),
 ];
 
-Future<BookingView> _publishBookingChange(
-  DwContext ctx,
-  SessionBooking booking,
-  ClubSession session,
+DwLiveChannel _bookingsOf(int accountId) =>
+    DwLiveChannel(ExampleChannel.bookings, accountId);
+
+/// The session's new spots go to everyone on the schedule, the booking to its
+/// member's devices.
+Future<SessionBooking> _publishBookingChange(
+  DwCallContext ctx,
+  SessionBookingRow booking,
+  ClubSessionRow session,
+  UserProfileRow client,
 ) async {
-  final sessionView = await Views.session(ctx.db, session);
-  final view = await Views.booking(ctx.db, booking);
-  ctx.publish(const DwChannel(ExampleChannel.schedule), sessionView);
-  ctx.publish(DwChannel(ExampleChannel.bookings, booking.clientProfileId), view);
-  return view;
+  final sessionObject = (await ClubObjects.sessions(ctx.db, [session])).single;
+  final object = (await ClubObjects.bookings(
+    ctx.db,
+    [booking],
+    client: client,
+    session: sessionObject,
+  )).single;
+  ctx
+    ..publish(scheduleChannel, sessionObject)
+    ..publish(_bookingsOf(client.accountId), object);
+  return object;
 }

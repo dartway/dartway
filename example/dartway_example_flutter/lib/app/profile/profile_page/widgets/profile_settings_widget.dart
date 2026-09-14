@@ -15,7 +15,7 @@ class ProfileSettingsWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final profile = context.profile;
     // Keyed by the fields it edits: when they change — this user's own save
-    // coming back on the profile channel, or an edit on another device — the
+    // coming back in its answer, or an edit on another device — the
     // form starts again from the profile as it now is, rather than keeping a
     // draft of a value that no longer exists.
     return _ProfileForm(
@@ -28,7 +28,7 @@ class ProfileSettingsWidget extends StatelessWidget {
 class _ProfileForm extends HookWidget {
   const _ProfileForm({required this.profile, super.key});
 
-  final ProfileView profile;
+  final UserProfile profile;
 
   @override
   Widget build(BuildContext context) {
@@ -103,9 +103,9 @@ class _ProfileForm extends HookWidget {
                     UpdateMyProfile(
                       firstName: nameChanged ? trimmedName : null,
                       gender: switch (gender.value) {
-                        _ when !genderChanged => const DwPatch.keep(),
-                        final UserGender value => DwPatch.set(value),
-                        null => const DwPatch.clear(),
+                        _ when !genderChanged => const DwFieldPatch.keep(),
+                        final UserGender value => DwFieldPatch.set(value),
+                        null => const DwFieldPatch.clear(),
                       },
                     ),
                   ),

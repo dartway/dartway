@@ -38,12 +38,12 @@ void main() {
       resendAfter: DateTime.now().add(const Duration(minutes: 1)),
     );
     club.server
-      ..onCommand<DwRequestCode>((command, call) => DwOk(ticket))
+      ..onCommand<DwRequestCode>((command, call) => DwCallOk(ticket))
       ..onCommand<DwVerifyCode>(
         (command, call) => command.code == '111111'
-            ? const DwOk(testSession)
-            : DwRefused<DwSession>(
-                DwRefusal(
+            ? const DwCallOk(testSession)
+            : DwCallRefused<DwAuthSession>(
+                DwCallRefusal(
                   DwCoreRefusal.invalid,
                   field: 'code',
                   params: {'attemptsLeft': 4},
@@ -60,7 +60,7 @@ void main() {
     await app.tap(tester, find.text('Continue'));
 
     expect(
-      app.server.commandsOf<DwRequestCode>().single.command,
+      app.server.callsOf<DwRequestCode>().single.call,
       const DwRequestCode(
         kind: DwIdentifierKind.phone,
         identifier: '79990000003',
@@ -78,7 +78,7 @@ void main() {
     await app.settle(tester);
     await app.tap(tester, find.text('Continue'));
 
-    final verify = app.server.commandsOf<DwVerifyCode>().last.command;
+    final verify = app.server.callsOf<DwVerifyCode>().last.call;
     expect(verify, const DwVerifyCode(ticketId: 'ticket-1', code: '111111'));
     expect(
       (verify as DwVerifyCode).registration,
@@ -97,8 +97,8 @@ void main() {
     final club = FakeClub(firstName: '');
     club.server.onCommand<UpdateMyProfile>((command, call) {
       club.profile = club.profile.copyWith(firstName: command.firstName);
-      club.server.publish(club.profileChannel, [club.profile]);
-      return DwOk(club.profile);
+      call.publish(club.profileChannel, [club.profile]);
+      return DwCallOk(club.profile);
     });
     final app = await ExampleTestApp.start(tester, club);
 
@@ -110,7 +110,7 @@ void main() {
     await app.tap(tester, find.text('Continue'));
 
     expect(
-      app.server.commandsOf<UpdateMyProfile>().single.command,
+      app.server.callsOf<UpdateMyProfile>().single.call,
       const UpdateMyProfile(firstName: 'Vera'),
     );
     expect(find.text('Hello, Vera'), findsOneWidget);

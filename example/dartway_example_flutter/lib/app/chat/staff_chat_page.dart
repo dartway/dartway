@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/app/chat/logic/chat_read_positions.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_composer.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_list.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
@@ -9,6 +10,7 @@ import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart'
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Staff-only chat. The UI hides the tab for clients; the real protection is
@@ -60,18 +62,45 @@ class StaffChatPage extends ConsumerWidget implements DwFeature {
         loadingWidget: const Center(child: CircularProgressIndicator()),
         onRetry: () =>
             ref.read(dw.request(const ListChatChannels()).notifier).refetch(),
-        builder: (channels) {
-          if (channels.isEmpty) {
-            return Center(child: AppText.body(l10n.noChatChannels));
-          }
-          return Column(
-            children: [
-              Expanded(child: ChatMessageList(channel: channels.first)),
-              ChatMessageComposer(channel: channels.first),
-            ],
-          );
-        },
+        builder: (channels) => channels.isEmpty
+            ? Center(child: AppText.body(l10n.noChatChannels))
+            : _ChannelChat(key: ValueKey(channels.first.id), channels.first),
       ),
+    );
+  }
+}
+
+/// One channel: the window over its messages and the composer, sharing where
+/// the window is opened.
+class _ChannelChat extends HookConsumerWidget {
+  const _ChannelChat(this.channel, {super.key});
+
+  final ChatChannel channel;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final positions = ref.watch(chatReadPositionsProvider);
+    final position = (context.profile.accountId, channel.id);
+    // Opened around where the chat stood when it was last left; `null` opens
+    // at the newest messages.
+    final anchor = useState(positions[position]);
+
+    return Column(
+      children: [
+        Expanded(
+          child: ChatMessageList(
+            channel: channel,
+            anchor: anchor.value,
+            onJumpToNewest: () => anchor.value = null,
+            onLeave: (cursor) => positions[position] = cursor,
+          ),
+        ),
+        ChatMessageComposer(
+          channel: channel,
+          // A sent message is the newest one: the chat goes where it is.
+          onSent: () => anchor.value = null,
+        ),
+      ],
     );
   }
 }

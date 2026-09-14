@@ -9,7 +9,7 @@ import 'package:gap/gap.dart';
 class BookingCard extends StatelessWidget {
   const BookingCard({required this.booking, super.key});
 
-  final BookingView booking;
+  final SessionBooking booking;
 
   @override
   Widget build(BuildContext context) {

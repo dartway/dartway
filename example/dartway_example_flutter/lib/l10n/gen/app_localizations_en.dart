@@ -161,6 +161,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageTheTeam => 'Message the team...';
 
   @override
+  String get sendMessage => 'Send';
+
+  @override
+  String get showNewerMessages => 'Show newer messages';
+
+  @override
+  String get newerMessages => 'Newer messages';
+
+  @override
+  String newMessagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count new messages',
+      one: '1 new message',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get ourServices => 'Our services';
 
   @override
@@ -360,6 +380,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noMembersMatch => 'No members match.';
 
   @override
+  String membersPage(int page, int pageCount, int total) {
+    return 'Page $page of $pageCount · $total members';
+  }
+
+  @override
+  String get previousPage => 'Previous page';
+
+  @override
+  String get nextPage => 'Next page';
+
+  @override
   String confirmChangeRole(String name, String role) {
     return 'Change the role of $name to $role?';
   }
@@ -475,4 +506,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get refusalUnknownChannel =>
       'This version of the app does not match the server — please update it.';
+
+  @override
+  String get updateRequiredTitle => 'Update the app';
+
+  @override
+  String get updateRequiredBody =>
+      'This version of the app is no longer supported. Install the latest one to keep using the club.';
+
+  @override
+  String get serverMismatchTitle => 'The app cannot reach its server';
+
+  @override
+  String get serverMismatchBody =>
+      'This app and the club\'s server speak different versions. We are on it — please try again later.';
 }

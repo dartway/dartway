@@ -1,8 +1,8 @@
 /// The DartWay example server: a fitness club.
 library;
 
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_server/dartway_server.dart';
 
 import 'generated/dw_schema.dart';
 import 'src/example_auth.dart';
@@ -15,16 +15,17 @@ import 'src/handlers/schedule_handlers.dart';
 import 'src/migrations/migrations.dart';
 
 export 'generated/dw_schema.dart';
-export 'src/example_auth.dart' show createProfile, exampleAuth;
+export 'src/example_auth.dart' show createProfile, exampleAuth, normalizePhone;
+export 'src/migrations/migrations.dart' show appMigrations;
 
 /// Builds the example server. `bin/server.dart` starts it; tests start it on a
 /// free port against their own database.
-DwServer buildExampleServer({
+DwAppServer buildExampleServer({
   required DwDatabaseConfig database,
   int port = 8080,
-  DwAuth? auth,
-  Set<String> allowedOrigins = const {},
-}) => DwServer(
+  DwAuthConfig? auth,
+  DwServerSettings settings = const DwServerSettings(),
+}) => DwAppServer(
   protocol: dartwayExampleProtocol,
   schema: dartwayExampleSchema,
   migrations: appMigrations,
@@ -39,5 +40,5 @@ DwServer buildExampleServer({
   ],
   channels: exampleChannels,
   port: port,
-  settings: DwServerSettings(allowedOrigins: allowedOrigins),
+  settings: settings,
 );

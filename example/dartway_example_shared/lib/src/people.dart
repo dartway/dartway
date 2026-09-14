@@ -1,6 +1,7 @@
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import 'example_channel.dart';
+import 'example_refusal.dart';
 
 part 'people.dw.dart';
 
@@ -8,9 +9,10 @@ enum UserRole { client, staff, admin }
 
 enum UserGender { female, male }
 
-/// A person as others see them: a coach on a session, an author of a post.
-final class PersonView extends DwDataObject with _$PersonView {
-  const PersonView({
+/// A person as other members see them: the coach of a session, the author of
+/// a post or a message. Nothing on it is private.
+final class PersonCard extends DwDataObject with _$PersonCard {
+  const PersonCard({
     required this.id,
     required this.firstName,
     this.lastName,
@@ -25,10 +27,11 @@ final class PersonView extends DwDataObject with _$PersonView {
   final String? imageUrl;
 }
 
-/// A profile as its owner and admins see it.
-final class ProfileView extends DwDataObject with _$ProfileView {
-  const ProfileView({
+/// A profile as its owner and the club's admins see it.
+final class UserProfile extends DwDataObject with _$UserProfile {
+  const UserProfile({
     required this.id,
+    required this.accountId,
     required this.phone,
     required this.firstName,
     required this.role,
@@ -38,8 +41,12 @@ final class ProfileView extends DwDataObject with _$ProfileView {
     this.gender,
   });
 
+  /// The profile id.
   @override
   final int id;
+
+  /// The account the profile belongs to — the key of its owner's channels.
+  final int accountId;
   final String phone;
   final String firstName;
   final String? lastName;
@@ -49,35 +56,46 @@ final class ProfileView extends DwDataObject with _$ProfileView {
   final bool agreedForMarketing;
 }
 
-/// The signed-in user's own profile.
+/// The signed-in member's own profile, live on their profile channel.
 ///
-/// [accountId] is the caller's own account: the server answers only for the
-/// connection's account and refuses any other. It is a field anyway, so that
-/// two accounts signed in one after the other on a device are two different
-/// states — the cache cannot serve one person's profile to the next.
-final class GetMyProfile extends DwMaybeRequest<ProfileView> with _$GetMyProfile {
+/// [accountId] must be the caller's own account: the server refuses any other
+/// with `dw.forbidden` and reads the profile of the caller, never of the
+/// field. The field exists because a live request names its channel by its
+/// own fields, and this one lives on `profile:<account>`: a channel keyed by
+/// "whoever is signed in" is not something a request can declare.
+final class GetMyProfile extends DwSingleRequest<UserProfile>
+    with _$GetMyProfile {
   const GetMyProfile({required this.accountId});
 
   final int accountId;
 
   @override
-  List<DwChannel> get channels => [DwChannel(ExampleChannel.profile, accountId)];
-
-  @override
-  bool matches(ProfileView object) => true;
+  List<DwLiveChannel> get channels => [
+    DwLiveChannel(ExampleChannel.profile, accountId),
+  ];
 }
 
-/// Edits the signed-in user's own profile.
-final class UpdateMyProfile extends DwCommand<ProfileView> with _$UpdateMyProfile {
+/// Edits the signed-in member's own profile. A field left as it is is kept;
+/// a cleared one is cleared.
+final class UpdateMyProfile extends DwActionCommand<UserProfile>
+    with _$UpdateMyProfile
+    implements DwSelfValidating {
   const UpdateMyProfile({
     this.firstName,
-    this.lastName = const DwPatch.keep(),
-    this.gender = const DwPatch.keep(),
-    this.imageUrl = const DwPatch.keep(),
+    this.lastName = const DwFieldPatch.keep(),
+    this.gender = const DwFieldPatch.keep(),
+    this.imageUrl = const DwFieldPatch.keep(),
   });
 
+  /// `null` keeps the name; a name cannot be cleared.
   final String? firstName;
-  final DwPatch<String> lastName;
-  final DwPatch<UserGender> gender;
-  final DwPatch<String> imageUrl;
+  final DwFieldPatch<String> lastName;
+  final DwFieldPatch<UserGender> gender;
+  final DwFieldPatch<String> imageUrl;
+
+  @override
+  List<DwCallRefusal> validate() => [
+    if (firstName case final name? when name.trim().isEmpty)
+      DwCallRefusal(ExampleRefusal.firstNameRequired, field: 'firstName'),
+  ];
 }

@@ -1,57 +1,105 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_server/dartway_server.dart';
 
 import '../../generated/dw_schema.dart';
+import '../club_objects.dart';
 import '../entities/people.dart';
 import '../example_context.dart';
-import '../projections.dart';
 
-const _admin = DwChannel(ExampleChannel.admin);
+const adminChannel = DwLiveChannel(ExampleChannel.admin);
 
-Future<AdminCountersView> _counters(DwContext ctx) async => AdminCountersView(
-  members: await ctx.db.userProfiles.count(),
-  upcomingSessions: await ctx.db.clubSessions.count(
-    where: (t) => t.startsAt.gte(DateTime.now()),
-  ),
-  newsPosts: await ctx.db.newsPosts.count(),
-);
+/// The dashboard numbers, counted now.
+Future<AdminCounters> countAdminCounters(DwCallContext ctx) async =>
+    AdminCounters(
+      members: await ctx.db.userProfiles.count(),
+      upcomingSessions: await ctx.db.clubSessions.count(
+        where: (t) => t.startsAt.gte(DateTime.now()),
+      ),
+      newsPosts: await ctx.db.newsPosts.count(),
+    );
 
 /// Publishes fresh counters to the admin dashboard. Called by the commands that
-/// change what they count, so a dashboard never re-reads on its own.
-Future<void> publishAdminCounters(DwContext ctx) async =>
-    ctx.publish(_admin, await _counters(ctx));
+/// change what they count, so a dashboard never reads again on its own.
+Future<void> publishAdminCounters(DwCallContext ctx) async =>
+    ctx.publish(adminChannel, await countAdminCounters(ctx));
 
-final adminHandlers = <DwHandler>[
-  DwHandler.request<GetAdminCounters, AdminCountersView>(
+/// The filter of a [ListUserProfiles] page — by name or phone, and by role —
+/// or `null` for every member.
+DwWhereCondition Function(UserProfileTable t)? _membersFilter(
+  ListUserProfiles request,
+) {
+  final search = request.search.trim();
+  final role = request.role;
+  if (search.isEmpty && role == null) return null;
+  // LIKE's own characters in what was typed are matched literally.
+  final pattern =
+      '%${search.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
+  return (t) {
+    final byRole = role == null ? null : t.role.equals(role);
+    if (search.isEmpty) return byRole!;
+    final bySearch =
+        t.firstName.ilike(pattern) |
+        t.lastName.ilike(pattern) |
+        t.phone.like(pattern);
+    return byRole == null ? bySearch : bySearch & byRole;
+  };
+}
+
+final adminHandlers = <DwCallHandler>[
+  DwCallHandler.single<GetAdminCounters, AdminCounters>(
     access: ExampleAccess.admin,
-    handle: (ctx, request) => _counters(ctx),
+    handle: (ctx, request) => countAdminCounters(ctx),
   ),
 
-  DwHandler.request<ListProfiles, List<ProfileView>>(
+  DwCallHandler.table<ListUserProfiles, UserProfile>(
     access: ExampleAccess.admin,
-    handle: (ctx, request) async => [
-      for (final p in await ctx.db.userProfiles.find(
+    rows: (ctx, request, table) async => [
+      for (final row in await ctx.db.userProfiles.find(
+        where: _membersFilter(request),
         orderBy: (t) => [t.firstName.asc(), t.id.asc()],
+        limit: table.fetchLimit,
+        offset: table.offset,
       ))
-        Views.profile(p),
+        ClubObjects.profile(row),
     ],
+    count: (ctx, request) =>
+        ctx.db.userProfiles.count(where: _membersFilter(request)),
   ),
 
-  DwHandler.command<ChangeRole, ProfileView>(
+  DwCallHandler.command<ChangeRole, UserProfile>(
     access: ExampleAccess.admin,
     handle: (ctx, command) async {
-      final profile = await ctx.db.userProfiles.findById(
+      final row = await ctx.db.userProfiles.findById(
         command.profileId,
-        lock: DwLock.forUpdate,
+        lock: DwRowLock.forUpdate,
       );
-      if (profile == null) ctx.refuse(DwCoreRefusal.notFound);
+      if (row == null) ctx.refuse(DwCoreRefusal.notFound);
       final updated = await ctx.db.userProfiles.update(
-        profile.copyWith(role: command.role),
+        row.copyWith(role: command.role),
       );
-      final view = Views.profile(updated);
-      ctx.publish(_admin, view);
-      ctx.publish(DwChannel(ExampleChannel.profile, updated.accountId), view);
-      return view;
+      final profile = ClubObjects.profile(updated);
+      ctx
+        ..publish(adminChannel, profile)
+        ..publish(
+          DwLiveChannel(ExampleChannel.profile, updated.accountId),
+          profile,
+        );
+      // Access is checked once, at subscription: a role taken away closes
+      // what it opened.
+      final account = updated.accountId;
+      if (row.role == UserRole.admin && command.role != UserRole.admin) {
+        ctx.revoke(adminChannel, account);
+      }
+      if (row.role != UserRole.client && command.role == UserRole.client) {
+        ctx.revoke(const DwLiveChannel(ExampleChannel.staffChannels), account);
+        for (final channel in await ctx.db.chatChannels.find()) {
+          ctx.revoke(
+            DwLiveChannel(ExampleChannel.staffChat, channel.id),
+            account,
+          );
+        }
+      }
+      return profile;
     },
   ),
 ];

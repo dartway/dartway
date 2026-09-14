@@ -1,4 +1,4 @@
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 /// Why the example server refuses. Codes only: the app renders every one of
 /// them through its string catalogue.

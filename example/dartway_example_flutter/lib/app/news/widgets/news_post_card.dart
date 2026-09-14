@@ -6,7 +6,7 @@ import 'package:gap/gap.dart';
 class NewsPostCard extends StatelessWidget {
   const NewsPostCard({required this.post, super.key});
 
-  final NewsPostView post;
+  final NewsPost post;
 
   @override
   Widget build(BuildContext context) {

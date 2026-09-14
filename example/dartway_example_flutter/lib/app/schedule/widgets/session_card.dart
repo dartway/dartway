@@ -12,10 +12,10 @@ class SessionCard extends StatelessWidget {
     super.key,
   });
 
-  final ClubSessionView session;
+  final ClubSession session;
 
   /// The current user's active booking for this session, if any.
-  final BookingView? activeBooking;
+  final SessionBooking? activeBooking;
 
   @override
   Widget build(BuildContext context) {
@@ -56,8 +56,9 @@ class SessionCard extends StatelessWidget {
               ),
             ),
             const Gap(12),
-            // The results need no handling: the server publishes the booking
-            // and the session, and both lists on screen take them live.
+            // The results need no handling: the answer carries the booking and
+            // the session, and both lists on screen take them before the
+            // command completes; other devices get them on their channels.
             if (booking != null)
               AppButton.secondary(
                 l10n.cancel,

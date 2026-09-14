@@ -6,14 +6,12 @@ environment:
   sdk: ^3.11.0
 
 dependencies:
+  dartway_core_server: ^0.20.0-dev.1
   dartway_example_shared:
     path: ../dartway_example_shared
-  dartway_orm: ^1.0.0-dev.1
-  dartway_server: ^1.0.0-dev.1
 
 dev_dependencies:
-  dartway_client: ^1.0.0-dev.1
-  dartway_generator: ^1.0.0-dev.1
+  dartway_generator: ^0.20.0-dev.1
   lints: ^6.0.0
   test: ^1.26.0
 
@@ -21,11 +19,11 @@ dev_dependencies:
 dependency_overrides:
   dartway_client:
     path: ../../packages/dartway_client
-  dartway_core:
-    path: ../../packages/dartway_core
+  dartway_core_server:
+    path: ../../packages/dartway_core_server
+  dartway_core_shared:
+    path: ../../packages/dartway_core_shared
   dartway_generator:
     path: ../../packages/dartway_generator
   dartway_orm:
     path: ../../packages/dartway_orm
-  dartway_server:
-    path: ../../packages/dartway_server

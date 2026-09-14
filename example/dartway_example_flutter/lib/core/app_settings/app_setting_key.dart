@@ -9,8 +9,9 @@ enum AppSettingType { toggle, number, text }
 /// falls back to.
 ///
 /// The catalogue is the enum itself: open this file and you see the whole list.
-/// The server holds the same set of keys and refuses any other
-/// (`settingKeyUnknown`), so a key is added in both places.
+/// The contract holds the same set of keys (`exampleSettingKeys`) and refuses any
+/// other (`settingKeyUnknown`), so a key is added in both places — a test
+/// holds them equal.
 ///
 /// The type argument is what makes a read typed: `valueOf(clubName)` returns a
 /// `String` and `valueOf(bookingEnabled)` a `bool`, checked at compile time.
@@ -36,7 +37,7 @@ enum AppSettingKey<T> {
 
   const AppSettingKey(this.key, this.type, {required this.defaultValue});
 
-  /// The setting's key on the wire and in the database — `AppSettingView.id`.
+  /// The setting's key on the wire and in the database — `AppSetting.id`.
   /// A contract: renaming it orphans the value that is already stored.
   final String key;
 

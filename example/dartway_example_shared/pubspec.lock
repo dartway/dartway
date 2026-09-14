@@ -81,13 +81,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
-  dartway_core:
+  dartway_core_shared:
     dependency: "direct main"
     description:
-      path: "../../packages/dartway_core"
+      path: "../../packages/dartway_core_shared"
       relative: true
     source: path
-    version: "1.0.0-dev.1"
+    version: "0.20.0-dev.1"
   file:
     dependency: transitive
     description:

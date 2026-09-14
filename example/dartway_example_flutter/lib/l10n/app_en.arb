@@ -78,6 +78,11 @@
   "noChatChannels": "No chat channels yet",
   "sayHiToTeam": "Say hi to the team!",
   "messageTheTeam": "Message the team...",
+  "sendMessage": "Send",
+  "showNewerMessages": "Show newer messages",
+  "newerMessages": "Newer messages",
+  "newMessagesCount": "{count, plural, =1{1 new message} other{{count} new messages}}",
+  "@newMessagesCount": {"placeholders": {"count": {"type": "int"}}},
 
   "ourServices": "Our services",
   "priceListComingSoon": "The price list is coming soon",
@@ -163,6 +168,10 @@
   },
   "noMembersYet": "No members yet.",
   "noMembersMatch": "No members match.",
+  "membersPage": "Page {page} of {pageCount} · {total} members",
+  "@membersPage": {"placeholders": {"page": {"type": "int"}, "pageCount": {"type": "int"}, "total": {"type": "int"}}},
+  "previousPage": "Previous page",
+  "nextPage": "Next page",
   "confirmChangeRole": "Change the role of {name} to {role}?",
   "@confirmChangeRole": {
     "placeholders": {
@@ -214,5 +223,9 @@
       "seconds": {"type": "int"}
     }
   },
-  "refusalUnknownChannel": "This version of the app does not match the server — please update it."
+  "refusalUnknownChannel": "This version of the app does not match the server — please update it.",
+  "updateRequiredTitle": "Update the app",
+  "updateRequiredBody": "This version of the app is no longer supported. Install the latest one to keep using the club.",
+  "serverMismatchTitle": "The app cannot reach its server",
+  "serverMismatchBody": "This app and the club's server speak different versions. We are on it — please try again later."
 }

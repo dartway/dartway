@@ -2,7 +2,7 @@ import 'package:dartway_example_flutter/auth/profile_name_page.dart';
 import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_flutter/dartway_flutter.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -34,7 +34,7 @@ class SignedInGate extends HookConsumerWidget {
     // The last profile let through, with the account it belongs to. Kept over
     // a failed refetch — the app does not vanish because a reconnect's re-run
     // failed — and dropped as soon as a different account signs in.
-    final shown = useRef<({int accountId, ProfileView profile})?>(null);
+    final shown = useRef<({int accountId, UserProfile profile})?>(null);
     if (accountId != null) {
       if (profile.value case final loaded?) {
         shown.value = (accountId: accountId, profile: loaded);

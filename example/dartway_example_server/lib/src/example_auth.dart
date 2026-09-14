@@ -1,17 +1,16 @@
 import 'dart:io';
 
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_server/dartway_server.dart';
 
 import '../generated/dw_schema.dart';
 import 'entities/people.dart';
-import 'projections.dart';
 import 'handlers/admin_handlers.dart';
 
 /// Sign-in by a one-time code to a phone number.
-final exampleAuth = DwAuth(
+final exampleAuth = DwAuthConfig(
   normalize: (kind, raw) => switch (kind) {
-    DwIdentifierKind.phone => _normalizePhone(raw),
+    DwIdentifierKind.phone => normalizePhone(raw),
     DwIdentifierKind.email => null, // the club signs in by phone only
   },
 
@@ -21,7 +20,7 @@ final exampleAuth = DwAuth(
       stdout.writeln('Sign-in code for $identifier: $code'),
 
   // Demo personas and store reviewers sign in with a fixed code set on their
-  // profile by an admin.
+  // profile.
   fixedCode: (ctx, kind, identifier, accountId) async {
     if (accountId == null) return null;
     final profile = await ctx.db.userProfiles.findFirst(
@@ -33,27 +32,25 @@ final exampleAuth = DwAuth(
   // The profile is created with the account, in the same transaction: a
   // signed-in account without a profile cannot exist.
   onAccountCreated: (ctx, accountId, kind, identifier, registration) async {
-    final profile = await createProfile(
-      ctx.db,
-      accountId,
-      identifier,
-      registration,
-    );
-    // The admin users table and the counters learn about the new member.
-    ctx.publish(const DwChannel(ExampleChannel.admin), Views.profile(profile));
-    await publishAdminCounters(ctx);
+    await createProfile(ctx.db, accountId, identifier, registration);
+    // The dashboard counts the newcomer, and the members table reads its page
+    // again.
+    final counters = await countAdminCounters(ctx);
+    ctx
+      ..publish(adminChannel, counters)
+      ..publish(adminChannel, MemberCount(count: counters.members));
   },
 );
 
 /// The profile a new account starts with. Separate from the hook so tools that
 /// create accounts without a running server (the dev seed) create the same row.
-Future<UserProfile> createProfile(
-  DwDb db,
+Future<UserProfileRow> createProfile(
+  DwDatabaseHandle db,
   int accountId,
   String phone,
   Map<String, String> registration,
 ) => db.userProfiles.insert(
-  UserProfile(
+  UserProfileRow(
     accountId: accountId,
     phone: phone,
     firstName: registration['firstName']?.trim() ?? '',
@@ -64,7 +61,7 @@ Future<UserProfile> createProfile(
 
 /// Digits only; a Russian trunk prefix `8` becomes `7`. `null` for anything
 /// that is not a plausible phone number.
-String? _normalizePhone(String raw) {
+String? normalizePhone(String raw) {
   var digits = raw.replaceAll(RegExp(r'\D'), '');
   if (digits.length == 11 && digits.startsWith('8')) {
     digits = '7${digits.substring(1)}';

@@ -1,22 +1,18 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_server/dartway_server.dart';
 
 import '../../generated/dw_schema.dart';
+import '../club_objects.dart';
 import '../entities/content.dart';
 import '../example_context.dart';
-import '../projections.dart';
 import 'admin_handlers.dart';
 
-const _news = DwChannel(ExampleChannel.news);
+const _news = DwLiveChannel(ExampleChannel.news);
 
-/// The settings the app declares. A key outside this set is refused: settings
-/// are configuration the app reads, not a free-form store.
-const exampleSettingKeys = {'clubName', 'bookingEnabled', 'supportPhone'};
-
-final contentHandlers = <DwHandler>[
-  DwHandler.request<ListNews, List<NewsPostView>>(
-    access: DwAccess.signedIn,
-    handle: (ctx, request) async => Views.news(
+final contentHandlers = <DwCallHandler>[
+  DwCallHandler.list<ListNews, NewsPost>(
+    access: DwAccessRule.signedIn,
+    handle: (ctx, request) async => ClubObjects.news(
       ctx.db,
       await ctx.db.newsPosts.find(
         orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
@@ -24,120 +20,135 @@ final contentHandlers = <DwHandler>[
     ),
   ),
 
-  DwHandler.command<PublishNews, NewsPostView>(
+  DwCallHandler.command<PublishNews, NewsPost>(
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
-      if (command.title.trim().isEmpty) {
-        ctx.refuse(ExampleRefusal.titleRequired, field: 'title');
-      }
-      if (command.text.trim().isEmpty) {
-        ctx.refuse(ExampleRefusal.textRequired, field: 'text');
-      }
-      final post = await ctx.db.newsPosts.insert(
-        NewsPost(
-          authorProfileId: (await ctx.profile).id!,
+      final me = await ctx.profile;
+      final row = await ctx.db.newsPosts.insert(
+        NewsPostRow(
+          authorProfileId: me.id!,
           title: command.title.trim(),
           text: command.text.trim(),
           createdAt: DateTime.now(),
         ),
       );
-      final view = (await Views.news(ctx.db, [post])).single;
-      ctx.publish(_news, view);
+      final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
+      ctx.publish(_news, post);
       await publishAdminCounters(ctx);
-      return view;
+      return post;
     },
   ),
 
-  DwHandler.command<RemoveNews, void>(
+  DwCallHandler.command<RemoveNews, void>(
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
       if (await ctx.db.newsPosts.delete(command.postId) == 0) {
         ctx.refuse(DwCoreRefusal.notFound);
       }
-      ctx.publish(_news, DwDeleted.of<NewsPostView>(command.postId, ctx.protocol));
+      ctx.publish(
+        _news,
+        DwDeletedObject.of<NewsPost>(command.postId, ctx.protocol),
+      );
       await publishAdminCounters(ctx);
     },
   ),
 
-  DwHandler.request<ListChatChannels, List<ChatChannelView>>(
+  DwCallHandler.list<ListChatChannels, ChatChannel>(
     access: ExampleAccess.staff,
     handle: (ctx, request) async => [
-      for (final c in await ctx.db.chatChannels.find(
+      for (final row in await ctx.db.chatChannels.find(
         orderBy: (t) => [t.title.asc(), t.id.asc()],
       ))
-        ChatChannelView(id: c.id!, title: c.title),
+        ChatChannel(id: row.id!, title: row.title),
     ],
   ),
 
-  DwHandler.page<ListChatMessages, ChatMessageView>(
+  DwCallHandler.window<ListChatMessages, ChatMessage, DateTime, int>(
     access: ExampleAccess.staff,
-    handle: (ctx, request, page) async {
-      final before = page.before as int?;
-      return Views.messages(
-        ctx.db,
-        await ctx.db.chatMessages.find(
-          where: (t) => before == null
-              ? t.channelId.equals(request.channelId)
-              : t.channelId.equals(request.channelId) & t.id.lt(before),
-          orderBy: (t) => [t.id.desc()],
-          limit: page.fetchLimit,
-        ),
+    handle: (ctx, request, window) async {
+      final position = window.position;
+      final older = window.direction == DwWindowDirection.older;
+      final rows = await ctx.db.chatMessages.find(
+        where: (t) {
+          final inChannel = t.channelId.equals(request.channelId);
+          if (position == null) return inChannel;
+          final (:sortValue, :id) = position;
+          // `(createdAt, id)` compared as a pair. The bound on `createdAt`
+          // alone is what the index range scan starts from; the pair decides
+          // among messages sent at the same instant.
+          return older
+              ? inChannel &
+                    t.createdAt.lte(sortValue) &
+                    (t.createdAt.lt(sortValue) |
+                        (window.includesPosition ? t.id.lte(id) : t.id.lt(id)))
+              : inChannel &
+                    t.createdAt.gte(sortValue) &
+                    (t.createdAt.gt(sortValue) | t.id.gt(id));
+        },
+        orderBy: (t) => older
+            ? [t.createdAt.desc(), t.id.desc()]
+            : [t.createdAt.asc(), t.id.asc()],
+        limit: window.fetchLimit,
       );
+      return ClubObjects.messages(ctx.db, rows);
     },
   ),
 
-  DwHandler.command<SendChatMessage, ChatMessageView>(
+  DwCallHandler.command<SendChatMessage, ChatMessage>(
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
-      final text = command.text.trim();
-      if (text.isEmpty) ctx.refuse(ExampleRefusal.messageEmpty, field: 'text');
-      if (await ctx.db.chatChannels.findById(command.channelId) == null) {
+      final me = await ctx.profile;
+      final ChatMessageRow row;
+      try {
+        row = await ctx.db.chatMessages.insert(
+          ChatMessageRow(
+            channelId: command.channelId,
+            authorProfileId: me.id!,
+            text: command.text.trim(),
+            createdAt: DateTime.now(),
+          ),
+        );
+      } on DwForeignKeyViolation {
         ctx.refuse(DwCoreRefusal.notFound);
       }
-      final message = await ctx.db.chatMessages.insert(
-        ChatMessage(
-          channelId: command.channelId,
-          authorProfileId: (await ctx.profile).id!,
-          text: text,
-          createdAt: DateTime.now(),
-        ),
+      final message = (await ClubObjects.messages(ctx.db, [
+        row,
+      ], author: me)).single;
+      ctx.publish(
+        DwLiveChannel(ExampleChannel.staffChat, command.channelId),
+        message,
       );
-      final view = (await Views.messages(ctx.db, [message])).single;
-      ctx.publish(DwChannel(ExampleChannel.staffChat, command.channelId), view);
-      return view;
+      return message;
     },
   ),
 
-  DwHandler.request<ListAppSettings, List<AppSettingView>>(
-    access: DwAccess.signedIn,
+  DwCallHandler.list<ListAppSettings, AppSetting>(
+    access: DwAccessRule.signedIn,
     handle: (ctx, request) async => [
-      for (final s in await ctx.db.appSettings.find(
+      for (final row in await ctx.db.appSettings.find(
         orderBy: (t) => [t.key.asc()],
       ))
-        AppSettingView(id: s.key, value: s.value),
+        AppSetting(id: row.key, value: row.value),
     ],
   ),
 
-  DwHandler.command<SaveAppSetting, AppSettingView>(
+  DwCallHandler.command<SaveAppSetting, AppSetting>(
     access: ExampleAccess.admin,
     handle: (ctx, command) async {
-      if (!exampleSettingKeys.contains(command.key)) {
-        ctx.refuse(ExampleRefusal.settingKeyUnknown, field: 'key');
-      }
       final existing = await ctx.db.appSettings.findFirst(
         where: (t) => t.key.equals(command.key),
-        lock: DwLock.forUpdate,
+        lock: DwRowLock.forUpdate,
       );
       final saved = existing == null
           ? await ctx.db.appSettings.insert(
-              AppSetting(key: command.key, value: command.value),
+              AppSettingRow(key: command.key, value: command.value),
             )
           : await ctx.db.appSettings.update(
               existing.copyWith(value: command.value),
             );
-      final view = AppSettingView(id: saved.key, value: saved.value);
-      ctx.publish(const DwChannel(ExampleChannel.settings), view);
-      return view;
+      final setting = AppSetting(id: saved.key, value: saved.value);
+      ctx.publish(const DwLiveChannel(ExampleChannel.settings), setting);
+      return setting;
     },
   ),
 ];

@@ -1,15 +1,15 @@
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-/// The example's realtime channels. The server declares who may subscribe to
+/// The example's live channels. The server declares who may subscribe to
 /// each; a request declares which of them it lives on.
 enum ExampleChannel with DwChannelKind {
-  /// The club schedule and service catalogue: public to signed-in users.
+  /// The club schedule and service catalogue: every signed-in member.
   schedule,
 
-  /// One client's bookings. Key: the client's profile id.
+  /// One member's bookings. Key: the member's account id. Its owner only.
   bookings,
 
-  /// News posts: public to signed-in users.
+  /// News posts: every signed-in member.
   news,
 
   /// Messages of one staff chat channel. Key: the chat channel id. Staff only.
@@ -18,12 +18,12 @@ enum ExampleChannel with DwChannelKind {
   /// The list of staff chat channels. Staff only.
   staffChannels,
 
-  /// App settings: public to signed-in users.
+  /// App settings: every signed-in member.
   settings,
 
-  /// The signed-in user's own profile. Key: the account id. Its owner only.
+  /// One member's own profile. Key: the member's account id. Its owner only.
   profile,
 
-  /// Everything the admin dashboard and users table show. Admin only.
+  /// What the admin dashboard and the members table show. Admins only.
   admin,
 }

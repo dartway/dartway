@@ -56,8 +56,8 @@ class ProfileNamePage extends HookWidget implements DwFeature {
             AppButton.primary(
               l10n.continueAction,
               requireValidation: true,
-              // The gate lets the app through when the updated profile
-              // arrives on the profile channel; nothing to do on success.
+              // The gate lets the app through once the updated profile
+              // arrives with the answer; nothing to do on success.
               onTap: dw.action(
                 (_) =>
                     dw.command(UpdateMyProfile(firstName: name.value.trim())),

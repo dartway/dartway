@@ -18,10 +18,18 @@ dependencies:
     sdk: flutter
   intl: any
 
-  # The contract with the server: every request, command, view and refusal
-  # code the app speaks.
+  # The contract with the server: every request, command, data object and
+  # refusal code the app speaks.
   dartway_example_shared:
     path: ../dartway_example_shared
+
+  # The DartWay app skeleton: the client, its Riverpod bindings, the router
+  # and the shared contract, re-exported — one framework import.
+  dartway_core_flutter: ^0.20.0-dev.1
+  # Where the signed-in session is kept: the core asks the plugins for whoever
+  # claimed the DwKeyValueStorePlugin role, and without one there is nowhere
+  # to put the session.
+  dartway_shared_preferences: ^0.5.0
 
   flutter_hooks: ^0.21.2
   hooks_riverpod: ^3.0.0
@@ -29,14 +37,6 @@ dependencies:
   # UI-kit dependencies: the kit lives in this app's `lib/ui_kit/`, so its
   # packages belong to the app, not to the framework.
   device_frame: ^1.4.0
-
-  dartway_flutter: ^0.9.0
-  # Where the signed-in session is kept: the core asks the plugins for whoever
-  # claimed the DwKeyValueStorePlugin role, and without one there is nowhere
-  # to put the session.
-  dartway_shared_preferences: ^0.5.0
-  dartway_router: ^1.1.2
-
   cupertino_icons: ^1.0.5
   flutter_svg: ^2.0.10+1
   gap: ^3.0.1
@@ -49,8 +49,8 @@ dev_dependencies:
     sdk: flutter
 
   # `DwFakeServer`: widget tests talk to an in-memory server that speaks the
-  # real wire protocol.
-  dartway_client: ^1.0.0-dev.1
+  # real HTTP contract and live socket.
+  dartway_client: ^0.20.0-dev.1
 
   dartway_cli: ^0.10.0
 
@@ -64,20 +64,20 @@ dev_dependencies:
 # Inside the monorepo the example builds against the LOCAL framework packages.
 # Copied out into a standalone project — drop the whole dependency_overrides block.
 dependency_overrides:
-  dartway_core:
-    path: ../../packages/dartway_core
-  dartway_client:
-    path: ../../packages/dartway_client
-  dartway_flutter:
-    path: ../../packages/dartway_flutter
-  dartway_shared_preferences:
-    path: ../../packages/dartway_shared_preferences
-  dartway_router:
-    path: ../../packages/dartway_router
   dartway_cli:
     path: ../../packages/dartway_cli
+  dartway_client:
+    path: ../../packages/dartway_client
+  dartway_core_flutter:
+    path: ../../packages/dartway_core_flutter
+  dartway_core_shared:
+    path: ../../packages/dartway_core_shared
   dartway_lints:
     path: ../../packages/dartway_lints
+  dartway_router:
+    path: ../../packages/dartway_router
+  dartway_shared_preferences:
+    path: ../../packages/dartway_shared_preferences
 
 flutter_native_splash:
   color: "#05060C"

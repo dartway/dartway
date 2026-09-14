@@ -13,7 +13,7 @@ import 'package:gap/gap.dart';
 class ReviewBottomSheet extends HookWidget {
   const ReviewBottomSheet({required this.booking, super.key});
 
-  final BookingView booking;
+  final SessionBooking booking;
 
   @override
   Widget build(BuildContext context) {

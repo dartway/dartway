@@ -1,5 +1,5 @@
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_flutter/dartway_flutter.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/material.dart';
 
 /// Dev-only error stand: each item exercises one interception point of the

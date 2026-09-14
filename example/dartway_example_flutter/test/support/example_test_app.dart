@@ -1,8 +1,9 @@
 import 'package:dartway_client/testing.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
+import 'package:dartway_example_flutter/app_version.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_flutter/dartway_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,21 +13,27 @@ export 'package:dartway_client/testing.dart';
 export 'package:dartway_example_shared/dartway_example_shared.dart';
 
 /// The session a signed-in test starts with.
-const testSession = DwSession(id: 42, token: 'token-42', isNewAccount: false);
+const testSession = DwAuthSession(
+  id: 42,
+  token: 'token-42',
+  isNewAccount: false,
+);
 
-const scheduleChannel = DwChannel(ExampleChannel.schedule);
-const newsChannel = DwChannel(ExampleChannel.news);
+const scheduleChannel = DwLiveChannel(ExampleChannel.schedule);
+const newsChannel = DwLiveChannel(ExampleChannel.news);
+const adminChannel = DwLiveChannel(ExampleChannel.admin);
 
 /// The club as the fake server knows it: the signed-in member, and whatever
 /// a test puts on the schedule, in the bookings and in the news.
 ///
 /// Its handlers answer the reads the app makes on its way to any screen, and
-/// nothing else: a command a test does not expect is recorded by the fake
-/// server as an error, and every test ends asserting there are none.
+/// nothing else: a call a test does not expect is recorded by the fake server
+/// as an error, and every test ends asserting there are none.
 final class FakeClub {
   FakeClub({UserRole role = UserRole.client, String firstName = 'Vera'})
-    : profile = ProfileView(
+    : profile = UserProfile(
         id: 7,
+        accountId: testSession.id,
         phone: '79990000003',
         firstName: firstName,
         role: role,
@@ -36,30 +43,32 @@ final class FakeClub {
       ..registerToken(testSession.token, testSession.id)
       ..onRequest<GetMyProfile>(
         (request, call) => call.accountId == request.accountId
-            ? DwOk<ProfileView?>(profile)
-            : DwRefused(DwRefusal(DwCoreRefusal.forbidden)),
+            ? DwCallOk<UserProfile>(profile)
+            : DwCallRefused<UserProfile>(
+                DwCallRefusal(DwCoreRefusal.forbidden),
+              ),
       )
       ..onRequest<ListUpcomingSessions>(
-        (request, call) => DwOk(<ClubSessionView>[...sessions]),
+        (request, call) => DwCallOk(<ClubSession>[...sessions]),
       )
       ..onRequest<ListMyBookings>(
-        (request, call) => DwOk(<BookingView>[...bookings]),
+        (request, call) => DwCallOk(<SessionBooking>[...bookings]),
       )
-      ..onRequest<ListNews>((request, call) => DwOk(<NewsPostView>[...news]));
+      ..onRequest<ListNews>((request, call) => DwCallOk(<NewsPost>[...news]));
   }
 
   final server = DwFakeServer(protocol: dartwayExampleProtocol);
 
-  ProfileView profile;
-  final sessions = <ClubSessionView>[];
-  final bookings = <BookingView>[];
-  final news = <NewsPostView>[];
+  UserProfile profile;
+  final sessions = <ClubSession>[];
+  final bookings = <SessionBooking>[];
+  final news = <NewsPost>[];
 
-  DwChannel get profileChannel =>
-      DwChannel(ExampleChannel.profile, testSession.id);
+  DwLiveChannel get profileChannel =>
+      DwLiveChannel(ExampleChannel.profile, testSession.id);
 
-  DwChannel get bookingsChannel =>
-      DwChannel(ExampleChannel.bookings, profile.id);
+  DwLiveChannel get bookingsChannel =>
+      DwLiveChannel(ExampleChannel.bookings, testSession.id);
 }
 
 /// A running example app over a [FakeClub]: the app's own core, built for this
@@ -68,7 +77,7 @@ final class ExampleTestApp {
   ExampleTestApp._(this.club, this.core, this.logs, this._debugPrint);
 
   final FakeClub club;
-  final DwCore core;
+  final DwFlutterCore core;
 
   /// What `debugPrint` printed while the app ran — the app's error reports
   /// end up here, so a test can assert nothing was reported.
@@ -83,10 +92,11 @@ final class ExampleTestApp {
   static Future<ExampleTestApp> start(
     WidgetTester tester,
     FakeClub club, {
-    DwSession? session = testSession,
+    DwAuthSession? session = testSession,
+    Size size = const Size(390, 844),
   }) async {
     tester.view
-      ..physicalSize = const Size(1170, 2532)
+      ..physicalSize = size * 3
       ..devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
@@ -97,13 +107,12 @@ final class ExampleTestApp {
     debugPrint = (message, {wrapWidth}) => logs.add(message ?? '');
 
     final core = createExampleDwCore(
-      endpoint: club.server.endpoint,
-      connector: club.server.connector,
+      baseUrl: club.server.baseUrl,
+      appVersion: exampleAppVersion,
+      httpTransport: club.server.httpTransport,
+      liveConnector: club.server.liveConnector,
       tokenStore: DwMemoryTokenStore(session),
-      clientOptions: const DwClientOptions(
-        releaseDelay: Duration.zero,
-        reconnectDelay: Duration(milliseconds: 1),
-      ),
+      clientOptions: dwFakeClientOptions,
     );
     // Disposing twice is harmless; this one is for a test that failed before
     // [stop], so the next test can build its own core.

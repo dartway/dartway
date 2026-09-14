@@ -1,7 +1,7 @@
 import 'package:dartway_example_flutter/app/news/widgets/news_post_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/shared/placeholder_views.dart';
+import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
@@ -18,7 +18,10 @@ class NewsPostList extends ConsumerWidget {
     return ref
         .watch(dw.request(const ListNews()))
         .section(
-          loadingValue: PlaceholderViews.listOf(PlaceholderViews.newsPost, 5),
+          loadingValue: PlaceholderObjects.listOf(
+            PlaceholderObjects.newsPost,
+            5,
+          ),
           onRetry: () =>
               ref.read(dw.request(const ListNews()).notifier).refetch(),
           builder: (posts) {

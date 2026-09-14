@@ -4,13 +4,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../dw_core.dart';
 
-/// The signed-in user's profile, live: `AsyncData(null)` while signed out.
+/// The signed-in member's profile, live: `AsyncData(null)` while signed out.
 ///
-/// The request is keyed by the account, so a second person signing in on the
-/// same device is a different request — never the previous person's cached
-/// profile. It follows the profile channel, so a role an admin changes or a
+/// It follows the member's profile channel, so a role an admin changes or a
 /// name edited on another device arrives here without a refetch.
-final myProfileProvider = Provider<AsyncValue<ProfileView?>>((ref) {
+final myProfileProvider = Provider<AsyncValue<UserProfile?>>((ref) {
   final accountId = ref.watch(dw.accountId);
   if (accountId == null) return const AsyncData(null);
   return ref.watch(dw.request(GetMyProfile(accountId: accountId)));
@@ -29,7 +27,7 @@ class SignedInProfile extends InheritedWidget {
   });
 
   /// `null` only while signed out, when no screen that reads it is shown.
-  final ProfileView? profile;
+  final UserProfile? profile;
 
   @override
   bool updateShouldNotify(SignedInProfile oldWidget) =>
@@ -37,8 +35,8 @@ class SignedInProfile extends InheritedWidget {
 }
 
 extension SignedInProfileContext on BuildContext {
-  /// The signed-in user's profile. Rebuilds the caller when it changes.
-  ProfileView get profile {
+  /// The signed-in member's profile. Rebuilds the caller when it changes.
+  UserProfile get profile {
     final profile =
         dependOnInheritedWidgetOfExactType<SignedInProfile>()?.profile;
     assert(

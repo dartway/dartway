@@ -4,9 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../support/example_test_app.dart';
 
-const coach = PersonView(id: 2, firstName: 'Boris');
+const coach = PersonCard(id: 2, firstName: 'Boris');
 
-NewsPostView post(int id, String title, DateTime createdAt) => NewsPostView(
+NewsPost post(int id, String title, DateTime createdAt) => NewsPost(
   id: id,
   title: title,
   text: 'Details inside.',
@@ -50,7 +50,7 @@ void main() {
     final club = FakeClub(role: UserRole.staff);
     club.server.onCommand<PublishNews>(
       (command, call) =>
-          DwRefused<NewsPostView>(DwRefusal(DwCoreRefusal.forbidden)),
+          DwCallRefused<NewsPost>(DwCallRefusal(DwCoreRefusal.forbidden)),
     );
     final app = await ExampleTestApp.start(tester, club);
 
@@ -61,7 +61,7 @@ void main() {
     await app.settle(tester);
     await app.tap(tester, find.text('Publish'));
 
-    final sent = app.server.commandsOf<PublishNews>().single.command;
+    final sent = app.server.callsOf<PublishNews>().single.call;
     expect(
       sent,
       const PublishNews(title: 'Pool closed', text: 'Maintenance day.'),

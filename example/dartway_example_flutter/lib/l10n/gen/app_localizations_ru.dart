@@ -161,6 +161,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get messageTheTeam => 'Напишите команде...';
 
   @override
+  String get sendMessage => 'Отправить';
+
+  @override
+  String get showNewerMessages => 'Показать новее';
+
+  @override
+  String get newerMessages => 'Сообщения новее';
+
+  @override
+  String newMessagesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count новых сообщения',
+      many: '$count новых сообщений',
+      few: '$count новых сообщения',
+      one: '$count новое сообщение',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get ourServices => 'Наши услуги';
 
   @override
@@ -359,6 +381,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noMembersMatch => 'Никто не подходит под фильтр.';
 
   @override
+  String membersPage(int page, int pageCount, int total) {
+    return 'Страница $page из $pageCount · участников: $total';
+  }
+
+  @override
+  String get previousPage => 'Предыдущая страница';
+
+  @override
+  String get nextPage => 'Следующая страница';
+
+  @override
   String confirmChangeRole(String name, String role) {
     return 'Сменить роль $name на «$role»?';
   }
@@ -475,4 +508,18 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get refusalUnknownChannel =>
       'Версия приложения не совпадает с сервером — обновите приложение.';
+
+  @override
+  String get updateRequiredTitle => 'Обновите приложение';
+
+  @override
+  String get updateRequiredBody =>
+      'Эта версия приложения больше не поддерживается. Установите последнюю, чтобы продолжить пользоваться клубом.';
+
+  @override
+  String get serverMismatchTitle => 'Приложение не может связаться с сервером';
+
+  @override
+  String get serverMismatchBody =>
+      'Приложение и сервер клуба говорят на разных версиях. Мы уже чиним — попробуйте позже.';
 }

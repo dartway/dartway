@@ -7,7 +7,7 @@ import 'package:gap/gap.dart';
 class ServiceCard extends StatelessWidget {
   const ServiceCard({required this.service, super.key});
 
-  final ClubServiceView service;
+  final ClubService service;
 
   @override
   Widget build(BuildContext context) {

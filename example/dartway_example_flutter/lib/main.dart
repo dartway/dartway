@@ -1,13 +1,15 @@
 import 'package:flutter/foundation.dart';
 
+import 'app_version.dart';
 import 'dartway_example_app.dart';
 
 void main() {
   // Concrete development parameters live here; the app itself stays
   // environment agnostic.
   //
-  // A deployed build is compiled against a fixed server address:
-  // `--dart-define=DW_BACKEND_URL=wss://api.example.com/dw`.
+  // A deployed build is compiled against a fixed server address, the origin
+  // the app's calls go to: `--dart-define=DW_BACKEND_URL=https://app.example.com`
+  // (the web app's own host, where `/dw/` is proxied to the server).
   const deployedBackendUrl = String.fromEnvironment('DW_BACKEND_URL');
 
   // Empty on a local run, where the machine decides instead: the Android
@@ -19,8 +21,11 @@ void main() {
   final backendUrl = deployedBackendUrl.isNotEmpty
       ? deployedBackendUrl
       : !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-      ? 'ws://10.0.2.2:8080/dw'
-      : 'ws://localhost:8080/dw';
+      ? 'http://10.0.2.2:8080'
+      : 'http://localhost:8080';
 
-  DartwayExampleApp(endpoint: Uri.parse(backendUrl)).run();
+  DartwayExampleApp(
+    baseUrl: Uri.parse(backendUrl),
+    appVersion: exampleAppVersion,
+  ).run();
 }

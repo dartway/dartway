@@ -1,4 +1,3 @@
-import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';

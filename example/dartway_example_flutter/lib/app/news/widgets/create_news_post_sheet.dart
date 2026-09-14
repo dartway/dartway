@@ -7,7 +7,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 
 /// Publishes a post under the signed-in staff member's name. The author is not
-/// sent: the server takes it from the connection. A refusal — not staff, an
+/// sent: the server takes it from the caller. A refusal — not staff, an
 /// empty field — is shown in the user's language and keeps the sheet open.
 class CreateNewsPostSheet extends HookWidget {
   const CreateNewsPostSheet({super.key});

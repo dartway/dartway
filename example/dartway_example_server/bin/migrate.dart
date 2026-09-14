@@ -1,8 +1,7 @@
 import 'dart:io';
 
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
-import 'package:dartway_example_server/src/migrations/migrations.dart';
-import 'package:dartway_server/dartway_server.dart';
 
 /// `dart run bin/migrate.dart <apply|rollback|status|create <name>|check|rehash>`
 Future<void> main(List<String> args) async {
@@ -10,7 +9,7 @@ Future<void> main(List<String> args) async {
     schema: dartwayExampleSchema,
     migrations: appMigrations,
     directory: 'lib/src/migrations',
-    modules: {'dw': DwServer.frameworkMigrations},
+    modules: {'dw': DwAppServer.frameworkMigrations},
     database: DwDatabaseConfig.fromEnvironment(Platform.environment),
   ).run(args);
 }

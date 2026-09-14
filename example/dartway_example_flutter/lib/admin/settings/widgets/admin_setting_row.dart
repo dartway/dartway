@@ -26,7 +26,7 @@ class AdminSettingRow extends StatelessWidget {
 
   /// Saves this setting alone. Two admins editing different settings
   /// therefore cannot overwrite each other.
-  DwUiAction<DwResult<AppSettingView>> _save(
+  DwUiAction<DwCallResult<AppSetting>> _save(
     BuildContext context,
     String rawValue,
   ) => dw.action(

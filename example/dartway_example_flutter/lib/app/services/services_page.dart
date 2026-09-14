@@ -1,7 +1,7 @@
 import 'package:dartway_example_flutter/app/services/widgets/service_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/shared/placeholder_views.dart';
+import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -36,7 +36,10 @@ class ServicesPage extends ConsumerWidget implements DwFeature {
       body: ref
           .watch(dw.request(const ListClubServices()))
           .section(
-            loadingValue: PlaceholderViews.listOf(PlaceholderViews.service, 4),
+            loadingValue: PlaceholderObjects.listOf(
+              PlaceholderObjects.service,
+              4,
+            ),
             onRetry: () => ref
                 .read(dw.request(const ListClubServices()).notifier)
                 .refetch(),

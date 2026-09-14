@@ -50,14 +50,14 @@ class AuthState extends Notifier<AuthStateModel> {
   }
 
   /// Asks the server to send a one-time code to the entered phone.
-  Future<DwResult<DwCodeTicket>> requestCode() async {
+  Future<DwCallResult<DwCodeTicket>> requestCode() async {
     final result = await dw.command(
       DwRequestCode(
         kind: DwIdentifierKind.phone,
         identifier: state.phoneDigits,
       ),
     );
-    if (result case DwOk(value: final ticket)) {
+    if (result case DwCallOk(value: final ticket)) {
       _ticket = ticket;
       state = state.copyWith(
         currentStep: state.currentStep.requestOtpNextStep,
@@ -73,7 +73,7 @@ class AuthState extends Notifier<AuthStateModel> {
   /// the account-created hook and ignores it for an account that exists. A
   /// login with a phone that has no account creates one without a name, and
   /// `SignedInGate` asks for it.
-  Future<DwResult<DwSession>> verifyCode() async {
+  Future<DwCallResult<DwAuthSession>> verifyCode() async {
     // The code step is only ever entered by a successful [requestCode].
     final ticket =
         _ticket ?? (throw StateError('verifyCode ran before requestCode'));
@@ -89,7 +89,7 @@ class AuthState extends Notifier<AuthStateModel> {
             : const {},
       ),
     );
-    if (result case DwOk(value: final session)) {
+    if (result case DwCallOk(value: final session)) {
       await dw.signIn(session);
       // Signed in: the flow starts from the beginning next time, and the
       // phone and code typed here do not outlive it.

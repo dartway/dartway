@@ -1,11 +1,11 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_orm/dartway_orm.dart';
 
 part 'club.dw.dart';
 
-@DwTable('club_service')
-final class ClubService extends DwEntity with _$ClubService {
-  const ClubService({
+@DwSqlTable('club_service')
+final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
+  const ClubServiceRow({
     this.id,
     required this.title,
     required this.description,
@@ -25,9 +25,14 @@ final class ClubService extends DwEntity with _$ClubService {
   static const table = ClubServiceTable();
 }
 
-@DwTable('club_session', indexes: [DwIndex(['startsAt'])])
-final class ClubSession extends DwEntity with _$ClubSession {
-  const ClubSession({
+@DwSqlTable(
+  'club_session',
+  indexes: [
+    DwTableIndex(['startsAt']),
+  ],
+)
+final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
+  const ClubSessionRow({
     this.id,
     required this.serviceId,
     this.coachProfileId,
@@ -39,10 +44,10 @@ final class ClubSession extends DwEntity with _$ClubSession {
   @override
   final int? id;
 
-  @DwReferences('club_service', onDelete: DwOnDelete.cascade)
+  @DwForeignKey('club_service', onDelete: DwOnDelete.cascade)
   final int serviceId;
 
-  @DwReferences('user_profile', onDelete: DwOnDelete.setNull)
+  @DwForeignKey('user_profile', onDelete: DwOnDelete.setNull)
   final int? coachProfileId;
 
   final DateTime startsAt;
@@ -56,15 +61,15 @@ final class ClubSession extends DwEntity with _$ClubSession {
   static const table = ClubSessionTable();
 }
 
-@DwTable(
+@DwSqlTable(
   'session_booking',
   indexes: [
-    DwIndex(['sessionId', 'status']),
-    DwIndex(['clientProfileId', 'createdAt']),
+    DwTableIndex(['sessionId', 'status']),
+    DwTableIndex(['clientProfileId', 'createdAt']),
   ],
 )
-final class SessionBooking extends DwEntity with _$SessionBooking {
-  const SessionBooking({
+final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
+  const SessionBookingRow({
     this.id,
     required this.sessionId,
     required this.clientProfileId,
@@ -75,10 +80,10 @@ final class SessionBooking extends DwEntity with _$SessionBooking {
   @override
   final int? id;
 
-  @DwReferences('club_session', onDelete: DwOnDelete.cascade)
+  @DwForeignKey('club_session', onDelete: DwOnDelete.cascade)
   final int sessionId;
 
-  @DwReferences('user_profile', onDelete: DwOnDelete.cascade)
+  @DwForeignKey('user_profile', onDelete: DwOnDelete.cascade)
   final int clientProfileId;
 
   final BookingStatus status;
@@ -87,9 +92,9 @@ final class SessionBooking extends DwEntity with _$SessionBooking {
   static const table = SessionBookingTable();
 }
 
-@DwTable('session_review')
-final class SessionReview extends DwEntity with _$SessionReview {
-  const SessionReview({
+@DwSqlTable('session_review')
+final class SessionReviewRow extends DwTableRow with _$SessionReviewRow {
+  const SessionReviewRow({
     this.id,
     required this.bookingId,
     required this.rating,
@@ -101,8 +106,8 @@ final class SessionReview extends DwEntity with _$SessionReview {
   final int? id;
 
   /// One review per visit, held by the schema rather than by a check.
-  @DwUnique()
-  @DwReferences('session_booking', onDelete: DwOnDelete.cascade)
+  @DwUniqueColumn()
+  @DwForeignKey('session_booking', onDelete: DwOnDelete.cascade)
   final int bookingId;
 
   final int rating;

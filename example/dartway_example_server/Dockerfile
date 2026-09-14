@@ -1,15 +1,15 @@
-# Built from the **project root**, not from this folder: the compose file
-# `dartway deploy setup` renders declares `context: .` and names this file
-# explicitly, because the web image next to it needs two packages and a context
-# can only be one directory. Every path below is therefore relative to the root.
+# Built from the **project root**: the shared contract package is a path
+# dependency of this one, so a context narrower than the root cannot resolve
+# it. Every path below is relative to the root.
 FROM dart:3.12.0 AS build
 
 WORKDIR /workspace
+COPY dartway_example_shared/ dartway_example_shared/
 COPY dartway_example_server/ dartway_example_server/
 
 WORKDIR /workspace/dartway_example_server
 RUN dart pub get
-RUN dart compile exe bin/main.dart -o /server
+RUN dart compile exe bin/server.dart -o /server
 
 FROM alpine:latest
 
@@ -19,24 +19,9 @@ FROM alpine:latest
 COPY --from=build /runtime/ /
 RUN apk add --no-cache ca-certificates
 
-WORKDIR /app
 COPY --from=build /server /app/server
-# The Serverpod configuration is source, not something the deploy renders. What
-# arrives over this directory at runtime comes from the server's secret store:
-# passwords.yaml, and every file named under `requires.files` in
-# deploy/config.yaml, each mounted read-only under its own name.
-COPY --from=build /workspace/dartway_example_server/config/ /app/config/
-COPY --from=build /workspace/dartway_example_server/web/ /app/web/
-COPY --from=build /workspace/dartway_example_server/migrations/ /app/migrations/
-# Insights reads this file to filter endpoint logs.
-COPY --from=build /workspace/dartway_example_server/lib/src/generated/protocol.yaml /app/lib/src/generated/protocol.yaml
 
-EXPOSE 8080 8081 8082
-
-# Exec form on purpose. Migrations run as `docker compose run backend
-# --mode=... --apply-migrations`, and those arguments replace CMD — which only
-# happens in this form. Shell form (`ENTRYPOINT ./server --mode=$runmode`)
-# ignores them and starts an ordinary server instead, so the deploy reports a
-# migration that never ran. `dartway deploy check` fails on that form.
+# Configured by the environment: DW_DATABASE_*, PORT, DW_MIN_APP_BUILD,
+# DW_ALLOWED_ORIGINS (see bin/server.dart). It applies its migrations on start.
+EXPOSE 8080
 ENTRYPOINT ["/app/server"]
-CMD ["--mode=production", "--server-id=default", "--logging=normal", "--role=monolith"]

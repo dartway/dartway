@@ -19,7 +19,7 @@ class AdminSettingsForm extends ConsumerWidget {
     return ref
         .watch(dw.request(const ListAppSettings()))
         .section(
-          loadingValue: const <AppSettingView>[],
+          loadingValue: const <AppSetting>[],
           onRetry: () =>
               ref.read(dw.request(const ListAppSettings()).notifier).refetch(),
           builder: (stored) {

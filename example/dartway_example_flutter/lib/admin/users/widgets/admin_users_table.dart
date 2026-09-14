@@ -1,52 +1,85 @@
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/shared/placeholder_views.dart';
+import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Every profile, with the role editable inline. Search and role filtering
-/// are client-side over the live list.
+/// One page of members, with the role editable inline and the pager under
+/// it. The page is live: rows change in place, and a new member reads it
+/// again.
 class AdminUsersTable extends ConsumerWidget {
-  const AdminUsersTable({super.key, this.searchQuery = '', this.roleFilter});
+  const AdminUsersTable({
+    required this.request,
+    required this.onPage,
+    super.key,
+  });
 
-  final String searchQuery;
-  final UserRole? roleFilter;
+  final ListUserProfiles request;
 
-  bool _matches(ProfileView user) {
-    if (roleFilter != null && user.role != roleFilter) return false;
-    final query = searchQuery.trim().toLowerCase();
-    if (query.isEmpty) return true;
-    final name = '${user.firstName} ${user.lastName ?? ''}'
-        .trim()
-        .toLowerCase();
-    return name.contains(query) || user.phone.contains(query);
-  }
+  /// Switches to page number `page`.
+  final void Function(int page) onPage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final table = dw.table(request);
+
     return ref
-        .watch(dw.request(const ListProfiles()))
+        .watch(table)
         .section(
-          loadingValue: PlaceholderViews.listOf(PlaceholderViews.profile, 4),
-          onRetry: () =>
-              ref.read(dw.request(const ListProfiles()).notifier).refetch(),
-          builder: (users) {
-            final visible = [
-              for (final user in users)
-                if (_matches(user)) user,
-            ];
-            if (visible.isEmpty) {
+          loadingValue: DwTablePage(
+            PlaceholderObjects.listOf(PlaceholderObjects.profile, 4),
+            total: 4,
+            page: 1,
+            pageSize: request.pageSize,
+          ),
+          onRetry: () => ref.read(table.notifier).refetch(),
+          builder: (page) {
+            if (page.items.isEmpty) {
               return AppText.body(
-                users.isEmpty
-                    ? context.l10n.noMembersYet
-                    : context.l10n.noMembersMatch,
+                request.search.isEmpty && request.role == null
+                    ? l10n.noMembersYet
+                    : l10n.noMembersMatch,
               );
             }
-            return ListView(
-              children: [for (final user in visible) _UserRow(user: user)],
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    children: [
+                      for (final user in page.items) _UserRow(user: user),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: l10n.previousPage,
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: page.page > 1
+                          ? () => onPage(page.page - 1)
+                          : null,
+                    ),
+                    Flexible(
+                      child: AppText.body(
+                        l10n.membersPage(page.page, page.pageCount, page.total),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: l10n.nextPage,
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: page.page < page.pageCount
+                          ? () => onPage(page.page + 1)
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
             );
           },
         );
@@ -56,7 +89,7 @@ class AdminUsersTable extends ConsumerWidget {
 class _UserRow extends StatelessWidget {
   const _UserRow({required this.user});
 
-  final ProfileView user;
+  final UserProfile user;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +105,7 @@ class _UserRow extends StatelessWidget {
         onChanged: (role) {
           if (role == null || role == user.role) return;
           // Changing someone's role is a rights change — confirm it. The row
-          // changes when the server publishes the updated profile.
+          // changes when the answer carries the updated profile.
           dw.action(
             (_) => dw.command(ChangeRole(profileId: user.id, role: role)),
             label: 'changeUserRole',

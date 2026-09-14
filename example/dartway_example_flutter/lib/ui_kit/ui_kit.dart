@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:dartway_flutter/dartway_flutter.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:device_frame/device_frame.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +15,7 @@ import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-export 'package:dartway_flutter/dartway_flutter.dart';
+export 'package:dartway_core_flutter/dartway_core_flutter.dart';
 
 part 'assets/app_icon.dart';
 part 'assets/app_icon_view.dart';

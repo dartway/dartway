@@ -2,7 +2,7 @@
 /// exchange is declared here and nowhere else.
 library;
 
-export 'package:dartway_core/dartway_core.dart';
+export 'package:dartway_core_shared/dartway_core_shared.dart';
 
 export 'generated/dw_protocol.dart';
 export 'src/admin.dart';

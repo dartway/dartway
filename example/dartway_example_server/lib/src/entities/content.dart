@@ -1,10 +1,15 @@
-import 'package:dartway_orm/dartway_orm.dart';
+import 'package:dartway_core_server/dartway_core_server.dart';
 
 part 'content.dw.dart';
 
-@DwTable('news_post', indexes: [DwIndex(['createdAt'])])
-final class NewsPost extends DwEntity with _$NewsPost {
-  const NewsPost({
+@DwSqlTable(
+  'news_post',
+  indexes: [
+    DwTableIndex(['createdAt']),
+  ],
+)
+final class NewsPostRow extends DwTableRow with _$NewsPostRow {
+  const NewsPostRow({
     this.id,
     required this.authorProfileId,
     required this.title,
@@ -15,7 +20,7 @@ final class NewsPost extends DwEntity with _$NewsPost {
   @override
   final int? id;
 
-  @DwReferences('user_profile', onDelete: DwOnDelete.cascade)
+  @DwForeignKey('user_profile', onDelete: DwOnDelete.cascade)
   final int authorProfileId;
 
   final String title;
@@ -25,9 +30,9 @@ final class NewsPost extends DwEntity with _$NewsPost {
   static const table = NewsPostTable();
 }
 
-@DwTable('chat_channel')
-final class ChatChannel extends DwEntity with _$ChatChannel {
-  const ChatChannel({this.id, required this.title});
+@DwSqlTable('chat_channel')
+final class ChatChannelRow extends DwTableRow with _$ChatChannelRow {
+  const ChatChannelRow({this.id, required this.title});
 
   @override
   final int? id;
@@ -36,9 +41,16 @@ final class ChatChannel extends DwEntity with _$ChatChannel {
   static const table = ChatChannelTable();
 }
 
-@DwTable('chat_message', indexes: [DwIndex(['channelId', 'id'])])
-final class ChatMessage extends DwEntity with _$ChatMessage {
-  const ChatMessage({
+/// The window over a channel reads by `(channelId, createdAt, id)` in both
+/// directions; the index serves each read as one range scan.
+@DwSqlTable(
+  'chat_message',
+  indexes: [
+    DwTableIndex(['channelId', 'createdAt', 'id']),
+  ],
+)
+final class ChatMessageRow extends DwTableRow with _$ChatMessageRow {
+  const ChatMessageRow({
     this.id,
     required this.channelId,
     required this.authorProfileId,
@@ -49,10 +61,10 @@ final class ChatMessage extends DwEntity with _$ChatMessage {
   @override
   final int? id;
 
-  @DwReferences('chat_channel', onDelete: DwOnDelete.cascade)
+  @DwForeignKey('chat_channel', onDelete: DwOnDelete.cascade)
   final int channelId;
 
-  @DwReferences('user_profile', onDelete: DwOnDelete.cascade)
+  @DwForeignKey('user_profile', onDelete: DwOnDelete.cascade)
   final int authorProfileId;
 
   final String text;
@@ -61,14 +73,14 @@ final class ChatMessage extends DwEntity with _$ChatMessage {
   static const table = ChatMessageTable();
 }
 
-@DwTable('app_setting')
-final class AppSetting extends DwEntity with _$AppSetting {
-  const AppSetting({this.id, required this.key, required this.value});
+@DwSqlTable('app_setting')
+final class AppSettingRow extends DwTableRow with _$AppSettingRow {
+  const AppSettingRow({this.id, required this.key, required this.value});
 
   @override
   final int? id;
 
-  @DwUnique()
+  @DwUniqueColumn()
   final String key;
 
   final String value;

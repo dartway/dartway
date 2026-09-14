@@ -368,6 +368,30 @@ abstract class AppLocalizations {
   /// **'Message the team...'**
   String get messageTheTeam;
 
+  /// No description provided for @sendMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get sendMessage;
+
+  /// No description provided for @showNewerMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Show newer messages'**
+  String get showNewerMessages;
+
+  /// No description provided for @newerMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Newer messages'**
+  String get newerMessages;
+
+  /// No description provided for @newMessagesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 new message} other{{count} new messages}}'**
+  String newMessagesCount(int count);
+
   /// No description provided for @ourServices.
   ///
   /// In en, this message translates to:
@@ -698,6 +722,24 @@ abstract class AppLocalizations {
   /// **'No members match.'**
   String get noMembersMatch;
 
+  /// No description provided for @membersPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pageCount} · {total} members'**
+  String membersPage(int page, int pageCount, int total);
+
+  /// No description provided for @previousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get previousPage;
+
+  /// No description provided for @nextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get nextPage;
+
   /// No description provided for @confirmChangeRole.
   ///
   /// In en, this message translates to:
@@ -907,6 +949,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This version of the app does not match the server — please update it.'**
   String get refusalUnknownChannel;
+
+  /// No description provided for @updateRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update the app'**
+  String get updateRequiredTitle;
+
+  /// No description provided for @updateRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app is no longer supported. Install the latest one to keep using the club.'**
+  String get updateRequiredBody;
+
+  /// No description provided for @serverMismatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The app cannot reach its server'**
+  String get serverMismatchTitle;
+
+  /// No description provided for @serverMismatchBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This app and the club\'s server speak different versions. We are on it — please try again later.'**
+  String get serverMismatchBody;
 }
 
 class _AppLocalizationsDelegate

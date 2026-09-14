@@ -1,5 +1,5 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_orm/dartway_orm.dart';
 
 part 'people.dw.dart';
 
@@ -8,9 +8,14 @@ part 'people.dw.dart';
 /// The framework owns the account and its identifiers; this row is what the
 /// club knows about the person, and it exists from the moment the account does
 /// (created in the same transaction, see `exampleAuth`).
-@DwTable('user_profile')
-final class UserProfile extends DwEntity with _$UserProfile {
-  const UserProfile({
+@DwSqlTable(
+  'user_profile',
+  indexes: [
+    DwTableIndex(['firstName']),
+  ],
+)
+final class UserProfileRow extends DwTableRow with _$UserProfileRow {
+  const UserProfileRow({
     this.id,
     required this.accountId,
     required this.phone,
@@ -27,8 +32,8 @@ final class UserProfile extends DwEntity with _$UserProfile {
   @override
   final int? id;
 
-  @DwUnique()
-  @DwReferences('dw_account', onDelete: DwOnDelete.cascade)
+  @DwUniqueColumn()
+  @DwForeignKey('dw_account', onDelete: DwOnDelete.cascade)
   final int accountId;
 
   final String phone;
@@ -41,7 +46,7 @@ final class UserProfile extends DwEntity with _$UserProfile {
   final DateTime conditionsAcceptedAt;
 
   /// A fixed sign-in code for store reviewers and demo personas. Never leaves
-  /// the server: no view carries it.
+  /// the server: no data object carries it.
   final String? testVerificationCode;
 
   static const table = UserProfileTable();

@@ -1,72 +1,74 @@
 # DartWay example — a fitness club
 
-A complete application built on [DartWay](https://dartway.dev) (Flutter + Serverpod): sessions,
-bookings, coaches, an admin panel, roles, uploads, real-time lists. Three packages:
+A complete application on DartWay 1.0 (fullstack Dart): a schedule with live
+spots, bookings and reviews, club news, a staff chat, an admin panel with a
+members table, roles and settings. Three packages:
 
-- `dartway_example_server` — Serverpod backend (models, CRUD configs, logic)
-- `dartway_example_flutter` — Flutter app (features, UI kit, navigation)
-- `dartway_example_client` — generated API client (**do not edit by hand**)
+- `dartway_example_shared` — the contract: data objects, requests, commands,
+  channels and refusal codes, with their generated codecs and registry
+- `dartway_example_server` — row classes, handlers, access and channel rules,
+  migrations, the dev seed (`dartway_core_server`)
+- `dartway_example_flutter` — the app: screens on `dw.request` / `dw.table` /
+  `dw.window` / `dw.command`, the UI kit, navigation (`dartway_core_flutter`)
 
-**This is a reference to read and run, not a project to inherit.** Starting your own app from it
-means deleting somebody else's fitness club before writing yours — `dartway create` exists for
-that and hands you a skeleton with no domain in it. Read this one to see what a finished DartWay
-app looks like: how a `DwCrudConfig` replaces an endpoint, how a feature declares its own spec, how
-the UI kit stays the only source of styles.
+**This is a reference to read and run, not a project to inherit.** Starting
+your own app from it means deleting somebody else's fitness club before
+writing yours — `dartway create` exists for that.
+
+## How it talks
+
+Every request and command is `POST /dw/<Name>` with the DTO's JSON as the
+body; the answer is an `ApiResponse` whose `updates` carry what the command
+changed that this client listens to. A WebSocket (`/dw/live`) is opened only
+while something on screen is live, and brings other people's changes. Booking
+a spot therefore updates your own schedule and bookings from the answer, and
+everyone else's schedule over their socket.
 
 ## Running it
 
-The three packages depend on the framework from pub.dev, so they run outside this monorepo. Copy
-them somewhere, then **delete the `dependency_overrides:` block from each of the three
-`pubspec.yaml` files** — inside the monorepo those overrides point at sibling folders so the
-example builds against the framework's working copy, and in a standalone checkout they lead
-nowhere.
+Inside this monorepo the packages build against the framework's working copy
+through `dependency_overrides`; copied out, delete those blocks.
 
 ```bash
-# backend
+# the database: any Postgres; the variables below point the server at it
+export DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=5432 DW_DATABASE_NAME=club \
+       DW_DATABASE_USER=club DW_DATABASE_PASSWORD=club DW_DATABASE_SSL=false
+
 cd dartway_example_server
 dart pub get
-docker compose up -d                                       # Postgres on 8090, MinIO on 8100
-dart bin/main.dart --apply-migrations --role maintenance    # apply the schema
-dart bin/seed_dev.dart --mode development                   # seed the club and its people
-dart bin/main.dart                                          # run the server
+dart run bin/server.dart          # applies the migrations, serves :8080
+dart run bin/seed_dev.dart        # in another terminal, once
 ```
 
 ```bash
-# app — in another terminal
 cd dartway_example_flutter
 flutter pub get
-flutter run
+flutter run                       # http://localhost:8080, or 10.0.2.2 on Android
 ```
 
-Sign in as **79990000003** (a client), **79990000002** (a coach) or **79990000001** (the admin).
-There are no passwords: the one-time code is printed in the server console.
+Sign in as **79990000003** (a client), **79990000002** or **79990000004**
+(staff) or **79990000001** (the admin), with the code **111111**. Other
+phones get a code printed in the server log.
 
-`dartway doctor` says whether this machine has what any of it needs — Dart, Flutter, git, a pub
-host that answers, a responding Docker daemon, a `serverpod_cli` matching the pin.
+A browser app calls its server on the same origin (`/dw/` proxied next to the
+web build, as the deploy does), so the web build names that origin:
+`flutter build web --dart-define=DW_BACKEND_URL=https://app.example.com`.
+The server's `DW_ALLOWED_ORIGINS` lists further hosts allowed to open the live
+socket, and `DW_MIN_APP_BUILD` the oldest app build it still serves.
+
+## Code generation and migrations
+
+```bash
+cd dartway_example_server
+dart run dartway_generator --project ..       # codecs, registry, schema
+dart run bin/migrate.dart create <name>       # a migration from the row classes
+dart run bin/migrate.dart check               # migrations produce the schema
+```
 
 ## Tests
 
-The server carries DartWay's integration suites: the auth limits — attempt caps,
-code expiry, request rate limiting, single-use access tokens — and password
-hashing, including the migration of a legacy hash on the user's next sign-in.
-They run against a real database, because that is the only place the guarantees
-hold: the limits are enforced with database locks, a race cannot be observed in
-a rolled-back transaction, and neither can a hash that must actually be written.
-
 ```bash
-dartway test                  # from the project root
+cd dartway_example_shared && dart test        # the contract
+cd dartway_example_server && dart test        # acceptance, real server + Postgres (DW_DATABASE_* names a maintenance database)
+cd dartway_example_flutter && flutter test    # the app against the in-memory DwFakeServer
 ```
-
-`dartway test` creates the database this run needs, on a port Docker picks, and
-removes it when the run ends. Nothing is shared and nothing survives, so two
-projects — or two runs of this one — cannot reach each other's rows, and a row
-written by yesterday's run cannot turn up in today's assertions. The coordinates
-reach the suite as `SERVERPOD_DATABASE_*`, which Serverpod reads over
-`config/test.yaml`. `docker compose up -d` is still what the development
-database and object storage need; it no longer has anything to do with tests.
-
-The suites commit real transactions (`RollbackDatabase.disabled`) and wipe the
-auth tables around themselves, which makes them stateful neighbours rather than
-isolated units: run in parallel they wipe each other's rows mid-test. Files
-therefore run one at a time — pinned in `dart_test.yaml`, not left to whoever
-remembers a flag.

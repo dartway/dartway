@@ -15,7 +15,7 @@ void main() {
       ];
       for (final code in codes) {
         expect(
-          refusalText(l10n, DwRefusal(code)),
+          refusalText(l10n, DwCallRefusal(code)),
           isNot(l10n.refusalGeneric),
           reason: code.code,
         );
@@ -27,7 +27,7 @@ void main() {
 
   test('a code the app does not know still reads as a sentence', () {
     expect(
-      refusalText(en, const DwRefusal.raw('fromANewerServer')),
+      refusalText(en, const DwCallRefusal.raw('fromANewerServer')),
       en.refusalGeneric,
     );
   });
@@ -36,7 +36,7 @@ void main() {
     expect(
       refusalText(
         en,
-        DwRefusal(
+        DwCallRefusal(
           DwCoreRefusal.invalid,
           field: 'code',
           params: {'attemptsLeft': 2},
@@ -45,11 +45,17 @@ void main() {
       'Wrong code. Attempts left: 2',
     );
     expect(
-      refusalText(en, DwRefusal(DwCoreRefusal.invalid, field: 'identifier')),
+      refusalText(
+        en,
+        DwCallRefusal(DwCoreRefusal.invalid, field: 'identifier'),
+      ),
       'Enter a valid phone number.',
     );
     expect(
-      refusalText(en, DwRefusal.tooManyRequests(const Duration(seconds: 30))),
+      refusalText(
+        en,
+        DwCallRefusal.tooManyRequests(const Duration(seconds: 30)),
+      ),
       'Too many attempts. Try again in 30 s.',
     );
   });

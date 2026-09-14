@@ -8,22 +8,22 @@ import 'core/router/router.dart';
 import 'ui_kit/ui_kit.dart';
 
 /// The DartWay example application. All app wiring lives here; `main` only
-/// supplies concrete development parameters (server address, version) and
-/// runs it.
+/// supplies concrete parameters (server address, version) and runs it.
 class DartwayExampleApp {
-  const DartwayExampleApp({required this.endpoint, this.appVersion = 'local'});
+  const DartwayExampleApp({required this.baseUrl, required this.appVersion});
 
-  /// The server's app WebSocket, `…/dw`.
-  final Uri endpoint;
+  /// Where the server's calls and live socket are: `http://localhost:8080`.
+  final Uri baseUrl;
 
-  /// Version label shown in the corner of every page and in error reports.
+  /// This build, `<semver>+<build>`: shown in the corner of every page and in
+  /// error reports, and sent with every call.
   final String appVersion;
 
   void run() {
-    // Built here, started by the runner: `dw.init()` starts the plugins, reads
-    // the stored session and begins connecting, without waiting for the
-    // server — a start offline is a start.
-    createExampleDwCore(endpoint: endpoint, appVersion: appVersion);
+    // Built here, started by the runner: `dw.init()` starts the plugins and
+    // reads the stored session, without waiting for the server — a start
+    // offline is a start.
+    createExampleDwCore(baseUrl: baseUrl, appVersion: appVersion);
 
     DwAppRunner(
       // No onError: uncaught errors flow into the dw pipeline, where the app's

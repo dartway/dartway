@@ -3,14 +3,14 @@ import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';
-import 'package:dartway_example_flutter/shared/placeholder_views.dart';
+import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-typedef _Schedule = ({List<ClubSessionView> sessions, List<BookingView> mine});
+typedef _Schedule = ({List<ClubSession> sessions, List<SessionBooking> mine});
 
 /// Upcoming sessions grouped by day, each card knowing whether you hold a
 /// place on it. Both reads are live: a place someone else takes changes the
@@ -55,7 +55,9 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
     final sessionsRequest = ListUpcomingSessions(
       from: ref.watch(todayProvider),
     );
-    final bookingsRequest = ListMyBookings(profileId: context.profile.id);
+    final bookingsRequest = ListMyBookings(
+      accountId: context.profile.accountId,
+    );
     final sessions = ref.watch(dw.request(sessionsRequest));
     final bookings = ref.watch(dw.request(bookingsRequest));
 
@@ -72,7 +74,7 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
 
     return schedule.section(
       loadingValue: (
-        sessions: PlaceholderViews.listOf(PlaceholderViews.session, 5),
+        sessions: PlaceholderObjects.listOf(PlaceholderObjects.session, 5),
         mine: const [],
       ),
       onRetry: () => Future.wait([

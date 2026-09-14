@@ -52,6 +52,10 @@
   "noChatChannels": "Пока нет каналов чата",
   "sayHiToTeam": "Поздоровайтесь с командой!",
   "messageTheTeam": "Напишите команде...",
+  "sendMessage": "Отправить",
+  "showNewerMessages": "Показать новее",
+  "newerMessages": "Сообщения новее",
+  "newMessagesCount": "{count, plural, =1{{count} новое сообщение} few{{count} новых сообщения} many{{count} новых сообщений} other{{count} новых сообщения}}",
 
   "ourServices": "Наши услуги",
   "priceListComingSoon": "Прайс-лист скоро появится",
@@ -111,6 +115,9 @@
   "roleName": "{role, select, client{Клиент} staff{Команда} admin{Админ} other{—}}",
   "noMembersYet": "Участников пока нет.",
   "noMembersMatch": "Никто не подходит под фильтр.",
+  "membersPage": "Страница {page} из {pageCount} · участников: {total}",
+  "previousPage": "Предыдущая страница",
+  "nextPage": "Следующая страница",
   "confirmChangeRole": "Сменить роль {name} на «{role}»?",
   "clubSettings": "Настройки клуба",
   "clubNameLabel": "Название клуба",
@@ -146,5 +153,9 @@
   "refusalCodeExpired": "Код больше не действует — запросите новый.",
   "refusalTooManyRequests": "Слишком много попыток. Подождите немного.",
   "refusalTooManyRequestsRetryIn": "Слишком много попыток. Повторите через {seconds} с.",
-  "refusalUnknownChannel": "Версия приложения не совпадает с сервером — обновите приложение."
+  "refusalUnknownChannel": "Версия приложения не совпадает с сервером — обновите приложение.",
+  "updateRequiredTitle": "Обновите приложение",
+  "updateRequiredBody": "Эта версия приложения больше не поддерживается. Установите последнюю, чтобы продолжить пользоваться клубом.",
+  "serverMismatchTitle": "Приложение не может связаться с сервером",
+  "serverMismatchBody": "Приложение и сервер клуба говорят на разных версиях. Мы уже чиним — попробуйте позже."
 }

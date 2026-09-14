@@ -1,15 +1,15 @@
 // Draft written by `migrate create`. Review it before applying:
 // from now on it is an ordinary migration, and it is yours.
-import 'package:dartway_orm/dartway_orm.dart';
+import 'package:dartway_core_server/dartway_core_server.dart';
 
-final class M20260913211555Initial extends DwMigration {
-  const M20260913211555Initial();
-
-  @override
-  String get id => '20260913_211555_initial';
+final class M20260914131904Initial extends DwDatabaseMigration {
+  const M20260914131904Initial();
 
   @override
-  String get checksum => '38963514f751367a8e751f17531fd387';
+  String get id => '20260914_131904_initial';
+
+  @override
+  String get checksum => '4821f265fb328734f85d2fc9c2dbbffb';
 
   @override
   Future<void> up(DwMigrationContext m) async {
@@ -38,7 +38,7 @@ final class M20260913211555Initial extends DwMigration {
             'account_id',
             'bigint',
             unique: true,
-            references: DwReferences(
+            references: DwForeignKey(
               'dw_account',
               onDelete: DwOnDelete.cascade,
             ),
@@ -53,6 +53,9 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema('conditions_accepted_at', 'timestamp with time zone'),
           DwColumnSchema('test_verification_code', 'text', nullable: true),
         ],
+        indexes: [
+          DwIndexSchema('user_profile_first_name_idx', ['first_name']),
+        ],
       ),
     );
     await m.createTable(
@@ -63,7 +66,7 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema(
             'channel_id',
             'bigint',
-            references: DwReferences(
+            references: DwForeignKey(
               'chat_channel',
               onDelete: DwOnDelete.cascade,
             ),
@@ -71,7 +74,7 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema(
             'author_profile_id',
             'bigint',
-            references: DwReferences(
+            references: DwForeignKey(
               'user_profile',
               onDelete: DwOnDelete.cascade,
             ),
@@ -80,7 +83,11 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema('created_at', 'timestamp with time zone'),
         ],
         indexes: [
-          DwIndexSchema('chat_message_channel_id_id_idx', ['channel_id', 'id']),
+          DwIndexSchema('chat_message_channel_id_created_at_id_idx', [
+            'channel_id',
+            'created_at',
+            'id',
+          ]),
         ],
       ),
     );
@@ -105,7 +112,7 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema(
             'service_id',
             'bigint',
-            references: DwReferences(
+            references: DwForeignKey(
               'club_service',
               onDelete: DwOnDelete.cascade,
             ),
@@ -114,7 +121,7 @@ final class M20260913211555Initial extends DwMigration {
             'coach_profile_id',
             'bigint',
             nullable: true,
-            references: DwReferences(
+            references: DwForeignKey(
               'user_profile',
               onDelete: DwOnDelete.setNull,
             ),
@@ -136,7 +143,7 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema(
             'author_profile_id',
             'bigint',
-            references: DwReferences(
+            references: DwForeignKey(
               'user_profile',
               onDelete: DwOnDelete.cascade,
             ),
@@ -158,7 +165,7 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema(
             'session_id',
             'bigint',
-            references: DwReferences(
+            references: DwForeignKey(
               'club_session',
               onDelete: DwOnDelete.cascade,
             ),
@@ -166,7 +173,7 @@ final class M20260913211555Initial extends DwMigration {
           DwColumnSchema(
             'client_profile_id',
             'bigint',
-            references: DwReferences(
+            references: DwForeignKey(
               'user_profile',
               onDelete: DwOnDelete.cascade,
             ),
@@ -195,7 +202,7 @@ final class M20260913211555Initial extends DwMigration {
             'booking_id',
             'bigint',
             unique: true,
-            references: DwReferences(
+            references: DwForeignKey(
               'session_booking',
               onDelete: DwOnDelete.cascade,
             ),
