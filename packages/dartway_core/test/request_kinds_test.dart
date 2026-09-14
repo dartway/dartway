@@ -6,11 +6,11 @@ import 'support/protocol.dart';
 void main() {
   final cancelled = bookingWith(8, status: BookingStatus.cancelled);
   const note = CoachNote(7);
-  final deletion = DwDeleted.of<ClubBooking>(7, protocol);
+  final deletion = DwDeletedObject.of<ClubBooking>(7, protocol);
 
   /// The action of every kind for: a matching item, a non-matching item, a
   /// deletion, and an object of another type.
-  Map<String, DwUpdateAction> actions(DwRequest<Object?> request) => {
+  Map<String, DwUpdateAction> actions(DwDataRequest<Object?> request) => {
     'matching': request.onUpdate(booking),
     'notMatching': request.onUpdate(cancelled),
     'deletion': request.onUpdate(deletion),
@@ -112,7 +112,7 @@ void main() {
   });
 
   group('item type', () {
-    final requests = <DwRequest<Object?>>[
+    final requests = <DwDataRequest<Object?>>[
       const GetBooking(),
       const FindBooking(7),
       const ListMyBookings(),
@@ -135,7 +135,7 @@ void main() {
         expect(request.acceptsDeletion(deletion, protocol), isTrue);
         expect(
           request.acceptsDeletion(
-            DwDeleted.of<CoachNote>(7, protocol),
+            DwDeletedObject.of<CoachNote>(7, protocol),
             protocol,
           ),
           isFalse,
@@ -171,7 +171,7 @@ void main() {
       expect(table.checkPage(), isNull);
       expect(
         const ListBookingTable(page: 0).checkPage(),
-        DwRefusal(DwCoreRefusal.invalid, field: 'page', params: {'min': 1}),
+        DwCallRefusal(DwCoreRefusal.invalid, field: 'page', params: {'min': 1}),
       );
       expect(
         const ListBookingTable(pageSize: 0).checkPage()?.field,
@@ -181,7 +181,7 @@ void main() {
   });
 
   group('results per kind', () {
-    Object? wire(DwRequest<Object?> request, Object? result) =>
+    Object? wire(DwDataRequest<Object?> request, Object? result) =>
         roundTrip(request.encodeResult(result, protocol));
 
     test('single and maybe', () {
@@ -208,7 +208,7 @@ void main() {
 
     test('page', () {
       const request = FeedBookings();
-      final page = DwPage([booking, bookingWith(8)], hasMore: true);
+      final page = DwPageResult([booking, bookingWith(8)], hasMore: true);
       final json = wire(request, page);
       expect(json, {
         'items': [booking.toJson(), bookingWith(8).toJson()],
@@ -274,7 +274,10 @@ void main() {
     test('window: cursors present exactly when rows exist past an end', () {
       const request = BookingHistory();
       final older = DwWindowCursor.encode(DateTime.utc(2026), 8);
-      final window = DwWindow([booking, bookingWith(8)], olderCursor: older);
+      final window = DwWindowResult([
+        booking,
+        bookingWith(8),
+      ], olderCursor: older);
       expect(window.hasOlder, isTrue);
       expect(window.hasNewer, isFalse);
       final json = wire(request, window);
@@ -286,10 +289,10 @@ void main() {
       expect(decoded, window);
       expect(decoded.items, isA<List<ClubBooking>>());
 
-      final newest = DwWindow<ClubBooking>([]);
+      final newest = DwWindowResult<ClubBooking>([]);
       expect(wire(request, newest), {'items': []});
       expect(
-        () => DwWindow<ClubBooking>([], newerCursor: 'x'),
+        () => DwWindowResult<ClubBooking>([], newerCursor: 'x'),
         throwsArgumentError,
       );
       expect(

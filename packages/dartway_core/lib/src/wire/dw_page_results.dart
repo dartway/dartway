@@ -1,6 +1,6 @@
-import '../protocol/dw_json.dart';
+import '../protocol/dw_json_codec.dart';
 import '../protocol/dw_read.dart';
-import 'dw_dto.dart';
+import 'dw_wire_object.dart';
 
 // The result shapes of the paginated request kinds. Each encodes its items
 // untagged (the item type is the request's) and decodes them with the
@@ -16,14 +16,17 @@ List<T> _decodeItems<T>(Object? json, T Function(Object? json) decodeItem) => [
 
 /// One page of a `DwPageRequest`: the rows after the offset, and whether
 /// more exist.
-final class DwPage<T extends DwDataObject> {
-  const DwPage(this.items, {required this.hasMore});
+final class DwPageResult<T extends DwDataObject> {
+  const DwPageResult(this.items, {required this.hasMore});
 
   /// Decodes a page; [decodeItem] is the request's item decoder.
-  factory DwPage.fromJson(Object? json, T Function(Object? json) decodeItem) {
+  factory DwPageResult.fromJson(
+    Object? json,
+    T Function(Object? json) decodeItem,
+  ) {
     final map = dwReadMap(json, 'A page');
     dwRejectUnknownKeys(map, const {'items', 'hasMore'}, 'A page');
-    return DwPage(
+    return DwPageResult(
       _decodeItems(map['items'], decodeItem),
       hasMore: dwReadBool(map['hasMore'], 'hasMore'),
     );
@@ -42,7 +45,7 @@ final class DwPage<T extends DwDataObject> {
 
   @override
   bool operator ==(Object other) =>
-      other is DwPage<T> &&
+      other is DwPageResult<T> &&
       other.hasMore == hasMore &&
       dwListEquals(other.items, items);
 
@@ -50,7 +53,7 @@ final class DwPage<T extends DwDataObject> {
   int get hashCode => Object.hash(hasMore, Object.hashAll(items));
 
   @override
-  String toString() => 'DwPage(${items.length} items, hasMore: $hasMore)';
+  String toString() => 'DwPageResult(${items.length} items, hasMore: $hasMore)';
 }
 
 /// One numbered page of a `DwTableRequest`.
@@ -145,10 +148,10 @@ final class DwTablePage<T extends DwDataObject> {
 ///
 /// A cursor is present exactly when rows exist past that end, so "has older"
 /// and "the cursor to load them" are one fact and cannot disagree.
-final class DwWindow<T extends DwDataObject> {
+final class DwWindowResult<T extends DwDataObject> {
   /// Throws [ArgumentError] for a window with a cursor but no rows: a cursor
   /// names the row at an end of the window.
-  DwWindow(this.items, {this.olderCursor, this.newerCursor}) {
+  DwWindowResult(this.items, {this.olderCursor, this.newerCursor}) {
     if (items.isEmpty && (olderCursor != null || newerCursor != null)) {
       throw ArgumentError(
         'An empty window has no ends, so it has no cursors: rows past an end '
@@ -158,7 +161,10 @@ final class DwWindow<T extends DwDataObject> {
   }
 
   /// Decodes a window; [decodeItem] is the request's item decoder.
-  factory DwWindow.fromJson(Object? json, T Function(Object? json) decodeItem) {
+  factory DwWindowResult.fromJson(
+    Object? json,
+    T Function(Object? json) decodeItem,
+  ) {
     const what = 'A window';
     final map = dwReadMap(json, what);
     dwRejectUnknownKeys(map, const {
@@ -168,7 +174,7 @@ final class DwWindow<T extends DwDataObject> {
     }, what);
     final items = _decodeItems(map['items'], decodeItem);
     try {
-      return DwWindow(
+      return DwWindowResult(
         items,
         olderCursor: dwReadOptionalString(map['olderCursor'], 'olderCursor'),
         newerCursor: dwReadOptionalString(map['newerCursor'], 'newerCursor'),
@@ -203,7 +209,7 @@ final class DwWindow<T extends DwDataObject> {
 
   @override
   bool operator ==(Object other) =>
-      other is DwWindow<T> &&
+      other is DwWindowResult<T> &&
       other.olderCursor == olderCursor &&
       other.newerCursor == newerCursor &&
       dwListEquals(other.items, items);
@@ -214,5 +220,5 @@ final class DwWindow<T extends DwDataObject> {
 
   @override
   String toString() =>
-      'DwWindow(${items.length} items, hasOlder: $hasOlder, hasNewer: $hasNewer)';
+      'DwWindowResult(${items.length} items, hasOlder: $hasOlder, hasNewer: $hasNewer)';
 }

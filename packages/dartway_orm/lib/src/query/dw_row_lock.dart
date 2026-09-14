@@ -1,12 +1,12 @@
 import 'package:meta/meta.dart';
 
 import '../entity/dw_table_def.dart';
-import 'dw_column.dart';
+import 'dw_table_column.dart';
 
 /// A row lock taken by a read. Allowed only inside a transaction: outside one
 /// the lock would be released as soon as the statement ends, which reads like
 /// protection and is none.
-enum DwLock {
+enum DwRowLock {
   /// `FOR UPDATE`: waits for rows another transaction holds.
   forUpdate(' FOR UPDATE'),
 
@@ -14,14 +14,14 @@ enum DwLock {
   /// concurrent workers claim distinct jobs from one queue.
   forUpdateSkipLocked(' FOR UPDATE SKIP LOCKED');
 
-  const DwLock(this.sql);
+  const DwRowLock(this.sql);
 
   @internal
   final String sql;
 }
 
 /// The isolation level of a transaction.
-enum DwIsolation {
+enum DwIsolationLevel {
   readCommitted('READ COMMITTED'),
   repeatableRead('REPEATABLE READ'),
 
@@ -29,7 +29,7 @@ enum DwIsolation {
   /// whole transaction.
   serializable('SERIALIZABLE');
 
-  const DwIsolation(this.sql);
+  const DwIsolationLevel(this.sql);
 
   @internal
   final String sql;
@@ -43,7 +43,7 @@ sealed class DwOnConflict<T extends DwTableDef> {
   /// unique constraint or index the conflict is expected on; an empty list
   /// accepts a conflict on any of them.
   const factory DwOnConflict.doNothing(
-    List<DwColumn<Object?>> Function(T table) target,
+    List<DwTableColumn<Object?>> Function(T table) target,
   ) = _DwDoNothing<T>;
 
   @internal
@@ -53,7 +53,7 @@ sealed class DwOnConflict<T extends DwTableDef> {
 final class _DwDoNothing<T extends DwTableDef> extends DwOnConflict<T> {
   const _DwDoNothing(this.target);
 
-  final List<DwColumn<Object?>> Function(T table) target;
+  final List<DwTableColumn<Object?>> Function(T table) target;
 
   @override
   String sql(T table) {

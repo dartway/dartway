@@ -5,19 +5,19 @@ import '../app_setting.dart';
 import '../club_service.dart';
 import '../club_session.dart';
 
-final DwSchema fixtureSchema = DwSchema([
+final DwDatabaseSchema fixtureSchema = DwDatabaseSchema([
   AppSettingRow.table,
   ClubServiceRow.table,
   ClubSessionRow.table,
 ]);
 
-extension FixtureDb on DwDb {
-  DwRepository<AppSettingRow, AppSettingTable> get appSettings =>
+extension FixtureDb on DwDatabaseHandle {
+  DwTableRepository<AppSettingRow, AppSettingTable> get appSettings =>
       repository(AppSettingRow.table);
 
-  DwRepository<ClubServiceRow, ClubServiceTable> get clubServices =>
+  DwTableRepository<ClubServiceRow, ClubServiceTable> get clubServices =>
       repository(ClubServiceRow.table);
 
-  DwRepository<ClubSessionRow, ClubSessionTable> get clubSessions =>
+  DwTableRepository<ClubSessionRow, ClubSessionTable> get clubSessions =>
       repository(ClubSessionRow.table);
 }

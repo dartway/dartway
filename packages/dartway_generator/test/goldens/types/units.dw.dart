@@ -32,15 +32,17 @@ mixin _$Dimensions on DwDataObject {
 
 Dimensions $DimensionsFromJson(Map<String, Object?> json) => Dimensions(
   id: json['id']! as String,
-  width: DwJson.decodeDouble(json['width']),
-  height: json['height'] == null ? null : DwJson.decodeDouble(json['height']),
+  width: DwJsonCodec.decodeDouble(json['width']),
+  height: json['height'] == null
+      ? null
+      : DwJsonCodec.decodeDouble(json['height']),
 );
 
 extension DimensionsCopyWith on Dimensions {
   Dimensions copyWith({
     String? id,
     double? width,
-    DwPatch<double> height = const DwPatch.keep(),
+    DwFieldPatch<double> height = const DwFieldPatch.keep(),
   }) => Dimensions(
     id: id ?? this.id,
     width: width ?? this.width,

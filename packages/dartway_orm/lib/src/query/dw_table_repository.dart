@@ -1,25 +1,25 @@
 import 'package:meta/meta.dart';
 import 'package:postgres/postgres.dart' as pg;
 
-import '../db/dw_db.dart';
+import '../db/dw_database_handle.dart';
 import '../db/dw_errors.dart';
 import '../entity/dw_table_row.dart';
 import '../entity/dw_table_def.dart';
-import 'dw_column.dart';
-import 'dw_lock.dart';
+import 'dw_table_column.dart';
+import 'dw_row_lock.dart';
 
-/// Typed access to the table of one row class through a [DwDb].
+/// Typed access to the table of one row class through a [DwDatabaseHandle].
 ///
-/// Every method is one statement and one round trip (two inside a
-/// transaction, where the driver closes the portal). Statement text depends
-/// only on the *shape* of a call — which columns, which operators — never on
-/// the values, so each shape is prepared once per connection: limits,
-/// offsets and `inList` values are all parameters.
-final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
+/// Every method is one statement and one round trip (two inside a transaction,
+/// where the driver closes the portal). Statement text depends only on the
+/// *shape* of a call — which columns, which operators — never on the
+/// values, so each shape is prepared once per connection: limits, offsets and
+/// `inList` values are all parameters.
+final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   @internal
-  DwRepository.internal(this._db, this.table);
+  DwTableRepository.internal(this._db, this.table);
 
-  final DwDb _db;
+  final DwDatabaseHandle _db;
   final T table;
 
   _DwTableSql get _sql => _DwTableSql.of(table);
@@ -29,11 +29,11 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   /// Without [orderBy] the order is whatever the database returns; paging
   /// with [limit] and [offset] needs an order to be stable.
   Future<List<R>> find({
-    DwExpression Function(T t)? where,
-    List<DwOrder> Function(T t)? orderBy,
+    DwWhereCondition Function(T t)? where,
+    List<DwOrderTerm> Function(T t)? orderBy,
     int? limit,
     int? offset,
-    DwLock? lock,
+    DwRowLock? lock,
   }) async {
     _checkLock(lock);
     final writer = DwSqlWriter()..write(_sql.select);
@@ -57,9 +57,9 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   }
 
   Future<R?> findFirst({
-    DwExpression Function(T t)? where,
-    List<DwOrder> Function(T t)? orderBy,
-    DwLock? lock,
+    DwWhereCondition Function(T t)? where,
+    List<DwOrderTerm> Function(T t)? orderBy,
+    DwRowLock? lock,
   }) async {
     final rows = await find(
       where: where,
@@ -70,7 +70,7 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<R?> findById(int id, {DwLock? lock}) async {
+  Future<R?> findById(int id, {DwRowLock? lock}) async {
     _checkLock(lock);
     final result = await _db.run(
       lock == null ? _sql.selectById : '${_sql.selectById}${lock.sql}',
@@ -94,14 +94,14 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return _decode(result);
   }
 
-  Future<int> count({DwExpression Function(T t)? where}) async {
+  Future<int> count({DwWhereCondition Function(T t)? where}) async {
     final writer = DwSqlWriter()..write(_sql.count);
     _writeWhere(writer, where);
     final result = await _run(writer);
     return result.first.first! as int;
   }
 
-  Future<bool> exists({DwExpression Function(T t)? where}) async {
+  Future<bool> exists({DwWhereCondition Function(T t)? where}) async {
     final writer = DwSqlWriter()
       ..write('SELECT EXISTS (SELECT 1 FROM ${_sql.table}');
     _writeWhere(writer, where);
@@ -178,8 +178,8 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
 
   /// Sets columns on every row matching [where]; returns the number of rows.
   Future<int> updateWhere({
-    required DwExpression Function(T t) where,
-    required List<DwAssignment<Object?>> Function(T t) set,
+    required DwWhereCondition Function(T t) where,
+    required List<DwColumnAssignment<Object?>> Function(T t) set,
   }) async {
     final assignments = set(table);
     if (assignments.isEmpty) {
@@ -201,7 +201,9 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     [id],
   )).affectedRows;
 
-  Future<int> deleteWhere({required DwExpression Function(T t) where}) async {
+  Future<int> deleteWhere({
+    required DwWhereCondition Function(T t) where,
+  }) async {
     final writer = DwSqlWriter()..write('DELETE FROM ${_sql.table}');
     _writeWhere(writer, where);
     return (await _run(writer)).affectedRows;
@@ -230,10 +232,10 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return values;
   }
 
-  Object? _encode(DwColumn<Object?> column, Object? value) =>
+  Object? _encode(DwTableColumn<Object?> column, Object? value) =>
       value == null ? null : column.type.encode(value);
 
-  void _checkLock(DwLock? lock) {
+  void _checkLock(DwRowLock? lock) {
     if (lock != null && !_db.inTransaction) {
       throw StateError(
         '${lock.name} on "${table.name}" needs a transaction: outside one the '
@@ -242,7 +244,7 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     }
   }
 
-  void _writeWhere(DwSqlWriter writer, DwExpression Function(T t)? where) {
+  void _writeWhere(DwSqlWriter writer, DwWhereCondition Function(T t)? where) {
     if (where == null) return;
     writer.write(' WHERE ');
     where(table).write(writer);
@@ -252,18 +254,18 @@ final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
       _db.run(writer.sql, writer.types, writer.values);
 
   List<R> _decode(pg.Result result) => [
-    for (final row in dwRows(result)) table.fromRow(row),
+    for (final row in dwResultRows(result)) table.fromRow(row),
   ];
 
   @override
-  String toString() => 'DwRepository(${table.name})';
+  String toString() => 'DwTableRepository(${table.name})';
 }
 
 /// Statement text of a table that does not depend on a call, built once per
 /// table object.
 final class _DwTableSql {
   _DwTableSql(DwTableDef table)
-    : table = dwQuote(table.name),
+    : table = dwQuoteIdentifier(table.name),
       columns = List.unmodifiable(table.columns) {
     if (columns.isEmpty || !columns.first.primaryKey) {
       throw StateError('${table.name}.columns must start with the id column');
@@ -288,7 +290,7 @@ final class _DwTableSql {
       _cache[table] ??= _DwTableSql(table);
 
   final String table;
-  final List<DwColumn<Object?>> columns;
+  final List<DwTableColumn<Object?>> columns;
   late final String returning;
   late final String select;
   late final String selectById;
@@ -297,11 +299,11 @@ final class _DwTableSql {
   late final String deleteById;
   late final String updateById;
 
-  late final List<DwColumn<Object?>> _withoutId = List.unmodifiable(
+  late final List<DwTableColumn<Object?>> _withoutId = List.unmodifiable(
     columns.skip(1),
   );
 
-  List<DwColumn<Object?>> insertColumns({required bool withId}) =>
+  List<DwTableColumn<Object?>> insertColumns({required bool withId}) =>
       withId ? columns : _withoutId;
 
   late final String _insertWithId = _insertInto(columns);
@@ -310,7 +312,7 @@ final class _DwTableSql {
   String insert({required bool withId}) =>
       withId ? _insertWithId : _insertWithoutId;
 
-  String _insertInto(List<DwColumn<Object?>> columns) =>
+  String _insertInto(List<DwTableColumn<Object?>> columns) =>
       'INSERT INTO $table (${columns.map((column) => column.sql).join(', ')}) '
       'VALUES (${[for (var i = 1; i <= columns.length; i++) '\$$i'].join(', ')})';
 
@@ -322,7 +324,7 @@ final class _DwTableSql {
 
   /// One array per column, zipped by `unnest` and kept in input order by
   /// its ordinality, so the returned rows line up with the rows given.
-  String _insertAllInto(List<DwColumn<Object?>> columns) {
+  String _insertAllInto(List<DwTableColumn<Object?>> columns) {
     final names = columns.map((column) => column.sql).join(', ');
     final aliases = [for (var i = 1; i <= columns.length; i++) 'c$i'];
     final arrays = [for (var i = 1; i <= columns.length; i++) '\$$i'];

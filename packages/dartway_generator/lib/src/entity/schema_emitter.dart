@@ -1,8 +1,8 @@
 import '../emit/source_text.dart';
 import 'entity_model.dart';
 
-/// Writes `lib/generated/dw_schema.dart` of the server package: the schema
-/// and the `DwDb` extension with one repository getter per row class.
+/// Writes `lib/generated/dw_schema.dart` of the server package: the schema and
+/// the `DwDatabaseHandle` extension with one repository getter per row class.
 abstract final class SchemaEmitter {
   static String emit({
     required String baseName,
@@ -20,16 +20,16 @@ abstract final class SchemaEmitter {
     out
       ..writeln()
       ..writeln(
-        'final DwSchema ${camelCase(baseName)}Schema = DwSchema(['
+        'final DwDatabaseSchema ${camelCase(baseName)}Schema = DwDatabaseSchema(['
         '${sorted.map((entity) => '${entity.name}.table').join(', ')}]);',
       )
       ..writeln()
-      ..write('extension ${pascalCase(baseName)}Db on DwDb {');
+      ..write('extension ${pascalCase(baseName)}Db on DwDatabaseHandle {');
     out.write(
       sorted
           .map(
             (entity) =>
-                '\nDwRepository<${entity.name}, ${entity.tableClass}> get '
+                '\nDwTableRepository<${entity.name}, ${entity.tableClass}> get '
                 '${entity.repositoryGetter} => repository(${entity.name}.table);\n',
           )
           .join(),

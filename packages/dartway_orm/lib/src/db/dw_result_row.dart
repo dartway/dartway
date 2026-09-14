@@ -2,7 +2,7 @@ import 'dart:collection';
 
 import 'package:meta/meta.dart';
 
-import '../query/dw_column.dart';
+import '../query/dw_table_column.dart';
 import 'dw_errors.dart';
 
 /// One result row: a read-only map from column name to the value the driver
@@ -35,7 +35,7 @@ final class DwResultRow extends MapBase<String, Object?> {
   }
 
   /// The value of [column], decoded through the column's type.
-  T decode<T>(DwColumn<T> column) {
+  T decode<T>(DwTableColumn<T> column) {
     final position = _index[column.name];
     if (position == null) {
       throw DwDecodeException('the row has no column "${column.name}"');

@@ -10,12 +10,12 @@ import 'support/test_database.dart';
 void main() {
   final database = useTestDatabase(withFixtureSchema: false);
 
-  Future<DwDatabase> open({
+  Future<DwPostgresDatabase> open({
     int maxConnections = 1,
     Duration connectTimeout = const Duration(seconds: 15),
   }) async {
     final base = testServerConfig(name: database().name);
-    final opened = await DwDatabase.open(
+    final opened = await DwPostgresDatabase.open(
       DwDatabaseConfig(
         host: base.host,
         port: base.port,

@@ -4,12 +4,12 @@ import 'values.dart';
 
 part 'columns.dw.dart';
 
-@DwTable(
+@DwSqlTable(
   'columns',
   indexes: [
-    DwIndex(['missing']),
-    DwIndex(['title'], name: 'columns_title_idx'),
-    DwIndex(['title']),
+    DwTableIndex(['missing']),
+    DwTableIndex(['title'], name: 'columns_title_idx'),
+    DwTableIndex(['title']),
   ],
 )
 final class ColumnsRow extends DwTableRow with _$ColumnsRow {
@@ -31,7 +31,7 @@ final class ColumnsRow extends DwTableRow with _$ColumnsRow {
   final List<DateTime> dates;
   final Set<int> set;
 
-  @DwReferences('owner')
+  @DwForeignKey('owner')
   final String ownerName;
 
   final int same;
@@ -42,7 +42,7 @@ final class ColumnsRow extends DwTableRow with _$ColumnsRow {
   static const table = ColumnsTable();
 }
 
-@DwTable('shared_name')
+@DwSqlTable('shared_name')
 final class SameTableARow extends DwTableRow with _$SameTableARow {
   const SameTableARow({this.id});
 
@@ -52,7 +52,7 @@ final class SameTableARow extends DwTableRow with _$SameTableARow {
   static const table = SameTableATable();
 }
 
-@DwTable('shared_name')
+@DwSqlTable('shared_name')
 final class SameTableBRow extends DwTableRow with _$SameTableBRow {
   const SameTableBRow({this.id});
 
@@ -62,7 +62,9 @@ final class SameTableBRow extends DwTableRow with _$SameTableBRow {
   static const table = SameTableBTable();
 }
 
-@DwTable('a_table_name_that_is_far_too_long_for_postgres_to_keep_in_one_piece')
+@DwSqlTable(
+  'a_table_name_that_is_far_too_long_for_postgres_to_keep_in_one_piece',
+)
 final class LongNameRow extends DwTableRow with _$LongNameRow {
   const LongNameRow({this.id});
 

@@ -1,10 +1,10 @@
 import 'package:meta/meta.dart';
 
-import '../db/dw_db.dart';
+import '../db/dw_database_handle.dart';
 import '../db/dw_result_row.dart';
 import '../entity/dw_annotations.dart';
-import '../schema/dw_ddl.dart';
-import '../schema/dw_schema.dart';
+import '../schema/dw_ddl_writer.dart';
+import '../schema/dw_database_schema.dart';
 import 'dw_migration_errors.dart';
 
 /// One migration: Dart code that moves the schema (and data) one step.
@@ -12,8 +12,8 @@ import 'dw_migration_errors.dart';
 /// A migration never imports row classes — they change, and an old
 /// migration must still run in six months. It describes tables with schema
 /// literals and works on data with SQL.
-abstract class DwMigration {
-  const DwMigration();
+abstract class DwDatabaseMigration {
+  const DwDatabaseMigration();
 
   /// `YYYYMMDD_HHMMSS_name`, unique within its namespace.
   String get id;
@@ -72,7 +72,7 @@ final class DwMigrationContext {
   @internal
   DwMigrationContext(this._db);
 
-  final DwDb _db;
+  final DwDatabaseHandle _db;
 
   /// Runs SQL; without [params] the text may hold several statements.
   Future<int> sql(String sql, {Map<String, Object?> params = const {}}) =>
@@ -85,9 +85,9 @@ final class DwMigrationContext {
 
   /// Creates the table with its columns, constraints and indexes.
   Future<void> createTable(DwTableSchema table) =>
-      _script(DwDdl.createTable(table));
+      _script(DwDdlWriter.createTable(table));
 
-  Future<void> dropTable(String table) => _script(DwDdl.dropTable(table));
+  Future<void> dropTable(String table) => _script(DwDdlWriter.dropTable(table));
 
   /// Adds [column]. A `NOT NULL` column without a default cannot be added to
   /// a table that has rows; give [backfill], an SQL expression computed for
@@ -97,13 +97,13 @@ final class DwMigrationContext {
     String table,
     DwColumnSchema column, {
     String? backfill,
-  }) => _script(DwDdl.addColumn(table, column, backfill: backfill));
+  }) => _script(DwDdlWriter.addColumn(table, column, backfill: backfill));
 
   Future<void> dropColumn(String table, String column) =>
-      _script(DwDdl.dropColumn(table, column));
+      _script(DwDdlWriter.dropColumn(table, column));
 
   Future<void> renameColumn(String table, String from, String to) =>
-      _script(DwDdl.renameColumn(table, from, to));
+      _script(DwDdlWriter.renameColumn(table, from, to));
 
   /// Changes nullability. Making a column `NOT NULL` fails on existing nulls
   /// unless [backfill] gives the SQL expression to write into them first.
@@ -113,7 +113,7 @@ final class DwMigrationContext {
     required bool nullable,
     String? backfill,
   }) => _script(
-    DwDdl.alterColumnNullability(
+    DwDdlWriter.alterColumnNullability(
       table,
       column,
       nullable: nullable,
@@ -126,7 +126,7 @@ final class DwMigrationContext {
     String table,
     String column,
     String? defaultSql,
-  ) => _script(DwDdl.alterColumnDefault(table, column, defaultSql));
+  ) => _script(DwDdlWriter.alterColumnDefault(table, column, defaultSql));
 
   /// Changes the column type; [using] converts existing values when Postgres
   /// has no implicit cast.
@@ -135,27 +135,29 @@ final class DwMigrationContext {
     String column,
     String sqlType, {
     String? using,
-  }) => _script(DwDdl.alterColumnType(table, column, sqlType, using: using));
+  }) => _script(
+    DwDdlWriter.alterColumnType(table, column, sqlType, using: using),
+  );
 
   Future<void> addForeignKey(
     String table,
     String column,
-    DwReferences references,
-  ) => _script(DwDdl.addForeignKey(table, column, references));
+    DwForeignKey references,
+  ) => _script(DwDdlWriter.addForeignKey(table, column, references));
 
   Future<void> dropForeignKey(String table, String column) =>
-      _script(DwDdl.dropForeignKey(table, column));
+      _script(DwDdlWriter.dropForeignKey(table, column));
 
   Future<void> addUnique(String table, String column) =>
-      _script(DwDdl.addUnique(table, column));
+      _script(DwDdlWriter.addUnique(table, column));
 
   Future<void> dropUnique(String table, String column) =>
-      _script(DwDdl.dropUnique(table, column));
+      _script(DwDdlWriter.dropUnique(table, column));
 
   Future<void> createIndex(String table, DwIndexSchema index) =>
-      _script(DwDdl.createIndex(table, index));
+      _script(DwDdlWriter.createIndex(table, index));
 
-  Future<void> dropIndex(String name) => _script(DwDdl.dropIndex(name));
+  Future<void> dropIndex(String name) => _script(DwDdlWriter.dropIndex(name));
 
   /// The answer of `down` for a migration that cannot be undone.
   Future<Never> irreversible() async => throw const DwIrreversibleMigration();

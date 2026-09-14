@@ -4,11 +4,17 @@ library;
 // Generated row code uses these; re-exported so a row class file needs one
 // import.
 export 'package:dartway_core/dartway_core.dart'
-    show DwClear, DwKeep, DwPatch, DwSet, dwListEquals, dwMapEquals;
+    show
+        DwClearField,
+        DwKeepField,
+        DwFieldPatch,
+        DwSetField,
+        dwListEquals,
+        dwMapEquals;
 
-export 'src/db/dw_database.dart' show DwDatabase;
+export 'src/db/dw_postgres_database.dart' show DwPostgresDatabase;
 export 'src/db/dw_database_config.dart' show DwDatabaseConfig;
-export 'src/db/dw_db.dart' show DwDb;
+export 'src/db/dw_database_handle.dart' show DwDatabaseHandle;
 export 'src/db/dw_errors.dart'
     show
         DwDatabaseException,
@@ -21,14 +27,14 @@ export 'src/db/dw_result_row.dart' show DwResultRow;
 export 'src/entity/dw_annotations.dart';
 export 'src/entity/dw_table_row.dart';
 export 'src/entity/dw_table_def.dart';
-export 'src/entity/dw_type.dart';
-export 'src/migrations/dw_migration.dart';
+export 'src/entity/dw_column_type.dart';
+export 'src/migrations/dw_database_migration.dart';
 export 'src/migrations/dw_migration_errors.dart';
-export 'src/migrations/dw_migrator.dart';
-export 'src/query/dw_column.dart' hide DwSqlWriter, dwQuote;
-export 'src/query/dw_lock.dart';
-export 'src/query/dw_repository.dart';
-export 'src/schema/dw_schema.dart' hide dwCheckIdentifier;
+export 'src/migrations/dw_migration_runner.dart';
+export 'src/query/dw_table_column.dart' hide DwSqlWriter, dwQuoteIdentifier;
+export 'src/query/dw_row_lock.dart';
+export 'src/query/dw_table_repository.dart';
+export 'src/schema/dw_database_schema.dart' hide dwCheckIdentifier;
 export 'src/migrations/dw_migration_cli.dart';
-export 'src/schema/dw_introspector.dart';
+export 'src/schema/dw_schema_introspector.dart';
 export 'src/schema/dw_schema_diff.dart';

@@ -1,14 +1,14 @@
-import '../dto/dw_server_call.dart';
-import '../result/dw_refusal.dart';
-import '../result/dw_result.dart';
-import 'dw_http.dart';
-import 'dw_protocol.dart';
+import '../wire/dw_server_call.dart';
+import '../result/dw_call_refusal.dart';
+import '../result/dw_call_result.dart';
+import 'dw_http_contract.dart';
+import 'dw_wire_protocol.dart';
 import 'dw_read.dart';
-import 'dw_transport.dart';
+import 'dw_update_transport.dart';
 
 /// Why a call failed, as far as the client may know: which of the three
 /// failing HTTP statuses it gets. No detail beyond this crosses the wire.
-enum DwFailure {
+enum DwFailureKind {
   /// The server failed while handling a well-formed call: `500`, and an
   /// alert.
   internal,
@@ -42,31 +42,33 @@ sealed class DwApiResponse {
 
   /// Success: the call's [result], already encoded by its class, and the
   /// [updates] the call published that the caller should apply.
-  const factory DwApiResponse.ok(Object? result, {DwTransport updates}) =
+  const factory DwApiResponse.ok(Object? result, {DwUpdateTransport updates}) =
       DwApiOk;
 
   /// Refused by a rule or validation. Throws [ArgumentError] for an
   /// incompatibility code, which answers [DwApiResponse.incompatible].
-  factory DwApiResponse.refused(DwRefusal refusal) = DwApiRefused;
+  factory DwApiResponse.refused(DwCallRefusal refusal) = DwApiRefused;
 
   /// The call needs a signed-in caller and has none (or its key is revoked).
   const factory DwApiResponse.unauthenticated() = DwApiUnauthenticated;
 
   /// The call failed; [incidentId] is what the operator finds it by.
-  const factory DwApiResponse.failed(String incidentId, {DwFailure failure}) =
-      DwApiFailed;
+  const factory DwApiResponse.failed(
+    String incidentId, {
+    DwFailureKind failure,
+  }) = DwApiFailed;
 
   /// This build cannot talk to this server. Throws [ArgumentError] unless the
   /// refusal is one of [DwCoreRefusal.incompatibilities].
-  factory DwApiResponse.incompatible(DwRefusal refusal) = DwApiIncompatible;
+  factory DwApiResponse.incompatible(DwCallRefusal refusal) = DwApiIncompatible;
 
   /// Reads a response body. Throws [FormatException] for a body that is not
   /// one of the five shapes, or whose updates do not decode with [protocol].
-  factory DwApiResponse.fromJson(Object? json, DwProtocol protocol) {
+  factory DwApiResponse.fromJson(Object? json, DwWireProtocol protocol) {
     const what = 'An API response';
     final map = dwReadMap(json, what);
     final status = dwReadString(map['status'], 'The response status');
-    DwRefusal refusal() => DwRefusal.fromJson(map['refusal']);
+    DwCallRefusal refusal() => DwCallRefusal.fromJson(map['refusal']);
     switch (status) {
       case _ok:
         dwRejectUnknownKeys(map, const {'status', 'result', 'updates'}, what);
@@ -74,8 +76,8 @@ sealed class DwApiResponse {
         return DwApiOk(
           map['result'],
           updates: updates == null
-              ? DwTransport.empty
-              : DwTransport.fromJson(updates, protocol),
+              ? DwUpdateTransport.empty
+              : DwUpdateTransport.fromJson(updates, protocol),
         );
       case _refused:
         dwRejectUnknownKeys(map, const {'status', 'refusal'}, what);
@@ -93,7 +95,7 @@ sealed class DwApiResponse {
         return DwApiFailed(
           dwReadString(map['incidentId'], 'The incident id'),
           failure: failure == null
-              ? DwFailure.internal
+              ? DwFailureKind.internal
               : _failureNamed(dwReadString(failure, 'The failure')),
         );
       case _incompatible:
@@ -112,7 +114,7 @@ sealed class DwApiResponse {
   factory DwApiResponse.fromHttp(
     int status,
     Object? json,
-    DwProtocol protocol,
+    DwWireProtocol protocol,
   ) {
     final response = DwApiResponse.fromJson(json, protocol);
     final expected = dwHttpStatusFor(response);
@@ -139,8 +141,8 @@ sealed class DwApiResponse {
     }
   }
 
-  static DwFailure _failureNamed(String name) {
-    for (final failure in DwFailure.values) {
+  static DwFailureKind _failureNamed(String name) {
+    for (final failure in DwFailureKind.values) {
       if (failure.name == name) return failure;
     }
     throw FormatException('Unknown failure "$name"');
@@ -153,30 +155,30 @@ sealed class DwApiResponse {
 
   /// The response as the caller's typed result, its value decoded by [call].
   ///
-  /// An incompatibility becomes a [DwRefused] carrying its code: the result
+  /// An incompatibility becomes a [DwCallRefused] carrying its code: the result
   /// of a call has four outcomes, and "update the app" is one the app renders
   /// from the refusal code. Updates are not part of the result; the client
   /// applies [DwApiOk.updates] before handing the result on. Throws
   /// [FormatException] when the result does not decode as [call]'s.
-  DwResult<R> toResult<R>(DwServerCall<R> call, DwProtocol protocol) =>
+  DwCallResult<R> toResult<R>(DwServerCall<R> call, DwWireProtocol protocol) =>
       switch (this) {
-        DwApiOk(:final result) => DwOk(call.decodeResult(result, protocol)),
+        DwApiOk(:final result) => DwCallOk(call.decodeResult(result, protocol)),
         DwApiRefused(:final refusal) ||
-        DwApiIncompatible(:final refusal) => DwRefused(refusal),
+        DwApiIncompatible(:final refusal) => DwCallRefused(refusal),
         DwApiUnauthenticated() => const DwNotAuthenticated(),
-        DwApiFailed(:final incidentId) => DwFailed(incidentId),
+        DwApiFailed(:final incidentId) => DwCallFailed(incidentId),
       };
 }
 
 /// See [DwApiResponse.ok].
 final class DwApiOk extends DwApiResponse {
-  const DwApiOk(this.result, {this.updates = DwTransport.empty});
+  const DwApiOk(this.result, {this.updates = DwUpdateTransport.empty});
 
   /// The call's result, encoded by its class; `null` for an absent maybe or
   /// a `void` command.
   final Object? result;
 
-  final DwTransport updates;
+  final DwUpdateTransport updates;
 
   @override
   Map<String, Object?> toJson() => {
@@ -201,7 +203,7 @@ final class DwApiRefused extends DwApiResponse {
     }
   }
 
-  final DwRefusal refusal;
+  final DwCallRefusal refusal;
 
   @override
   Map<String, Object?> toJson() => {
@@ -228,16 +230,16 @@ final class DwApiUnauthenticated extends DwApiResponse {
 
 /// See [DwApiResponse.failed].
 final class DwApiFailed extends DwApiResponse {
-  const DwApiFailed(this.incidentId, {this.failure = DwFailure.internal});
+  const DwApiFailed(this.incidentId, {this.failure = DwFailureKind.internal});
 
   final String incidentId;
-  final DwFailure failure;
+  final DwFailureKind failure;
 
   @override
   Map<String, Object?> toJson() => {
     'status': DwApiResponse._failed,
     'incidentId': incidentId,
-    if (failure != DwFailure.internal) 'failure': failure.name,
+    if (failure != DwFailureKind.internal) 'failure': failure.name,
   };
 
   @override
@@ -257,7 +259,7 @@ final class DwApiIncompatible extends DwApiResponse {
     }
   }
 
-  final DwRefusal refusal;
+  final DwCallRefusal refusal;
 
   @override
   Map<String, Object?> toJson() => {
@@ -289,9 +291,9 @@ int dwHttpStatusFor(DwApiResponse response) => switch (response) {
   DwApiRefused(:final refusal) => _refusedStatus(refusal),
   DwApiUnauthenticated() => 401,
   DwApiFailed(:final failure) => switch (failure) {
-    DwFailure.internal => 500,
-    DwFailure.malformedCall => 400,
-    DwFailure.unknownCall => 404,
+    DwFailureKind.internal => 500,
+    DwFailureKind.malformedCall => 400,
+    DwFailureKind.unknownCall => 404,
   },
   DwApiIncompatible() => 426,
 };
@@ -300,13 +302,13 @@ int dwHttpStatusFor(DwApiResponse response) => switch (response) {
 /// `dw.tooManyRequests` refusal, nothing otherwise.
 Map<String, String> dwHttpHeadersFor(DwApiResponse response) =>
     switch (response) {
-      DwApiRefused(refusal: DwRefusal(:final retryAfter?)) => {
-        DwHttp.retryAfterHeader: '${retryAfter.inSeconds}',
+      DwApiRefused(refusal: DwCallRefusal(:final retryAfter?)) => {
+        DwHttpContract.retryAfterHeader: '${retryAfter.inSeconds}',
       },
       _ => const {},
     };
 
-int _refusedStatus(DwRefusal refusal) {
+int _refusedStatus(DwCallRefusal refusal) {
   if (refusal.isCode(DwCoreRefusal.forbidden)) return 403;
   if (refusal.isCode(DwCoreRefusal.notFound)) return 404;
   if (refusal.isCode(DwCoreRefusal.conflict)) return 409;

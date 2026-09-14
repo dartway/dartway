@@ -229,7 +229,9 @@ final class Bad extends DwDataObject with _\$Bad {
           project.readFile(
             'dartway_example_shared/lib/generated/dw_protocol.dart',
           ),
-          contains('final DwProtocol dartwayExampleProtocol = DwProtocol(['),
+          contains(
+            'final DwWireProtocol dartwayExampleProtocol = DwWireProtocol([',
+          ),
         );
         expect(await project.analyze('dartway_example_shared'), isNull);
       });

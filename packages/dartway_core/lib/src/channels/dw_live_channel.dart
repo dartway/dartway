@@ -13,8 +13,8 @@ mixin DwChannelKind on Enum {
 }
 
 /// One channel: a kind and an optional key (`chat` + `7`).
-final class DwChannel {
-  const DwChannel(this.kind, [this.key]);
+final class DwLiveChannel {
+  const DwLiveChannel(this.kind, [this.key]);
 
   final DwChannelKind kind;
 
@@ -28,13 +28,13 @@ final class DwChannel {
 
   @override
   bool operator ==(Object other) =>
-      other is DwChannel && other.kind == kind && other.key == key;
+      other is DwLiveChannel && other.kind == kind && other.key == key;
 
   @override
   int get hashCode => Object.hash(kind, key);
 
   @override
-  String toString() => 'DwChannel($wireName)';
+  String toString() => 'DwLiveChannel($wireName)';
 }
 
 /// Splits a wire channel name into its kind name and raw key.

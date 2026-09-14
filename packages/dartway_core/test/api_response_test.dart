@@ -9,9 +9,9 @@ void main() {
 
   group('JSON (R2.2)', () {
     test('ok: the result untagged, updates as a transport', () {
-      final updates = DwTransport([
+      final updates = DwUpdateTransport([
         booking,
-        DwDeleted.of<ClubBooking>(3, protocol),
+        DwDeletedObject.of<ClubBooking>(3, protocol),
       ]);
       final response = DwApiResponse.ok(
         const ListMyBookings().encodeResult([booking], protocol),
@@ -22,7 +22,7 @@ void main() {
         'result': [booking.toJson()],
         'updates': {
           'ClubBooking': [booking.toJson()],
-          'DwDeleted': [
+          'DwDeletedObject': [
             {'type': 'ClubBooking', 'id': 3},
           ],
         },
@@ -36,12 +36,12 @@ void main() {
       expect(const DwApiResponse.ok(null).toJson(), {'status': 'ok'});
       final decoded = back(const DwApiResponse.ok(null)) as DwApiOk;
       expect(decoded.result, isNull);
-      expect(decoded.updates, DwTransport.empty);
+      expect(decoded.updates, DwUpdateTransport.empty);
     });
 
     test('refused, unauthenticated, failed, incompatible', () {
       final refused = DwApiResponse.refused(
-        DwRefusal(DwCoreRefusal.invalid, field: 'note', params: {'max': 3}),
+        DwCallRefusal(DwCoreRefusal.invalid, field: 'note', params: {'max': 3}),
       );
       expect(refused.toJson(), {
         'status': 'refused',
@@ -68,16 +68,19 @@ void main() {
       expect(failed.toJson(), {'status': 'failed', 'incidentId': 'inc-1'});
       final failedBack = back(failed) as DwApiFailed;
       expect(failedBack.incidentId, 'inc-1');
-      expect(failedBack.failure, DwFailure.internal);
+      expect(failedBack.failure, DwFailureKind.internal);
 
       const malformed = DwApiResponse.failed(
         'inc-2',
-        failure: DwFailure.malformedCall,
+        failure: DwFailureKind.malformedCall,
       );
-      expect((back(malformed) as DwApiFailed).failure, DwFailure.malformedCall);
+      expect(
+        (back(malformed) as DwApiFailed).failure,
+        DwFailureKind.malformedCall,
+      );
 
       final incompatible = DwApiResponse.incompatible(
-        DwRefusal(DwCoreRefusal.updateRequired),
+        DwCallRefusal(DwCoreRefusal.updateRequired),
       );
       expect(incompatible.toJson(), {
         'status': 'incompatible',
@@ -101,7 +104,7 @@ void main() {
         );
         expect(
           (response as DwApiRefused).refusal,
-          const DwRefusal.raw('noSpotsLeft'),
+          const DwCallRefusal.raw('noSpotsLeft'),
         );
       },
     );
@@ -111,12 +114,14 @@ void main() {
       () {
         expect(
           () => DwApiResponse.refused(
-            DwRefusal(DwCoreRefusal.protocolUnsupported),
+            DwCallRefusal(DwCoreRefusal.protocolUnsupported),
           ),
           throwsArgumentError,
         );
         expect(
-          () => DwApiResponse.incompatible(DwRefusal(DwCoreRefusal.forbidden)),
+          () => DwApiResponse.incompatible(
+            DwCallRefusal(DwCoreRefusal.forbidden),
+          ),
           throwsArgumentError,
         );
         expect(
@@ -127,10 +132,13 @@ void main() {
           throwsFormatException,
         );
         expect(
-          DwRefusal(DwCoreRefusal.updateRequired).isIncompatibility,
+          DwCallRefusal(DwCoreRefusal.updateRequired).isIncompatibility,
           isTrue,
         );
-        expect(DwRefusal(DwCoreRefusal.conflict).isIncompatibility, isFalse);
+        expect(
+          DwCallRefusal(DwCoreRefusal.conflict).isIncompatibility,
+          isFalse,
+        );
       },
     );
 
@@ -166,14 +174,14 @@ void main() {
   group('HTTP status (R2.2 honest statuses)', () {
     int status(DwApiResponse response) => dwHttpStatusFor(response);
     DwApiResponse refused(DwRefusalCode code) =>
-        DwApiResponse.refused(DwRefusal(code));
+        DwApiResponse.refused(DwCallRefusal(code));
 
     test('every outcome maps to its status', () {
       expect(status(const DwApiResponse.ok(null)), 200);
       expect(status(refused(DwCoreRefusal.invalid)), 422);
       expect(status(refused(DwCoreRefusal.codeExpired)), 422);
       expect(
-        status(DwApiResponse.refused(const DwRefusal.raw('noSpotsLeft'))),
+        status(DwApiResponse.refused(const DwCallRefusal.raw('noSpotsLeft'))),
         422,
       );
       expect(status(refused(DwCoreRefusal.forbidden)), 403);
@@ -182,7 +190,7 @@ void main() {
       expect(
         status(
           DwApiResponse.refused(
-            DwRefusal.tooManyRequests(const Duration(seconds: 4)),
+            DwCallRefusal.tooManyRequests(const Duration(seconds: 4)),
           ),
         ),
         429,
@@ -191,23 +199,27 @@ void main() {
       expect(status(const DwApiResponse.failed('i')), 500);
       expect(
         status(
-          const DwApiResponse.failed('i', failure: DwFailure.malformedCall),
+          const DwApiResponse.failed('i', failure: DwFailureKind.malformedCall),
         ),
         400,
       );
       expect(
-        status(const DwApiResponse.failed('i', failure: DwFailure.unknownCall)),
+        status(
+          const DwApiResponse.failed('i', failure: DwFailureKind.unknownCall),
+        ),
         404,
       );
       expect(
         status(
-          DwApiResponse.incompatible(DwRefusal(DwCoreRefusal.updateRequired)),
+          DwApiResponse.incompatible(
+            DwCallRefusal(DwCoreRefusal.updateRequired),
+          ),
         ),
         426,
       );
       expect(
         DwApiResponse.incompatible(
-          DwRefusal(DwCoreRefusal.protocolUnsupported),
+          DwCallRefusal(DwCoreRefusal.protocolUnsupported),
         ).httpStatus,
         426,
       );
@@ -217,7 +229,7 @@ void main() {
       'a project code named like a framework code is not mistaken for it',
       () {
         expect(
-          status(DwApiResponse.refused(const DwRefusal.raw('forbidden'))),
+          status(DwApiResponse.refused(const DwCallRefusal.raw('forbidden'))),
           422,
         );
       },
@@ -227,7 +239,7 @@ void main() {
       expect(
         dwHttpHeadersFor(
           DwApiResponse.refused(
-            DwRefusal.tooManyRequests(const Duration(milliseconds: 2500)),
+            DwCallRefusal.tooManyRequests(const Duration(milliseconds: 2500)),
           ),
         ),
         {'Retry-After': '3'},
@@ -249,7 +261,7 @@ void main() {
     });
   });
 
-  group('client decoding into DwResult', () {
+  group('client decoding into DwCallResult', () {
     test('ok decodes with the call class, typed', () {
       const request = ListMyBookings();
       final response = DwApiResponse.fromJson(
@@ -259,7 +271,7 @@ void main() {
         protocol,
       );
       final result = response.toResult(request, protocol);
-      expect(result, isA<DwOk<List<ClubBooking>>>());
+      expect(result, isA<DwCallOk<List<ClubBooking>>>());
       expect(result.valueOrNull, [booking]);
 
       const command = RenameBooking(bookingId: 7);
@@ -276,15 +288,15 @@ void main() {
       const request = GetBooking();
       expect(
         DwApiResponse.refused(
-          DwRefusal(DwCoreRefusal.notFound),
+          DwCallRefusal(DwCoreRefusal.notFound),
         ).toResult(request, protocol),
-        isA<DwRefused<ClubBooking>>(),
+        isA<DwCallRefused<ClubBooking>>(),
       );
       final incompatible = DwApiResponse.incompatible(
-        DwRefusal(DwCoreRefusal.updateRequired),
+        DwCallRefusal(DwCoreRefusal.updateRequired),
       ).toResult(request, protocol);
       expect(
-        (incompatible as DwRefused<ClubBooking>).refusal.isCode(
+        (incompatible as DwCallRefused<ClubBooking>).refusal.isCode(
           DwCoreRefusal.updateRequired,
         ),
         isTrue,
@@ -296,7 +308,7 @@ void main() {
       final failed = const DwApiResponse.failed(
         'inc',
       ).toResult(request, protocol);
-      expect((failed as DwFailed<ClubBooking>).incidentId, 'inc');
+      expect((failed as DwCallFailed<ClubBooking>).incidentId, 'inc');
     });
 
     test('a result that does not decode as the call is a FormatException', () {

@@ -110,7 +110,9 @@ abstract final class ValueClassWriter {
         // A nullable parameter cannot tell "keep" from "set to null"; a patch
         // can.
         final nonNull = field.spelling.substring(0, field.spelling.length - 1);
-        parameters.add('DwPatch<$nonNull> $name = const DwPatch.keep()');
+        parameters.add(
+          'DwFieldPatch<$nonNull> $name = const DwFieldPatch.keep()',
+        );
         arguments.add('$name: $name.apply(this.$name)');
       } else {
         parameters.add('${field.spelling}? $name');

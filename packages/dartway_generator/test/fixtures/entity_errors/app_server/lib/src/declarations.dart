@@ -11,7 +11,7 @@ final class NoTableRow extends DwTableRow with _$NoTableRow {
   static const table = NoTableTable();
 }
 
-@DwTable('no_static_table')
+@DwSqlTable('no_static_table')
 final class NoStaticTableRow extends DwTableRow with _$NoStaticTableRow {
   const NoStaticTableRow({this.id});
 
@@ -19,7 +19,7 @@ final class NoStaticTableRow extends DwTableRow with _$NoStaticTableRow {
   final int? id;
 }
 
-@DwTable('wrong_id')
+@DwSqlTable('wrong_id')
 final class WrongIdRow extends DwTableRow with _$WrongIdRow {
   const WrongIdRow({required this.id});
 
@@ -29,7 +29,7 @@ final class WrongIdRow extends DwTableRow with _$WrongIdRow {
   static const table = WrongIdTable();
 }
 
-@DwTable('shadowing')
+@DwSqlTable('shadowing')
 final class ShadowingRow extends DwTableRow with _$ShadowingRow {
   const ShadowingRow({this.id, required this.name, required this.columns});
 
@@ -42,7 +42,7 @@ final class ShadowingRow extends DwTableRow with _$ShadowingRow {
 }
 
 /// The table and repository names derive from the name without `Row`.
-@DwTable('club_session')
+@DwSqlTable('club_session')
 final class ClubSession extends DwTableRow with _$ClubSession {
   const ClubSession({this.id});
 
@@ -53,7 +53,7 @@ final class ClubSession extends DwTableRow with _$ClubSession {
 }
 
 /// Nothing before the suffix.
-@DwTable('bare_row')
+@DwSqlTable('bare_row')
 final class Row extends DwTableRow with _$Row {
   const Row({this.id});
 

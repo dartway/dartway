@@ -9,7 +9,7 @@ import 'package:meta/meta.dart';
 /// file cannot contain its own hash — and with all whitespace removed, so
 /// running `dart format` over a migration does not "change" it.
 @internal
-abstract final class DwChecksum {
+abstract final class DwMigrationChecksum {
   static final RegExp _declaration = RegExp(
     r"(String\s+get\s+checksum\s*=>\s*)'([^']*)'",
   );
@@ -17,7 +17,7 @@ abstract final class DwChecksum {
   static final RegExp _id = RegExp(r"String\s+get\s+id\s*=>\s*'([^']+)'");
 
   static final RegExp _class = RegExp(
-    r'class\s+(\w+)\s+extends\s+DwMigration\b',
+    r'class\s+(\w+)\s+extends\s+DwDatabaseMigration\b',
   );
 
   static String of(String source) {

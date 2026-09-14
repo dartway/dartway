@@ -33,12 +33,13 @@ final class ListMyBookings extends DwListRequest<ClubBooking>
   bool matches(ClubBooking item) => status == null || item.status == status;
 }
 
-final class RenameBooking extends DwCommand<ClubBooking> with _$RenameBooking {
+final class RenameBooking extends DwActionCommand<ClubBooking>
+    with _$RenameBooking {
   const RenameBooking({
     required this.bookingId,
-    this.note = const DwPatch.keep(),
+    this.note = const DwFieldPatch.keep(),
   });
 
   final int bookingId;
-  final DwPatch<String> note;
+  final DwFieldPatch<String> note;
 }

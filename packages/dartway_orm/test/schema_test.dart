@@ -20,26 +20,29 @@ DwTableSchema table(
 
 void main() {
   late TestDatabase database;
-  DwDb db() => database.db;
+  DwDatabaseHandle db() => database.db;
 
   setUp(() async {
     database = await TestDatabase.create(withFixtureSchema: false);
   });
   tearDown(() => database.dispose());
 
-  Future<DwSchema> introspect() async =>
-      (await DwIntrospector.read(db())).schema;
+  Future<DwDatabaseSchema> introspect() async =>
+      (await DwSchemaIntrospector.read(db())).schema;
 
-  Future<void> create(DwSchema schema) async {
+  Future<void> create(DwDatabaseSchema schema) async {
     await applyChanges(
       DwMigrationContext(db()),
-      DwSchemaDiff.compare(from: DwSchema.fromTables(const []), to: schema),
+      DwSchemaDiff.compare(
+        from: DwDatabaseSchema.fromTables(const []),
+        to: schema,
+      ),
     );
   }
 
   /// Moves the live database from its schema to [to] through the diff and
   /// requires it to arrive exactly.
-  Future<List<DwSchemaChange>> migrateTo(DwSchema to) async {
+  Future<List<DwSchemaChange>> migrateTo(DwDatabaseSchema to) async {
     final changes = DwSchemaDiff.compare(from: await introspect(), to: to);
     await applyChanges(DwMigrationContext(db()), changes);
     expect(await introspect(), to);
@@ -49,7 +52,7 @@ void main() {
   group('introspection', () {
     test('reads back exactly what the row classes declare', () async {
       await create(fixtureSchema);
-      final introspection = await DwIntrospector.read(db());
+      final introspection = await DwSchemaIntrospector.read(db());
       expect(introspection.schema, fixtureSchema);
       expect(introspection.unmodelled, isEmpty);
       // Column order is part of the table, not of equality.
@@ -74,7 +77,7 @@ void main() {
         CREATE INDEX child_expr_idx ON child ((a + b));
         CREATE TABLE natural_key (code text PRIMARY KEY);
       ''');
-      final introspection = await DwIntrospector.read(db());
+      final introspection = await DwSchemaIntrospector.read(db());
       expect(introspection.unmodelled, hasLength(6));
       expect(
         introspection.unmodelled.join('\n'),
@@ -101,13 +104,16 @@ void main() {
         CREATE TABLE here (id bigserial CONSTRAINT here_pkey PRIMARY KEY);
         CREATE TABLE skipped (id bigint);
       ''');
-      final public = await DwIntrospector.read(
+      final public = await DwSchemaIntrospector.read(
         db(),
         excludeTables: {'skipped'},
       );
       expect(public.schema.tables.map((t) => t.name), ['here']);
-      final other = await DwIntrospector.read(db(), schemaName: 'other');
-      expect(other.schema, DwSchema.fromTables([table('elsewhere', const [])]));
+      final other = await DwSchemaIntrospector.read(db(), schemaName: 'other');
+      expect(
+        other.schema,
+        DwDatabaseSchema.fromTables([table('elsewhere', const [])]),
+      );
     });
   });
 
@@ -127,7 +133,7 @@ void main() {
             'b_id',
             'bigint',
             nullable: true,
-            references: const DwReferences('b'),
+            references: const DwForeignKey('b'),
           ),
         ]);
         final b = table('b', [
@@ -135,12 +141,12 @@ void main() {
             'a_id',
             'bigint',
             nullable: true,
-            references: const DwReferences('a'),
+            references: const DwForeignKey('a'),
           ),
           DwColumnSchema(
             'c_id',
             'bigint',
-            references: const DwReferences('c', onDelete: DwOnDelete.cascade),
+            references: const DwForeignKey('c', onDelete: DwOnDelete.cascade),
           ),
         ]);
         final c = table('c', [
@@ -148,10 +154,10 @@ void main() {
             'parent_id',
             'bigint',
             nullable: true,
-            references: const DwReferences('c'),
+            references: const DwForeignKey('c'),
           ),
         ]);
-        final changes = await migrateTo(DwSchema.fromTables([a, b, c]));
+        final changes = await migrateTo(DwDatabaseSchema.fromTables([a, b, c]));
         expect(changes.map((change) => change.toString()), [
           'create table c',
           'create table b',
@@ -164,7 +170,7 @@ void main() {
 
     test('columns: add, drop, nullability, default, type', () async {
       await create(
-        DwSchema.fromTables([
+        DwDatabaseSchema.fromTables([
           table('t', [
             text('kept'),
             text('dropped'),
@@ -176,7 +182,7 @@ void main() {
         ]),
       );
       final changes = await migrateTo(
-        DwSchema.fromTables([
+        DwDatabaseSchema.fromTables([
           table('t', [
             text('kept'),
             text('becomes_required'),
@@ -209,7 +215,7 @@ void main() {
 
     test('constraints and indexes: add, drop, change', () async {
       await create(
-        DwSchema.fromTables([
+        DwDatabaseSchema.fromTables([
           table('target', const []),
           table('other_target', const []),
           table(
@@ -218,18 +224,18 @@ void main() {
               DwColumnSchema(
                 'ref',
                 'bigint',
-                references: const DwReferences('target'),
+                references: const DwForeignKey('target'),
               ),
               DwColumnSchema(
                 'ref_changed',
                 'bigint',
-                references: const DwReferences('target'),
+                references: const DwForeignKey('target'),
               ),
               DwColumnSchema(
                 'unref',
                 'bigint',
                 nullable: true,
-                references: const DwReferences('target'),
+                references: const DwForeignKey('target'),
               ),
               text('code', nullable: true),
               text('was_unique', nullable: true).copyWith(unique: true),
@@ -243,7 +249,7 @@ void main() {
         ]),
       );
       final changes = await migrateTo(
-        DwSchema.fromTables([
+        DwDatabaseSchema.fromTables([
           table('target', const []),
           table('other_target', const []),
           table(
@@ -252,12 +258,12 @@ void main() {
               DwColumnSchema(
                 'ref',
                 'bigint',
-                references: const DwReferences('target'),
+                references: const DwForeignKey('target'),
               ),
               DwColumnSchema(
                 'ref_changed',
                 'bigint',
-                references: const DwReferences(
+                references: const DwForeignKey(
                   'other_target',
                   onDelete: DwOnDelete.cascade,
                 ),
@@ -292,20 +298,20 @@ void main() {
       'a dropped table is a decision, dropped referencing tables first',
       () async {
         await create(
-          DwSchema.fromTables([
+          DwDatabaseSchema.fromTables([
             table('kept', const []),
             table('gone_parent', const []),
             table('gone_child', [
               DwColumnSchema(
                 'parent_id',
                 'bigint',
-                references: const DwReferences('gone_parent'),
+                references: const DwForeignKey('gone_parent'),
               ),
             ]),
           ]),
         );
         final changes = await migrateTo(
-          DwSchema.fromTables([table('kept', const [])]),
+          DwDatabaseSchema.fromTables([table('kept', const [])]),
         );
         expect(changes.map((change) => change.toString()), [
           'drop table gone_child',
@@ -319,13 +325,13 @@ void main() {
       'a NOT NULL column added with a backfill fills existing rows',
       () async {
         await create(
-          DwSchema.fromTables([
+          DwDatabaseSchema.fromTables([
             table('t', [text('a', nullable: true)]),
           ]),
         );
         await db().execute("INSERT INTO t (a) VALUES ('x'), (NULL)");
         await migrateTo(
-          DwSchema.fromTables([
+          DwDatabaseSchema.fromTables([
             table('t', [text('a'), DwColumnSchema('n', 'bigint')]),
           ]),
         );
@@ -336,7 +342,7 @@ void main() {
     );
 
     test('every change has an inverse that restores the schema', () async {
-      final before = DwSchema.fromTables([
+      final before = DwDatabaseSchema.fromTables([
         table('target', const []),
         table(
           't',
@@ -346,7 +352,7 @@ void main() {
               'ref',
               'bigint',
               nullable: true,
-              references: const DwReferences('target'),
+              references: const DwForeignKey('target'),
             ),
           ],
           indexes: [
@@ -356,7 +362,7 @@ void main() {
       ]);
       await create(before);
       final changes = await migrateTo(
-        DwSchema.fromTables([
+        DwDatabaseSchema.fromTables([
           table('target', const []),
           table('t', [
             text(
@@ -370,7 +376,7 @@ void main() {
             DwColumnSchema(
               't_id',
               'bigint',
-              references: const DwReferences('t'),
+              references: const DwForeignKey('t'),
             ),
           ]),
         ]),
@@ -410,7 +416,10 @@ void main() {
         throwsArgumentError,
       );
       expect(
-        () => DwSchema.fromTables([table('t', const []), table('t', const [])]),
+        () => DwDatabaseSchema.fromTables([
+          table('t', const []),
+          table('t', const []),
+        ]),
         throwsArgumentError,
       );
     });

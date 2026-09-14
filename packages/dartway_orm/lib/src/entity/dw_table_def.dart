@@ -1,6 +1,6 @@
 import '../db/dw_result_row.dart';
-import '../query/dw_column.dart';
-import '../schema/dw_schema.dart';
+import '../query/dw_table_column.dart';
+import '../schema/dw_database_schema.dart';
 import 'dw_table_row.dart';
 
 /// The generated description of a row class's table: its columns, its
@@ -16,10 +16,10 @@ abstract class DwTableDef<R extends DwTableRow> {
   final String name;
 
   /// The primary key every table has.
-  DwColumn<int> get id => DwColumn.id;
+  DwTableColumn<int> get id => DwTableColumn.id;
 
   /// Every column in declaration order, [id] first.
-  List<DwColumn<Object?>> get columns;
+  List<DwTableColumn<Object?>> get columns;
 
   List<DwIndexSchema> get indexSchemas => const [];
 

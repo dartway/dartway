@@ -1,5 +1,5 @@
-import '../dto/dw_server_call.dart';
-import 'dw_http.dart';
+import '../wire/dw_server_call.dart';
+import 'dw_http_contract.dart';
 
 /// Which rows of a window a call reads.
 enum DwWindowDirection {
@@ -39,7 +39,7 @@ sealed class DwPageQuery {
   /// for a parameter the kind does not define or a value it cannot take —
   /// a malformed call.
   static DwPageQuery? parse(
-    DwRequest<Object?> request,
+    DwDataRequest<Object?> request,
     Map<String, String> query,
   ) => switch (request) {
     DwPageRequest() => DwOffsetQuery._parse(query),
@@ -57,9 +57,9 @@ sealed class DwPageQuery {
   };
 
   static int? _readPageSize(Map<String, String> query) {
-    final raw = query[DwHttp.pageSizeParameter];
+    final raw = query[DwHttpContract.pageSizeParameter];
     if (raw == null) return null;
-    final value = _readCount(raw, DwHttp.pageSizeParameter);
+    final value = _readCount(raw, DwHttpContract.pageSizeParameter);
     if (value < 1) {
       throw FormatException('pageSize must be at least 1', raw);
     }
@@ -92,14 +92,14 @@ final class DwOffsetQuery extends DwPageQuery {
 
   static DwOffsetQuery _parse(Map<String, String> query) {
     DwPageQuery._rejectUnknown(query, const {
-      DwHttp.offsetParameter,
-      DwHttp.pageSizeParameter,
+      DwHttpContract.offsetParameter,
+      DwHttpContract.pageSizeParameter,
     });
-    final offset = query[DwHttp.offsetParameter];
+    final offset = query[DwHttpContract.offsetParameter];
     return DwOffsetQuery(
       offset: offset == null
           ? 0
-          : DwPageQuery._readCount(offset, DwHttp.offsetParameter),
+          : DwPageQuery._readCount(offset, DwHttpContract.offsetParameter),
       pageSize: DwPageQuery._readPageSize(query),
     );
   }
@@ -109,8 +109,8 @@ final class DwOffsetQuery extends DwPageQuery {
 
   @override
   Map<String, String> toQuery() => {
-    if (offset != 0) DwHttp.offsetParameter: '$offset',
-    if (pageSize != null) DwHttp.pageSizeParameter: '$pageSize',
+    if (offset != 0) DwHttpContract.offsetParameter: '$offset',
+    if (pageSize != null) DwHttpContract.pageSizeParameter: '$pageSize',
   };
 
   @override
@@ -151,14 +151,14 @@ final class DwWindowQuery extends DwPageQuery {
 
   static DwWindowQuery _parse(Map<String, String> query) {
     DwPageQuery._rejectUnknown(query, const {
-      DwHttp.anchorParameter,
-      DwHttp.beforeParameter,
-      DwHttp.afterParameter,
-      DwHttp.pageSizeParameter,
+      DwHttpContract.anchorParameter,
+      DwHttpContract.beforeParameter,
+      DwHttpContract.afterParameter,
+      DwHttpContract.pageSizeParameter,
     });
-    final anchor = query[DwHttp.anchorParameter];
-    final before = query[DwHttp.beforeParameter];
-    final after = query[DwHttp.afterParameter];
+    final anchor = query[DwHttpContract.anchorParameter];
+    final before = query[DwHttpContract.beforeParameter];
+    final after = query[DwHttpContract.afterParameter];
     final pageSize = DwPageQuery._readPageSize(query);
     return switch ((anchor, before, after)) {
       (null, null, null) => DwWindowQuery.newest(pageSize: pageSize),
@@ -189,11 +189,11 @@ final class DwWindowQuery extends DwPageQuery {
   @override
   Map<String, String> toQuery() => {
     switch (direction) {
-      DwWindowDirection.around => DwHttp.anchorParameter,
-      DwWindowDirection.older => DwHttp.beforeParameter,
-      DwWindowDirection.newer => DwHttp.afterParameter,
+      DwWindowDirection.around => DwHttpContract.anchorParameter,
+      DwWindowDirection.older => DwHttpContract.beforeParameter,
+      DwWindowDirection.newer => DwHttpContract.afterParameter,
     }: ?cursor,
-    if (pageSize != null) DwHttp.pageSizeParameter: '$pageSize',
+    if (pageSize != null) DwHttpContract.pageSizeParameter: '$pageSize',
   };
 
   @override

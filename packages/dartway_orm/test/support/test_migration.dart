@@ -2,7 +2,7 @@ import 'package:dartway_orm/dartway_orm.dart';
 
 /// A migration assembled from closures, so each test states exactly what its
 /// migrations do.
-final class TestMigration extends DwMigration {
+final class TestMigration extends DwDatabaseMigration {
   TestMigration(
     this.id, {
     this.checksum = 'sealed',

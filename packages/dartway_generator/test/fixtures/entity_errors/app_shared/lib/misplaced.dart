@@ -2,7 +2,7 @@ import 'package:dartway_orm/dartway_orm.dart';
 
 part 'misplaced.dw.dart';
 
-@DwTable('misplaced')
+@DwSqlTable('misplaced')
 final class MisplacedRow extends DwTableRow with _$MisplacedRow {
   const MisplacedRow({this.id});
 

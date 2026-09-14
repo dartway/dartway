@@ -1,23 +1,24 @@
-import '../auth/dw_auth_dtos.dart';
-import '../dto/dw_server_call.dart';
-import '../dto/dw_dto.dart';
-import 'dw_http.dart';
+import '../auth/dw_auth_wire_objects.dart';
+import '../wire/dw_server_call.dart';
+import '../wire/dw_wire_object.dart';
+import 'dw_http_contract.dart';
 
 /// Builds a DTO of type [T] from its JSON fields.
-typedef DwDtoFactory<T extends DwDto> = T Function(Map<String, Object?> json);
+typedef DwWireObjectFactory<T extends DwWireObject> =
+    T Function(Map<String, Object?> json);
 
 /// Which of the DTO kinds a registered class is.
-enum DwDtoKind {
+enum DwWireObjectKind {
   /// A `DwDataObject`.
   dataObject,
 
-  /// A `DwRequest` of any request kind.
+  /// A `DwDataRequest` of any request kind.
   request,
 
-  /// A `DwCommand`.
+  /// A `DwActionCommand`.
   command,
 
-  /// Anything else that travels — `DwDeleted`, a nested value DTO.
+  /// Anything else that travels — `DwDeletedObject`, a nested value DTO.
   other,
 }
 
@@ -27,36 +28,36 @@ enum DwDtoKind {
 /// generated registry does:
 ///
 /// ```dart
-/// DwDtoEntry<SessionBooking>('SessionBooking', $SessionBookingFromJson)
+/// DwProtocolEntry<SessionBooking>('SessionBooking', $SessionBookingFromJson)
 /// ```
 ///
 /// Inside a list literal Dart infers it from the list's element type
-/// (`DwDto`), not from the factory, so an entry without it would register
-/// `DwDto` itself; [DwProtocol] refuses such an entry.
+/// (`DwWireObject`), not from the factory, so an entry without it would
+/// register `DwWireObject` itself; [DwWireProtocol] refuses such an entry.
 ///
 /// Because the entry is typed, the questions only a type can answer — which
 /// kind the class is, whether it is a command's result type — are asked of
 /// the entry, never probed from a `Type` object, which cannot be asked about
 /// subtyping.
-final class DwDtoEntry<T extends DwDto> {
-  const DwDtoEntry(this.name, this.fromJson);
+final class DwProtocolEntry<T extends DwWireObject> {
+  const DwProtocolEntry(this.name, this.fromJson);
 
   /// The name the class travels under: the call path (`/dw/<name>`) and the
   /// group name in a transport.
   final String name;
 
   /// The class's own factory — `$NameFromJson`, or a static `fromJson`.
-  final DwDtoFactory<T> fromJson;
+  final DwWireObjectFactory<T> fromJson;
 
   /// The registered class.
   Type get type => T;
 
-  DwDtoKind get kind {
+  DwWireObjectKind get kind {
     final list = <T>[];
-    if (list is List<DwRequest<Object?>>) return DwDtoKind.request;
-    if (list is List<DwCommand<Object?>>) return DwDtoKind.command;
-    if (list is List<DwDataObject>) return DwDtoKind.dataObject;
-    return DwDtoKind.other;
+    if (list is List<DwDataRequest<Object?>>) return DwWireObjectKind.request;
+    if (list is List<DwActionCommand<Object?>>) return DwWireObjectKind.command;
+    if (list is List<DwDataObject>) return DwWireObjectKind.dataObject;
+    return DwWireObjectKind.other;
   }
 
   /// Whether [R] is this class or its nullable form — the one question a
@@ -68,26 +69,28 @@ final class DwDtoEntry<T extends DwDto> {
   bool get _isFrameworkBase =>
       <DwDataObject>[] is List<T> ||
       <DwServerCall<Never>>[] is List<T> ||
-      <DwRequest<Never>>[] is List<T> ||
-      <DwCommand<Never>>[] is List<T>;
+      <DwDataRequest<Never>>[] is List<T> ||
+      <DwActionCommand<Never>>[] is List<T>;
 
   @override
-  String toString() => 'DwDtoEntry<$T>($name, ${kind.name})';
+  String toString() => 'DwProtocolEntry<$T>($name, ${kind.name})';
 }
 
 /// The set of DTO classes a server and its clients agree on.
 ///
 /// The project's registry is generated into its shared package
-/// (`lib/generated/dw_protocol.dart`) and composed with [DwProtocol.core], which
-/// holds the framework's own DTOs. Both sides of the wire use the same instance.
+/// (`lib/generated/dw_protocol.dart`) and composed with [DwWireProtocol.core],
+/// which holds the framework's own DTOs. Both sides of the wire use the same
+/// instance.
 ///
 /// Nothing on the wire carries a type tag: a call's body is typed by its path,
-/// a result by its call, and objects in a `DwTransport` by their group name.
-final class DwProtocol {
+/// a result by its call, and objects in a `DwUpdateTransport` by their group
+/// name.
+final class DwWireProtocol {
   /// Throws [ArgumentError] for an entry whose type argument is a framework
   /// base or whose name cannot be a call path, and [StateError] for two
   /// classes under one name or one class under two names.
-  DwProtocol(Iterable<DwDtoEntry> entries, {DwProtocol? include}) {
+  DwWireProtocol(Iterable<DwProtocolEntry> entries, {DwWireProtocol? include}) {
     if (include != null) {
       for (final entry in include._byName.values) {
         _add(entry);
@@ -98,30 +101,30 @@ final class DwProtocol {
     }
   }
 
-  final Map<String, DwDtoEntry> _byName = {};
-  final Map<Type, DwDtoEntry> _byType = {};
+  final Map<String, DwProtocolEntry> _byName = {};
+  final Map<Type, DwProtocolEntry> _byType = {};
 
   /// Result types already looked up by [decodeValue]; `null` for a type that
   /// is not a registered DTO.
-  final Map<Type, DwDtoEntry?> _resultEntries = {};
+  final Map<Type, DwProtocolEntry?> _resultEntries = {};
 
   /// A wire name is a call path segment: an identifier, nothing a URL would
   /// need to escape.
   static final _namePattern = RegExp(r'^[A-Za-z_$][A-Za-z0-9_$]*$');
 
-  void _add(DwDtoEntry entry) {
+  void _add(DwProtocolEntry entry) {
     if (entry._isFrameworkBase) {
       throw ArgumentError(
         'The DTO entry "${entry.name}" registers ${entry.type}, a framework '
         'base, not a class: write the type argument out, '
-        'DwDtoEntry<${entry.name}>(...).',
+        'DwProtocolEntry<${entry.name}>(...).',
       );
     }
     if (!_namePattern.hasMatch(entry.name) ||
-        entry.name == DwHttp.liveSegment) {
+        entry.name == DwHttpContract.liveSegment) {
       throw ArgumentError(
         'The DTO name "${entry.name}" cannot be a call path: it must be an '
-        'identifier other than "${DwHttp.liveSegment}".',
+        'identifier other than "${DwHttpContract.liveSegment}".',
       );
     }
     final existing = _byName[entry.name];
@@ -143,20 +146,23 @@ final class DwProtocol {
   }
 
   /// The framework's own DTOs, present in every protocol.
-  static final DwProtocol core = DwProtocol([
-    const DwDtoEntry<DwDeleted>('DwDeleted', DwDeleted.fromJson),
-    ...dwAuthDtoEntries,
+  static final DwWireProtocol core = DwWireProtocol([
+    const DwProtocolEntry<DwDeletedObject>(
+      'DwDeletedObject',
+      DwDeletedObject.fromJson,
+    ),
+    ...dwAuthProtocolEntries,
   ]);
 
   /// Every registered class, the included protocol's first, each once.
-  Iterable<DwDtoEntry> get entries => _byName.values;
+  Iterable<DwProtocolEntry> get entries => _byName.values;
 
   /// Whether [type] is registered.
   bool knows(Type type) => _byType.containsKey(type);
 
-  /// The entry registered under [name], or `null` — for the server, an unknown
-  /// call path.
-  DwDtoEntry? entryNamed(String name) => _byName[name];
+  /// The entry registered under [name], or `null` — for the server, an
+  /// unknown call path.
+  DwProtocolEntry? entryNamed(String name) => _byName[name];
 
   /// The wire name of a registered DTO type.
   String nameOf(Type type) {
@@ -169,7 +175,7 @@ final class DwProtocol {
 
   /// Decodes the JSON of the class registered under [name]. Throws
   /// [FormatException] for an unknown name or a [json] that is not an object.
-  DwDto decodeNamed(String name, Object? json) {
+  DwWireObject decodeNamed(String name, Object? json) {
     final entry = _byName[name];
     if (entry == null) throw FormatException('Unknown DTO type "$name"');
     if (json is! Map<String, Object?>) {
@@ -181,7 +187,7 @@ final class DwProtocol {
   /// Decodes a DTO whose type the receiver knows statically. Throws
   /// [StateError] when [T] is not registered and [FormatException] when
   /// [json] is not an object.
-  T decodeAs<T extends DwDto>(Object? json) {
+  T decodeAs<T extends DwWireObject>(Object? json) {
     final entry = _byType[T];
     if (entry == null) {
       throw StateError('$T is not registered in this protocol.');
@@ -196,7 +202,7 @@ final class DwProtocol {
   /// JSON, untagged). Throws [ArgumentError] for anything else.
   Object? encodeValue(Object? value) => switch (value) {
     null => null,
-    DwDto() => value.toJson(),
+    DwWireObject() => value.toJson(),
     num() || String() || bool() => value,
     _ => throw ArgumentError(
       'A command result must be null, a JSON primitive or a DTO; '
@@ -224,7 +230,7 @@ final class DwProtocol {
             .firstOrNull,
       );
       if (entry != null) return entry.fromJson(json) as R;
-      if (<R>[] is List<DwDto?>) {
+      if (<R>[] is List<DwWireObject?>) {
         throw StateError(
           'The result type $R is not a DTO registered in this protocol.',
         );

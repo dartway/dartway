@@ -5,24 +5,24 @@ import 'package:postgres/postgres.dart' as pg;
 
 import '../entity/dw_table_row.dart';
 import '../entity/dw_table_def.dart';
-import '../query/dw_lock.dart';
-import '../query/dw_repository.dart';
-import 'dw_connection.dart';
+import '../query/dw_row_lock.dart';
+import '../query/dw_table_repository.dart';
+import 'dw_connection_pool.dart';
 import 'dw_errors.dart';
 import 'dw_result_row.dart';
 
 /// A handle to run statements: bound to the pool, or to one connection inside
 /// a transaction.
 ///
-/// Code that receives a `DwDb` does not know which, and should not: the same
-/// repository call works in both. What differs is checked, not assumed —
-/// row locks and advisory locks need a transaction and throw [StateError]
+/// Code that receives a `DwDatabaseHandle` does not know which, and should not:
+/// the same repository call works in both. What differs is checked, not assumed
+/// — row locks and advisory locks need a transaction and throw [StateError]
 /// without one.
 ///
 /// Sealed: the transaction guarantees below hold only for the handles this
 /// library creates.
-sealed class DwDb {
-  DwDb();
+sealed class DwDatabaseHandle {
+  DwDatabaseHandle();
 
   /// Whether statements run inside a transaction.
   bool get inTransaction;
@@ -39,14 +39,14 @@ sealed class DwDb {
   /// the nested part. The enclosing handle must not be used while the nested
   /// one is open. [isolation] can be chosen only by the outermost transaction.
   Future<R> transaction<R>(
-    Future<R> Function(DwDb tx) body, {
-    DwIsolation? isolation,
+    Future<R> Function(DwDatabaseHandle tx) body, {
+    DwIsolationLevel? isolation,
   });
 
   /// The typed repository of [table].
-  DwRepository<R, T> repository<R extends DwTableRow, T extends DwTableDef<R>>(
-    T table,
-  ) => DwRepository.internal(this, table);
+  DwTableRepository<R, T>
+  repository<R extends DwTableRow, T extends DwTableDef<R>>(T table) =>
+      DwTableRepository.internal(this, table);
 
   /// Runs a statement with `@name` parameters and returns its rows.
   Future<List<DwResultRow>> query(
@@ -54,7 +54,7 @@ sealed class DwDb {
     Map<String, Object?> params = const {},
   }) async {
     final result = await runNamed(sql, params);
-    return dwRows(result);
+    return dwResultRows(result);
   }
 
   /// Runs statements and returns the number of affected rows.
@@ -125,12 +125,12 @@ sealed class DwDb {
   /// duration, outside any transaction — for session-level state such as a
   /// session advisory lock.
   @internal
-  Future<R> pinned<R>(Future<R> Function(DwDb db) body);
+  Future<R> pinned<R>(Future<R> Function(DwDatabaseHandle db) body);
 }
 
 /// Wraps result rows, sharing one column index across the rows.
 @internal
-List<DwResultRow> dwRows(pg.Result result) {
+List<DwResultRow> dwResultRows(pg.Result result) {
   if (result.isEmpty) return const [];
   final index = <String, int>{};
   for (final (position, column) in result.schema.columns.indexed) {
@@ -142,10 +142,10 @@ List<DwResultRow> dwRows(pg.Result result) {
 /// The pool-bound handle: every statement borrows a connection for exactly
 /// its own duration.
 @internal
-final class DwPoolDb extends DwDb {
+final class DwPoolDb extends DwDatabaseHandle {
   DwPoolDb(this._pool);
 
-  final DwPool _pool;
+  final DwConnectionPool _pool;
 
   @override
   bool get inTransaction => false;
@@ -171,8 +171,8 @@ final class DwPoolDb extends DwDb {
 
   @override
   Future<R> transaction<R>(
-    Future<R> Function(DwDb tx) body, {
-    DwIsolation? isolation,
+    Future<R> Function(DwDatabaseHandle tx) body, {
+    DwIsolationLevel? isolation,
   }) async {
     final connection = await _pool.acquire();
     var broken = false;
@@ -192,7 +192,7 @@ final class DwPoolDb extends DwDb {
   /// session-level state (a session advisory lock, a `SET`) must never leak
   /// into someone else's borrow, and one reconnect per pinned use is cheap.
   @override
-  Future<R> pinned<R>(Future<R> Function(DwDb db) body) async {
+  Future<R> pinned<R>(Future<R> Function(DwDatabaseHandle db) body) async {
     final connection = await _pool.acquire();
     final db = DwConnectionDb(connection);
     try {
@@ -204,7 +204,7 @@ final class DwPoolDb extends DwDb {
   }
 
   Future<R> _withConnection<R>(
-    Future<R> Function(DwConnection connection) action,
+    Future<R> Function(DwPooledConnection connection) action,
   ) async {
     final connection = await _pool.acquire();
     try {
@@ -225,17 +225,17 @@ Future<R> dwRetryStale<R>(Future<R> Function() action) async {
   try {
     return await action();
   } on DwDatabaseException catch (error) {
-    if (!DwConnection.isStale(error)) rethrow;
+    if (!DwPooledConnection.isStale(error)) rethrow;
     return action();
   }
 }
 
 /// A handle bound to one connection, outside a transaction.
 @internal
-final class DwConnectionDb extends DwDb {
+final class DwConnectionDb extends DwDatabaseHandle {
   DwConnectionDb(this._connection);
 
-  final DwConnection _connection;
+  final DwPooledConnection _connection;
   bool _inTransaction = false;
   bool _closed = false;
 
@@ -247,7 +247,7 @@ final class DwConnectionDb extends DwDb {
   void _check() {
     if (_closed) {
       throw StateError(
-        'a pinned DwDb must not escape the callback it was given to',
+        'a pinned DwDatabaseHandle must not escape the callback it was given to',
       );
     }
     if (_inTransaction) {
@@ -287,8 +287,8 @@ final class DwConnectionDb extends DwDb {
 
   @override
   Future<R> transaction<R>(
-    Future<R> Function(DwDb tx) body, {
-    DwIsolation? isolation,
+    Future<R> Function(DwDatabaseHandle tx) body, {
+    DwIsolationLevel? isolation,
   }) async {
     _check();
     _inTransaction = true;
@@ -306,7 +306,7 @@ final class DwConnectionDb extends DwDb {
   }
 
   @override
-  Future<R> pinned<R>(Future<R> Function(DwDb db) body) {
+  Future<R> pinned<R>(Future<R> Function(DwDatabaseHandle db) body) {
     _check();
     return body(this);
   }
@@ -318,9 +318,9 @@ final class DwConnectionDb extends DwDb {
 /// unknown; the caller must then close the connection instead of reusing it.
 @internal
 Future<R> dwRunTransaction<R>(
-  DwConnection connection,
-  Future<R> Function(DwDb tx) body,
-  DwIsolation? isolation, {
+  DwPooledConnection connection,
+  Future<R> Function(DwDatabaseHandle tx) body,
+  DwIsolationLevel? isolation, {
   required void Function() onBroken,
 }) async {
   await connection.runScript(
@@ -343,9 +343,9 @@ Future<R> dwRunTransaction<R>(
 }
 
 Future<R> _completeScope<R>(
-  DwConnection connection,
+  DwPooledConnection connection,
   _DwTxScope scope,
-  Future<R> Function(DwDb tx) body, {
+  Future<R> Function(DwDatabaseHandle tx) body, {
   required String end,
   required String rollback,
   required void Function() onBroken,
@@ -439,10 +439,10 @@ final class _DwTxScope {
       _running == 0 ? Future.value() : (_settled ??= Completer()).future;
 }
 
-final class _DwTxDb extends DwDb {
+final class _DwTxDb extends DwDatabaseHandle {
   _DwTxDb(this._connection, this._scope, this._onBroken);
 
-  final DwConnection _connection;
+  final DwPooledConnection _connection;
   final _DwTxScope _scope;
   final void Function() _onBroken;
 
@@ -452,7 +452,7 @@ final class _DwTxDb extends DwDb {
   void _check() {
     if (!_scope.open) {
       throw StateError(
-        'the transaction has finished; its DwDb must not escape the body',
+        'the transaction has finished; its DwDatabaseHandle must not escape the body',
       );
     }
     if (_scope.child != null) {
@@ -498,8 +498,8 @@ final class _DwTxDb extends DwDb {
 
   @override
   Future<R> transaction<R>(
-    Future<R> Function(DwDb tx) body, {
-    DwIsolation? isolation,
+    Future<R> Function(DwDatabaseHandle tx) body, {
+    DwIsolationLevel? isolation,
   }) async {
     if (isolation != null) {
       throw ArgumentError(
@@ -541,6 +541,6 @@ final class _DwTxDb extends DwDb {
   }
 
   @override
-  Future<R> pinned<R>(Future<R> Function(DwDb db) body) =>
+  Future<R> pinned<R>(Future<R> Function(DwDatabaseHandle db) body) =>
       throw StateError('session-level work cannot run inside a transaction');
 }

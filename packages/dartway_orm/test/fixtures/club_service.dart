@@ -12,7 +12,7 @@ enum ClubServiceKind { group, personal }
 /// Covers every column type: enum, nullable double, `Duration`, a `jsonb`
 /// list, a `now()` default, a nullable `DateTime`, nullable bytes, and a
 /// boolean with an SQL default.
-@DwTable('club_service')
+@DwSqlTable('club_service')
 final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   const ClubServiceRow({
     this.id,
@@ -36,13 +36,13 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   final Duration duration;
   final List<String> tags;
 
-  @DwDefault.now()
+  @DwDefaultValue.now()
   final DateTime createdAt;
 
   final DateTime? archivedAt;
   final Uint8List? cover;
 
-  @DwDefault('true')
+  @DwDefaultValue('true')
   final bool active;
 
   static const table = ClubServiceTable();

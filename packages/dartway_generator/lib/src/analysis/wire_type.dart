@@ -32,7 +32,7 @@ final class DoubleWire extends WireType {
   const DoubleWire({required super.nullable});
 
   /// A double encodes as itself; only decoding converts, through
-  /// `DwJson.decodeDouble`, because a whole number arrives as `int`.
+  /// `DwJsonCodec.decodeDouble`, because a whole number arrives as `int`.
   @override
   bool get isIdentity => true;
 }
@@ -107,7 +107,7 @@ final class WireTypeReader {
             'List<T> or Map<String, T> of int, double, String or bool (jsonb), '
             'or a nullable one of these'
       : 'int, double, String, bool, DateTime, Duration, Uint8List, an enum, '
-            'a DTO class, List<T>, Map<String, T>, DwPatch<T>, or a nullable '
+            'a DTO class, List<T>, Map<String, T>, DwFieldPatch<T>, or a nullable '
             'one of these';
 
   /// Throws [UnsupportedType] with the reason when [type] is not supported.
@@ -205,7 +205,7 @@ final class WireTypeReader {
         nullable: nullable,
       );
     }
-    if (DwFramework.isPatch(type)) {
+    if (DwFrameworkTypes.isPatch(type)) {
       if (position != _Position.field) {
         throw UnsupportedType(
           '`$display` cannot be ${position.description}: a patch is a whole '
@@ -215,19 +215,20 @@ final class WireTypeReader {
       if (nullable) {
         throw UnsupportedType(
           '`$display` cannot be nullable: an absent patch is already '
-          '`DwPatch.keep()`',
+          '`DwFieldPatch.keep()`',
         );
       }
       final inner = type.typeArguments.single;
       if (inner.nullabilitySuffix == NullabilitySuffix.question) {
         throw UnsupportedType(
-          '`$display` patches a nullable type; clearing is `DwPatch.clear()`, '
-          'so write `DwPatch<${inner.getDisplayString().replaceAll('?', '')}>`',
+          '`$display` patches a nullable type; clearing is `DwFieldPatch.clear()`, '
+          'so write `DwFieldPatch<${inner.getDisplayString().replaceAll('?', '')}>`',
         );
       }
       return PatchWire(_read(inner, _Position.patchValue));
     }
-    if (element is ClassElement && DwFramework.dtoKindOf(element) != null) {
+    if (element is ClassElement &&
+        DwFrameworkTypes.dtoKindOf(element) != null) {
       if (element.isAbstract || element.isSealed) {
         throw UnsupportedType(
           '`$display` is abstract; a field must name a concrete DTO class '
@@ -274,7 +275,7 @@ final class WireTypeReader {
 enum _Position {
   field(''),
   collectionElement('a list element or map value'),
-  patchValue('the value of a DwPatch');
+  patchValue('the value of a DwFieldPatch');
 
   const _Position(this.description);
 

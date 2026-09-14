@@ -9,7 +9,7 @@ import 'support/test_database.dart';
 
 void main() {
   final database = useTestDatabase(maxConnections: 6);
-  DwDb db() => database().db;
+  DwDatabaseHandle db() => database().db;
 
   AppSettingRow setting(String key, [String value = 'v']) =>
       AppSettingRow(key: key, value: value, updatedAt: DateTime.utc(2026));
@@ -125,7 +125,7 @@ void main() {
     });
 
     test('a handle escaping its transaction is refused', () async {
-      late DwDb escaped;
+      late DwDatabaseHandle escaped;
       await db().transaction((tx) async => escaped = tx);
       expect(() => escaped.appSettings.count(), throwsStateError);
     });
@@ -145,7 +145,9 @@ void main() {
     });
 
     test('isolation is chosen by the outermost transaction only', () async {
-      await db().transaction(isolation: DwIsolation.repeatableRead, (tx) async {
+      await db().transaction(isolation: DwIsolationLevel.repeatableRead, (
+        tx,
+      ) async {
         final level = await tx.query('SHOW transaction_isolation');
         expect(
           level.single.get<String>('transaction_isolation'),
@@ -153,7 +155,7 @@ void main() {
         );
         expect(
           () => tx.transaction(
-            isolation: DwIsolation.serializable,
+            isolation: DwIsolationLevel.serializable,
             (inner) async {},
           ),
           throwsArgumentError,
@@ -170,16 +172,18 @@ void main() {
         ]);
         final bothRead = Completer<void>();
         var reads = 0;
-        Future<void> writeSkew(String read, String write) =>
-            db().transaction(isolation: DwIsolation.serializable, (tx) async {
-              await tx.appSettings.findFirst(where: (t) => t.key.equals(read));
-              if (++reads == 2) bothRead.complete();
-              await bothRead.future;
-              await tx.appSettings.updateWhere(
-                where: (t) => t.key.equals(write),
-                set: (t) => [t.value.set('1')],
-              );
-            });
+        Future<void> writeSkew(String read, String write) => db().transaction(
+          isolation: DwIsolationLevel.serializable,
+          (tx) async {
+            await tx.appSettings.findFirst(where: (t) => t.key.equals(read));
+            if (++reads == 2) bothRead.complete();
+            await bothRead.future;
+            await tx.appSettings.updateWhere(
+              where: (t) => t.key.equals(write),
+              set: (t) => [t.value.set('1')],
+            );
+          },
+        );
         final results = await Future.wait([
           writeSkew(
             'x',
@@ -203,7 +207,7 @@ void main() {
       final release = Completer<void>();
 
       final first = db().transaction((tx) async {
-        await tx.appSettings.findById(row.id!, lock: DwLock.forUpdate);
+        await tx.appSettings.findById(row.id!, lock: DwRowLock.forUpdate);
         events.add('first locked');
         held.complete();
         await release.future;
@@ -214,7 +218,7 @@ void main() {
       final second = db().transaction((tx) async {
         final seen = await tx.appSettings.findById(
           row.id!,
-          lock: DwLock.forUpdate,
+          lock: DwRowLock.forUpdate,
         );
         events.add('second locked');
         return seen!.value;
@@ -239,7 +243,7 @@ void main() {
           final rows = await tx.appSettings.find(
             orderBy: (t) => [t.id.asc()],
             limit: 2,
-            lock: DwLock.forUpdateSkipLocked,
+            lock: DwRowLock.forUpdateSkipLocked,
           );
           claimed.complete();
           await done.future;
@@ -251,7 +255,7 @@ void main() {
             for (final r in await tx.appSettings.find(
               orderBy: (t) => [t.id.asc()],
               limit: 2,
-              lock: DwLock.forUpdateSkipLocked,
+              lock: DwRowLock.forUpdateSkipLocked,
             ))
               r.key,
           ],
@@ -314,7 +318,7 @@ void main() {
     test(
       'an expected constraint error keeps the connection and its cache',
       () async {
-        final pool = await DwDatabase.open(
+        final pool = await DwPostgresDatabase.open(
           testServerConfig(name: database().name, maxConnections: 1),
         );
         addTearDown(pool.close);
@@ -332,7 +336,7 @@ void main() {
     );
 
     test('never exceeds maxConnections', () async {
-      final pool = await DwDatabase.open(
+      final pool = await DwPostgresDatabase.open(
         testServerConfig(name: database().name, maxConnections: 2),
       );
       addTearDown(pool.close);
@@ -347,7 +351,7 @@ void main() {
     });
 
     test('a closed database refuses statements', () async {
-      final pool = await DwDatabase.open(
+      final pool = await DwPostgresDatabase.open(
         testServerConfig(name: database().name),
       );
       await pool.close();
@@ -357,7 +361,7 @@ void main() {
     test('a wrong password fails at open', () async {
       final config = testServerConfig(name: database().name);
       await expectLater(
-        DwDatabase.open(
+        DwPostgresDatabase.open(
           DwDatabaseConfig(
             host: config.host,
             port: config.port,

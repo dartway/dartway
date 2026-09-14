@@ -24,13 +24,13 @@ final class ConstructorField {
 /// from its fields at all.
 List<ConstructorField>? readConstructorFields(
   ClassElement element,
-  List<DwDiagnostic> diagnostics,
+  List<DwGenerationDiagnostic> diagnostics,
 ) {
   final name = element.name!;
   final constructor = element.unnamedConstructor;
   if (constructor == null || constructor.isFactory) {
     diagnostics.add(
-      DwDiagnostic.at(
+      DwGenerationDiagnostic.at(
         element,
         '`$name` needs an unnamed generative constructor: the generated code '
         'rebuilds it as `$name(field: …)`',
@@ -44,7 +44,7 @@ List<ConstructorField>? readConstructorFields(
   for (
     InterfaceElement? current = element;
     current is ClassElement &&
-        !DwFramework.isFramework(current) &&
+        !DwFrameworkTypes.isFramework(current) &&
         current.supertype != null;
     current = current.supertype?.element
   ) {
@@ -74,7 +74,7 @@ List<ConstructorField>? readConstructorFields(
       final location = owner == element ? field : element;
       if (!field.isFinal) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'field `$fieldName` of `$name` must be final: generated equality '
             'and hashing assume a value that does not change',
@@ -86,7 +86,7 @@ List<ConstructorField>? readConstructorFields(
       final parameter = parameters[fieldName];
       if (parameter == null || !parameter.isNamed) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'field `$fieldName` of `$name` is serialised but the constructor '
             '${parameter == null ? 'has no' : 'has a positional, not a'} named '
@@ -102,7 +102,7 @@ List<ConstructorField>? readConstructorFields(
         parameter.type,
       )) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'constructor parameter `$fieldName` of `$name` has type '
             '`${parameter.type.getDisplayString()}`, which does not accept the '
@@ -120,7 +120,7 @@ List<ConstructorField>? readConstructorFields(
     if (used.contains(parameter.name)) continue;
     if (parameter.isRequiredPositional || parameter.isRequiredNamed) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           'constructor parameter `${parameter.name}` of `$name` is required '
           'but is not a serialised field, so the generated code cannot supply '

@@ -11,8 +11,8 @@ import 'diagnostic.dart';
 enum DwPackageRole { shared, server, flutter }
 
 /// One Dart package of the project.
-final class DwPackage {
-  const DwPackage({
+final class DwProjectPackage {
+  const DwProjectPackage({
     required this.root,
     required this.name,
     required this.role,
@@ -43,7 +43,10 @@ final class DwPackage {
 ///
 /// The role is read from the package name in `pubspec.yaml`, not from the
 /// directory, because the name is what the registry variable is derived from.
-List<DwPackage> detectPackages(String root, List<DwDiagnostic> diagnostics) {
+List<DwProjectPackage> detectPackages(
+  String root,
+  List<DwGenerationDiagnostic> diagnostics,
+) {
   final candidates = <String>[
     if (File(p.join(root, 'pubspec.yaml')).existsSync())
       root
@@ -54,7 +57,7 @@ List<DwPackage> detectPackages(String root, List<DwDiagnostic> diagnostics) {
           entity.path,
   ]..sort();
 
-  final packages = <DwPackage>[];
+  final packages = <DwProjectPackage>[];
   for (final directory in candidates) {
     final pubspecFile = File(p.join(directory, 'pubspec.yaml'));
     final Object? pubspec;
@@ -62,7 +65,7 @@ List<DwPackage> detectPackages(String root, List<DwDiagnostic> diagnostics) {
       pubspec = loadYaml(pubspecFile.readAsStringSync());
     } on YamlException catch (error) {
       diagnostics.add(
-        DwDiagnostic(
+        DwGenerationDiagnostic(
           'cannot read ${pubspecFile.path}: ${error.message}',
           path: pubspecFile.path,
           line: (error.span?.start.line ?? 0) + 1,
@@ -80,7 +83,7 @@ List<DwPackage> detectPackages(String root, List<DwDiagnostic> diagnostics) {
     final version = _languageVersion(directory, name);
     if (version == null) {
       diagnostics.add(
-        DwDiagnostic(
+        DwGenerationDiagnostic(
           '$name has no resolved package config; run `dart pub get` in '
           '${p.normalize(directory)} first',
         ),
@@ -88,7 +91,7 @@ List<DwPackage> detectPackages(String root, List<DwDiagnostic> diagnostics) {
       continue;
     }
     packages.add(
-      DwPackage(
+      DwProjectPackage(
         root: p.normalize(p.absolute(directory)),
         name: name,
         role: role,
@@ -99,7 +102,7 @@ List<DwPackage> detectPackages(String root, List<DwDiagnostic> diagnostics) {
 
   if (packages.isEmpty && diagnostics.isEmpty) {
     diagnostics.add(
-      DwDiagnostic(
+      DwGenerationDiagnostic(
         'no DartWay package in ${p.normalize(p.absolute(root))}: expected a '
         'project root holding *_shared and *_server packages, or one of them',
       ),
@@ -109,7 +112,7 @@ List<DwPackage> detectPackages(String root, List<DwDiagnostic> diagnostics) {
     final ofRole = packages.where((package) => package.role == role).toList();
     if (ofRole.length > 1) {
       diagnostics.add(
-        DwDiagnostic(
+        DwGenerationDiagnostic(
           'several *_${role.name} packages in $root '
           '(${ofRole.map((package) => package.name).join(', ')}); a project '
           'has one',

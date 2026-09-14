@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dartway_orm/dartway_orm.dart';
-import 'package:dartway_orm/src/migrations/dw_checksum.dart';
+import 'package:dartway_orm/src/migrations/dw_migration_checksum.dart';
 import 'package:dartway_orm/src/migrations/dw_draft_writer.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -39,11 +39,11 @@ void main() {
   String migrationsDir() => p.join(sandbox.path, 'migrations');
 
   DwMigrationCli cli({
-    DwSchema? schema,
-    List<DwMigration> migrations = const [],
-    Map<String, List<DwMigration>> modules = const {},
+    DwDatabaseSchema? schema,
+    List<DwDatabaseMigration> migrations = const [],
+    Map<String, List<DwDatabaseMigration>> modules = const {},
   }) => DwMigrationCli(
-    schema: schema ?? DwSchema.fromTables(const []),
+    schema: schema ?? DwDatabaseSchema.fromTables(const []),
     migrations: migrations,
     directory: migrationsDir(),
     modules: modules,
@@ -60,10 +60,10 @@ void main() {
     Future<void> Function(DwMigrationContext m) up, {
     Future<void> Function(DwMigrationContext m)? down,
   }) async {
-    final source = DwChecksum.seal('''
+    final source = DwMigrationChecksum.seal('''
 import 'package:dartway_orm/dartway_orm.dart';
 
-final class M$id extends DwMigration {
+final class M$id extends DwDatabaseMigration {
   @override
   String get id => '$id';
 
@@ -79,7 +79,7 @@ final class M$id extends DwMigration {
     ).writeAsString(source);
     return TestMigration(
       id,
-      checksum: DwChecksum.declared(source)!,
+      checksum: DwMigrationChecksum.declared(source)!,
       onUp: up,
       onDown: down,
     );
@@ -170,7 +170,7 @@ final class M$id extends DwMigration {
 
     test('an unreachable database exits 1', () async {
       final unreachable = DwMigrationCli(
-        schema: DwSchema.fromTables(const []),
+        schema: DwDatabaseSchema.fromTables(const []),
         migrations: const [],
         directory: migrationsDir(),
         database: DwDatabaseConfig(
@@ -201,10 +201,15 @@ final class M$id extends DwMigration {
       final source = file.readAsStringSync();
       expect(
         source,
-        contains('final class M20260914083005Initial extends DwMigration'),
+        contains(
+          'final class M20260914083005Initial extends DwDatabaseMigration',
+        ),
       );
       expect(source, contains("String get id => '20260914_083005_initial';"));
-      expect(DwChecksum.declared(source), DwChecksum.of(source));
+      expect(
+        DwMigrationChecksum.declared(source),
+        DwMigrationChecksum.of(source),
+      );
       expect(source, isNot(contains('decisionRequired')));
       // Referenced tables come first; the self-reference stays inline.
       final order = [
@@ -219,7 +224,7 @@ final class M$id extends DwMigration {
         source,
         contains(
           "DwColumnSchema('featured_service_id', 'bigint', nullable: true, unique: true, "
-          "references: DwReferences('club_service', onDelete: DwOnDelete.setNull))",
+          "references: DwForeignKey('club_service', onDelete: DwOnDelete.setNull))",
         ),
       );
 
@@ -229,7 +234,7 @@ final class M$id extends DwMigration {
       expect(registration, contains("import 'm20260914_083005_initial.dart';"));
       expect(
         registration,
-        contains('final List<DwMigration> appMigrations = ['),
+        contains('final List<DwDatabaseMigration> appMigrations = ['),
       );
       expect(registration, contains('  const M20260914083005Initial(),'));
       expect(out.toString(), contains('create table club_session'));
@@ -240,7 +245,7 @@ final class M$id extends DwMigration {
         '20260101_000000_note',
         onUp: (m) => m.createTable(noteTable()),
       );
-      final target = DwSchema.fromTables([
+      final target = DwDatabaseSchema.fromTables([
         DwTableSchema(
           'note',
           columns: [
@@ -296,7 +301,7 @@ final class M$id extends DwMigration {
           DwTableSchema('dw_account', columns: [DwColumnSchema.primaryKey()]),
         ),
       );
-      final target = DwSchema.fromTables([
+      final target = DwDatabaseSchema.fromTables([
         DwTableSchema(
           'profile',
           columns: [
@@ -304,7 +309,7 @@ final class M$id extends DwMigration {
             DwColumnSchema(
               'account_id',
               'bigint',
-              references: const DwReferences('dw_account'),
+              references: const DwForeignKey('dw_account'),
             ),
           ],
         ),
@@ -339,7 +344,7 @@ final class M$id extends DwMigration {
         down: (m) => m.dropColumn('note', 'title'),
       );
       final code = await cli(
-        schema: DwSchema.fromTables([noteTable()]),
+        schema: DwDatabaseSchema.fromTables([noteTable()]),
         migrations: [create, addTitle],
       ).run(['check']);
       expect(code, DwMigrationCli.exitOk, reason: out.toString());
@@ -360,7 +365,7 @@ final class M$id extends DwMigration {
         down: (m) => m.dropTable('note'),
       );
       final code = await cli(
-        schema: DwSchema.fromTables([noteTable()]),
+        schema: DwDatabaseSchema.fromTables([noteTable()]),
         migrations: [create],
       ).run(['check']);
       expect(code, DwMigrationCli.exitCheckFailed);
@@ -379,7 +384,7 @@ final class M$id extends DwMigration {
         down: (m) => m.noop(),
       );
       final code = await cli(
-        schema: DwSchema.fromTables([
+        schema: DwDatabaseSchema.fromTables([
           DwTableSchema(
             'note',
             columns: noteTable().columns,
@@ -408,7 +413,7 @@ final class M$id extends DwMigration {
         down: (m) => m.dropIndex('note_body_idx'),
       );
       final code = await cli(
-        schema: DwSchema.fromTables([
+        schema: DwDatabaseSchema.fromTables([
           DwTableSchema(
             'note',
             columns: noteTable().columns,
@@ -442,7 +447,7 @@ final class M$id extends DwMigration {
             '// Edited: the test',
           ),
         );
-        final schema = DwSchema.fromTables([noteTable()]);
+        final schema = DwDatabaseSchema.fromTables([noteTable()]);
         expect(
           await cli(schema: schema, migrations: [create]).run(['check']),
           DwMigrationCli.exitCheckFailed,
@@ -461,7 +466,7 @@ final class M$id extends DwMigration {
         final resealed = File(path).readAsStringSync();
         final registered = TestMigration(
           create.id,
-          checksum: DwChecksum.declared(resealed)!,
+          checksum: DwMigrationChecksum.declared(resealed)!,
           onUp: create.onUp,
           onDown: create.onDown,
         );
@@ -485,18 +490,22 @@ final class M$id extends DwMigration {
   });
 
   test('checksums ignore whitespace and the checksum literal', () {
-    const a = "class M extends DwMigration { String get checksum => 'abc'; }";
+    const a =
+        "class M extends DwDatabaseMigration { String get checksum => 'abc'; }";
     const b =
-        "class M extends DwMigration {\n  String get checksum =>\n      'zzz';\n}";
-    expect(DwChecksum.of(a), DwChecksum.of(b));
-    expect(DwChecksum.of(a), isNot(DwChecksum.of(a.replaceFirst('M', 'N'))));
-    expect(() => DwChecksum.seal('class X {}'), throwsFormatException);
+        "class M extends DwDatabaseMigration {\n  String get checksum =>\n      'zzz';\n}";
+    expect(DwMigrationChecksum.of(a), DwMigrationChecksum.of(b));
+    expect(
+      DwMigrationChecksum.of(a),
+      isNot(DwMigrationChecksum.of(a.replaceFirst('M', 'N'))),
+    );
+    expect(() => DwMigrationChecksum.seal('class X {}'), throwsFormatException);
     expect(
       DwDraftWriter.registration(
         variable: 'pushMigrations',
         classesById: const {},
       ),
-      contains('final List<DwMigration> pushMigrations = [\n];'),
+      contains('final List<DwDatabaseMigration> pushMigrations = [\n];'),
     );
   });
 }

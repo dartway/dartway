@@ -2,5 +2,5 @@
 /// in the shared package, entity tables and the schema in the server package.
 library;
 
-export 'src/diagnostic.dart' show DwDiagnostic;
-export 'src/generator.dart' show DwGenerationReport, DwGenerator;
+export 'src/diagnostic.dart' show DwGenerationDiagnostic;
+export 'src/generator.dart' show DwGenerationReport, DwCodeGenerator;

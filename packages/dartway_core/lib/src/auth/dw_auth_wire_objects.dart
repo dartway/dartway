@@ -1,7 +1,7 @@
-import '../dto/dw_server_call.dart';
-import '../dto/dw_dto.dart';
-import '../protocol/dw_json.dart';
-import '../protocol/dw_protocol.dart';
+import '../wire/dw_server_call.dart';
+import '../wire/dw_wire_object.dart';
+import '../protocol/dw_json_codec.dart';
+import '../protocol/dw_wire_protocol.dart';
 
 /// The kinds of identifier an account signs in with by one-time code.
 enum DwIdentifierKind { phone, email }
@@ -11,7 +11,7 @@ enum DwIdentifierKind { phone, email }
 /// The server normalises the identifier with the project's rule, applies the
 /// attempt limits and answers with a ticket. Whether the identifier belongs to
 /// an account is not revealed.
-final class DwRequestCode extends DwCommand<DwCodeTicket> {
+final class DwRequestCode extends DwActionCommand<DwCodeTicket> {
   const DwRequestCode({required this.kind, required this.identifier});
 
   final DwIdentifierKind kind;
@@ -27,7 +27,7 @@ final class DwRequestCode extends DwCommand<DwCodeTicket> {
   };
 
   static DwRequestCode fromJson(Map<String, Object?> json) => DwRequestCode(
-    kind: DwJson.decodeEnum(json['kind'], DwIdentifierKind.values),
+    kind: DwJsonCodec.decodeEnum(json['kind'], DwIdentifierKind.values),
     identifier: json['identifier']! as String,
   );
 
@@ -60,14 +60,14 @@ final class DwCodeTicket extends DwDataObject {
   @override
   Map<String, Object?> toJson() => {
     'id': id,
-    'expiresAt': DwJson.encodeDateTime(expiresAt),
-    'resendAfter': DwJson.encodeDateTime(resendAfter),
+    'expiresAt': DwJsonCodec.encodeDateTime(expiresAt),
+    'resendAfter': DwJsonCodec.encodeDateTime(resendAfter),
   };
 
   static DwCodeTicket fromJson(Map<String, Object?> json) => DwCodeTicket(
     id: json['id']! as String,
-    expiresAt: DwJson.decodeDateTime(json['expiresAt']),
-    resendAfter: DwJson.decodeDateTime(json['resendAfter']),
+    expiresAt: DwJsonCodec.decodeDateTime(json['expiresAt']),
+    resendAfter: DwJsonCodec.decodeDateTime(json['resendAfter']),
   );
 
   @override
@@ -83,8 +83,9 @@ final class DwCodeTicket extends DwDataObject {
 
 /// Verifies a code and signs in; creates the account when the identifier has
 /// none. [registration] carries what the project collects at sign-up (name,
-/// consents) to its account-created hook; it is ignored for an existing account.
-final class DwVerifyCode extends DwCommand<DwSession> {
+/// consents) to its account-created hook; it is ignored for an existing
+/// account.
+final class DwVerifyCode extends DwActionCommand<DwAuthSession> {
   const DwVerifyCode({
     required this.ticketId,
     required this.code,
@@ -110,7 +111,7 @@ final class DwVerifyCode extends DwCommand<DwSession> {
     code: json['code']! as String,
     registration: json['registration'] == null
         ? const {}
-        : DwJson.decodeMap(json['registration'], (v) => v! as String),
+        : DwJsonCodec.decodeMap(json['registration'], (v) => v! as String),
   );
 
   @override
@@ -123,8 +124,8 @@ final class DwVerifyCode extends DwCommand<DwSession> {
 
 /// A signed-in session: the account and the token the client keeps and sends
 /// as `Authorization: Bearer <token>` and in the live `auth` message.
-final class DwSession extends DwDataObject {
-  const DwSession({
+final class DwAuthSession extends DwDataObject {
+  const DwAuthSession({
     required this.id,
     required this.token,
     required this.isNewAccount,
@@ -137,7 +138,7 @@ final class DwSession extends DwDataObject {
   final bool isNewAccount;
 
   @override
-  String get dwTypeName => 'DwSession';
+  String get dwTypeName => 'DwAuthSession';
 
   @override
   Map<String, Object?> toJson() => {
@@ -146,7 +147,7 @@ final class DwSession extends DwDataObject {
     if (isNewAccount) 'isNewAccount': true,
   };
 
-  static DwSession fromJson(Map<String, Object?> json) => DwSession(
+  static DwAuthSession fromJson(Map<String, Object?> json) => DwAuthSession(
     id: json['id']! as int,
     token: json['token']! as String,
     isNewAccount: json['isNewAccount'] == true,
@@ -154,7 +155,7 @@ final class DwSession extends DwDataObject {
 
   @override
   bool operator ==(Object other) =>
-      other is DwSession && other.id == id && other.token == token;
+      other is DwAuthSession && other.id == id && other.token == token;
 
   @override
   int get hashCode => Object.hash(id, token);
@@ -162,7 +163,7 @@ final class DwSession extends DwDataObject {
 
 /// Revokes the caller's session key; the server closes the live
 /// subscriptions of connections authenticated with it.
-final class DwSignOut extends DwCommand<void> {
+final class DwSignOut extends DwActionCommand<void> {
   const DwSignOut();
 
   @override
@@ -180,11 +181,11 @@ final class DwSignOut extends DwCommand<void> {
   int get hashCode => 0;
 }
 
-/// The auth DTOs, registered in [DwProtocol.core].
-const List<DwDtoEntry> dwAuthDtoEntries = [
-  DwDtoEntry<DwRequestCode>('DwRequestCode', DwRequestCode.fromJson),
-  DwDtoEntry<DwCodeTicket>('DwCodeTicket', DwCodeTicket.fromJson),
-  DwDtoEntry<DwVerifyCode>('DwVerifyCode', DwVerifyCode.fromJson),
-  DwDtoEntry<DwSession>('DwSession', DwSession.fromJson),
-  DwDtoEntry<DwSignOut>('DwSignOut', DwSignOut.fromJson),
+/// The auth DTOs, registered in [DwWireProtocol.core].
+const List<DwProtocolEntry> dwAuthProtocolEntries = [
+  DwProtocolEntry<DwRequestCode>('DwRequestCode', DwRequestCode.fromJson),
+  DwProtocolEntry<DwCodeTicket>('DwCodeTicket', DwCodeTicket.fromJson),
+  DwProtocolEntry<DwVerifyCode>('DwVerifyCode', DwVerifyCode.fromJson),
+  DwProtocolEntry<DwAuthSession>('DwAuthSession', DwAuthSession.fromJson),
+  DwProtocolEntry<DwSignOut>('DwSignOut', DwSignOut.fromJson),
 ];

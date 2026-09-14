@@ -7,11 +7,11 @@ part 'club_session.dw.dart';
 /// Covers references (a cascading one and a nullable self-reference), a
 /// renamed column, a nullable `jsonb` list, a plain index and a unique
 /// multi-column index.
-@DwTable(
+@DwSqlTable(
   'club_session',
   indexes: [
-    DwIndex(['startsAt']),
-    DwIndex(['serviceId', 'startsAt'], unique: true),
+    DwTableIndex(['startsAt']),
+    DwTableIndex(['serviceId', 'startsAt'], unique: true),
   ],
 )
 final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
@@ -28,10 +28,10 @@ final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
   @override
   final int? id;
 
-  @DwReferences('club_service', onDelete: DwOnDelete.cascade)
+  @DwForeignKey('club_service', onDelete: DwOnDelete.cascade)
   final int serviceId;
 
-  @DwReferences('club_session', onDelete: DwOnDelete.setNull)
+  @DwForeignKey('club_session', onDelete: DwOnDelete.setNull)
   final int? previousSessionId;
 
   final DateTime startsAt;

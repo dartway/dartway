@@ -1,7 +1,7 @@
 import '../protocol/dw_read.dart';
 
-/// A reason the server can refuse for. Declared by the project as an enum in its
-/// shared package:
+/// A reason the server can refuse for. Declared by the project as an enum in
+/// its shared package:
 ///
 /// ```dart
 /// enum AppRefusal with DwRefusalCodes { seatsNotEnough, bookingClosed }
@@ -29,20 +29,20 @@ enum DwCoreRefusal implements DwRefusalCode {
   /// The state changed under the caller (a unique key, a stale version).
   conflict,
 
-  /// The input is not acceptable; [DwRefusal.field] names the field.
+  /// The input is not acceptable; [DwCallRefusal.field] names the field.
   invalid,
 
   /// A subscription to a channel kind the server does not declare.
   unknownChannel,
 
-  /// Asked too often. `retryAfter` holds whole seconds until asking again
-  /// can succeed; build it with [DwRefusal.tooManyRequests] and read it with
-  /// [DwRefusal.retryAfter].
+  /// Asked too often. `retryAfter` holds whole seconds until asking again can
+  /// succeed; build it with [DwCallRefusal.tooManyRequests] and read it with
+  /// [DwCallRefusal.retryAfter].
   tooManyRequests,
 
   /// A one-time code can no longer be verified — its ticket is unknown, used,
-  /// expired or out of attempts; [DwRefusal.field] is `code`. The user needs
-  /// a new code, not another try.
+  /// expired or out of attempts; [DwCallRefusal.field] is `code`. The user
+  /// needs a new code, not another try.
   codeExpired,
 
   /// The app build is below the server's minimum (`Dw-App-Version`). An
@@ -78,8 +78,8 @@ enum DwCoreRefusal implements DwRefusalCode {
 ///
 /// Permission checks, business rules and validation are all refusals — one
 /// mechanism. A refusal reaches the user and never alerts the operator.
-final class DwRefusal {
-  DwRefusal(
+final class DwCallRefusal {
+  DwCallRefusal(
     DwRefusalCode code, {
     Map<String, Object?> params = const {},
     this.field,
@@ -89,15 +89,15 @@ final class DwRefusal {
            if (entry.value != null) entry.key: '${entry.value}',
        };
 
-  const DwRefusal.raw(this.code, {this.params = const {}, this.field});
+  const DwCallRefusal.raw(this.code, {this.params = const {}, this.field});
 
   /// [DwCoreRefusal.tooManyRequests], asking to wait [retryAfter]: rounded up
   /// to whole seconds, and at least one — "retry in 0 s" would invite the
   /// request it refuses.
-  factory DwRefusal.tooManyRequests(Duration retryAfter) {
+  factory DwCallRefusal.tooManyRequests(Duration retryAfter) {
     final seconds = (retryAfter.inMicroseconds / Duration.microsecondsPerSecond)
         .ceil();
-    return DwRefusal(
+    return DwCallRefusal(
       DwCoreRefusal.tooManyRequests,
       params: {_retryAfterParam: seconds < 1 ? 1 : seconds},
     );
@@ -137,12 +137,12 @@ final class DwRefusal {
 
   /// Reads a refusal. Throws [FormatException] for anything but a code with
   /// string parameters and an optional field.
-  static DwRefusal fromJson(Object? json) {
+  static DwCallRefusal fromJson(Object? json) {
     const what = 'A refusal';
     final map = dwReadMap(json, what);
     dwRejectUnknownKeys(map, const {'code', 'params', 'field'}, what);
     final params = map['params'];
-    return DwRefusal.raw(
+    return DwCallRefusal.raw(
       dwReadString(map['code'], 'The refusal code'),
       params: params == null
           ? const {}
@@ -159,7 +159,7 @@ final class DwRefusal {
 
   @override
   bool operator ==(Object other) =>
-      other is DwRefusal &&
+      other is DwCallRefusal &&
       other.code == code &&
       other.field == field &&
       _mapEquals(other.params, params);
@@ -175,14 +175,15 @@ final class DwRefusal {
 
   @override
   String toString() =>
-      'DwRefusal($code${params.isEmpty ? '' : ' $params'}${field == null ? '' : ' @$field'})';
+      'DwCallRefusal($code${params.isEmpty ? '' : ' $params'}${field == null ? '' : ' @$field'})';
 }
 
-/// Thrown by server code to refuse; the framework turns it into a refused result.
+/// Thrown by server code to refuse; the framework turns it into a refused
+/// result.
 final class DwRefusalException implements Exception {
   DwRefusalException(this.refusal);
 
-  final DwRefusal refusal;
+  final DwCallRefusal refusal;
 
   @override
   String toString() => 'DwRefusalException($refusal)';

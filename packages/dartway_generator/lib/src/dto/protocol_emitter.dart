@@ -28,20 +28,20 @@ abstract final class ProtocolEmitter {
     }
     out
       ..writeln()
-      ..write('final DwProtocol $variable = DwProtocol([');
+      ..write('final DwWireProtocol $variable = DwWireProtocol([');
     out.write(
       sorted
           .map(
             (entry) =>
                 // The type argument is written out: inside the list literal
-                // Dart would infer `DwDto` from the list, not the class from
-                // the factory, and the protocol refuses such an entry.
-                'DwDtoEntry<${entry.name}>(${dartString(entry.name)}, '
+                // Dart would infer `DwWireObject` from the list, not the class
+                // from the factory, and the protocol refuses such an entry.
+                'DwProtocolEntry<${entry.name}>(${dartString(entry.name)}, '
                 '\$${entry.name}FromJson)',
           )
           .join(', '),
     );
-    out.writeln('], include: DwProtocol.core);');
+    out.writeln('], include: DwWireProtocol.core);');
     return out.toString();
   }
 }

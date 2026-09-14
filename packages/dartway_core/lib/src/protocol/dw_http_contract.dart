@@ -15,11 +15,12 @@ const int dwProtocolVersion = 1;
 ///
 /// `/dw/` and `/health` are reserved: a project route under them fails the
 /// server's startup.
-abstract final class DwHttp {
+abstract final class DwHttpContract {
   /// The prefix of every framework path.
   static const String pathPrefix = '/dw/';
 
-  /// The segment of the live path; never a DTO name (`DwProtocol` refuses it).
+  /// The segment of the live path; never a DTO name (`DwWireProtocol` refuses
+  /// it).
   static const String liveSegment = 'live';
 
   /// The WebSocket of live updates.

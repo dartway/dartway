@@ -2,8 +2,8 @@ import '../emit/source_text.dart';
 import '../emit/value_class_writer.dart';
 import 'entity_model.dart';
 
-/// Writes the generated code of one row class: the value mixin, `copyWith`
-/// and the table definition (the shape of `packages/dartway_orm/test/fixtures`).
+/// Writes the generated code of one row class: the value mixin, `copyWith` and
+/// the table definition (the shape of `packages/dartway_orm/test/fixtures`).
 abstract final class EntityEmitter {
   static String emit(EntityClass entity) => [
     _mixin(entity),
@@ -33,7 +33,7 @@ abstract final class EntityEmitter {
     final members = <String>[
       'const ${entity.tableClass}() : super(${dartString(entity.tableName)});',
       for (final field in columns) _columnGetter(field),
-      '@override\nList<DwColumn<Object?>> get columns => '
+      '@override\nList<DwTableColumn<Object?>> get columns => '
           '[id, ${columns.map((field) => field.name).join(', ')}];',
       if (entity.indexes.isNotEmpty)
         '@override\nList<DwIndexSchema> get indexSchemas => ['
@@ -57,13 +57,13 @@ abstract final class EntityEmitter {
     final arguments = [
       dartString(column.sqlName),
       column.dwType,
-      // In the order DwColumn declares them.
+      // In the order DwTableColumn declares them.
       if (column.unique) 'unique: true',
       if (column.defaultValue != null) 'defaultValue: ${column.defaultValue}',
       if (column.references != null) 'references: ${column.references}',
     ];
-    return 'DwColumn<${field.spelling}> get ${field.name} => '
-        'const DwColumn(${arguments.join(', ')});';
+    return 'DwTableColumn<${field.spelling}> get ${field.name} => '
+        'const DwTableColumn(${arguments.join(', ')});';
   }
 
   static String _index(EntityIndex index) =>

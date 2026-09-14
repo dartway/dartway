@@ -78,7 +78,10 @@ final class OutputPlan {
 }
 
 /// Compares [files] with the disk and finds stale generated parts.
-OutputPlan planOutput(List<GeneratedFile> files, List<DwPackage> packages) {
+OutputPlan planOutput(
+  List<GeneratedFile> files,
+  List<DwProjectPackage> packages,
+) {
   final written = <String>[];
   final unchanged = <String>[];
   final contents = <String, String>{};

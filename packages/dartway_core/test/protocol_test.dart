@@ -27,18 +27,18 @@ void main() {
     });
 
     test('a patch distinguishes keep, set and clear on the wire', () {
-      Map<String, Object?> wire(DwPatch<String> p) =>
+      Map<String, Object?> wire(DwFieldPatch<String> p) =>
           roundTrip(RenameBooking(bookingId: 1, note: p).toJson())
               as Map<String, Object?>;
 
-      expect(wire(const DwPatch.keep()).containsKey('note'), isFalse);
-      expect(wire(const DwPatch.clear())['note'], isNull);
-      expect(wire(const DwPatch.clear()).containsKey('note'), isTrue);
+      expect(wire(const DwFieldPatch.keep()).containsKey('note'), isFalse);
+      expect(wire(const DwFieldPatch.clear())['note'], isNull);
+      expect(wire(const DwFieldPatch.clear()).containsKey('note'), isTrue);
 
       for (final patch in const [
-        DwPatch<String>.keep(),
-        DwPatch<String>.set('late'),
-        DwPatch<String>.clear(),
+        DwFieldPatch<String>.keep(),
+        DwFieldPatch<String>.set('late'),
+        DwFieldPatch<String>.clear(),
       ]) {
         final decoded =
             protocol.decodeNamed('RenameBooking', wire(patch)) as RenameBooking;
@@ -63,7 +63,7 @@ void main() {
   });
 
   group('command results: one untagged value typed by R', () {
-    R wire<R>(DwCommand<R> command, R value) => command.decodeResult(
+    R wire<R>(DwActionCommand<R> command, R value) => command.decodeResult(
       roundTrip(command.encodeResult(value, protocol)),
       protocol,
     );
@@ -82,7 +82,7 @@ void main() {
     });
 
     test('a framework DTO result (the auth commands)', () {
-      const session = DwSession(id: 5, token: 't', isNewAccount: true);
+      const session = DwAuthSession(id: 5, token: 't', isNewAccount: true);
       const verify = DwVerifyCode(ticketId: 'x', code: '1');
       expect(wire(verify, session), session);
     });
@@ -143,11 +143,11 @@ void main() {
   group('registry', () {
     test('every entry is listed once with its kind, core entries first', () {
       expect(protocol.entries.map((e) => e.name), [
-        'DwDeleted',
+        'DwDeletedObject',
         'DwRequestCode',
         'DwCodeTicket',
         'DwVerifyCode',
-        'DwSession',
+        'DwAuthSession',
         'DwSignOut',
         'ClubBooking',
         'ListMyBookings',
@@ -157,16 +157,16 @@ void main() {
       expect(
         {for (final e in protocol.entries) e.name: e.kind},
         {
-          'DwDeleted': DwDtoKind.other,
-          'DwRequestCode': DwDtoKind.command,
-          'DwCodeTicket': DwDtoKind.dataObject,
-          'DwVerifyCode': DwDtoKind.command,
-          'DwSession': DwDtoKind.dataObject,
-          'DwSignOut': DwDtoKind.command,
-          'ClubBooking': DwDtoKind.dataObject,
-          'ListMyBookings': DwDtoKind.request,
-          'RenameBooking': DwDtoKind.command,
-          'CoachNote': DwDtoKind.dataObject,
+          'DwDeletedObject': DwWireObjectKind.other,
+          'DwRequestCode': DwWireObjectKind.command,
+          'DwCodeTicket': DwWireObjectKind.dataObject,
+          'DwVerifyCode': DwWireObjectKind.command,
+          'DwAuthSession': DwWireObjectKind.dataObject,
+          'DwSignOut': DwWireObjectKind.command,
+          'ClubBooking': DwWireObjectKind.dataObject,
+          'ListMyBookings': DwWireObjectKind.request,
+          'RenameBooking': DwWireObjectKind.command,
+          'CoachNote': DwWireObjectKind.dataObject,
         },
       );
       expect(protocol.entryNamed('ClubBooking')?.type, ClubBooking);
@@ -175,26 +175,38 @@ void main() {
 
     test('every request kind reads as a request', () {
       final entries = [
-        DwDtoEntry<GetBooking>('GetBooking', (_) => const GetBooking()),
-        DwDtoEntry<FindBooking>('FindBooking', (_) => const FindBooking(1)),
-        DwDtoEntry<FeedBookings>('FeedBookings', (_) => const FeedBookings()),
-        DwDtoEntry<ListBookingTable>(
+        DwProtocolEntry<GetBooking>('GetBooking', (_) => const GetBooking()),
+        DwProtocolEntry<FindBooking>(
+          'FindBooking',
+          (_) => const FindBooking(1),
+        ),
+        DwProtocolEntry<FeedBookings>(
+          'FeedBookings',
+          (_) => const FeedBookings(),
+        ),
+        DwProtocolEntry<ListBookingTable>(
           'ListBookingTable',
           (_) => const ListBookingTable(),
         ),
-        DwDtoEntry<BookingHistory>(
+        DwProtocolEntry<BookingHistory>(
           'BookingHistory',
           (_) => const BookingHistory(),
         ),
       ];
-      expect(entries.map((e) => e.kind), everyElement(DwDtoKind.request));
+      expect(
+        entries.map((e) => e.kind),
+        everyElement(DwWireObjectKind.request),
+      );
     });
 
     test('two classes under one wire name are refused', () {
       expect(
-        () => DwProtocol([
-          const DwDtoEntry<ClubBooking>('Same', $ClubBookingFromJson),
-          const DwDtoEntry<ListMyBookings>('Same', $ListMyBookingsFromJson),
+        () => DwWireProtocol([
+          const DwProtocolEntry<ClubBooking>('Same', $ClubBookingFromJson),
+          const DwProtocolEntry<ListMyBookings>(
+            'Same',
+            $ListMyBookingsFromJson,
+          ),
         ]),
         throwsStateError,
       );
@@ -202,9 +214,9 @@ void main() {
 
     test('one class under two names is refused', () {
       expect(
-        () => DwProtocol([
-          const DwDtoEntry<ClubBooking>('One', $ClubBookingFromJson),
-          const DwDtoEntry<ClubBooking>('Two', $ClubBookingFromJson),
+        () => DwWireProtocol([
+          const DwProtocolEntry<ClubBooking>('One', $ClubBookingFromJson),
+          const DwProtocolEntry<ClubBooking>('Two', $ClubBookingFromJson),
         ]),
         throwsStateError,
       );
@@ -214,14 +226,16 @@ void main() {
       'an entry whose type argument was inferred, not written, is refused',
       () {
         // In a list literal the type argument comes from the list, not from the
-        // factory: this entry registers DwDto.
+        // factory: this entry registers DwWireObject.
         expect(
-          () => DwProtocol([DwDtoEntry('ClubBooking', $ClubBookingFromJson)]),
+          () => DwWireProtocol([
+            DwProtocolEntry('ClubBooking', $ClubBookingFromJson),
+          ]),
           throwsArgumentError,
         );
         expect(
-          () => DwProtocol([
-            DwDtoEntry<DwDataObject>('ClubBooking', $ClubBookingFromJson),
+          () => DwWireProtocol([
+            DwProtocolEntry<DwDataObject>('ClubBooking', $ClubBookingFromJson),
           ]),
           throwsArgumentError,
         );
@@ -231,12 +245,12 @@ void main() {
 
   group('refusals', () {
     test('a refusal carries a code and string params, never a sentence', () {
-      final refusal = DwRefusal(
+      final refusal = DwCallRefusal(
         DwCoreRefusal.invalid,
         params: {'max': 5, 'skip': null},
         field: 'rating',
       );
-      final back = DwRefusal.fromJson(roundTrip(refusal.toJson()));
+      final back = DwCallRefusal.fromJson(roundTrip(refusal.toJson()));
       expect(back, refusal);
       expect(back.code, 'dw.invalid');
       expect(back.params, {'max': '5'});
@@ -244,29 +258,35 @@ void main() {
     });
 
     test('tooManyRequests carries whole seconds, rounded up, at least one', () {
-      final refusal = DwRefusal.tooManyRequests(
+      final refusal = DwCallRefusal.tooManyRequests(
         const Duration(milliseconds: 2001),
       );
       expect(refusal.code, 'dw.tooManyRequests');
       expect(refusal.params, {'retryAfter': '3'});
       expect(
-        DwRefusal.fromJson(roundTrip(refusal.toJson())).retryAfter,
+        DwCallRefusal.fromJson(roundTrip(refusal.toJson())).retryAfter,
         const Duration(seconds: 3),
       );
       expect(
-        DwRefusal.tooManyRequests(Duration.zero).retryAfter,
+        DwCallRefusal.tooManyRequests(Duration.zero).retryAfter,
         const Duration(seconds: 1),
       );
       expect(
-        DwRefusal(DwCoreRefusal.invalid, params: {'retryAfter': 5}).retryAfter,
+        DwCallRefusal(
+          DwCoreRefusal.invalid,
+          params: {'retryAfter': 5},
+        ).retryAfter,
         isNull,
       );
     });
 
     test('the incompatibility codes', () {
-      expect(DwRefusal(DwCoreRefusal.updateRequired).code, 'dw.updateRequired');
       expect(
-        DwRefusal(DwCoreRefusal.protocolUnsupported).code,
+        DwCallRefusal(DwCoreRefusal.updateRequired).code,
+        'dw.updateRequired',
+      );
+      expect(
+        DwCallRefusal(DwCoreRefusal.protocolUnsupported).code,
         'dw.protocolUnsupported',
       );
     });
@@ -275,7 +295,7 @@ void main() {
   test('a validatable DTO answers its refusals', () {
     expect(const _Rating(3).validate(), isEmpty);
     expect(const _Rating(9).validate(), [
-      DwRefusal(DwCoreRefusal.invalid, field: 'stars', params: {'max': 5}),
+      DwCallRefusal(DwCoreRefusal.invalid, field: 'stars', params: {'max': 5}),
     ]);
   });
 
@@ -285,7 +305,7 @@ void main() {
   });
 }
 
-final class _Command<R> extends DwCommand<R> {
+final class _Command<R> extends DwActionCommand<R> {
   const _Command();
 
   @override
@@ -308,15 +328,15 @@ final class _Unregistered extends DwDataObject {
   Map<String, Object?> toJson() => const {'id': 1};
 }
 
-final class _Rating extends DwCommand<void> implements DwValidatable {
+final class _Rating extends DwActionCommand<void> implements DwSelfValidating {
   const _Rating(this.stars);
 
   final int stars;
 
   @override
-  List<DwRefusal> validate() => [
+  List<DwCallRefusal> validate() => [
     if (stars > 5)
-      DwRefusal(DwCoreRefusal.invalid, field: 'stars', params: {'max': 5}),
+      DwCallRefusal(DwCoreRefusal.invalid, field: 'stars', params: {'max': 5}),
   ];
 
   @override

@@ -46,7 +46,7 @@ final class DwGenerationReport {
   final List<String> removed;
 
   /// Problems that stopped generation. When not empty, nothing was written.
-  final List<DwDiagnostic> diagnostics;
+  final List<DwGenerationDiagnostic> diagnostics;
   final Duration elapsed;
   final bool check;
 
@@ -80,7 +80,7 @@ final class DwGenerationReport {
 /// A run either writes everything or nothing: the first problem does not stop
 /// the analysis (every problem is reported at once), but any problem stops the
 /// writing, so the project is never left half-generated.
-abstract final class DwGenerator {
+abstract final class DwCodeGenerator {
   /// Runs over the project at [projectRoot] — a directory holding the
   /// `*_shared` / `*_server` / `*_flutter` packages, or one such package.
   ///
@@ -99,7 +99,7 @@ abstract final class DwGenerator {
     if (Directory(root).existsSync()) {
       root = Directory(root).resolveSymbolicLinksSync();
     }
-    final diagnostics = <DwDiagnostic>[];
+    final diagnostics = <DwGenerationDiagnostic>[];
 
     DwGenerationReport finish({OutputPlan? plan}) {
       diagnostics.sort();
@@ -141,7 +141,7 @@ abstract final class DwGenerator {
 final class _Library {
   _Library({required this.package, required this.element, required this.path});
 
-  final DwPackage package;
+  final DwProjectPackage package;
   final LibraryElement element;
   final String path;
 
@@ -156,11 +156,14 @@ final class _Library {
 final class _Run {
   _Run(this.diagnostics);
 
-  final List<DwDiagnostic> diagnostics;
+  final List<DwGenerationDiagnostic> diagnostics;
   final List<_Library> libraries = [];
-  final Map<DwPackage, AnalysisContext> contexts = {};
+  final Map<DwProjectPackage, AnalysisContext> contexts = {};
 
-  Future<void> scanPackage(DwPackage package, AnalysisContext context) async {
+  Future<void> scanPackage(
+    DwProjectPackage package,
+    AnalysisContext context,
+  ) async {
     contexts[package] = context;
     final lib = Directory(package.lib);
     if (!lib.existsSync()) return;
@@ -207,7 +210,7 @@ final class _Run {
       if (!written.endsWith('.dw.dart')) continue;
       if (written != library.partName || declaresPart) {
         diagnostics.add(
-          DwDiagnostic.inFile(
+          DwGenerationDiagnostic.inFile(
             fragment,
             include.partKeywordOffset,
             declaresPart
@@ -230,10 +233,10 @@ final class _Run {
     ClassElement? firstGenerated;
 
     for (final classElement in element.classes) {
-      final dtoKind = DwFramework.dtoKindOf(classElement);
-      final isEntity = DwFramework.isEntity(classElement);
+      final dtoKind = DwFrameworkTypes.dtoKindOf(classElement);
+      final isEntity = DwFrameworkTypes.isEntity(classElement);
       if (dtoKind == null && !isEntity) continue;
-      if (DwFramework.isFramework(classElement)) continue;
+      if (DwFrameworkTypes.isFramework(classElement)) continue;
       if (classElement.isAbstract || classElement.isSealed) continue;
       final name = classElement.name!;
 
@@ -253,7 +256,7 @@ final class _Run {
       firstGenerated ??= classElement;
       if (name.startsWith('_')) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             classElement,
             '`$name` is private, but the generated '
             '${isEntity ? 'schema' : 'protocol registry'} lives in another '
@@ -270,7 +273,7 @@ final class _Run {
           false;
       if (!hasMixin) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             classElement,
             '`$name` must mix in its generated code: declare it as '
             '`class $name extends … with $mixin`',
@@ -290,7 +293,7 @@ final class _Run {
 
     if (firstGenerated != null && !declaresPart && !misnamedPart) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           firstGenerated,
           '`${p.basename(library.path)}` declares generated classes but not '
           "their part: add `part '${library.partName}';` after the imports",
@@ -328,14 +331,15 @@ final class _Run {
     return files;
   }
 
-  bool _resolves(DwPackage package, String dependency) =>
+  bool _resolves(DwProjectPackage package, String dependency) =>
       contexts[package]!.currentSession.uriConverter.uriToPath(
         Uri.parse('package:$dependency/$dependency.dart'),
       ) !=
       null;
 
-  /// Row classes feed one schema and one `DwDb` extension, so their table
-  /// names, class names, index names and repository getters must not collide.
+  /// Row classes feed one schema and one `DwDatabaseHandle` extension, so their
+  /// table names, class names, index names and repository getters must not
+  /// collide.
   void _checkEntities() {
     final entities = <EntityClass>[];
     for (final library in libraries) {
@@ -343,7 +347,7 @@ final class _Run {
         if (entity == null) continue;
         if (library.package.role != DwPackageRole.server) {
           diagnostics.add(
-            DwDiagnostic.at(
+            DwGenerationDiagnostic.at(
               element,
               'row class `${entity.name}` is declared in '
               '`${library.package.name}`; row classes belong in the *_server '
@@ -369,7 +373,7 @@ final class _Run {
               .map((other) => _locationOf(other.element))
               .join(', ');
           diagnostics.add(
-            DwDiagnostic.at(
+            DwGenerationDiagnostic.at(
               owner.element,
               '$what `$key` of row class `${owner.name}` is also used at '
               '$others',
@@ -390,22 +394,25 @@ final class _Run {
     ]);
 
     for (final entity in entities) {
-      final dwDb = entity.element.library.firstFragment.scope
-          .lookup('DwDb')
+      final handleClass = entity.element.library.firstFragment.scope
+          .lookup('DwDatabaseHandle')
           .getter;
-      if (dwDb is! InterfaceElement) continue;
+      if (handleClass is! InterfaceElement) continue;
       final members = {
-        for (final type in [dwDb.thisType, ...dwDb.allSupertypes]) ...[
+        for (final type in [
+          handleClass.thisType,
+          ...handleClass.allSupertypes,
+        ]) ...[
           for (final field in type.element.fields) field.name,
           for (final method in type.element.methods) method.name,
         ],
       };
       if (members.contains(entity.repositoryGetter)) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             entity.element,
             'the repository getter of row class `${entity.name}` would be '
-            '`${entity.repositoryGetter}`, which DwDb already declares; rename '
+            '`${entity.repositoryGetter}`, which DwDatabaseHandle already declares; rename '
             'the class',
           ),
         );
@@ -416,20 +423,20 @@ final class _Run {
   /// Framework names a generated part uses without a prefix, by the package
   /// that must be imported for them.
   static const _frameworkNames = {
-    'DwJson': 'dartway_core',
-    'DwPatch': 'dartway_core',
+    'DwJsonCodec': 'dartway_core',
+    'DwFieldPatch': 'dartway_core',
     'dwListEquals': 'dartway_core',
     'dwMapEquals': 'dartway_core',
-    'DwColumn': 'dartway_orm',
-    'DwType': 'dartway_orm',
+    'DwTableColumn': 'dartway_orm',
+    'DwColumnType': 'dartway_orm',
     'DwEnumType': 'dartway_orm',
     'DwJsonListType': 'dartway_orm',
     'DwJsonMapType': 'dartway_orm',
     'DwTableDef': 'dartway_orm',
     'DwResultRow': 'dartway_orm',
-    'DwReferences': 'dartway_orm',
+    'DwForeignKey': 'dartway_orm',
     'DwOnDelete': 'dartway_orm',
-    'DwDefault': 'dartway_orm',
+    'DwDefaultValue': 'dartway_orm',
     'DwIndexSchema': 'dartway_orm',
   };
 
@@ -443,7 +450,7 @@ final class _Run {
     for (final MapEntry(key: name, value: package) in _frameworkNames.entries) {
       if (!RegExp('\\b$name\\b').hasMatch(generated)) continue;
       final visible = scope.lookup(name).getter;
-      if (visible != null && DwFramework.isFramework(visible)) continue;
+      if (visible != null && DwFrameworkTypes.isFramework(visible)) continue;
       missing.add('`$name`');
       // dartway_orm re-exports what row class parts need from dartway_core.
       packages.add(hasEntities ? 'dartway_orm' : package);
@@ -454,7 +461,7 @@ final class _Run {
         "`import 'package:$package/$package.dart';`",
     ];
     diagnostics.add(
-      DwDiagnostic.at(
+      DwGenerationDiagnostic.at(
         library.classes.first.$1,
         'the generated part uses ${missing.join(', ')}, which '
         '`${p.basename(library.path)}` does not import without a prefix; add '
@@ -488,8 +495,8 @@ final class _Run {
     );
   }
 
-  /// Wire names are class names, and two classes under one name would make
-  /// the protocol refuse to start — so the collision is reported here, at both
+  /// Wire names are class names, and two classes under one name would make the
+  /// protocol refuse to start — so the collision is reported here, at both
   /// declarations, including collisions with the framework's own DTOs.
   void _checkWireNames() {
     final byName = <String, List<ClassElement>>{};
@@ -504,7 +511,7 @@ final class _Run {
         _collidingNames.add(name);
         for (final element in elements) {
           diagnostics.add(
-            DwDiagnostic.at(
+            DwGenerationDiagnostic.at(
               element,
               'DTO name `$name` is already taken by a dartway_core DTO; wire '
               'names must be unique, rename the class',
@@ -520,7 +527,7 @@ final class _Run {
             .map(_locationOf)
             .join(', ');
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             element,
             'DTO name `$name` is declared more than once (also at $others); '
             'wire names must be unique across the project',
@@ -538,7 +545,7 @@ final class _Run {
         for (final element in core.exportNamespace.definedNames2.values)
           if (element is ClassElement &&
               !element.isAbstract &&
-              DwFramework.dtoKindOf(element) != null)
+              DwFrameworkTypes.dtoKindOf(element) != null)
             element.name!,
       };
     }
@@ -563,12 +570,12 @@ final class _Run {
   }
 
   String _locationOf(Element element) {
-    final diagnostic = DwDiagnostic.at(element, '');
+    final diagnostic = DwGenerationDiagnostic.at(element, '');
     return '${p.basename(diagnostic.path!)}:${diagnostic.line}:'
         '${diagnostic.column}';
   }
 
-  GeneratedFile _emitProtocol(DwPackage package) {
+  GeneratedFile _emitProtocol(DwProjectPackage package) {
     final entries = <ProtocolEntry>[];
     final registered = <(ClassElement, _Library)>[];
     for (final library in libraries) {
@@ -603,7 +610,7 @@ final class _Run {
             continue;
           }
           diagnostics.add(
-            DwDiagnostic.at(
+            DwGenerationDiagnostic.at(
               element,
               '`$name` is also exported by `${other.uri}`, so the generated '
               'protocol registry cannot name it unambiguously; rename one of '
@@ -629,7 +636,7 @@ final class _Run {
     );
   }
 
-  GeneratedFile _emitSchema(DwPackage package) {
+  GeneratedFile _emitSchema(DwProjectPackage package) {
     final entities = <EntityClass>[
       for (final library in libraries)
         if (library.package == package)
@@ -660,7 +667,7 @@ final class _Run {
     );
   }
 
-  FormatterOptions _formatterOptions(DwPackage package) {
+  FormatterOptions _formatterOptions(DwProjectPackage package) {
     final context = contexts[package]!;
     final pubspec = context.currentSession.resourceProvider.getFile(
       p.join(package.root, 'pubspec.yaml'),

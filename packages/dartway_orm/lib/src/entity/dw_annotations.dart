@@ -1,23 +1,24 @@
 import 'package:meta/meta_meta.dart';
 
-/// Declares a row class (`<Name>Row extends DwTableRow`) stored in the table [name].
+/// Declares a row class (`<Name>Row extends DwTableRow`) stored in the table
+/// [name].
 ///
 /// The generator reads the class and writes its table definition, codecs and
 /// schema into the part file; the annotation itself carries only what cannot
 /// be derived from the Dart declaration.
 @Target({TargetKind.classType})
-final class DwTable {
-  const DwTable(this.name, {this.indexes = const []});
+final class DwSqlTable {
+  const DwSqlTable(this.name, {this.indexes = const []});
 
   /// The SQL table name.
   final String name;
 
-  final List<DwIndex> indexes;
+  final List<DwTableIndex> indexes;
 }
 
 /// An index over row class fields, named by their Dart names.
-final class DwIndex {
-  const DwIndex(this.fields, {this.unique = false, this.name});
+final class DwTableIndex {
+  const DwTableIndex(this.fields, {this.unique = false, this.name});
 
   /// Dart field names, in index order.
   final List<String> fields;
@@ -47,15 +48,15 @@ enum DwOnDelete {
 /// in a schema, so the annotation and the schema cannot disagree about what a
 /// reference is.
 @Target({TargetKind.field})
-final class DwReferences {
-  const DwReferences(this.tableName, {this.onDelete = DwOnDelete.noAction});
+final class DwForeignKey {
+  const DwForeignKey(this.tableName, {this.onDelete = DwOnDelete.noAction});
 
   final String tableName;
   final DwOnDelete onDelete;
 
   @override
   bool operator ==(Object other) =>
-      other is DwReferences &&
+      other is DwForeignKey &&
       other.tableName == tableName &&
       other.onDelete == onDelete;
 
@@ -63,7 +64,7 @@ final class DwReferences {
   int get hashCode => Object.hash(tableName, onDelete);
 
   @override
-  String toString() => 'DwReferences($tableName, onDelete: ${onDelete.name})';
+  String toString() => 'DwForeignKey($tableName, onDelete: ${onDelete.name})';
 }
 
 /// Overrides the SQL column name, which defaults to the snake_case field name.
@@ -80,26 +81,26 @@ final class DwColumnName {
 /// when the column was added, and raw SQL inserts. A repository insert always
 /// writes every column.
 @Target({TargetKind.field})
-final class DwDefault {
+final class DwDefaultValue {
   /// A raw SQL expression, e.g. `'0'`, `"'draft'"`, `"'[]'::jsonb"`.
-  const DwDefault(this.sql);
+  const DwDefaultValue(this.sql);
 
-  const DwDefault.now() : sql = 'now()';
+  const DwDefaultValue.now() : sql = 'now()';
 
   final String sql;
 
   @override
-  bool operator ==(Object other) => other is DwDefault && other.sql == sql;
+  bool operator ==(Object other) => other is DwDefaultValue && other.sql == sql;
 
   @override
   int get hashCode => sql.hashCode;
 
   @override
-  String toString() => 'DwDefault($sql)';
+  String toString() => 'DwDefaultValue($sql)';
 }
 
 /// A single-column unique constraint.
 @Target({TargetKind.field})
-final class DwUnique {
-  const DwUnique();
+final class DwUniqueColumn {
+  const DwUniqueColumn();
 }

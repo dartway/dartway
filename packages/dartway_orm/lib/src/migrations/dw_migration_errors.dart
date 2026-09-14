@@ -1,4 +1,4 @@
-import 'dw_migration.dart';
+import 'dw_database_migration.dart';
 
 /// Why the migrator refused or failed. Every subtype stops the process: the
 /// CLI maps them to non-zero exit codes and the server does not start.

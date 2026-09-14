@@ -8,7 +8,7 @@ part 'app_setting.dw.dart';
 /// one-to-one reference) — a `jsonb` map, and columns named like SQL
 /// keywords (`key`, `value`), which only work because every identifier is
 /// quoted.
-@DwTable('app_setting')
+@DwSqlTable('app_setting')
 final class AppSettingRow extends DwTableRow with _$AppSettingRow {
   const AppSettingRow({
     this.id,
@@ -22,17 +22,17 @@ final class AppSettingRow extends DwTableRow with _$AppSettingRow {
   @override
   final int? id;
 
-  @DwUnique()
+  @DwUniqueColumn()
   final String key;
 
   final String value;
   final Map<String, int> limits;
 
-  @DwUnique()
-  @DwReferences('club_service', onDelete: DwOnDelete.setNull)
+  @DwUniqueColumn()
+  @DwForeignKey('club_service', onDelete: DwOnDelete.setNull)
   final int? featuredServiceId;
 
-  @DwDefault.now()
+  @DwDefaultValue.now()
   final DateTime updatedAt;
 
   static const table = AppSettingTable();

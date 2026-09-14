@@ -2,14 +2,15 @@ import 'dart:async';
 
 import 'package:postgres/postgres.dart' as pg;
 
-import 'dw_connection.dart';
+import 'dw_connection_pool.dart';
 import 'dw_database_config.dart';
-import 'dw_db.dart';
+import 'dw_database_handle.dart';
 import 'dw_errors.dart';
 
 /// An open database: the connection pool and the handle bound to it.
-final class DwDatabase {
-  DwDatabase._(this.config, this._pool, this._counter) : db = DwPoolDb(_pool);
+final class DwPostgresDatabase {
+  DwPostgresDatabase._(this.config, this._pool, this._counter)
+    : db = DwPoolDb(_pool);
 
   /// Opens the pool and proves the database is reachable with one real
   /// connection, so a wrong password fails at startup rather than at the
@@ -17,7 +18,7 @@ final class DwDatabase {
   ///
   /// [countRoundTrips] makes [roundTrips] available — for tests asserting
   /// that an operation costs no more than it should.
-  static Future<DwDatabase> open(
+  static Future<DwPostgresDatabase> open(
     DwDatabaseConfig config, {
     bool countRoundTrips = false,
   }) async {
@@ -29,17 +30,17 @@ final class DwDatabase {
       );
     }
     final counter = countRoundTrips ? DwRoundTripCounter() : null;
-    final pool = DwPool(config, counter: counter);
+    final pool = DwConnectionPool(config, counter: counter);
     pool.release(await pool.acquire());
-    return DwDatabase._(config, pool, counter);
+    return DwPostgresDatabase._(config, pool, counter);
   }
 
   final DwDatabaseConfig config;
-  final DwPool _pool;
+  final DwConnectionPool _pool;
   final DwRoundTripCounter? _counter;
 
   /// The pool-bound handle.
-  final DwDb db;
+  final DwDatabaseHandle db;
 
   final List<_DwListener> _listeners = [];
 

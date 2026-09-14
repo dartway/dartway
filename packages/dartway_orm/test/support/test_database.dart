@@ -34,9 +34,9 @@ final class TestDatabase {
   TestDatabase._(this.name, this.database);
 
   final String name;
-  final DwDatabase database;
+  final DwPostgresDatabase database;
 
-  DwDb get db => database.db;
+  DwDatabaseHandle get db => database.db;
 
   static Future<TestDatabase> create({
     bool withFixtureSchema = true,
@@ -45,7 +45,7 @@ final class TestDatabase {
   }) async {
     final name = uniqueDatabaseName();
     await createDatabase(name);
-    final database = await DwDatabase.open(
+    final database = await DwPostgresDatabase.open(
       testServerConfig(name: name, maxConnections: maxConnections),
       countRoundTrips: countRoundTrips,
     );
@@ -59,9 +59,10 @@ final class TestDatabase {
     return TestDatabase._(name, database);
   }
 
-  Future<DwDatabase> openAnother({int maxConnections = 4}) => DwDatabase.open(
-    testServerConfig(name: name, maxConnections: maxConnections),
-  );
+  Future<DwPostgresDatabase> openAnother({int maxConnections = 4}) =>
+      DwPostgresDatabase.open(
+        testServerConfig(name: name, maxConnections: maxConnections),
+      );
 
   Future<void> dispose() async {
     await database.close();
@@ -70,8 +71,10 @@ final class TestDatabase {
 }
 
 /// Runs statements against the maintenance database.
-Future<T> withServer<T>(Future<T> Function(DwDb db) body) async {
-  final server = await DwDatabase.open(testServerConfig(maxConnections: 1));
+Future<T> withServer<T>(Future<T> Function(DwDatabaseHandle db) body) async {
+  final server = await DwPostgresDatabase.open(
+    testServerConfig(maxConnections: 1),
+  );
   try {
     return await body(server.db);
   } finally {

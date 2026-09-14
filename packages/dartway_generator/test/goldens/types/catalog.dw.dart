@@ -13,18 +13,19 @@ mixin _$Item on Named {
     'id': _self.id,
     'price': _self.price,
     if (_self.discount != null) 'discount': _self.discount,
-    'duration': DwJson.encodeDuration(_self.duration),
-    if (_self.timeout != null) 'timeout': DwJson.encodeDuration(_self.timeout!),
-    'image': DwJson.encodeBytes(_self.image),
+    'duration': DwJsonCodec.encodeDuration(_self.duration),
+    if (_self.timeout != null)
+      'timeout': DwJsonCodec.encodeDuration(_self.timeout!),
+    'image': DwJsonCodec.encodeBytes(_self.image),
     if (_self.thumbnail != null)
-      'thumbnail': DwJson.encodeBytes(_self.thumbnail!),
+      'thumbnail': DwJsonCodec.encodeBytes(_self.thumbnail!),
     'color': _self.color.name,
     if (_self.colors.isNotEmpty)
       'colors': [for (final e in _self.colors) e.name],
     if (_self.labels.isNotEmpty) 'labels': _self.labels,
-    'createdAt': DwJson.encodeDateTime(_self.createdAt),
+    'createdAt': DwJsonCodec.encodeDateTime(_self.createdAt),
     if (_self.updatedAt != null)
-      'updatedAt': DwJson.encodeDateTime(_self.updatedAt!),
+      'updatedAt': DwJsonCodec.encodeDateTime(_self.updatedAt!),
     'weight': _self.weight,
     'unit': _self.unit.name,
     if (_self.parent != null) 'parent': _self.parent!.toJson(),
@@ -34,7 +35,7 @@ mixin _$Item on Named {
     if (_self.scores != null) 'scores': _self.scores,
     if (_self.history.isNotEmpty)
       'history': _self.history.map(
-        (k, v) => MapEntry(k, v == null ? null : DwJson.encodeDateTime(v)),
+        (k, v) => MapEntry(k, v == null ? null : DwJsonCodec.encodeDateTime(v)),
       ),
     if (_self.maybeColors.isNotEmpty)
       'maybeColors': [for (final e in _self.maybeColors) e?.name],
@@ -117,62 +118,65 @@ Item $ItemFromJson(Map<String, Object?> json) => Item(
   price: json['price']! as int,
   discount: json['discount'] == null
       ? null
-      : DwJson.decodeDouble(json['discount']),
-  duration: DwJson.decodeDuration(json['duration']),
+      : DwJsonCodec.decodeDouble(json['discount']),
+  duration: DwJsonCodec.decodeDuration(json['duration']),
   timeout: json['timeout'] == null
       ? null
-      : DwJson.decodeDuration(json['timeout']),
-  image: DwJson.decodeBytes(json['image']),
+      : DwJsonCodec.decodeDuration(json['timeout']),
+  image: DwJsonCodec.decodeBytes(json['image']),
   thumbnail: json['thumbnail'] == null
       ? null
-      : DwJson.decodeBytes(json['thumbnail']),
-  color: DwJson.decodeEnum(json['color'], Color.values),
+      : DwJsonCodec.decodeBytes(json['thumbnail']),
+  color: DwJsonCodec.decodeEnum(json['color'], Color.values),
   colors: json['colors'] == null
       ? const []
-      : DwJson.decodeList(
+      : DwJsonCodec.decodeList(
           json['colors'],
-          (e) => DwJson.decodeEnum(e, Color.values),
+          (e) => DwJsonCodec.decodeEnum(e, Color.values),
         ),
   labels: json['labels'] == null
       ? const {}
-      : DwJson.decodeMap(json['labels'], (v) => v! as String),
-  createdAt: DwJson.decodeDateTime(json['createdAt']),
+      : DwJsonCodec.decodeMap(json['labels'], (v) => v! as String),
+  createdAt: DwJsonCodec.decodeDateTime(json['createdAt']),
   updatedAt: json['updatedAt'] == null
       ? null
-      : DwJson.decodeDateTime(json['updatedAt']),
+      : DwJsonCodec.decodeDateTime(json['updatedAt']),
   weight: json['weight']! as int,
-  unit: DwJson.decodeEnum(json['unit'], units.Unit.values),
+  unit: DwJsonCodec.decodeEnum(json['unit'], units.Unit.values),
   parent: json['parent'] == null
       ? null
       : $ItemFromJson(json['parent']! as Map<String, Object?>),
   children: json['children'] == null
       ? const []
-      : DwJson.decodeList(
+      : DwJsonCodec.decodeList(
           json['children'],
           (e) => $ItemFromJson(e! as Map<String, Object?>),
         ),
-  ratings: DwJson.decodeList(json['ratings'], (e) => DwJson.decodeDouble(e)),
+  ratings: DwJsonCodec.decodeList(
+    json['ratings'],
+    (e) => DwJsonCodec.decodeDouble(e),
+  ),
   scores: json['scores'] == null
       ? null
-      : DwJson.decodeMap(json['scores'], (v) => v! as int),
+      : DwJsonCodec.decodeMap(json['scores'], (v) => v! as int),
   history: json['history'] == null
       ? const {}
-      : DwJson.decodeMap(
+      : DwJsonCodec.decodeMap(
           json['history'],
-          (v) => v == null ? null : DwJson.decodeDateTime(v),
+          (v) => v == null ? null : DwJsonCodec.decodeDateTime(v),
         ),
   maybeColors: json['maybeColors'] == null
       ? const []
-      : DwJson.decodeList(
+      : DwJsonCodec.decodeList(
           json['maybeColors'],
-          (e) => e == null ? null : DwJson.decodeEnum(e, Color.values),
+          (e) => e == null ? null : DwJsonCodec.decodeEnum(e, Color.values),
         ),
   dimensions: units.$DimensionsFromJson(
     json['dimensions']! as Map<String, Object?>,
   ),
   allDimensions: json['allDimensions'] == null
       ? const []
-      : DwJson.decodeList(
+      : DwJsonCodec.decodeList(
           json['allDimensions'],
           (e) => e == null
               ? null
@@ -185,22 +189,22 @@ extension ItemCopyWith on Item {
     String? title,
     int? id,
     int? price,
-    DwPatch<double> discount = const DwPatch.keep(),
+    DwFieldPatch<double> discount = const DwFieldPatch.keep(),
     Duration? duration,
-    DwPatch<Duration> timeout = const DwPatch.keep(),
+    DwFieldPatch<Duration> timeout = const DwFieldPatch.keep(),
     Uint8List? image,
-    DwPatch<Uint8List> thumbnail = const DwPatch.keep(),
+    DwFieldPatch<Uint8List> thumbnail = const DwFieldPatch.keep(),
     Color? color,
     List<Color>? colors,
     Map<String, String>? labels,
     DateTime? createdAt,
-    DwPatch<DateTime> updatedAt = const DwPatch.keep(),
+    DwFieldPatch<DateTime> updatedAt = const DwFieldPatch.keep(),
     int? weight,
     units.Unit? unit,
-    DwPatch<Item> parent = const DwPatch.keep(),
+    DwFieldPatch<Item> parent = const DwFieldPatch.keep(),
     List<Item>? children,
     List<double>? ratings,
-    DwPatch<Map<String, int>> scores = const DwPatch.keep(),
+    DwFieldPatch<Map<String, int>> scores = const DwFieldPatch.keep(),
     Map<String, DateTime?>? history,
     List<Color?>? maybeColors,
     units.Dimensions? dimensions,
@@ -317,17 +321,17 @@ mixin _$SessionHolder on DwDataObject {
 SessionHolder $SessionHolderFromJson(Map<String, Object?> json) =>
     SessionHolder(
       id: json['id']! as int,
-      session: DwSession.fromJson(json['session']! as Map<String, Object?>),
+      session: DwAuthSession.fromJson(json['session']! as Map<String, Object?>),
       previous: json['previous'] == null
           ? null
-          : DwSession.fromJson(json['previous']! as Map<String, Object?>),
+          : DwAuthSession.fromJson(json['previous']! as Map<String, Object?>),
     );
 
 extension SessionHolderCopyWith on SessionHolder {
   SessionHolder copyWith({
     int? id,
-    DwSession? session,
-    DwPatch<DwSession> previous = const DwPatch.keep(),
+    DwAuthSession? session,
+    DwFieldPatch<DwAuthSession> previous = const DwFieldPatch.keep(),
   }) => SessionHolder(
     id: id ?? this.id,
     session: session ?? this.session,
@@ -391,9 +395,9 @@ FindItem $FindItemFromJson(Map<String, Object?> json) => FindItem(
   title: json['title'] as String?,
   colors: json['colors'] == null
       ? const []
-      : DwJson.decodeList(
+      : DwJsonCodec.decodeList(
           json['colors'],
-          (e) => DwJson.decodeEnum(e, Color.values),
+          (e) => DwJsonCodec.decodeEnum(e, Color.values),
         ),
 );
 
@@ -406,7 +410,7 @@ mixin _$ListItems on DwPageRequest<Item> {
   @override
   Map<String, Object?> toJson() => {
     if (_self.color != null) 'color': _self.color!.name,
-    if (_self.since != null) 'since': DwJson.encodeDateTime(_self.since!),
+    if (_self.since != null) 'since': DwJsonCodec.encodeDateTime(_self.since!),
     if (_self.labels != null) 'labels': _self.labels,
   };
 
@@ -438,11 +442,13 @@ mixin _$ListItems on DwPageRequest<Item> {
 ListItems $ListItemsFromJson(Map<String, Object?> json) => ListItems(
   color: json['color'] == null
       ? null
-      : DwJson.decodeEnum(json['color'], Color.values),
-  since: json['since'] == null ? null : DwJson.decodeDateTime(json['since']),
+      : DwJsonCodec.decodeEnum(json['color'], Color.values),
+  since: json['since'] == null
+      ? null
+      : DwJsonCodec.decodeDateTime(json['since']),
   labels: json['labels'] == null
       ? null
-      : DwJson.decodeMap(json['labels'], (v) => v! as String),
+      : DwJsonCodec.decodeMap(json['labels'], (v) => v! as String),
 );
 
 mixin _$FeedItems on DwPageRequest<Item> {
@@ -524,7 +530,7 @@ ItemTable $ItemTableFromJson(Map<String, Object?> json) => ItemTable(
   pageSize: json['pageSize']! as int,
   color: json['color'] == null
       ? null
-      : DwJson.decodeEnum(json['color'], Color.values),
+      : DwJsonCodec.decodeEnum(json['color'], Color.values),
 );
 
 mixin _$ItemHistory on DwWindowRequest<Item> {
@@ -551,7 +557,7 @@ mixin _$ItemHistory on DwWindowRequest<Item> {
 ItemHistory $ItemHistoryFromJson(Map<String, Object?> json) =>
     ItemHistory(itemId: json['itemId']! as int);
 
-mixin _$EditItem on DwCommand<Item> {
+mixin _$EditItem on DwActionCommand<Item> {
   EditItem get _self => this as EditItem;
 
   @override
@@ -563,21 +569,26 @@ mixin _$EditItem on DwCommand<Item> {
       'itemId': _self.itemId,
       if (_self.tags.isNotEmpty) 'tags': _self.tags,
     };
-    DwJson.writePatch(json, 'title', _self.title, (v) => v);
-    DwJson.writePatch(
+    DwJsonCodec.writePatch(json, 'title', _self.title, (v) => v);
+    DwJsonCodec.writePatch(
       json,
       'updatedAt',
       _self.updatedAt,
-      (v) => DwJson.encodeDateTime(v),
+      (v) => DwJsonCodec.encodeDateTime(v),
     );
-    DwJson.writePatch(json, 'color', _self.color, (v) => v.name);
-    DwJson.writePatch(json, 'dimensions', _self.dimensions, (v) => v.toJson());
-    DwJson.writePatch(json, 'discount', _self.discount, (v) => v);
-    DwJson.writePatch(
+    DwJsonCodec.writePatch(json, 'color', _self.color, (v) => v.name);
+    DwJsonCodec.writePatch(
+      json,
+      'dimensions',
+      _self.dimensions,
+      (v) => v.toJson(),
+    );
+    DwJsonCodec.writePatch(json, 'discount', _self.discount, (v) => v);
+    DwJsonCodec.writePatch(
       json,
       'timeout',
       _self.timeout,
-      (v) => DwJson.encodeDuration(v),
+      (v) => DwJsonCodec.encodeDuration(v),
     );
     return json;
   }
@@ -611,30 +622,38 @@ mixin _$EditItem on DwCommand<Item> {
 
 EditItem $EditItemFromJson(Map<String, Object?> json) => EditItem(
   itemId: json['itemId']! as int,
-  title: DwJson.readPatch(json, 'title', (v) => v! as String),
-  updatedAt: DwJson.readPatch(
+  title: DwJsonCodec.readPatch(json, 'title', (v) => v! as String),
+  updatedAt: DwJsonCodec.readPatch(
     json,
     'updatedAt',
-    (v) => DwJson.decodeDateTime(v),
+    (v) => DwJsonCodec.decodeDateTime(v),
   ),
-  color: DwJson.readPatch(
+  color: DwJsonCodec.readPatch(
     json,
     'color',
-    (v) => DwJson.decodeEnum(v, Color.values),
+    (v) => DwJsonCodec.decodeEnum(v, Color.values),
   ),
-  dimensions: DwJson.readPatch(
+  dimensions: DwJsonCodec.readPatch(
     json,
     'dimensions',
     (v) => units.$DimensionsFromJson(v! as Map<String, Object?>),
   ),
-  discount: DwJson.readPatch(json, 'discount', (v) => DwJson.decodeDouble(v)),
-  timeout: DwJson.readPatch(json, 'timeout', (v) => DwJson.decodeDuration(v)),
+  discount: DwJsonCodec.readPatch(
+    json,
+    'discount',
+    (v) => DwJsonCodec.decodeDouble(v),
+  ),
+  timeout: DwJsonCodec.readPatch(
+    json,
+    'timeout',
+    (v) => DwJsonCodec.decodeDuration(v),
+  ),
   tags: json['tags'] == null
       ? const []
-      : DwJson.decodeList(json['tags'], (e) => e! as String),
+      : DwJsonCodec.decodeList(json['tags'], (e) => e! as String),
 );
 
-mixin _$OnlyPatches on DwCommand<void> {
+mixin _$OnlyPatches on DwActionCommand<void> {
   OnlyPatches get _self => this as OnlyPatches;
 
   @override
@@ -643,7 +662,7 @@ mixin _$OnlyPatches on DwCommand<void> {
   @override
   Map<String, Object?> toJson() {
     final json = <String, Object?>{};
-    DwJson.writePatch(json, 'note', _self.note, (v) => v);
+    DwJsonCodec.writePatch(json, 'note', _self.note, (v) => v);
     return json;
   }
 
@@ -657,9 +676,9 @@ mixin _$OnlyPatches on DwCommand<void> {
 }
 
 OnlyPatches $OnlyPatchesFromJson(Map<String, Object?> json) =>
-    OnlyPatches(note: DwJson.readPatch(json, 'note', (v) => v! as String));
+    OnlyPatches(note: DwJsonCodec.readPatch(json, 'note', (v) => v! as String));
 
-mixin _$RemoveItem on DwCommand<void> {
+mixin _$RemoveItem on DwActionCommand<void> {
   @override
   String get dwTypeName => 'RemoveItem';
 

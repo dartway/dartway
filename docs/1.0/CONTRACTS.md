@@ -76,7 +76,7 @@ GET  /health               liveness + database reachability
 ### ApiResponse (always the body)
 
 ```json
-{"status":"ok","result":<encoded by the request/command class>,"updates":{"ClubSession":[{…}],"DwDeleted":[{"type":"X","id":1}]}}
+{"status":"ok","result":<encoded by the request/command class>,"updates":{"ClubSession":[{…}],"DwDeletedObject":[{"type":"X","id":1}]}}
 {"status":"refused","refusal":{"code":"noSpotsLeft","params":{},"field":null}}
 {"status":"unauthenticated"}
 {"status":"failed","incidentId":"…"}

@@ -140,7 +140,7 @@ final class TempProject {
   bool exists(String relative) => File(path(relative)).existsSync();
 
   Future<DwGenerationReport> generate({bool check = false}) =>
-      DwGenerator.run(root, check: check);
+      DwCodeGenerator.run(root, check: check);
 
   /// Generates and fails the test on any diagnostic.
   Future<DwGenerationReport> generateClean() async {

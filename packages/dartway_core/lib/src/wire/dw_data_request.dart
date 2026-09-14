@@ -28,9 +28,9 @@ enum DwUpdateAction {
   ignore,
 }
 
-/// How a request kind answers [DwRequest.onUpdate] by default. Chosen by the
-/// kind's (named) super constructor, so a project request class stays `const`
-/// and says its scenario in its declaration.
+/// How a request kind answers [DwDataRequest.onUpdate] by default. Chosen by
+/// the kind's (named) super constructor, so a project request class stays
+/// `const` and says its scenario in its declaration.
 enum _DwUpdatePolicy {
   /// An object → [DwUpdateAction.update]; a deletion → remove.
   update,
@@ -54,9 +54,9 @@ enum _DwUpdatePolicy {
 /// | [DwSingleRequest] | `T` (absent ⇒ `dw.notFound`) | update |
 /// | [DwMaybeRequest] | `T?` | `matches ? upsert : remove` |
 /// | [DwListRequest] | `List<T>` | `matches ? upsert : remove`; `.updateOnly()`, `.refetchOnUpdate()` |
-/// | [DwPageRequest] | [DwPage] | `matches ? upsert : remove`; `.updateOnly()` |
+/// | [DwPageRequest] | [DwPageResult] | `matches ? upsert : remove`; `.updateOnly()` |
 /// | [DwTableRequest] | [DwTablePage] | update; a deletion refetches |
-/// | [DwWindowRequest] | [DwWindow] | `matches ? upsert : remove` |
+/// | [DwWindowRequest] | [DwWindowResult] | `matches ? upsert : remove` |
 ///
 /// A request has no side effects: the client may retry it, cache its result
 /// under the request itself (equality is generated from the fields) and keep it
@@ -66,14 +66,14 @@ enum _DwUpdatePolicy {
 /// pure functions of the object and the request's fields: the client relies
 /// on an equal request answering equally. `DateTime.now()` inside them is a
 /// bug.
-sealed class DwRequest<R> extends DwServerCall<R> {
-  const DwRequest._(this._policy);
+sealed class DwDataRequest<R> extends DwServerCall<R> {
+  const DwDataRequest._(this._policy);
 
   final _DwUpdatePolicy _policy;
 
   /// The channels whose updates this request's state absorbs while it is
   /// watched. Subscriptions are reference-counted across requests.
-  List<DwChannel> get channels => const [];
+  List<DwLiveChannel> get channels => const [];
 
   /// Whether [item] is an instance of this request's item type.
   ///
@@ -86,16 +86,16 @@ sealed class DwRequest<R> extends DwServerCall<R> {
   ///
   /// A deletion names its type by wire name, which only the protocol can
   /// relate to the kind's type argument.
-  bool acceptsDeletion(DwDeleted deletion, DwProtocol protocol);
+  bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol);
 
   /// What an arrived object does to this request's state.
   ///
   /// The client offers only what concerns the request: objects [acceptsItem]
   /// is true for and deletions [acceptsDeletion] is true for. The kind's
-  /// answer is explicit (see the table on [DwRequest]); override for a
+  /// answer is explicit (see the table on [DwDataRequest]); override for a
   /// special case, keeping it a pure function of [item] and the fields.
   DwUpdateAction onUpdate(Object item) {
-    if (item is DwDeleted) {
+    if (item is DwDeletedObject) {
       return switch (_policy) {
         _DwUpdatePolicy.refetch ||
         _DwUpdatePolicy.table => DwUpdateAction.refetch,
@@ -123,21 +123,22 @@ sealed class DwRequest<R> extends DwServerCall<R> {
 /// Default update: an object with the held id replaces the state
 /// ([DwUpdateAction.update]); a deletion removes it, and the client asks again
 /// to show what the server now answers.
-abstract class DwSingleRequest<T extends DwDataObject> extends DwRequest<T> {
+abstract class DwSingleRequest<T extends DwDataObject>
+    extends DwDataRequest<T> {
   const DwSingleRequest() : super._(_DwUpdatePolicy.update);
 
   @override
   bool acceptsItem(Object? item) => item is T;
 
   @override
-  bool acceptsDeletion(DwDeleted deletion, DwProtocol protocol) =>
+  bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
 
   @override
-  Object? encodeResult(T result, DwProtocol protocol) => result.toJson();
+  Object? encodeResult(T result, DwWireProtocol protocol) => result.toJson();
 
   @override
-  T decodeResult(Object? json, DwProtocol protocol) =>
+  T decodeResult(Object? json, DwWireProtocol protocol) =>
       protocol.decodeAs<T>(json);
 }
 
@@ -147,14 +148,15 @@ abstract class DwSingleRequest<T extends DwDataObject> extends DwRequest<T> {
 /// object for which [matches] is true fills it (#242: a request that answered
 /// "none" must hear about the row once it exists); an object that stops
 /// matching, or a deletion of the held one, empties it.
-abstract class DwMaybeRequest<T extends DwDataObject> extends DwRequest<T?> {
+abstract class DwMaybeRequest<T extends DwDataObject>
+    extends DwDataRequest<T?> {
   const DwMaybeRequest() : super._(_DwUpdatePolicy.matching);
 
   @override
   bool acceptsItem(Object? item) => item is T;
 
   @override
-  bool acceptsDeletion(DwDeleted deletion, DwProtocol protocol) =>
+  bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
 
   /// Whether [item] is the one this request asks for.
@@ -169,18 +171,18 @@ abstract class DwMaybeRequest<T extends DwDataObject> extends DwRequest<T?> {
   bool _matchesItem(Object item) => matches(item as T);
 
   @override
-  Object? encodeResult(T? result, DwProtocol protocol) => result?.toJson();
+  Object? encodeResult(T? result, DwWireProtocol protocol) => result?.toJson();
 
   @override
-  T? decodeResult(Object? json, DwProtocol protocol) =>
+  T? decodeResult(Object? json, DwWireProtocol protocol) =>
       json == null ? null : protocol.decodeAs<T>(json);
 }
 
 /// A request for a whole, unpaginated list.
 ///
-/// Default update (`DwListRequest()`): `matches ? upsert : remove` — an object
-/// already in the list is replaced in place and never moved, a new matching
-/// one is inserted by [sort] (at the head without one), one that stops
+/// Default update (`DwListRequest()`): `matches ? upsert : remove` — an
+/// object already in the list is replaced in place and never moved, a new
+/// matching one is inserted by [sort] (at the head without one), one that stops
 /// matching is removed, a deletion removes.
 ///
 /// `DwListRequest.updateOnly()`: objects in the list are replaced, nothing is
@@ -190,7 +192,7 @@ abstract class DwMaybeRequest<T extends DwDataObject> extends DwRequest<T?> {
 /// `DwListRequest.refetchOnUpdate()`: every update re-runs the request — for
 /// derived lists the client cannot compute.
 abstract class DwListRequest<T extends DwDataObject>
-    extends DwRequest<List<T>> {
+    extends DwDataRequest<List<T>> {
   const DwListRequest() : super._(_DwUpdatePolicy.matching);
 
   const DwListRequest.updateOnly() : super._(_DwUpdatePolicy.update);
@@ -201,7 +203,7 @@ abstract class DwListRequest<T extends DwDataObject>
   bool acceptsItem(Object? item) => item is T;
 
   @override
-  bool acceptsDeletion(DwDeleted deletion, DwProtocol protocol) =>
+  bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
 
   /// Whether [item] belongs to this list. By default every object of type [T]
@@ -215,12 +217,12 @@ abstract class DwListRequest<T extends DwDataObject>
   int Function(T a, T b)? get sort => null;
 
   @override
-  Object? encodeResult(List<T> result, DwProtocol protocol) => [
+  Object? encodeResult(List<T> result, DwWireProtocol protocol) => [
     for (final item in result) item.toJson(),
   ];
 
   @override
-  List<T> decodeResult(Object? json, DwProtocol protocol) => [
+  List<T> decodeResult(Object? json, DwWireProtocol protocol) => [
     for (final item in dwReadList(json, 'A list result'))
       protocol.decodeAs<T>(item),
   ];
@@ -242,7 +244,7 @@ abstract class DwListRequest<T extends DwDataObject>
 /// and appears on scroll. `DwPageRequest.updateOnly(pageSize: …)`: replace,
 /// never insert, a deletion removes.
 abstract class DwPageRequest<T extends DwDataObject>
-    extends DwRequest<DwPage<T>> {
+    extends DwDataRequest<DwPageResult<T>> {
   const DwPageRequest({required this.pageSize, int? maxPageSize})
     : assert(pageSize > 0, 'pageSize must be positive'),
       assert(
@@ -277,7 +279,7 @@ abstract class DwPageRequest<T extends DwDataObject>
   bool acceptsItem(Object? item) => item is T;
 
   @override
-  bool acceptsDeletion(DwDeleted deletion, DwProtocol protocol) =>
+  bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
 
   /// Whether [item] belongs to this feed. By default every object of type [T]
@@ -291,12 +293,12 @@ abstract class DwPageRequest<T extends DwDataObject>
   int Function(T a, T b)? get sort => null;
 
   @override
-  Object? encodeResult(DwPage<T> result, DwProtocol protocol) =>
+  Object? encodeResult(DwPageResult<T> result, DwWireProtocol protocol) =>
       result.toJson();
 
   @override
-  DwPage<T> decodeResult(Object? json, DwProtocol protocol) =>
-      DwPage.fromJson(json, protocol.decodeAs<T>);
+  DwPageResult<T> decodeResult(Object? json, DwWireProtocol protocol) =>
+      DwPageResult.fromJson(json, protocol.decodeAs<T>);
 }
 
 /// Numbered pages: page 3 of 12, with a total.
@@ -319,7 +321,7 @@ abstract class DwPageRequest<T extends DwDataObject>
 /// numbered page never grows by an update); a deletion re-reads the page,
 /// since every later row moves up.
 abstract class DwTableRequest<T extends DwDataObject>
-    extends DwRequest<DwTablePage<T>> {
+    extends DwDataRequest<DwTablePage<T>> {
   const DwTableRequest({required this.maxPageSize})
     : assert(maxPageSize > 0, 'maxPageSize must be positive'),
       super._(_DwUpdatePolicy.table);
@@ -342,16 +344,16 @@ abstract class DwTableRequest<T extends DwDataObject>
   /// The refusal for a page or page size below 1, which no clamping can turn
   /// into the page the caller meant; `null` when both are valid. The framework
   /// runs it with `validate()`, on both sides.
-  DwRefusal? checkPage() {
+  DwCallRefusal? checkPage() {
     if (page < 1) {
-      return DwRefusal(
+      return DwCallRefusal(
         DwCoreRefusal.invalid,
         field: 'page',
         params: {'min': 1},
       );
     }
     if (pageSize < 1) {
-      return DwRefusal(
+      return DwCallRefusal(
         DwCoreRefusal.invalid,
         field: 'pageSize',
         params: {'min': 1},
@@ -364,15 +366,15 @@ abstract class DwTableRequest<T extends DwDataObject>
   bool acceptsItem(Object? item) => item is T;
 
   @override
-  bool acceptsDeletion(DwDeleted deletion, DwProtocol protocol) =>
+  bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
 
   @override
-  Object? encodeResult(DwTablePage<T> result, DwProtocol protocol) =>
+  Object? encodeResult(DwTablePage<T> result, DwWireProtocol protocol) =>
       result.toJson();
 
   @override
-  DwTablePage<T> decodeResult(Object? json, DwProtocol protocol) =>
+  DwTablePage<T> decodeResult(Object? json, DwWireProtocol protocol) =>
       DwTablePage.fromJson(json, protocol.decodeAs<T>);
 }
 
@@ -380,9 +382,9 @@ abstract class DwTableRequest<T extends DwDataObject>
 /// directions from an anchor.
 ///
 /// Without an anchor the window opens at the newest rows. Loading older or
-/// newer rows goes by the cursors of [DwWindow], which the server builds from
-/// the sort value and the id (`DwWindowCursor`), so rows sharing a timestamp
-/// are neither lost nor repeated.
+/// newer rows goes by the cursors of [DwWindowResult], which the server builds
+/// from the sort value and the id (`DwWindowCursor`), so rows sharing a
+/// timestamp are neither lost nor repeated.
 ///
 /// [pageSize] and [maxPageSize] are constants of the class, as in
 /// [DwPageRequest].
@@ -392,7 +394,7 @@ abstract class DwTableRequest<T extends DwDataObject>
 /// window shows the newest rows** (`hasNewer` false), otherwise the window
 /// counts it as unseen; one that stops matching, or a deletion, is removed.
 abstract class DwWindowRequest<T extends DwDataObject>
-    extends DwRequest<DwWindow<T>> {
+    extends DwDataRequest<DwWindowResult<T>> {
   const DwWindowRequest({required this.pageSize, int? maxPageSize})
     : assert(pageSize > 0, 'pageSize must be positive'),
       assert(
@@ -418,7 +420,7 @@ abstract class DwWindowRequest<T extends DwDataObject>
   bool acceptsItem(Object? item) => item is T;
 
   @override
-  bool acceptsDeletion(DwDeleted deletion, DwProtocol protocol) =>
+  bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
 
   /// Whether [item] belongs to this window's sequence. By default every
@@ -429,12 +431,12 @@ abstract class DwWindowRequest<T extends DwDataObject>
   bool _matchesItem(Object item) => matches(item as T);
 
   @override
-  Object? encodeResult(DwWindow<T> result, DwProtocol protocol) =>
+  Object? encodeResult(DwWindowResult<T> result, DwWireProtocol protocol) =>
       result.toJson();
 
   @override
-  DwWindow<T> decodeResult(Object? json, DwProtocol protocol) =>
-      DwWindow.fromJson(json, protocol.decodeAs<T>);
+  DwWindowResult<T> decodeResult(Object? json, DwWireProtocol protocol) =>
+      DwWindowResult.fromJson(json, protocol.decodeAs<T>);
 }
 
 /// One clamping rule for the kinds with a constant page size. An asked size

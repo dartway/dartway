@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import '../dto/dw_patch.dart';
+import '../wire/dw_field_patch.dart';
 
 /// Conversions the generated codecs call. One place decides how each Dart type
 /// looks on the wire, so a generator change never has to agree with a second
 /// copy of the rule.
-abstract final class DwJson {
+abstract final class DwJsonCodec {
   /// `DateTime` travels as UTC microseconds since the epoch: exact, compact and
   /// free of time-zone text.
   static int encodeDateTime(DateTime value) =>
@@ -44,27 +44,29 @@ abstract final class DwJson {
   static void writePatch<T>(
     Map<String, Object?> json,
     String key,
-    DwPatch<T> patch,
+    DwFieldPatch<T> patch,
     Object? Function(T value) encode,
   ) {
     switch (patch) {
-      case DwKeep():
+      case DwKeepField():
         return;
-      case DwSet(:final value):
+      case DwSetField(:final value):
         json[key] = encode(value);
-      case DwClear():
+      case DwClearField():
         json[key] = null;
     }
   }
 
-  static DwPatch<T> readPatch<T>(
+  static DwFieldPatch<T> readPatch<T>(
     Map<String, Object?> json,
     String key,
     T Function(Object? value) decode,
   ) {
-    if (!json.containsKey(key)) return DwPatch<T>.keep();
+    if (!json.containsKey(key)) return DwFieldPatch<T>.keep();
     final value = json[key];
-    return value == null ? DwPatch<T>.clear() : DwPatch<T>.set(decode(value));
+    return value == null
+        ? DwFieldPatch<T>.clear()
+        : DwFieldPatch<T>.set(decode(value));
   }
 }
 

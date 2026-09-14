@@ -4,21 +4,21 @@ import 'package:dartway_core/dartway_core.dart';
 import '../src/catalog.dart';
 import '../src/units.dart';
 
-final DwProtocol appProtocol = DwProtocol([
-  DwDtoEntry<Dimensions>('Dimensions', $DimensionsFromJson),
-  DwDtoEntry<EditItem>('EditItem', $EditItemFromJson),
-  DwDtoEntry<FeedItems>('FeedItems', $FeedItemsFromJson),
-  DwDtoEntry<FindItem>('FindItem', $FindItemFromJson),
-  DwDtoEntry<GetItem>('GetItem', $GetItemFromJson),
-  DwDtoEntry<Item>('Item', $ItemFromJson),
-  DwDtoEntry<ItemHistory>('ItemHistory', $ItemHistoryFromJson),
-  DwDtoEntry<ItemTable>('ItemTable', $ItemTableFromJson),
-  DwDtoEntry<ListItems>('ListItems', $ListItemsFromJson),
-  DwDtoEntry<ListPinnedItems>('ListPinnedItems', $ListPinnedItemsFromJson),
-  DwDtoEntry<OnlyPatches>('OnlyPatches', $OnlyPatchesFromJson),
-  DwDtoEntry<Ref>('Ref', $RefFromJson),
-  DwDtoEntry<RemoveItem>('RemoveItem', $RemoveItemFromJson),
-  DwDtoEntry<SessionHolder>('SessionHolder', $SessionHolderFromJson),
-  DwDtoEntry<Stats>('Stats', $StatsFromJson),
-  DwDtoEntry<WideRequest>('WideRequest', $WideRequestFromJson),
-], include: DwProtocol.core);
+final DwWireProtocol appProtocol = DwWireProtocol([
+  DwProtocolEntry<Dimensions>('Dimensions', $DimensionsFromJson),
+  DwProtocolEntry<EditItem>('EditItem', $EditItemFromJson),
+  DwProtocolEntry<FeedItems>('FeedItems', $FeedItemsFromJson),
+  DwProtocolEntry<FindItem>('FindItem', $FindItemFromJson),
+  DwProtocolEntry<GetItem>('GetItem', $GetItemFromJson),
+  DwProtocolEntry<Item>('Item', $ItemFromJson),
+  DwProtocolEntry<ItemHistory>('ItemHistory', $ItemHistoryFromJson),
+  DwProtocolEntry<ItemTable>('ItemTable', $ItemTableFromJson),
+  DwProtocolEntry<ListItems>('ListItems', $ListItemsFromJson),
+  DwProtocolEntry<ListPinnedItems>('ListPinnedItems', $ListPinnedItemsFromJson),
+  DwProtocolEntry<OnlyPatches>('OnlyPatches', $OnlyPatchesFromJson),
+  DwProtocolEntry<Ref>('Ref', $RefFromJson),
+  DwProtocolEntry<RemoveItem>('RemoveItem', $RemoveItemFromJson),
+  DwProtocolEntry<SessionHolder>('SessionHolder', $SessionHolderFromJson),
+  DwProtocolEntry<Stats>('Stats', $StatsFromJson),
+  DwProtocolEntry<WideRequest>('WideRequest', $WideRequestFromJson),
+], include: DwWireProtocol.core);

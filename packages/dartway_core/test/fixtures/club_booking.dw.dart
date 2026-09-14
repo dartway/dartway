@@ -11,7 +11,7 @@ mixin _$ClubBooking on DwDataObject {
   Map<String, Object?> toJson() => {
     'id': _self.id,
     'status': _self.status.name,
-    'startsAt': DwJson.encodeDateTime(_self.startsAt),
+    'startsAt': DwJsonCodec.encodeDateTime(_self.startsAt),
     if (_self.note != null) 'note': _self.note,
     if (_self.tags.isNotEmpty) 'tags': _self.tags,
   };
@@ -42,12 +42,12 @@ mixin _$ClubBooking on DwDataObject {
 
 ClubBooking $ClubBookingFromJson(Map<String, Object?> json) => ClubBooking(
   id: json['id']! as int,
-  status: DwJson.decodeEnum(json['status'], BookingStatus.values),
-  startsAt: DwJson.decodeDateTime(json['startsAt']),
+  status: DwJsonCodec.decodeEnum(json['status'], BookingStatus.values),
+  startsAt: DwJsonCodec.decodeDateTime(json['startsAt']),
   note: json['note'] as String?,
   tags: json['tags'] == null
       ? const []
-      : DwJson.decodeList(json['tags'], (e) => e! as String),
+      : DwJsonCodec.decodeList(json['tags'], (e) => e! as String),
 );
 
 extension ClubBookingCopyWith on ClubBooking {
@@ -55,7 +55,7 @@ extension ClubBookingCopyWith on ClubBooking {
     int? id,
     BookingStatus? status,
     DateTime? startsAt,
-    DwPatch<String> note = const DwPatch.keep(),
+    DwFieldPatch<String> note = const DwFieldPatch.keep(),
     List<String>? tags,
   }) => ClubBooking(
     id: id ?? this.id,
@@ -93,10 +93,10 @@ ListMyBookings $ListMyBookingsFromJson(Map<String, Object?> json) =>
     ListMyBookings(
       status: json['status'] == null
           ? null
-          : DwJson.decodeEnum(json['status'], BookingStatus.values),
+          : DwJsonCodec.decodeEnum(json['status'], BookingStatus.values),
     );
 
-mixin _$RenameBooking on DwCommand<ClubBooking> {
+mixin _$RenameBooking on DwActionCommand<ClubBooking> {
   RenameBooking get _self => this as RenameBooking;
 
   @override
@@ -105,7 +105,7 @@ mixin _$RenameBooking on DwCommand<ClubBooking> {
   @override
   Map<String, Object?> toJson() {
     final json = <String, Object?>{'bookingId': _self.bookingId};
-    DwJson.writePatch(json, 'note', _self.note, (v) => v);
+    DwJsonCodec.writePatch(json, 'note', _self.note, (v) => v);
     return json;
   }
 
@@ -123,5 +123,5 @@ mixin _$RenameBooking on DwCommand<ClubBooking> {
 RenameBooking $RenameBookingFromJson(Map<String, Object?> json) =>
     RenameBooking(
       bookingId: json['bookingId']! as int,
-      note: DwJson.readPatch(json, 'note', (v) => v! as String),
+      note: DwJsonCodec.readPatch(json, 'note', (v) => v! as String),
     );

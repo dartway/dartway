@@ -141,9 +141,14 @@ void main() {
       );
       expect(
         schema,
-        contains('final DwSchema dartwayExampleSchema = DwSchema(['),
+        contains(
+          'final DwDatabaseSchema dartwayExampleSchema = DwDatabaseSchema([',
+        ),
       );
-      expect(schema, contains('extension DartwayExampleDb on DwDb {'));
+      expect(
+        schema,
+        contains('extension DartwayExampleDb on DwDatabaseHandle {'),
+      );
       expect(await project.analyze('dartway_example_server'), isNull);
       expect(await project.analyze('dartway_example_shared'), isNull);
     },

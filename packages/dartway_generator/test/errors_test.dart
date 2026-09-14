@@ -37,7 +37,7 @@ void main() {
     test('a directory without DartWay packages', () async {
       final empty = Directory.systemTemp.createTempSync('dw_empty_');
       addTearDown(() => empty.deleteSync(recursive: true));
-      final report = await DwGenerator.run(empty.path);
+      final report = await DwCodeGenerator.run(empty.path);
       expect(
         report.diagnostics.single.message,
         startsWith('no DartWay package in '),
@@ -71,7 +71,7 @@ void main() {
     test('a single package can be the project', () async {
       final project = TempProject.create(['app_shared']);
       project.copyFixture('types');
-      final report = await DwGenerator.run(project.path('app_shared'));
+      final report = await DwCodeGenerator.run(project.path('app_shared'));
       expect(report.diagnostics, isEmpty);
       expect(report.written.map(p.basename), contains('dw_protocol.dart'));
     });

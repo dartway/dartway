@@ -2,15 +2,16 @@ import '../analysis/wire_type.dart';
 
 /// Writes the expressions that convert values between Dart and JSON.
 ///
-/// Every conversion goes through `DwJson` (dartway_core), so how a type looks
-/// on the wire is decided in one place and the generated code only calls it.
+/// Every conversion goes through `DwJsonCodec` (dartway_core), so how a type
+/// looks on the wire is decided in one place and the generated code only calls
+/// it.
 abstract final class JsonCodecWriter {
   /// Encodes [value], an expression of the non-nullable form of [type].
   static String encodeValue(WireType type, String value) => switch (type) {
     ScalarWire() || DoubleWire() => value,
-    DateTimeWire() => 'DwJson.encodeDateTime($value)',
-    DurationWire() => 'DwJson.encodeDuration($value)',
-    BytesWire() => 'DwJson.encodeBytes($value)',
+    DateTimeWire() => 'DwJsonCodec.encodeDateTime($value)',
+    DurationWire() => 'DwJsonCodec.encodeDuration($value)',
+    BytesWire() => 'DwJsonCodec.encodeBytes($value)',
     EnumWire() => '$value.name',
     DtoWire() => '$value.toJson()',
     ListWire(:final element) =>
@@ -55,16 +56,17 @@ abstract final class JsonCodecWriter {
     final nonNull = promoted ? json : '$json!';
     return switch (type) {
       ScalarWire(:final dartName) => '$nonNull as $dartName',
-      DoubleWire() => 'DwJson.decodeDouble($json)',
-      DateTimeWire() => 'DwJson.decodeDateTime($json)',
-      DurationWire() => 'DwJson.decodeDuration($json)',
-      BytesWire() => 'DwJson.decodeBytes($json)',
-      EnumWire(:final spelling) => 'DwJson.decodeEnum($json, $spelling.values)',
+      DoubleWire() => 'DwJsonCodec.decodeDouble($json)',
+      DateTimeWire() => 'DwJsonCodec.decodeDateTime($json)',
+      DurationWire() => 'DwJsonCodec.decodeDuration($json)',
+      BytesWire() => 'DwJsonCodec.decodeBytes($json)',
+      EnumWire(:final spelling) =>
+        'DwJsonCodec.decodeEnum($json, $spelling.values)',
       DtoWire(:final decoder) => '$decoder($nonNull as Map<String, Object?>)',
       ListWire(:final element) =>
-        'DwJson.decodeList($json, (e) => ${decode(element, 'e', local: true)})',
+        'DwJsonCodec.decodeList($json, (e) => ${decode(element, 'e', local: true)})',
       MapWire(:final value) =>
-        'DwJson.decodeMap($json, (v) => ${decode(value, 'v', local: true)})',
+        'DwJsonCodec.decodeMap($json, (v) => ${decode(value, 'v', local: true)})',
       PatchWire() => throw StateError('A patch is decoded by readPatch.'),
     };
   }

@@ -1,12 +1,12 @@
-import '../dto/dw_dto.dart';
-import 'dw_protocol.dart';
+import '../wire/dw_wire_object.dart';
+import 'dw_wire_protocol.dart';
 import 'dw_read.dart';
 
 /// The updates one command produced, as they travel: data objects and
-/// [DwDeleted] notices grouped by wire name.
+/// [DwDeletedObject] notices grouped by wire name.
 ///
 /// ```json
-/// {"ClubSession": [{"id": 3, …}, {"id": 4, …}], "DwDeleted": [{"type": "Booking", "id": 9}]}
+/// {"ClubSession": [{"id": 3, …}, {"id": 4, …}], "DwDeletedObject": [{"type": "Booking", "id": 9}]}
 /// ```
 ///
 /// **The only place a type name stands next to objects.** A call's body is
@@ -19,47 +19,48 @@ import 'dw_read.dart';
 /// ended, and a row updated then deleted travels as its deletion. That is
 /// also what makes the grouping safe: with every key once, the order between
 /// groups cannot change the outcome, and within a group the order is kept.
-final class DwTransport {
+final class DwUpdateTransport {
   /// Collects [objects] in order: duplicates by key collapse to the last one,
   /// which keeps the position of that last occurrence. Throws [ArgumentError]
-  /// for an object that is neither a [DwDataObject] nor a [DwDeleted].
-  factory DwTransport(Iterable<DwDto> objects) {
+  /// for an object that is neither a [DwDataObject] nor a [DwDeletedObject].
+  factory DwUpdateTransport(Iterable<DwWireObject> objects) {
     final latest = <(String, Object), int>{};
     final list = objects.toList();
     for (var i = 0; i < list.length; i++) {
       latest[_keyOf(list[i])] = i;
     }
-    final groups = <String, List<DwDto>>{};
+    final groups = <String, List<DwWireObject>>{};
     for (var i = 0; i < list.length; i++) {
       final object = list[i];
       if (latest[_keyOf(object)] != i) continue;
       (groups[object.dwTypeName] ??= []).add(object);
     }
-    return DwTransport._(
+    return DwUpdateTransport._(
       List.unmodifiable([for (final group in groups.values) ...group]),
     );
   }
 
-  const DwTransport._(this.objects);
+  const DwUpdateTransport._(this.objects);
 
   /// A transport without objects.
-  static const DwTransport empty = DwTransport._([]);
+  static const DwUpdateTransport empty = DwUpdateTransport._([]);
 
   /// Decodes a transport produced by [toJson]. Throws [FormatException] for
   /// an unknown group name, a group of a type that is not a data object or
-  /// [DwDeleted], an empty group, a deletion of a type that is not a data
+  /// [DwDeletedObject], an empty group, a deletion of a type that is not a data
   /// object, or an object that appears twice.
-  factory DwTransport.fromJson(Object? json, DwProtocol protocol) {
+  factory DwUpdateTransport.fromJson(Object? json, DwWireProtocol protocol) {
     const what = 'A transport';
     final groups = dwReadMap(json, what);
-    final objects = <DwDto>[];
+    final objects = <DwWireObject>[];
     final keys = <(String, Object)>{};
     for (final MapEntry(key: name, value: items) in groups.entries) {
       final entry = protocol.entryNamed(name);
       if (entry == null) {
         throw FormatException('$what has a group of unknown type "$name"');
       }
-      if (entry.kind != DwDtoKind.dataObject && entry.type != DwDeleted) {
+      if (entry.kind != DwWireObjectKind.dataObject &&
+          entry.type != DwDeletedObject) {
         throw FormatException(
           '$what carries data objects and deletions; "$name" is neither',
         );
@@ -70,9 +71,9 @@ final class DwTransport {
       }
       for (final item in group) {
         final object = entry.fromJson(dwReadMap(item, 'An object of "$name"'));
-        if (object is DwDeleted &&
+        if (object is DwDeletedObject &&
             protocol.entryNamed(object.typeName)?.kind !=
-                DwDtoKind.dataObject) {
+                DwWireObjectKind.dataObject) {
           throw FormatException(
             '$what deletes a "${object.typeName}", which is not a data object '
             'of this protocol',
@@ -87,11 +88,11 @@ final class DwTransport {
         objects.add(object);
       }
     }
-    return DwTransport._(List.unmodifiable(objects));
+    return DwUpdateTransport._(List.unmodifiable(objects));
   }
 
   /// Every object, group by group, in order within a group.
-  final List<DwDto> objects;
+  final List<DwWireObject> objects;
 
   bool get isEmpty => objects.isEmpty;
 
@@ -106,8 +107,8 @@ final class DwTransport {
     return groups;
   }
 
-  static (String, Object) _keyOf(DwDto object) => switch (object) {
-    DwDeleted(:final typeName, :final id) => (typeName, id),
+  static (String, Object) _keyOf(DwWireObject object) => switch (object) {
+    DwDeletedObject(:final typeName, :final id) => (typeName, id),
     DwDataObject(:final id) => (object.dwTypeName, id),
     _ => throw ArgumentError.value(
       object,
@@ -117,15 +118,15 @@ final class DwTransport {
     ),
   };
 
-  static String _describe(DwDto object) => switch (object) {
-    DwDeleted() => object.toString(),
+  static String _describe(DwWireObject object) => switch (object) {
+    DwDeletedObject() => object.toString(),
     DwDataObject(:final id) => '${object.dwTypeName}#$id',
     _ => object.dwTypeName,
   };
 
   @override
   bool operator ==(Object other) {
-    if (other is! DwTransport || other.objects.length != objects.length) {
+    if (other is! DwUpdateTransport || other.objects.length != objects.length) {
       return false;
     }
     for (var i = 0; i < objects.length; i++) {
@@ -138,5 +139,6 @@ final class DwTransport {
   int get hashCode => Object.hashAll(objects);
 
   @override
-  String toString() => 'DwTransport(${objects.map(_describe).join(', ')})';
+  String toString() =>
+      'DwUpdateTransport(${objects.map(_describe).join(', ')})';
 }

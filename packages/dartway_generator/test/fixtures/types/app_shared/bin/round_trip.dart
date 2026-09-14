@@ -14,7 +14,7 @@ void main() {
 
   Object? wire(Object? json) => jsonDecode(jsonEncode(json));
 
-  T roundTrip<T extends DwDto>(T dto) {
+  T roundTrip<T extends DwWireObject>(T dto) {
     // Untagged, as the wire carries it: the type comes from the registry,
     // once by the static type and once by the wire name.
     final json = wire(dto.toJson());
@@ -127,8 +127,8 @@ void main() {
   // copyWith: plain fields replace, nullable fields take a patch.
   final edited = full.copyWith(
     title: 'New',
-    discount: const DwPatch.clear(),
-    timeout: const DwPatch.set(Duration(seconds: 9)),
+    discount: const DwFieldPatch.clear(),
+    timeout: const DwFieldPatch.set(Duration(seconds: 9)),
   );
   check(edited.title == 'New', 'copyWith sets a plain field');
   check(edited.discount == null, 'copyWith clears through a patch');
@@ -142,7 +142,7 @@ void main() {
   roundTrip(
     const SessionHolder(
       id: 1,
-      session: DwSession(id: 5, token: 't', isNewAccount: true),
+      session: DwAuthSession(id: 5, token: 't', isNewAccount: true),
     ),
   );
 
@@ -187,18 +187,18 @@ void main() {
 
   // Patches: keep is absent, clear is an explicit null, set carries a value.
   for (final patch in const [
-    DwPatch<Dimensions>.keep(),
-    DwPatch<Dimensions>.clear(),
-    DwPatch<Dimensions>.set(dimensions),
+    DwFieldPatch<Dimensions>.keep(),
+    DwFieldPatch<Dimensions>.clear(),
+    DwFieldPatch<Dimensions>.set(dimensions),
   ]) {
     final command = EditItem(
       itemId: 1,
-      title: const DwPatch.set('x'),
-      updatedAt: DwPatch.set(DateTime.utc(2026, 1, 2)),
-      color: const DwPatch.clear(),
+      title: const DwFieldPatch.set('x'),
+      updatedAt: DwFieldPatch.set(DateTime.utc(2026, 1, 2)),
+      color: const DwFieldPatch.clear(),
       dimensions: patch,
-      discount: const DwPatch.set(2),
-      timeout: const DwPatch.set(Duration(milliseconds: 5)),
+      discount: const DwFieldPatch.set(2),
+      timeout: const DwFieldPatch.set(Duration(milliseconds: 5)),
       tags: const ['a'],
     );
     final back = roundTrip(command);
@@ -210,13 +210,13 @@ void main() {
     'kept patches are absent',
   );
   final clearedJson =
-      wire(const EditItem(itemId: 1, color: DwPatch.clear()).toJson())
+      wire(const EditItem(itemId: 1, color: DwFieldPatch.clear()).toJson())
           as Map<String, Object?>;
   check(
     clearedJson.containsKey('color') && clearedJson['color'] == null,
     'a cleared patch is an explicit null',
   );
-  roundTrip(const OnlyPatches(note: DwPatch.set('n')));
+  roundTrip(const OnlyPatches(note: DwFieldPatch.set('n')));
   roundTrip(const RemoveItem());
 
   if (failures.isEmpty) {

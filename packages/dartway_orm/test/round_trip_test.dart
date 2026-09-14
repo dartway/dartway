@@ -1,6 +1,6 @@
 import 'package:dartway_orm/dartway_orm.dart';
 // ignore: implementation_imports
-import 'package:dartway_orm/src/db/dw_connection.dart';
+import 'package:dartway_orm/src/db/dw_connection_pool.dart';
 import 'package:postgres/postgres.dart' as pg;
 import 'package:test/test.dart';
 
@@ -18,7 +18,7 @@ import 'support/test_database.dart';
 /// transaction).
 void main() {
   final database = useTestDatabase(countRoundTrips: true, maxConnections: 1);
-  DwDatabase dw() => database().database;
+  DwPostgresDatabase dw() => database().database;
 
   Future<int> cost(Future<void> Function() action) async {
     final before = dw().roundTrips;
@@ -138,7 +138,7 @@ void main() {
   });
 
   test('the cache is bounded per connection', () async {
-    final small = await DwDatabase.open(
+    final small = await DwPostgresDatabase.open(
       DwDatabaseConfig(
         host: testServerConfig().host,
         port: testServerConfig().port,

@@ -7,13 +7,13 @@ app_server/lib/src/columns.dart:35:16: field `ownerName` of row class `ColumnsRo
 app_server/lib/src/columns.dart:40:13: fields `same` and `alsoSame` of row class `ColumnsRow` both map to column `same`
 app_server/lib/src/columns.dart:46:13: table name `shared_name` of row class `SameTableARow` is also used at columns.dart:56:13
 app_server/lib/src/columns.dart:56:13: table name `shared_name` of row class `SameTableBRow` is also used at columns.dart:46:13
-app_server/lib/src/columns.dart:66:13: the table name `a_table_name_that_is_far_too_long_for_postgres_to_keep_in_one_piece` is longer than 63 bytes, and Postgres would silently truncate it
-app_server/lib/src/declarations.dart:5:13: row class `NoTableRow` needs its table: annotate it with `@DwTable('no_table')`
+app_server/lib/src/columns.dart:68:13: the table name `a_table_name_that_is_far_too_long_for_postgres_to_keep_in_one_piece` is longer than 63 bytes, and Postgres would silently truncate it
+app_server/lib/src/declarations.dart:5:13: row class `NoTableRow` needs its table: annotate it with `@DwSqlTable('no_table')`
 app_server/lib/src/declarations.dart:15:13: row class `NoStaticTableRow` must declare its table: add `static const table = NoStaticTableTable();`
 app_server/lib/src/declarations.dart:27:13: the id of row class `WrongIdRow` must be `int?` (a bigserial key, null before insert), not `int`
 app_server/lib/src/declarations.dart:38:16: field `name` of row class `ShadowingRow` would shadow `DwTableDef.name` in the generated table class; rename the field (the column can keep its name with `@DwColumnName('...')`)
 app_server/lib/src/declarations.dart:39:13: field `columns` of row class `ShadowingRow` would shadow `DwTableDef.columns` in the generated table class; rename the field (the column can keep its name with `@DwColumnName('...')`)
 app_server/lib/src/declarations.dart:46:13: row class `ClubSession` must be named `<Entity>Row` (`ClubSessionRow`): its table class is `<Entity>Table` and its repository getter `db.<entities>`, and a row never shares a name with the data object clients see
 app_server/lib/src/declarations.dart:57:13: row class `Row` must be named `<Entity>Row` (`SomeRow`): its table class is `<Entity>Table` and its repository getter `db.<entities>`, and a row never shares a name with the data object clients see
-app_server/lib/src/prefixed.dart:6:13: the generated part uses `DwPatch`, `DwColumn`, `DwTableDef`, `DwResultRow`, which `prefixed.dart` does not import without a prefix; add `import 'package:dartway_orm/dartway_orm.dart';`
+app_server/lib/src/prefixed.dart:6:13: the generated part uses `DwFieldPatch`, `DwTableColumn`, `DwTableDef`, `DwResultRow`, which `prefixed.dart` does not import without a prefix; add `import 'package:dartway_orm/dartway_orm.dart';`
 app_shared/lib/misplaced.dart:6:13: row class `MisplacedRow` is declared in `app_shared`; row classes belong in the *_server package, whose schema lists them

@@ -112,10 +112,10 @@ void main() {
       final refused = refusedBack(
         DwSubscriptionRefusedMessage.refused(
           'chat:7',
-          DwRefusal(DwCoreRefusal.forbidden),
+          DwCallRefusal(DwCoreRefusal.forbidden),
         ),
       );
-      expect(refused.refusal, DwRefusal(DwCoreRefusal.forbidden));
+      expect(refused.refusal, DwCallRefusal(DwCoreRefusal.forbidden));
       expect(refused.incidentId, isNull);
       expect(refused.isUnauthenticated, isFalse);
 
@@ -145,14 +145,17 @@ void main() {
     test('upd carries a transport, typed on arrival', () {
       final message = DwUpdateMessage(
         channel: 'myBookings:3',
-        updates: DwTransport([booking, DwDeleted.of<ClubBooking>(8, protocol)]),
+        updates: DwUpdateTransport([
+          booking,
+          DwDeletedObject.of<ClubBooking>(8, protocol),
+        ]),
       );
       expect(roundTrip(message.toJson()), {
         'k': 'upd',
         'ch': 'myBookings:3',
         'updates': {
           'ClubBooking': [booking.toJson()],
-          'DwDeleted': [
+          'DwDeletedObject': [
             {'type': 'ClubBooking', 'id': 8},
           ],
         },
@@ -161,7 +164,7 @@ void main() {
       expect(decoded.channel, 'myBookings:3');
       expect(decoded.updates, message.updates);
       expect(decoded.updates.objects.first, isA<ClubBooking>());
-      final deleted = decoded.updates.objects.last as DwDeleted;
+      final deleted = decoded.updates.objects.last as DwDeletedObject;
       expect(deleted.isOf<ClubBooking>(protocol), isTrue);
     });
 

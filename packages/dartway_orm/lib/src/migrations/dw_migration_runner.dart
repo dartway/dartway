@@ -1,8 +1,8 @@
 import 'package:collection/collection.dart';
 import 'package:postgres/postgres.dart' as pg;
 
-import '../db/dw_db.dart';
-import 'dw_migration.dart';
+import '../db/dw_database_handle.dart';
+import 'dw_database_migration.dart';
 import 'dw_migration_errors.dart';
 
 /// Applies and rolls back migrations of several namespaces against one
@@ -12,12 +12,14 @@ import 'dw_migration_errors.dart';
 /// The migrator owns only the namespaces it is given: ledger rows of other
 /// namespaces are neither validated nor touched, so a module's migrations and
 /// the application's can be run by different entry points.
-final class DwMigrator {
-  DwMigrator(this._db, {required Map<String, List<DwMigration>> migrations})
-    : _migrations = {
-        for (final MapEntry(key: namespace, value: list) in migrations.entries)
-          namespace: List.unmodifiable(list),
-      };
+final class DwMigrationRunner {
+  DwMigrationRunner(
+    this._db, {
+    required Map<String, List<DwDatabaseMigration>> migrations,
+  }) : _migrations = {
+         for (final MapEntry(key: namespace, value: list) in migrations.entries)
+           namespace: List.unmodifiable(list),
+       };
 
   static const ledgerTable = 'dw_migrations';
 
@@ -25,8 +27,8 @@ final class DwMigrator {
   /// "dwMigrat" in ASCII.
   static const lockKey = 0x64774d6967726174;
 
-  final DwDb _db;
-  final Map<String, List<DwMigration>> _migrations;
+  final DwDatabaseHandle _db;
+  final Map<String, List<DwDatabaseMigration>> _migrations;
 
   /// Applies every pending migration as one batch and returns them in the
   /// order applied.
@@ -190,7 +192,7 @@ final class DwMigrator {
     );
   }
 
-  Future<T> _locked<T>(Future<T> Function(DwDb db) body) =>
+  Future<T> _locked<T>(Future<T> Function(DwDatabaseHandle db) body) =>
       _db.pinned((db) async {
         // Waits for a concurrent migrator; everything after this point sees the
         // ledger it left behind.
@@ -211,7 +213,7 @@ final class DwMigrator {
       });
 
   Future<Map<DwMigrationRef, _LedgerRow>> _readLedger(
-    DwDb db, {
+    DwDatabaseHandle db, {
     bool create = true,
   }) async {
     if (create) {
@@ -361,7 +363,11 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
     return byId != 0 ? byId : a.ref.namespace.compareTo(b.ref.namespace);
   }
 
-  Future<void> _applyOne(DwDb db, _Registered entry, int batch) async {
+  Future<void> _applyOne(
+    DwDatabaseHandle db,
+    _Registered entry,
+    int batch,
+  ) async {
     final migration = entry.migration;
     if (migration.transactional) {
       await db.transaction((tx) async {
@@ -379,7 +385,7 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
     }
   }
 
-  Future<void> _rollbackOne(DwDb db, _Registered entry) async {
+  Future<void> _rollbackOne(DwDatabaseHandle db, _Registered entry) async {
     final migration = entry.migration;
     if (migration.transactional) {
       await db.transaction((tx) async {
@@ -414,7 +420,7 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
   }
 
   Future<void> _insertRow(
-    DwDb db,
+    DwDatabaseHandle db,
     _Registered entry,
     int batch,
     String state,
@@ -430,7 +436,10 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
     },
   );
 
-  Future<void> _deleteRow(DwDb db, DwMigrationRef ref) => db.execute(
+  Future<void> _deleteRow(
+    DwDatabaseHandle db,
+    DwMigrationRef ref,
+  ) => db.execute(
     'DELETE FROM "$ledgerTable" WHERE "namespace" = @namespace AND "id" = @id',
     params: {'namespace': ref.namespace, 'id': ref.id},
   );
@@ -481,7 +490,7 @@ final class _Registered {
   const _Registered(this.ref, this.migration);
 
   final DwMigrationRef ref;
-  final DwMigration migration;
+  final DwDatabaseMigration migration;
 }
 
 final class _LedgerRow {

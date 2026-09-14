@@ -46,7 +46,7 @@ Future<void> main(List<String> arguments) async {
     return;
   }
 
-  final report = await DwGenerator.run(
+  final report = await DwCodeGenerator.run(
     options.option('project')!,
     sdkPath: options.option('sdk'),
     check: options.flag('check'),

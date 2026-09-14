@@ -24,7 +24,7 @@ TestMigration createTable(
 
 void main() {
   late TestDatabase database;
-  DwDb db() => database.db;
+  DwDatabaseHandle db() => database.db;
 
   setUp(() async {
     database = await TestDatabase.create(withFixtureSchema: false);
@@ -54,7 +54,7 @@ void main() {
           createTable('20260102_000000_b', 'b'),
         ],
       };
-      final run = await DwMigrator(db(), migrations: migrations).apply();
+      final run = await DwMigrationRunner(db(), migrations: migrations).apply();
       expect(run.batch, 1);
       expect(run.migrations, const [
         DwMigrationRef('app', '20260101_000000_a'),
@@ -62,12 +62,18 @@ void main() {
       ]);
       expect(await tables(), containsAll(['a', 'b', 'dw_migrations']));
 
-      final again = await DwMigrator(db(), migrations: migrations).apply();
+      final again = await DwMigrationRunner(
+        db(),
+        migrations: migrations,
+      ).apply();
       expect(again.isEmpty, isTrue);
       expect(again.batch, isNull);
 
       migrations['app']!.add(createTable('20260103_000000_c', 'c'));
-      final next = await DwMigrator(db(), migrations: migrations).apply();
+      final next = await DwMigrationRunner(
+        db(),
+        migrations: migrations,
+      ).apply();
       expect(next.batch, 2);
       expect(await ledger(), [
         'app/20260101_000000_a:1:applied',
@@ -77,7 +83,7 @@ void main() {
     });
 
     test('orders by dependsOn first, then by id, across namespaces', () async {
-      final run = await DwMigrator(
+      final run = await DwMigrationRunner(
         db(),
         migrations: {
           'app': [
@@ -89,7 +95,7 @@ void main() {
                 DwColumnSchema(
                   'late_id',
                   'bigint',
-                  references: const DwReferences('late'),
+                  references: const DwForeignKey('late'),
                 ),
               ],
               dependsOn: const [DwMigrationRef('app', '20260101_000000_late')],
@@ -101,7 +107,7 @@ void main() {
                 DwColumnSchema(
                   'account_id',
                   'bigint',
-                  references: const DwReferences('dw_account'),
+                  references: const DwForeignKey('dw_account'),
                 ),
               ],
               dependsOn: const [
@@ -122,13 +128,13 @@ void main() {
     test(
       'a dependency applied earlier by another migrator is satisfied',
       () async {
-        await DwMigrator(
+        await DwMigrationRunner(
           db(),
           migrations: {
             'dw': [createTable('1_account', 'dw_account')],
           },
         ).apply();
-        final run = await DwMigrator(
+        final run = await DwMigrationRunner(
           db(),
           migrations: {
             'app': [
@@ -145,7 +151,7 @@ void main() {
     );
 
     test('namespaces are owned separately', () async {
-      await DwMigrator(
+      await DwMigrationRunner(
         db(),
         migrations: {
           'dw': [createTable('1_framework', 'framework')],
@@ -154,7 +160,7 @@ void main() {
       ).apply();
       // A migrator given only `app` neither validates nor touches `dw` rows,
       // and the same id in two namespaces is two migrations.
-      final run = await DwMigrator(
+      final run = await DwMigrationRunner(
         db(),
         migrations: {
           'app': [
@@ -188,7 +194,7 @@ void main() {
         ],
       };
       await expectLater(
-        DwMigrator(db(), migrations: migrations).apply(),
+        DwMigrationRunner(db(), migrations: migrations).apply(),
         throwsA(
           isA<DwMigrationFailed>()
               .having((e) => e.ref.id, 'ref', '2_broken')
@@ -202,7 +208,7 @@ void main() {
     });
 
     test('a non-transactional migration runs outside a transaction', () async {
-      final run = await DwMigrator(
+      final run = await DwMigrationRunner(
         db(),
         migrations: {
           'app': [
@@ -239,12 +245,12 @@ void main() {
           ],
         };
         await expectLater(
-          DwMigrator(db(), migrations: migrations).apply(),
+          DwMigrationRunner(db(), migrations: migrations).apply(),
           throwsA(isA<DwMigrationFailed>()),
         );
         expect(await ledger(), ['app/1_dirty:1:dirty']);
         await expectLater(
-          DwMigrator(db(), migrations: migrations).apply(),
+          DwMigrationRunner(db(), migrations: migrations).apply(),
           throwsA(
             isA<DwMigrationRefused>().having(
               (e) => e.problems.single,
@@ -259,14 +265,14 @@ void main() {
 
   group('refusals', () {
     test('an applied migration missing from the code', () async {
-      await DwMigrator(
+      await DwMigrationRunner(
         db(),
         migrations: {
           'app': [createTable('1_a', 'a'), createTable('2_b', 'b')],
         },
       ).apply();
       await expectLater(
-        DwMigrator(
+        DwMigrationRunner(
           db(),
           migrations: {
             'app': [createTable('2_b', 'b'), createTable('3_c', 'c')],
@@ -284,14 +290,14 @@ void main() {
     });
 
     test('an applied migration whose checksum changed', () async {
-      await DwMigrator(
+      await DwMigrationRunner(
         db(),
         migrations: {
           'app': [createTable('1_a', 'a', checksum: 'v1')],
         },
       ).apply();
       await expectLater(
-        DwMigrator(
+        DwMigrationRunner(
           db(),
           migrations: {
             'app': [
@@ -313,7 +319,7 @@ void main() {
     });
 
     test('every problem is reported at once', () async {
-      final refused = DwMigrator(
+      final refused = DwMigrationRunner(
         db(),
         migrations: {
           'app': [
@@ -352,7 +358,7 @@ void main() {
   });
 
   group('rollback', () {
-    Map<String, List<DwMigration>> threeBatches() => {
+    Map<String, List<DwDatabaseMigration>> threeBatches() => {
       'app': [
         createTable('1_a', 'a'),
         createTable('2_b', 'b'),
@@ -363,7 +369,7 @@ void main() {
     Future<void> applyInBatches() async {
       final all = threeBatches()['app']!;
       for (var i = 1; i <= all.length; i++) {
-        await DwMigrator(
+        await DwMigrationRunner(
           db(),
           migrations: {'app': all.take(i).toList()},
         ).apply();
@@ -371,14 +377,17 @@ void main() {
     }
 
     test('rolls back the last batch by default, in reverse order', () async {
-      await DwMigrator(
+      await DwMigrationRunner(
         db(),
         migrations: {
           'app': [createTable('1_a', 'a')],
         },
       ).apply();
-      await DwMigrator(db(), migrations: threeBatches()).apply();
-      final run = await DwMigrator(db(), migrations: threeBatches()).rollback();
+      await DwMigrationRunner(db(), migrations: threeBatches()).apply();
+      final run = await DwMigrationRunner(
+        db(),
+        migrations: threeBatches(),
+      ).rollback();
       expect(run.batch, 2);
       expect(run.migrations.map((ref) => ref.id), ['3_c', '2_b']);
       expect(await tables(), {'a', 'dw_migrations'});
@@ -387,19 +396,19 @@ void main() {
 
     test('rolls back a named batch or a single migration', () async {
       await applyInBatches();
-      final byId = await DwMigrator(
+      final byId = await DwMigrationRunner(
         db(),
         migrations: threeBatches(),
       ).rollback(id: const DwMigrationRef('app', '3_c'));
       expect(byId.migrations.single.id, '3_c');
-      final byBatch = await DwMigrator(
+      final byBatch = await DwMigrationRunner(
         db(),
         migrations: threeBatches(),
       ).rollback(batch: 1);
       expect(byBatch.migrations.single.id, '1_a');
       expect(await ledger(), ['app/2_b:2:applied']);
       // What was rolled back is pending again.
-      final reapplied = await DwMigrator(
+      final reapplied = await DwMigrationRunner(
         db(),
         migrations: threeBatches(),
       ).apply();
@@ -417,9 +426,9 @@ void main() {
           ),
         ],
       };
-      await DwMigrator(db(), migrations: migrations).apply();
+      await DwMigrationRunner(db(), migrations: migrations).apply();
       await expectLater(
-        DwMigrator(
+        DwMigrationRunner(
           db(),
           migrations: migrations,
         ).rollback(id: const DwMigrationRef('app', '1_a')),
@@ -436,18 +445,21 @@ void main() {
         ),
       );
       // Both in one batch: rolling back the batch takes the dependent too.
-      final run = await DwMigrator(db(), migrations: migrations).rollback();
+      final run = await DwMigrationRunner(
+        db(),
+        migrations: migrations,
+      ).rollback();
       expect(run.migrations.map((ref) => ref.id), ['2_b', '1_a']);
     });
 
     test('refuses unknown targets and foreign namespaces', () async {
-      await DwMigrator(
+      await DwMigrationRunner(
         db(),
         migrations: {
           'dw': [createTable('1_f', 'f')],
         },
       ).apply();
-      final app = DwMigrator(db(), migrations: {'app': const []});
+      final app = DwMigrationRunner(db(), migrations: {'app': const []});
       await expectLater(
         app.rollback(id: const DwMigrationRef('app', 'nope')),
         throwsA(isA<DwMigrationRefused>()),
@@ -484,9 +496,9 @@ void main() {
             createTable('2_reversible', 'reversible'),
           ],
         };
-        await DwMigrator(db(), migrations: migrations).apply();
+        await DwMigrationRunner(db(), migrations: migrations).apply();
         await expectLater(
-          DwMigrator(db(), migrations: migrations).rollback(),
+          DwMigrationRunner(db(), migrations: migrations).rollback(),
           throwsA(
             isA<DwMigrationFailed>()
                 .having((e) => e.ref.id, 'ref', '1_irreversible')
@@ -497,14 +509,15 @@ void main() {
                 ),
           ),
         );
-        // 2_reversible was rolled back inside the same transaction, and restored.
+        // 2_reversible was rolled back inside the same transaction, and
+        // restored.
         expect(await tables(), containsAll(['kept', 'reversible']));
         expect(await ledger(), hasLength(2));
       },
     );
 
     test('an empty ledger has nothing to roll back', () async {
-      final run = await DwMigrator(
+      final run = await DwMigrationRunner(
         db(),
         migrations: {'app': const []},
       ).rollback();
@@ -513,7 +526,7 @@ void main() {
   });
 
   test('status reports every state', () async {
-    await DwMigrator(
+    await DwMigrationRunner(
       db(),
       migrations: {
         'app': [
@@ -528,7 +541,7 @@ void main() {
         ],
       },
     ).apply().then((_) {}, onError: (Object _) {});
-    final status = await DwMigrator(
+    final status = await DwMigrationRunner(
       db(),
       migrations: {
         'app': [
@@ -552,7 +565,7 @@ void main() {
   });
 
   test('status of a database never migrated is all pending', () async {
-    final status = await DwMigrator(
+    final status = await DwMigrationRunner(
       db(),
       migrations: {
         'app': [createTable('1_a', 'a')],
@@ -566,8 +579,8 @@ void main() {
     'a module added to a live database applies only its own migrations',
     () async {
       final app = [createTable('20260101_000000_profile', 'profile')];
-      await DwMigrator(db(), migrations: {'app': app}).apply();
-      final run = await DwMigrator(
+      await DwMigrationRunner(db(), migrations: {'app': app}).apply();
+      final run = await DwMigrationRunner(
         db(),
         migrations: {
           'app': app,
@@ -592,7 +605,7 @@ void main() {
       final other = await database.openAnother();
       addTearDown(other.close);
       final started = <String>[];
-      Map<String, List<DwMigration>> slow(String who) => {
+      Map<String, List<DwDatabaseMigration>> slow(String who) => {
         'app': [
           TestMigration(
             '1_slow',
@@ -606,8 +619,8 @@ void main() {
         ],
       };
       final runs = await Future.wait([
-        DwMigrator(db(), migrations: slow('first')).apply(),
-        DwMigrator(other.db, migrations: slow('second')).apply(),
+        DwMigrationRunner(db(), migrations: slow('first')).apply(),
+        DwMigrationRunner(other.db, migrations: slow('second')).apply(),
       ]);
       expect(runs.where((run) => run.isEmpty), hasLength(1));
       expect(runs.where((run) => !run.isEmpty), hasLength(1));

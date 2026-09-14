@@ -34,11 +34,11 @@ mixin _$AppSettingRow on DwTableRow {
 
 extension AppSettingRowCopyWith on AppSettingRow {
   AppSettingRow copyWith({
-    DwPatch<int> id = const DwPatch.keep(),
+    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     String? key,
     String? value,
     Map<String, int>? limits,
-    DwPatch<int> featuredServiceId = const DwPatch.keep(),
+    DwFieldPatch<int> featuredServiceId = const DwFieldPatch.keep(),
     DateTime? updatedAt,
   }) => AppSettingRow(
     id: id.apply(this.id),
@@ -53,28 +53,30 @@ extension AppSettingRowCopyWith on AppSettingRow {
 final class AppSettingTable extends DwTableDef<AppSettingRow> {
   const AppSettingTable() : super('app_setting');
 
-  DwColumn<String> get key => const DwColumn('key', DwType.text, unique: true);
+  DwTableColumn<String> get key =>
+      const DwTableColumn('key', DwColumnType.text, unique: true);
 
-  DwColumn<String> get value => const DwColumn('value', DwType.text);
+  DwTableColumn<String> get value =>
+      const DwTableColumn('value', DwColumnType.text);
 
-  DwColumn<Map<String, int>> get limits =>
-      const DwColumn('limits', DwJsonMapType<int>());
+  DwTableColumn<Map<String, int>> get limits =>
+      const DwTableColumn('limits', DwJsonMapType<int>());
 
-  DwColumn<int?> get featuredServiceId => const DwColumn(
+  DwTableColumn<int?> get featuredServiceId => const DwTableColumn(
     'featured_service_id',
-    DwType.bigint,
+    DwColumnType.bigint,
     unique: true,
-    references: DwReferences('club_service', onDelete: DwOnDelete.setNull),
+    references: DwForeignKey('club_service', onDelete: DwOnDelete.setNull),
   );
 
-  DwColumn<DateTime> get updatedAt => const DwColumn(
+  DwTableColumn<DateTime> get updatedAt => const DwTableColumn(
     'updated_at',
-    DwType.timestamptz,
-    defaultValue: DwDefault.now(),
+    DwColumnType.timestamptz,
+    defaultValue: DwDefaultValue.now(),
   );
 
   @override
-  List<DwColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get columns => [
     id,
     key,
     value,

@@ -40,15 +40,15 @@ mixin _$ClubServiceRow on DwTableRow {
 
 extension ClubServiceRowCopyWith on ClubServiceRow {
   ClubServiceRow copyWith({
-    DwPatch<int> id = const DwPatch.keep(),
+    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     String? title,
     ClubServiceKind? kind,
-    DwPatch<double> price = const DwPatch.keep(),
+    DwFieldPatch<double> price = const DwFieldPatch.keep(),
     Duration? duration,
     List<String>? tags,
     DateTime? createdAt,
-    DwPatch<DateTime> archivedAt = const DwPatch.keep(),
-    DwPatch<Uint8List> cover = const DwPatch.keep(),
+    DwFieldPatch<DateTime> archivedAt = const DwFieldPatch.keep(),
+    DwFieldPatch<Uint8List> cover = const DwFieldPatch.keep(),
     bool? active,
   }) => ClubServiceRow(
     id: id.apply(this.id),
@@ -67,36 +67,41 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
 final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
   const ClubServiceTable() : super('club_service');
 
-  DwColumn<String> get title => const DwColumn('title', DwType.text);
+  DwTableColumn<String> get title =>
+      const DwTableColumn('title', DwColumnType.text);
 
-  DwColumn<ClubServiceKind> get kind =>
-      const DwColumn('kind', DwEnumType(ClubServiceKind.values));
+  DwTableColumn<ClubServiceKind> get kind =>
+      const DwTableColumn('kind', DwEnumType(ClubServiceKind.values));
 
-  DwColumn<double?> get price =>
-      const DwColumn('price', DwType.doublePrecision);
+  DwTableColumn<double?> get price =>
+      const DwTableColumn('price', DwColumnType.doublePrecision);
 
-  DwColumn<Duration> get duration =>
-      const DwColumn('duration', DwType.duration);
+  DwTableColumn<Duration> get duration =>
+      const DwTableColumn('duration', DwColumnType.duration);
 
-  DwColumn<List<String>> get tags =>
-      const DwColumn('tags', DwJsonListType<String>());
+  DwTableColumn<List<String>> get tags =>
+      const DwTableColumn('tags', DwJsonListType<String>());
 
-  DwColumn<DateTime> get createdAt => const DwColumn(
+  DwTableColumn<DateTime> get createdAt => const DwTableColumn(
     'created_at',
-    DwType.timestamptz,
-    defaultValue: DwDefault.now(),
+    DwColumnType.timestamptz,
+    defaultValue: DwDefaultValue.now(),
   );
 
-  DwColumn<DateTime?> get archivedAt =>
-      const DwColumn('archived_at', DwType.timestamptz);
+  DwTableColumn<DateTime?> get archivedAt =>
+      const DwTableColumn('archived_at', DwColumnType.timestamptz);
 
-  DwColumn<Uint8List?> get cover => const DwColumn('cover', DwType.bytea);
+  DwTableColumn<Uint8List?> get cover =>
+      const DwTableColumn('cover', DwColumnType.bytea);
 
-  DwColumn<bool> get active =>
-      const DwColumn('active', DwType.boolean, defaultValue: DwDefault('true'));
+  DwTableColumn<bool> get active => const DwTableColumn(
+    'active',
+    DwColumnType.boolean,
+    defaultValue: DwDefaultValue('true'),
+  );
 
   @override
-  List<DwColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get columns => [
     id,
     title,
     kind,

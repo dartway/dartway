@@ -6,18 +6,28 @@ import 'package:path/path.dart' as p;
 /// Located problems print as `path:line:column: message` — the shape editors
 /// and terminals turn into a link — because a generator error the author has
 /// to hunt for is half an error message.
-final class DwDiagnostic implements Comparable<DwDiagnostic> {
-  const DwDiagnostic(this.message, {this.path, this.line, this.column});
+final class DwGenerationDiagnostic
+    implements Comparable<DwGenerationDiagnostic> {
+  const DwGenerationDiagnostic(
+    this.message, {
+    this.path,
+    this.line,
+    this.column,
+  });
 
   /// A diagnostic pointing at the name of [element] (or at [offset] in its
   /// library file when given).
-  factory DwDiagnostic.at(Element element, String message, {int? offset}) {
+  factory DwGenerationDiagnostic.at(
+    Element element,
+    String message, {
+    int? offset,
+  }) {
     final fragment = element.firstFragment;
     final libraryFragment = fragment.libraryFragment!;
     final location = libraryFragment.lineInfo.getLocation(
       offset ?? fragment.nameOffset ?? fragment.offset,
     );
-    return DwDiagnostic(
+    return DwGenerationDiagnostic(
       message,
       path: libraryFragment.source.fullName,
       line: location.lineNumber,
@@ -26,13 +36,13 @@ final class DwDiagnostic implements Comparable<DwDiagnostic> {
   }
 
   /// A diagnostic at [offset] of the file of [libraryFragment].
-  factory DwDiagnostic.inFile(
+  factory DwGenerationDiagnostic.inFile(
     LibraryFragment libraryFragment,
     int offset,
     String message,
   ) {
     final location = libraryFragment.lineInfo.getLocation(offset);
-    return DwDiagnostic(
+    return DwGenerationDiagnostic(
       message,
       path: libraryFragment.source.fullName,
       line: location.lineNumber,
@@ -54,7 +64,7 @@ final class DwDiagnostic implements Comparable<DwDiagnostic> {
   }
 
   @override
-  int compareTo(DwDiagnostic other) {
+  int compareTo(DwGenerationDiagnostic other) {
     final byPath = (path ?? '').compareTo(other.path ?? '');
     if (byPath != 0) return byPath;
     final byLine = (line ?? 0).compareTo(other.line ?? 0);
@@ -66,7 +76,7 @@ final class DwDiagnostic implements Comparable<DwDiagnostic> {
 
   @override
   bool operator ==(Object other) =>
-      other is DwDiagnostic &&
+      other is DwGenerationDiagnostic &&
       other.message == message &&
       other.path == path &&
       other.line == line &&

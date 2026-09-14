@@ -17,10 +17,10 @@ import 'dw_errors.dart';
 /// inside one (the driver closes the portal). The cache is per connection
 /// because a prepared statement lives in the server session that parsed it.
 @internal
-final class DwConnection {
-  DwConnection._(this._connection, this._cacheSize);
+final class DwPooledConnection {
+  DwPooledConnection._(this._connection, this._cacheSize);
 
-  static Future<DwConnection> open(
+  static Future<DwPooledConnection> open(
     DwDatabaseConfig config, {
     DwRoundTripCounter? counter,
   }) async {
@@ -42,7 +42,7 @@ final class DwConnection {
           transformer: dwWireTap(counter),
         ),
       );
-      return DwConnection._(connection, config.statementCacheSize);
+      return DwPooledConnection._(connection, config.statementCacheSize);
     } on pg.PgException catch (error, stackTrace) {
       Error.throwWithStackTrace(dwMapError(error), stackTrace);
     } on Exception catch (error, stackTrace) {
@@ -239,23 +239,24 @@ final class _DwObservedSink implements StreamSink<pgm.Message> {
 
 /// A bounded set of connections.
 ///
-/// The driver's own pool disposes a connection whenever an exception leaves
-/// its callback — every unique violation would cost a reconnect — and cannot
+/// The driver's own pool disposes a connection whenever an exception leaves its
+/// callback — every unique violation would cost a reconnect — and cannot
 /// keep prepared statements across borrows. This one keeps connections (and
-/// their statement caches) until they are actually broken, and hands the
-/// most recently used one out first so its cache stays warm.
+/// their statement caches) until they are actually broken, and hands the most
+/// recently used one out first so its cache stays warm.
 @internal
-final class DwPool {
-  DwPool(this._config, {DwRoundTripCounter? counter}) : _counter = counter;
+final class DwConnectionPool {
+  DwConnectionPool(this._config, {DwRoundTripCounter? counter})
+    : _counter = counter;
 
   final DwDatabaseConfig _config;
   final DwRoundTripCounter? _counter;
-  final List<DwConnection> _idle = [];
+  final List<DwPooledConnection> _idle = [];
   final Queue<_Waiter> _waiters = Queue();
   int _open = 0;
   bool _closed = false;
 
-  Future<DwConnection> acquire() async {
+  Future<DwPooledConnection> acquire() async {
     if (_closed) throw StateError('the database is closed');
     while (_idle.isNotEmpty) {
       final connection = _idle.removeLast();
@@ -282,7 +283,7 @@ final class DwPool {
 
   /// Returns [connection]. A connection whose session state is unknown — a
   /// failed `ROLLBACK`, a lost socket — must be released with [discard].
-  void release(DwConnection connection, {bool discard = false}) {
+  void release(DwPooledConnection connection, {bool discard = false}) {
     if (_closed || discard || !connection.isOpen) {
       _open--;
       connection.close().ignore();
@@ -297,10 +298,10 @@ final class DwPool {
     }
   }
 
-  Future<DwConnection> _connect() async {
+  Future<DwPooledConnection> _connect() async {
     _open++;
     try {
-      return await DwConnection.open(_config, counter: _counter);
+      return await DwPooledConnection.open(_config, counter: _counter);
     } catch (_) {
       _open--;
       // The slot this attempt held is free again; a caller queued behind it
@@ -335,6 +336,6 @@ final class DwPool {
 }
 
 final class _Waiter {
-  final Completer<DwConnection> completer = Completer();
+  final Completer<DwPooledConnection> completer = Completer();
   late final Timer timer;
 }

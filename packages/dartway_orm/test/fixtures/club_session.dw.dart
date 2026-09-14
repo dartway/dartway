@@ -34,13 +34,13 @@ mixin _$ClubSessionRow on DwTableRow {
 
 extension ClubSessionRowCopyWith on ClubSessionRow {
   ClubSessionRow copyWith({
-    DwPatch<int> id = const DwPatch.keep(),
+    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? serviceId,
-    DwPatch<int> previousSessionId = const DwPatch.keep(),
+    DwFieldPatch<int> previousSessionId = const DwFieldPatch.keep(),
     DateTime? startsAt,
     int? capacity,
-    DwPatch<String> note = const DwPatch.keep(),
-    DwPatch<List<String>> labels = const DwPatch.keep(),
+    DwFieldPatch<String> note = const DwFieldPatch.keep(),
+    DwFieldPatch<List<String>> labels = const DwFieldPatch.keep(),
   }) => ClubSessionRow(
     id: id.apply(this.id),
     serviceId: serviceId ?? this.serviceId,
@@ -55,30 +55,32 @@ extension ClubSessionRowCopyWith on ClubSessionRow {
 final class ClubSessionTable extends DwTableDef<ClubSessionRow> {
   const ClubSessionTable() : super('club_session');
 
-  DwColumn<int> get serviceId => const DwColumn(
+  DwTableColumn<int> get serviceId => const DwTableColumn(
     'service_id',
-    DwType.bigint,
-    references: DwReferences('club_service', onDelete: DwOnDelete.cascade),
+    DwColumnType.bigint,
+    references: DwForeignKey('club_service', onDelete: DwOnDelete.cascade),
   );
 
-  DwColumn<int?> get previousSessionId => const DwColumn(
+  DwTableColumn<int?> get previousSessionId => const DwTableColumn(
     'previous_session_id',
-    DwType.bigint,
-    references: DwReferences('club_session', onDelete: DwOnDelete.setNull),
+    DwColumnType.bigint,
+    references: DwForeignKey('club_session', onDelete: DwOnDelete.setNull),
   );
 
-  DwColumn<DateTime> get startsAt =>
-      const DwColumn('starts_at', DwType.timestamptz);
+  DwTableColumn<DateTime> get startsAt =>
+      const DwTableColumn('starts_at', DwColumnType.timestamptz);
 
-  DwColumn<int> get capacity => const DwColumn('capacity', DwType.bigint);
+  DwTableColumn<int> get capacity =>
+      const DwTableColumn('capacity', DwColumnType.bigint);
 
-  DwColumn<String?> get note => const DwColumn('note_text', DwType.text);
+  DwTableColumn<String?> get note =>
+      const DwTableColumn('note_text', DwColumnType.text);
 
-  DwColumn<List<String>?> get labels =>
-      const DwColumn('labels', DwJsonListType<String>());
+  DwTableColumn<List<String>?> get labels =>
+      const DwTableColumn('labels', DwJsonListType<String>());
 
   @override
-  List<DwColumn<Object?>> get columns => [
+  List<DwTableColumn<Object?>> get columns => [
     id,
     serviceId,
     previousSessionId,

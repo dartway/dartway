@@ -7,14 +7,14 @@ import '../entity/dw_table_def.dart';
 
 /// A database schema: the tables an application owns.
 ///
-/// Built from the tables of row classes it is the *target* the migrations must reach;
-/// built by introspection it is what a database *has*. Both are the same
+/// Built from the tables of row classes it is the *target* the migrations must
+/// reach; built by introspection it is what a database *has*. Both are the same
 /// value type so they compare with `==` and diff with one function.
-final class DwSchema {
-  DwSchema(Iterable<DwTableDef> tables)
+final class DwDatabaseSchema {
+  DwDatabaseSchema(Iterable<DwTableDef> tables)
     : this.fromTables([for (final table in tables) table.schema]);
 
-  DwSchema.fromTables(Iterable<DwTableSchema> tables)
+  DwDatabaseSchema.fromTables(Iterable<DwTableSchema> tables)
     : tables = List.unmodifiable(tables.sortedBy((table) => table.name)) {
     final seen = <String>{};
     for (final table in this.tables) {
@@ -32,14 +32,14 @@ final class DwSchema {
 
   @override
   bool operator ==(Object other) =>
-      other is DwSchema &&
+      other is DwDatabaseSchema &&
       const ListEquality<DwTableSchema>().equals(other.tables, tables);
 
   @override
   int get hashCode => const ListEquality<DwTableSchema>().hash(tables);
 
   @override
-  String toString() => 'DwSchema(${tables.join(', ')})';
+  String toString() => 'DwDatabaseSchema(${tables.join(', ')})';
 }
 
 /// One table: its columns in declaration order and its indexes.
@@ -147,7 +147,7 @@ final class DwColumnSchema {
   final bool primaryKey;
   final bool unique;
   final String? defaultSql;
-  final DwReferences? references;
+  final DwForeignKey? references;
 
   DwColumnSchema copyWith({
     String? name,
@@ -155,7 +155,7 @@ final class DwColumnSchema {
     bool? nullable,
     bool? unique,
     String? Function()? defaultSql,
-    DwReferences? Function()? references,
+    DwForeignKey? Function()? references,
   }) => DwColumnSchema(
     name ?? this.name,
     sqlType ?? this.sqlType,

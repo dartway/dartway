@@ -1,8 +1,8 @@
 import 'package:meta/meta.dart';
 
 import '../entity/dw_annotations.dart';
-import '../query/dw_column.dart';
-import 'dw_schema.dart';
+import '../query/dw_table_column.dart';
+import 'dw_database_schema.dart';
 
 /// DDL text for schema values.
 ///
@@ -11,9 +11,9 @@ import 'dw_schema.dart';
 /// explicitly: introspection then reads back exactly what was declared, and
 /// a later migration can drop a constraint by a name it can compute.
 @internal
-abstract final class DwDdl {
+abstract final class DwDdlWriter {
   static String createTable(DwTableSchema table) {
-    final name = dwQuote(table.name);
+    final name = dwQuoteIdentifier(table.name);
     final lines = [
       for (final column in table.columns)
         '  ${_columnDefinition(table.name, column)}',
@@ -25,14 +25,15 @@ abstract final class DwDdl {
     return '${statements.join(';\n')};';
   }
 
-  static String dropTable(String table) => 'DROP TABLE ${dwQuote(table)};';
+  static String dropTable(String table) =>
+      'DROP TABLE ${dwQuoteIdentifier(table)};';
 
   static String addColumn(
     String table,
     DwColumnSchema column, {
     String? backfill,
   }) {
-    final name = dwQuote(table);
+    final name = dwQuoteIdentifier(table);
     if (backfill == null) {
       return 'ALTER TABLE $name ADD COLUMN ${_columnDefinition(table, column)};';
     }
@@ -44,17 +45,17 @@ abstract final class DwDdl {
     return [
       'ALTER TABLE $name ADD COLUMN '
           '${_columnDefinition(table, column.copyWith(nullable: true))}',
-      'UPDATE $name SET ${dwQuote(column.name)} = $backfill',
-      'ALTER TABLE $name ALTER COLUMN ${dwQuote(column.name)} SET NOT NULL',
+      'UPDATE $name SET ${dwQuoteIdentifier(column.name)} = $backfill',
+      'ALTER TABLE $name ALTER COLUMN ${dwQuoteIdentifier(column.name)} SET NOT NULL',
     ].join(';\n').withSemicolon;
   }
 
   static String dropColumn(String table, String column) =>
-      'ALTER TABLE ${dwQuote(table)} DROP COLUMN ${dwQuote(column)};';
+      'ALTER TABLE ${dwQuoteIdentifier(table)} DROP COLUMN ${dwQuoteIdentifier(column)};';
 
   static String renameColumn(String table, String from, String to) {
     dwCheckIdentifier(to);
-    return 'ALTER TABLE ${dwQuote(table)} RENAME COLUMN ${dwQuote(from)} TO ${dwQuote(to)};';
+    return 'ALTER TABLE ${dwQuoteIdentifier(table)} RENAME COLUMN ${dwQuoteIdentifier(from)} TO ${dwQuoteIdentifier(to)};';
   }
 
   static String alterColumnNullability(
@@ -63,8 +64,8 @@ abstract final class DwDdl {
     required bool nullable,
     String? backfill,
   }) {
-    final name = dwQuote(table);
-    final quoted = dwQuote(column);
+    final name = dwQuoteIdentifier(table);
+    final quoted = dwQuoteIdentifier(column);
     if (nullable) {
       if (backfill != null) {
         throw ArgumentError('a backfill is only for making a column NOT NULL');
@@ -83,7 +84,7 @@ abstract final class DwDdl {
     String column,
     String? defaultSql,
   ) =>
-      'ALTER TABLE ${dwQuote(table)} ALTER COLUMN ${dwQuote(column)} '
+      'ALTER TABLE ${dwQuoteIdentifier(table)} ALTER COLUMN ${dwQuoteIdentifier(column)} '
       '${defaultSql == null ? 'DROP DEFAULT' : 'SET DEFAULT $defaultSql'};';
 
   static String alterColumnType(
@@ -92,33 +93,34 @@ abstract final class DwDdl {
     String sqlType, {
     String? using,
   }) =>
-      'ALTER TABLE ${dwQuote(table)} ALTER COLUMN ${dwQuote(column)} '
+      'ALTER TABLE ${dwQuoteIdentifier(table)} ALTER COLUMN ${dwQuoteIdentifier(column)} '
       'TYPE $sqlType${using == null ? '' : ' USING $using'};';
 
   static String addForeignKey(
     String table,
     String column,
-    DwReferences references,
+    DwForeignKey references,
   ) =>
-      'ALTER TABLE ${dwQuote(table)} ADD ${_foreignKey(table, column, references)};';
+      'ALTER TABLE ${dwQuoteIdentifier(table)} ADD ${_foreignKey(table, column, references)};';
 
   static String dropForeignKey(String table, String column) =>
-      'ALTER TABLE ${dwQuote(table)} DROP CONSTRAINT '
-      '${dwQuote(foreignKeyName(table, column))};';
+      'ALTER TABLE ${dwQuoteIdentifier(table)} DROP CONSTRAINT '
+      '${dwQuoteIdentifier(foreignKeyName(table, column))};';
 
   static String addUnique(String table, String column) =>
-      'ALTER TABLE ${dwQuote(table)} ADD CONSTRAINT '
-      '${dwQuote(uniqueName(table, column))} UNIQUE (${dwQuote(column)});';
+      'ALTER TABLE ${dwQuoteIdentifier(table)} ADD CONSTRAINT '
+      '${dwQuoteIdentifier(uniqueName(table, column))} UNIQUE (${dwQuoteIdentifier(column)});';
 
   static String dropUnique(String table, String column) =>
-      'ALTER TABLE ${dwQuote(table)} DROP CONSTRAINT '
-      '${dwQuote(uniqueName(table, column))};';
+      'ALTER TABLE ${dwQuoteIdentifier(table)} DROP CONSTRAINT '
+      '${dwQuoteIdentifier(uniqueName(table, column))};';
 
   static String createIndex(String table, DwIndexSchema index) =>
-      'CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${dwQuote(index.name)} '
-      'ON ${dwQuote(table)} (${index.columns.map(dwQuote).join(', ')});';
+      'CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${dwQuoteIdentifier(index.name)} '
+      'ON ${dwQuoteIdentifier(table)} (${index.columns.map(dwQuoteIdentifier).join(', ')});';
 
-  static String dropIndex(String name) => 'DROP INDEX ${dwQuote(name)};';
+  static String dropIndex(String name) =>
+      'DROP INDEX ${dwQuoteIdentifier(name)};';
 
   static String uniqueName(String table, String column) =>
       '${table}_${column}_key';
@@ -129,9 +131,9 @@ abstract final class DwDdl {
   static String primaryKeyName(String table) => '${table}_pkey';
 
   static String _columnDefinition(String table, DwColumnSchema column) {
-    final name = dwQuote(column.name);
+    final name = dwQuoteIdentifier(column.name);
     if (column.primaryKey) {
-      return '$name bigserial CONSTRAINT ${dwQuote(primaryKeyName(table))} PRIMARY KEY';
+      return '$name bigserial CONSTRAINT ${dwQuoteIdentifier(primaryKeyName(table))} PRIMARY KEY';
     }
     final parts = [
       name,
@@ -139,10 +141,10 @@ abstract final class DwDdl {
       if (!column.nullable) 'NOT NULL',
       if (column.defaultSql case final defaultSql?) 'DEFAULT $defaultSql',
       if (column.unique)
-        'CONSTRAINT ${dwQuote(uniqueName(table, column.name))} UNIQUE',
+        'CONSTRAINT ${dwQuoteIdentifier(uniqueName(table, column.name))} UNIQUE',
       if (column.references case final references?)
-        'CONSTRAINT ${dwQuote(foreignKeyName(table, column.name))} '
-            'REFERENCES ${dwQuote(references.tableName)} ("id") '
+        'CONSTRAINT ${dwQuoteIdentifier(foreignKeyName(table, column.name))} '
+            'REFERENCES ${dwQuoteIdentifier(references.tableName)} ("id") '
             'ON DELETE ${references.onDelete.sql}',
     ];
     return parts.join(' ');
@@ -151,11 +153,11 @@ abstract final class DwDdl {
   static String _foreignKey(
     String table,
     String column,
-    DwReferences references,
+    DwForeignKey references,
   ) =>
-      'CONSTRAINT ${dwQuote(foreignKeyName(table, column))} '
-      'FOREIGN KEY (${dwQuote(column)}) '
-      'REFERENCES ${dwQuote(references.tableName)} ("id") '
+      'CONSTRAINT ${dwQuoteIdentifier(foreignKeyName(table, column))} '
+      'FOREIGN KEY (${dwQuoteIdentifier(column)}) '
+      'REFERENCES ${dwQuoteIdentifier(references.tableName)} ("id") '
       'ON DELETE ${references.onDelete.sql}';
 }
 

@@ -4,7 +4,7 @@ import 'visible.dart' show Visible;
 
 part 'hidden.dw.dart';
 
-final class UsesHidden extends DwCommand<void> with _$UsesHidden {
+final class UsesHidden extends DwActionCommand<void> with _$UsesHidden {
   const UsesHidden({required this.visible});
 
   final Visible visible;

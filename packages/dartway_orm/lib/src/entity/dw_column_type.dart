@@ -15,39 +15,39 @@ import '../db/dw_errors.dart';
 /// [sqlType] is spelled the way `format_type` reports it, so a column created
 /// from it and the same column read back by introspection compare equal
 /// without a translation table.
-abstract final class DwType<T> {
-  const DwType(this.sqlType);
+abstract final class DwColumnType<T> {
+  const DwColumnType(this.sqlType);
 
   final String sqlType;
 
-  static const DwType<int> bigint = _DwIdentityType<int>(
+  static const DwColumnType<int> bigint = _DwIdentityType<int>(
     'bigint',
     pg.Type.bigInteger,
     pg.Type.bigIntegerArray,
   );
 
-  static const DwType<double> doublePrecision = _DwDoubleType();
+  static const DwColumnType<double> doublePrecision = _DwDoubleType();
 
-  static const DwType<bool> boolean = _DwIdentityType<bool>(
+  static const DwColumnType<bool> boolean = _DwIdentityType<bool>(
     'boolean',
     pg.Type.boolean,
     pg.Type.booleanArray,
   );
 
-  static const DwType<String> text = _DwIdentityType<String>(
+  static const DwColumnType<String> text = _DwIdentityType<String>(
     'text',
     pg.Type.text,
     pg.Type.textArray,
   );
 
   /// Stored as an instant; always read back in UTC.
-  static const DwType<DateTime> timestamptz = _DwDateTimeType();
+  static const DwColumnType<DateTime> timestamptz = _DwDateTimeType();
 
   /// Stored as `bigint` microseconds: exact, sortable, and free of the
   /// month/day ambiguity of `interval`.
-  static const DwType<Duration> duration = _DwDurationType();
+  static const DwColumnType<Duration> duration = _DwDurationType();
 
-  static const DwType<Uint8List> bytea = _DwByteaType();
+  static const DwColumnType<Uint8List> bytea = _DwByteaType();
 
   @internal
   pg.Type<Object> get parameterType;
@@ -74,10 +74,10 @@ abstract final class DwType<T> {
   T decode(Object raw);
 
   @override
-  String toString() => 'DwType($sqlType)';
+  String toString() => 'DwColumnType($sqlType)';
 }
 
-final class _DwIdentityType<T> extends DwType<T> {
+final class _DwIdentityType<T> extends DwColumnType<T> {
   const _DwIdentityType(
     super.sqlType,
     this.parameterType,
@@ -100,7 +100,7 @@ final class _DwIdentityType<T> extends DwType<T> {
   }
 }
 
-final class _DwDoubleType extends DwType<double> {
+final class _DwDoubleType extends DwColumnType<double> {
   const _DwDoubleType() : super('double precision');
 
   @override
@@ -119,7 +119,7 @@ final class _DwDoubleType extends DwType<double> {
   }
 }
 
-final class _DwDateTimeType extends DwType<DateTime> {
+final class _DwDateTimeType extends DwColumnType<DateTime> {
   const _DwDateTimeType() : super('timestamp with time zone');
 
   @override
@@ -138,7 +138,7 @@ final class _DwDateTimeType extends DwType<DateTime> {
   }
 }
 
-final class _DwDurationType extends DwType<Duration> {
+final class _DwDurationType extends DwColumnType<Duration> {
   const _DwDurationType() : super('bigint');
 
   @override
@@ -157,7 +157,7 @@ final class _DwDurationType extends DwType<Duration> {
   }
 }
 
-final class _DwByteaType extends DwType<Uint8List> {
+final class _DwByteaType extends DwColumnType<Uint8List> {
   const _DwByteaType() : super('bytea');
 
   @override
@@ -179,7 +179,7 @@ final class _DwByteaType extends DwType<Uint8List> {
 
 /// An enum stored as `text` holding its `name` (D-008): adding a value needs
 /// no migration, and the driver decodes native enum types only as raw bytes.
-final class DwEnumType<E extends Enum> extends DwType<E> {
+final class DwEnumType<E extends Enum> extends DwColumnType<E> {
   const DwEnumType(this.values) : super('text');
 
   final List<E> values;
@@ -211,7 +211,7 @@ final class DwEnumType<E extends Enum> extends DwType<E> {
 /// the driver encodes a null element of a `jsonb[]` parameter as the JSON
 /// value `null`, which is not SQL `NULL` — a nullable column filled by
 /// `insertAll` would answer `IS NULL` with false.
-abstract final class _DwJsonType<T> extends DwType<T> {
+abstract final class _DwJsonType<T> extends DwColumnType<T> {
   const _DwJsonType() : super('jsonb');
 
   @override

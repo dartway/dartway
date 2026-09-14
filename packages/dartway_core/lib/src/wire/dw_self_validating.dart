@@ -1,4 +1,4 @@
-import '../result/dw_refusal.dart';
+import '../result/dw_call_refusal.dart';
 
 /// A DTO that checks its own input.
 ///
@@ -9,7 +9,7 @@ import '../result/dw_refusal.dart';
 ///
 /// [validate] must depend on the DTO's fields only: a DTO is a value, and the
 /// client relies on an equal DTO validating equally.
-abstract interface class DwValidatable {
+abstract interface class DwSelfValidating {
   /// Every problem with the input; empty when the input is acceptable.
-  List<DwRefusal> validate();
+  List<DwCallRefusal> validate();
 }

@@ -99,8 +99,8 @@ final class SessionHolder extends DwDataObject with _$SessionHolder {
 
   @override
   final int id;
-  final DwSession session;
-  final DwSession? previous;
+  final DwAuthSession session;
+  final DwAuthSession? previous;
 }
 
 final class GetItem extends DwSingleRequest<Item> with _$GetItem {
@@ -162,35 +162,35 @@ final class ItemHistory extends DwWindowRequest<Item> with _$ItemHistory {
   final int itemId;
 }
 
-final class EditItem extends DwCommand<Item> with _$EditItem {
+final class EditItem extends DwActionCommand<Item> with _$EditItem {
   const EditItem({
     required this.itemId,
-    this.title = const DwPatch.keep(),
-    this.updatedAt = const DwPatch.keep(),
-    this.color = const DwPatch.keep(),
-    this.dimensions = const DwPatch.keep(),
-    this.discount = const DwPatch.keep(),
-    this.timeout = const DwPatch.keep(),
+    this.title = const DwFieldPatch.keep(),
+    this.updatedAt = const DwFieldPatch.keep(),
+    this.color = const DwFieldPatch.keep(),
+    this.dimensions = const DwFieldPatch.keep(),
+    this.discount = const DwFieldPatch.keep(),
+    this.timeout = const DwFieldPatch.keep(),
     this.tags = const [],
   });
 
   final int itemId;
-  final DwPatch<String> title;
-  final DwPatch<DateTime> updatedAt;
-  final DwPatch<Color> color;
-  final DwPatch<units.Dimensions> dimensions;
-  final DwPatch<double> discount;
-  final DwPatch<Duration> timeout;
+  final DwFieldPatch<String> title;
+  final DwFieldPatch<DateTime> updatedAt;
+  final DwFieldPatch<Color> color;
+  final DwFieldPatch<units.Dimensions> dimensions;
+  final DwFieldPatch<double> discount;
+  final DwFieldPatch<Duration> timeout;
   final List<String> tags;
 }
 
-final class OnlyPatches extends DwCommand<void> with _$OnlyPatches {
-  const OnlyPatches({this.note = const DwPatch.keep()});
+final class OnlyPatches extends DwActionCommand<void> with _$OnlyPatches {
+  const OnlyPatches({this.note = const DwFieldPatch.keep()});
 
-  final DwPatch<String> note;
+  final DwFieldPatch<String> note;
 }
 
-final class RemoveItem extends DwCommand<void> with _$RemoveItem {
+final class RemoveItem extends DwActionCommand<void> with _$RemoveItem {
   const RemoveItem();
 }
 

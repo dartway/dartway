@@ -37,14 +37,15 @@ final class EntityColumn {
 
   final String sqlName;
 
-  /// The `DwType` expression: `DwType.bigint`, `DwEnumType(Kind.values)`, …
+  /// The `DwColumnType` expression: `DwColumnType.bigint`,
+  /// `DwEnumType(Kind.values)`, …
   final String dwType;
   final bool unique;
 
-  /// A const `DwDefault` expression, or `null`.
+  /// A const `DwDefaultValue` expression, or `null`.
   final String? defaultValue;
 
-  /// A const `DwReferences` expression, or `null`.
+  /// A const `DwForeignKey` expression, or `null`.
   final String? references;
 }
 
@@ -90,7 +91,7 @@ final class EntityClass {
   /// `SessionBookingRow` → `SessionBookingTable`.
   String get tableClass => '${entityName}Table';
 
-  /// The repository getter on the project's `DwDb` extension:
+  /// The repository getter on the project's `DwDatabaseHandle` extension:
   /// `SessionBookingRow` → `sessionBookings`.
   String get repositoryGetter => pluralCamelCase(entityName);
 }
@@ -115,8 +116,9 @@ String? entityNameOf(String className) =>
 /// `addresses`.
 ///
 /// Deliberately a plain rule, not a dictionary: the name must be predictable
-/// from the class name alone (`Person` → `persons`). A getter that reads badly
-/// is fixed by renaming the class, never by a lookup table nobody can see.
+/// from the class name alone (`Person` → `persons`). A getter that reads
+/// badly is fixed by renaming the class, never by a lookup table nobody can
+/// see.
 String pluralCamelCase(String className) {
   final camel = _lowerCamel(className);
   final lower = camel.toLowerCase();

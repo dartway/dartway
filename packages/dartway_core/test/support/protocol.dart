@@ -7,12 +7,15 @@ import '../fixtures/club_booking.dart';
 export '../fixtures/club_booking.dart';
 
 /// The fixture DTOs plus hand-written request kinds, as a project registry.
-final protocol = DwProtocol([
-  const DwDtoEntry<ClubBooking>('ClubBooking', $ClubBookingFromJson),
-  const DwDtoEntry<ListMyBookings>('ListMyBookings', $ListMyBookingsFromJson),
-  const DwDtoEntry<RenameBooking>('RenameBooking', $RenameBookingFromJson),
-  DwDtoEntry<CoachNote>('CoachNote', CoachNote.fromJson),
-], include: DwProtocol.core);
+final protocol = DwWireProtocol([
+  const DwProtocolEntry<ClubBooking>('ClubBooking', $ClubBookingFromJson),
+  const DwProtocolEntry<ListMyBookings>(
+    'ListMyBookings',
+    $ListMyBookingsFromJson,
+  ),
+  const DwProtocolEntry<RenameBooking>('RenameBooking', $RenameBookingFromJson),
+  DwProtocolEntry<CoachNote>('CoachNote', CoachNote.fromJson),
+], include: DwWireProtocol.core);
 
 /// Through real JSON text, as the wire carries it.
 Object? roundTrip(Object? json) => jsonDecode(jsonEncode(json));

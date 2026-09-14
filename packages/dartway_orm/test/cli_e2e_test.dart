@@ -25,7 +25,7 @@ void main() {
     await File(p.join(migrations.path, 'migrations.dart')).writeAsString('''
 import 'package:dartway_orm/dartway_orm.dart';
 
-final List<DwMigration> appMigrations = [];
+final List<DwDatabaseMigration> appMigrations = [];
 ''');
     final fixtures = p.relative(
       p.join(
@@ -47,9 +47,9 @@ import 'package:dartway_orm/dartway_orm.dart';
 import '$fixtures';
 import 'migrations/migrations.dart';
 
-DwSchema get schema {
+DwDatabaseSchema get schema {
   if (Platform.environment['SCHEMA'] != 'v2') return fixtureSchema;
-  return DwSchema.fromTables([
+  return DwDatabaseSchema.fromTables([
     for (final table in fixtureSchema.tables)
       switch (table.name) {
         'club_session' => DwTableSchema(

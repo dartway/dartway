@@ -2,7 +2,7 @@ import 'package:dartway_core/dartway_core.dart';
 
 part 'declaration.dw.dart';
 
-final class NoMixin extends DwCommand<void> {
+final class NoMixin extends DwActionCommand<void> {
   const NoMixin();
 
   @override
@@ -12,18 +12,20 @@ final class NoMixin extends DwCommand<void> {
   Map<String, Object?> toJson() => const {};
 }
 
-final class Generic<T> extends DwCommand<T> with _$Generic<T> {
+final class Generic<T> extends DwActionCommand<T> with _$Generic<T> {
   const Generic();
 }
 
-final class Bare extends DwDto with _$Bare {
+final class Bare extends DwWireObject with _$Bare {
   const Bare();
 }
 
-final class Implements extends Object with _$Implements implements DwCommand<void> {
+final class Implements extends Object
+    with _$Implements
+    implements DwActionCommand<void> {
   const Implements();
 }
 
-final class _Private extends DwCommand<void> with _$_Private {
+final class _Private extends DwActionCommand<void> with _$_Private {
   const _Private();
 }

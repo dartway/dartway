@@ -2,8 +2,8 @@ import 'package:meta/meta.dart';
 import 'package:postgres/postgres.dart' as pg;
 
 import '../entity/dw_annotations.dart';
-import '../entity/dw_type.dart';
-import '../schema/dw_schema.dart';
+import '../entity/dw_column_type.dart';
+import '../schema/dw_database_schema.dart';
 
 /// A column of a table, typed by the Dart value it holds.
 ///
@@ -14,8 +14,8 @@ import '../schema/dw_schema.dart';
 /// Expressions that make sense only for some types are extensions constrained
 /// on `T` (see [DwComparableColumn], [DwStringColumn]), so `gt` on a `bool` or
 /// `like` on a `DateTime` does not compile.
-final class DwColumn<T> {
-  const DwColumn(
+final class DwTableColumn<T> {
+  const DwTableColumn(
     this.name,
     this.type, {
     this.unique = false,
@@ -23,24 +23,24 @@ final class DwColumn<T> {
     this.references,
   }) : primaryKey = false;
 
-  const DwColumn._primaryKey(this.name, this.type)
+  const DwTableColumn._primaryKey(this.name, this.type)
     : primaryKey = true,
       unique = false,
       defaultValue = null,
       references = null;
 
   /// The `id bigserial primary key` every table has.
-  static const DwColumn<int> id = DwColumn<int>._primaryKey(
+  static const DwTableColumn<int> id = DwTableColumn<int>._primaryKey(
     'id',
-    DwType.bigint,
+    DwColumnType.bigint,
   );
 
   final String name;
-  final DwType<T> type;
+  final DwColumnType<T> type;
   final bool primaryKey;
   final bool unique;
-  final DwDefault? defaultValue;
-  final DwReferences? references;
+  final DwDefaultValue? defaultValue;
+  final DwForeignKey? references;
 
   bool get nullable => null is T;
 
@@ -55,28 +55,28 @@ final class DwColumn<T> {
   );
 
   /// `null` matches rows where the column is null.
-  DwExpression equals(T value) => value == null
+  DwWhereCondition equals(T value) => value == null
       ? _DwNullTest(this, isNull: true)
       : _DwComparison(this, '=', value);
 
   /// Dart semantics: a null cell is not equal to any value, so it matches.
-  DwExpression notEquals(T value) => value == null
+  DwWhereCondition notEquals(T value) => value == null
       ? _DwNullTest(this, isNull: false)
       : _DwComparison(this, nullable ? 'IS DISTINCT FROM' : '<>', value);
 
-  DwExpression isNull() => _DwNullTest(this, isNull: true);
+  DwWhereCondition isNull() => _DwNullTest(this, isNull: true);
 
-  DwExpression isNotNull() => _DwNullTest(this, isNull: false);
+  DwWhereCondition isNotNull() => _DwNullTest(this, isNull: false);
 
-  DwOrder asc() => DwOrder._(this, descending: false);
+  DwOrderTerm asc() => DwOrderTerm._(this, descending: false);
 
-  DwOrder desc() => DwOrder._(this, descending: true);
+  DwOrderTerm desc() => DwOrderTerm._(this, descending: true);
 
   /// An assignment for `updateWhere`.
-  DwAssignment<T> set(T value) => DwAssignment._(this, value);
+  DwColumnAssignment<T> set(T value) => DwColumnAssignment._(this, value);
 
   @internal
-  String get sql => dwQuote(name);
+  String get sql => dwQuoteIdentifier(name);
 
   @internal
   String encodeParameter(DwSqlWriter writer, T value) => value == null
@@ -84,39 +84,41 @@ final class DwColumn<T> {
       : writer.parameter(type.encode(value), type.parameterType);
 
   @override
-  String toString() => 'DwColumn<$T>($name)';
+  String toString() => 'DwTableColumn<$T>($name)';
 }
 
 /// Membership tests. The values are non-null by type: SQL `IN` never matches a
 /// null, so accepting one would read as a filter and silently match nothing.
-extension DwColumnMembership<T extends Object> on DwColumn<T?> {
+extension DwColumnMembership<T extends Object> on DwTableColumn<T?> {
   /// One array parameter whatever the length, so the statement is prepared
   /// once and reused for every list size.
-  DwExpression inList(Iterable<T> values) =>
+  DwWhereCondition inList(Iterable<T> values) =>
       _DwMembership(this, values.toList(growable: false), negated: false);
 
-  DwExpression notInList(Iterable<T> values) =>
+  DwWhereCondition notInList(Iterable<T> values) =>
       _DwMembership(this, values.toList(growable: false), negated: true);
 }
 
 /// Ordering comparisons, for types whose Dart ordering matches the SQL one.
-extension DwComparableColumn<T extends Comparable<Object?>> on DwColumn<T?> {
-  DwExpression gt(T value) => _DwComparison(this, '>', value);
+extension DwComparableColumn<T extends Comparable<Object?>>
+    on DwTableColumn<T?> {
+  DwWhereCondition gt(T value) => _DwComparison(this, '>', value);
 
-  DwExpression gte(T value) => _DwComparison(this, '>=', value);
+  DwWhereCondition gte(T value) => _DwComparison(this, '>=', value);
 
-  DwExpression lt(T value) => _DwComparison(this, '<', value);
+  DwWhereCondition lt(T value) => _DwComparison(this, '<', value);
 
-  DwExpression lte(T value) => _DwComparison(this, '<=', value);
+  DwWhereCondition lte(T value) => _DwComparison(this, '<=', value);
 
   /// Inclusive on both ends, as SQL `BETWEEN`.
-  DwExpression between(T low, T high) => _DwBetween(this, low, high);
+  DwWhereCondition between(T low, T high) => _DwBetween(this, low, high);
 }
 
-extension DwStringColumn on DwColumn<String?> {
-  DwExpression like(String pattern) => _DwComparison(this, 'LIKE', pattern);
+extension DwStringColumn on DwTableColumn<String?> {
+  DwWhereCondition like(String pattern) => _DwComparison(this, 'LIKE', pattern);
 
-  DwExpression ilike(String pattern) => _DwComparison(this, 'ILIKE', pattern);
+  DwWhereCondition ilike(String pattern) =>
+      _DwComparison(this, 'ILIKE', pattern);
 }
 
 /// A boolean condition over one table's columns.
@@ -127,24 +129,25 @@ extension DwStringColumn on DwColumn<String?> {
 /// Null follows Dart, not SQL three-valued logic: a comparison against a null
 /// cell is false, and [not] of it is true. `NOT` is therefore written as
 /// `IS NOT TRUE`, which is exactly that.
-sealed class DwExpression {
-  const DwExpression();
+sealed class DwWhereCondition {
+  const DwWhereCondition();
 
-  DwExpression operator &(DwExpression other) =>
+  DwWhereCondition operator &(DwWhereCondition other) =>
       _DwJunction(this, 'AND', other);
 
-  DwExpression operator |(DwExpression other) => _DwJunction(this, 'OR', other);
+  DwWhereCondition operator |(DwWhereCondition other) =>
+      _DwJunction(this, 'OR', other);
 
-  DwExpression not() => _DwNot(this);
+  DwWhereCondition not() => _DwNot(this);
 
   @internal
   void write(DwSqlWriter writer);
 }
 
-final class _DwComparison<T> extends DwExpression {
+final class _DwComparison<T> extends DwWhereCondition {
   const _DwComparison(this.column, this.operator, this.value);
 
-  final DwColumn<T> column;
+  final DwTableColumn<T> column;
   final String operator;
   final T value;
 
@@ -154,10 +157,10 @@ final class _DwComparison<T> extends DwExpression {
   );
 }
 
-final class _DwBetween<T> extends DwExpression {
+final class _DwBetween<T> extends DwWhereCondition {
   const _DwBetween(this.column, this.low, this.high);
 
-  final DwColumn<T> column;
+  final DwTableColumn<T> column;
   final T low;
   final T high;
 
@@ -169,10 +172,10 @@ final class _DwBetween<T> extends DwExpression {
   }
 }
 
-final class _DwNullTest extends DwExpression {
+final class _DwNullTest extends DwWhereCondition {
   const _DwNullTest(this.column, {required this.isNull});
 
-  final DwColumn<Object?> column;
+  final DwTableColumn<Object?> column;
   final bool isNull;
 
   @override
@@ -180,10 +183,10 @@ final class _DwNullTest extends DwExpression {
       writer.write('${column.sql} ${isNull ? 'IS NULL' : 'IS NOT NULL'}');
 }
 
-final class _DwMembership<T extends Object> extends DwExpression {
+final class _DwMembership<T extends Object> extends DwWhereCondition {
   const _DwMembership(this.column, this.values, {required this.negated});
 
-  final DwColumn<T?> column;
+  final DwTableColumn<T?> column;
   final List<T> values;
   final bool negated;
 
@@ -200,12 +203,12 @@ final class _DwMembership<T extends Object> extends DwExpression {
   }
 }
 
-final class _DwJunction extends DwExpression {
+final class _DwJunction extends DwWhereCondition {
   const _DwJunction(this.left, this.operator, this.right);
 
-  final DwExpression left;
+  final DwWhereCondition left;
   final String operator;
-  final DwExpression right;
+  final DwWhereCondition right;
 
   @override
   void write(DwSqlWriter writer) {
@@ -217,10 +220,10 @@ final class _DwJunction extends DwExpression {
   }
 }
 
-final class _DwNot extends DwExpression {
+final class _DwNot extends DwWhereCondition {
   const _DwNot(this.inner);
 
-  final DwExpression inner;
+  final DwWhereCondition inner;
 
   @override
   void write(DwSqlWriter writer) {
@@ -231,10 +234,10 @@ final class _DwNot extends DwExpression {
 }
 
 /// One `ORDER BY` term.
-final class DwOrder {
-  const DwOrder._(this.column, {required this.descending});
+final class DwOrderTerm {
+  const DwOrderTerm._(this.column, {required this.descending});
 
-  final DwColumn<Object?> column;
+  final DwTableColumn<Object?> column;
   final bool descending;
 
   @internal
@@ -242,10 +245,10 @@ final class DwOrder {
 }
 
 /// One `SET column = value` of `updateWhere`.
-final class DwAssignment<T> {
-  const DwAssignment._(this.column, this.value);
+final class DwColumnAssignment<T> {
+  const DwColumnAssignment._(this.column, this.value);
 
-  final DwColumn<T> column;
+  final DwTableColumn<T> column;
   final T value;
 
   @internal
@@ -279,4 +282,5 @@ final class DwSqlWriter {
 /// Quotes an SQL identifier. Every identifier the ORM writes is quoted, so a
 /// column called `key`, `order` or `user` needs no special handling.
 @internal
-String dwQuote(String identifier) => '"${identifier.replaceAll('"', '""')}"';
+String dwQuoteIdentifier(String identifier) =>
+    '"${identifier.replaceAll('"', '""')}"';

@@ -4,17 +4,17 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:path/path.dart' as p;
 
-import '../db/dw_database.dart';
+import '../db/dw_postgres_database.dart';
 import '../db/dw_database_config.dart';
-import '../db/dw_db.dart';
-import '../schema/dw_introspector.dart';
-import '../schema/dw_schema.dart';
+import '../db/dw_database_handle.dart';
+import '../schema/dw_schema_introspector.dart';
+import '../schema/dw_database_schema.dart';
 import '../schema/dw_schema_diff.dart';
-import 'dw_checksum.dart';
+import 'dw_migration_checksum.dart';
 import 'dw_draft_writer.dart';
-import 'dw_migration.dart';
+import 'dw_database_migration.dart';
 import 'dw_migration_errors.dart';
-import 'dw_migrator.dart';
+import 'dw_migration_runner.dart';
 
 /// The migration command line of a project, run from `bin/migrate.dart`:
 ///
@@ -57,10 +57,10 @@ final class DwMigrationCli {
   static const exitUsage = 64;
 
   /// The schema the row classes declare.
-  final DwSchema schema;
+  final DwDatabaseSchema schema;
 
   /// The project's migrations, registered in [directory]/migrations.dart.
-  final List<DwMigration> migrations;
+  final List<DwDatabaseMigration> migrations;
 
   /// Where migration files live, relative to the working directory.
   final String directory;
@@ -69,7 +69,7 @@ final class DwMigrationCli {
 
   /// Migrations of other namespaces (the framework's `dw`, modules) that run
   /// before the project's. Their tables are not part of [schema].
-  final Map<String, List<DwMigration>> modules;
+  final Map<String, List<DwDatabaseMigration>> modules;
 
   /// Defaults to `DW_DATABASE_*` from the environment.
   final DwDatabaseConfig? database;
@@ -97,7 +97,7 @@ usage: migrate <command>
     return code;
   }
 
-  Map<String, List<DwMigration>> get _allMigrations => {
+  Map<String, List<DwDatabaseMigration>> get _allMigrations => {
     ...modules,
     namespace: migrations,
   };
@@ -150,8 +150,12 @@ usage: migrate <command>
     return exitUsage;
   }
 
-  Future<T> _withDatabase<T>(Future<T> Function(DwDb db) body) async {
-    final opened = await DwDatabase.open(_config.copyWith(maxConnections: 2));
+  Future<T> _withDatabase<T>(
+    Future<T> Function(DwDatabaseHandle db) body,
+  ) async {
+    final opened = await DwPostgresDatabase.open(
+      _config.copyWith(maxConnections: 2),
+    );
     try {
       return await body(opened.db);
     } finally {
@@ -160,7 +164,7 @@ usage: migrate <command>
   }
 
   Future<int> _apply() => _withDatabase((db) async {
-    final run = await DwMigrator(db, migrations: _allMigrations).apply();
+    final run = await DwMigrationRunner(db, migrations: _allMigrations).apply();
     if (run.isEmpty) {
       _out.writeln('nothing to apply');
     } else {
@@ -193,7 +197,7 @@ usage: migrate <command>
         throw _UsageException('rollback takes --batch N or --id X');
     }
     return _withDatabase((db) async {
-      final run = await DwMigrator(
+      final run = await DwMigrationRunner(
         db,
         migrations: _allMigrations,
       ).rollback(batch: batch, id: id);
@@ -210,7 +214,10 @@ usage: migrate <command>
   }
 
   Future<int> _status() => _withDatabase((db) async {
-    final entries = await DwMigrator(db, migrations: _allMigrations).status();
+    final entries = await DwMigrationRunner(
+      db,
+      migrations: _allMigrations,
+    ).status();
     for (final entry in entries) {
       _out.writeln(entry);
     }
@@ -339,28 +346,28 @@ usage: migrate <command>
   /// them again one by one, and requires every step up to reproduce the schema
   /// its rollback started from.
   Future<bool> _roundTrip(
-    DwDatabase scratch,
-    DwSchema full,
+    DwPostgresDatabase scratch,
+    DwDatabaseSchema full,
     void Function(String message) fail,
   ) async {
     final db = scratch.db;
     final excluded = await _moduleTables(scratch);
-    Future<DwSchema> snapshot() async =>
-        (await DwIntrospector.read(db, excludeTables: excluded)).schema;
+    Future<DwDatabaseSchema> snapshot() async =>
+        (await DwSchemaIntrospector.read(db, excludeTables: excluded)).schema;
 
     final applied = await db.query(
-      'SELECT "id" FROM "${DwMigrator.ledgerTable}" WHERE "namespace" = @namespace ORDER BY "seq"',
+      'SELECT "id" FROM "${DwMigrationRunner.ledgerTable}" WHERE "namespace" = @namespace ORDER BY "seq"',
       params: {'namespace': namespace},
     );
     final order = [for (final row in applied) row.get<String>('id')];
     final byId = {for (final migration in migrations) migration.id: migration};
 
     // before[k]: the schema with the first k migrations applied.
-    final before = <int, DwSchema>{order.length: full};
+    final before = <int, DwDatabaseSchema>{order.length: full};
     var bottom = order.length;
     for (var k = order.length - 1; k >= 0; k--) {
       try {
-        await DwMigrator(
+        await DwMigrationRunner(
           db,
           migrations: _allMigrations,
         ).rollback(id: DwMigrationRef(namespace, order[k]));
@@ -380,7 +387,7 @@ usage: migrate <command>
 
     var ok = true;
     for (var k = bottom; k < order.length; k++) {
-      await DwMigrator(
+      await DwMigrationRunner(
         db,
         migrations: {
           ...modules,
@@ -425,7 +432,7 @@ usage: migrate <command>
       if (ids.isNotEmpty && !ids.contains(file.id)) continue;
       if (file.declaredChecksum == file.computedChecksum) continue;
       final source = await File(file.path).readAsString();
-      await File(file.path).writeAsString(DwChecksum.seal(source));
+      await File(file.path).writeAsString(DwMigrationChecksum.seal(source));
       _out.writeln('resealed ${file.id}');
       changed++;
     }
@@ -443,13 +450,13 @@ usage: migrate <command>
       final name = p.basename(entity.path);
       if (!name.endsWith('.dart') || name == 'migrations.dart') continue;
       final source = await entity.readAsString();
-      final id = DwChecksum.idOf(source);
-      final className = DwChecksum.classOf(source);
-      final declared = DwChecksum.declared(source);
+      final id = DwMigrationChecksum.idOf(source);
+      final className = DwMigrationChecksum.classOf(source);
+      final declared = DwMigrationChecksum.declared(source);
       if (id == null || className == null || declared == null) {
         throw FormatException(
           '${entity.path} is not a migration: expected a class extending '
-          'DwMigration with `String get id` and `String get checksum`',
+          'DwDatabaseMigration with `String get id` and `String get checksum`',
         );
       }
       if (name != DwDraftWriter.fileName(id)) {
@@ -463,21 +470,25 @@ usage: migrate <command>
           id,
           className,
           declared,
-          DwChecksum.of(source),
+          DwMigrationChecksum.of(source),
         ),
       );
     }
     return files;
   }
 
-  Future<T> _withScratch<T>(Future<T> Function(DwDatabase scratch) body) async {
+  Future<T> _withScratch<T>(
+    Future<T> Function(DwPostgresDatabase scratch) body,
+  ) async {
     final config = _config;
     final name =
         '$scratchDatabasePrefix${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(1 << 30)}';
-    final server = await DwDatabase.open(config.copyWith(maxConnections: 1));
+    final server = await DwPostgresDatabase.open(
+      config.copyWith(maxConnections: 1),
+    );
     try {
       await server.db.execute('CREATE DATABASE "$name"');
-      final scratch = await DwDatabase.open(
+      final scratch = await DwPostgresDatabase.open(
         config.copyWith(name: name, maxConnections: 2),
       );
       try {
@@ -493,23 +504,23 @@ usage: migrate <command>
 
   /// Applies every migration to a scratch database and reads back the tables
   /// the project owns.
-  Future<DwIntrospection> _replay(DwDatabase scratch) async {
+  Future<DwSchemaIntrospection> _replay(DwPostgresDatabase scratch) async {
     if (modules.isNotEmpty) {
-      await DwMigrator(scratch.db, migrations: modules).apply();
+      await DwMigrationRunner(scratch.db, migrations: modules).apply();
     }
     final excluded = await _moduleTables(scratch);
-    await DwMigrator(scratch.db, migrations: _allMigrations).apply();
-    return DwIntrospector.read(scratch.db, excludeTables: excluded);
+    await DwMigrationRunner(scratch.db, migrations: _allMigrations).apply();
+    return DwSchemaIntrospector.read(scratch.db, excludeTables: excluded);
   }
 
   final Expando<Set<String>> _moduleTablesOf = Expando();
 
   /// Tables that exist before the project's migrations run: the modules' and
   /// the ledger. Computed on the first call, while only they exist.
-  Future<Set<String>> _moduleTables(DwDatabase scratch) async =>
+  Future<Set<String>> _moduleTables(DwPostgresDatabase scratch) async =>
       _moduleTablesOf[scratch] ??= {
-        DwMigrator.ledgerTable,
-        for (final table in (await DwIntrospector.read(
+        DwMigrationRunner.ledgerTable,
+        for (final table in (await DwSchemaIntrospector.read(
           scratch.db,
         )).schema.tables)
           table.name,
@@ -518,34 +529,36 @@ usage: migrate <command>
   /// The target schema as Postgres itself spells it: created in a separate
   /// schema of the scratch database and introspected, so defaults and types
   /// compare in canonical form rather than as the row class author typed them.
-  Future<DwIntrospection> _canonical(DwDatabase scratch, DwSchema target) =>
-      scratch.db.pinned((db) async {
-        await db.execute(
-          'CREATE SCHEMA "dw_target"; SET search_path TO "dw_target", public',
-        );
-        final m = DwMigrationContext(db);
-        // Tables first, foreign keys after: declaration order must not matter.
-        for (final table in target.tables) {
-          await m.createTable(
-            DwTableSchema(
-              table.name,
-              columns: [
-                for (final column in table.columns)
-                  column.copyWith(references: () => null),
-              ],
-              indexes: table.indexes,
-            ),
-          );
+  Future<DwSchemaIntrospection> _canonical(
+    DwPostgresDatabase scratch,
+    DwDatabaseSchema target,
+  ) => scratch.db.pinned((db) async {
+    await db.execute(
+      'CREATE SCHEMA "dw_target"; SET search_path TO "dw_target", public',
+    );
+    final m = DwMigrationContext(db);
+    // Tables first, foreign keys after: declaration order must not matter.
+    for (final table in target.tables) {
+      await m.createTable(
+        DwTableSchema(
+          table.name,
+          columns: [
+            for (final column in table.columns)
+              column.copyWith(references: () => null),
+          ],
+          indexes: table.indexes,
+        ),
+      );
+    }
+    for (final table in target.tables) {
+      for (final column in table.columns) {
+        if (column.references case final references?) {
+          await m.addForeignKey(table.name, column.name, references);
         }
-        for (final table in target.tables) {
-          for (final column in table.columns) {
-            if (column.references case final references?) {
-              await m.addForeignKey(table.name, column.name, references);
-            }
-          }
-        }
-        return DwIntrospector.read(db, schemaName: 'dw_target');
-      });
+      }
+    }
+    return DwSchemaIntrospector.read(db, schemaName: 'dw_target');
+  });
 }
 
 final class _MigrationFile {

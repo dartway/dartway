@@ -7,10 +7,10 @@ void main() {
   group('call contract', () {
     test('paths', () {
       expect(dwProtocolVersion, 1);
-      expect(DwHttp.livePath, '/dw/live');
-      expect(DwHttp.healthPath, '/health');
-      expect(DwHttp.callPath('BookSession'), '/dw/BookSession');
-      expect(DwHttp.wireNameOf('/dw/BookSession'), 'BookSession');
+      expect(DwHttpContract.livePath, '/dw/live');
+      expect(DwHttpContract.healthPath, '/health');
+      expect(DwHttpContract.callPath('BookSession'), '/dw/BookSession');
+      expect(DwHttpContract.wireNameOf('/dw/BookSession'), 'BookSession');
       for (final path in [
         '/dw/live',
         '/dw/',
@@ -18,24 +18,24 @@ void main() {
         '/health',
         '/x/Book',
       ]) {
-        expect(DwHttp.wireNameOf(path), isNull, reason: path);
+        expect(DwHttpContract.wireNameOf(path), isNull, reason: path);
       }
     });
 
     test('header and parameter names', () {
-      expect(DwHttp.authorizationHeader, 'Authorization');
-      expect(DwHttp.idempotencyKeyHeader, 'Dw-Idempotency-Key');
-      expect(DwHttp.protocolHeader, 'Dw-Protocol');
-      expect(DwHttp.appVersionHeader, 'Dw-App-Version');
-      expect(DwHttp.liveConnectionHeader, 'Dw-Live-Connection');
-      expect(DwHttp.retryAfterHeader, 'Retry-After');
+      expect(DwHttpContract.authorizationHeader, 'Authorization');
+      expect(DwHttpContract.idempotencyKeyHeader, 'Dw-Idempotency-Key');
+      expect(DwHttpContract.protocolHeader, 'Dw-Protocol');
+      expect(DwHttpContract.appVersionHeader, 'Dw-App-Version');
+      expect(DwHttpContract.liveConnectionHeader, 'Dw-Live-Connection');
+      expect(DwHttpContract.retryAfterHeader, 'Retry-After');
       expect(
         [
-          DwHttp.offsetParameter,
-          DwHttp.pageSizeParameter,
-          DwHttp.anchorParameter,
-          DwHttp.beforeParameter,
-          DwHttp.afterParameter,
+          DwHttpContract.offsetParameter,
+          DwHttpContract.pageSizeParameter,
+          DwHttpContract.anchorParameter,
+          DwHttpContract.beforeParameter,
+          DwHttpContract.afterParameter,
         ],
         ['offset', 'pageSize', 'anchor', 'before', 'after'],
       );
@@ -43,12 +43,14 @@ void main() {
 
     test('a DTO cannot be named like the live path or a non-identifier', () {
       expect(
-        () => DwProtocol([DwDtoEntry<CoachNote>('live', CoachNote.fromJson)]),
+        () => DwWireProtocol([
+          DwProtocolEntry<CoachNote>('live', CoachNote.fromJson),
+        ]),
         throwsArgumentError,
       );
       expect(
-        () => DwProtocol([
-          DwDtoEntry<CoachNote>('Coach/Note', CoachNote.fromJson),
+        () => DwWireProtocol([
+          DwProtocolEntry<CoachNote>('Coach/Note', CoachNote.fromJson),
         ]),
         throwsArgumentError,
       );
@@ -117,7 +119,7 @@ void main() {
     });
 
     test('the other kinds take no query', () {
-      for (final request in <DwRequest<Object?>>[
+      for (final request in <DwDataRequest<Object?>>[
         const GetBooking(),
         const FindBooking(1),
         const ListMyBookings(),
@@ -135,7 +137,7 @@ void main() {
       const feed = FeedBookings();
       const history = BookingHistory();
       for (final (request, query)
-          in <(DwRequest<Object?>, Map<String, String>)>[
+          in <(DwDataRequest<Object?>, Map<String, String>)>[
             (feed, {'offset': '-1'}),
             (feed, {'offset': 'x'}),
             (feed, {'offset': '01'}),

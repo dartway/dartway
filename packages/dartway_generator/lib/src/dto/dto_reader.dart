@@ -17,7 +17,7 @@ final class DtoReader {
 
   final LibraryNames names;
   final WireTypeReader types;
-  final List<DwDiagnostic> diagnostics;
+  final List<DwGenerationDiagnostic> diagnostics;
 
   DtoClass? read(
     ClassElement element,
@@ -27,10 +27,10 @@ final class DtoReader {
     final name = element.name!;
     if (kind == DtoKind.bare) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
-          '`$name` extends DwDto directly; extend DwDataObject, a DwRequest '
-          'kind or DwCommand',
+          '`$name` extends DwWireObject directly; extend DwDataObject, a DwDataRequest '
+          'kind or DwActionCommand',
         ),
       );
       return null;
@@ -38,10 +38,10 @@ final class DtoReader {
     final extendsClause = declaration.extendsClause;
     if (extendsClause == null || !_reachesKindBySuperclass(element)) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           '`$name` must extend its DTO kind (`extends DwDataObject`, a '
-          'DwRequest kind or DwCommand); implementing or mixing it in is not '
+          'DwDataRequest kind or DwActionCommand); implementing or mixing it in is not '
           'supported',
         ),
       );
@@ -49,7 +49,7 @@ final class DtoReader {
     }
     if (element.typeParameters.isNotEmpty) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           '`$name` is generic; a DTO class cannot have type parameters, '
           'because its decoder cannot know them',
@@ -72,7 +72,7 @@ final class DtoReader {
         type = types.read(field.type);
       } on UnsupportedType catch (problem) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'field `${field.name}` of `$name` cannot be serialised: '
             '${problem.reason}',
@@ -84,7 +84,7 @@ final class DtoReader {
       final spelling = names.spell(field.type);
       if (spelling == null) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'field `${field.name}` of `$name` has a type this library does not '
             'import, and the generated part can only use the library\'s imports',
@@ -129,7 +129,7 @@ final class DtoReader {
     Element? idElement;
     for (
       InterfaceElement? current = element;
-      current != null && !DwFramework.isFramework(current);
+      current != null && !DwFrameworkTypes.isFramework(current);
       current = current.supertype?.element
     ) {
       final field = current.getField('id');
@@ -147,7 +147,7 @@ final class DtoReader {
     }
     if (idType == null) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           'data object `$name` declares no `id`; add `@override final int id;` '
           '(or a String) or an `id` getter',
@@ -163,7 +163,7 @@ final class DtoReader {
           ? idElement
           : element;
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           location,
           'the id of data object `$name` must be `int` or `String`, not '
           '`${idType.getDisplayString()}`',
@@ -180,9 +180,9 @@ final class DtoReader {
       type = type.element.supertype
     ) {
       final superElement = type.element;
-      if (DwFramework.isCoreClass(superElement, 'DwDataObject') ||
-          DwFramework.isCoreClass(superElement, 'DwRequest') ||
-          DwFramework.isCoreClass(superElement, 'DwCommand')) {
+      if (DwFrameworkTypes.isCoreClass(superElement, 'DwDataObject') ||
+          DwFrameworkTypes.isCoreClass(superElement, 'DwDataRequest') ||
+          DwFrameworkTypes.isCoreClass(superElement, 'DwActionCommand')) {
         return true;
       }
     }

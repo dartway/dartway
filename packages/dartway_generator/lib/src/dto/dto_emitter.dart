@@ -48,7 +48,9 @@ abstract final class DtoEmitter {
       final type = field.type;
       if (type is PatchWire) {
         final encode = JsonCodecWriter.encodeValue(type.inner, 'v');
-        patches.add('DwJson.writePatch(json, $key, $self, (v) => $encode);');
+        patches.add(
+          'DwJsonCodec.writePatch(json, $key, $self, (v) => $encode);',
+        );
       } else if (type.nullable) {
         final value = type.isIdentity
             ? self
@@ -91,7 +93,7 @@ abstract final class DtoEmitter {
     final type = field.type;
     if (type is PatchWire) {
       final decode = JsonCodecWriter.decodeValue(type.inner, 'v');
-      return 'DwJson.readPatch(json, $key, (v) => $decode)';
+      return 'DwJsonCodec.readPatch(json, $key, (v) => $decode)';
     }
     if (field.omitWhenEmpty && !type.nullable) {
       final empty = type is MapWire ? 'const {}' : 'const []';

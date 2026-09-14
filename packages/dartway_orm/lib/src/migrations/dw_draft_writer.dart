@@ -1,9 +1,9 @@
 import 'package:meta/meta.dart';
 
 import '../entity/dw_annotations.dart';
-import '../schema/dw_schema.dart';
+import '../schema/dw_database_schema.dart';
 import '../schema/dw_schema_diff.dart';
-import 'dw_checksum.dart';
+import 'dw_migration_checksum.dart';
 
 /// Writes migration drafts and the registration list as Dart source.
 ///
@@ -47,7 +47,7 @@ abstract final class DwDraftWriter {
     buffer
       ..writeln("import 'package:dartway_orm/dartway_orm.dart';")
       ..writeln()
-      ..writeln('final class $className extends DwMigration {')
+      ..writeln('final class $className extends DwDatabaseMigration {')
       ..writeln('  const $className();')
       ..writeln()
       ..writeln('  @override')
@@ -79,7 +79,7 @@ abstract final class DwDraftWriter {
       buffer.writeln('  }');
     }
     buffer.writeln('}');
-    return DwChecksum.seal(buffer.toString());
+    return DwMigrationChecksum.seal(buffer.toString());
   }
 
   /// The registration file: every migration of [files] (id → class name), in
@@ -101,7 +101,7 @@ abstract final class DwDraftWriter {
     }
     buffer
       ..writeln()
-      ..writeln('final List<DwMigration> $variable = [');
+      ..writeln('final List<DwDatabaseMigration> $variable = [');
     for (final id in ids) {
       buffer.writeln('  const ${classesById[id]}(),');
     }
@@ -264,8 +264,8 @@ abstract final class DwDraftWriter {
     return 'DwColumnSchema(${arguments.join(', ')})';
   }
 
-  static String _references(DwReferences references) =>
-      'DwReferences(${_string(references.tableName)}, '
+  static String _references(DwForeignKey references) =>
+      'DwForeignKey(${_string(references.tableName)}, '
       'onDelete: DwOnDelete.${references.onDelete.name})';
 
   static String _index(DwIndexSchema index) =>

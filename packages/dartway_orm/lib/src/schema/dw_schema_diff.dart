@@ -1,7 +1,7 @@
 import 'package:collection/collection.dart';
 
 import '../entity/dw_annotations.dart';
-import 'dw_schema.dart';
+import 'dw_database_schema.dart';
 
 /// One step from a schema towards another.
 ///
@@ -177,7 +177,7 @@ final class DwAddForeignKey extends DwSchemaChange {
   const DwAddForeignKey(super.table, this.column, this.references);
 
   final String column;
-  final DwReferences references;
+  final DwForeignKey references;
 
   @override
   DwSchemaChange get inverse => DwDropForeignKey(table, column, references);
@@ -191,7 +191,7 @@ final class DwDropForeignKey extends DwSchemaChange {
   const DwDropForeignKey(super.table, this.column, this.references);
 
   final String column;
-  final DwReferences references;
+  final DwForeignKey references;
 
   @override
   DwSchemaChange get inverse => DwAddForeignKey(table, column, references);
@@ -232,8 +232,8 @@ abstract final class DwSchemaDiff {
   /// created before columns reference them, and drops of columns and tables
   /// come last.
   static List<DwSchemaChange> compare({
-    required DwSchema from,
-    required DwSchema to,
+    required DwDatabaseSchema from,
+    required DwDatabaseSchema to,
   }) {
     final dropConstraints = <DwSchemaChange>[];
     final createTables = <DwSchemaChange>[];

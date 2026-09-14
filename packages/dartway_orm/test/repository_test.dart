@@ -11,7 +11,7 @@ import 'support/test_database.dart';
 
 void main() {
   final database = useTestDatabase();
-  DwDb db() => database().db;
+  DwDatabaseHandle db() => database().db;
 
   ClubServiceRow service({
     String title = 'Yoga',
@@ -99,7 +99,7 @@ void main() {
 
     test('an explicit id is written', () async {
       final stored = await db().clubServices.insert(
-        service().copyWith(id: const DwPatch.set(42)),
+        service().copyWith(id: const DwFieldPatch.set(42)),
       );
       expect(stored.id, 42);
     });
@@ -161,7 +161,7 @@ void main() {
     });
 
     Future<List<String>> titles(
-      DwExpression Function(ClubServiceTable t)? where,
+      DwWhereCondition Function(ClubServiceTable t)? where,
     ) async => [
       for (final found in await db().clubServices.find(
         where: where,
@@ -311,11 +311,12 @@ void main() {
 
     test('a row lock outside a transaction throws before any statement', () {
       expect(
-        () => db().clubServices.find(lock: DwLock.forUpdate),
+        () => db().clubServices.find(lock: DwRowLock.forUpdate),
         throwsA(isA<StateError>()),
       );
       expect(
-        () => db().clubServices.findById(1, lock: DwLock.forUpdateSkipLocked),
+        () =>
+            db().clubServices.findById(1, lock: DwRowLock.forUpdateSkipLocked),
         throwsA(isA<StateError>()),
       );
     });
@@ -367,7 +368,7 @@ void main() {
       ]);
       final single = await db().clubSessions.insert(
         sessions.first.copyWith(
-          id: const DwPatch.clear(),
+          id: const DwFieldPatch.clear(),
           startsAt: DateTime.utc(2030),
         ),
       );
@@ -414,7 +415,7 @@ void main() {
       expect(
         () => db().clubServices.insertAll([
           service(),
-          service().copyWith(id: const DwPatch.set(7)),
+          service().copyWith(id: const DwFieldPatch.set(7)),
         ]),
         throwsArgumentError,
       );
@@ -491,9 +492,9 @@ void main() {
       final stored = await db().clubServices.insert(service(price: 5));
       final changed = stored.copyWith(
         title: 'Renamed',
-        price: const DwPatch.clear(),
+        price: const DwFieldPatch.clear(),
         tags: ['x'],
-        archivedAt: DwPatch.set(DateTime.utc(2030)),
+        archivedAt: DwFieldPatch.set(DateTime.utc(2030)),
       );
       final updated = await db().clubServices.update(changed);
       expect(updated, changed);
@@ -501,7 +502,7 @@ void main() {
     });
 
     test('update of a missing row throws DwRowNotFound', () async {
-      final ghost = service().copyWith(id: const DwPatch.set(12345));
+      final ghost = service().copyWith(id: const DwFieldPatch.set(12345));
       await expectLater(
         db().clubServices.update(ghost),
         throwsA(
@@ -677,7 +678,7 @@ void main() {
     expect(session.column('note_text')!.nullable, isTrue);
     expect(
       session.column('service_id')!.references,
-      const DwReferences('club_service', onDelete: DwOnDelete.cascade),
+      const DwForeignKey('club_service', onDelete: DwOnDelete.cascade),
     );
     expect(session.indexes.map((i) => i.name), [
       'club_session_service_id_starts_at_key',

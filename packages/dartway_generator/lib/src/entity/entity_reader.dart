@@ -20,7 +20,7 @@ final class EntityReader {
 
   final LibraryNames names;
   final WireTypeReader types;
-  final List<DwDiagnostic> diagnostics;
+  final List<DwGenerationDiagnostic> diagnostics;
 
   /// Postgres truncates longer identifiers silently.
   static const _maxIdentifierBytes = 63;
@@ -32,7 +32,7 @@ final class EntityReader {
         !_reachesEntityBySuperclass(element) ||
         element.typeParameters.isNotEmpty) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           element.typeParameters.isNotEmpty
               ? '`$name` is generic; a row class cannot have type '
@@ -50,7 +50,7 @@ final class EntityReader {
           ? 'Some$rowSuffix'
           : '$name$rowSuffix';
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           'row class `$name` must be named `<Entity>$rowSuffix` (`$suggested`): '
           'its table class is `<Entity>Table` and its repository getter '
@@ -61,14 +61,14 @@ final class EntityReader {
       return null;
     }
 
-    final table = _annotation(element.metadata.annotations, 'DwTable');
+    final table = _annotation(element.metadata.annotations, 'DwSqlTable');
     final tableName = table?.getField('name')?.toStringValue();
     if (table == null || tableName == null) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           'row class `$name` needs its table: annotate it with '
-          "`@DwTable('${snakeCase(entityName)}')`",
+          "`@DwSqlTable('${snakeCase(entityName)}')`",
         ),
       );
       return null;
@@ -77,7 +77,7 @@ final class EntityReader {
     var valid = _checkIdentifier(element, tableName, 'table name');
     if (!_declaresTable(element)) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           'row class `$name` must declare its table: add '
           '`static const table = ${entityName}Table();`',
@@ -108,7 +108,7 @@ final class EntityReader {
         if (!type.isDartCoreInt ||
             type.nullabilitySuffix != NullabilitySuffix.question) {
           diagnostics.add(
-            DwDiagnostic.at(
+            DwGenerationDiagnostic.at(
               location,
               'the id of row class `$name` must be `int?` (a bigserial key, '
               'null before insert), not `${type.getDisplayString()}`',
@@ -130,7 +130,7 @@ final class EntityReader {
 
       if (reserved.contains(fieldName)) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'field `$fieldName` of row class `$name` would shadow '
             '`DwTableDef.$fieldName` in the generated table class; rename the '
@@ -146,7 +146,7 @@ final class EntityReader {
         type = types.read(fieldElement.type);
       } on UnsupportedType catch (problem) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'field `$fieldName` of row class `$name` cannot be a column: '
             '${problem.reason}',
@@ -158,7 +158,7 @@ final class EntityReader {
       final spelling = names.spell(fieldElement.type);
       if (spelling == null) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'field `$fieldName` of row class `$name` has a type this library does '
             'not import, and the generated part can only use the library\'s '
@@ -179,7 +179,7 @@ final class EntityReader {
       final previous = fieldsByColumn[sqlName];
       if (previous != null) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             location,
             'fields `$previous` and `$fieldName` of row class `$name` both map to '
             'column `$sqlName`',
@@ -192,7 +192,7 @@ final class EntityReader {
       columnsByField[fieldName] = sqlName;
       valid &= _checkIdentifier(location, sqlName, 'column name');
 
-      final unique = _annotation(annotations, 'DwUnique') != null;
+      final unique = _annotation(annotations, 'DwUniqueColumn') != null;
       if (unique) {
         valid &= _checkIdentifier(
           location,
@@ -201,12 +201,12 @@ final class EntityReader {
         );
       }
 
-      final referencesValue = _annotation(annotations, 'DwReferences');
+      final referencesValue = _annotation(annotations, 'DwForeignKey');
       String? references;
       if (referencesValue != null) {
         if (type is! ScalarWire || type.dartName != 'int') {
           diagnostics.add(
-            DwDiagnostic.at(
+            DwGenerationDiagnostic.at(
               location,
               'field `$fieldName` of row class `$name` references another table, '
               'so it holds that row\'s id and must be `int` or `int?`',
@@ -223,11 +223,11 @@ final class EntityReader {
         final target = referencesValue.getField('tableName')!.toStringValue()!;
         final onDelete = _enumName(referencesValue.getField('onDelete'));
         references =
-            'DwReferences(${dartString(target)}'
+            'DwForeignKey(${dartString(target)}'
             '${onDelete == null || onDelete == 'noAction' ? '' : ', onDelete: DwOnDelete.$onDelete'})';
       }
 
-      final defaultValue = _annotation(annotations, 'DwDefault');
+      final defaultValue = _annotation(annotations, 'DwDefaultValue');
       final defaultSql = defaultValue?.getField('sql')?.toStringValue();
 
       fields.add(
@@ -242,8 +242,8 @@ final class EntityReader {
             defaultValue: defaultSql == null
                 ? null
                 : defaultSql == 'now()'
-                ? 'DwDefault.now()'
-                : 'DwDefault(${dartString(defaultSql)})',
+                ? 'DwDefaultValue.now()'
+                : 'DwDefaultValue(${dartString(defaultSql)})',
             references: references,
           ),
         ),
@@ -252,7 +252,7 @@ final class EntityReader {
 
     if (!hasId && valid) {
       diagnostics.add(
-        DwDiagnostic.at(
+        DwGenerationDiagnostic.at(
           element,
           'row class `$name` must declare `@override final int? id;` with a '
           'named constructor parameter `this.id`',
@@ -271,7 +271,7 @@ final class EntityReader {
       final unknown = fieldNames.where((f) => !columnsByField.containsKey(f));
       if (fieldNames.isEmpty || unknown.isNotEmpty) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             element,
             fieldNames.isEmpty
                 ? 'an index of row class `$name` names no fields'
@@ -290,7 +290,7 @@ final class EntityReader {
           '${tableName}_${columns.join('_')}_${unique ? 'key' : 'idx'}';
       if (!indexNames.add(indexName)) {
         diagnostics.add(
-          DwDiagnostic.at(
+          DwGenerationDiagnostic.at(
             element,
             'row class `$name` declares index `$indexName` twice',
           ),
@@ -317,7 +317,7 @@ final class EntityReader {
   bool _checkIdentifier(Element location, String identifier, String what) {
     if (utf8.encode(identifier).length <= _maxIdentifierBytes) return true;
     diagnostics.add(
-      DwDiagnostic.at(
+      DwGenerationDiagnostic.at(
         location,
         'the $what `$identifier` is longer than $_maxIdentifierBytes bytes, '
         'and Postgres would silently truncate it',
@@ -327,13 +327,13 @@ final class EntityReader {
   }
 
   static String _dwType(WireType type) => switch (type) {
-    ScalarWire(dartName: 'int') => 'DwType.bigint',
-    ScalarWire(dartName: 'String') => 'DwType.text',
-    ScalarWire() => 'DwType.boolean',
-    DoubleWire() => 'DwType.doublePrecision',
-    DateTimeWire() => 'DwType.timestamptz',
-    DurationWire() => 'DwType.duration',
-    BytesWire() => 'DwType.bytea',
+    ScalarWire(dartName: 'int') => 'DwColumnType.bigint',
+    ScalarWire(dartName: 'String') => 'DwColumnType.text',
+    ScalarWire() => 'DwColumnType.boolean',
+    DoubleWire() => 'DwColumnType.doublePrecision',
+    DateTimeWire() => 'DwColumnType.timestamptz',
+    DurationWire() => 'DwColumnType.duration',
+    BytesWire() => 'DwColumnType.bytea',
     EnumWire(:final spelling) => 'DwEnumType($spelling.values)',
     ListWire(:final element) => 'DwJsonListType<${_jsonSpelling(element)}>()',
     MapWire(:final value) => 'DwJsonMapType<${_jsonSpelling(value)}>()',
@@ -361,7 +361,7 @@ final class EntityReader {
           ? annotationElement.enclosingElement
           : annotationElement;
       if (classElement != null &&
-          DwFramework.isOrmClass(classElement, className)) {
+          DwFrameworkTypes.isOrmClass(classElement, className)) {
         return annotation.computeConstantValue();
       }
     }
@@ -377,7 +377,7 @@ final class EntityReader {
       type != null;
       type = type.element.supertype
     ) {
-      if (DwFramework.isOrmClass(type.element, 'DwTableRow')) return true;
+      if (DwFrameworkTypes.isOrmClass(type.element, 'DwTableRow')) return true;
     }
     return false;
   }

@@ -1,16 +1,16 @@
 import 'package:collection/collection.dart';
 
-import '../db/dw_db.dart';
+import '../db/dw_database_handle.dart';
 import '../entity/dw_annotations.dart';
-import 'dw_ddl.dart';
-import 'dw_schema.dart';
+import 'dw_ddl_writer.dart';
+import 'dw_database_schema.dart';
 
-/// What a live database has, as a [DwSchema], plus everything in it that
-/// row classes cannot declare.
-final class DwIntrospection {
-  const DwIntrospection(this.schema, this.unmodelled);
+/// What a live database has, as a [DwDatabaseSchema], plus everything in it
+/// that row classes cannot declare.
+final class DwSchemaIntrospection {
+  const DwSchemaIntrospection(this.schema, this.unmodelled);
 
-  final DwSchema schema;
+  final DwDatabaseSchema schema;
 
   /// Objects the schema model has no place for — a partial index, a check
   /// constraint, a multi-column foreign key — described in words. They are
@@ -20,11 +20,11 @@ final class DwIntrospection {
 }
 
 /// Reads tables, columns, constraints and indexes from `pg_catalog`.
-abstract final class DwIntrospector {
+abstract final class DwSchemaIntrospector {
   /// Introspects the tables of [schemaName] (the current schema by default),
   /// except [excludeTables].
-  static Future<DwIntrospection> read(
-    DwDb db, {
+  static Future<DwSchemaIntrospection> read(
+    DwDatabaseHandle db, {
     String? schemaName,
     Set<String> excludeTables = const {},
   }) async {
@@ -123,7 +123,7 @@ ORDER BY t.relname, i.relname''', params: params);
         case 'p':
           final sequence = RegExp(r"^nextval\('.*_seq'::regclass\)$");
           if (column != null &&
-              name == DwDdl.primaryKeyName(table.name) &&
+              name == DwDdlWriter.primaryKeyName(table.name) &&
               column.sqlType == 'bigint' &&
               sequence.hasMatch(column.defaultSql ?? '')) {
             column
@@ -137,7 +137,7 @@ ORDER BY t.relname, i.relname''', params: params);
           }
         case 'u':
           if (column != null &&
-              name == DwDdl.uniqueName(table.name, column.name)) {
+              name == DwDdlWriter.uniqueName(table.name, column.name)) {
             column.unique = true;
           } else {
             unmodelled.add(
@@ -156,11 +156,11 @@ ORDER BY t.relname, i.relname''', params: params);
             _ => null,
           };
           if (column != null &&
-              name == DwDdl.foreignKeyName(table.name, column.name) &&
+              name == DwDdlWriter.foreignKeyName(table.name, column.name) &&
               referencedColumns.length == 1 &&
               referencedColumns.single == 'id' &&
               onDelete != null) {
-            column.references = DwReferences(
+            column.references = DwForeignKey(
               row.get<String>('referenced_table'),
               onDelete: onDelete,
             );
@@ -193,8 +193,10 @@ ORDER BY t.relname, i.relname''', params: params);
       );
     }
 
-    return DwIntrospection(
-      DwSchema.fromTables([for (final table in tables.values) table.build()]),
+    return DwSchemaIntrospection(
+      DwDatabaseSchema.fromTables([
+        for (final table in tables.values) table.build(),
+      ]),
       List.unmodifiable(unmodelled),
     );
   }
@@ -237,7 +239,7 @@ final class _ColumnBuilder {
   String? defaultSql;
   bool primaryKey = false;
   bool unique = false;
-  DwReferences? references;
+  DwForeignKey? references;
 
   DwColumnSchema build() => primaryKey
       ? DwColumnSchema.primaryKey(name)

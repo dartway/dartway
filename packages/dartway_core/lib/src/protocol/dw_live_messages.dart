@@ -1,7 +1,7 @@
-import '../result/dw_refusal.dart';
-import 'dw_protocol.dart';
+import '../result/dw_call_refusal.dart';
+import 'dw_wire_protocol.dart';
 import 'dw_read.dart';
-import 'dw_transport.dart';
+import 'dw_update_transport.dart';
 
 // The messages of the live WebSocket (`GET /dw/live`). Calls do not travel
 // here — they are HTTP — so the socket carries only what HTTP cannot: the
@@ -95,7 +95,7 @@ sealed class DwServerMessage {
   /// Reads a server message; an update's transport is decoded with
   /// [protocol]. Throws [FormatException] for an unknown kind, a missing field
   /// or a key the kind does not define.
-  factory DwServerMessage.fromJson(Object? json, DwProtocol protocol) {
+  factory DwServerMessage.fromJson(Object? json, DwWireProtocol protocol) {
     const what = 'A server message';
     final map = dwReadMap(json, what);
     switch (map['k']) {
@@ -125,7 +125,7 @@ sealed class DwServerMessage {
         dwRejectUnknownKeys(map, const {'k', 'ch', 'updates'}, what);
         return DwUpdateMessage(
           channel: dwReadString(map['ch'], 'The channel'),
-          updates: DwTransport.fromJson(map['updates'], protocol),
+          updates: DwUpdateTransport.fromJson(map['updates'], protocol),
         );
       case 'closed':
         return DwChannelClosedMessage(_channel(map, what));
@@ -198,7 +198,7 @@ final class DwSubscribedMessage extends DwServerMessage {
 final class DwSubscriptionRefusedMessage extends DwServerMessage {
   const DwSubscriptionRefusedMessage.refused(
     this.channel,
-    DwRefusal this.refusal,
+    DwCallRefusal this.refusal,
   ) : incidentId = null;
 
   const DwSubscriptionRefusedMessage.unauthenticated(this.channel)
@@ -215,7 +215,10 @@ final class DwSubscriptionRefusedMessage extends DwServerMessage {
     return switch ((json['r'], json['x'])) {
       (null, null) => DwSubscriptionRefusedMessage.unauthenticated(channel),
       (final Map<String, Object?> r, null) =>
-        DwSubscriptionRefusedMessage.refused(channel, DwRefusal.fromJson(r)),
+        DwSubscriptionRefusedMessage.refused(
+          channel,
+          DwCallRefusal.fromJson(r),
+        ),
       (null, final String x) => DwSubscriptionRefusedMessage.failed(channel, x),
       _ => throw FormatException(
         'A subscription refusal carries either a refusal or an incident: $json',
@@ -224,7 +227,7 @@ final class DwSubscriptionRefusedMessage extends DwServerMessage {
   }
 
   final String channel;
-  final DwRefusal? refusal;
+  final DwCallRefusal? refusal;
 
   /// What the operator finds the failed check by.
   final String? incidentId;
@@ -249,7 +252,7 @@ final class DwUpdateMessage extends DwServerMessage {
 
   final String channel;
 
-  final DwTransport updates;
+  final DwUpdateTransport updates;
 
   @override
   Map<String, Object?> toJson() => {
