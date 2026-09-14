@@ -7,6 +7,19 @@ The rewrite (see docs/1.0).
 - **`DwAppBootstrapper` is exported**, so a widget test can mount the app as
   `DwAppRunner` mounts it — initializers, loading and error screens, and the
   "update the app" screen over everything — instead of rebuilding that by hand.
+- **`DwWindowListView`** — the chat list over `dw.window(request)`, not
+  reversed: a `CustomScrollView` centred on the split between the items up to
+  an anchor (growing upward) and those after it (growing downward), with the
+  viewport's zero at its bottom edge. Loading older or newer items never moves
+  what is on screen, and nothing compensates an offset after the fact. Opens at
+  `initialAnchor` (the anchor item's bottom at `anchorAlignment`) or at the
+  newest items, never with blank space under the newest; stays at the newest
+  item as items arrive there; loads both ends as they come near; reports the
+  items on screen, debounced (`onVisibleItemsChanged`). `DwWindowListController`
+  scrolls to an item by cursor — animated when near, placed when loaded but
+  far, reopening the window around it when not loaded — jumps to the newest
+  (reopening at it when not loaded), and tells `isAtNewest`, `newerCount`,
+  `topVisibleItem` and `isScrolling` for the "↓" button and a floating date.
 - **Uploads:** `dw.files` (the client's `DwFileClient`) and `dw.uploader()` — a
   `DwUploadNotifier`, a `ValueNotifier` of `DwUploadIdle` / `DwUploadProgress`
   / `DwUploadDone` / `DwUploadError` for one upload slot of a screen. Refusals,

@@ -60,6 +60,15 @@ export 'src/bootstrap/widgets/dw_app_bootstrapper.dart';
 export 'src/ui/actions/dw_ui_action.dart';
 export 'src/ui/actions/widgets/dw_action_builder.dart';
 
+// ui/window_list: the chat-style list over `dw.window` — newest at the
+// bottom, not reversed, grown both ways without moving what is on screen.
+export 'src/ui/window_list/dw_window_list_view.dart'
+    show
+        DwWindowListController,
+        DwWindowListEdge,
+        DwWindowListItem,
+        DwWindowListView;
+
 // ui/async_ui: render loading/error/data uniformly, with skeletons.
 export 'src/ui/async_ui/dw_async_ui.dart';
 

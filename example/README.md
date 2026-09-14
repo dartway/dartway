@@ -40,6 +40,10 @@ dart run bin/server.dart          # applies the migrations, serves :8080
 dart run bin/seed_dev.dart        # in another terminal, once
 ```
 
+Uploads need file storage — a public and a private bucket; with a local MinIO
+the endpoint and keys are enough (`dartway_example_server/README.md`, "File
+storage"). Without `DW_STORAGE_ENDPOINT` the server runs without them.
+
 ```bash
 cd dartway_example_flutter
 flutter pub get
@@ -70,6 +74,6 @@ dart run bin/migrate.dart check               # migrations produce the schema
 
 ```bash
 cd dartway_example_shared && dart test        # the contract
-cd dartway_example_server && dart test        # acceptance, real server + Postgres (DW_DATABASE_* names a maintenance database)
+cd dartway_example_server && dart test        # acceptance, real server + Postgres (DW_DATABASE_* names a maintenance database) + S3 storage (DW_STORAGE_ENDPOINT, _ACCESS_KEY, _SECRET_KEY)
 cd dartway_example_flutter && flutter test    # the app against the in-memory DwFakeServer
 ```

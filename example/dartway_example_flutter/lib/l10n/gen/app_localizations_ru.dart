@@ -164,23 +164,113 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sendMessage => 'Отправить';
 
   @override
-  String get showNewerMessages => 'Показать новее';
+  String get chatUnreadDivider => 'Непрочитанные сообщения';
 
   @override
-  String get newerMessages => 'Сообщения новее';
+  String get chatToday => 'Сегодня';
 
   @override
-  String newMessagesCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count новых сообщения',
-      many: '$count новых сообщений',
-      few: '$count новых сообщения',
-      one: '$count новое сообщение',
-    );
-    return '$_temp0';
+  String get chatYesterday => 'Вчера';
+
+  @override
+  String get chatEdited => 'изменено';
+
+  @override
+  String get chatDeletedMessage => 'Удалённое сообщение';
+
+  @override
+  String get chatPinnedMessage => 'Закреплённое сообщение';
+
+  @override
+  String chatPinnedPosition(int index, int count) {
+    return '$index из $count';
   }
+
+  @override
+  String get chatReply => 'Ответить';
+
+  @override
+  String get chatEdit => 'Редактировать';
+
+  @override
+  String get chatCopyText => 'Скопировать текст';
+
+  @override
+  String get chatCopied => 'Скопировано';
+
+  @override
+  String get chatPin => 'Закрепить';
+
+  @override
+  String get chatUnpin => 'Открепить';
+
+  @override
+  String get chatDelete => 'Удалить';
+
+  @override
+  String get chatDeleteQuestion => 'Удалить сообщение?';
+
+  @override
+  String get chatDeleteExplanation =>
+      'Оно пропадёт у всей команды. В ответах останется пометка, что сообщение удалено.';
+
+  @override
+  String chatReplyTo(String name) {
+    return 'Ответ $name';
+  }
+
+  @override
+  String get chatEditingMessage => 'Редактирование сообщения';
+
+  @override
+  String get chatAttachFile => 'Прикрепить файл';
+
+  @override
+  String chatAttachmentLimit(int max) {
+    return 'Не больше $max файлов в одном сообщении';
+  }
+
+  @override
+  String chatFileTooLarge(String name, int megabytes) {
+    return '$name больше $megabytes МБ';
+  }
+
+  @override
+  String chatUploadFailed(String name) {
+    return '$name не загрузился';
+  }
+
+  @override
+  String get chatPhoto => 'Фото';
+
+  @override
+  String get chatSearch => 'Поиск по чату';
+
+  @override
+  String get chatSearchHint => 'Искать сообщения';
+
+  @override
+  String get chatSearchNothing => 'Ничего не найдено';
+
+  @override
+  String chatSearchPosition(int index, int count) {
+    return '$index из $count';
+  }
+
+  @override
+  String get chatSearchOlder => 'Совпадение старше';
+
+  @override
+  String get chatSearchNewer => 'Совпадение новее';
+
+  @override
+  String get chatCloseSearch => 'Закрыть поиск';
+
+  @override
+  String get chatJumpToNewest => 'К новым сообщениям';
+
+  @override
+  String get chatMessageGone => 'Этого сообщения в чате больше нет';
 
   @override
   String get ourServices => 'Наши услуги';
@@ -462,6 +552,25 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get refusalMessageEmpty => 'Сообщение пустое.';
+
+  @override
+  String refusalMessageTooLong(int max) {
+    return 'Сообщение длиннее $max символов.';
+  }
+
+  @override
+  String refusalTooManyAttachments(int max) {
+    return 'Не больше $max файлов в одном сообщении.';
+  }
+
+  @override
+  String get refusalEditWindowClosed =>
+      'Сообщение нельзя изменить через сутки после отправки.';
+
+  @override
+  String refusalSearchQueryTooShort(int min) {
+    return 'Для поиска нужно хотя бы $min символа.';
+  }
 
   @override
   String get refusalSettingKeyUnknown => 'Такой настройки нет.';

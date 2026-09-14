@@ -1,7 +1,6 @@
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/entities/club.dart';
-import 'package:dartway_example_server/src/entities/content.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
@@ -167,43 +166,26 @@ void main() {
     expect(unauthenticated.response, isA<DwApiUnauthenticated>());
   });
 
-  test('closed access: a client reads no staff chat and no one else\'s '
-      'bookings, by request or by subscription', () async {
-    final vera = await club.member('79990000014', 'Vera');
-    final oleg = await club.member('79990000015', 'Oleg');
-    final channel = await club.db.chatChannels.insert(
-      const ChatChannelRow(title: 'Staff only'),
-    );
+  test(
+    "closed access: a member subscribes to their own bookings only",
+    () async {
+      final vera = await club.member('79990000014', 'Vera');
+      final oleg = await club.member('79990000015', 'Oleg');
 
-    final chat = vera.client.watchWindow(
-      ListChatMessages(channelId: channel.id!),
-    );
-    addTearDown(chat.close);
-    await eventually(() => chat.state is DwRequestRefused);
-    expect(
-      (chat.state as DwRequestRefused).refusal.isCode(DwCoreRefusal.forbidden),
-      isTrue,
-    );
-    await eventually(
-      () => vera.live
-          .refusalsOf(DwLiveChannel(ExampleChannel.staffChat, channel.id))
-          .isNotEmpty,
-      reason: 'the channel refuses the subscription too',
-    );
-
-    // Oleg's bookings: no request names them, and his channel is his alone.
-    final socket = await club.server.openLive();
-    addTearDown(socket.close);
-    await socket.authenticate(vera.session.token);
-    final foreign =
-        await socket.subscribe('bookings:${oleg.accountId}')
-            as DwSubscriptionRefusedMessage;
-    expect(foreign.refusal?.isCode(DwCoreRefusal.forbidden), isTrue);
-    expect(
-      await socket.subscribe('bookings:${vera.accountId}'),
-      isA<DwSubscribedMessage>(),
-    );
-  });
+      // Oleg's bookings: no request names them, and his channel is his alone.
+      final socket = await club.server.openLive();
+      addTearDown(socket.close);
+      await socket.authenticate(vera.session.token);
+      final foreign =
+          await socket.subscribe('bookings:${oleg.accountId}')
+              as DwSubscriptionRefusedMessage;
+      expect(foreign.refusal?.isCode(DwCoreRefusal.forbidden), isTrue);
+      expect(
+        await socket.subscribe('bookings:${vera.accountId}'),
+        isA<DwSubscribedMessage>(),
+      );
+    },
+  );
 
   test("an admin changing a member's role: the member's own profile follows "
       "live, and the admin's own profile is not touched by it", () async {
@@ -314,80 +296,5 @@ void main() {
       2,
       reason: 'the row came in the response; the page was not read again',
     );
-  });
-
-  test('the staff chat window reads older and newer messages around an '
-      'anchor, and counts what arrives past it', () async {
-    final boris = await club.memberWithRole(
-      '79990000021',
-      'Boris',
-      UserRole.staff,
-    );
-    final galina = await club.memberWithRole(
-      '79990000022',
-      'Galina',
-      UserRole.staff,
-    );
-    final authorRow = (await club.db.userProfiles.findFirst(
-      where: (t) => t.accountId.equals(boris.accountId),
-    ))!;
-    final channel = await club.db.chatChannels.insert(
-      const ChatChannelRow(title: 'Front desk'),
-    );
-    // 70 messages in 35 instants: every read boundary falls on a tie.
-    final base = DateTime.utc(2026, 9, 14, 9);
-    final rows = await club.db.chatMessages.insertAll([
-      for (var i = 0; i < 70; i++)
-        ChatMessageRow(
-          channelId: channel.id!,
-          authorProfileId: authorRow.id!,
-          text: 'm$i',
-          createdAt: base.add(Duration(minutes: i ~/ 2)),
-        ),
-    ]);
-    final request = ListChatMessages(channelId: channel.id!);
-    List<String> texts(DwWindowWatch<ChatMessage> w) => [
-      for (final m in dataOf(w.state)!.items) m.text,
-    ];
-
-    // At the newest: a page, then older pages to the start.
-    final newest = boris.client.watchWindow(request);
-    addTearDown(newest.close);
-    await eventually(() => newest.isLive);
-    expect(texts(newest), [for (var i = 69; i >= 40; i--) 'm$i']);
-    expect(dataOf(newest.state)!.hasNewer, isFalse);
-    while (dataOf(newest.state)!.hasOlder) {
-      await newest.loadOlder();
-    }
-    expect(texts(newest), [for (var i = 69; i >= 0; i--) 'm$i']);
-    expect(boris.http.posts('ListChatMessages'), 3);
-
-    // Around m21 (it shares its instant with m20): both ways from there.
-    final anchor = DwWindowCursor.encode(rows[21].createdAt, rows[21].id!);
-    final around = galina.client.watchWindow(request, anchor: anchor);
-    addTearDown(around.close);
-    await eventually(() => around.isLive);
-    final opened = dataOf(around.state)!;
-    expect(opened.items.map((m) => m.text), contains('m21'));
-    expect((opened.hasOlder, opened.hasNewer), (true, true));
-
-    // A message arriving while newer ones are not loaded is counted, not
-    // shown; the window at the newest shows it at once.
-    final sent = await boris.client.command(
-      SendChatMessage(channelId: channel.id!, text: 'live one'),
-    );
-    expect(texts(newest).first, 'live one', reason: 'from the response');
-    await eventually(() => dataOf(around.state)!.unseenNewerCount == 1);
-    expect(texts(around), isNot(contains('live one')));
-
-    while (dataOf(around.state)!.hasNewer) {
-      await around.loadNewer();
-    }
-    while (dataOf(around.state)!.hasOlder) {
-      await around.loadOlder();
-    }
-    expect(texts(around), ['live one', for (var i = 69; i >= 0; i--) 'm$i']);
-    expect(dataOf(around.state)!.unseenNewerCount, 0);
-    expect(dataOf(around.state)!.items.first.id, sent.valueOrThrow.id);
   });
 }

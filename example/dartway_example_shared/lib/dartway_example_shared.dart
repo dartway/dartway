@@ -10,6 +10,7 @@ export 'src/bookings.dart';
 export 'src/chat.dart';
 export 'src/example_channel.dart';
 export 'src/example_refusal.dart';
+export 'src/example_upload.dart';
 export 'src/news.dart';
 export 'src/people.dart';
 export 'src/schedule.dart';

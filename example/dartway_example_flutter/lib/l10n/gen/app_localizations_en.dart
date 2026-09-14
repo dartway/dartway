@@ -164,21 +164,113 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sendMessage => 'Send';
 
   @override
-  String get showNewerMessages => 'Show newer messages';
+  String get chatUnreadDivider => 'Unread messages';
 
   @override
-  String get newerMessages => 'Newer messages';
+  String get chatToday => 'Today';
 
   @override
-  String newMessagesCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count new messages',
-      one: '1 new message',
-    );
-    return '$_temp0';
+  String get chatYesterday => 'Yesterday';
+
+  @override
+  String get chatEdited => 'edited';
+
+  @override
+  String get chatDeletedMessage => 'Deleted message';
+
+  @override
+  String get chatPinnedMessage => 'Pinned message';
+
+  @override
+  String chatPinnedPosition(int index, int count) {
+    return '$index of $count';
   }
+
+  @override
+  String get chatReply => 'Reply';
+
+  @override
+  String get chatEdit => 'Edit';
+
+  @override
+  String get chatCopyText => 'Copy text';
+
+  @override
+  String get chatCopied => 'Copied';
+
+  @override
+  String get chatPin => 'Pin';
+
+  @override
+  String get chatUnpin => 'Unpin';
+
+  @override
+  String get chatDelete => 'Delete';
+
+  @override
+  String get chatDeleteQuestion => 'Delete the message?';
+
+  @override
+  String get chatDeleteExplanation =>
+      'It disappears for the whole team. Replies keep a note that it was deleted.';
+
+  @override
+  String chatReplyTo(String name) {
+    return 'Reply to $name';
+  }
+
+  @override
+  String get chatEditingMessage => 'Editing the message';
+
+  @override
+  String get chatAttachFile => 'Attach a file';
+
+  @override
+  String chatAttachmentLimit(int max) {
+    return 'At most $max files in one message';
+  }
+
+  @override
+  String chatFileTooLarge(String name, int megabytes) {
+    return '$name is larger than $megabytes MB';
+  }
+
+  @override
+  String chatUploadFailed(String name) {
+    return '$name did not upload';
+  }
+
+  @override
+  String get chatPhoto => 'Photo';
+
+  @override
+  String get chatSearch => 'Search the chat';
+
+  @override
+  String get chatSearchHint => 'Search messages';
+
+  @override
+  String get chatSearchNothing => 'Nothing found';
+
+  @override
+  String chatSearchPosition(int index, int count) {
+    return '$index of $count';
+  }
+
+  @override
+  String get chatSearchOlder => 'Older match';
+
+  @override
+  String get chatSearchNewer => 'Newer match';
+
+  @override
+  String get chatCloseSearch => 'Close search';
+
+  @override
+  String get chatJumpToNewest => 'To the newest messages';
+
+  @override
+  String get chatMessageGone => 'That message is no longer in the chat';
 
   @override
   String get ourServices => 'Our services';
@@ -460,6 +552,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get refusalMessageEmpty => 'The message is empty.';
+
+  @override
+  String refusalMessageTooLong(int max) {
+    return 'The message is longer than $max characters.';
+  }
+
+  @override
+  String refusalTooManyAttachments(int max) {
+    return 'At most $max files in one message.';
+  }
+
+  @override
+  String get refusalEditWindowClosed =>
+      'A message can no longer be edited a day after it was sent.';
+
+  @override
+  String refusalSearchQueryTooShort(int min) {
+    return 'Type at least $min characters to search.';
+  }
 
   @override
   String get refusalSettingKeyUnknown => 'This setting does not exist.';

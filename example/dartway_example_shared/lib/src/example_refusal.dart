@@ -17,6 +17,10 @@ enum ExampleRefusal with DwRefusalCodes {
   reviewNeedsAttendance,
   alreadyReviewed,
   messageEmpty,
+  messageTooLong,
+  tooManyAttachments,
+  editWindowClosed,
+  searchQueryTooShort,
   settingKeyUnknown,
   firstNameRequired,
 }

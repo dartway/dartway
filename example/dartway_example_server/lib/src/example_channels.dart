@@ -22,6 +22,15 @@ final exampleChannels = <DwChannelRule>[
   // "My" channels: a member subscribes to their own account's only.
   DwChannelRule.ofCaller(ExampleChannel.bookings),
   DwChannelRule.ofCaller(ExampleChannel.profile),
+  // A caller channel, as `ofCaller` declares one — the member's own account
+  // only — and staff only besides: nothing is ever published to a client's,
+  // and a subscription that can never hear anything is a mistake to refuse.
+  DwChannelRule.keyed<int>(
+    ExampleChannel.chatReads,
+    parseKey: int.parse,
+    canSubscribe: (ctx, accountId) async =>
+        ctx.accountId == accountId && await ctx.isStaff,
+  ),
   DwChannelRule.single(
     ExampleChannel.admin,
     canSubscribe: (ctx) => ctx.isAdmin,

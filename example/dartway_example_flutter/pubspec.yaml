@@ -43,6 +43,10 @@ dependencies:
   pin_code_fields: ^8.0.1
   collection: ^1.19.1
 
+  # Picking a chat attachment: the framework uploads bytes and carries no
+  # picker, so the app brings one.
+  file_picker: ^10.3.10
+
 dev_dependencies:
   flutter_lints: '>=3.0.0 <7.0.0'
   flutter_test:

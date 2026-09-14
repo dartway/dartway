@@ -19,30 +19,47 @@ final Map<String, DwRefusalCode> _codes = {
 /// A code neither knows — a newer server — still gets a sentence.
 String refusalText(AppLocalizations l10n, DwCallRefusal refusal) =>
     switch (_codes[refusal.code]) {
-      final ExampleRefusal code => _exampleText(l10n, code),
+      final ExampleRefusal code => _exampleText(l10n, code, refusal),
       final DwCoreRefusal code => _coreText(l10n, code, refusal),
       _ => l10n.refusalGeneric,
     };
 
-String _exampleText(AppLocalizations l10n, ExampleRefusal code) =>
-    switch (code) {
-      ExampleRefusal.titleRequired => l10n.refusalTitleRequired,
-      ExampleRefusal.textRequired => l10n.refusalTextRequired,
-      ExampleRefusal.durationNotPositive => l10n.refusalDurationNotPositive,
-      ExampleRefusal.priceNegative => l10n.refusalPriceNegative,
-      ExampleRefusal.capacityTooSmall => l10n.refusalCapacityTooSmall,
-      ExampleRefusal.sessionInPast => l10n.refusalSessionInPast,
-      ExampleRefusal.sessionStarted => l10n.refusalSessionStarted,
-      ExampleRefusal.noSpotsLeft => l10n.refusalNoSpotsLeft,
-      ExampleRefusal.alreadyBooked => l10n.refusalAlreadyBooked,
-      ExampleRefusal.bookingNotActive => l10n.refusalBookingNotActive,
-      ExampleRefusal.ratingOutOfRange => l10n.refusalRatingOutOfRange,
-      ExampleRefusal.reviewNeedsAttendance => l10n.refusalReviewNeedsAttendance,
-      ExampleRefusal.alreadyReviewed => l10n.refusalAlreadyReviewed,
-      ExampleRefusal.messageEmpty => l10n.refusalMessageEmpty,
-      ExampleRefusal.settingKeyUnknown => l10n.refusalSettingKeyUnknown,
-      ExampleRefusal.firstNameRequired => l10n.refusalFirstNameRequired,
-    };
+String _exampleText(
+  AppLocalizations l10n,
+  ExampleRefusal code,
+  DwCallRefusal refusal,
+) {
+  int param(String name, int fallback) =>
+      int.tryParse(refusal.params[name] ?? '') ?? fallback;
+  return switch (code) {
+    ExampleRefusal.titleRequired => l10n.refusalTitleRequired,
+    ExampleRefusal.textRequired => l10n.refusalTextRequired,
+    ExampleRefusal.durationNotPositive => l10n.refusalDurationNotPositive,
+    ExampleRefusal.priceNegative => l10n.refusalPriceNegative,
+    ExampleRefusal.capacityTooSmall => l10n.refusalCapacityTooSmall,
+    ExampleRefusal.sessionInPast => l10n.refusalSessionInPast,
+    ExampleRefusal.sessionStarted => l10n.refusalSessionStarted,
+    ExampleRefusal.noSpotsLeft => l10n.refusalNoSpotsLeft,
+    ExampleRefusal.alreadyBooked => l10n.refusalAlreadyBooked,
+    ExampleRefusal.bookingNotActive => l10n.refusalBookingNotActive,
+    ExampleRefusal.ratingOutOfRange => l10n.refusalRatingOutOfRange,
+    ExampleRefusal.reviewNeedsAttendance => l10n.refusalReviewNeedsAttendance,
+    ExampleRefusal.alreadyReviewed => l10n.refusalAlreadyReviewed,
+    ExampleRefusal.messageEmpty => l10n.refusalMessageEmpty,
+    ExampleRefusal.messageTooLong => l10n.refusalMessageTooLong(
+      param('max', ChatMessage.maxTextLength),
+    ),
+    ExampleRefusal.tooManyAttachments => l10n.refusalTooManyAttachments(
+      param('max', ChatMessage.maxAttachments),
+    ),
+    ExampleRefusal.editWindowClosed => l10n.refusalEditWindowClosed,
+    ExampleRefusal.searchQueryTooShort => l10n.refusalSearchQueryTooShort(
+      param('min', SearchChatMessages.minQueryLength),
+    ),
+    ExampleRefusal.settingKeyUnknown => l10n.refusalSettingKeyUnknown,
+    ExampleRefusal.firstNameRequired => l10n.refusalFirstNameRequired,
+  };
+}
 
 String _coreText(
   AppLocalizations l10n,

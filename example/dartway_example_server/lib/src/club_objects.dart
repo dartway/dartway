@@ -151,25 +151,4 @@ abstract final class ClubObjects {
         ),
     ];
   }
-
-  /// [author] is the author of every message, when the caller holds it.
-  static Future<List<ChatMessage>> messages(
-    DwDatabaseHandle db,
-    List<ChatMessageRow> rows, {
-    UserProfileRow? author,
-  }) async {
-    final authors = author != null
-        ? {author.id!: author}
-        : await _profiles(db, rows.map((m) => m.authorProfileId));
-    return [
-      for (final row in rows)
-        ChatMessage(
-          id: row.id!,
-          channelId: row.channelId,
-          text: row.text,
-          author: person(authors[row.authorProfileId]!),
-          createdAt: row.createdAt,
-        ),
-    ];
-  }
 }

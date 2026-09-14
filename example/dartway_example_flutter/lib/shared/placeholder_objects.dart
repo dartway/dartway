@@ -46,7 +46,7 @@ abstract final class PlaceholderObjects {
     channelId: 0,
     text: 'A message to the team',
     author: coach,
-    createdAt: _day,
+    sentAt: _day,
   );
 
   static const profile = UserProfile(

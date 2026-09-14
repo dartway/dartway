@@ -19,6 +19,10 @@ enum ExampleChannel with DwChannelKind {
   /// The list of staff chat channels. Staff only.
   staffChannels,
 
+  /// One staff member's read state of the chat channels: a caller channel,
+  /// keyed by the member's account. Its owner only.
+  chatReads,
+
   /// App settings: every signed-in member.
   settings,
 

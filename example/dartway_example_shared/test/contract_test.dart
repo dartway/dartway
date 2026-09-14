@@ -52,6 +52,56 @@ void main() {
       const ListUserProfiles(role: UserRole.staff),
       const ListChatMessages(channelId: 1),
       const SendChatMessage(channelId: 1, text: 'hi'),
+      const SendChatMessage(
+        channelId: 1,
+        text: '',
+        replyToMessageId: 4,
+        attachments: [ChatAttachmentDraft(id: 9, width: 640, height: 480)],
+      ),
+      const EditChatMessage(messageId: 4, text: 'fixed'),
+      const DeleteChatMessage(messageId: 4),
+      const PinChatMessage(messageId: 4, pinned: true),
+      const ReactToChatMessage(messageId: 4, reaction: ChatReaction.fire),
+      const ReactToChatMessage(messageId: 4),
+      const MarkChatRead(channelId: 1, messageId: 4),
+      const ListPinnedChatMessages(channelId: 1),
+      const SearchChatMessages(channelId: 1, query: 'yoga'),
+      const ListMyChatReadStates(),
+      ChatReadState(
+        id: 1,
+        unreadCount: 3,
+        lastReadMessageId: 4,
+        lastReadSentAt: DateTime.utc(2026, 9, 14, 9),
+      ),
+      ChatMessage(
+        id: 5,
+        channelId: 1,
+        text: 'see above',
+        author: person,
+        sentAt: DateTime.utc(2026, 9, 14, 10),
+        editedAt: DateTime.utc(2026, 9, 14, 11),
+        pinnedAt: DateTime.utc(2026, 9, 14, 12),
+        replyTo: ChatMessageQuote(
+          id: 4,
+          sentAt: DateTime.utc(2026, 9, 14, 9),
+          authorName: 'Boris',
+          text: '',
+          isDeleted: true,
+        ),
+        attachments: const [
+          ChatAttachment(
+            id: 9,
+            fileName: 'plan.png',
+            contentType: 'image/png',
+            byteSize: 2048,
+            width: 640,
+            height: 480,
+          ),
+        ],
+        reactions: const [
+          ChatMessageReaction(id: 2, reaction: ChatReaction.heart),
+        ],
+      ),
       booking(id: 5, accountId: 42),
       profile(),
       const AdminCounters(members: 3, upcomingSessions: 2, newsPosts: 1),
@@ -82,6 +132,33 @@ void main() {
     ]);
     expect(codes(const SendChatMessage(channelId: 1, text: '\n')), [
       'messageEmpty@text',
+    ]);
+    expect(
+      codes(
+        const SendChatMessage(
+          channelId: 1,
+          text: ' ',
+          attachments: [ChatAttachmentDraft(id: 1)],
+        ),
+      ),
+      isEmpty,
+      reason: 'a picture needs no words',
+    );
+    expect(
+      codes(
+        SendChatMessage(
+          channelId: 1,
+          text: 'x' * (ChatMessage.maxTextLength + 1),
+          attachments: [
+            for (var id = 0; id <= ChatMessage.maxAttachments; id++)
+              ChatAttachmentDraft(id: id),
+          ],
+        ),
+      ),
+      ['messageTooLong@text', 'tooManyAttachments@attachments'],
+    );
+    expect(codes(const SearchChatMessages(channelId: 1, query: ' a ')), [
+      'searchQueryTooShort@query',
     ]);
     expect(codes(const SaveAppSetting(key: 'colour', value: 'red')), [
       'settingKeyUnknown@key',
@@ -143,12 +220,12 @@ void main() {
   test('the chat window orders by the time sent, then by id', () {
     const request = ListChatMessages(channelId: 1);
     final at = DateTime.utc(2026, 9, 14, 9);
-    ChatMessage message(int id, DateTime createdAt) => ChatMessage(
+    ChatMessage message(int id, DateTime sentAt) => ChatMessage(
       id: id,
       channelId: 1,
       text: 'm$id',
       author: person,
-      createdAt: createdAt,
+      sentAt: sentAt,
     );
     expect(
       request.compareItems(message(2, at), message(1, at)),
@@ -169,7 +246,7 @@ void main() {
           channelId: 2,
           text: 'elsewhere',
           author: person,
-          createdAt: at,
+          sentAt: at,
         ),
       ),
       isFalse,
@@ -178,6 +255,47 @@ void main() {
       sortValue: at,
       id: 5,
     ));
+  });
+
+  test('the read position reopens the window at the message it names', () {
+    final at = DateTime.utc(2026, 9, 14, 9);
+    expect(const ChatReadState(id: 1, unreadCount: 0).lastReadCursor, isNull);
+    final read = ChatReadState(
+      id: 1,
+      unreadCount: 2,
+      lastReadMessageId: 7,
+      lastReadSentAt: at,
+    );
+    expect(DwWindowCursor.decode(read.lastReadCursor!).position, (
+      sortValue: at,
+      id: 7,
+    ));
+    expect(
+      const ListMyChatReadStates().channels.single.resolvedFor(42).wireName,
+      'chatReads:42',
+    );
+  });
+
+  test('the pinned list hears a pin and an unpin anywhere in the channel, '
+      'newest first', () {
+    const pinned = ListPinnedChatMessages(channelId: 1);
+    final at = DateTime.utc(2026, 9, 14, 9);
+    ChatMessage message(int id, {DateTime? pinnedAt, int channelId = 1}) =>
+        ChatMessage(
+          id: id,
+          channelId: channelId,
+          text: 'm$id',
+          author: person,
+          sentAt: at.add(Duration(minutes: id)),
+          pinnedAt: pinnedAt,
+        );
+    expect(pinned.onUpdate(message(1, pinnedAt: at)), DwUpdateAction.upsert);
+    expect(pinned.onUpdate(message(1)), DwUpdateAction.remove);
+    expect(
+      pinned.onUpdate(message(1, pinnedAt: at, channelId: 2)),
+      DwUpdateAction.remove,
+    );
+    expect(pinned.sort(message(2), message(1)), lessThan(0));
   });
 }
 

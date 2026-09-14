@@ -19,14 +19,17 @@ final class ClubHarness {
   /// The codes the server delivered, by normalized phone.
   final Map<String, String> delivered = {};
 
+  /// With [storage], the server takes uploads on its buckets.
   static Future<ClubHarness> start({
     DwServerSettings settings = const DwServerSettings(),
+    DwFileStorageConfig? storage,
   }) async {
     final database = await DwTestDatabase.create(prefix: 'dw_example_test');
     late final ClubHarness harness;
     final server = await DwTestServer.start(
       buildExampleServer(
         database: database.config,
+        storage: storage,
         port: 0,
         settings: settings,
         auth: DwAuthConfig(

@@ -374,23 +374,197 @@ abstract class AppLocalizations {
   /// **'Send'**
   String get sendMessage;
 
-  /// No description provided for @showNewerMessages.
+  /// No description provided for @chatUnreadDivider.
   ///
   /// In en, this message translates to:
-  /// **'Show newer messages'**
-  String get showNewerMessages;
+  /// **'Unread messages'**
+  String get chatUnreadDivider;
 
-  /// No description provided for @newerMessages.
+  /// No description provided for @chatToday.
   ///
   /// In en, this message translates to:
-  /// **'Newer messages'**
-  String get newerMessages;
+  /// **'Today'**
+  String get chatToday;
 
-  /// No description provided for @newMessagesCount.
+  /// No description provided for @chatYesterday.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 new message} other{{count} new messages}}'**
-  String newMessagesCount(int count);
+  /// **'Yesterday'**
+  String get chatYesterday;
+
+  /// No description provided for @chatEdited.
+  ///
+  /// In en, this message translates to:
+  /// **'edited'**
+  String get chatEdited;
+
+  /// No description provided for @chatDeletedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted message'**
+  String get chatDeletedMessage;
+
+  /// No description provided for @chatPinnedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned message'**
+  String get chatPinnedMessage;
+
+  /// No description provided for @chatPinnedPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {count}'**
+  String chatPinnedPosition(int index, int count);
+
+  /// No description provided for @chatReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get chatReply;
+
+  /// No description provided for @chatEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get chatEdit;
+
+  /// No description provided for @chatCopyText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy text'**
+  String get chatCopyText;
+
+  /// No description provided for @chatCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get chatCopied;
+
+  /// No description provided for @chatPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get chatPin;
+
+  /// No description provided for @chatUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get chatUnpin;
+
+  /// No description provided for @chatDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatDelete;
+
+  /// No description provided for @chatDeleteQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the message?'**
+  String get chatDeleteQuestion;
+
+  /// No description provided for @chatDeleteExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'It disappears for the whole team. Replies keep a note that it was deleted.'**
+  String get chatDeleteExplanation;
+
+  /// No description provided for @chatReplyTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply to {name}'**
+  String chatReplyTo(String name);
+
+  /// No description provided for @chatEditingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing the message'**
+  String get chatEditingMessage;
+
+  /// No description provided for @chatAttachFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach a file'**
+  String get chatAttachFile;
+
+  /// No description provided for @chatAttachmentLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} files in one message'**
+  String chatAttachmentLimit(int max);
+
+  /// No description provided for @chatFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is larger than {megabytes} MB'**
+  String chatFileTooLarge(String name, int megabytes);
+
+  /// No description provided for @chatUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} did not upload'**
+  String chatUploadFailed(String name);
+
+  /// No description provided for @chatPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get chatPhoto;
+
+  /// No description provided for @chatSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search the chat'**
+  String get chatSearch;
+
+  /// No description provided for @chatSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search messages'**
+  String get chatSearchHint;
+
+  /// No description provided for @chatSearchNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found'**
+  String get chatSearchNothing;
+
+  /// No description provided for @chatSearchPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {count}'**
+  String chatSearchPosition(int index, int count);
+
+  /// No description provided for @chatSearchOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Older match'**
+  String get chatSearchOlder;
+
+  /// No description provided for @chatSearchNewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Newer match'**
+  String get chatSearchNewer;
+
+  /// No description provided for @chatCloseSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Close search'**
+  String get chatCloseSearch;
+
+  /// No description provided for @chatJumpToNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'To the newest messages'**
+  String get chatJumpToNewest;
+
+  /// No description provided for @chatMessageGone.
+  ///
+  /// In en, this message translates to:
+  /// **'That message is no longer in the chat'**
+  String get chatMessageGone;
 
   /// No description provided for @ourServices.
   ///
@@ -871,6 +1045,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The message is empty.'**
   String get refusalMessageEmpty;
+
+  /// No description provided for @refusalMessageTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'The message is longer than {max} characters.'**
+  String refusalMessageTooLong(int max);
+
+  /// No description provided for @refusalTooManyAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} files in one message.'**
+  String refusalTooManyAttachments(int max);
+
+  /// No description provided for @refusalEditWindowClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'A message can no longer be edited a day after it was sent.'**
+  String get refusalEditWindowClosed;
+
+  /// No description provided for @refusalSearchQueryTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Type at least {min} characters to search.'**
+  String refusalSearchQueryTooShort(int min);
 
   /// No description provided for @refusalSettingKeyUnknown.
   ///

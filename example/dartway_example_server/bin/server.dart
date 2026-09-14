@@ -15,11 +15,26 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 ///   (`https://app.example.com,http://localhost:5000`): scheme, host and port
 ///   all count. A web app served through the same host, as R2.7 deploys it,
 ///   needs none; the server refuses to start on an entry that is not an
-///   origin.
+///   origin;
+/// - `DW_STORAGE_*` — file storage (see `exampleStorageConfig`): without
+///   `DW_STORAGE_ENDPOINT` the server takes no uploads. `DW_STORAGE_ENDPOINT`,
+///   `DW_STORAGE_ACCESS_KEY` and `DW_STORAGE_SECRET_KEY` are required with
+///   it; the buckets default to `club-public` and `club-private`, and the
+///   public base URL to the public bucket on the endpoint. At startup the
+///   server verifies that the public bucket reads anonymously and the private
+///   one does not (`DW_STORAGE_VERIFY_BUCKETS=false` skips it);
+/// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
+///   before starting (`DwFileStorageSetup.provision`): for a development
+///   MinIO the project owns, never for a storage somebody else administers.
 Future<void> main() async {
   final env = Platform.environment;
+  final storage = exampleStorageConfig(env);
+  if (storage != null && env['DW_STORAGE_PROVISION'] == 'true') {
+    await DwFileStorageSetup.provision(storage);
+  }
   final server = buildExampleServer(
     database: DwDatabaseConfig.fromEnvironment(env),
+    storage: storage,
     port: int.parse(env['PORT'] ?? '8080'),
     settings: DwServerSettings(
       minAppBuild: int.parse(env['DW_MIN_APP_BUILD'] ?? '0'),

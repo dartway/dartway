@@ -32,6 +32,249 @@ extension ChatChannelCopyWith on ChatChannel {
       ChatChannel(id: id ?? this.id, title: title ?? this.title);
 }
 
+mixin _$ChatReadState on DwDataObject {
+  ChatReadState get _self => this as ChatReadState;
+
+  @override
+  String get dwTypeName => 'ChatReadState';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'id': _self.id,
+    'unreadCount': _self.unreadCount,
+    if (_self.lastReadMessageId != null)
+      'lastReadMessageId': _self.lastReadMessageId,
+    if (_self.lastReadSentAt != null)
+      'lastReadSentAt': DwJsonCodec.encodeDateTime(_self.lastReadSentAt!),
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChatReadState &&
+          other.id == _self.id &&
+          other.unreadCount == _self.unreadCount &&
+          other.lastReadMessageId == _self.lastReadMessageId &&
+          other.lastReadSentAt == _self.lastReadSentAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.id,
+    _self.unreadCount,
+    _self.lastReadMessageId,
+    _self.lastReadSentAt,
+  );
+
+  @override
+  String toString() =>
+      'ChatReadState(id: ${_self.id}, unreadCount: ${_self.unreadCount}, lastReadMessageId: ${_self.lastReadMessageId}, lastReadSentAt: ${_self.lastReadSentAt})';
+}
+
+ChatReadState $ChatReadStateFromJson(Map<String, Object?> json) =>
+    ChatReadState(
+      id: json['id']! as int,
+      unreadCount: json['unreadCount']! as int,
+      lastReadMessageId: json['lastReadMessageId'] as int?,
+      lastReadSentAt: json['lastReadSentAt'] == null
+          ? null
+          : DwJsonCodec.decodeDateTime(json['lastReadSentAt']),
+    );
+
+extension ChatReadStateCopyWith on ChatReadState {
+  ChatReadState copyWith({
+    int? id,
+    int? unreadCount,
+    DwFieldPatch<int> lastReadMessageId = const DwFieldPatch.keep(),
+    DwFieldPatch<DateTime> lastReadSentAt = const DwFieldPatch.keep(),
+  }) => ChatReadState(
+    id: id ?? this.id,
+    unreadCount: unreadCount ?? this.unreadCount,
+    lastReadMessageId: lastReadMessageId.apply(this.lastReadMessageId),
+    lastReadSentAt: lastReadSentAt.apply(this.lastReadSentAt),
+  );
+}
+
+mixin _$ChatMessageQuote on DwDataObject {
+  ChatMessageQuote get _self => this as ChatMessageQuote;
+
+  @override
+  String get dwTypeName => 'ChatMessageQuote';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'id': _self.id,
+    'sentAt': DwJsonCodec.encodeDateTime(_self.sentAt),
+    'authorName': _self.authorName,
+    'text': _self.text,
+    'isDeleted': _self.isDeleted,
+    'hasAttachments': _self.hasAttachments,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChatMessageQuote &&
+          other.id == _self.id &&
+          other.sentAt == _self.sentAt &&
+          other.authorName == _self.authorName &&
+          other.text == _self.text &&
+          other.isDeleted == _self.isDeleted &&
+          other.hasAttachments == _self.hasAttachments;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.id,
+    _self.sentAt,
+    _self.authorName,
+    _self.text,
+    _self.isDeleted,
+    _self.hasAttachments,
+  );
+
+  @override
+  String toString() =>
+      'ChatMessageQuote(id: ${_self.id}, sentAt: ${_self.sentAt}, authorName: ${_self.authorName}, text: ${_self.text}, isDeleted: ${_self.isDeleted}, hasAttachments: ${_self.hasAttachments})';
+}
+
+ChatMessageQuote $ChatMessageQuoteFromJson(Map<String, Object?> json) =>
+    ChatMessageQuote(
+      id: json['id']! as int,
+      sentAt: DwJsonCodec.decodeDateTime(json['sentAt']),
+      authorName: json['authorName']! as String,
+      text: json['text']! as String,
+      isDeleted: json['isDeleted']! as bool,
+      hasAttachments: json['hasAttachments']! as bool,
+    );
+
+extension ChatMessageQuoteCopyWith on ChatMessageQuote {
+  ChatMessageQuote copyWith({
+    int? id,
+    DateTime? sentAt,
+    String? authorName,
+    String? text,
+    bool? isDeleted,
+    bool? hasAttachments,
+  }) => ChatMessageQuote(
+    id: id ?? this.id,
+    sentAt: sentAt ?? this.sentAt,
+    authorName: authorName ?? this.authorName,
+    text: text ?? this.text,
+    isDeleted: isDeleted ?? this.isDeleted,
+    hasAttachments: hasAttachments ?? this.hasAttachments,
+  );
+}
+
+mixin _$ChatAttachment on DwDataObject {
+  ChatAttachment get _self => this as ChatAttachment;
+
+  @override
+  String get dwTypeName => 'ChatAttachment';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'id': _self.id,
+    'fileName': _self.fileName,
+    'contentType': _self.contentType,
+    'byteSize': _self.byteSize,
+    if (_self.width != null) 'width': _self.width,
+    if (_self.height != null) 'height': _self.height,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChatAttachment &&
+          other.id == _self.id &&
+          other.fileName == _self.fileName &&
+          other.contentType == _self.contentType &&
+          other.byteSize == _self.byteSize &&
+          other.width == _self.width &&
+          other.height == _self.height;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.id,
+    _self.fileName,
+    _self.contentType,
+    _self.byteSize,
+    _self.width,
+    _self.height,
+  );
+
+  @override
+  String toString() =>
+      'ChatAttachment(id: ${_self.id}, fileName: ${_self.fileName}, contentType: ${_self.contentType}, byteSize: ${_self.byteSize}, width: ${_self.width}, height: ${_self.height})';
+}
+
+ChatAttachment $ChatAttachmentFromJson(Map<String, Object?> json) =>
+    ChatAttachment(
+      id: json['id']! as int,
+      fileName: json['fileName']! as String,
+      contentType: json['contentType']! as String,
+      byteSize: json['byteSize']! as int,
+      width: json['width'] as int?,
+      height: json['height'] as int?,
+    );
+
+extension ChatAttachmentCopyWith on ChatAttachment {
+  ChatAttachment copyWith({
+    int? id,
+    String? fileName,
+    String? contentType,
+    int? byteSize,
+    DwFieldPatch<int> width = const DwFieldPatch.keep(),
+    DwFieldPatch<int> height = const DwFieldPatch.keep(),
+  }) => ChatAttachment(
+    id: id ?? this.id,
+    fileName: fileName ?? this.fileName,
+    contentType: contentType ?? this.contentType,
+    byteSize: byteSize ?? this.byteSize,
+    width: width.apply(this.width),
+    height: height.apply(this.height),
+  );
+}
+
+mixin _$ChatMessageReaction on DwDataObject {
+  ChatMessageReaction get _self => this as ChatMessageReaction;
+
+  @override
+  String get dwTypeName => 'ChatMessageReaction';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'id': _self.id,
+    'reaction': _self.reaction.name,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChatMessageReaction &&
+          other.id == _self.id &&
+          other.reaction == _self.reaction;
+
+  @override
+  int get hashCode => Object.hash(_self.id, _self.reaction);
+
+  @override
+  String toString() =>
+      'ChatMessageReaction(id: ${_self.id}, reaction: ${_self.reaction})';
+}
+
+ChatMessageReaction $ChatMessageReactionFromJson(Map<String, Object?> json) =>
+    ChatMessageReaction(
+      id: json['id']! as int,
+      reaction: DwJsonCodec.decodeEnum(json['reaction'], ChatReaction.values),
+    );
+
+extension ChatMessageReactionCopyWith on ChatMessageReaction {
+  ChatMessageReaction copyWith({int? id, ChatReaction? reaction}) =>
+      ChatMessageReaction(
+        id: id ?? this.id,
+        reaction: reaction ?? this.reaction,
+      );
+}
+
 mixin _$ChatMessage on DwDataObject {
   ChatMessage get _self => this as ChatMessage;
 
@@ -44,7 +287,16 @@ mixin _$ChatMessage on DwDataObject {
     'channelId': _self.channelId,
     'text': _self.text,
     'author': _self.author.toJson(),
-    'createdAt': DwJsonCodec.encodeDateTime(_self.createdAt),
+    'sentAt': DwJsonCodec.encodeDateTime(_self.sentAt),
+    if (_self.editedAt != null)
+      'editedAt': DwJsonCodec.encodeDateTime(_self.editedAt!),
+    if (_self.pinnedAt != null)
+      'pinnedAt': DwJsonCodec.encodeDateTime(_self.pinnedAt!),
+    if (_self.replyTo != null) 'replyTo': _self.replyTo!.toJson(),
+    if (_self.attachments.isNotEmpty)
+      'attachments': [for (final e in _self.attachments) e.toJson()],
+    if (_self.reactions.isNotEmpty)
+      'reactions': [for (final e in _self.reactions) e.toJson()],
   };
 
   @override
@@ -55,7 +307,12 @@ mixin _$ChatMessage on DwDataObject {
           other.channelId == _self.channelId &&
           other.text == _self.text &&
           other.author == _self.author &&
-          other.createdAt == _self.createdAt;
+          other.sentAt == _self.sentAt &&
+          other.editedAt == _self.editedAt &&
+          other.pinnedAt == _self.pinnedAt &&
+          other.replyTo == _self.replyTo &&
+          dwListEquals(other.attachments, _self.attachments) &&
+          dwListEquals(other.reactions, _self.reactions);
 
   @override
   int get hashCode => Object.hash(
@@ -63,12 +320,17 @@ mixin _$ChatMessage on DwDataObject {
     _self.channelId,
     _self.text,
     _self.author,
-    _self.createdAt,
+    _self.sentAt,
+    _self.editedAt,
+    _self.pinnedAt,
+    _self.replyTo,
+    Object.hashAll(_self.attachments),
+    Object.hashAll(_self.reactions),
   );
 
   @override
   String toString() =>
-      'ChatMessage(id: ${_self.id}, channelId: ${_self.channelId}, text: ${_self.text}, author: ${_self.author}, createdAt: ${_self.createdAt})';
+      'ChatMessage(id: ${_self.id}, channelId: ${_self.channelId}, text: ${_self.text}, author: ${_self.author}, sentAt: ${_self.sentAt}, editedAt: ${_self.editedAt}, pinnedAt: ${_self.pinnedAt}, replyTo: ${_self.replyTo}, attachments: ${_self.attachments}, reactions: ${_self.reactions})';
 }
 
 ChatMessage $ChatMessageFromJson(Map<String, Object?> json) => ChatMessage(
@@ -76,7 +338,28 @@ ChatMessage $ChatMessageFromJson(Map<String, Object?> json) => ChatMessage(
   channelId: json['channelId']! as int,
   text: json['text']! as String,
   author: $PersonCardFromJson(json['author']! as Map<String, Object?>),
-  createdAt: DwJsonCodec.decodeDateTime(json['createdAt']),
+  sentAt: DwJsonCodec.decodeDateTime(json['sentAt']),
+  editedAt: json['editedAt'] == null
+      ? null
+      : DwJsonCodec.decodeDateTime(json['editedAt']),
+  pinnedAt: json['pinnedAt'] == null
+      ? null
+      : DwJsonCodec.decodeDateTime(json['pinnedAt']),
+  replyTo: json['replyTo'] == null
+      ? null
+      : $ChatMessageQuoteFromJson(json['replyTo']! as Map<String, Object?>),
+  attachments: json['attachments'] == null
+      ? const []
+      : DwJsonCodec.decodeList(
+          json['attachments'],
+          (e) => $ChatAttachmentFromJson(e! as Map<String, Object?>),
+        ),
+  reactions: json['reactions'] == null
+      ? const []
+      : DwJsonCodec.decodeList(
+          json['reactions'],
+          (e) => $ChatMessageReactionFromJson(e! as Map<String, Object?>),
+        ),
 );
 
 extension ChatMessageCopyWith on ChatMessage {
@@ -85,13 +368,23 @@ extension ChatMessageCopyWith on ChatMessage {
     int? channelId,
     String? text,
     PersonCard? author,
-    DateTime? createdAt,
+    DateTime? sentAt,
+    DwFieldPatch<DateTime> editedAt = const DwFieldPatch.keep(),
+    DwFieldPatch<DateTime> pinnedAt = const DwFieldPatch.keep(),
+    DwFieldPatch<ChatMessageQuote> replyTo = const DwFieldPatch.keep(),
+    List<ChatAttachment>? attachments,
+    List<ChatMessageReaction>? reactions,
   }) => ChatMessage(
     id: id ?? this.id,
     channelId: channelId ?? this.channelId,
     text: text ?? this.text,
     author: author ?? this.author,
-    createdAt: createdAt ?? this.createdAt,
+    sentAt: sentAt ?? this.sentAt,
+    editedAt: editedAt.apply(this.editedAt),
+    pinnedAt: pinnedAt.apply(this.pinnedAt),
+    replyTo: replyTo.apply(this.replyTo),
+    attachments: attachments ?? this.attachments,
+    reactions: reactions ?? this.reactions,
   );
 }
 
@@ -115,6 +408,27 @@ mixin _$ListChatChannels on DwListRequest<ChatChannel> {
 
 ListChatChannels $ListChatChannelsFromJson(Map<String, Object?> json) =>
     const ListChatChannels();
+
+mixin _$ListMyChatReadStates on DwListRequest<ChatReadState> {
+  @override
+  String get dwTypeName => 'ListMyChatReadStates';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is ListMyChatReadStates;
+
+  @override
+  int get hashCode => (ListMyChatReadStates).hashCode;
+
+  @override
+  String toString() => 'ListMyChatReadStates()';
+}
+
+ListMyChatReadStates $ListMyChatReadStatesFromJson(Map<String, Object?> json) =>
+    const ListMyChatReadStates();
 
 mixin _$ListChatMessages on DwWindowRequest<ChatMessage, DateTime, int> {
   ListChatMessages get _self => this as ListChatMessages;
@@ -140,6 +454,113 @@ mixin _$ListChatMessages on DwWindowRequest<ChatMessage, DateTime, int> {
 ListChatMessages $ListChatMessagesFromJson(Map<String, Object?> json) =>
     ListChatMessages(channelId: json['channelId']! as int);
 
+mixin _$ListPinnedChatMessages on DwListRequest<ChatMessage> {
+  ListPinnedChatMessages get _self => this as ListPinnedChatMessages;
+
+  @override
+  String get dwTypeName => 'ListPinnedChatMessages';
+
+  @override
+  Map<String, Object?> toJson() => {'channelId': _self.channelId};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ListPinnedChatMessages && other.channelId == _self.channelId;
+
+  @override
+  int get hashCode => Object.hash(ListPinnedChatMessages, _self.channelId);
+
+  @override
+  String toString() => 'ListPinnedChatMessages(channelId: ${_self.channelId})';
+}
+
+ListPinnedChatMessages $ListPinnedChatMessagesFromJson(
+  Map<String, Object?> json,
+) => ListPinnedChatMessages(channelId: json['channelId']! as int);
+
+mixin _$SearchChatMessages on DwListRequest<ChatMessage> {
+  SearchChatMessages get _self => this as SearchChatMessages;
+
+  @override
+  String get dwTypeName => 'SearchChatMessages';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'channelId': _self.channelId,
+    'query': _self.query,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SearchChatMessages &&
+          other.channelId == _self.channelId &&
+          other.query == _self.query;
+
+  @override
+  int get hashCode =>
+      Object.hash(SearchChatMessages, _self.channelId, _self.query);
+
+  @override
+  String toString() =>
+      'SearchChatMessages(channelId: ${_self.channelId}, query: ${_self.query})';
+}
+
+SearchChatMessages $SearchChatMessagesFromJson(Map<String, Object?> json) =>
+    SearchChatMessages(
+      channelId: json['channelId']! as int,
+      query: json['query']! as String,
+    );
+
+mixin _$ChatAttachmentDraft on DwDataObject {
+  ChatAttachmentDraft get _self => this as ChatAttachmentDraft;
+
+  @override
+  String get dwTypeName => 'ChatAttachmentDraft';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'id': _self.id,
+    if (_self.width != null) 'width': _self.width,
+    if (_self.height != null) 'height': _self.height,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChatAttachmentDraft &&
+          other.id == _self.id &&
+          other.width == _self.width &&
+          other.height == _self.height;
+
+  @override
+  int get hashCode => Object.hash(_self.id, _self.width, _self.height);
+
+  @override
+  String toString() =>
+      'ChatAttachmentDraft(id: ${_self.id}, width: ${_self.width}, height: ${_self.height})';
+}
+
+ChatAttachmentDraft $ChatAttachmentDraftFromJson(Map<String, Object?> json) =>
+    ChatAttachmentDraft(
+      id: json['id']! as int,
+      width: json['width'] as int?,
+      height: json['height'] as int?,
+    );
+
+extension ChatAttachmentDraftCopyWith on ChatAttachmentDraft {
+  ChatAttachmentDraft copyWith({
+    int? id,
+    DwFieldPatch<int> width = const DwFieldPatch.keep(),
+    DwFieldPatch<int> height = const DwFieldPatch.keep(),
+  }) => ChatAttachmentDraft(
+    id: id ?? this.id,
+    width: width.apply(this.width),
+    height: height.apply(this.height),
+  );
+}
+
 mixin _$SendChatMessage on DwActionCommand<ChatMessage> {
   SendChatMessage get _self => this as SendChatMessage;
 
@@ -150,6 +571,10 @@ mixin _$SendChatMessage on DwActionCommand<ChatMessage> {
   Map<String, Object?> toJson() => {
     'channelId': _self.channelId,
     'text': _self.text,
+    if (_self.replyToMessageId != null)
+      'replyToMessageId': _self.replyToMessageId,
+    if (_self.attachments.isNotEmpty)
+      'attachments': [for (final e in _self.attachments) e.toJson()],
   };
 
   @override
@@ -157,14 +582,170 @@ mixin _$SendChatMessage on DwActionCommand<ChatMessage> {
       identical(this, other) ||
       other is SendChatMessage &&
           other.channelId == _self.channelId &&
-          other.text == _self.text;
+          other.text == _self.text &&
+          other.replyToMessageId == _self.replyToMessageId &&
+          dwListEquals(other.attachments, _self.attachments);
 
   @override
-  int get hashCode => Object.hash(SendChatMessage, _self.channelId, _self.text);
+  int get hashCode => Object.hash(
+    SendChatMessage,
+    _self.channelId,
+    _self.text,
+    _self.replyToMessageId,
+    Object.hashAll(_self.attachments),
+  );
 }
 
 SendChatMessage $SendChatMessageFromJson(Map<String, Object?> json) =>
     SendChatMessage(
       channelId: json['channelId']! as int,
       text: json['text']! as String,
+      replyToMessageId: json['replyToMessageId'] as int?,
+      attachments: json['attachments'] == null
+          ? const []
+          : DwJsonCodec.decodeList(
+              json['attachments'],
+              (e) => $ChatAttachmentDraftFromJson(e! as Map<String, Object?>),
+            ),
     );
+
+mixin _$EditChatMessage on DwActionCommand<ChatMessage> {
+  EditChatMessage get _self => this as EditChatMessage;
+
+  @override
+  String get dwTypeName => 'EditChatMessage';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'messageId': _self.messageId,
+    'text': _self.text,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EditChatMessage &&
+          other.messageId == _self.messageId &&
+          other.text == _self.text;
+
+  @override
+  int get hashCode => Object.hash(EditChatMessage, _self.messageId, _self.text);
+}
+
+EditChatMessage $EditChatMessageFromJson(Map<String, Object?> json) =>
+    EditChatMessage(
+      messageId: json['messageId']! as int,
+      text: json['text']! as String,
+    );
+
+mixin _$DeleteChatMessage on DwActionCommand<void> {
+  DeleteChatMessage get _self => this as DeleteChatMessage;
+
+  @override
+  String get dwTypeName => 'DeleteChatMessage';
+
+  @override
+  Map<String, Object?> toJson() => {'messageId': _self.messageId};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeleteChatMessage && other.messageId == _self.messageId;
+
+  @override
+  int get hashCode => Object.hash(DeleteChatMessage, _self.messageId);
+}
+
+DeleteChatMessage $DeleteChatMessageFromJson(Map<String, Object?> json) =>
+    DeleteChatMessage(messageId: json['messageId']! as int);
+
+mixin _$PinChatMessage on DwActionCommand<ChatMessage> {
+  PinChatMessage get _self => this as PinChatMessage;
+
+  @override
+  String get dwTypeName => 'PinChatMessage';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'messageId': _self.messageId,
+    'pinned': _self.pinned,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PinChatMessage &&
+          other.messageId == _self.messageId &&
+          other.pinned == _self.pinned;
+
+  @override
+  int get hashCode =>
+      Object.hash(PinChatMessage, _self.messageId, _self.pinned);
+}
+
+PinChatMessage $PinChatMessageFromJson(Map<String, Object?> json) =>
+    PinChatMessage(
+      messageId: json['messageId']! as int,
+      pinned: json['pinned']! as bool,
+    );
+
+mixin _$ReactToChatMessage on DwActionCommand<ChatMessage> {
+  ReactToChatMessage get _self => this as ReactToChatMessage;
+
+  @override
+  String get dwTypeName => 'ReactToChatMessage';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'messageId': _self.messageId,
+    if (_self.reaction != null) 'reaction': _self.reaction!.name,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReactToChatMessage &&
+          other.messageId == _self.messageId &&
+          other.reaction == _self.reaction;
+
+  @override
+  int get hashCode =>
+      Object.hash(ReactToChatMessage, _self.messageId, _self.reaction);
+}
+
+ReactToChatMessage $ReactToChatMessageFromJson(Map<String, Object?> json) =>
+    ReactToChatMessage(
+      messageId: json['messageId']! as int,
+      reaction: json['reaction'] == null
+          ? null
+          : DwJsonCodec.decodeEnum(json['reaction'], ChatReaction.values),
+    );
+
+mixin _$MarkChatRead on DwActionCommand<ChatReadState> {
+  MarkChatRead get _self => this as MarkChatRead;
+
+  @override
+  String get dwTypeName => 'MarkChatRead';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'channelId': _self.channelId,
+    'messageId': _self.messageId,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MarkChatRead &&
+          other.channelId == _self.channelId &&
+          other.messageId == _self.messageId;
+
+  @override
+  int get hashCode =>
+      Object.hash(MarkChatRead, _self.channelId, _self.messageId);
+}
+
+MarkChatRead $MarkChatReadFromJson(Map<String, Object?> json) => MarkChatRead(
+  channelId: json['channelId']! as int,
+  messageId: json['messageId']! as int,
+);
