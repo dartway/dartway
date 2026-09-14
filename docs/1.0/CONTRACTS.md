@@ -16,6 +16,40 @@
 
 ORM renames: `DwEntity` → `DwRow` (base class of table rows); the raw SQL result row `DwRow` → `DwResultRow`. The `*View` suffix of the first build is gone.
 
+**The rule covers the framework's own public names too** (owner, 2026-09-14); the `Dw` prefix is not a word:
+
+| Was | Is |
+|---|---|
+| `DwEntity` / `DwRow` (row base) | `DwTableRow` |
+| `DwRow` (raw SQL row) | `DwResultRow` |
+| `DwCall` | `DwServerCall` |
+| `DwRequest` | `DwDataRequest` |
+| `DwSingleRequest` / `DwMaybeRequest` / `DwListRequest` / `DwPageRequest` / `DwTableRequest` / `DwWindowRequest` | unchanged (two words already) |
+| `DwCommand` | `DwActionCommand` |
+| `DwServer` | `DwAppServer` |
+| `DwClient` | `DwAppClient` |
+| `DwChannel` | `DwLiveChannel` (and `DwChannelKind` stays, `DwChannelRule` stays) |
+| `DwProtocol` | `DwWireProtocol` |
+| `DwTransport` | `DwUpdateTransport` |
+| `DwDto` | `DwWireObject` |
+| `DwPatch` (+ `DwKeep`/`DwSet`/`DwClear`) | `DwFieldPatch` (+ `DwKeepField`/`DwSetField`/`DwClearField`) |
+| `DwResult` (+ `DwOk`/`DwRefused`/`DwFailed`) | `DwCallResult` (+ `DwCallOk`/`DwCallRefused`/`DwCallFailed`; `DwNotAuthenticated` stays) |
+| `DwRefusal` | `DwCallRefusal` |
+| `DwContext` | `DwCallContext` |
+| `DwAccess` | `DwAccessRule` |
+| `DwHandler` | `DwCallHandler` |
+| `DwAuth` | `DwAuthConfig` |
+| `DwAccounts` | `DwAccountService` |
+| `DwJobs` | `DwJobQueue` |
+| `DwJson` | `DwJsonCodec` |
+| `DwPage` / `DwWindow` | `DwPageResult` / `DwWindowResult` |
+| `DwSession` | `DwAuthSession` |
+| `DwCore` (Flutter) | `DwFlutterCore` |
+| `DwHttp` | `DwHttpContract` |
+| `DwDeleted` | `DwDeletedObject` |
+
+Any other one-word public name found during the renames follows the same rule (`Dw` + two or more words) and is listed in the stage's report.
+
 ## R2.2 Transport: HTTP per DTO, WebSocket only for live updates
 
 One server process, one port.
