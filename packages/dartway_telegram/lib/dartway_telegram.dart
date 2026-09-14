@@ -1,7 +1,7 @@
 /// Telegram Mini App integration for [DartWay](https://dartway.dev) apps.
 ///
 /// Optional by construction: an app that is not a Mini App never depends on
-/// this package, and `dartway_flutter` knows nothing about Telegram. The app
+/// this package, and `dartway_core_flutter` knows nothing about Telegram. The app
 /// owns the bridge and starts it through the bootstrap seam it already has.
 library;
 

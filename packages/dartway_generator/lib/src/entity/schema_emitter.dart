@@ -8,11 +8,12 @@ abstract final class SchemaEmitter {
     required String baseName,
     required List<EntityClass> entities,
     required List<String> imports,
+    String frameworkPackage = 'dartway_orm',
   }) {
     final sorted = [...entities]..sort((a, b) => a.name.compareTo(b.name));
     final out = StringBuffer()
       ..writeln(generatedHeader)
-      ..writeln("import 'package:dartway_orm/dartway_orm.dart';");
+      ..writeln("import 'package:$frameworkPackage/$frameworkPackage.dart';");
     if (imports.isNotEmpty) out.writeln();
     for (final uri in imports) {
       out.writeln('import ${dartString(uri)};');

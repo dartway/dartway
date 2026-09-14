@@ -62,7 +62,7 @@ void main() {
     _prefs = DwSharedPreferences();
 
     // Not initialized on purpose. `init` takes the core the plugin was plugged
-    // into, and constructing one would put `dartway_flutter` in the import list
+    // into, and constructing one would put `dartway_core_flutter` in the import list
     // this file exists to keep short. Nothing here reads a provider, so nothing
     // needs the storage behind it.
     //

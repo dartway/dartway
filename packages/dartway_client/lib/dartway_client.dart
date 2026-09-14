@@ -3,7 +3,7 @@
 /// the web.
 library;
 
-export 'package:dartway_core/dartway_core.dart';
+export 'package:dartway_core_shared/dartway_core_shared.dart';
 
 export 'src/client/dw_app_client.dart'
     show

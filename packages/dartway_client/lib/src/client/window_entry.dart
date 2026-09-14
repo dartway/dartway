@@ -10,7 +10,8 @@ final class _WindowEntry<T extends DwDataObject> extends _Entry {
   @override
   DwRequestState<Object?> get state => _state;
 
-  DwWindowRequest<T> get _typed => request as DwWindowRequest<T>;
+  DwWindowRequest<T, Object, Object> get _typed =>
+      request as DwWindowRequest<T, Object, Object>;
 
   /// The anchor the window opened at; `null` for the newest rows.
   String? get _anchor => key.$3;
@@ -301,8 +302,12 @@ final class _WindowEntry<T extends DwDataObject> extends _Entry {
   /// One action on the window's rows; also counts unseen rows. Returns the
   /// outcome and how many rows it inserted at the head (0 or 1).
   ///
-  /// A new row is inserted at the head only while the window shows the
-  /// newest rows: otherwise the rows between would be missing above it.
+  /// A new row goes where the request's `positionOf` puts it, and only inside
+  /// the range the window has loaded: past an end that has more rows beyond
+  /// it, the rows between are missing, so a row there would sit next to rows
+  /// it does not follow. Newer than the newest row while newer rows exist, it
+  /// is counted as unseen; older than the oldest while older rows exist, it
+  /// is left for loading older rows to bring.
   (_Outcome, int) _apply(
     List<DwDataObject> items,
     DwWireObject object,
@@ -331,10 +336,27 @@ final class _WindowEntry<T extends DwDataObject> extends _Entry {
               : (_Changed(items.toList()..[index] = object), 0);
         }
         if (action == DwUpdateAction.update) return (_unchanged, 0);
-        if (_newerCursor != null) {
-          return (_unseen.add(id) ? _Changed(items) : _unchanged, 0);
+        final row = object as T;
+        final request = _typed;
+        // Rows are the entry's own, all of type T; compared one at a time
+        // rather than casting the list, whose reified type may be wider.
+        int compareTo(int i) => request.compareItems(row, items[i] as T);
+        if (items.isEmpty || compareTo(0) > 0) {
+          if (_newerCursor != null) {
+            return (_unseen.add(id) ? _Changed(items) : _unchanged, 0);
+          }
+          return (_Changed(items.toList()..insert(0, row)), 1);
         }
-        return (_Changed(items.toList()..insert(0, object)), 1);
+        if (compareTo(items.length - 1) < 0) {
+          if (_olderCursor != null) return (_unchanged, 0);
+          return (_Changed(items.toList()..add(row)), 0);
+        }
+        // Inside the loaded range: before the first row it is newer than.
+        var at = 1;
+        while (compareTo(at) < 0) {
+          at++;
+        }
+        return (_Changed(items.toList()..insert(at, row)), 0);
     }
   }
 

@@ -52,7 +52,7 @@ void main() {
         ..writeAsStringSync(source);
     });
 
-    File(p.join(srcDir.path, 'dartway', 'dartway_core.dart'))
+    File(p.join(srcDir.path, 'dartway', 'dartway_core_shared.dart'))
       ..parent.createSync(recursive: true)
       ..writeAsStringSync(
         'void initDartwayCore() {\n'
@@ -197,7 +197,7 @@ void main() {
               '  saveConfig: DwSaveConfig<Invoice>(allowSave: (s, c) => x),\n',
         ),
       );
-    File(p.join(serverDir.path, 'lib', 'src', 'dartway', 'dartway_core.dart'))
+    File(p.join(serverDir.path, 'lib', 'src', 'dartway', 'dartway_core_shared.dart'))
       ..parent.createSync(recursive: true)
       ..writeAsStringSync('crudConfigurations: [invoiceCrudConfig],');
     File(

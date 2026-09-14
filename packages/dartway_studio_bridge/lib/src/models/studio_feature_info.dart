@@ -3,7 +3,7 @@
 ///
 /// The bridge does not know *how* the app discovers its features — DartWay
 /// apps typically map `DwFeatureSpec`s collected by `DwFeature.scanMounted()`
-/// (package `dartway_flutter`) onto this model in their bridge binding, but
+/// (package `dartway_core_flutter`) onto this model in their bridge binding, but
 /// any source works.
 ///
 /// The fields split by audience, and Studio shows them accordingly: [title],

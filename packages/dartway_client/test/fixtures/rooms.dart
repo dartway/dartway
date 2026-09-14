@@ -1,5 +1,5 @@
 // DTOs in the exact shape `dartway generate` produces (see
-// dartway_core/test/fixtures), written by hand so the client is exercised
+// dartway_core_shared/test/fixtures), written by hand so the client is exercised
 // against the generated contract without the generator.
 
 import 'package:dartway_client/dartway_client.dart';
@@ -399,14 +399,19 @@ RoomsTable $RoomsTableFromJson(Map<String, Object?> json) =>
     RoomsTable(page: json['page']! as int, pageSize: json['pageSize']! as int);
 
 /// The chat, read as a window: three lines per load.
-final class ReadChat extends DwWindowRequest<ChatLine> with _$ReadChat {
+final class ReadChat extends DwWindowRequest<ChatLine, int, int>
+    with _$ReadChat {
   const ReadChat() : super(pageSize: 3, maxPageSize: 20);
+
+  @override
+  DwWindowPosition<int, int> positionOf(ChatLine item) =>
+      (sortValue: item.at, id: item.id);
 
   @override
   List<DwLiveChannel> get channels => const [chatChannel];
 }
 
-mixin _$ReadChat on DwWindowRequest<ChatLine> {
+mixin _$ReadChat on DwWindowRequest<ChatLine, int, int> {
   @override
   String get dwTypeName => 'ReadChat';
   @override

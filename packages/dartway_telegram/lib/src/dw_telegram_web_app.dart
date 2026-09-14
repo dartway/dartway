@@ -1,4 +1,4 @@
-import 'package:dartway_flutter/dartway_flutter.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/widgets.dart';
 
 import 'dw_telegram_platform.dart';
@@ -29,7 +29,7 @@ import 'dw_telegram_web_app_stub.dart'
 /// final insets = dw.plugins.telegram.safeAreaInset;
 /// ```
 ///
-/// `dartway_flutter` knows nothing of Telegram: it knows only what a [DwPlugin]
+/// `dartway_core_flutter` knows nothing of Telegram: it knows only what a [DwPlugin]
 /// is. The `dw.plugins.telegram` accessor is an extension declared *here*, so it
 /// exists only for apps that chose this package.
 abstract class DwTelegramWebApp extends DwPlugin {

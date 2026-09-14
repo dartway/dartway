@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import '../dw_client_exceptions.dart';
 import '../dw_client_options.dart';
@@ -28,7 +28,8 @@ part 'window_entry.dart';
 /// the status is what an "offline, data may be stale" hint reads.
 enum DwConnectionStatus {
   /// No socket, because nothing watched is live (no request declares a
-  /// channel), or the client is not started.
+  /// channel), nobody is signed in (every subscription requires an account),
+  /// or the client is not started.
   idle,
 
   /// Opening the socket, or authenticating it.
@@ -62,7 +63,9 @@ typedef _EntryKey = (
 /// Calls go over HTTP — `POST <baseUrl>/dw/<WireName>` — and the answer's
 /// updates are applied to every watched request before the call completes.
 /// A WebSocket (`<baseUrl>/dw/live`) is opened only while something watched
-/// declares channels, and carries subscriptions and other people's updates.
+/// declares channels and an account is signed in, and carries subscriptions
+/// and other people's updates. Signed out, a request with channels is
+/// fetched at once and is not live; it becomes live after sign-in.
 ///
 /// ```dart
 /// final client = DwAppClient(
@@ -388,7 +391,7 @@ final class DwAppClient {
   /// grow it. Windows of one request opened at different anchors are
   /// different entries.
   DwWindowWatch<T> watchWindow<T extends DwDataObject>(
-    DwWindowRequest<T> request, {
+    DwWindowRequest<T, Object, Object> request, {
     String? anchor,
   }) {
     _checkNotStopped();
@@ -499,6 +502,9 @@ final class DwAppClient {
         _bind(watch);
       }
     }
+    // Signing in or out changes whether the socket is wanted at all, even
+    // when no entry was rebound to say so.
+    _updateLiveDemand();
   }
 
   /// The session is over (a revoked or rejected token, a sign-out): forget it

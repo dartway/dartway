@@ -35,7 +35,11 @@ void main() {
             final message = DwClientMessage.fromJson(
               jsonDecode(frame as String),
             );
-            if (message is DwSubscribeMessage) {
+            if (message is DwAuthenticateMessage) {
+              socket.add(
+                jsonEncode(DwAuthenticatedMessage.account(alice.id).toJson()),
+              );
+            } else if (message is DwSubscribeMessage) {
               socket.add(
                 jsonEncode(DwSubscribedMessage(message.channel).toJson()),
               );
@@ -58,6 +62,8 @@ void main() {
         protocol: roomsProtocol,
         baseUrl: Uri.parse('http://127.0.0.1:${server.port}'),
         appVersion: '3.1.0+42',
+        // Signed in: a socket is opened only for an account (D-020).
+        tokenStore: DwMemoryTokenStore(alice),
         options: const DwClientOptions(
           retryDelay: Duration(milliseconds: 10),
           maxRetryDelay: Duration(milliseconds: 50),
@@ -72,6 +78,10 @@ void main() {
       expect(dataOf(watch.state), [a, b]);
       expect(postHeaders.single.value('dw-protocol'), '1');
       expect(postHeaders.single.value('dw-app-version'), '3.1.0+42');
+      expect(
+        postHeaders.single.value('authorization'),
+        'Bearer ${alice.token}',
+      );
 
       sockets.single.add(
         jsonEncode(

@@ -105,20 +105,34 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.13"
-  dartway_core:
-    dependency: "direct dev"
+  dartway_client:
+    dependency: "direct overridden"
     description:
-      path: "../dartway_core"
+      path: "../dartway_client"
       relative: true
     source: path
-    version: "1.0.0-dev.1"
+    version: "0.20.0-dev.1"
+  dartway_core_server:
+    dependency: "direct dev"
+    description:
+      path: "../dartway_core_server"
+      relative: true
+    source: path
+    version: "0.20.0-dev.1"
+  dartway_core_shared:
+    dependency: "direct dev"
+    description:
+      path: "../dartway_core_shared"
+      relative: true
+    source: path
+    version: "0.20.0-dev.1"
   dartway_orm:
     dependency: "direct dev"
     description:
       path: "../dartway_orm"
       relative: true
     source: path
-    version: "1.0.0-dev.1"
+    version: "0.20.0-dev.1"
   file:
     dependency: transitive
     description:
@@ -143,6 +157,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  http:
+    dependency: transitive
+    description:
+      name: http
+      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   http_multi_server:
     dependency: transitive
     description:

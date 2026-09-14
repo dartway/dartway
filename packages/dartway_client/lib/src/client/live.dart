@@ -72,9 +72,15 @@ extension on DwAppClient {
   _LiveState get _live => _liveState;
   DwLiveConnection? get _liveConnection => _liveState.connection;
 
+  /// Whether the socket should be open: something watched declares channels
+  /// and an account is signed in. Every subscription requires sign-in
+  /// (D-020) — a framework rule, not a project's — so a socket opened for an
+  /// anonymous client would only collect refusals, and hold a connection per
+  /// visitor for nothing.
   bool get _wantsLive =>
       _lifecycle == _Lifecycle.started &&
       _incompatibility.value == null &&
+      _session != null &&
       _channels.isNotEmpty;
 
   Uri get _liveUrl => baseUrl.replace(
@@ -102,8 +108,8 @@ extension on DwAppClient {
   // Demand
   // ===========================================================================
 
-  /// Opens the socket while some entry has channels; closes it
-  /// `liveIdleDelay` after the last one left.
+  /// Opens the socket while some entry has channels and an account is signed
+  /// in; closes it `liveIdleDelay` after either stops being true.
   void _updateLiveDemand() {
     final live = _live;
     if (_wantsLive) {
@@ -118,7 +124,7 @@ extension on DwAppClient {
     if (!live.looping || live.idleTimer != null) return;
     live.idleTimer = Timer(options.liveIdleDelay, () {
       live.idleTimer = null;
-      if (_channels.isNotEmpty) return;
+      if (_wantsLive) return;
       final connection = live.connection;
       if (connection != null) unawaited(connection.close());
       _wakeLiveLoop();
@@ -479,6 +485,13 @@ extension on DwAppClient {
     // Set without telling the entries yet: they hear once the subscriptions
     // below are on their way.
     _status.value = DwConnectionStatus.connected;
+    // Signed out while the socket winds down: nothing may be subscribed.
+    if (_session == null) {
+      for (final entry in _entries.values.toList()) {
+        entry.onLiveChanged();
+      }
+      return;
+    }
     for (final record in _channels.values.toList()) {
       final retry = switch (record.state) {
         _SubState.idle => true,
@@ -509,7 +522,9 @@ extension on DwAppClient {
     for (final name in entry.channels) {
       final record = _channels.putIfAbsent(name, () => _ChannelRecord(name));
       record.entries.add(entry);
-      if (record.state == _SubState.idle && _live.ready) _subscribe(record);
+      if (record.state == _SubState.idle && _live.ready && _session != null) {
+        _subscribe(record);
+      }
     }
     _updateLiveDemand();
   }
@@ -602,7 +617,8 @@ extension on DwAppClient {
   /// Whether [entry]'s subscriptions are on their way, so fetching now could
   /// miss what is published before they are active.
   bool _liveSettling(_Entry entry) {
-    if (entry.channels.isEmpty) return false;
+    // Signed out, nothing is subscribed: there is nothing to wait for.
+    if (entry.channels.isEmpty || _session == null) return false;
     switch (_status.value) {
       case DwConnectionStatus.connecting:
         return true;

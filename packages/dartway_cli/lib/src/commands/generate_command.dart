@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 ///
 /// The CLI does not link the generator in. The generator pins `analyzer`, and
 /// a CLI activated globally would force one analyzer on every project it ever
-/// touches; the generator must instead match the `dartway_core` and
+/// touches; the generator must instead match the `dartway_core_shared` and
 /// `dartway_orm` the project builds against. So the command finds the
 /// generator the project resolved — a dev dependency of one of its packages —
 /// and runs that one, falling back to a globally activated generator only when

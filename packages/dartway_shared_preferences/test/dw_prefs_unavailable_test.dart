@@ -1,4 +1,4 @@
-import 'package:dartway_flutter/dartway_flutter.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

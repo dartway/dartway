@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import 'units.dart' as units;
 
@@ -156,10 +156,15 @@ final class ItemTable extends DwTableRequest<Item> with _$ItemTable {
   final Color? color;
 }
 
-final class ItemHistory extends DwWindowRequest<Item> with _$ItemHistory {
+final class ItemHistory extends DwWindowRequest<Item, DateTime, int>
+    with _$ItemHistory {
   const ItemHistory({required this.itemId}) : super(pageSize: 50);
 
   final int itemId;
+
+  @override
+  DwWindowPosition<DateTime, int> positionOf(Item item) =>
+      (sortValue: item.createdAt, id: item.id);
 }
 
 final class EditItem extends DwActionCommand<Item> with _$EditItem {

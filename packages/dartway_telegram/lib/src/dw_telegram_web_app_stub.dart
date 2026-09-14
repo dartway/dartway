@@ -1,4 +1,4 @@
-import 'package:dartway_flutter/dartway_flutter.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/widgets.dart';
 
 import 'dw_telegram_platform.dart';

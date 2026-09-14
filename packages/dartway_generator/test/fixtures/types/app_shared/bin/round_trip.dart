@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:app_shared/app_shared.dart';
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 /// Encodes and decodes every generated DTO through real JSON text and checks
 /// that nothing is lost: equality, hash, omission rules, patches, copyWith.

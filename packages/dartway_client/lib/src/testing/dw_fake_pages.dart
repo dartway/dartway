@@ -1,4 +1,4 @@
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 /// The page of [ordered] a [DwPageRequest] call asks for, as a DartWay
 /// server serves it: rows after the offset, at the size the request serves
@@ -29,20 +29,22 @@ DwTablePage<T> dwFakeTablePage<T extends DwDataObject>(
 }
 
 /// The window of [newestFirst] a [DwWindowRequest] call asks for, with the
-/// cursors a DartWay server builds: `DwWindowCursor(sortValue(row), row.id)`.
+/// cursors a DartWay server builds from the request's `positionOf`.
 ///
-/// [newestFirst] must be ordered by that pair, descending. Around an anchor
+/// [newestFirst] must be ordered by that position, descending. Around an anchor
 /// the window holds the anchor row and the rows older than it, with up to
 /// half of the page newer than it.
 DwWindowResult<T> dwFakeWindow<T extends DwDataObject>(
   List<T> newestFirst,
-  DwWindowRequest<T> request,
-  DwPageQuery? page, {
-  required Object Function(T row) sortValue,
-}) {
+  DwWindowRequest<T, Object, Object> request,
+  DwPageQuery? page,
+) {
   final query = page is DwWindowQuery ? page : const DwWindowQuery.newest();
   final size = request.servedPageSize(query.pageSize);
-  DwWindowCursor keyOf(T row) => DwWindowCursor(sortValue(row), row.id);
+  DwWindowCursor keyOf(T row) {
+    final (:sortValue, :id) = request.positionOf(row);
+    return DwWindowCursor(sortValue, id);
+  }
 
   // Positions in newest-first order: rows before `index` are newer.
   int firstNotNewerThan(DwWindowCursor cursor) {
@@ -89,8 +91,5 @@ DwWindowResult<T> dwFakeWindow<T extends DwDataObject>(
   );
 }
 
-int _compare(DwWindowCursor a, DwWindowCursor b) {
-  final bySort = (a.sortValue as Comparable<Object>).compareTo(b.sortValue);
-  if (bySort != 0) return bySort;
-  return (a.id as Comparable<Object>).compareTo(b.id);
-}
+int _compare(DwWindowCursor a, DwWindowCursor b) =>
+    DwWindowCursor.comparePositions(a.position, b.position);

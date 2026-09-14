@@ -15,7 +15,7 @@ final frameworkPackages = p.normalize(p.join(generatorRoot, '..'));
 final dartExecutable = Platform.resolvedExecutable;
 
 /// A throwaway DartWay project on disk: real packages with a real package
-/// config, resolved against this tree's `dartway_core` and `dartway_orm`, so
+/// config, resolved against this tree's `dartway_core_shared` and `dartway_orm`, so
 /// the generator and `dart analyze` see exactly what a project would.
 final class TempProject {
   TempProject._(this.root);
@@ -46,7 +46,7 @@ final class TempProject {
       'environment:\n'
       '  sdk: ^3.11.0\n'
       'dependencies:\n'
-      '  dartway_core: any\n'
+      '  dartway_core_shared: any\n'
       '${isServer ? '  dartway_orm: any\n' : ''}'
       '${isServer ? '  ${name.replaceAll('_server', '_shared')}: any\n' : ''}'
       'dev_dependencies:\n'

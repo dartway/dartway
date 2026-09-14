@@ -2,7 +2,7 @@ import '../analysis/wire_type.dart';
 
 /// Writes the expressions that convert values between Dart and JSON.
 ///
-/// Every conversion goes through `DwJsonCodec` (dartway_core), so how a type
+/// Every conversion goes through `DwJsonCodec` (dartway_core_shared), so how a type
 /// looks on the wire is decided in one place and the generated code only calls
 /// it.
 abstract final class JsonCodecWriter {

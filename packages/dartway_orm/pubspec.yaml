@@ -1,6 +1,6 @@
 name: dartway_orm
 description: Typed PostgreSQL access, schema and migrations for DartWay servers.
-version: 1.0.0-dev.1
+version: 0.20.0-dev.1
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 publish_to: none
@@ -10,7 +10,7 @@ environment:
 dependencies:
   collection: ^1.19.0
   crypto: ^3.0.6
-  dartway_core: ^1.0.0-dev.1
+  dartway_core_shared: ^0.20.0-dev.1
   meta: ^1.16.0
   path: ^1.9.0
   postgres: ^3.5.12

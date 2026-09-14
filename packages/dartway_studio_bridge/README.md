@@ -85,7 +85,7 @@ currently on screen — so what Studio shows is what the running build actually
 does, with nothing stored on the Studio side that could drift away from it.
 
 The bridge does not care how the app finds its features. DartWay apps let each
-widget declare a `DwFeatureSpec` (package `dartway_flutter`) and collect the
+widget declare a `DwFeatureSpec` (package `dartway_core_flutter`) and collect the
 mounted ones:
 
 ```dart

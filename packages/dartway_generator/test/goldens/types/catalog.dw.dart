@@ -533,7 +533,7 @@ ItemTable $ItemTableFromJson(Map<String, Object?> json) => ItemTable(
       : DwJsonCodec.decodeEnum(json['color'], Color.values),
 );
 
-mixin _$ItemHistory on DwWindowRequest<Item> {
+mixin _$ItemHistory on DwWindowRequest<Item, DateTime, int> {
   ItemHistory get _self => this as ItemHistory;
 
   @override

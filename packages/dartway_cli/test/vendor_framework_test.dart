@@ -21,7 +21,7 @@ Directory _monorepo() {
     Directory(p.join(dir.path, '.dart_tool'))..createSync();
   }
 
-  package('dartway_core', 'dependencies:\n  dartway_extra: ^0.13.0\n');
+  package('dartway_core_shared', 'dependencies:\n  dartway_extra: ^0.13.0\n');
   package('dartway_extra', '');
   // Flutter-only, and nothing in the server package reaches it. An override is
   // resolved whether or not anything depends on it, so this is what a
@@ -38,7 +38,7 @@ Directory _project() {
   File(p.join(server.path, 'pubspec.yaml')).writeAsStringSync(
     'name: shop_server\n'
     'dependencies:\n'
-    '  dartway_core: ^0.13.0\n',
+    '  dartway_core_shared: ^0.13.0\n',
   );
   File(p.join(server.path, 'Dockerfile')).writeAsStringSync('''
 FROM dart:3.12.0 AS build
@@ -79,7 +79,7 @@ void main() {
 
     expect(
       File(
-        p.join(project.path, vendorDirName, 'dartway_core', 'pubspec.yaml'),
+        p.join(project.path, vendorDirName, 'dartway_core_shared', 'pubspec.yaml'),
       ).existsSync(),
       isTrue,
     );
@@ -87,7 +87,7 @@ void main() {
     // multiply the build context by the number of packages.
     expect(
       Directory(
-        p.join(project.path, vendorDirName, 'dartway_core', '.dart_tool'),
+        p.join(project.path, vendorDirName, 'dartway_core_shared', '.dart_tool'),
       ).existsSync(),
       isFalse,
     );
@@ -100,7 +100,7 @@ void main() {
     // one — the copy would refuse to resolve with it.
     expect(
       File(
-        p.join(project.path, vendorDirName, 'dartway_core', 'pubspec.yaml'),
+        p.join(project.path, vendorDirName, 'dartway_core_shared', 'pubspec.yaml'),
       ).readAsStringSync(),
       isNot(contains('resolution: workspace')),
     );
@@ -114,7 +114,7 @@ void main() {
     ).readAsStringSync();
 
     expect(pubspec, contains('dependency_overrides:'));
-    expect(pubspec, contains('path: ../$vendorDirName/dartway_core'));
+    expect(pubspec, contains('path: ../$vendorDirName/dartway_core_shared'));
     // Including the ones the project never names itself: the framework's own
     // dependencies carry the same unpublished carets, and the entry package's
     // overrides are what govern the whole resolution.

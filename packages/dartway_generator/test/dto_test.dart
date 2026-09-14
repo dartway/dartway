@@ -6,12 +6,12 @@ import 'package:test/test.dart';
 import 'support/temp_project.dart';
 
 void main() {
-  group('dartway_core reference fixture', () {
+  group('dartway_core_shared reference fixture', () {
     test('club_booking.dw.dart is reproduced from club_booking.dart', () async {
       final project = TempProject.create(['app_shared']);
       final fixtures = p.join(
         frameworkPackages,
-        'dartway_core',
+        'dartway_core_shared',
         'test',
         'fixtures',
       );
@@ -159,7 +159,7 @@ void main() {
       final project = TempProject.create(['app_shared']);
       project.copyFixture('types');
       project.writeFile('app_shared/lib/src/bad.dart', '''
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 part 'bad.dw.dart';
 

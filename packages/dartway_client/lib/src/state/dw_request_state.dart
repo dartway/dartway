@@ -1,4 +1,4 @@
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 /// The state of a watched request, as a screen renders it.
 ///
@@ -201,12 +201,15 @@ final class DwWindowData<T extends DwDataObject> {
   /// Newest first, with live updates applied.
   final List<T> items;
 
-  /// Rows older than the last item exist on the server.
+  /// Rows older than the last item exist on the server. While `false`, a new
+  /// row older than the last item arriving live is appended; while `true` it
+  /// is left for `loadOlder` to bring.
   final bool hasOlder;
 
   /// Rows newer than the first item exist on the server. While `false`, a new
-  /// row arriving live is inserted at the head; while `true` it is counted in
-  /// [unseenNewerCount] instead.
+  /// row newer than the first item arriving live is inserted at the head;
+  /// while `true` it is counted in [unseenNewerCount] instead. A row between
+  /// the first and the last goes where the request's `positionOf` puts it.
   final bool hasNewer;
 
   final bool loadingOlder;

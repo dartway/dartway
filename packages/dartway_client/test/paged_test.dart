@@ -288,6 +288,55 @@ void main() {
       expect(idsOf(reached.items).first, 7);
     });
 
+    test('a new row goes where positionOf puts it, and only inside the loaded '
+        'range', () async {
+      final h = Harness()..serveRooms();
+      h.chat = lines(6);
+      await h.start();
+      final watch = h.client.watchWindow(const ReadChat());
+      await settle();
+      expect(idsOf(dataOf(watch.state).items), [6, 5, 4]);
+      expect(dataOf(watch.state).hasOlder, isTrue);
+
+      h.server.publish(chatChannel, [
+        // A late row between 5 and 4: inside the range, in order.
+        const ChatLine(id: 45, at: 45, text: 'late'),
+        // Ties with row 5 on the sort value; the larger id is newer.
+        const ChatLine(id: 8, at: 50, text: 'tie'),
+        // Older than the oldest row shown while older rows exist: the rows
+        // between are not loaded, so it waits for loadOlder.
+        const ChatLine(id: 11, at: 15, text: 'old'),
+      ]);
+      await settle();
+      var data = dataOf(watch.state);
+      expect(idsOf(data.items), [6, 8, 5, 45, 4]);
+      expect(data.prependedCount, 0, reason: 'nothing went to the head');
+      expect(data.unseenNewerCount, 0);
+
+      // Loaded to the oldest end: below the last row is inside the range.
+      h.chat = lines(4);
+      await watch.loadOlder();
+      await watch.loadOlder();
+      expect(dataOf(watch.state).hasOlder, isFalse);
+      h.server.publish(chatChannel, [
+        const ChatLine(id: 20, at: 0, text: 'first ever'),
+      ]);
+      await settle();
+      data = dataOf(watch.state);
+      expect(idsOf(data.items).last, 20);
+      expect(data.items.map((line) => line.at), [
+        60,
+        50,
+        50,
+        45,
+        40,
+        30,
+        20,
+        10,
+        0,
+      ]);
+    });
+
     test('rows are updated and removed in place; a removed unseen row is '
         'uncounted', () async {
       final h = Harness()..serveRooms();

@@ -6,7 +6,7 @@ the client platform and the Telegram user id.
 
 ## A plugin, not a framework feature
 
-`dartway_flutter` knows nothing about Telegram — it knows only what a `DwPlugin`
+`dartway_core_flutter` knows nothing about Telegram — it knows only what a `DwPlugin`
 is. The framework's config has no business carrying a vendor's name, and an app
 that is not a Mini App should not download a Telegram SDK to get a bootstrap
 runner.

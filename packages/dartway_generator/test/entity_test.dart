@@ -53,6 +53,51 @@ void main() {
     });
   });
 
+  test('a server package on dartway_core_server gets its generated code '
+      'importing that, not the ORM it re-exports', () async {
+    final project = TempProject.create(['app_server']);
+    // As a project declares it (D-030): the ORM is not a dependency of its
+    // own, so an import of it would be `depend_on_referenced_packages`.
+    project.writeFile(
+      'app_server/pubspec.yaml',
+      'name: app_server\n'
+          'publish_to: none\n'
+          'environment:\n'
+          '  sdk: ^3.11.0\n'
+          'dependencies:\n'
+          '  dartway_core_server: any\n'
+          'dev_dependencies:\n'
+          '  lints: any\n',
+    );
+    project.writeFile('app_server/lib/src/memo_row.dart', '''
+import 'package:dartway_core_server/dartway_core_server.dart';
+
+part 'memo_row.dw.dart';
+
+@DwSqlTable('memo')
+final class MemoRow extends DwTableRow with _\$MemoRow {
+  const MemoRow({this.id, required this.text});
+
+  @override
+  final int? id;
+
+  final String text;
+
+  static const table = MemoTable();
+}
+''');
+    await project.generateClean();
+    final schema = project.readFile('app_server/lib/generated/dw_schema.dart');
+    expect(
+      schema,
+      contains(
+        "import 'package:dartway_core_server/dartway_core_server.dart';",
+      ),
+    );
+    expect(schema, isNot(contains('dartway_orm')));
+    expect(await project.analyze('app_server'), isNull);
+  });
+
   test(
     'entity problems are reported, located, and nothing is written',
     () async {

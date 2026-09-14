@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import '../client/dw_app_client.dart';
 import '../dw_client_options.dart';
@@ -172,7 +172,7 @@ final class DwFakeNetworkException implements Exception {
 ///
 /// Not the real server: handlers are closures registered per DTO type, there
 /// is no database and no access rule beyond what a test declares. What it
-/// reproduces is the protocol as `dartway_server` speaks it — headers and
+/// reproduces is the protocol as `dartway_core_server` speaks it — headers and
 /// their checks, honest statuses, `426` for an incompatible build,
 /// idempotent commands, the response transport filtered by
 /// `Dw-Live-Connection`, hello and authentication on the socket, a changed

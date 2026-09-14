@@ -7,6 +7,7 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'analysis/framework.dart';
 import 'analysis/library_names.dart';
@@ -320,7 +321,8 @@ final class _Run {
         // A package that cannot import the framework package would get a
         // registry or schema that does not compile; without DTOs or entities
         // it simply has none.
-        case DwPackageRole.shared when _resolves(package, 'dartway_core'):
+        case DwPackageRole.shared
+            when _resolves(package, 'dartway_core_shared'):
           files.add(_emitProtocol(package));
         case DwPackageRole.server when _resolves(package, 'dartway_orm'):
           files.add(_emitSchema(package));
@@ -329,6 +331,38 @@ final class _Run {
       }
     }
     return files;
+  }
+
+  /// The package a server package's generated code imports the ORM through.
+  /// A project depends on `dartway_core_server`, which re-exports the ORM
+  /// (D-030); importing `dartway_orm` there would reach into a dependency the
+  /// package does not declare (`depend_on_referenced_packages`). So the
+  /// declaration decides, not resolution — the server package brings the ORM
+  /// into every package config either way. Only a package that declares the
+  /// ORM alone (the ORM's own fixtures) gets `dartway_orm`.
+  String _serverFrameworkPackage(DwProjectPackage package) =>
+      _serverFrameworkPackages.putIfAbsent(package, () {
+        const server = 'dartway_core_server';
+        return _declares(package, server) && _resolves(package, server)
+            ? server
+            : 'dartway_orm';
+      });
+
+  final Map<DwProjectPackage, String> _serverFrameworkPackages = {};
+
+  static bool _declares(DwProjectPackage package, String dependency) {
+    try {
+      final pubspec = loadYaml(
+        File(p.join(package.root, 'pubspec.yaml')).readAsStringSync(),
+      );
+      return pubspec is YamlMap &&
+          pubspec['dependencies'] is YamlMap &&
+          (pubspec['dependencies'] as YamlMap).containsKey(dependency);
+    } on Exception {
+      // The package was detected from this very file; one that no longer
+      // reads keeps the ORM import, and analysis reports the rest.
+      return false;
+    }
   }
 
   bool _resolves(DwProjectPackage package, String dependency) =>
@@ -423,10 +457,10 @@ final class _Run {
   /// Framework names a generated part uses without a prefix, by the package
   /// that must be imported for them.
   static const _frameworkNames = {
-    'DwJsonCodec': 'dartway_core',
-    'DwFieldPatch': 'dartway_core',
-    'dwListEquals': 'dartway_core',
-    'dwMapEquals': 'dartway_core',
+    'DwJsonCodec': 'dartway_core_shared',
+    'DwFieldPatch': 'dartway_core_shared',
+    'dwListEquals': 'dartway_core_shared',
+    'dwMapEquals': 'dartway_core_shared',
     'DwTableColumn': 'dartway_orm',
     'DwColumnType': 'dartway_orm',
     'DwEnumType': 'dartway_orm',
@@ -452,8 +486,11 @@ final class _Run {
       final visible = scope.lookup(name).getter;
       if (visible != null && DwFrameworkTypes.isFramework(visible)) continue;
       missing.add('`$name`');
-      // dartway_orm re-exports what row class parts need from dartway_core.
-      packages.add(hasEntities ? 'dartway_orm' : package);
+      // The server package (through dartway_orm) re-exports what row class
+      // parts need from dartway_core_shared.
+      packages.add(
+        hasEntities ? _serverFrameworkPackage(library.package) : package,
+      );
     }
     if (missing.isEmpty) return;
     final imports = [
@@ -513,7 +550,7 @@ final class _Run {
           diagnostics.add(
             DwGenerationDiagnostic.at(
               element,
-              'DTO name `$name` is already taken by a dartway_core DTO; wire '
+              'DTO name `$name` is already taken by a dartway_core_shared DTO; wire '
               'names must be unique, rename the class',
             ),
           );
@@ -554,14 +591,15 @@ final class _Run {
 
   static LibraryElement? _coreLibrary(LibraryElement from) {
     for (final imported in from.firstFragment.importedLibraries) {
-      if (imported.uri.toString() == 'package:dartway_core/dartway_core.dart') {
+      if (imported.uri.toString() ==
+          'package:dartway_core_shared/dartway_core_shared.dart') {
         return imported;
       }
     }
     for (final imported in from.firstFragment.importedLibraries) {
       for (final exported in imported.exportedLibraries) {
         if (exported.uri.toString() ==
-            'package:dartway_core/dartway_core.dart') {
+            'package:dartway_core_shared/dartway_core_shared.dart') {
           return exported;
         }
       }
@@ -593,7 +631,7 @@ final class _Run {
     }
 
     // The registry imports every DTO library unprefixed; a name any of them
-    // (or dartway_core) also exports would be ambiguous there.
+    // (or dartway_core_shared) also exports would be ambiguous there.
     final imported = <LibraryElement>{
       for (final (_, library) in registered) library.element,
     };
@@ -659,6 +697,7 @@ final class _Run {
           baseName: package.baseName,
           entities: entities,
           imports: importUris.toList()..sort(),
+          frameworkPackage: _serverFrameworkPackage(package),
         ),
         languageVersion: package.languageVersion,
         options: _formatterOptions(package),

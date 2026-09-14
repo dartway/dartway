@@ -61,7 +61,7 @@ void main() {
 
   test('one commit across every package says nothing', () {
     writeLock('my_flutter', [
-      gitEntry('dartway_flutter', resolvedRef: 'a' * 40),
+      gitEntry('dartway_core_flutter', resolvedRef: 'a' * 40),
       gitEntry('dartway_serverpod_core_flutter', resolvedRef: 'a' * 40),
     ]);
     writeLock('my_server', [
@@ -73,7 +73,7 @@ void main() {
 
   test('two commits are reported, with the packages and where they live', () {
     writeLock('my_flutter', [
-      gitEntry('dartway_flutter', resolvedRef: 'abcdef1${'0' * 33}'),
+      gitEntry('dartway_core_flutter', resolvedRef: 'abcdef1${'0' * 33}'),
     ]);
     writeLock('my_server', [
       gitEntry(
@@ -87,7 +87,7 @@ void main() {
     expect(reported.single, contains('2 different commits'));
     expect(reported.single, contains('abcdef1'));
     expect(reported.single, contains('9876543'));
-    expect(reported.single, contains('dartway_flutter in my_flutter'));
+    expect(reported.single, contains('dartway_core_flutter in my_flutter'));
     expect(
       reported.single,
       contains('dartway_serverpod_core_server in my_server'),
@@ -98,7 +98,7 @@ void main() {
 
   test('the divergence is caught inside a single package too', () {
     writeLock('my_flutter', [
-      gitEntry('dartway_flutter', resolvedRef: 'a' * 40),
+      gitEntry('dartway_core_flutter', resolvedRef: 'a' * 40),
       gitEntry('dartway_push_flutter', resolvedRef: 'b' * 40),
     ]);
 
@@ -107,7 +107,7 @@ void main() {
 
   test('different repositories are not compared with each other', () {
     writeLock('my_flutter', [
-      gitEntry('dartway_flutter', resolvedRef: 'a' * 40),
+      gitEntry('dartway_core_flutter', resolvedRef: 'a' * 40),
       gitEntry(
         'dartway_something_else',
         resolvedRef: 'b' * 40,
@@ -122,7 +122,7 @@ void main() {
     // Semver already answers it for a hosted package, and a path dependency is
     // somebody deliberately working on the framework.
     writeLock('my_flutter', [
-      gitEntry('dartway_flutter', resolvedRef: 'a' * 40),
+      gitEntry('dartway_core_flutter', resolvedRef: 'a' * 40),
       '  dartway_lints:\n'
           '    dependency: "direct dev"\n'
           '    description:\n'

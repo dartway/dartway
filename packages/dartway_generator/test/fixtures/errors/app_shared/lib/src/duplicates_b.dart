@@ -1,4 +1,4 @@
-import 'package:dartway_core/dartway_core.dart' hide DwAuthSession;
+import 'package:dartway_core_shared/dartway_core_shared.dart' hide DwAuthSession;
 
 part 'duplicates_b.dw.dart';
 

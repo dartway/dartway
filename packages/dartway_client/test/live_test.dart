@@ -366,28 +366,46 @@ void main() {
       );
     });
 
-    test(
-      'an anonymous client is refused subscriptions and fetches at once',
-      () async {
-        final h = Harness(signedIn: false)..serveRooms();
-        await h.start();
-        final watch = h.client.watch(const ListRooms());
-        await settle();
-        expect(watch.state, const DwRequestData([a, b]));
-        expect(
-          h.server.sent
-              .whereType<DwSubscriptionRefusedMessage>()
-              .single
-              .isUnauthenticated,
-          isTrue,
-        );
-        expect(
-          h.server.receivedOf<DwAuthenticateMessage>(),
-          isEmpty,
-          reason: 'no session, no authentication',
-        );
-      },
-    );
+    test('an anonymous client opens no socket, fetches at once and becomes '
+        'live after sign-in', () async {
+      final h = Harness(signedIn: false)..serveRooms();
+      await h.start();
+      final statuses = DwStreamRecording(h.client.connectionStatusStream);
+      final watch = h.client.watch(const ListRooms());
+      await settle();
+      expect(watch.state, const DwRequestData([a, b]));
+      expect(watch.isLive, isFalse);
+      expect(
+        h.server.connections,
+        isEmpty,
+        reason: 'no socket while signed out',
+      );
+      expect(h.client.connectionStatus, DwConnectionStatus.idle);
+      expect(h.server.callsOf<ListRooms>(), hasLength(1));
+
+      await h.client.signIn(alice);
+      await until(() => watch.isLive);
+      expect(h.server.connections, hasLength(1));
+      expect(
+        h.server.sent.whereType<DwSubscriptionRefusedMessage>(),
+        isEmpty,
+        reason: 'never subscribed without an account',
+      );
+      expect(dataOf(watch.state), [a, b]);
+
+      await h.client.signOut();
+      await settle();
+      expect(watch.isLive, isFalse);
+      expect(dataOf(watch.state), [a, b]);
+      await until(() => h.client.connectionStatus == DwConnectionStatus.idle);
+      expect(
+        h.server.sent.whereType<DwSubscriptionRefusedMessage>(),
+        isEmpty,
+        reason: 'signed out, nothing is subscribed again',
+      );
+      expect(statuses.values, contains(DwConnectionStatus.connected));
+      expect(statuses.values.last, DwConnectionStatus.idle);
+    });
   });
 
   group('incompatibility on the socket', () {

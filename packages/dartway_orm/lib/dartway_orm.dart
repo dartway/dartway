@@ -3,7 +3,7 @@ library;
 
 // Generated row code uses these; re-exported so a row class file needs one
 // import.
-export 'package:dartway_core/dartway_core.dart'
+export 'package:dartway_core_shared/dartway_core_shared.dart'
     show
         DwClearField,
         DwKeepField,

@@ -5,7 +5,7 @@ import 'package:analyzer/dart/element/type.dart';
 /// project class that happens to be called `DwActionCommand` is never mistaken
 /// for the real one.
 abstract final class DwFrameworkTypes {
-  static const corePackage = 'dartway_core';
+  static const corePackage = 'dartway_core_shared';
   static const ormPackage = 'dartway_orm';
 
   static bool isFrom(Element element, String package) =>

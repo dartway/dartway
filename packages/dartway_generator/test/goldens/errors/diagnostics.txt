@@ -11,7 +11,7 @@ app_shared/lib/src/declaration.dart:19:13: `Bare` extends DwWireObject directly;
 app_shared/lib/src/declaration.dart:23:13: `Implements` must extend its DTO kind (`extends DwDataObject`, a DwDataRequest kind or DwActionCommand); implementing or mixing it in is not supported
 app_shared/lib/src/declaration.dart:29:13: `_Private` is private, but the generated protocol registry lives in another library and must name it; make the class public
 app_shared/lib/src/duplicates_a.dart:5:13: DTO name `Twice` is declared more than once (also at duplicates_b.dart:5:13); wire names must be unique across the project
-app_shared/lib/src/duplicates_a.dart:10:13: DTO name `DwAuthSession` is already taken by a dartway_core DTO; wire names must be unique, rename the class
+app_shared/lib/src/duplicates_a.dart:10:13: DTO name `DwAuthSession` is already taken by a dartway_core_shared DTO; wire names must be unique, rename the class
 app_shared/lib/src/duplicates_b.dart:5:13: DTO name `Twice` is declared more than once (also at duplicates_a.dart:5:13); wire names must be unique across the project
 app_shared/lib/src/hidden.dart:10:17: field `visible` of `UsesHidden` cannot be serialised: `$VisibleFromJson` is not visible in this library: the import that brings in `Visible` hides it — add it to the `show` list
 app_shared/lib/src/ids.dart:9:16: the id of data object `DoubleId` must be `int` or `String`, not `double`

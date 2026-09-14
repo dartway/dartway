@@ -3,7 +3,7 @@
 The shared-preferences plugin for [DartWay](https://dartway.dev): typed riverpod providers over local
 storage, reached as `dw.plugins.prefs`.
 
-Optional by design. The core (`dartway_flutter`) carries no dependency an app might not need — local
+Optional by design. The core (`dartway_core_flutter`) carries no dependency an app might not need — local
 storage is a plugin, like any other integration. An app that needs it declares the plugin; one that
 doesn't never downloads `shared_preferences`.
 
@@ -47,7 +47,7 @@ while `unused_import` suggests removing the very import that fixes it.
 
 **The extension has to be in scope.** `dw.plugins.prefs` is declared here, so every file reading it
 imports this package. If that gets noisy, re-export the package from wherever the app declares `dw`
-— the same way a UI kit's root file re-exports `dartway_flutter`:
+— the same way a UI kit's root file re-exports `dartway_core_flutter`:
 
 ```dart
 // lib/core/dw_core.dart

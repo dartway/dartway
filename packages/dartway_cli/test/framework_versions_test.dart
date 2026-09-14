@@ -64,7 +64,7 @@ void main() {
       // The multi-package modules — the core, push, offline — sit a directory
       // deeper than the single ones, and a walk that stopped at the first level
       // would silently report the core as absent.
-      writePackage('dartway_flutter', 'dartway_flutter', '0.8.0');
+      writePackage('dartway_core_flutter', 'dartway_core_flutter', '0.8.0');
       writePackage(
         p.join('dartway_serverpod_core', 'dartway_serverpod_core_server'),
         'dartway_serverpod_core_server',
@@ -72,7 +72,7 @@ void main() {
       );
 
       expect(readFrameworkVersions(monorepo()), {
-        'dartway_flutter': '0.8.0',
+        'dartway_core_flutter': '0.8.0',
         'dartway_serverpod_core_server': '0.12.1',
       });
     });
@@ -85,12 +85,12 @@ void main() {
 
   group('compareToFramework', () {
     test('the oldest copy is the version the project is on', () {
-      writeLock('app_flutter', [hostedEntry('dartway_flutter', '0.8.0')]);
-      writeLock('app_server', [hostedEntry('dartway_flutter', '0.4.0')]);
+      writeLock('app_flutter', [hostedEntry('dartway_core_flutter', '0.8.0')]);
+      writeLock('app_server', [hostedEntry('dartway_core_flutter', '0.4.0')]);
 
       final gaps = compareToFramework(
         projectRoot: sandbox,
-        frameworkVersions: const {'dartway_flutter': '0.8.0'},
+        frameworkVersions: const {'dartway_core_flutter': '0.8.0'},
       );
 
       expect(gaps.single.projectVersion, '0.4.0');
@@ -112,11 +112,11 @@ void main() {
     test('versions compare numerically, not as text', () {
       // `0.11.0` sorts below `0.9.0` as text, and a report built on that would
       // send a project to redo a migration it has already applied.
-      writeLock('app_flutter', [hostedEntry('dartway_flutter', '0.11.0')]);
+      writeLock('app_flutter', [hostedEntry('dartway_core_flutter', '0.11.0')]);
 
       final gaps = compareToFramework(
         projectRoot: sandbox,
-        frameworkVersions: const {'dartway_flutter': '0.9.0'},
+        frameworkVersions: const {'dartway_core_flutter': '0.9.0'},
       );
 
       expect(gaps.single.isBehind, isFalse);
@@ -126,11 +126,11 @@ void main() {
     test('a git dependency states its version too, and is marked as git', () {
       // The instruction differs by source — a caret is edited, a git pin is
       // upgraded — so the report has to know which it is looking at.
-      writeLock('app_flutter', [gitEntry('dartway_flutter', '0.4.0')]);
+      writeLock('app_flutter', [gitEntry('dartway_core_flutter', '0.4.0')]);
 
       final gaps = compareToFramework(
         projectRoot: sandbox,
-        frameworkVersions: const {'dartway_flutter': '0.8.0'},
+        frameworkVersions: const {'dartway_core_flutter': '0.8.0'},
       );
 
       expect(gaps.single.fromGit, isTrue);
@@ -138,17 +138,17 @@ void main() {
     });
 
     test('a package the project never asked for is not a gap', () {
-      writeLock('app_flutter', [hostedEntry('dartway_flutter', '0.8.0')]);
+      writeLock('app_flutter', [hostedEntry('dartway_core_flutter', '0.8.0')]);
 
       final gaps = compareToFramework(
         projectRoot: sandbox,
         frameworkVersions: const {
-          'dartway_flutter': '0.8.0',
+          'dartway_core_flutter': '0.8.0',
           'dartway_telegram': '0.2.0',
         },
       );
 
-      expect(gaps.map((gap) => gap.name), ['dartway_flutter']);
+      expect(gaps.map((gap) => gap.name), ['dartway_core_flutter']);
     });
   });
 }

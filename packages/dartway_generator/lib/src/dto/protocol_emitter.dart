@@ -21,7 +21,9 @@ abstract final class ProtocolEmitter {
       ..sort();
     final out = StringBuffer()
       ..writeln(generatedHeader)
-      ..writeln("import 'package:dartway_core/dartway_core.dart';");
+      ..writeln(
+        "import 'package:dartway_core_shared/dartway_core_shared.dart';",
+      );
     if (imports.isNotEmpty) out.writeln();
     for (final uri in imports) {
       out.writeln('import ${dartString(uri)};');

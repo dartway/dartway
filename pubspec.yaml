@@ -6,12 +6,12 @@ environment:
 workspace:
   - packages/dartway_cli
   - packages/dartway_client
-  - packages/dartway_core
-  - packages/dartway_flutter
+  - packages/dartway_core_flutter
+  - packages/dartway_core_server
+  - packages/dartway_core_shared
   - packages/dartway_lints
   - packages/dartway_orm
   - packages/dartway_router
-  - packages/dartway_server
   - packages/dartway_shared_preferences
   - packages/dartway_studio_bridge
   - packages/dartway_telegram

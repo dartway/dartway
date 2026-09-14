@@ -1,4 +1,4 @@
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 part 'clash_b.dw.dart';
 

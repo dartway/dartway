@@ -187,9 +187,14 @@ final class DwPagesWatch<T extends DwDataObject>
 /// One watcher of a window.
 final class DwWindowWatch<T extends DwDataObject>
     extends _Watch<DwWindowData<T>> {
-  DwWindowWatch._(super.client, DwWindowRequest<T> super.request, super.anchor);
+  DwWindowWatch._(
+    super.client,
+    DwWindowRequest<T, Object, Object> super.request,
+    super.anchor,
+  );
 
-  DwWindowRequest<T> get request => _request as DwWindowRequest<T>;
+  DwWindowRequest<T, Object, Object> get request =>
+      _request as DwWindowRequest<T, Object, Object>;
 
   /// The anchor the window opened at; `null` for the newest rows.
   String? get anchor => _anchor;

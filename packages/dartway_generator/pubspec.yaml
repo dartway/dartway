@@ -1,6 +1,6 @@
 name: dartway_generator
 description: Code generation for DartWay projects — DTO codecs, registries, entity tables and schema.
-version: 1.0.0-dev.1
+version: 0.20.0-dev.1
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 publish_to: none
@@ -18,8 +18,10 @@ dependencies:
   pub_semver: ^2.2.0
   yaml: ^3.1.2
 dev_dependencies:
-  dartway_core:
-    path: ../dartway_core
+  dartway_core_server:
+    path: ../dartway_core_server
+  dartway_core_shared:
+    path: ../dartway_core_shared
   dartway_orm:
     path: ../dartway_orm
   lints: ^6.0.0
@@ -28,7 +30,11 @@ dev_dependencies:
 # Outside the workspace, the framework packages the generator's tests compile
 # generated code against resolve from this tree, not from pub.dev.
 dependency_overrides:
-  dartway_core:
-    path: ../dartway_core
+  dartway_client:
+    path: ../dartway_client
+  dartway_core_server:
+    path: ../dartway_core_server
+  dartway_core_shared:
+    path: ../dartway_core_shared
   dartway_orm:
     path: ../dartway_orm

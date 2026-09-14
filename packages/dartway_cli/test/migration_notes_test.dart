@@ -46,7 +46,7 @@ void main() {
         '---\n'
         'title: DwCore.init takes its plugins as a list\n'
         'affects:\n'
-        '  dartway_flutter: "0.8.0"\n'
+        '  dartway_core_flutter: "0.8.0"\n'
         '---\n'
         '\n'
         '## What to change\n'
@@ -54,7 +54,7 @@ void main() {
       );
 
       expect(parsed.title, 'DwCore.init takes its plugins as a list');
-      expect(parsed.affects, {'dartway_flutter': '0.8.0'});
+      expect(parsed.affects, {'dartway_core_flutter': '0.8.0'});
       expect(parsed.body, contains('Pass a list.'));
     });
 
@@ -67,7 +67,7 @@ void main() {
           '---\n'
           'title: t\n'
           'affects:\n'
-          '  dartway_flutter: 0.8\n'
+          '  dartway_core_flutter: 0.8\n'
           '---\n',
         ),
         contains('full version in quotes'),
@@ -99,17 +99,17 @@ void main() {
     final note = DwMigrationNote(
       path: 'docs/migrations/2026-09-05-plugins.md',
       title: 'plugins as a list',
-      affects: const {'dartway_flutter': '0.8.0'},
+      affects: const {'dartway_core_flutter': '0.8.0'},
       body: '',
     );
 
     test('applies to a project below the version it lands in', () {
-      expect(note.appliesTo({'dartway_flutter': '0.4.0'}), isTrue);
+      expect(note.appliesTo({'dartway_core_flutter': '0.4.0'}), isTrue);
     });
 
     test('does not apply once the project has that version', () {
-      expect(note.appliesTo({'dartway_flutter': '0.8.0'}), isFalse);
-      expect(note.appliesTo({'dartway_flutter': '0.9.1'}), isFalse);
+      expect(note.appliesTo({'dartway_core_flutter': '0.8.0'}), isFalse);
+      expect(note.appliesTo({'dartway_core_flutter': '0.9.1'}), isFalse);
     });
 
     test('does not apply to a project without the package at all', () {
@@ -123,14 +123,14 @@ void main() {
         path: 'n.md',
         title: 't',
         affects: const {
-          'dartway_flutter': '0.8.0',
+          'dartway_core_flutter': '0.8.0',
           'dartway_serverpod_core_server': '0.12.0',
         },
         body: '',
       );
       expect(
         wide.appliesTo({
-          'dartway_flutter': '0.8.0',
+          'dartway_core_flutter': '0.8.0',
           'dartway_serverpod_core_server': '0.11.4',
         }),
         isTrue,

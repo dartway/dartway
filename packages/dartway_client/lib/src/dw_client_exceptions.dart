@@ -1,4 +1,4 @@
-import 'package:dartway_core/dartway_core.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 /// The server failed a call; [incidentId] is what the operator finds it by.
 ///

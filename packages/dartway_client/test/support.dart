@@ -98,9 +98,7 @@ final class Harness {
         return DwCallOk(notes[account]?.toList() ?? <NoteView>[]);
       })
       ..onRequest<ReadChat>(
-        (request, call) => DwCallOk(
-          dwFakeWindow(chat, request, call.page, sortValue: (line) => line.at),
-        ),
+        (request, call) => DwCallOk(dwFakeWindow(chat, request, call.page)),
       )
       ..onCommand<RenameRoom>((command, call) {
         final renamed = RoomView(
