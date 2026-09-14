@@ -1,3 +1,136 @@
+# Revision 2 — the owner's review of 2026-09-14
+
+**This section supersedes everything below it where they disagree.** It records the decisions of the morning review; the build is being redone to match. Sections below remain valid where untouched.
+
+## R2.1 Naming — no name shorter than two words
+
+| What | Where | Rule | Example |
+|---|---|---|---|
+| table row class | server | `<Entity>Row extends DwRow` | `SessionBookingRow` |
+| generated table | server | `<Entity>Table` | `SessionBookingTable` |
+| repository getter | server | camelCase plural of the entity (without `Row`) | `db.sessionBookings` |
+| data object | shared | a noun of two or more words, no suffix | `SessionBooking`, `ClubSession`, `UserProfile` |
+| read | shared | `Get…` / `List…` + two or more words | `GetUserProfile`, `ListMyBookings` |
+| change | shared | verb + object | `BookSession`, `CancelBooking` |
+| project channels / refusals | shared | `<Project>Channel` / `<Project>Refusal` | `ExampleChannel` |
+
+ORM renames: `DwEntity` → `DwRow` (base class of table rows); the raw SQL result row `DwRow` → `DwResultRow`. The `*View` suffix of the first build is gone.
+
+## R2.2 Transport: HTTP per DTO, WebSocket only for live updates
+
+One server process, one port.
+
+```
+POST /dw/<DtoWireName>     requests and commands (framework)
+GET  /dw/live              WebSocket: authenticate, subscribe, unsubscribe; receives updates and channel closures
+GET  /health               liveness + database reachability
+*                          project routes (external doors); /dw/ and /health are reserved, a collision fails startup
+```
+
+### Call
+
+- Body: the DTO's own JSON (`toJson()`), no type tag — the type is the path.
+- Query: page parameters only — `offset` (page), `page`&`pageSize` (table), `anchor`/`before`/`after` (window cursors, opaque strings produced by the server).
+- Headers:
+  - `Authorization: Bearer <token>` (absent = anonymous);
+  - `Dw-Idempotency-Key: <key>` — required for commands, forbidden for requests;
+  - `Dw-Protocol: 1` — required; unsupported → 426;
+  - `Dw-App-Version: <semver>+<build>` — sent by the framework client; below the project's `minAppBuild` → 426 `dw.updateRequired`;
+  - `Dw-Live-Connection: <id>` — optional: the id the server gave this client's WebSocket; lets the server exclude that connection from the socket broadcast of this command's updates and filter the response transport to that connection's subscriptions. Without it the response carries every update the command published and nothing is excluded.
+- Only POST. Body limit 1 MiB by default.
+
+### ApiResponse (always the body)
+
+```json
+{"status":"ok","result":<encoded by the request/command class>,"updates":{"ClubSession":[{…}],"DwDeleted":[{"type":"X","id":1}]}}
+{"status":"refused","refusal":{"code":"noSpotsLeft","params":{},"field":null}}
+{"status":"unauthenticated"}
+{"status":"failed","incidentId":"…"}
+{"status":"incompatible","refusal":{"code":"dw.updateRequired"}}
+```
+
+`result` is never tagged (its type is the request's or command's); `updates` is the **transport** — objects grouped by wire name, the only place a type name stands next to objects. `updates` is omitted when empty.
+
+### Honest HTTP statuses
+
+| Outcome | HTTP |
+|---|---|
+| ok | 200 |
+| refused by a rule or validation | 422 |
+| `dw.forbidden` | 403 |
+| `dw.notFound` | 404 |
+| `dw.conflict` | 409 |
+| `dw.tooManyRequests` | 429 + `Retry-After` |
+| unauthenticated | 401 |
+| failed | 500 |
+| malformed call, unknown DTO, wrong method, missing required header | 400 (unknown DTO: 404 with `failed`) |
+| protocol unsupported / update required | 426 |
+
+Refusals never alert; 5xx alert.
+
+### WebSocket `/dw/live`
+
+```
+← {"k":"hello","connection":"<id>"}                  on open
+→ {"k":"auth","token":"…"} / {"k":"auth"}            first, and after sign-in/out
+← {"k":"authed","account":7} / {"k":"authed","rejected":true}
+→ {"k":"sub","ch":"bookings:7"} / {"k":"unsub","ch":"…"}
+← {"k":"subok","ch":"…"} / {"k":"subno","ch":"…", …}
+← {"k":"upd","ch":"schedule","updates":{<transport>}}
+← {"k":"closed","ch":"…"}
+```
+
+Query `?protocol=1&app=<version>` on the upgrade (browsers cannot set headers); same 426 semantics as a close code. Pings as before. The author's own connection (named in `Dw-Live-Connection`) does not receive updates of its own command over the socket — it has them in the response.
+
+## R2.3 Request kinds and update actions
+
+```dart
+enum DwUpdateAction { upsert, update, remove, refetch, ignore }
+```
+
+- `upsert` — replace by id; insert when absent (by `sort`, else at the head).
+- `update` — replace only when present.
+- `remove`, `refetch`, `ignore`.
+
+No `auto`. Every kind's `onUpdate(Object item)` returns an explicit action; scenarios are chosen with **named super constructors**, overriding `onUpdate` stays for special cases.
+
+| Kind | Result | Default action | Named constructors |
+|---|---|---|---|
+| `DwSingleRequest<T>` | `T` (absent ⇒ `dw.notFound`) | `update` | — |
+| `DwMaybeRequest<T>` | `T?` | `matches ? upsert : remove` | — |
+| `DwListRequest<T>` | `List<T>` | `matches ? upsert : remove` | `.updateOnly()`, `.refetchOnUpdate()` |
+| `DwPageRequest<T>` (offset, accumulating feed) | `DwPage<T>` (items, hasMore) | `matches ? upsert : remove`; an insert sorting past the loaded pages is dropped while more pages exist | `.updateOnly()` |
+| `DwTableRequest<T>` (numbered pages) | `DwTablePage<T>` (items, total, page, pageSize) | `update` (a table page never inserts; `refetch` when an item is removed) | — |
+| `DwWindowRequest<T>` (anchored, both directions) | `DwWindow<T>` (items newest-first, hasOlder, hasNewer, olderCursor, newerCursor) | present → `update`; new + `matches` → insert **only when `hasNewer == false`** (otherwise the window counts it as unseen); not matches → `remove` | — |
+
+`DwCursorRequest` is removed (a window without anchor opens at the newest).
+
+Page sizes: `DwPageRequest` / `DwWindowRequest` take `pageSize` (and `maxPageSize`) as super-constructor arguments — constants, not serialised. `DwTableRequest` declares `page` and `pageSize` as **fields** (they are the key); the class declares `maxPageSize`; the server clamps.
+
+Window cursors are opaque strings the server builds from the sort value and the id (`DwWindowCursor.encode(sortValue, id)` / `.decode`), so rows sharing a timestamp are neither lost nor repeated. The handler receives `DwWindowInput { direction: around|older|newer, anchor?, cursor?, fetchLimit }` and returns the rows of that direction; the framework assembles the window and the flags.
+
+`bool acceptsItem(Object?)`, `matches`, `sort`, `channels` stay pure functions of the object and the request's fields. `DateTime.now()` inside them is a bug.
+
+## R2.4 Access and account scoping
+
+- `validate()` (`DwValidatable`) knows only the DTO's fields and runs on both sides; **who calls** is decided on the server only.
+- Client state is always scoped by account: a sign-in as a different account never sees the previous account's entries. "My …" requests carry no account or profile id; the server uses the caller.
+- `DwAccess.check((ctx, request) async => bool)` receives the request for rules on real parameters (staff viewing a client's bookings).
+
+## R2.5 Versions
+
+`Dw-Protocol` (framework envelope) and `Dw-App-Version` (the app build). The server's `DwServerSettings.minAppBuild` (int, default 0) can be changed without a release (read from settings/environment at startup; a project may also load it from the database). The Flutter layer turns `dw.updateRequired` into a full-screen "update the app" page with project-supplied text and store links.
+
+## R2.6 External doors
+
+`DwRoute.get/post/any(path, (DwRouteContext ctx, DwHttpRequest request) async => DwHttpResponse)` — framework types over the HTTP server; relic stays an implementation detail of `dartway_server` and does not appear in any project import.
+
+## R2.7 Web and deploy (for the deploy milestone)
+
+Three hosts, one server process: `example.com` (site: optional `app_site/` built by the project or external), `app.example.com` (Flutter web by nginx; `/dw/*` and `/health` proxied to the server — same origin, no CORS, no preflight), `api.example.com` (the server for mobile apps and webhooks). The server does not serve static files.
+
+---
+
 # DartWay 1.0 — package contracts
 
 The seams between the 1.0 packages, fixed before the packages are written so they can be built in parallel. `SPEC.md` says *what* and *why*; this file says *which names and shapes*. Where an implementation finds a contract unworkable, it changes this file in the same commit and says why in `DECISIONS.md`.
