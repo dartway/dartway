@@ -1,4 +1,5 @@
 import '../auth/dw_auth_wire_objects.dart';
+import '../files/dw_file_wire_objects.dart';
 import '../wire/dw_server_call.dart';
 import '../wire/dw_wire_object.dart';
 import 'dw_http_contract.dart';
@@ -152,6 +153,7 @@ final class DwWireProtocol {
       DwDeletedObject.fromJson,
     ),
     ...dwAuthProtocolEntries,
+    ...dwFileProtocolEntries,
   ]);
 
   /// Every registered class, the included protocol's first, each once.

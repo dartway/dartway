@@ -598,6 +598,7 @@ final class TestApp {
     List<DwDatabaseMigration>? migrations,
     DwWireProtocol? protocol,
     DwDatabaseSchema? schema,
+    DwFileStorage? files,
   }) => DwAppServer(
     protocol: protocol ?? testProtocol,
     schema: schema,
@@ -608,6 +609,7 @@ final class TestApp {
     channels: channels ?? this.channels(),
     jobs: jobs ?? this.jobs(),
     routes: routes,
+    files: files,
     alerts: alerts,
     logger: logger,
     settings: settings,

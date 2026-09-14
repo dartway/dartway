@@ -8,6 +8,7 @@ import '../auth/dw_account_service.dart';
 import '../auth/dw_auth_config.dart';
 import '../auth/dw_session_cache.dart';
 import '../context/dw_call_context.dart';
+import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../live/dw_live_connection.dart';
 import '../live/dw_live_hub.dart';
@@ -26,6 +27,7 @@ final class DwRuntime {
     required this.alerts,
     required this.log,
     required this.jobsFor,
+    this.files,
   });
 
   final DwWireProtocol protocol;
@@ -36,6 +38,9 @@ final class DwRuntime {
   final DwAlertGate alerts;
   final DwServerLogger log;
   final DwJobQueue Function(DwRuntimeContext ctx) jobsFor;
+
+  /// The file storage; `null` when the server has none.
+  final DwFileStore? files;
 
   DwRuntimeContext context({
     required String scope,
@@ -50,6 +55,7 @@ final class DwRuntime {
     log: log.scoped(scope),
     jobs: jobsFor,
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
+    files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
     accountId: accountId,
     keyId: keyId,
   );
@@ -106,6 +112,7 @@ int dwLockKey(String text) {
 abstract final class DwLockSpace {
   static const int identifier = 0x44570001;
   static const int idempotencyKey = 0x44570002;
+  static const int pendingUploads = 0x44570003;
 }
 
 /// Whether [error] means "run the transaction again".

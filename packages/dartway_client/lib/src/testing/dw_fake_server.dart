@@ -9,6 +9,7 @@ import '../dw_client_options.dart';
 import '../session/dw_token_store.dart';
 import '../transport/dw_http_transport.dart';
 import '../transport/dw_live_connection.dart';
+import '../transport/dw_storage_transport.dart';
 
 /// A handler of the fake server: the outcome of one call.
 ///
@@ -273,12 +274,14 @@ final class DwFakeServer {
     String appVersion = '1.0.0+1',
     DwClientOptions options = dwFakeClientOptions,
     void Function(Object error, StackTrace stackTrace)? onError,
+    DwStorageTransport? storageTransport,
   }) => DwAppClient(
     protocol: protocol,
     baseUrl: baseUrl,
     appVersion: appVersion,
     httpTransport: httpTransport,
     liveConnector: liveConnector,
+    storageTransport: storageTransport,
     tokenStore: tokenStore,
     options: options,
     onError: onError,

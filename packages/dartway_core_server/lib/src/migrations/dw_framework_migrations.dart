@@ -13,6 +13,11 @@ const String dwFrameworkNamespace = 'dw';
 /// database that ran it); a change is a new migration in this list.
 final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
   const _DwSqlMigration('20260913_000000_dw_initial', _initialUp, _initialDown),
+  const _DwSqlMigration(
+    '20260914_000000_dw_stored_file',
+    _storedFileUp,
+    _storedFileDown,
+  ),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -132,6 +137,37 @@ CREATE TABLE dw_recurring_job (
   last_error text
 )''',
 ];
+
+// Uploaded files. A row exists from the moment an upload is started; it is
+// confirmed once the server has seen the object, and an unconfirmed one past
+// its ticket and grace is removed with its object by `dw.files.cleanup`.
+const List<String> _storedFileUp = [
+  // The account is not deleted from under its files (no cascade): deleting
+  // rows here would orphan their objects in storage, where nothing could
+  // find them again. An account's files are deleted through ctx.files first.
+  '''
+CREATE TABLE dw_stored_file (
+  id bigserial PRIMARY KEY,
+  account_id bigint NOT NULL REFERENCES dw_account (id),
+  purpose text NOT NULL,
+  object_key text NOT NULL,
+  visibility text NOT NULL CHECK (visibility IN ('public', 'private')),
+  file_name text NOT NULL,
+  content_type text NOT NULL,
+  byte_size bigint NOT NULL CHECK (byte_size > 0),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  confirmed_at timestamptz,
+  CONSTRAINT dw_stored_file_object_key UNIQUE (object_key)
+)''',
+  // Cleanup reads unconfirmed rows by age.
+  'CREATE INDEX dw_stored_file_cleanup '
+      'ON dw_stored_file (confirmed_at, created_at)',
+  // The per-account limit of pending uploads counts only unconfirmed rows.
+  'CREATE INDEX dw_stored_file_pending ON dw_stored_file (account_id, created_at) '
+      'WHERE confirmed_at IS NULL',
+];
+
+const List<String> _storedFileDown = ['DROP TABLE dw_stored_file'];
 
 const List<String> _initialDown = [
   'DROP TABLE dw_recurring_job',

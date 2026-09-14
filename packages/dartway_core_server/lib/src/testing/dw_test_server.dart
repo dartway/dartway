@@ -139,8 +139,8 @@ final class DwTestServer {
   ///
   /// [options] defaults to [dwTestClientOptions]: short retries and no
   /// release or idle delay, so a test sees the effects of what it did at
-  /// once. [httpTransport] and [liveConnector] wrap the real ones when a test
-  /// needs to lose an answer or watch the frames; [onError] receives what the
+  /// once. [httpTransport], [liveConnector] and [storageTransport] wrap the
+  /// real ones when a test needs to lose an answer or watch the frames; [onError] receives what the
   /// client reports (by default the zone's uncaught-error handler, which
   /// fails the test).
   Future<DwAppClient> connectClient({
@@ -149,6 +149,7 @@ final class DwTestServer {
     String appVersion = DwTestCaller.defaultAppVersion,
     DwHttpTransport? httpTransport,
     DwLiveConnector? liveConnector,
+    DwStorageTransport? storageTransport,
     void Function(Object error, StackTrace stackTrace)? onError,
   }) async {
     final client = DwAppClient(
@@ -158,6 +159,7 @@ final class DwTestServer {
       tokenStore: tokenStore,
       httpTransport: httpTransport,
       liveConnector: liveConnector,
+      storageTransport: storageTransport,
       options: options,
       onError: onError,
     );

@@ -26,7 +26,7 @@ export 'package:dartway_router/dartway_router.dart';
 
 // data: DwFlutterCore — the toolbox plus the client and its Riverpod bindings
 // (`dw.request`, `dw.pages`, `dw.table`, `dw.window`, `dw.command`,
-// `dw.accountId`, `dw.liveStatus`).
+// `dw.accountId`, `dw.liveStatus`), and uploads (`dw.files`, `dw.uploader()`).
 export 'src/data/dw_flutter_core.dart';
 export 'src/data/dw_request_notifiers.dart'
     show
@@ -40,6 +40,7 @@ export 'src/data/dw_request_notifiers.dart'
         DwValueProvider,
         DwWindowNotifier,
         DwWindowProvider;
+export 'src/data/dw_upload_notifier.dart';
 
 // core: the ambient app root, its config, and the plugin registry
 // (`dw.plugins.<name>`).

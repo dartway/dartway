@@ -4,6 +4,13 @@
 
 The rewrite (see docs/1.0).
 
+- **Uploads:** `dw.files` (the client's `DwFileClient`) and `dw.uploader()` — a
+  `DwUploadNotifier`, a `ValueNotifier` of `DwUploadIdle` / `DwUploadProgress`
+  / `DwUploadDone` / `DwUploadError` for one upload slot of a screen. Refusals,
+  a signed-out caller and an unreachable network stay in the state; server
+  failures and storage refusing an upload go to the app's error reporting. No
+  picker: choosing a file is the app's. `DwFlutterCore(storageTransport:)`.
+
 ## 0.9.0
 
 - **A start that fails says so, and says what failed.** An initializer that threw was reported and

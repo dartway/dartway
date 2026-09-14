@@ -4,6 +4,7 @@ library;
 
 export 'src/auth/dw_auth_wire_objects.dart';
 export 'src/channels/dw_live_channel.dart';
+export 'src/files/dw_file_wire_objects.dart';
 export 'src/wire/dw_server_call.dart';
 export 'src/wire/dw_wire_object.dart';
 export 'src/wire/dw_page_results.dart';

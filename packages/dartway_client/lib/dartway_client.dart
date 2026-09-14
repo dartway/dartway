@@ -9,6 +9,7 @@ export 'src/client/dw_app_client.dart'
     show
         DwAppClient,
         DwConnectionStatus,
+        DwFileClient,
         DwPagesWatch,
         DwRequestWatch,
         DwWindowWatch;
@@ -18,4 +19,5 @@ export 'src/session/dw_token_store.dart';
 export 'src/state/dw_request_state.dart';
 export 'src/transport/dw_http_transport.dart';
 export 'src/transport/dw_live_connection.dart';
+export 'src/transport/dw_storage_transport.dart';
 export 'src/transport/dw_web_socket_connector.dart';

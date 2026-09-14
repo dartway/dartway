@@ -11,10 +11,12 @@ import '../session/dw_token_store.dart';
 import '../state/dw_request_state.dart';
 import '../transport/dw_http_transport.dart';
 import '../transport/dw_live_connection.dart';
+import '../transport/dw_storage_transport.dart';
 import '../transport/dw_web_socket_connector.dart';
 
 part 'calls.dart';
 part 'entries.dart';
+part 'files.dart';
 part 'live.dart';
 part 'pages_entry.dart';
 part 'replay.dart';
@@ -93,6 +95,7 @@ final class DwAppClient {
     DwTokenStore? tokenStore,
     DwHttpTransport? httpTransport,
     DwLiveConnector? liveConnector,
+    DwStorageTransport? storageTransport,
     this.options = const DwClientOptions(),
     void Function(Object error, StackTrace stackTrace)? onError,
     Random? random,
@@ -102,6 +105,8 @@ final class DwAppClient {
        httpTransport = httpTransport ?? DwHttpClientTransport(),
        _ownsTransport = httpTransport == null,
        liveConnector = liveConnector ?? const DwWebSocketConnector(),
+       storageTransport = storageTransport ?? DwHttpStorageTransport(),
+       _ownsStorageTransport = storageTransport == null,
        _onError = onError,
        _random = random ?? Random.secure();
 
@@ -120,9 +125,14 @@ final class DwAppClient {
   final DwTokenStore tokenStore;
   final DwHttpTransport httpTransport;
   final DwLiveConnector liveConnector;
+
+  /// Where upload bytes go: straight to storage, by presigned URLs.
+  final DwStorageTransport storageTransport;
+
   final DwClientOptions options;
 
   final bool _ownsTransport;
+  final bool _ownsStorageTransport;
   final void Function(Object error, StackTrace stackTrace)? _onError;
   final Random _random;
 
@@ -219,10 +229,14 @@ final class DwAppClient {
     final connection = _liveConnection;
     if (connection != null) await connection.close();
     if (_ownsTransport) httpTransport.close();
+    if (_ownsStorageTransport) storageTransport.close();
     _status.close();
     _account.close();
     _incompatibility.close();
   }
+
+  /// File uploads and links: `client.files.upload(...)`.
+  late final DwFileClient files = DwFileClient._(this);
 
   /// The signed-in account id, or `null`. Known from the stored session right
   /// after [start], and corrected by the server: a rejected token makes it

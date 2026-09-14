@@ -13,6 +13,8 @@ import '../auth/dw_auth_service.dart';
 import '../auth/dw_session_cache.dart';
 import '../calls/dw_call_endpoint.dart';
 import '../channels/dw_channel_rule.dart';
+import '../files/dw_file_service.dart';
+import '../files/dw_file_storage.dart';
 import '../handlers/dw_call_handler.dart';
 import '../http/dw_http_front.dart';
 import '../jobs/dw_job_queue.dart';
@@ -62,6 +64,7 @@ final class DwAppServer {
     this.channels = const [],
     this.jobs = const [],
     this.routes = const [],
+    this.files,
     this.port = 8080,
     InternetAddress? address,
     DwAlertSink? alerts,
@@ -94,6 +97,12 @@ final class DwAppServer {
   final List<DwChannelRule> channels;
   final List<DwJobDefinition> jobs;
   final List<DwRoute> routes;
+
+  /// File uploads: storage, a rule per purpose, who reads private files.
+  /// Without it the framework's file calls fail as incidents and `ctx.files`
+  /// throws — the `dw_stored_file` table exists either way.
+  final DwFileStorage? files;
+
   final int port;
   final InternetAddress address;
   final DwAlertSink alerts;
@@ -136,8 +145,13 @@ final class DwAppServer {
     DwPostgresDatabase? openedDatabase;
     DwJobRunner? jobRunner;
     DwHttpFront? front;
+    final fileStore = switch (files) {
+      final storage? => DwFileStore(storage),
+      null => null,
+    };
     try {
       openedDatabase = await DwPostgresDatabase.open(database);
+      fileStore?.attach(openedDatabase.db);
       await DwMigrationRunner(
         openedDatabase.db,
         migrations: {
@@ -168,11 +182,12 @@ final class DwAppServer {
         ),
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),
+        files: fileStore,
       );
       final authService = DwAuthService(runtime);
       runner = jobRunner = DwJobRunner(
         runtime: runtime,
-        definitions: [...jobs, _cleanupJob()],
+        definitions: [...jobs, _cleanupJob(), ...?fileStore?.jobs()],
         listen: openedDatabase.listen,
         workers: settings.jobWorkers,
         pollInterval: settings.jobPollInterval,
@@ -187,7 +202,11 @@ final class DwAppServer {
           authService: authService,
           settings: settings,
           handlers: {
-            for (final handler in [...handlers, ...authService.handlers()])
+            for (final handler in [
+              ...handlers,
+              ...authService.handlers(),
+              ...fileStore?.handlers() ?? DwFileStore.unconfiguredHandlers(),
+            ])
               handler.callType: handler,
           },
         ),
@@ -207,6 +226,7 @@ final class DwAppServer {
         runtime: runtime,
         jobRunner: runner,
         front: front,
+        files: fileStore,
       );
       _running = running;
       if (handleSignals) {
@@ -223,6 +243,7 @@ final class DwAppServer {
       await front?.close();
       await jobRunner?.stop();
       await openedDatabase?.close();
+      fileStore?.close();
       rethrow;
     }
   }
@@ -251,6 +272,7 @@ final class DwAppServer {
       );
       await running.front.close();
       await running.database.close();
+      running.files?.close();
       logger.info('DartWay server stopped');
     } finally {
       _running = null;
@@ -273,7 +295,8 @@ final class DwAppServer {
     final handled = <Type>{};
     for (final handler in handlers) {
       final type = handler.callType;
-      if (DwAuthService.builtInTypes.contains(type)) {
+      if (DwAuthService.builtInTypes.contains(type) ||
+          DwFileStore.builtInTypes.contains(type)) {
         problems.add('$type has a built-in handler and cannot have another');
       } else if (!protocol.knows(type)) {
         problems.add(
@@ -293,7 +316,10 @@ final class DwAppServer {
           kind != DwWireObjectKind.command) {
         continue;
       }
-      if (DwAuthService.builtInTypes.contains(entry.type)) continue;
+      if (DwAuthService.builtInTypes.contains(entry.type) ||
+          DwFileStore.builtInTypes.contains(entry.type)) {
+        continue;
+      }
       if (!handled.contains(entry.type)) {
         problems.add(
           '${entry.type} is a registered ${kind.name} without a handler',
@@ -328,6 +354,7 @@ final class DwAppServer {
         problems.add('job "${job.name}" needs at least one attempt');
       }
     }
+    if (files case final storage?) problems.addAll(storage.problems);
     final routeKeys = <String>{};
     for (final route in routes) {
       final path = route.path;
@@ -408,11 +435,13 @@ final class _DwRunning {
     required this.runtime,
     required this.jobRunner,
     required this.front,
+    required this.files,
   });
 
   final DwPostgresDatabase database;
   final DwRuntime runtime;
   final DwJobRunner jobRunner;
   final DwHttpFront front;
+  final DwFileStore? files;
   List<StreamSubscription<ProcessSignal>> signals = const [];
 }

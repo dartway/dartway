@@ -6,6 +6,7 @@ import 'package:meta/meta.dart';
 
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_service.dart';
+import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 
 /// Thrown when a call needs a signed-in account and has none. The framework
@@ -73,6 +74,11 @@ abstract class DwCallContext {
   /// Accounts by identifier, bound to this context: writes join its
   /// transaction, and revoked sessions close after it commits.
   DwAccountService get accounts;
+
+  /// Stored files: checking a file id a row references, public URLs in
+  /// batch, deleting. Throws [StateError] on use when the server has no file
+  /// storage.
+  DwFileService get files;
 
   DwServerLogger get log;
 
@@ -142,17 +148,20 @@ final class DwRuntimeContext extends DwCallContext {
     required this.log,
     required DwJobQueue Function(DwRuntimeContext ctx) jobs,
     required DwAccountService Function(DwRuntimeContext ctx) accounts,
+    DwFileService Function(DwRuntimeContext ctx)? files,
     this.accountId,
     this.keyId,
   }) : _root = _Scope(db),
        _jobs = jobs,
-       _accounts = accounts;
+       _accounts = accounts,
+       _files = files ?? ((_) => const DwUnconfiguredFiles());
 
   final _Scope _root;
   final Object _zoneKey = Object();
   final Map<Object, Object?> _memo = {};
   final DwJobQueue Function(DwRuntimeContext ctx) _jobs;
   final DwAccountService Function(DwRuntimeContext ctx) _accounts;
+  final DwFileService Function(DwRuntimeContext ctx) _files;
 
   final DwContextKind kind;
 
@@ -174,6 +183,9 @@ final class DwRuntimeContext extends DwCallContext {
 
   @override
   late final DwAccountService accounts = _accounts(this);
+
+  @override
+  late final DwFileService files = _files(this);
 
   _Scope get _current => (Zone.current[_zoneKey] as _Scope?) ?? _root;
 

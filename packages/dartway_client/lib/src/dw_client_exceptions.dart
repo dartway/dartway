@@ -175,3 +175,53 @@ extension DwCallResultValue<R> on DwCallResult<R> {
     DwCallFailed(:final incidentId) => throw DwFailedException(incidentId),
   };
 }
+
+/// Why an upload's bytes did not reach storage.
+enum DwUploadFailure {
+  /// Every attempt failed on the network, stalled, or met a transient
+  /// answer (`408`, `429`, `5xx`) until the ticket expired. Nothing is wrong with the file; the user tries again later.
+  unreachable,
+
+  /// Storage refused the upload ([DwUploadException.status]): the ticket
+  /// does not match what was sent, the bucket is misconfigured (CORS, keys),
+  /// or storage is down in a way retries did not outlast.
+  rejected,
+
+  /// The ticket expired before an attempt could finish — a very slow
+  /// network, or a device clock far from the server's. A new upload starts
+  /// with a new ticket.
+  expired,
+}
+
+/// The bytes of an upload did not reach storage. The server's part — the
+/// ticket, the confirmation — is answered as a `DwCallResult`; this is the
+/// part between the client and storage, where no server answers.
+final class DwUploadException implements Exception {
+  const DwUploadException(
+    this.failure, {
+    this.status,
+    this.storageCode,
+    this.lastError,
+  });
+
+  final DwUploadFailure failure;
+
+  /// Storage's HTTP status: the refusal of [DwUploadFailure.rejected] and
+  /// [DwUploadFailure.expired], the last transient answer of
+  /// [DwUploadFailure.unreachable] when there was one.
+  final int? status;
+
+  /// S3's error `<Code>` (`AccessDenied`, `SignatureDoesNotMatch`), when the
+  /// answer had one.
+  final String? storageCode;
+
+  /// What the last failed attempt threw.
+  final Object? lastError;
+
+  @override
+  String toString() =>
+      'DwUploadException(${failure.name}'
+      '${status == null ? '' : ', HTTP $status'}'
+      '${storageCode == null ? '' : ' $storageCode'}'
+      '${lastError == null ? '' : '; last error: $lastError'})';
+}

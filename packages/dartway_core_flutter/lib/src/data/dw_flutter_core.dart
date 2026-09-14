@@ -10,6 +10,7 @@ import '../diagnostics/error_reporting/logic/dw_error_source.dart';
 import '../private/dw_singleton.dart';
 import 'dw_key_value_token_store.dart';
 import 'dw_request_notifiers.dart';
+import 'dw_upload_notifier.dart';
 
 /// The app core with the data layer: the toolbox of [DwFlutter] plus one
 /// [DwAppClient] and the Riverpod bindings over it.
@@ -52,6 +53,7 @@ class DwFlutterCore extends DwFlutter {
     DwTokenStore? tokenStore,
     DwHttpTransport? httpTransport,
     DwLiveConnector? liveConnector,
+    DwStorageTransport? storageTransport,
     DwClientOptions clientOptions = const DwClientOptions(),
   }) : _ownStore = _checkConfig(config, ownStore: tokenStore == null) {
     try {
@@ -66,6 +68,7 @@ class DwFlutterCore extends DwFlutter {
             ),
         httpTransport: httpTransport,
         liveConnector: liveConnector,
+        storageTransport: storageTransport,
         options: clientOptions,
         onError: (error, stackTrace) =>
             handleError(error, stackTrace, source: DwErrorSource.client),
@@ -190,6 +193,20 @@ class DwFlutterCore extends DwFlutter {
   /// `dw.action((context) => dw.command(BookSession(sessionId: 3)))`.
   Future<DwCallResult<R>> command<R>(DwActionCommand<R> command) =>
       client.command(command);
+
+  /// File uploads and links, straight to storage: `dw.files.upload(...)`,
+  /// `dw.files.getLink(fileId)`. For a screen, [uploader] keeps the state.
+  DwFileClient get files => client.files;
+
+  /// An upload slot for a screen — progress, the error, the file — as a
+  /// `ValueListenable`; dispose it with the screen. Failures worth an
+  /// operator's attention go to the app's error reporting; refusals and a
+  /// network that is down stay in the state for the screen to show.
+  DwUploadNotifier uploader() => DwUploadNotifier(
+    client.files,
+    onError: (error, stackTrace) =>
+        handleError(error, stackTrace, source: DwErrorSource.client),
+  );
 
   /// The signed-in account id, `null` when signed out.
   late final DwValueProvider<int?> accountId =

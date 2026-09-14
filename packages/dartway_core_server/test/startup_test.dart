@@ -175,6 +175,9 @@ void main() {
       expect(ledger.map((r) => '${r['namespace']}/${r['id']}'), [
         'dw/20260913_000000_dw_initial',
         'app/20260913_120000_test_app',
+        // Framework and app migrations interleave by id: a later framework
+        // migration runs after an earlier app one.
+        'dw/20260914_000000_dw_stored_file',
       ]);
       await server.stop();
 
@@ -209,11 +212,12 @@ void main() {
           'dw_identity',
           'dw_job',
           'dw_recurring_job',
+          'dw_stored_file',
         ]);
         await runner.rollback(batch: 1);
         expect(await tables(), isEmpty);
         await runner.apply();
-        expect(await tables(), hasLength(7));
+        expect(await tables(), hasLength(8));
       } finally {
         await opened.close();
       }

@@ -13,6 +13,15 @@ export 'src/auth/dw_account_service.dart'
     show DwAccountService, DwEnsuredAccount;
 export 'src/auth/dw_auth_config.dart';
 export 'src/channels/dw_channel_rule.dart' show DwChannelRule;
+export 'src/files/dw_file_service.dart' show DwFileService;
+export 'src/files/dw_file_storage.dart'
+    show
+        DwFileRecord,
+        DwFileStorage,
+        DwFileStorageConfig,
+        DwFileVisibility,
+        DwUploadRule;
+export 'src/files/dw_object_store.dart' show DwStorageException;
 export 'src/context/dw_call_context.dart'
     show DwCallContext, DwNotAuthenticatedException;
 export 'src/handlers/dw_call_handler.dart'
