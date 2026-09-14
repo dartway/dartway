@@ -166,8 +166,12 @@ List<String> _describeProbes(DwStack stack) => [
   'cache policy of the web build entry points',
   'upgrade ${stack.apiOrigin}/dw/live and ${stack.appOrigin}/dw/live — 101',
   if (stack.siteOrigin case final site?) 'GET $site/ — the site',
-  if (stack.storageOrigin case final storage?)
-    'preflight PUT $storage/${stack.bucketName}/… from ${stack.appOrigin}',
+  if (stack.storageOrigin case final storage?) ...[
+    'preflight PUT $storage/${stack.privateBucketName}/… from ${stack.appOrigin}',
+    'GET $storage/{${stack.publicBucketName},${stack.privateBucketName}}/'
+        '${DwStack.visibilityProbeKey} without credentials — public 200, '
+        'private refused, neither listed',
+  ],
 ];
 
 /// Writes [text] under the step that produced it, one indented line at a time,

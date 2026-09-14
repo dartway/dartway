@@ -240,7 +240,7 @@ class DwStackRenderer {
           '(PutBucketCors answers',
         )
         ..writeln(
-          '      # NotImplemented), so it is set here, for the one bucket this '
+          '      # NotImplemented), so it is set here, for both buckets this '
           'server holds.',
         )
         ..writeln('      MINIO_API_CORS_ALLOW_ORIGIN: ${_q(stack.appOrigin)}')
@@ -275,20 +275,26 @@ class DwStackRenderer {
         )
         ..writeln('    entrypoint: ["/bin/sh", "-c"]')
         ..writeln(
-          '    # Idempotent: an existing bucket is kept, objects and all. '
-          r'"$$" is a literal',
+          '    # Idempotent: an existing bucket is kept, objects and all, and '
+          'its access is',
         )
-        ..writeln('    # dollar for the shell rather than a Compose variable.')
-        ..writeln('    command:')
         ..writeln(
-          '      - ${_q('set -e; '
-          'mc alias set dw http://${DwStack.minioService}:9000 '
-          '"\$\$${DwStack.storageAccessKey}" '
-          '"\$\$${DwStack.storageSecretKey}" >/dev/null; '
-          'mc mb --ignore-existing dw/${stack.bucketName}; '
-          'mc stat dw/${stack.bucketName} >/dev/null; '
-          'echo "bucket ${stack.bucketName} is ready"')}',
+          '    # set again on every deploy — the public bucket reads objects '
+          'to anyone and',
         )
+        ..writeln(
+          '    # lists to no one, the private one reads nothing unsigned. The '
+          'probe object',
+        )
+        ..writeln(
+          '    # in each is what the outside check reads without credentials. '
+          r'"$$" is a',
+        )
+        ..writeln(
+          '    # literal dollar for the shell rather than a Compose variable.',
+        )
+        ..writeln('    command:')
+        ..writeln('      - ${_q(_minioInit)}')
         ..writeln();
     }
 
@@ -374,6 +380,47 @@ class DwStackRenderer {
         ..writeln('  certbot_www:');
     }
     return buffer.toString();
+  }
+
+  /// The script of `minio-init`: both buckets, their access, and the probe
+  /// object in each.
+  ///
+  /// The public policy is the framework's (`DwFileStorageSetup`): anonymous
+  /// `s3:GetObject` and nothing else. Not `mc anonymous set download`, which
+  /// also grants `s3:ListBucket` — anyone could enumerate every public file.
+  String get _minioInit {
+    final public = stack.publicBucketName;
+    final private = stack.privateBucketName;
+    final policy = jsonEncode({
+      'Version': '2012-10-17',
+      'Statement': [
+        {
+          'Sid': 'DartWayPublicRead',
+          'Effect': 'Allow',
+          'Principal': {
+            'AWS': ['*'],
+          },
+          'Action': ['s3:GetObject'],
+          'Resource': ['arn:aws:s3:::$public/*'],
+        },
+      ],
+    });
+    return [
+      'set -e',
+      'mc alias set dw http://${DwStack.minioService}:9000 '
+          '"\$\$${DwStack.storageAccessKey}" '
+          '"\$\$${DwStack.storageSecretKey}" >/dev/null',
+      'mc mb --ignore-existing dw/$public',
+      'mc mb --ignore-existing dw/$private',
+      "printf '%s' '$policy' > /tmp/dw-public-read.json",
+      'mc anonymous set-json /tmp/dw-public-read.json dw/$public',
+      'mc anonymous set none dw/$private',
+      for (final bucket in [public, private])
+        "printf '%s\\n' '${DwStack.visibilityProbeText}' "
+            '| mc pipe dw/$bucket/${DwStack.visibilityProbeKey} >/dev/null',
+      'echo "bucket $public reads objects anonymously, bucket $private does '
+          'not"',
+    ].join('; ');
   }
 
   /// The largest request body the proxy accepts on the server's hosts.

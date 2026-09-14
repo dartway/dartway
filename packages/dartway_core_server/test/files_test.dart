@@ -10,15 +10,15 @@ import 'support/test_app.dart';
 /// the server issues tickets, storage enforces them, the server confirms
 /// what storage holds, and cleanup removes what was never finished.
 void main() {
-  late TestBucket bucket;
-  setUpAll(() async => bucket = await TestBucket.create());
-  tearDownAll(() async => bucket.drop());
+  late TestStorage storage;
+  setUpAll(() async => storage = await TestStorage.create());
+  tearDownAll(() async => storage.drop());
 
   /// Read rule of the test project: owners, and account ids listed here.
   final readers = <int>{};
   final harness = useFilesHarness(
-    () => bucket,
-    storage: (config) => testStorage(
+    () => storage,
+    declaration: (config) => testStorage(
       config,
       maxPendingUploads: 50,
       canRead: (ctx, file) async =>
@@ -112,7 +112,9 @@ void main() {
       expect(file.contentType, 'image/png');
       expect(file.byteSize, 40);
       final key = pending.get<String>('object_key');
-      expect(file.url, '${bucket.config.publicBaseUrl}/$key');
+      expect(pending['bucket'], storage.publicBucket);
+      expect(file.url, '${storage.config.publicBaseUrl}/$key');
+      expect(Uri.parse(ticket.uploadUrl).path, '/${storage.publicBucket}/$key');
       expect((await rowOf(ticket.id))['confirmed_at'], isNotNull);
 
       final read = await getUrl(file.url!);
@@ -150,7 +152,7 @@ void main() {
       // The upload URL is for that key and nothing else.
       final ticket = await ticketFor(alice, start(TestUpload.avatar));
       final key = (await rowOf(ticket.id)).get<String>('object_key');
-      expect(Uri.parse(ticket.uploadUrl).path, '/${bucket.config.bucket}/$key');
+      expect(Uri.parse(ticket.uploadUrl).path, '/${storage.publicBucket}/$key');
     });
   });
 
@@ -167,11 +169,15 @@ void main() {
       );
       expect(file.url, isNull);
 
-      final key = (await rowOf(file.id)).get<String>('object_key');
+      final row = await rowOf(file.id);
+      final key = row.get<String>('object_key');
+      expect(row['bucket'], storage.privateBucket);
+      expect(await storage.keys(storage.privateBucket), contains(key));
+      expect(await storage.keys(storage.publicBucket), isNot(contains(key)));
       final direct = await getUrl(
-        '${bucket.config.endpoint}/${bucket.config.bucket}/$key',
+        '${storage.config.endpoint}/${storage.privateBucket}/$key',
       );
-      expect(direct.status, 403, reason: 'the bucket is not public');
+      expect(direct.status, 403, reason: 'the private bucket is not public');
 
       final request = DwGetFileLink(fileId: file.id);
       final link = (await alice.call(request)).value(request);
@@ -179,6 +185,11 @@ void main() {
       expect(
         link.expiresAt!.difference(DateTime.now()).inSeconds,
         inInclusiveRange(590, 600),
+      );
+      expect(
+        Uri.parse(link.url).path,
+        '/${storage.privateBucket}/$key',
+        reason: 'the link reads the private bucket',
       );
       final read = await getUrl(link.url);
       expect(read.status, 200);
@@ -316,7 +327,7 @@ void main() {
       expect((await putToTicket(ticket, bytesOf(17))).status, 403);
       expect((await putToTicket(ticket, bytesOf(15))).status, 403);
       expect(
-        await bucket.keys(),
+        await storage.keys(storage.publicBucket),
         isNot(contains(await _keyOf(harness, ticket))),
       );
     });
@@ -395,7 +406,8 @@ void main() {
           alice,
           start(TestUpload.avatar, size: 16),
         );
-        await bucket.putDirectly(
+        await storage.putDirectly(
+          storage.publicBucket,
           await _keyOf(harness, sized),
           bytesOf(20),
           'image/png',
@@ -408,7 +420,8 @@ void main() {
           alice,
           start(TestUpload.avatar, size: 16),
         );
-        await bucket.putDirectly(
+        await storage.putDirectly(
+          storage.publicBucket,
           await _keyOf(harness, typed),
           bytesOf(16),
           'text/html',
@@ -440,22 +453,47 @@ void main() {
   });
 
   test('unfinished uploads past their ticket and grace are removed with '
-      'their objects; finished and recent ones stay', () async {
+      'their objects, from the bucket each is in; finished and recent ones '
+      'stay', () async {
     final uploadedStale = await ticketFor(alice, start(TestUpload.avatar));
     await putToTicket(uploadedStale, bytesOf(16));
+    final privateStale = await ticketFor(
+      alice,
+      start(TestUpload.document, type: 'text/plain'),
+    );
+    await putToTicket(privateStale, bytesOf(16));
     final emptyStale = await ticketFor(alice, start(TestUpload.avatar));
     final recent = await ticketFor(alice, start(TestUpload.avatar));
     await putToTicket(recent, bytesOf(16));
     final finished = await upload(alice, TestUpload.avatar);
+    final finishedPrivate = await upload(
+      alice,
+      TestUpload.document,
+      type: 'text/plain',
+    );
     final staleKey = await _keyOf(harness, uploadedStale);
+    final privateStaleKey = await _keyOf(harness, privateStale);
     final recentKey = await _keyOf(harness, recent);
     final finishedKey = (await rowOf(finished.id)).get<String>('object_key');
+    final finishedPrivateKey = (await rowOf(
+      finishedPrivate.id,
+    )).get<String>('object_key');
+    expect(
+      await storage.keys(storage.privateBucket),
+      containsAll([privateStaleKey, finishedPrivateKey]),
+    );
 
     await harness().db.execute(
       "UPDATE dw_stored_file SET created_at = now() - interval '11 minutes' "
       'WHERE id = ANY(@ids::int8[])',
       params: {
-        'ids': [uploadedStale.id, emptyStale.id, finished.id],
+        'ids': [
+          uploadedStale.id,
+          privateStale.id,
+          emptyStale.id,
+          finished.id,
+          finishedPrivate.id,
+        ],
       },
     );
     // Cleanup runs every ten minutes; this run is brought forward, so no
@@ -469,14 +507,17 @@ void main() {
       final rows = await harness().db.query(
         'SELECT id FROM dw_stored_file WHERE id = ANY(@ids::int8[])',
         params: {
-          'ids': [uploadedStale.id, emptyStale.id],
+          'ids': [uploadedStale.id, privateStale.id, emptyStale.id],
         },
       );
       return rows.isEmpty;
     }, reason: 'cleanup removed the stale rows');
-    final keys = await bucket.keys();
+    final keys = await storage.keys(storage.publicBucket);
     expect(keys, isNot(contains(staleKey)));
     expect(keys, containsAll([recentKey, finishedKey]));
+    final privateKeys = await storage.keys(storage.privateBucket);
+    expect(privateKeys, isNot(contains(privateStaleKey)));
+    expect(privateKeys, contains(finishedPrivateKey));
     expect(await rowOf(recent.id), isNotNull);
     expect((await rowOf(finished.id))['confirmed_at'], isNotNull);
     expect(harness().app.alerts.incidents, isEmpty);
@@ -538,16 +579,25 @@ void main() {
       },
     );
 
-    test(
-      'delete removes the row at once and the object after commit',
-      () async {
-        final file = await upload(alice, TestUpload.avatar);
+    for (final (purpose, type, public) in [
+      (TestUpload.avatar, 'image/png', true),
+      (TestUpload.document, 'text/plain', false),
+    ]) {
+      test('delete removes the row at once and the object after commit, '
+          'from the ${public ? 'public' : 'private'} bucket', () async {
+        final bucket = public ? storage.publicBucket : storage.privateBucket;
+        final file = await upload(alice, purpose, type: type);
         final key = (await rowOf(file.id)).get<String>('object_key');
+        expect(await storage.keys(bucket), contains(key));
 
         final kept = await alice.call(DropFile(file.id, refuse: true));
         expect(kept.status, 409);
         await Future<void>.delayed(const Duration(milliseconds: 300));
-        expect(await bucket.keys(), contains(key), reason: 'rolled back');
+        expect(
+          await storage.keys(bucket),
+          contains(key),
+          reason: 'rolled back',
+        );
 
         final dropped = await alice.call(DropFile(file.id));
         expect(dropped.value(DropFile(file.id)), isTrue);
@@ -560,15 +610,16 @@ void main() {
         );
         harness().server.wakeJobs();
         await eventually(
-          () async => !(await bucket.keys()).contains(key),
+          () async => !(await storage.keys(bucket)).contains(key),
           reason: 'the delete job removed the object',
         );
         expect(
           (await alice.call(DropFile(file.id))).value(DropFile(file.id)),
           isFalse,
         );
-      },
-    );
+        expect(harness().app.alerts.incidents, isEmpty);
+      });
+    }
 
     test('delete from a read is an error, and deletes nothing', () async {
       final file = await upload(alice, TestUpload.avatar);

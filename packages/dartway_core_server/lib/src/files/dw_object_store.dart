@@ -34,9 +34,10 @@ final class DwStorageException implements Exception {
       '${errorCode == null ? '' : ' $errorCode'})';
 }
 
-/// The four storage operations the framework needs, over `dart:io` and
-/// [DwSigV4Signer]: a presigned PUT and GET for clients, a signed HEAD and
-/// DELETE for the server itself.
+/// The storage operations the framework needs, over `dart:io` and
+/// [DwSigV4Signer], for any bucket of one storage: a presigned PUT and GET for
+/// clients, signed requests for the server itself, and an unsigned GET for
+/// checking what anyone without keys can read.
 @internal
 final class DwObjectStore {
   DwObjectStore(this.config, {required this.requestTimeout, HttpClient? http})
@@ -52,30 +53,37 @@ final class DwObjectStore {
   final DwSigV4Signer _signer;
   final HttpClient _http;
 
-  /// The authority requests go to, as the `host` header carries it: with the
-  /// port only when it is not the scheme's default, which is what HTTP
-  /// clients send and therefore what the signature must cover.
-  String get _host {
+  /// The authority requests to [bucket] go to, as the `host` header carries
+  /// it: with the port only when it is not the scheme's default, which is
+  /// what HTTP clients send and therefore what the signature must cover.
+  String _host(String bucket) {
     final endpoint = config.endpoint;
-    final host = config.pathStyle
-        ? endpoint.host
-        : '${config.bucket}.${endpoint.host}';
+    final host = config.pathStyle ? endpoint.host : '$bucket.${endpoint.host}';
     return endpoint.hasPort ? '$host:${endpoint.port}' : host;
   }
 
-  /// The decoded path of [key]'s object (and of the bucket for a null key).
-  String _path(String? key) {
-    final prefix = config.pathStyle ? '/${config.bucket}' : '';
+  /// The decoded path of [key]'s object in [bucket] (of the bucket itself for
+  /// a null key).
+  String _path(String bucket, String? key) {
+    final prefix = config.pathStyle ? '/$bucket' : '';
     return key == null ? (prefix.isEmpty ? '/' : prefix) : '$prefix/$key';
   }
 
   /// A URL with the path encoded exactly as it is signed; `Uri.parse` keeps
   /// that encoding.
-  Uri _url(String path, [String query = '']) => Uri.parse(
-    '${config.endpoint.scheme}://$_host'
+  Uri _url(String bucket, String path, [String query = '']) => Uri.parse(
+    '${config.endpoint.scheme}://${_host(bucket)}'
     '${DwSigV4Signer.encode(path, keepSlash: true)}'
     '${query.isEmpty ? '' : '?$query'}',
   );
+
+  /// The unsigned URL of [key] in [bucket] (of the bucket for a null key),
+  /// with [query]: what someone without keys would request.
+  Uri urlOf(
+    String bucket, {
+    String? key,
+    List<(String, String)> query = const [],
+  }) => _url(bucket, _path(bucket, key), DwSigV4Signer.canonicalQuery(query));
 
   /// A URL a client can PUT one object to until [expires] passes, bound to
   /// the length and headers in the answer.
@@ -87,37 +95,39 @@ final class DwObjectStore {
   /// which the client reads as "already stored". Storage that does not know
   /// the header ignores it and loses only that protection.
   ({Uri url, Map<String, String> headers}) presignPut({
+    required String bucket,
     required String key,
     required String contentType,
     required int byteSize,
     required Duration expires,
     required DateTime time,
   }) {
-    final path = _path(key);
+    final path = _path(bucket, key);
     final bound = {'content-type': contentType, 'if-none-match': '*'};
     final query = _signer.presignedQuery(
       method: 'PUT',
       path: path,
       headers: [
-        ('host', _host),
+        ('host', _host(bucket)),
         ('content-length', '$byteSize'),
         for (final MapEntry(:key, :value) in bound.entries) (key, value),
       ],
       expires: expires,
       time: time,
     );
-    return (url: _url(path, query), headers: bound);
+    return (url: _url(bucket, path, query), headers: bound);
   }
 
-  /// A URL anyone holding it can read [key] with until [expires] passes.
-  /// [fileName] becomes the name a browser saves the file under.
+  /// A URL anyone holding it can read [key] in [bucket] with until [expires]
+  /// passes. [fileName] becomes the name a browser saves the file under.
   Uri presignGet({
+    required String bucket,
     required String key,
     required Duration expires,
     required DateTime time,
     String? fileName,
   }) {
-    final path = _path(key);
+    final path = _path(bucket, key);
     final query = _signer.presignedQuery(
       method: 'GET',
       path: path,
@@ -125,11 +135,11 @@ final class DwObjectStore {
         if (fileName != null)
           ('response-content-disposition', _inlineDisposition(fileName)),
       ],
-      headers: [('host', _host)],
+      headers: [('host', _host(bucket))],
       expires: expires,
       time: time,
     );
-    return _url(path, query);
+    return _url(bucket, path, query);
   }
 
   /// `inline` with the name in both forms of RFC 6266: an ASCII fallback for
@@ -141,8 +151,8 @@ final class DwObjectStore {
   }
 
   /// The object's size and type, or `null` when there is none.
-  Future<DwObjectHead?> head(String key) async {
-    final response = await _send('HEAD', _path(key));
+  Future<DwObjectHead?> head(String bucket, String key) async {
+    final response = await send('HEAD', bucket: bucket, key: key);
     await response.drain<void>();
     if (response.statusCode == HttpStatus.notFound) return null;
     if (response.statusCode != HttpStatus.ok) {
@@ -157,51 +167,42 @@ final class DwObjectStore {
 
   /// Deletes the object; an absent one is not an error (S3 answers `204`
   /// either way, and a `404` from a stricter storage means the same).
-  Future<void> delete(String key) async {
-    final response = await _send('DELETE', _path(key));
-    final body = await _readError(response);
+  Future<void> delete(String bucket, String key) async {
+    final response = await send('DELETE', bucket: bucket, key: key);
+    final code = await errorCodeOf(response);
     if (response.statusCode != HttpStatus.noContent &&
         response.statusCode != HttpStatus.ok &&
         response.statusCode != HttpStatus.notFound) {
-      throw DwStorageException('DELETE', response.statusCode, body);
+      throw DwStorageException('DELETE', response.statusCode, code);
     }
   }
 
-  /// A signed request to the bucket or one of its objects. For the framework
-  /// operations above and for tests that set a storage up (a bucket, its
-  /// policy); answers the raw response.
-  @visibleForTesting
+  /// A signed request to [bucket] or one of its objects, answered raw: for
+  /// the operations above, for setting buckets up and for checking them.
   Future<HttpClientResponse> send(
     String method, {
+    required String bucket,
     String? key,
     List<(String, String)> query = const [],
     List<int> body = const [],
     Map<String, String> headers = const {},
-  }) => _send(method, _path(key), query: query, body: body, headers: headers);
-
-  Future<HttpClientResponse> _send(
-    String method,
-    String path, {
-    List<(String, String)> query = const [],
-    List<int> body = const [],
-    Map<String, String> headers = const {},
-  }) async {
-    final payloadHash = DwSigV4Signer.hexSha256(body);
+  }) {
+    final path = _path(bucket, key);
     final signed = _signer.authorizationHeaders(
       method: method,
       path: path,
       query: query,
       headers: [
-        ('host', _host),
+        ('host', _host(bucket)),
         for (final MapEntry(:key, :value) in headers.entries) (key, value),
       ],
-      payloadHash: payloadHash,
+      payloadHash: DwSigV4Signer.hexSha256(body),
       time: DateTime.now(),
     );
     Future<HttpClientResponse> run() async {
       final request = await _http.openUrl(
         method,
-        _url(path, DwSigV4Signer.canonicalQuery(query)),
+        _url(bucket, path, DwSigV4Signer.canonicalQuery(query)),
       );
       // `openUrl` has set the host header from the URL — the signed value,
       // port rule included.
@@ -216,8 +217,35 @@ final class DwObjectStore {
     return run().timeout(requestTimeout);
   }
 
-  /// S3's `<Code>` from an error body, reading at most a few kilobytes.
-  static Future<String?> _readError(HttpClientResponse response) async {
+  /// A GET of [url] without credentials, as anyone could send it. The body is
+  /// kept up to [maxBytes] and the rest drained.
+  ///
+  /// On a connection of its own, closed after the answer: MinIO at times
+  /// drops the connection right after refusing an anonymous read, and a
+  /// request that picked it up from the pool would fail with "connection
+  /// closed before full header" — a check reporting storage as unreachable
+  /// when it only said no.
+  Future<({int status, List<int> body})> anonymousGet(
+    Uri url, {
+    int maxBytes = 64 * 1024,
+  }) {
+    Future<({int status, List<int> body})> run() async {
+      final request = await _http.getUrl(url);
+      request.persistentConnection = false;
+      final response = await request.close();
+      final body = <int>[];
+      await for (final chunk in response) {
+        if (body.length < maxBytes) body.addAll(chunk);
+      }
+      return (status: response.statusCode, body: body);
+    }
+
+    return run().timeout(requestTimeout);
+  }
+
+  /// S3's `<Code>` from an error body, reading at most a few kilobytes; a
+  /// successful response is drained and answers `null`.
+  static Future<String?> errorCodeOf(HttpClientResponse response) async {
     if (response.statusCode < 300) {
       await response.drain<void>();
       return null;
@@ -230,11 +258,6 @@ final class DwObjectStore {
         );
     return RegExp(r'<Code>([^<]+)</Code>').firstMatch(text)?.group(1);
   }
-
-  /// Reads an error code the way [delete] does — for tests of storage setup.
-  @visibleForTesting
-  static Future<String?> errorCodeOf(HttpClientResponse response) =>
-      _readError(response);
 
   void close() => _http.close(force: true);
 }

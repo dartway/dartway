@@ -215,7 +215,7 @@ void main() {
   test('every outside probe answers as a browser and an app need', () async {
     final results = await runner.verifyFromOutside(attempts: 3);
     expect(reportOutsideVerification(results), 0, reason: results.join('\n'));
-    expect(results.map((r) => r.title), hasLength(8));
+    expect(results.map((r) => r.title), hasLength(9));
   });
 
   test(
@@ -325,13 +325,14 @@ void main() {
   group('storage', () {
     Future<({String url, Map<String, String> headers})> presignPut(
       String key,
-      List<int> body,
-    ) async {
+      List<int> body, {
+      required String bucket,
+    }) async {
       final store = await shell.run("cat '${runner.store.file}'");
       final secrets = DwSecretStore.parse(store.stdout);
       return _presignPut(
         endpoint: stack.storageOrigin!,
-        bucket: stack.bucketName,
+        bucket: bucket,
         key: key,
         accessKey: secrets[DwStack.storageAccessKey]!,
         secretKey: secrets[DwStack.storageSecretKey]!,
@@ -342,8 +343,12 @@ void main() {
 
     test('a browser on the app origin uploads through a presigned PUT', () async {
       final body = List<int>.generate(4096, (i) => i % 256);
-      final key = 'avatar/proof-$suffix.png';
-      final signed = await presignPut(key, body);
+      final key = 'chatAttachment/proof-$suffix.png';
+      final signed = await presignPut(
+        key,
+        body,
+        bucket: stack.privateBucketName,
+      );
 
       final preflight = await send(
         'OPTIONS',
@@ -379,10 +384,57 @@ void main() {
       expect(again.status, 412, reason: again.body);
     });
 
+    test('an object in the private bucket is not readable without a '
+        'signature; one in the public bucket is, at the base URL the server '
+        'is given, and neither bucket lists its keys', () async {
+      final body = List<int>.generate(64, (i) => i);
+      final privateKey = 'chatAttachment/secret-$suffix.png';
+      final publicKey = 'avatar/open-$suffix.png';
+      for (final (bucket, key) in [
+        (stack.privateBucketName, privateKey),
+        (stack.publicBucketName, publicKey),
+      ]) {
+        final signed = await presignPut(key, body, bucket: bucket);
+        final put = await send(
+          'PUT',
+          signed.url,
+          headers: signed.headers,
+          body: body,
+        );
+        expect(put.status, 200, reason: '$bucket: ${put.body}');
+      }
+
+      final private = await send(
+        'GET',
+        '${stack.storageOrigin}/${stack.privateBucketName}/$privateKey',
+      );
+      expect(private.status, 403, reason: private.body);
+      expect(private.body, contains('AccessDenied'));
+
+      // What the running server was given, not what the renderer meant to.
+      final printed = await compose(
+        'exec -T server printenv ${DwStack.storagePublicBaseUrlKey}',
+      );
+      expect(printed.ok, isTrue, reason: printed.stderr);
+      final base = printed.stdout.trim();
+      expect(base, '${stack.storageOrigin}/${stack.publicBucketName}');
+      final public = await send('GET', '$base/$publicKey');
+      expect(public.status, 200, reason: public.body);
+      expect(public.body.length, body.length);
+
+      for (final bucket in [stack.publicBucketName, stack.privateBucketName]) {
+        final listing = await send(
+          'GET',
+          '${stack.storageOrigin}/$bucket?list-type=2',
+        );
+        expect(listing.status, 403, reason: '$bucket: ${listing.body}');
+      }
+    });
+
     test('another origin is not admitted', () async {
       final preflight = await send(
         'OPTIONS',
-        '${stack.storageOrigin}/${stack.bucketName}/x',
+        '${stack.storageOrigin}/${stack.privateBucketName}/x',
         headers: {
           'origin': 'http://evil.dwproof.test:$port',
           'access-control-request-method': 'PUT',

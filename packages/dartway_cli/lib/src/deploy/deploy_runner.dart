@@ -113,7 +113,7 @@ class DwDeployRunner {
 
   Future<DwSshResult> build() => _compose('build');
 
-  /// Starts MinIO and runs the bucket initialisation, whose output says what
+  /// Starts MinIO and runs the initialisation of both buckets, whose output says what
   /// it did.
   ///
   /// `</dev/null` is not decoration: without it `compose run -T` consumes the
@@ -362,7 +362,7 @@ echo "nginx restarted and running"
     if (target.storage == DwStorageMode.minio)
       DwDeployStep(
         id: 'storage',
-        title: 'Start MinIO and initialise the bucket',
+        title: 'Start MinIO and set up its public and private bucket',
         run: startStorage,
         showOutput: true,
       ),

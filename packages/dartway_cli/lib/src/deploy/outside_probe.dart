@@ -301,6 +301,53 @@ class DwOutsideProbe {
     }
   }
 
+  /// Without credentials, the probe object `minio-init` writes reads from
+  /// [publicBucket] and is refused from [privateBucket], and neither bucket
+  /// lists its keys: the public files open, the private ones are not public.
+  Future<DwProbeResult> storageVisibility({
+    required String storageOrigin,
+    required String publicBucket,
+    required String privateBucket,
+  }) async {
+    final title =
+        'anonymous GET of $storageOrigin/{$publicBucket,$privateBucket}/'
+        '${DwStack.visibilityProbeKey}';
+    try {
+      Future<({int status, String body})> get(String path) async {
+        final answer = await _send('GET', Uri.parse('$storageOrigin/$path'));
+        return (status: answer.status, body: answer.body);
+      }
+
+      final public = await get('$publicBucket/${DwStack.visibilityProbeKey}');
+      final private = await get('$privateBucket/${DwStack.visibilityProbeKey}');
+      final publicListing = await get('$publicBucket?list-type=2');
+      final privateListing = await get('$privateBucket?list-type=2');
+      final problems = [
+        if (public.status != 200 ||
+            public.body.trim() != DwStack.visibilityProbeText)
+          '$publicBucket answered ${public.status} — public files will not '
+              'open',
+        if (private.status < 300)
+          '$privateBucket answered ${private.status} — every private file is '
+              'public',
+        if (publicListing.status < 300)
+          '$publicBucket lists its keys to anyone',
+        if (privateListing.status < 300)
+          '$privateBucket lists its keys to anyone',
+      ];
+      if (problems.isEmpty) {
+        return DwProbeResult.pass(
+          title,
+          'public ${public.status}, private ${private.status}, listings '
+          '${publicListing.status} and ${privateListing.status}',
+        );
+      }
+      return DwProbeResult.fail(title, problems.join('; '));
+    } on Object catch (error) {
+      return DwProbeResult.fail(title, _describe(error));
+    }
+  }
+
   /// `GET <origin>/` of the static site answers 200 HTML.
   Future<DwProbeResult> site(String origin) async {
     final url = Uri.parse('$origin/');
@@ -339,8 +386,9 @@ class DwOutsideProbe {
 
 /// The questions a deployment of [stack] must answer from outside, in order:
 /// health through both hosts, the app page and its cache policy, the live
-/// socket through both hosts, and — where they exist — the site and the
-/// storage CORS rule a browser upload depends on.
+/// socket through both hosts, and — where they exist — the site, the storage
+/// CORS rule a browser upload depends on, and what each bucket gives to
+/// anyone without keys.
 List<Future<DwProbeResult> Function()> dwOutsideProbes(
   DwStack stack,
   DwOutsideProbe probe,
@@ -352,10 +400,16 @@ List<Future<DwProbeResult> Function()> dwOutsideProbes(
   () => probe.liveUpgrade(stack.apiOrigin),
   () => probe.liveUpgrade(stack.appOrigin, browserOrigin: stack.appOrigin),
   if (stack.siteOrigin case final site?) () => probe.site(site),
-  if (stack.storageOrigin case final storage?)
+  if (stack.storageOrigin case final storage?) ...[
     () => probe.storageCors(
       storageOrigin: storage,
-      bucket: stack.bucketName,
+      bucket: stack.privateBucketName,
       appOrigin: stack.appOrigin,
     ),
+    () => probe.storageVisibility(
+      storageOrigin: storage,
+      publicBucket: stack.publicBucketName,
+      privateBucket: stack.privateBucketName,
+    ),
+  ],
 ];

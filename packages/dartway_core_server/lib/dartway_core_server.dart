@@ -22,6 +22,7 @@ export 'src/files/dw_file_storage.dart'
         DwFileVisibility,
         DwUploadRule;
 export 'src/files/dw_object_store.dart' show DwStorageException;
+export 'src/files/dw_storage_buckets.dart' show DwFileStorageSetup;
 export 'src/context/dw_call_context.dart'
     show DwCallContext, DwNotAuthenticatedException;
 export 'src/handlers/dw_call_handler.dart'

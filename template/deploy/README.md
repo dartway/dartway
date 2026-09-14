@@ -38,13 +38,22 @@ One server process behind one front proxy:
 | `postgres` | Postgres 17, on a named volume |
 | `server` | the project's server image, configured by environment only; healthcheck on `/health` |
 | `web` | the Flutter web build served by nginx, files only |
-| `minio` + `minio-init` | with `storage: minio`: the storage and its bucket |
+| `minio` + `minio-init` | with `storage: minio`: the storage and its two buckets — `<project>-public`, whose objects anyone reads (never its listing), and `<project>-private`, which reads nothing unsigned; `minio-init` sets both on every deploy |
 | `nginx` | TLS for every host: **app** → the web image, with `/dw/` (the live socket upgrade included) and `/health` sent to the server; **api** → the server; **site** → the static directory |
 | `certbot` | renews the one certificate every host shares |
 
 The server receives `DW_DATABASE_*` (and, with MinIO, `DW_STORAGE_*`) and `PORT`
 from the compose file, and every secret of the store through `.env`. It serves
 no static files.
+
+With MinIO the storage variables are `DW_STORAGE_PUBLIC_BUCKET`,
+`DW_STORAGE_PRIVATE_BUCKET` and
+`DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<project>-public`, and
+`DW_STORAGE_VERIFY_BUCKETS=false`: the server reaches MinIO through the
+proxy's storage host, which starts after it, so the bucket check a server runs
+at startup is made from outside once the stack is up (step 8). An external
+storage keeps the check on — the server refuses to start on a missing bucket,
+a private bucket anyone can read or a public one nobody can.
 
 ## What `run` does
 
@@ -65,7 +74,9 @@ no static files.
    through both hosts, the app host serves the Flutter `index.html` with a
    revalidating cache policy, `/dw/live` upgrades through both hosts and the
    server answers on the socket, and — where declared — the site answers and
-   the storage preflight admits a PUT from the app's origin.
+   the storage preflight admits a PUT from the app's origin, the public
+   bucket's probe object reads without credentials, the private bucket's does
+   not, and neither bucket lists its keys.
 
 ## Caching — why a redeploy might not reach the browser
 

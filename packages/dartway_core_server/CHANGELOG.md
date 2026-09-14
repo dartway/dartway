@@ -23,8 +23,8 @@ The rewrite (see docs/1.0).
   `Content Too Large`). `DwTestAnswer.reasonPhrase`.
 - **File uploads (D-034): the bytes never pass through the app server.**
   `DwAppServer(files: DwFileStorage(DwFileStorageConfig(...), rules: [...]))`
-  for one bucket of any S3-compatible storage; `DwFileStorageConfig.fromEnvironment`
-  reads `DW_STORAGE_*`. A `DwUploadRule` per purpose states visibility (no
+  on any S3-compatible storage; `DwFileStorageConfig.fromEnvironment` reads
+  `DW_STORAGE_*`. A `DwUploadRule` per purpose states visibility (no
   default), `maxBytes`, exact content types and `canUpload`; a purpose without
   a rule refuses. The server names every object
   (`<purpose>/<account>/<192 random bits>.<ext of the type>`), presigns a PUT
@@ -36,13 +36,42 @@ The rewrite (see docs/1.0).
   uploads count against `maxPendingUploads` per account and are removed with
   their objects by the framework job `dw.files.cleanup` once ticket and grace
   have passed.
+- **Two buckets: public and private, each as a whole.**
+  `DwFileStorageConfig(publicBucket:, publicBaseUrl:, privateBucket:)`
+  (`DW_STORAGE_PUBLIC_BUCKET`, `DW_STORAGE_PUBLIC_BASE_URL`,
+  `DW_STORAGE_PRIVATE_BUCKET`; `bucket` / `DW_STORAGE_BUCKET` are gone). A
+  rule's visibility picks the bucket: public objects are read anonymously
+  through `publicBaseUrl`, private ones only through presigned links after
+  `canRead`. A public bucket needs `publicBaseUrl`; the two must differ; a
+  public rule without a public bucket, or a private rule without a private
+  one, fails startup. `dw_stored_file.bucket` records where each object is,
+  so cleanup, `ctx.files.delete`, finishing and links address that bucket,
+  and a public URL is given only for files in the configured public bucket.
+- **The server checks its buckets at startup** (`verifyBuckets`, default on;
+  `DW_STORAGE_VERIFY_BUCKETS=false` turns it off where storage is unreachable
+  while the server starts). For each configured bucket: a signed `HEAD`, a
+  probe object `_dartway/visibility-probe` written with the keys, then
+  without credentials: the public probe must read back through
+  `publicBaseUrl`, the private one must be refused, and neither bucket may be
+  listed. Anything else refuses startup with one problem per finding.
+- **`DwFileStorageSetup.provision(config)`** creates both buckets on a storage
+  the project runs (MinIO in development, tests, deploy), sets the public
+  bucket's policy to anonymous `s3:GetObject` only
+  (`DwFileStorageSetup.publicReadPolicy`) and deletes the private bucket's
+  policy. Idempotent.
+- **`DwTestStorage`** (`testing.dart`): a provisioned public/private bucket
+  pair for one test file on the storage of `DW_STORAGE_*`, with `config`,
+  `keys(bucket)` and `drop()` — the storage counterpart of `DwTestDatabase`.
 - **`ctx.files`** (`DwFileService`): `requireOwned(fileId, purpose, field:)`
-  for rows that reference a file, `publicUrls(ids)` in one query, `delete`
+  for rows that reference a file, `publicUrls(ids)` in one query (no ids
+  answer empty without a query, even on a server without storage), `delete`
   (the row in the caller's transaction, the object by the retried job
   `dw.files.deleteObject` after commit). `DwCallContext` gains the getter.
 - **AWS Signature Version 4 in the framework**, no S3 SDK; pinned by the AWS
   SigV4 test suite and the S3 API reference examples.
-- Framework migration `20260914_000000_dw_stored_file` (`dw_stored_file`;
+- Framework migrations `20260914_000000_dw_stored_file` and
+  `20260914_180000_dw_stored_file_bucket` (`dw_stored_file`, unique by bucket
+  and key;
   `account_id` without cascade, so an account's files are deleted first and no
   object is orphaned). Without `files`, the file calls answer as incidents and
   `ctx.files` throws. `DwTestServer.connectClient` takes `storageTransport`.

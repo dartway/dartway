@@ -12,6 +12,7 @@ import '../jobs/dw_job_queue.dart';
 import '../server/dw_runtime.dart';
 import 'dw_file_storage.dart';
 import 'dw_object_store.dart';
+import 'dw_storage_buckets.dart';
 
 /// Stored files, for server code: `ctx.files`.
 ///
@@ -127,6 +128,11 @@ final class DwFileStore {
 
   void close() => objects.close();
 
+  /// Problems with the buckets as storage has them — see
+  /// [DwFileStorageConfig.verifyBuckets]; empty when both are right.
+  Future<List<String>> verifyBuckets() =>
+      DwBucketCheck.run(storage.config, objects);
+
   // --- handlers ---------------------------------------------------------------
 
   List<DwCallHandler> handlers() => [
@@ -226,17 +232,20 @@ final class DwFileStore {
       );
     }
 
+    // Present: startup refuses a rule whose visibility has no bucket.
+    final bucket = storage.config.bucketFor(rule.visibility)!;
     final key =
         '${rule.purpose.purposeName}/$accountId/${_randomName()}.'
         '${extensions[command.contentType] ?? 'bin'}';
     final row = (await ctx.db.query(
-      'INSERT INTO dw_stored_file (account_id, purpose, object_key, '
+      'INSERT INTO dw_stored_file (account_id, purpose, bucket, object_key, '
       'visibility, file_name, content_type, byte_size) '
-      'VALUES (@account, @purpose, @key, @visibility, @name, @type, @size) '
-      'RETURNING id',
+      'VALUES (@account, @purpose, @bucket, @key, @visibility, @name, @type, '
+      '@size) RETURNING id',
       params: {
         'account': accountId,
         'purpose': rule.purpose.purposeName,
+        'bucket': bucket,
         'key': key,
         'visibility': rule.visibility.name,
         'name': command.fileName,
@@ -246,6 +255,7 @@ final class DwFileStore {
     )).single;
     final now = DateTime.now().toUtc();
     final put = objects.presignPut(
+      bucket: bucket,
       key: key,
       contentType: command.contentType,
       byteSize: command.byteSize,
@@ -276,7 +286,7 @@ final class DwFileStore {
     DwFinishUpload command,
   ) async {
     final rows = await ctx.db.query(
-      'SELECT $_columns, object_key FROM dw_stored_file '
+      'SELECT $_columns, bucket, object_key FROM dw_stored_file '
       'WHERE id = @id FOR UPDATE',
       params: {'id': command.ticketId},
     );
@@ -304,7 +314,10 @@ final class DwFileStore {
     )).single.get<bool>('expired');
     if (expired) ctx.refuse(DwUploadRefusal.expired);
 
-    final head = await objects.head(row.get<String>('object_key'));
+    final head = await objects.head(
+      row.get<String>('bucket'),
+      row.get<String>('object_key'),
+    );
     if (head == null) ctx.refuse(DwUploadRefusal.missing);
     if (head.byteSize != record.byteSize ||
         head.contentType != record.contentType) {
@@ -324,22 +337,24 @@ final class DwFileStore {
 
   Future<DwFileLink?> _link(DwCallContext ctx, DwGetFileLink request) async {
     final rows = await ctx.db.query(
-      'SELECT $_columns, object_key FROM dw_stored_file '
+      'SELECT $_columns, bucket, object_key FROM dw_stored_file '
       'WHERE id = @id AND confirmed_at IS NOT NULL',
       params: {'id': request.fileId},
     );
     if (rows.isEmpty) return null;
     final row = rows.single;
     final record = _record(row);
+    final bucket = row.get<String>('bucket');
     final key = row.get<String>('object_key');
     final public = record.visibility == DwFileVisibility.public;
     if (public) {
-      if (publicUrlOf(key) case final url?) {
+      if (publicUrlOf(bucket, key) case final url?) {
         return DwFileLink(id: record.id, url: url);
       }
     }
-    // A public file read without a public base (the base was removed once no
-    // rule was public any more) is still everyone's: it gets a link, unasked.
+    // A public file that is no longer served publicly — its bucket is not
+    // the configured public bucket any more — is still everyone's: it gets a
+    // link, unasked.
     final canRead = storage.canRead;
     final allowed =
         public ||
@@ -356,7 +371,7 @@ final class DwFileStore {
     return DwFileLink(
       id: record.id,
       url:
-          '${objects.presignGet(key: key, expires: storage.linkLifetime, time: now, fileName: record.fileName)}',
+          '${objects.presignGet(bucket: bucket, key: key, expires: storage.linkLifetime, time: now, fileName: record.fileName)}',
       expiresAt: DateTime.fromMillisecondsSinceEpoch(
         now.millisecondsSinceEpoch ~/ 1000 * 1000,
         isUtc: true,
@@ -389,20 +404,18 @@ final class DwFileStore {
     contentType: record.contentType,
     byteSize: record.byteSize,
     url: record.visibility == DwFileVisibility.public
-        ? publicUrlOf(row.get<String>('object_key'))
+        ? publicUrlOf(row.get<String>('bucket'), row.get<String>('object_key'))
         : null,
   );
 
-  /// The public URL of [key]: the base, then the key encoded as a path;
-  /// `null` when the storage has no public base. Startup requires one while
-  /// a rule is public, and files uploaded public before a rule changed keep
-  /// their visibility.
-  String? publicUrlOf(String key) {
-    final base = storage.config.publicBaseUrl?.toString();
-    if (base == null) return null;
-    final encoded = key.split('/').map(Uri.encodeComponent).join('/');
-    return base.endsWith('/') ? '$base$encoded' : '$base/$encoded';
-  }
+  /// The public URL of [key] in [bucket]: the public base, then the key
+  /// encoded as a path. `null` unless [bucket] is the configured public
+  /// bucket — a file stays where it was uploaded, and a bucket that is no
+  /// longer the public one is not served from the public base.
+  String? publicUrlOf(String bucket, String key) =>
+      bucket == storage.config.publicBucket
+      ? storage.config.publicUrlOf(key)?.toString()
+      : null;
 
   // --- jobs -------------------------------------------------------------------
 
@@ -412,7 +425,10 @@ final class DwFileStore {
       // Storage is outside the database: a lease, not a transaction.
       transactional: false,
       maxAttempts: 10,
-      handle: (ctx, payload) => objects.delete(payload['key']! as String),
+      handle: (ctx, payload) => objects.delete(
+        payload['bucket']! as String,
+        payload['key']! as String,
+      ),
     ),
     DwRecurringJob(
       cleanupJob,
@@ -438,7 +454,7 @@ final class DwFileStore {
     for (var batch = 0; batch < cleanupBatchesPerRun; batch++) {
       final removed = await database.transaction((tx) async {
         final rows = await tx.query(
-          'SELECT id, object_key FROM dw_stored_file '
+          'SELECT id, bucket, object_key FROM dw_stored_file '
           'WHERE confirmed_at IS NULL '
           'AND created_at < now() - @window::int8 * interval \'1 microsecond\' '
           'ORDER BY confirmed_at, created_at LIMIT @limit '
@@ -454,7 +470,10 @@ final class DwFileStore {
         for (var i = 0; i < rows.length; i += 8) {
           await Future.wait([
             for (final row in rows.skip(i).take(8))
-              objects.delete(row.get<String>('object_key')),
+              objects.delete(
+                row.get<String>('bucket'),
+                row.get<String>('object_key'),
+              ),
           ]);
         }
         await tx.execute(
@@ -495,8 +514,11 @@ final class DwUnconfiguredFiles implements DwFileService {
     String? field,
   }) async => _fail();
 
+  /// No ids ask nothing of storage, so they answer empty even here: a handler
+  /// resolving the URLs of an empty page works on a server without files.
   @override
-  Future<Map<int, String>> publicUrls(Iterable<int> fileIds) async => _fail();
+  Future<Map<int, String>> publicUrls(Iterable<int> fileIds) async =>
+      fileIds.isEmpty ? const {} : _fail();
 
   @override
   Future<bool> delete(int fileId) async => _fail();
@@ -516,7 +538,7 @@ final class _DwContextFiles implements DwFileService {
   }) async {
     final accountId = _ctx.requireAccountId;
     final rows = await _ctx.db.query(
-      'SELECT ${DwFileStore._columns}, object_key FROM dw_stored_file '
+      'SELECT ${DwFileStore._columns}, bucket, object_key FROM dw_stored_file '
       'WHERE id = @id AND account_id = @account AND purpose = @purpose '
       'AND confirmed_at IS NOT NULL',
       params: {
@@ -535,14 +557,17 @@ final class _DwContextFiles implements DwFileService {
     final ids = fileIds.toSet().toList();
     if (ids.isEmpty) return const {};
     final rows = await _ctx.db.query(
-      'SELECT id, object_key FROM dw_stored_file '
+      'SELECT id, bucket, object_key FROM dw_stored_file '
       "WHERE id = ANY(@ids::int8[]) AND visibility = 'public' "
       'AND confirmed_at IS NOT NULL',
       params: {'ids': ids},
     );
     return {
       for (final row in rows)
-        row.get<int>('id'): ?_store.publicUrlOf(row.get<String>('object_key')),
+        row.get<int>('id'): ?_store.publicUrlOf(
+          row.get<String>('bucket'),
+          row.get<String>('object_key'),
+        ),
     };
   }
 
@@ -551,13 +576,15 @@ final class _DwContextFiles implements DwFileService {
     _ctx.requireSideEffects('files.delete');
     return _ctx.transaction((tx) async {
       final rows = await tx.query(
-        'DELETE FROM dw_stored_file WHERE id = @id RETURNING object_key',
+        'DELETE FROM dw_stored_file WHERE id = @id '
+        'RETURNING bucket, object_key',
         params: {'id': fileId},
       );
       if (rows.isEmpty) return false;
       // Enqueued in the same transaction: the object goes exactly when the
       // row's deletion commits.
       await _ctx.jobs.enqueue(DwFileStore.deleteObjectJob, {
+        'bucket': rows.single.get<String>('bucket'),
         'key': rows.single.get<String>('object_key'),
       });
       return true;

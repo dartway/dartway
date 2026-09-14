@@ -18,6 +18,11 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _storedFileUp,
     _storedFileDown,
   ),
+  const _DwSqlMigration(
+    '20260914_180000_dw_stored_file_bucket',
+    _storedFileBucketUp,
+    _storedFileBucketDown,
+  ),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -168,6 +173,24 @@ CREATE TABLE dw_stored_file (
 ];
 
 const List<String> _storedFileDown = ['DROP TABLE dw_stored_file'];
+
+// Public and private files live in two buckets, so a row names its bucket: a
+// file stays where it was uploaded when the configuration names other buckets
+// later, and its object is found — and deleted — there. No default: which
+// bucket an existing row is in is not something a migration can know.
+const List<String> _storedFileBucketUp = [
+  'ALTER TABLE dw_stored_file ADD COLUMN bucket text NOT NULL',
+  'ALTER TABLE dw_stored_file DROP CONSTRAINT dw_stored_file_object_key',
+  'ALTER TABLE dw_stored_file ADD CONSTRAINT dw_stored_file_object '
+      'UNIQUE (bucket, object_key)',
+];
+
+const List<String> _storedFileBucketDown = [
+  'ALTER TABLE dw_stored_file DROP CONSTRAINT dw_stored_file_object',
+  'ALTER TABLE dw_stored_file ADD CONSTRAINT dw_stored_file_object_key '
+      'UNIQUE (object_key)',
+  'ALTER TABLE dw_stored_file DROP COLUMN bucket',
+];
 
 const List<String> _initialDown = [
   'DROP TABLE dw_recurring_job',

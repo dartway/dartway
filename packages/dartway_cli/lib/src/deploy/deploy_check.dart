@@ -119,7 +119,7 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
   ),
   DwDeployCheck(
     id: 'stack-names',
-    title: 'The project prefix makes a database and a bucket name',
+    title: 'The project prefix makes a database and bucket names',
     stage: DwDeployCheckStage.local,
     severity: DwCheckSeverity.error,
     evaluate: _checkStackNames,
@@ -239,16 +239,15 @@ Future<DwDeployVerdict> _checkStackNames(DwDeployContext context) async {
   final problems = [
     if (!RegExp(r'^[a-z_][a-z0-9_]{0,62}$').hasMatch(stack.databaseName))
       'database name "${stack.databaseName}"',
-    if (context.target.storage == DwStorageMode.minio &&
-        !RegExp(
-          r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$',
-        ).hasMatch(stack.bucketName))
-      'bucket name "${stack.bucketName}"',
+    if (context.target.storage == DwStorageMode.minio)
+      for (final bucket in [stack.publicBucketName, stack.privateBucketName])
+        if (!RegExp(r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$').hasMatch(bucket))
+          'bucket name "$bucket"',
   ];
   if (problems.isEmpty) {
     return DwDeployVerdict.pass(
       'database ${stack.databaseName}'
-      '${context.target.storage == DwStorageMode.minio ? ', bucket ${stack.bucketName}' : ''}',
+      '${context.target.storage == DwStorageMode.minio ? ', buckets ${stack.publicBucketName} and ${stack.privateBucketName}' : ''}',
     );
   }
   return DwDeployVerdict.fail(

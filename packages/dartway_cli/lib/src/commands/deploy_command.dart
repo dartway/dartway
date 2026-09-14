@@ -201,7 +201,7 @@ class DeployCheckCommand extends Command<int> {
     stdout.writeln(
       '  storage:   ${switch (target.storage) {
         DwStorageMode.none => 'none',
-        DwStorageMode.minio => 'MinIO on ${stack.storageOrigin}, bucket ${stack.bucketName}',
+        DwStorageMode.minio => 'MinIO on ${stack.storageOrigin}, buckets ${stack.publicBucketName} (public) and ${stack.privateBucketName} (private)',
         DwStorageMode.external => 'external (DW_STORAGE_* in the secret store)',
       }}',
     );

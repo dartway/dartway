@@ -151,6 +151,18 @@ final class DwAppServer {
       null => null,
     };
     try {
+      // Before anything opens: a bucket that is missing, or more public or
+      // less public than declared, is a configuration the server must not
+      // serve on — a private file behind a public bucket is already leaked.
+      if (fileStore != null && fileStore.storage.config.verifyBuckets) {
+        final bucketProblems = await fileStore.verifyBuckets();
+        if (bucketProblems.isNotEmpty) {
+          throw DwStartupException(bucketProblems);
+        }
+        logger.info(
+          'file storage buckets verified: ${[if (fileStore.storage.config.publicBucket case final bucket?) 'public "$bucket" reads anonymously', if (fileStore.storage.config.privateBucket case final bucket?) 'private "$bucket" does not'].join(', ')}',
+        );
+      }
       openedDatabase = await DwPostgresDatabase.open(database);
       fileStore?.attach(openedDatabase.db);
       await DwMigrationRunner(

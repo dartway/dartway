@@ -46,19 +46,34 @@ staging:
   #   domain: example.com
   #   source: app_site/build
 
-  # Optional. File storage for uploads (presigned direct uploads, D-034):
+  # Optional. File storage for uploads (presigned direct uploads, D-034), in
+  # two buckets: public files (a rule with visibility public — avatars) are
+  # read by anyone at DW_STORAGE_PUBLIC_BASE_URL/<key>; private ones only
+  # through short presigned links the server gives after canRead.
   #
   #   minio    — a MinIO container in the stack, for staging. Browsers upload
   #              to it directly, so it needs a host of its own. Its keys are
   #              generated into the secret store; its CORS rule admits PUT from
   #              app_domain with the headers a presigned upload is bound to.
+  #              Every deploy creates <project>-public (anonymous s3:GetObject,
+  #              no listing) and <project>-private (nothing unsigned), and the
+  #              server gets both names and
+  #              DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<project>-public.
+  #              The outside check reads a probe object from both without
+  #              credentials: public 200, private refused, neither listed.
   #   external — an S3-compatible storage somebody else runs. Deliver
-  #              DW_STORAGE_ENDPOINT, DW_STORAGE_BUCKET, DW_STORAGE_ACCESS_KEY and
-  #              DW_STORAGE_SECRET_KEY (and optionally DW_STORAGE_REGION,
-  #              DW_STORAGE_PUBLIC_BASE_URL, DW_STORAGE_PATH_STYLE) with
-  #              `dartway deploy secret set`, and give the bucket a CORS rule
-  #              allowing PUT from https://<app_domain> with the headers
-  #              content-type, content-length and if-none-match.
+  #              DW_STORAGE_ENDPOINT, DW_STORAGE_ACCESS_KEY and
+  #              DW_STORAGE_SECRET_KEY, and the buckets your rules need —
+  #              DW_STORAGE_PUBLIC_BUCKET with DW_STORAGE_PUBLIC_BASE_URL for
+  #              public purposes, DW_STORAGE_PRIVATE_BUCKET for private ones —
+  #              (and optionally DW_STORAGE_REGION, DW_STORAGE_PATH_STYLE) with
+  #              `dartway deploy secret set`. Make the public bucket readable
+  #              anonymously (objects, not listing) and the private one not at
+  #              all, and give both a CORS rule allowing PUT from
+  #              https://<app_domain> with the headers content-type,
+  #              content-length and if-none-match. The server checks both
+  #              buckets as it starts and refuses to start on a bucket more or
+  #              less public than declared.
   # storage: minio
   # storage_domain: files.example.com
 

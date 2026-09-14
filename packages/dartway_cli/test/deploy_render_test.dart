@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dartway_cli/src/deploy/nginx_upstreams.dart';
 import 'package:dartway_cli/src/deploy/renderer.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
@@ -123,8 +125,6 @@ void main() {
         (minio['environment'] as YamlMap)['MINIO_API_CORS_ALLOW_ORIGIN'],
         'https://app.example.com',
       );
-      final init = _service(stack, 'minio-init');
-      expect((init['command'] as YamlList).single, contains('dw/shop'));
       expect(
         Map.of(_service(stack, 'server')['environment'] as YamlMap),
         containsPair('DW_STORAGE_ENDPOINT', 'https://files.example.com'),
@@ -133,6 +133,107 @@ void main() {
       expect(
         ((nginx['networks'] as YamlMap)['default'] as YamlMap)['aliases'],
         ['files.example.com'],
+      );
+    });
+
+    test('MinIO: two buckets — the public one reads objects to anyone and '
+        'lists to no one, the private one reads nothing unsigned — and the '
+        'server is given both', () {
+      final stack = stackVariants()['minio and a site']!;
+      expect(stack.publicBucketName, 'shop-public');
+      expect(stack.privateBucketName, 'shop-private');
+      final script =
+          (_service(stack, 'minio-init')['command'] as YamlList).single
+              as String;
+      final steps = script.split('; ');
+      expect(
+        steps,
+        containsAllInOrder([
+          'set -e',
+          'mc mb --ignore-existing dw/shop-public',
+          'mc mb --ignore-existing dw/shop-private',
+          'mc anonymous set-json /tmp/dw-public-read.json dw/shop-public',
+          'mc anonymous set none dw/shop-private',
+        ]),
+      );
+      // Not `mc anonymous set download`: that grants s3:ListBucket too.
+      expect(script, isNot(contains('set download')));
+      expect(script, isNot(contains('set public')));
+      final policyStep = steps.singleWhere(
+        (step) =>
+            step.contains('dw-public-read.json') && step.startsWith('printf'),
+      );
+      final policy =
+          jsonDecode(
+                RegExp(
+                  "printf '%s' '(.*)' >",
+                ).firstMatch(policyStep)!.group(1)!,
+              )
+              as Map<String, Object?>;
+      final statement = (policy['Statement']! as List).single as Map;
+      expect(statement['Effect'], 'Allow');
+      expect(statement['Principal'], {
+        'AWS': ['*'],
+      });
+      expect(statement['Action'], ['s3:GetObject']);
+      expect(statement['Resource'], ['arn:aws:s3:::shop-public/*']);
+      // The probe object the outside check reads, in both buckets.
+      for (final bucket in ['shop-public', 'shop-private']) {
+        expect(
+          script,
+          contains('mc pipe dw/$bucket/${DwStack.visibilityProbeKey}'),
+        );
+      }
+
+      final environment = Map.of(
+        _service(stack, 'server')['environment'] as YamlMap,
+      );
+      expect(
+        environment,
+        containsPair('DW_STORAGE_PUBLIC_BUCKET', 'shop-public'),
+      );
+      expect(
+        environment,
+        containsPair(
+          'DW_STORAGE_PUBLIC_BASE_URL',
+          'https://files.example.com/shop-public',
+        ),
+      );
+      expect(
+        environment,
+        containsPair('DW_STORAGE_PRIVATE_BUCKET', 'shop-private'),
+      );
+      expect(environment.containsKey('DW_STORAGE_BUCKET'), isFalse);
+      expect(
+        stack.reservedSecretKeys,
+        containsAll([
+          'DW_STORAGE_PUBLIC_BUCKET',
+          'DW_STORAGE_PUBLIC_BASE_URL',
+          'DW_STORAGE_PRIVATE_BUCKET',
+        ]),
+      );
+    });
+
+    test('external storage: the buckets are the project\'s to name, not '
+        'required secrets', () {
+      final stack = stackVariants()['external storage, external site, files']!;
+      expect(
+        stack.requiredSecretKeys,
+        containsAll([
+          'DW_STORAGE_ENDPOINT',
+          'DW_STORAGE_ACCESS_KEY',
+          'DW_STORAGE_SECRET_KEY',
+        ]),
+      );
+      expect(
+        stack.requiredSecretKeys.where((key) => key.contains('BUCKET')),
+        isEmpty,
+      );
+      expect(
+        Map.of(
+          _service(stack, 'server')['environment'] as YamlMap,
+        ).keys.where((key) => '$key'.startsWith('DW_STORAGE_')),
+        isEmpty,
       );
     });
 

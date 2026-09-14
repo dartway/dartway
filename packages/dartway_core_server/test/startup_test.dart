@@ -195,6 +195,7 @@ void main() {
         // Framework and app migrations interleave by id: a later framework
         // migration runs after an earlier app one.
         'dw/20260914_000000_dw_stored_file',
+        'dw/20260914_180000_dw_stored_file_bucket',
       ]);
       await server.stop();
 

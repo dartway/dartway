@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/outside_probe.dart';
+import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:test/test.dart';
 
 /// A stand-in for a deployed host: answers by path, as configured per test,
@@ -171,6 +172,67 @@ void main() {
       );
       expect(result.passed, isFalse);
       expect(result.detail, contains('refuse every upload'));
+    });
+  });
+
+  group('storage visibility', () {
+    const probeText = DwStack.visibilityProbeText;
+
+    Future<void> storage(
+      HttpRequest r, {
+      int public = 200,
+      int private = 403,
+      int listing = 403,
+    }) {
+      final path = r.uri.path;
+      if (r.uri.queryParameters.containsKey('list-type')) {
+        return text(r, listing, listing < 300 ? '<ListBucketResult/>' : '');
+      }
+      if (path == '/shop-public/${DwStack.visibilityProbeKey}') {
+        return text(r, public, public == 200 ? '$probeText\n' : '');
+      }
+      if (path == '/shop-private/${DwStack.visibilityProbeKey}') {
+        return text(r, private, private == 200 ? '$probeText\n' : '');
+      }
+      return text(r, 404, '');
+    }
+
+    Future<DwProbeResult> run() => site.probe.storageVisibility(
+      storageOrigin: 'http://files.example.com',
+      publicBucket: 'shop-public',
+      privateBucket: 'shop-private',
+    );
+
+    test(
+      'passes when only the public probe reads, and nothing lists',
+      () async {
+        site.handler = storage;
+        final result = await run();
+        expect(result.passed, isTrue, reason: result.detail);
+        expect(site.hosts, everyElement('files.example.com'));
+      },
+    );
+
+    test('fails when the private bucket reads without a signature', () async {
+      site.handler = (r) => storage(r, private: 200);
+      final result = await run();
+      expect(result.passed, isFalse);
+      expect(result.detail, contains('every private file is public'));
+    });
+
+    test('fails when the public bucket does not read', () async {
+      site.handler = (r) => storage(r, public: 403);
+      final result = await run();
+      expect(result.passed, isFalse);
+      expect(result.detail, contains('public files will not open'));
+    });
+
+    test('fails when a bucket lists its keys', () async {
+      site.handler = (r) => storage(r, listing: 200);
+      final result = await run();
+      expect(result.passed, isFalse);
+      expect(result.detail, contains('shop-public lists its keys to anyone'));
+      expect(result.detail, contains('shop-private lists its keys to anyone'));
     });
   });
 }

@@ -99,7 +99,10 @@ class DwStack {
   /// The one generated database secret.
   static const String databasePasswordKey = 'DW_DATABASE_PASSWORD';
   static const String storageEndpointKey = 'DW_STORAGE_ENDPOINT';
-  static const String storageBucketKey = 'DW_STORAGE_BUCKET';
+  static const String storagePublicBucketKey = 'DW_STORAGE_PUBLIC_BUCKET';
+  static const String storagePublicBaseUrlKey = 'DW_STORAGE_PUBLIC_BASE_URL';
+  static const String storagePrivateBucketKey = 'DW_STORAGE_PRIVATE_BUCKET';
+  static const String storageVerifyBucketsKey = 'DW_STORAGE_VERIFY_BUCKETS';
   static const String storageAccessKey = 'DW_STORAGE_ACCESS_KEY';
   static const String storageSecretKey = 'DW_STORAGE_SECRET_KEY';
 
@@ -112,8 +115,28 @@ class DwStack {
   /// which is what Postgres wants of an unquoted one.
   String get databaseName => projectPrefix;
 
-  /// The bucket: the prefix with dashes, which is what a bucket name allows.
-  String get bucketName => projectPrefix.replaceAll('_', '-');
+  /// The public bucket — objects readable by anyone, listing by no one: the
+  /// prefix with dashes, which is what a bucket name allows, and `-public`.
+  String get publicBucketName => '${projectPrefix.replaceAll('_', '-')}-public';
+
+  /// The private bucket — nothing readable without a signature.
+  String get privateBucketName =>
+      '${projectPrefix.replaceAll('_', '-')}-private';
+
+  /// The object `minio-init` writes into both buckets, and the outside probe
+  /// reads without credentials: the key and text the server's own startup
+  /// check uses (`_dartway/visibility-probe`).
+  static const String visibilityProbeKey = '_dartway/visibility-probe';
+  static const String visibilityProbeText =
+      'DartWay checks at startup that this bucket is exactly as public as it '
+      'is declared.';
+
+  /// Where public files are read: the public bucket on the storage host,
+  /// path-style.
+  String? get publicBaseUrl => switch (storageOrigin) {
+    final origin? => '$origin/$publicBucketName',
+    null => null,
+  };
 
   /// The public URL of [domain] under [front].
   String originOf(String domain) {
@@ -148,9 +171,18 @@ class DwStack {
     'DW_DATABASE_SSL': 'false',
     if (target.storage == DwStorageMode.minio) ...{
       storageEndpointKey: storageOrigin!,
-      storageBucketKey: bucketName,
+      storagePublicBucketKey: publicBucketName,
+      storagePublicBaseUrlKey: publicBaseUrl!,
+      storagePrivateBucketKey: privateBucketName,
       'DW_STORAGE_REGION': 'us-east-1',
       'DW_STORAGE_PATH_STYLE': 'true',
+      // The server reaches this MinIO only through the proxy's storage host,
+      // and the proxy starts after the server — on a first deploy it does not
+      // exist yet, and its certificate even less. So the server does not
+      // check its buckets while it starts: `minio-init` sets their access on
+      // every deploy, and the outside probe reads both without credentials
+      // once the stack is up.
+      storageVerifyBucketsKey: 'false',
     },
   };
 
@@ -174,9 +206,12 @@ class DwStack {
   /// Every secret the stack cannot start without, generated or delivered.
   List<String> get requiredSecretKeys => {
     ...generatedSecrets.keys,
+    // Which buckets an external storage needs is the project's rules'
+    // business — DW_STORAGE_PUBLIC_BUCKET with _PUBLIC_BASE_URL for public
+    // purposes, DW_STORAGE_PRIVATE_BUCKET for private ones — and the server
+    // names a missing one when it starts.
     if (target.storage == DwStorageMode.external) ...[
       storageEndpointKey,
-      storageBucketKey,
       storageAccessKey,
       storageSecretKey,
     ],

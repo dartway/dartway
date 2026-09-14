@@ -9,10 +9,10 @@ import 'support/test_app.dart';
 /// The real client uploading through the real server to real storage:
 /// `client.files` as an app calls it, with nothing faked between the three.
 void main() {
-  late TestBucket bucket;
-  setUpAll(() async => bucket = await TestBucket.create());
-  tearDownAll(() async => bucket.drop());
-  final harness = useFilesHarness(() => bucket);
+  late TestStorage storage;
+  setUpAll(() async => storage = await TestStorage.create());
+  tearDownAll(() async => storage.drop());
+  final harness = useFilesHarness(() => storage);
 
   Future<DwAppClient> signedInClient(
     String email, {

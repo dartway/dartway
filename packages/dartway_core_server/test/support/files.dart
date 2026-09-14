@@ -15,8 +15,10 @@ enum TestUpload with DwUploadPurpose { avatar, document, locked, unruled }
 
 /// The storage the suites run against: `DW_STORAGE_ENDPOINT`,
 /// `DW_STORAGE_ACCESS_KEY` and `DW_STORAGE_SECRET_KEY` (and optionally
-/// `DW_STORAGE_REGION`) from the environment, with a bucket of [bucket]'s
-/// name. A missing variable fails the suite loudly, as the database does.
+/// `DW_STORAGE_REGION`) from the environment, with a public bucket of
+/// [publicBucket]'s name served from itself and a private one of
+/// [privateBucket]'s. A missing variable fails the suite loudly, as the
+/// database does.
 ///
 /// ```
 /// docker run -d --name dw10-minio -p 127.0.0.1:55470:9000 \
@@ -25,20 +27,27 @@ enum TestUpload with DwUploadPurpose { avatar, document, locked, unruled }
 /// DW_STORAGE_ENDPOINT=http://127.0.0.1:55470 DW_STORAGE_ACCESS_KEY=dartway \
 ///   DW_STORAGE_SECRET_KEY=dartway-secret dart test
 /// ```
-DwFileStorageConfig storageConfig(String bucket, {bool public = true}) {
-  final environment = {...Platform.environment, 'DW_STORAGE_BUCKET': bucket};
+DwFileStorageConfig storageConfig({
+  String? publicBucket,
+  String? privateBucket,
+  bool verifyBuckets = true,
+}) {
   try {
-    final config = DwFileStorageConfig.fromEnvironment(environment);
+    final config = DwFileStorageConfig.fromEnvironment(Platform.environment);
     return DwFileStorageConfig(
       endpoint: config.endpoint,
       region: config.region,
-      bucket: bucket,
       accessKey: config.accessKey,
       secretKey: config.secretKey,
       pathStyle: true,
-      // The bucket itself, with anonymous reads allowed for `avatar/` by the
-      // policy [TestBucket.create] sets: the smallest real "public prefix".
-      publicBaseUrl: public ? config.endpoint.replace(path: '/$bucket') : null,
+      publicBucket: publicBucket,
+      // The bucket itself: public objects are served by the storage, path
+      // style, as a development MinIO serves them.
+      publicBaseUrl: publicBucket == null
+          ? null
+          : config.endpoint.replace(path: '/$publicBucket'),
+      privateBucket: privateBucket,
+      verifyBuckets: verifyBuckets,
     );
   } on ArgumentError catch (error) {
     throw StateError(
@@ -49,76 +58,78 @@ DwFileStorageConfig storageConfig(String bucket, {bool public = true}) {
   }
 }
 
-/// A bucket created for one test file and removed, objects and all, after it.
-final class TestBucket {
-  TestBucket._(this.config, this.store);
+/// A fresh bucket name, unique to one test file.
+String testBucketName(String role) {
+  final random = Random.secure();
+  return 'dw-test-$role-${List.generate(10, (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[random.nextInt(36)]).join()}';
+}
 
-  final DwFileStorageConfig config;
+/// A public and a private bucket for one test file: the framework's
+/// [DwTestStorage], with the server's own client of the storage beside it.
+final class TestStorage {
+  TestStorage._(this._buckets, this.store);
 
-  /// The framework's own client of the bucket, with the server's keys: for
+  final DwTestStorage _buckets;
+
+  DwFileStorageConfig get config => _buckets.config;
+
+  /// The framework's own client of the storage, with the server's keys: for
   /// looking at objects the way the server does.
   final DwObjectStore store;
 
-  static Future<TestBucket> create() async {
-    final random = Random.secure();
-    final name =
-        'dw-test-${List.generate(12, (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[random.nextInt(36)]).join()}';
-    final config = storageConfig(name);
-    final store = DwObjectStore(
-      config,
-      requestTimeout: const Duration(seconds: 10),
-    );
-    await _expectOk(await store.send('PUT'), 'create bucket $name');
-    final policy = jsonEncode({
-      'Version': '2012-10-17',
-      'Statement': [
-        {
-          'Effect': 'Allow',
-          'Principal': {
-            'AWS': ['*'],
-          },
-          'Action': ['s3:GetObject'],
-          'Resource': ['arn:aws:s3:::$name/${TestUpload.avatar.name}/*'],
-        },
-      ],
-    });
-    await _expectOk(
-      await store.send(
-        'PUT',
-        query: [('policy', '')],
-        body: utf8.encode(policy),
-        headers: {'content-type': 'application/json'},
+  String get publicBucket => _buckets.publicBucket;
+  String get privateBucket => _buckets.privateBucket;
+
+  static Future<TestStorage> create() async {
+    final buckets = await DwTestStorage.create();
+    return TestStorage._(
+      buckets,
+      DwObjectStore(
+        buckets.config,
+        requestTimeout: const Duration(seconds: 10),
       ),
-      'set the bucket policy',
     );
-    return TestBucket._(config, store);
   }
 
-  static Future<void> _expectOk(
-    HttpClientResponse response,
-    String what,
-  ) async {
+  static Future<void> expectOk(HttpClientResponse response, String what) async {
     final body = await utf8.decodeStream(response);
     if (response.statusCode >= 300) {
       throw StateError('could not $what: ${response.statusCode} $body');
     }
   }
 
-  /// Every key in the bucket.
-  Future<List<String>> keys() async {
-    final response = await store.send('GET', query: [('list-type', '2')]);
+  /// Every key in [bucket].
+  Future<List<String>> keys(String bucket) => _buckets.keys(bucket);
+
+  /// Every key in [bucket], as [store] lists them.
+  static Future<List<String>> keysIn(DwObjectStore store, String bucket) async {
+    final response = await store.send(
+      'GET',
+      bucket: bucket,
+      query: [('list-type', '2')],
+    );
     final body = await utf8.decodeStream(response);
+    if (response.statusCode != 200) {
+      throw StateError('could not list $bucket: ${response.statusCode} $body');
+    }
     return [
       for (final match in RegExp(r'<Key>([^<]+)</Key>').allMatches(body))
         match.group(1)!,
     ];
   }
 
-  /// Puts an object with the server's keys, around every ticket.
-  Future<void> putDirectly(String key, List<int> bytes, String type) async {
-    await _expectOk(
+  /// Puts an object into [bucket] with the server's keys, around every
+  /// ticket.
+  Future<void> putDirectly(
+    String bucket,
+    String key,
+    List<int> bytes,
+    String type,
+  ) async {
+    await expectOk(
       await store.send(
         'PUT',
+        bucket: bucket,
         key: key,
         body: bytes,
         headers: {'content-type': type},
@@ -128,11 +139,24 @@ final class TestBucket {
   }
 
   Future<void> drop() async {
-    for (final key in await keys()) {
-      await store.delete(key);
-    }
-    await (await store.send('DELETE')).drain<void>();
     store.close();
+    await _buckets.drop();
+  }
+
+  /// Removes [buckets] with every object in them; an absent one is skipped.
+  static Future<void> dropBuckets(
+    DwObjectStore store,
+    Iterable<String> buckets,
+  ) async {
+    for (final bucket in buckets) {
+      final head = await store.send('HEAD', bucket: bucket);
+      await head.drain<void>();
+      if (head.statusCode == 404) continue;
+      for (final key in await keysIn(store, bucket)) {
+        await store.delete(bucket, key);
+      }
+      await (await store.send('DELETE', bucket: bucket)).drain<void>();
+    }
   }
 }
 
@@ -144,6 +168,7 @@ DwFileStorage testStorage(
   Duration ticketLifetime = const Duration(minutes: 5),
   Duration uploadGrace = const Duration(minutes: 5),
   Duration cleanupInterval = const Duration(minutes: 10),
+  Duration linkLifetime = const Duration(minutes: 10),
 }) => DwFileStorage(
   config,
   rules: [
@@ -174,6 +199,7 @@ DwFileStorage testStorage(
   ticketLifetime: ticketLifetime,
   uploadGrace: uploadGrace,
   cleanupInterval: cleanupInterval,
+  linkLifetime: linkLifetime,
 );
 
 /// Sends [bytes] to a ticket's URL as a client would: exactly the ticket's
@@ -359,10 +385,10 @@ List<DwCallHandler> fileHandlers() => [
   ),
 ];
 
-/// A harness with file storage on [bucket]'s storage.
+/// A harness with file storage on [storage]'s buckets.
 Harness Function() useFilesHarness(
-  TestBucket Function() bucket, {
-  DwFileStorage Function(DwFileStorageConfig config)? storage,
+  TestStorage Function() storage, {
+  DwFileStorage Function(DwFileStorageConfig config)? declaration,
   DwServerSettings settings = const DwServerSettings(
     jobPollInterval: Duration(seconds: 30),
   ),
@@ -371,7 +397,7 @@ Harness Function() useFilesHarness(
     config,
     protocol: filesProtocol,
     handlers: [...app.handlers(), ...fileHandlers()],
-    files: (storage ?? testStorage)(bucket().config),
+    files: (declaration ?? testStorage)(storage().config),
     settings: settings,
   ),
 );
