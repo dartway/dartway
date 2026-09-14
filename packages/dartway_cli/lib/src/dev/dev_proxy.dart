@@ -33,8 +33,10 @@ final class DwDevProxy {
     required this.api,
     this.webServer,
     this.webDirectory,
+    Iterable<String> apiPaths = const [],
     void Function(String line)? log,
-  }) : _log = log ?? stderr.writeln,
+  }) : apiPaths = List.unmodifiable(apiPaths.map(_normalizePrefix)),
+       _log = log ?? stderr.writeln,
        assert(
          (webServer == null) != (webDirectory == null),
          'exactly one of webServer and webDirectory',
@@ -59,9 +61,35 @@ final class DwDevProxy {
     ..userAgent = null
     ..connectionTimeout = const Duration(seconds: 5);
 
-  /// Whether [path] belongs to the API: the framework's reserved paths.
+  /// The project's external doors (`DwRoute` paths such as `/mcp` or
+  /// `/github`) that go to the API as well. In production they live on the
+  /// API host, which proxies everything; locally they share the one origin, so
+  /// the proxy has to be told which paths are doors rather than app routes.
+  final List<String> apiPaths;
+
+  static String _normalizePrefix(String prefix) {
+    final trimmed = prefix.trim();
+    if (!trimmed.startsWith('/') || trimmed == '/') {
+      throw ArgumentError.value(
+        prefix,
+        'apiPaths',
+        'an API path is an absolute prefix such as /mcp',
+      );
+    }
+    return trimmed.endsWith('/')
+        ? trimmed.substring(0, trimmed.length - 1)
+        : trimmed;
+  }
+
+  /// Whether [path] belongs to the framework's reserved API paths.
   static bool isApiPath(String path) =>
       path == '/dw' || path.startsWith('/dw/') || path == '/health';
+
+  /// Whether [path] goes to the API: a reserved path or one of [apiPaths]
+  /// (the prefix itself or anything below it).
+  bool routesToApi(String path) =>
+      isApiPath(path) ||
+      apiPaths.any((prefix) => path == prefix || path.startsWith('$prefix/'));
 
   /// The port listened on, once started.
   int get port => _servers.isEmpty
@@ -96,7 +124,15 @@ final class DwDevProxy {
         ..serverHeader = null
         ..idleTimeout = const Duration(seconds: 120)
         ..defaultResponseHeaders.clear();
-      server.listen((request) => unawaited(_handle(request)));
+      server.listen(
+        (request) => unawaited(_handle(request)),
+        // An accept can fail for one connection — a client that closed before
+        // the socket was set up surfaces as `OS Error: Invalid argument` from
+        // `setOption` on macOS. Unhandled, that error ended the whole proxy;
+        // it belongs to that one connection.
+        onError: (Object error) =>
+            _log('dartway dev proxy: a connection failed to open: $error'),
+      );
     }
   }
 
@@ -115,6 +151,7 @@ final class DwDevProxy {
   /// What goes where, for the startup banner.
   List<String> describe() => [
     '/dw/*, /health  →  $api  (API, live socket included)',
+    for (final prefix in apiPaths) '$prefix  →  $api  (external door)',
     if (webServer case final web?)
       'everything else →  $web  (Flutter web dev server)'
     else
@@ -123,7 +160,7 @@ final class DwDevProxy {
 
   Future<void> _handle(HttpRequest request) async {
     try {
-      if (isApiPath(request.uri.path)) {
+      if (routesToApi(request.uri.path)) {
         await _forward(request, api, 'the API');
       } else if (webServer case final web?) {
         await _forward(request, web, 'the Flutter web dev server');

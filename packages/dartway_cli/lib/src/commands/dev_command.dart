@@ -43,6 +43,12 @@ void _addProxyOptions(ArgParser parser) {
       help:
           'The running server: /dw/* (the live socket included) and /health '
           'go here.',
+    )
+    ..addMultiOption(
+      'api-path',
+      help:
+          'A project door (DwRoute) that goes to the server too, e.g. '
+          '--api-path /mcp --api-path /github. Repeatable.',
     );
 }
 
@@ -193,6 +199,7 @@ class DevProxyCommand extends Command<int> {
       }
       proxy = DwDevProxy(
         api: api,
+        apiPaths: results.multiOption('api-path'),
         webDirectory: DwWebDirectory(
           directory,
           servingConfiguration: DwWebDirectory.projectServingConfiguration(
@@ -203,6 +210,7 @@ class DevProxyCommand extends Command<int> {
     } else {
       proxy = DwDevProxy(
         api: api,
+        apiPaths: results.multiOption('api-path'),
         webServer: _originOption(this, 'web', results.option('web')!),
       );
     }
@@ -261,6 +269,7 @@ class DevWebCommand extends Command<int> {
     final webPort = await _freePort();
     final proxy = DwDevProxy(
       api: api,
+      apiPaths: results.multiOption('api-path'),
       webServer: Uri(scheme: 'http', host: 'localhost', port: webPort),
     );
     if (!await _startProxy(proxy, port)) return 1;

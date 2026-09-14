@@ -373,6 +373,9 @@ Two things to know:
 - **The server is started separately**, as usual. Until it listens, the proxy answers `/dw/*` with
   `502` and says once in the terminal that nothing answers; calls go through as soon as it is up.
 
+
+Project doors (`DwRoute` paths such as `/mcp` or `/github`) are not app routes, so the proxy is told about them: `--api-path /mcp --api-path /github` (repeatable) sends those prefixes to the server too — in production they live on the API host, which proxies everything.
+
 ## `dartway deploy` — the server, without a folder of shell scripts
 
 ```bash

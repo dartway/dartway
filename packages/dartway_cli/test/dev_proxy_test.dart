@@ -52,6 +52,49 @@ void main() {
       }
     });
 
+    test('project doors named by apiPaths go to the API too', () {
+      final withDoors = DwDevProxy(
+        api: Uri.parse('http://localhost:8080'),
+        webServer: Uri.parse('http://localhost:5000'),
+        apiPaths: ['/mcp', '/github/'],
+      );
+      for (final path in [
+        '/mcp',
+        '/mcp/tools',
+        '/github',
+        '/github/push',
+        '/dw/x',
+      ]) {
+        expect(withDoors.routesToApi(path), isTrue, reason: path);
+      }
+      for (final path in ['/mcpx', '/githubber', '/', '/app/mcp']) {
+        expect(withDoors.routesToApi(path), isFalse, reason: path);
+      }
+      expect(
+        () => DwDevProxy(
+          api: Uri.parse('http://localhost:8080'),
+          webServer: Uri.parse('http://localhost:5000'),
+          apiPaths: ['mcp'],
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('a connection closed by the client before a request does not end the '
+        'proxy', () async {
+      for (var i = 0; i < 20; i++) {
+        final socket = await Socket.connect(
+          InternetAddress.loopbackIPv4,
+          proxy.port,
+        );
+        if (i.isEven) socket.add('POST /mcp HTTP/1.1\r\nhost: x\r\n'.codeUnits);
+        socket.destroy();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final health = await _get(client, at('/health'));
+      expect(health.status, 200);
+    });
+
     test('a call reaches the API and a page reaches the web server', () async {
       final health = await _get(client, at('/health'));
       expect((health.status, health.body), (200, 'api ok'));
