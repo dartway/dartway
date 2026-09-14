@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
-import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 
-import 'dw_logger.dart';
+import 'dw_server_logger.dart';
 
 /// A failure: something the operator must hear about. Refusals are never
 /// incidents — they are answers.
-final class DwIncident {
-  DwIncident({
+final class DwServerIncident {
+  DwServerIncident({
     required this.id,
     required this.where,
     required this.error,
@@ -18,7 +19,7 @@ final class DwIncident {
     DateTime? at,
   }) : at = at ?? DateTime.now().toUtc();
 
-  /// What the client received as `DwFailed.incidentId`.
+  /// What the client received as the `incidentId` of a failed answer.
   final String id;
 
   /// Where it happened, without payload: `command BookSession`, `job reminder`.
@@ -33,12 +34,13 @@ final class DwIncident {
   String get signature =>
       '$where|${error.runtimeType}|${dwFirstFrame(stackTrace)}';
 
+  static final Random _random = Random.secure();
+
   /// A random id short enough to read aloud, long enough never to collide in
   /// an operator's search.
   static String newId() {
-    final random = Random.secure();
     const alphabet = '0123456789abcdefghjkmnpqrstvwxyz';
-    return List.generate(12, (_) => alphabet[random.nextInt(32)]).join();
+    return List.generate(12, (_) => alphabet[_random.nextInt(32)]).join();
   }
 }
 
@@ -57,20 +59,20 @@ String dwFirstFrame(StackTrace stackTrace) {
 
 /// Where failures go. The framework logs every incident itself; a sink is the
 /// channel that reaches a person (Telegram, a pager).
-abstract interface class DwAlerts {
+abstract interface class DwAlertSink {
   /// Delivers an incident. [suppressedNote] is set on the last alert a
   /// signature sends before the ceiling mutes it.
-  Future<void> send(DwIncident incident, {String? suppressedNote});
+  Future<void> send(DwServerIncident incident, {String? suppressedNote});
 }
 
 /// The default sink: the log, at error level.
-final class DwLogAlerts implements DwAlerts {
-  const DwLogAlerts(this.logger);
+final class DwLogAlertSink implements DwAlertSink {
+  const DwLogAlertSink(this.logger);
 
-  final DwLogger logger;
+  final DwServerLogger logger;
 
   @override
-  Future<void> send(DwIncident incident, {String? suppressedNote}) async {
+  Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
     logger.error(
       'ALERT incident ${incident.id} in ${incident.where}'
       '${suppressedNote == null ? '' : ' ($suppressedNote)'}',
@@ -85,26 +87,28 @@ final class DwLogAlerts implements DwAlerts {
 /// The message carries the incident id, where it happened and the error text
 /// (truncated) — never payloads. A delivery failure is logged, not thrown: an
 /// alert channel that is down must not turn into a second incident loop.
-final class DwTelegramAlerts implements DwAlerts {
-  DwTelegramAlerts({
+///
+/// Speaks `dart:io`'s `HttpClient` directly: one POST does not justify an HTTP
+/// package dependency in every server.
+final class DwTelegramAlertSink implements DwAlertSink {
+  DwTelegramAlertSink({
     required this.botToken,
     required this.chatId,
     required this.logger,
     this.title = 'DartWay',
-    http.Client? client,
     Uri? apiBase,
-  }) : _client = client ?? http.Client(),
-       _apiBase = apiBase ?? Uri.parse('https://api.telegram.org');
+  }) : _apiBase = apiBase ?? Uri.parse('https://api.telegram.org');
 
   final String botToken;
   final String chatId;
   final String title;
-  final DwLogger logger;
-  final http.Client _client;
+  final DwServerLogger logger;
   final Uri _apiBase;
 
+  static const Duration _timeout = Duration(seconds: 10);
+
   @override
-  Future<void> send(DwIncident incident, {String? suppressedNote}) async {
+  Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
     var errorText = '${incident.error}';
     if (errorText.length > 1500) errorText = '${errorText.substring(0, 1500)}…';
     final text = StringBuffer()
@@ -113,14 +117,15 @@ final class DwTelegramAlerts implements DwAlerts {
       ..writeln(errorText)
       ..writeln(dwFirstFrame(incident.stackTrace));
     if (suppressedNote != null) text.writeln(suppressedNote);
+    final client = HttpClient()..connectionTimeout = _timeout;
     try {
-      final response = await _client
-          .post(
-            _apiBase.replace(path: '/bot$botToken/sendMessage'),
-            headers: {'content-type': 'application/json'},
-            body: jsonEncode({'chat_id': chatId, 'text': text.toString()}),
-          )
-          .timeout(const Duration(seconds: 10));
+      final request = await client
+          .postUrl(_apiBase.replace(path: '/bot$botToken/sendMessage'))
+          .timeout(_timeout);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({'chat_id': chatId, 'text': text.toString()}));
+      final response = await request.close().timeout(_timeout);
+      await response.drain<void>();
       if (response.statusCode != 200) {
         // The URL holds the token: report the status only.
         logger.warning(
@@ -129,10 +134,13 @@ final class DwTelegramAlerts implements DwAlerts {
         );
       }
     } catch (error) {
+      // The error text may carry the URL, and the URL holds the token.
       logger.warning(
         'Telegram alert for incident ${incident.id} was not delivered: '
         '${error.runtimeType}',
       );
+    } finally {
+      client.close(force: true);
     }
   }
 }
@@ -141,6 +149,7 @@ final class DwTelegramAlerts implements DwAlerts {
 /// ceiling: at most [maxPerWindow] alerts of one signature per [window]. A
 /// failure repeating a thousand times is one problem, and a channel flooded
 /// with it hides the next one.
+@internal
 final class DwAlertGate {
   DwAlertGate({
     required this.sink,
@@ -150,8 +159,8 @@ final class DwAlertGate {
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
-  final DwAlerts sink;
-  final DwLogger logger;
+  final DwAlertSink sink;
+  final DwServerLogger logger;
   final int maxPerWindow;
   final Duration window;
   final DateTime Function() _clock;
@@ -164,8 +173,8 @@ final class DwAlertGate {
     required StackTrace stackTrace,
     int? accountId,
   }) {
-    final incident = DwIncident(
-      id: DwIncident.newId(),
+    final incident = DwServerIncident(
+      id: DwServerIncident.newId(),
       where: where,
       error: error,
       stackTrace: stackTrace,

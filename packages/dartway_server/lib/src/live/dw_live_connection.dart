@@ -6,31 +6,34 @@ import 'dart:io';
 import 'package:dartway_core/dartway_core.dart';
 import 'package:meta/meta.dart';
 
-import '../alerts/dw_logger.dart';
+import '../alerts/dw_server_logger.dart';
 
-/// One app WebSocket: its session, its subscriptions and its outbound queue.
+/// One live socket (`GET /dw/live`): its session, its subscriptions and its
+/// outbound queue.
 ///
 /// The outbound queue writes through `WebSocket.addStream`, whose future
 /// completes only when the socket has taken the data, so [queuedBytes] is what
-/// the peer has not yet consumed from us — the number the ceiling needs and
-/// relic's `WebSocketUpgrade` cannot provide.
+/// the peer has not yet consumed from us — the number the ceiling needs. The
+/// raw [socket] is kept because a peer that stops reading also never
+/// completes the close handshake, and only the socket can be destroyed.
 @internal
-final class DwConnection {
-  DwConnection({
+final class DwLiveConnection {
+  DwLiveConnection({
     required this.id,
     required this.socket,
     required this.webSocket,
-    required this.protocol,
     required this.log,
     required this.outboundLimitBytes,
     required this.closeGrace,
   });
 
-  final int id;
+  /// Unguessable: a `Dw-Live-Connection` header names a connection by it, and
+  /// a guessed id would let a caller filter or suppress someone else's
+  /// updates. It is further bound to the account that authenticated it.
+  final String id;
   final Socket socket;
   final WebSocket webSocket;
-  final DwProtocol protocol;
-  final DwLogger log;
+  final DwServerLogger log;
   final int outboundLimitBytes;
   final Duration closeGrace;
 
@@ -43,9 +46,9 @@ final class DwConnection {
   /// under an older epoch does not take effect.
   int authEpoch = 0;
 
-  /// Completes when the latest authentication has been applied. Every message
-  /// waits for the gate as it was when the message arrived, so a call sent
-  /// right after `auth` runs as the new account.
+  /// Completes when the latest authentication has been applied. A
+  /// subscription waits for the gate as it was when the message arrived, so a
+  /// `sub` sent right after `auth` is checked for the new account.
   Future<void> authGate = Future.value();
 
   /// Channel wire names this connection is subscribed to.
@@ -54,59 +57,13 @@ final class DwConnection {
   /// Serialises subscribe/unsubscribe per channel, in arrival order.
   final Map<String, Future<void>> channelTails = {};
 
-  /// Calls received and not yet answered: running or waiting for a slot.
-  int inFlight = 0;
-  int _running = 0;
-  final Queue<Completer<void>> _waiting = Queue();
-
-  /// Completes when [inFlight] drops to zero (for a graceful stop).
-  Completer<void>? _idle;
-
-  /// Registers a received call; `false` when [maxRunning] calls run and
-  /// [maxWaiting] more are already queued — a client flooding the server.
-  /// Counted at arrival, before the call waits for anything.
-  bool admitCall(int maxRunning, int maxWaiting) {
-    if (inFlight >= maxRunning + maxWaiting) return false;
-    inFlight++;
-    return true;
-  }
-
-  /// Waits for one of [maxRunning] slots. The socket keeps being read
-  /// meanwhile: pausing it would also stop reading the peer's pongs, and a
-  /// client with slow calls would be dropped as dead.
-  Future<void> callSlot(int maxRunning) {
-    if (_running < maxRunning) {
-      _running++;
-      return Future.value();
-    }
-    final waiter = Completer<void>();
-    _waiting.add(waiter);
-    return waiter.future;
-  }
-
-  /// Releases the slot of an answered call.
-  void callEnded() {
-    inFlight--;
-    if (_waiting.isNotEmpty) {
-      // The slot passes straight to the next waiting call.
-      _waiting.removeFirst().complete();
-    } else {
-      _running--;
-    }
-    if (inFlight == 0) {
-      _idle?.complete();
-      _idle = null;
-    }
-  }
-
-  Future<void> whenIdle() {
-    if (inFlight == 0) return Future.value();
-    return (_idle ??= Completer<void>()).future;
-  }
-
   // --- outbound -------------------------------------------------------------
 
   final Queue<String> _queue = Queue();
+
+  /// Characters queued and not yet taken by the socket. Characters rather
+  /// than encoded bytes: counting UTF-8 would mean encoding every frame twice,
+  /// and the ceiling is a guard against a stalled peer, not a quota.
   int queuedBytes = 0;
   bool _pumping = false;
   Completer<void>? _drained;
@@ -120,7 +77,7 @@ final class DwConnection {
   /// Encodes and queues [message].
   void send(DwServerMessage message) {
     if (isClosing) return;
-    sendFrame(jsonEncode(message.toJson(protocol)));
+    sendFrame(jsonEncode(message.toJson()));
   }
 
   /// Queues an already encoded frame (an update encoded once for all
@@ -128,14 +85,14 @@ final class DwConnection {
   void sendFrame(String frame) {
     if (isClosing) return;
     // The ceiling is on the backlog already waiting, not on this frame: one
-    // large result for a client that reads promptly is not a slow consumer.
+    // large update for a client that reads promptly is not a slow consumer.
     final backlog = queuedBytes;
     _queue.add(frame);
     queuedBytes += frame.length;
     if (backlog > outboundLimitBytes) {
       log.warning(
-        'connection $id: outbound queue passed $outboundLimitBytes bytes '
-        '(account $accountId); disconnecting',
+        'live connection: outbound queue passed $outboundLimitBytes '
+        'characters (account $accountId); disconnecting',
       );
       _queue.clear();
       unawaited(close(DwCloseCode.slowConsumer, 'dw.slowConsumer'));
@@ -174,8 +131,7 @@ final class DwConnection {
     return (_drained ??= Completer<void>()).future;
   }
 
-  /// Closes with [code]: frames already handed over are delivered first, the
-  /// rest of the queue is dropped when the close was forced by the ceiling. A
+  /// Closes with [code]: frames already handed over are delivered first. A
   /// peer that does not complete the close within [closeGrace] is cut off.
   Future<void> close(int code, String reason) async {
     if (_closeCode != null || _closed) return;
@@ -192,6 +148,9 @@ final class DwConnection {
       socket.destroy();
     }
   }
+
+  /// Completes when the socket is closed, whoever closed it.
+  Future<void> get done => webSocket.done.then((_) {}, onError: (_) {});
 
   /// Called once the socket is done, whoever closed it.
   void markClosed() {

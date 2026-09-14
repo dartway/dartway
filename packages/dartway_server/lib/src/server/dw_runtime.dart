@@ -2,17 +2,19 @@ import 'package:dartway_core/dartway_core.dart';
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
-import '../alerts/dw_alerts.dart';
-import '../alerts/dw_logger.dart';
-import '../auth/dw_accounts.dart';
-import '../auth/dw_auth.dart';
-import '../channels/dw_hub.dart';
-import '../context/dw_context.dart';
-import '../jobs/dw_jobs.dart';
-import '../protocol/dw_connection.dart';
+import '../alerts/dw_alert_sink.dart';
+import '../alerts/dw_server_logger.dart';
+import '../auth/dw_account_service.dart';
+import '../auth/dw_auth_config.dart';
+import '../auth/dw_session_cache.dart';
+import '../context/dw_call_context.dart';
+import '../jobs/dw_job_queue.dart';
+import '../live/dw_live_connection.dart';
+import '../live/dw_live_hub.dart';
 
-/// What the running parts of a server share: the database, the hub, the alert
-/// gate and the way contexts are made.
+/// What the running parts of a server share: the database, the live hub, the
+/// session cache, the alert gate, and the way contexts are made and their
+/// effects delivered.
 @internal
 final class DwRuntime {
   DwRuntime({
@@ -20,42 +22,66 @@ final class DwRuntime {
     required this.auth,
     required this.db,
     required this.hub,
+    required this.sessions,
     required this.alerts,
     required this.log,
     required this.jobsFor,
   });
 
-  final DwProtocol protocol;
-  final DwAuth auth;
-  final DwDb db;
-  final DwHub hub;
+  final DwWireProtocol protocol;
+  final DwAuthConfig auth;
+  final DwDatabaseHandle db;
+  final DwLiveHub hub;
+  final DwSessionCache sessions;
   final DwAlertGate alerts;
-  final DwLogger log;
-  final DwJobs Function(DwCallContext ctx) jobsFor;
+  final DwServerLogger log;
+  final DwJobQueue Function(DwRuntimeContext ctx) jobsFor;
 
-  DwCallContext context({
+  DwRuntimeContext context({
     required String scope,
-    DwDb? db,
+    required DwContextKind kind,
+    DwDatabaseHandle? db,
     int? accountId,
     int? keyId,
-    DwConnection? connection,
-  }) => DwCallContext(
+  }) => DwRuntimeContext(
     db: db ?? this.db,
+    kind: kind,
     protocol: protocol,
     log: log.scoped(scope),
     jobs: jobsFor,
-    accounts: (ctx) => DwAccounts.ofContext(ctx, auth, hub),
-    isPublishable: (item) => protocol.knows(item.runtimeType),
+    accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     accountId: accountId,
     keyId: keyId,
-    connection: connection,
   );
 
-  /// Delivers the committed effects of [ctx].
-  void deliver(DwCallContext ctx) {
-    if (ctx.rootEffects.isEmpty) return;
-    hub.deliver(ctx.rootEffects);
-    ctx.rootEffects.clear();
+  /// Delivers the committed effects of [ctx] and returns the updates its
+  /// caller's response carries.
+  ///
+  /// Revocations go first, so nothing published by the same call reaches a
+  /// subscriber whose access it removed — the caller's own connection
+  /// included, whose response then carries only what it still listens to.
+  /// [author] is the caller's live connection when the response carries the
+  /// updates (see [DwLiveHub.publish]).
+  DwUpdateTransport deliver(DwRuntimeContext ctx, {DwLiveConnection? author}) {
+    final effects = ctx.rootEffects;
+    if (effects.isEmpty) return DwUpdateTransport.empty;
+    for (final keyId in effects.revokedKeys) {
+      revokeKey(keyId, author: author);
+    }
+    for (final (channel, accountId) in effects.revocations) {
+      hub.revokeChannel(channel, accountId);
+    }
+    final updates = hub.publish(effects.publications, author: author);
+    effects.clear();
+    return updates;
+  }
+
+  /// A session key was revoked and the revocation has committed: the next
+  /// call with its token reads the database again, and live connections
+  /// holding it lose their session.
+  void revokeKey(int keyId, {DwLiveConnection? author}) {
+    sessions.revoke(keyId);
+    hub.revokeKey(keyId, author: author);
   }
 }
 

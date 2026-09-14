@@ -1,99 +1,62 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:dartway_server/dartway_server.dart';
-import 'package:dartway_server/testing.dart';
+import 'package:dartway_server/src/context/dw_call_context.dart';
 import 'package:test/test.dart';
-
-import 'package:dartway_server/src/context/dw_context.dart';
 
 import 'support/test_app.dart';
 
 void main() {
-  final harness = useHarness(
-    build: (app, config) => app.server(
-      config,
-      routes: [
-        DwRoute.get('/hello', (ctx, request) => DwRoute.json({'hello': 'w'})),
-        DwRoute.post('/echo', (ctx, request) async {
-          final body = await DwRoute.readJson(request);
-          await ctx.jobs.enqueue('record', {'tag': body['tag']});
-          return DwRoute.json(body, status: 201);
-        }),
-        DwRoute.get(
-          '/refuse',
-          (ctx, request) => ctx.refuse(DwCoreRefusal.forbidden),
-        ),
-        DwRoute.get(
-          '/explode',
-          (ctx, request) => throw StateError('route secret s3cr3t'),
-        ),
-      ],
-    ),
-  );
+  final harness = useHarness();
 
-  late DwTestConnection anonymous;
-  late DwTestConnection signed;
-  late DwSession session;
+  late DwTestCaller anonymous;
+  late DwTestCaller signed;
+  late DwAuthSession session;
 
   setUpAll(() async {
-    anonymous = await harness().connect();
+    anonymous = harness().caller();
     (signed, session) = await harness().signedIn('calls@example.com');
   });
 
-  Future<List<NoteView>> seed(String prefix, int count) async {
-    final notes = <NoteView>[];
-    for (var i = 0; i < count; i++) {
-      final row = (await harness().db.query(
-        'INSERT INTO note (text) VALUES (@text) RETURNING id',
-        params: {'text': '$prefix-$i'},
-      )).single;
-      notes.add(NoteView(id: row.get<int>('id'), text: '$prefix-$i'));
-    }
-    return notes;
-  }
+  Future<List<NoteView>> seed(String prefix, int count) async => [
+    for (var i = 0; i < count; i++)
+      await TestApp.insertNote(harness().db, '$prefix-$i'),
+  ];
 
   group('access', () {
     test('anonymous access needs no session', () async {
-      final result = await anonymous.request(const ListNotes(ownerId: -1));
-      expect(result.status, DwResultStatus.ok);
-      expect(result.value, isEmpty);
+      final answer = await anonymous.call(const ListNotes(ownerId: -1));
+      expect(answer.value(const ListNotes()), isEmpty);
     });
 
-    test('signedIn answers unauthenticated without a session', () async {
-      final result = await anonymous.request(const MyNotes());
-      expect(result.status, DwResultStatus.unauthenticated);
-      expect(result.refusal, isNull);
-      expect(result.incidentId, isNull);
-      expect(harness().app.alerts.incidents, isEmpty);
+    test('signedIn answers unauthenticated without a session, and serves '
+        'with one', () async {
+      expect((await anonymous.call(const MyNotes())).status, 401);
+      expect((await signed.call(const MyNotes())).status, 200);
     });
 
-    test('signedIn answers with a session', () async {
-      final result = await signed.request(const MyNotes());
-      expect(result.status, DwResultStatus.ok);
-    });
-
-    test('check: forbidden until the check passes, unauthenticated without '
-        'a session', () async {
-      expect(
-        (await anonymous.request(const SecretNotes())).status,
-        DwResultStatus.unauthenticated,
+    test('check receives the call: the owner passes, another account is '
+        'forbidden until it is staff, and no session is unauthenticated '
+        'without running the check', () async {
+      final own = await signed.call(NotesOfOwner(session.id));
+      expect(own.status, 200);
+      final (other, otherSession) = await harness().signedIn(
+        'calls-other@example.com',
       );
-      final refused = await signed.request(const SecretNotes());
-      expect(refused.status, DwResultStatus.refused);
-      expect(refused.refusal!.isCode(DwCoreRefusal.forbidden), isTrue);
-      harness().app.secretReaders.add(session.id);
-      expect(
-        (await signed.request(const SecretNotes())).status,
-        DwResultStatus.ok,
-      );
+      final forbidden = await other.call(NotesOfOwner(session.id));
+      expect(forbidden.status, 403);
+      harness().app.staff.add(otherSession.id);
+      expect((await other.call(NotesOfOwner(session.id))).status, 200);
+
+      final checks = harness().app.ownerChecks;
+      expect((await anonymous.call(NotesOfOwner(session.id))).status, 401);
+      expect(harness().app.ownerChecks, checks);
     });
 
     test('requireAccountId in a handler answers unauthenticated', () async {
-      final result = await anonymous.command(const NeedsAccount());
-      expect(result.status, DwResultStatus.unauthenticated);
-      final ok = await signed.command(const NeedsAccount());
-      expect(ok.value, session.id);
+      expect((await anonymous.call(const NeedsAccount())).status, 401);
+      expect(
+        (await signed.call(const NeedsAccount())).value(const NeedsAccount()),
+        session.id,
+      );
     });
   });
 
@@ -101,61 +64,82 @@ void main() {
     test(
       'the first refusal of validate() is answered, before the handler',
       () async {
-        final before = await harness().db.query(
+        Future<int> notes() async => (await harness().db.query(
           'SELECT count(*) AS n FROM note',
+        )).single.get<int>('n');
+        final before = await notes();
+        final empty = await signed.call(const CreateNote(''));
+        expect(
+          empty.refusal,
+          DwCallRefusal(DwCoreRefusal.invalid, field: 'text'),
         );
-        final result = await signed.command(const CreateNote(''));
-        expect(result.status, DwResultStatus.refused);
-        expect(result.refusal, DwRefusal(DwCoreRefusal.invalid, field: 'text'));
-        final long = await signed.command(CreateNote('x' * 51));
-        expect(long.refusal!.params, {'max': '50'});
-        final after = await harness().db.query(
-          'SELECT count(*) AS n FROM note',
-        );
-        expect(after.single['n'], before.single['n']);
+        final long = await signed.call(CreateNote('x' * 51));
+        expect(long.refusal.params, {'max': '50'});
+        expect(await notes(), before);
       },
     );
 
-    test('an unauthenticated call is not validated first', () async {
-      final result = await anonymous.command(const CreateNote(''));
-      expect(result.status, DwResultStatus.unauthenticated);
+    test(
+      'sign-in is checked first, then validation, then the access check',
+      () async {
+        // Anonymous and invalid: told to sign in, not which field is wrong.
+        expect((await anonymous.call(const CreateNote(''))).status, 401);
+        expect((await anonymous.call(const NotesOfOwner(0))).status, 401);
+        // Signed in and invalid: the check, which may query, never runs.
+        final checks = harness().app.ownerChecks;
+        final invalid = await signed.call(const NotesOfOwner(0));
+        expect(invalid.status, 422);
+        expect(invalid.refusal.field, 'ownerId');
+        expect(harness().app.ownerChecks, checks);
+      },
+    );
+
+    test('a table page below 1 is refused with the page field', () async {
+      final page = await anonymous.call(const TableNotes('v', page: 0));
+      expect(page.status, 422);
+      expect(page.refusal.field, 'page');
+      final size = await anonymous.call(const TableNotes('v', pageSize: 0));
+      expect(size.refusal.field, 'pageSize');
     });
   });
 
-  group('request kinds', () {
-    test('single: an absent object refuses notFound', () async {
-      final result = await anonymous.request(const GetNote(-5));
-      expect(result.refusal!.isCode(DwCoreRefusal.notFound), isTrue);
+  group('single, maybe and list', () {
+    test('single: an absent object refuses dw.notFound', () async {
+      expect((await anonymous.call(const GetNote(-5))).status, 404);
       final [note] = await seed('single', 1);
-      final ok = await anonymous.request(GetNote(note.id));
-      expect(ok.okValue(GetNote(note.id), testProtocol), note);
+      expect(
+        (await anonymous.call(GetNote(note.id))).value(GetNote(note.id)),
+        note,
+      );
     });
 
-    test('maybe: an absent object is a value', () async {
-      final result = await anonymous.request(const FindNote(-5));
-      expect(result.status, DwResultStatus.ok);
-      expect(result.value, isNull);
-      expect(jsonDecode(anonymous.frames.last), isNot(contains('v')));
-    });
+    test(
+      'maybe: an absent object is a value, and the result is omitted',
+      () async {
+        final answer = await anonymous.call(const FindNote(-5));
+        expect(answer.json, {'status': 'ok'});
+        expect(answer.value(const FindNote(-5)), isNull);
+      },
+    );
+  });
 
-    test('offset pages read one row past the page and trim it', () async {
+  group('page', () {
+    test('reads one row past the page and trims it', () async {
       final notes = await seed('feed', 7);
       const request = FeedNotes('feed-');
-      final first = (await anonymous.request(
-        request,
-      )).okValue(request, testProtocol);
+      final first = (await anonymous.call(request)).value(request);
       expect(first.items, notes.sublist(0, 3));
       expect(first.hasMore, isTrue);
-      final second = (await anonymous.request(
+      final second = (await anonymous.call(
         request,
-        page: const DwOffsetParams(3),
-      )).okValue(request, testProtocol);
+        query: const DwOffsetQuery(offset: 3).toQuery(),
+      )).value(request);
       expect(second.items, notes.sublist(3, 6));
       expect(second.hasMore, isTrue);
-      final third = (await anonymous.request(
+      final third = (await anonymous.call(
         request,
-        page: const DwOffsetParams(6),
-      )).okValue(request, testProtocol);
+        query: const DwOffsetQuery(offset: 6).toQuery(),
+      )).value(request);
       expect(third.items, notes.sublist(6));
       expect(third.hasMore, isFalse);
     });
@@ -163,184 +147,263 @@ void main() {
     test('an exactly full last page has no more', () async {
       final notes = await seed('exact', 3);
       const request = FeedNotes('exact-');
-      final page = (await anonymous.request(
-        request,
-      )).okValue(request, testProtocol);
+      final page = (await anonymous.call(request)).value(request);
       expect(page.items, notes);
       expect(page.hasMore, isFalse);
     });
 
-    test('cursor pages go back from the newest by id', () async {
-      final notes = await seed('hist', 5);
-      const request = NoteHistory('hist-');
-      final newest = (await anonymous.request(
+    test('pageSize in the query is served up to the class maximum', () async {
+      final notes = await seed('sized', 8);
+      const request = FeedNotes('sized-');
+      final four = (await anonymous.call(
         request,
-      )).okValue(request, testProtocol);
-      expect(newest.items, [notes[4], notes[3]]);
-      expect(newest.hasMore, isTrue);
-      final older = (await anonymous.request(
+        query: const DwOffsetQuery(pageSize: 4).toQuery(),
+      )).value(request);
+      expect(four.items, notes.sublist(0, 4));
+      final clamped = (await anonymous.call(
         request,
-        page: DwCursorParams(newest.items.last.id),
-      )).okValue(request, testProtocol);
-      expect(older.items, [notes[2], notes[1]]);
-      final oldest = (await anonymous.request(
-        request,
-        page: DwCursorParams(older.items.last.id),
-      )).okValue(request, testProtocol);
-      expect(oldest.items, [notes[0]]);
-      expect(oldest.hasMore, isFalse);
+        query: const DwOffsetQuery(pageSize: 50).toQuery(),
+      )).value(request);
+      expect(clamped.items, notes.sublist(0, 5));
+      expect(clamped.hasMore, isTrue);
     });
 
-    test('page parameters that do not fit the request fail', () async {
-      final incidents = harness().app.alerts.incidents.length;
-      final onList = await anonymous.request(
-        const ListNotes(),
-        page: const DwOffsetParams(0),
-      );
-      expect(onList.status, DwResultStatus.failed);
-      final wrongKind = await anonymous.request(
-        const FeedNotes('x'),
-        page: const DwCursorParams(3),
-      );
-      expect(wrongKind.status, DwResultStatus.failed);
-      final negative = await anonymous.request(
-        const FeedNotes('x'),
-        page: const DwOffsetParams(-1),
-      );
-      expect(negative.status, DwResultStatus.failed);
-      await eventually(
-        () => harness().app.alerts.incidents.length == incidents + 3,
-      );
-    });
-  });
-
-  group('failures', () {
-    test('an exception answers an incident id and nothing else', () async {
-      final result = await anonymous.request(const ExplodingRequest('hunter2'));
-      expect(result.status, DwResultStatus.failed);
-      expect(result.incidentId, isNotEmpty);
-      final frame = anonymous.frames.last;
-      expect(frame, isNot(contains('hunter2')));
-      expect(jsonDecode(frame), {
-        'k': 'res',
-        'id': isA<int>(),
-        's': 'failed',
-        'x': result.incidentId,
-      });
+    test('a handler that reads past its fetch limit fails loudly instead of '
+        'being trimmed', () async {
+      final answer = await anonymous.call(const GreedyFeed());
+      expect(answer.status, 500);
+      final incident = (answer.response as DwApiFailed).incidentId;
       await eventually(
         () => harness().app.alerts.incidents.any(
-          (i) => i.id == result.incidentId,
+          (i) => i.id == incident && '${i.error}'.contains('at most 3'),
         ),
       );
-      final incident = harness().app.alerts.incidents.firstWhere(
-        (i) => i.id == result.incidentId,
-      );
-      expect('${incident.error}', contains('hunter2'));
-      expect(incident.where, 'request ExplodingRequest');
-    });
-
-    test('an unknown DTO type fails the call, not the connection', () async {
-      final connection = await harness().connect();
-      connection.sendRaw(
-        jsonEncode({
-          'k': 'req',
-          'id': 77,
-          'dto': {'@t': 'NoSuchRequest'},
-        }),
-      );
-      final result = await connection.expect<DwResultMessage>();
-      expect(result.id, 77);
-      expect(result.status, DwResultStatus.failed);
-      final next = await connection.request(const ListNotes(ownerId: -1));
-      expect(next.status, DwResultStatus.ok);
-      await connection.close();
-    });
-
-    test('a refusal does not alert', () async {
-      final before = harness().app.alerts.incidents.length;
-      await anonymous.request(const GetNote(-1));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(harness().app.alerts.incidents.length, before);
     });
   });
 
-  group('connection protocol', () {
-    test('malformed frames close with 4000', () async {
-      for (final frame in ['not json', '[1]', '{"k":"what"}', '{"k":"req"}']) {
-        final connection = await harness().connect();
-        connection.sendRaw(frame);
-        expect(
-          await connection.closeCode,
-          DwCloseCode.protocolError,
-          reason: frame,
+  group('table', () {
+    test('a full page asks the count; a short last page does not', () async {
+      final notes = await seed('table', 5);
+      const first = TableNotes('table-');
+      final counts = harness().app.tableCounts;
+      final page1 = (await anonymous.call(first)).value(first);
+      expect(page1.items, notes.sublist(0, 2));
+      expect((page1.total, page1.page, page1.pageSize), (5, 1, 2));
+      expect(harness().app.tableCounts, counts + 1);
+
+      const last = TableNotes('table-', page: 3);
+      final page3 = (await anonymous.call(last)).value(last);
+      expect(page3.items, notes.sublist(4));
+      expect(page3.total, 5, reason: 'offset 4 + 1 row');
+      expect(harness().app.tableCounts, counts + 1, reason: 'no count');
+    });
+
+    test('a small table costs one query; an empty one has total 0', () async {
+      final notes = await seed('small', 1);
+      final counts = harness().app.tableCounts;
+      const request = TableNotes('small-');
+      final page = (await anonymous.call(request)).value(request);
+      expect(page.items, notes);
+      expect(page.total, 1);
+      const none = TableNotes('none-');
+      expect((await anonymous.call(none)).value(none).total, 0);
+      expect(harness().app.tableCounts, counts);
+    });
+
+    test('a page past the end is empty with the real total', () async {
+      await seed('past', 3);
+      const request = TableNotes('past-', page: 9);
+      final counts = harness().app.tableCounts;
+      final page = (await anonymous.call(request)).value(request);
+      expect(page.items, isEmpty);
+      expect(page.total, 3);
+      expect(page.pageCount, 2);
+      expect(harness().app.tableCounts, counts + 1);
+    });
+
+    test('the page size is clamped to maxPageSize and answered', () async {
+      final notes = await seed('clamp', 6);
+      const request = TableNotes('clamp-', pageSize: 100);
+      final page = (await anonymous.call(request)).value(request);
+      expect(page.pageSize, 4);
+      expect(page.items, notes.sublist(0, 4));
+      expect(page.total, 6);
+    });
+  });
+
+  group('window', () {
+    // Nine messages; four of them share one timestamp, so only the id tells
+    // them apart. Newest first: m8 m7 m6 m5 m4 m3 m2 m1 m0.
+    late List<MessageView> messages;
+    final base = DateTime.utc(2026, 9, 14, 12);
+
+    setUpAll(() async {
+      messages = [];
+      for (var i = 0; i < 9; i++) {
+        final sentAt = i >= 3 && i <= 6
+            ? base.add(const Duration(minutes: 3))
+            : base.add(Duration(minutes: i));
+        final row = (await harness().db.query(
+          'INSERT INTO message (room, text, sent_at) '
+          'VALUES (@room, @text, @at) RETURNING id',
+          params: {'room': 'lobby', 'text': 'm$i', 'at': sentAt},
+        )).single;
+        messages.add(
+          MessageView(id: row.get<int>('id'), text: 'm$i', sentAt: sentAt),
         );
       }
     });
 
-    test('a binary frame closes with 1003', () async {
-      final socket = await WebSocket.connect(
-        harness().server.endpoint.toString(),
+    const request = ChatWindow('lobby');
+    List<String> texts(DwWindowResult<MessageView> window) => [
+      for (final m in window.items) m.text,
+    ];
+    String cursorOf(int i) =>
+        DwWindowCursor.encode(messages[i].sentAt, messages[i].id);
+
+    Future<DwWindowResult<MessageView>> load(DwWindowQuery query) async =>
+        (await anonymous.call(request, query: query.toQuery())).value(request);
+
+    test('without an anchor: the newest rows, one read', () async {
+      harness().app.windowReads.clear();
+      final window = await load(const DwWindowQuery.newest());
+      expect(texts(window), ['m8', 'm7', 'm6', 'm5']);
+      expect(window.hasNewer, isFalse);
+      expect(window.olderCursor, cursorOf(5));
+      expect(harness().app.windowReads, hasLength(1));
+    });
+
+    test('older pages walk back through rows sharing a timestamp, neither '
+        'losing nor repeating one', () async {
+      final seen = <String>[];
+      var window = await load(const DwWindowQuery.newest(pageSize: 3));
+      seen.addAll(texts(window));
+      while (window.olderCursor != null) {
+        window = await load(
+          DwWindowQuery.older(window.olderCursor!, pageSize: 3),
+        );
+        expect(window.hasNewer, isTrue);
+        seen.addAll(texts(window));
+      }
+      expect(seen, ['m8', 'm7', 'm6', 'm5', 'm4', 'm3', 'm2', 'm1', 'm0']);
+    });
+
+    test('newer pages walk forward, newest first within a page', () async {
+      final window = await load(DwWindowQuery.newer(cursorOf(1), pageSize: 3));
+      expect(texts(window), ['m4', 'm3', 'm2']);
+      expect(window.hasNewer, isTrue);
+      expect(window.newerCursor, cursorOf(4));
+      expect(window.olderCursor, cursorOf(2));
+      final next = await load(
+        DwWindowQuery.newer(window.newerCursor!, pageSize: 3),
       );
-      socket.add([1, 2, 3]);
-      await socket.drain<void>();
-      expect(socket.closeCode, DwCloseCode.unsupportedData);
+      expect(texts(next), ['m7', 'm6', 'm5']);
+      final last = await load(
+        DwWindowQuery.newer(next.newerCursor!, pageSize: 3),
+      );
+      expect(texts(last), ['m8']);
+      expect(last.hasNewer, isFalse);
+    });
+
+    test('around an anchor: the anchor and older rows, newer rows above; '
+        'two reads', () async {
+      harness().app.windowReads.clear();
+      final window = await load(DwWindowQuery.around(cursorOf(4)));
+      expect(texts(window), ['m6', 'm5', 'm4', 'm3']);
+      expect(window.hasNewer, isTrue);
+      expect(window.hasOlder, isTrue);
+      final reads = harness().app.windowReads;
+      expect(
+        reads.map((r) => (r.direction, r.includesPosition, r.fetchLimit)),
+        [
+          (DwWindowDirection.newer, false, 3),
+          (DwWindowDirection.older, true, 3),
+        ],
+      );
     });
 
     test(
-      'another or no wire version closes with 4001 and names ours',
+      'around an anchor near the newest: older rows fill the page',
       () async {
-        for (final version in [2, null]) {
-          final connection = await harness().server.connect(version: version);
-          expect(await connection.closeCode, DwCloseCode.unsupportedVersion);
-          expect(connection.closeReason, 'dw.wireVersion:$dwWireVersion');
-        }
+        final window = await load(DwWindowQuery.around(cursorOf(7)));
+        expect(texts(window), ['m8', 'm7', 'm6', 'm5']);
+        expect(window.hasNewer, isFalse);
+        expect(window.hasOlder, isTrue);
       },
     );
 
-    test('a browser upgrade from a foreign origin is refused', () async {
-      await expectLater(
-        harness().server.connect(headers: {'Origin': 'https://evil.example'}),
-        throwsA(isA<WebSocketException>()),
-      );
-      final same = await harness().server.connect(
-        headers: {'Origin': 'http://127.0.0.1:1234'},
-      );
-      expect(
-        (await same.request(const ListNotes(ownerId: -1))).status,
-        DwResultStatus.ok,
-      );
-      await same.close();
+    test('around an anchor at the oldest: newer rows fill the page, with '
+        'a third read only here', () async {
+      harness().app.windowReads.clear();
+      final window = await load(DwWindowQuery.around(cursorOf(0)));
+      expect(texts(window), ['m3', 'm2', 'm1', 'm0']);
+      expect(window.hasOlder, isFalse);
+      expect(window.hasNewer, isTrue);
+      expect(harness().app.windowReads, hasLength(3));
     });
 
-    test('authentication applies to the calls sent right after it', () async {
-      final connection = await harness().connect();
-      connection.send(DwAuthenticateMessage(session.token));
-      connection.send(DwRequestMessage(id: 900, request: const MyNotes()));
-      final result = await connection.expect<DwResultMessage>();
-      expect(result.status, DwResultStatus.ok);
-      await connection.close();
+    test('a page of one around an anchor below every row', () async {
+      final before = DwWindowCursor.encode(
+        base.subtract(const Duration(days: 1)),
+        0,
+      );
+      final window = await load(DwWindowQuery.around(before, pageSize: 1));
+      expect(texts(window), ['m0']);
+      expect(window.hasNewer, isTrue);
+      expect(window.hasOlder, isFalse);
     });
 
-    test('calls on one connection run concurrently', () async {
-      final connection = await harness().connect();
-      final watch = Stopwatch()..start();
-      await Future.wait([
-        for (var i = 0; i < 5; i++) connection.request(const SlowRequest(300)),
-      ]);
-      expect(watch.elapsedMilliseconds, lessThan(1200));
-      await connection.close();
+    test('an empty sequence is an empty window without cursors', () async {
+      const empty = ChatWindow('nobody-here');
+      final window = (await anonymous.call(empty)).value(empty);
+      expect(window.items, isEmpty);
+      expect((window.olderCursor, window.newerCursor), (null, null));
+    });
+
+    test(
+      'a cursor that is not one, or of another sequence, is malformed',
+      () async {
+        for (final query in [
+          const DwWindowQuery.older('not-a-cursor').toQuery(),
+          DwWindowQuery.older(DwWindowCursor.encode('text', 1)).toQuery(),
+          DwWindowQuery.older(DwWindowCursor.encode(base, 'id')).toQuery(),
+          {'before': cursorOf(1), 'after': cursorOf(2)},
+        ]) {
+          final answer = await anonymous.call(request, query: query);
+          expect(answer.status, 400, reason: '$query');
+        }
+        final foreign = await anonymous.call(
+          const NotesByText(),
+          query: DwWindowQuery.older(cursorOf(1)).toQuery(),
+        );
+        expect(foreign.status, 400);
+      },
+    );
+  });
+
+  group('reads have no side effects', () {
+    test('publishing from a request fails the call', () async {
+      final answer = await anonymous.call(const PublishingRequest());
+      expect(answer.status, 500);
+      final incident = (answer.response as DwApiFailed).incidentId;
+      await eventually(
+        () => harness().app.alerts.incidents.any(
+          (i) => i.id == incident && i.error is StateError,
+        ),
+      );
     });
   });
 
   group('context', () {
-    DwCallContext context() => DwCallContext(
-      db: harness().db,
-      protocol: testProtocol,
-      log: RecordingLogger(),
-      jobs: (_) => _NoJobs(),
-      accounts: (ctx) => throw UnimplementedError(),
-      isPublishable: (item) => testProtocol.knows(item.runtimeType),
-    );
+    DwRuntimeContext context({DwContextKind kind = DwContextKind.command}) =>
+        DwRuntimeContext(
+          db: harness().db,
+          kind: kind,
+          protocol: testProtocol,
+          log: RecordingLogger(),
+          jobs: (_) => _NoJobs(),
+          accounts: (ctx) => throw UnimplementedError(),
+        );
 
     test('memo creates once per key per call', () {
       final ctx = context();
@@ -354,20 +417,43 @@ void main() {
     test('publish takes only registered data objects and deletions', () {
       final ctx = context();
       expect(
-        () => ctx.publish(const DwChannel(TestChannel.notes), const Ping()),
+        () => ctx.publish(const DwLiveChannel(TestChannel.notes), const Ping()),
         throwsArgumentError,
       );
       ctx.publish(
-        const DwChannel(TestChannel.notes),
-        const DwDeleted(typeName: 'NoteView', id: 1),
+        const DwLiveChannel(TestChannel.notes),
+        const DwDeletedObject(typeName: 'NoteView', id: 1),
       );
       expect(ctx.rootEffects.publications, hasLength(1));
+      expect(
+        () => ctx.publish(
+          const DwLiveChannel(TestChannel.notes),
+          const DwDeletedObject(typeName: 'ListNotes', id: 1),
+        ),
+        throwsArgumentError,
+        reason: 'a deletion names a data object type',
+      );
+      final read = context(kind: DwContextKind.request);
+      expect(
+        () => read.publish(
+          const DwLiveChannel(TestChannel.notes),
+          const NoteView(id: 1, text: 'x'),
+        ),
+        throwsStateError,
+      );
+      expect(() => read.revokedKey(1), throwsStateError);
+      expect(
+        () => context(
+          kind: DwContextKind.subscription,
+        ).revoke(const DwLiveChannel(TestChannel.notes), 1),
+        throwsStateError,
+      );
     });
 
     test('effects of a rolled-back transaction are dropped, of a committed '
         'savepoint kept', () async {
       final ctx = context();
-      const channel = DwChannel(TestChannel.notes);
+      const channel = DwLiveChannel(TestChannel.notes);
       await expectLater(
         ctx.transaction((tx) async {
           ctx.publish(channel, const NoteView(id: 1, text: 'gone'));
@@ -397,58 +483,9 @@ void main() {
       expect(ctx.db, same(harness().db));
     });
   });
-
-  group('routes', () {
-    final client = HttpClient();
-    tearDownAll(client.close);
-
-    Future<(int, String)> call(
-      String method,
-      String path, [
-      String? body,
-    ]) async {
-      final request = await client.openUrl(
-        method,
-        harness().server.httpBase.resolve(path),
-      );
-      if (body != null) request.write(body);
-      final response = await request.close();
-      return (response.statusCode, await utf8.decodeStream(response));
-    }
-
-    test('health', () async {
-      expect(await call('GET', '/health'), (200, 'ok'));
-    });
-
-    test('get and post with JSON, jobs through the route context', () async {
-      expect(await call('GET', '/hello'), (200, '{"hello":"w"}'));
-      final (status, body) = await call('POST', '/echo', '{"tag":"route"}');
-      expect(status, 201);
-      expect(jsonDecode(body), {'tag': 'route'});
-      harness().server.wakeJobs();
-      await eventually(() => harness().app.jobRuns.contains('record:route'));
-    });
-
-    test('a refusal answers 400 with the refusal, a failure 500 with the '
-        'incident only', () async {
-      final (refusedStatus, refusedBody) = await call('GET', '/refuse');
-      expect(refusedStatus, 400);
-      expect(jsonDecode(refusedBody), {
-        'refusal': {'code': 'dw.forbidden'},
-      });
-      final (failedStatus, failedBody) = await call('GET', '/explode');
-      expect(failedStatus, 500);
-      expect(failedBody, isNot(contains('s3cr3t')));
-      expect((jsonDecode(failedBody) as Map).keys, ['incident']);
-    });
-
-    test('unknown paths are 404', () async {
-      expect((await call('GET', '/nope')).$1, 404);
-    });
-  });
 }
 
-final class _NoJobs implements DwJobs {
+final class _NoJobs implements DwJobQueue {
   @override
   Future<bool> enqueue(
     String name,

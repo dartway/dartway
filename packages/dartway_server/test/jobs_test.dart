@@ -1,5 +1,4 @@
 import 'package:dartway_server/dartway_server.dart';
-import 'package:dartway_server/testing.dart';
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
@@ -23,7 +22,7 @@ void main() {
       row['tag'] as String?,
   ];
 
-  Future<DwRow?> jobRow(String tag) async {
+  Future<DwResultRow?> jobRow(String tag) async {
     final rows = await harness().db.query(
       "SELECT * FROM dw_job WHERE payload->>'tag' = @tag",
       params: {'tag': tag},
@@ -31,17 +30,17 @@ void main() {
     return rows.isEmpty ? null : rows.single;
   }
 
-  late DwTestConnection connection;
-  setUpAll(() async => connection = await harness().connect());
+  late DwTestCaller caller;
+  setUpAll(() => caller = harness().caller());
 
   test(
     'a job enqueued in a committed command runs, woken by its notification',
     () async {
       final watch = Stopwatch()..start();
       expect(
-        (await connection.command(
+        (await caller.call(
           const EnqueueJob('record', 'committed'),
-        )).value,
+        )).value(const EnqueueJob('', '')),
         isTrue,
       );
       await eventually(
@@ -53,24 +52,24 @@ void main() {
   );
 
   test('a job enqueued in a rolled-back command does not exist', () async {
-    final result = await connection.command(
+    final result = await caller.call(
       const EnqueueJob('record', 'rolled-back', refuse: true),
     );
-    expect(result.status, DwResultStatus.refused);
+    expect(result.status, 409);
     expect(await jobRow('rolled-back'), isNull);
     await Future<void>.delayed(const Duration(milliseconds: 300));
     expect(await logged('record'), isNot(contains('rolled-back')));
   });
 
   test('a dedup key holds while the job is pending', () async {
-    final first = await connection.command(
+    final first = await caller.call(
       const EnqueueJob('record', 'dedup-1', key: 'dedup', delayMillis: 60000),
     );
-    final second = await connection.command(
+    final second = await caller.call(
       const EnqueueJob('record', 'dedup-2', key: 'dedup', delayMillis: 60000),
     );
-    expect(first.value, isTrue);
-    expect(second.value, isFalse);
+    expect(first.value(const EnqueueJob('', '')), isTrue);
+    expect(second.value(const EnqueueJob('', '')), isFalse);
     final rows = await harness().db.query(
       "SELECT payload->>'tag' AS tag FROM dw_job WHERE key = 'dedup'",
     );
@@ -78,9 +77,7 @@ void main() {
   });
 
   test('a delayed job waits for its time', () async {
-    await connection.command(
-      const EnqueueJob('record', 'delayed', delayMillis: 700),
-    );
+    await caller.call(const EnqueueJob('record', 'delayed', delayMillis: 700));
     await Future<void>.delayed(const Duration(milliseconds: 350));
     expect(await logged('record'), isNot(contains('delayed')));
     await eventually(() async => (await logged('record')).contains('delayed'));
@@ -89,7 +86,7 @@ void main() {
   test('a failing job is retried with backoff, its error text stored, and '
       'its work of failed attempts rolled back', () async {
     harness().app.jobFailures['flaky:twice'] = 2;
-    await connection.command(const EnqueueJob('flaky', 'twice'));
+    await caller.call(const EnqueueJob('flaky', 'twice'));
     await eventually(
       () =>
           harness().app.jobEvents.stream.isBroadcast &&
@@ -102,7 +99,7 @@ void main() {
 
   test('a job out of attempts is kept as failed and alerts', () async {
     harness().app.jobFailures['flaky:dead'] = 10;
-    await connection.command(const EnqueueJob('flaky', 'dead'));
+    await caller.call(const EnqueueJob('flaky', 'dead'));
     await eventually(() async => (await jobRow('dead'))?['failed_at'] != null);
     final row = (await jobRow('dead'))!;
     expect(row['attempts'], 3);
@@ -119,16 +116,14 @@ void main() {
 
   test('a failed job does not hold its dedup key', () async {
     harness().app.jobFailures['flaky:keyed-dead'] = 10;
-    await connection.command(
-      const EnqueueJob('flaky', 'keyed-dead', key: 'keyed'),
-    );
+    await caller.call(const EnqueueJob('flaky', 'keyed-dead', key: 'keyed'));
     await eventually(
       () async => (await jobRow('keyed-dead'))?['failed_at'] != null,
     );
-    final again = await connection.command(
+    final again = await caller.call(
       const EnqueueJob('record', 'keyed-again', key: 'keyed'),
     );
-    expect(again.value, isTrue);
+    expect(again.value(const EnqueueJob('', '')), isTrue);
     await eventually(
       () async => (await logged('record')).contains('keyed-again'),
     );
@@ -138,7 +133,7 @@ void main() {
     'a non-transactional job is leased, retried, and deleted when done',
     () async {
       harness().app.jobFailures['outside:leased'] = 1;
-      await connection.command(const EnqueueJob('outside', 'leased'));
+      await caller.call(const EnqueueJob('outside', 'leased'));
       await eventually(
         () async => (await logged('outside')).contains('leased'),
       );
@@ -147,8 +142,8 @@ void main() {
   );
 
   test('an unknown job name fails the enqueueing call', () async {
-    final result = await connection.command(const EnqueueJob('nope', 'x'));
-    expect(result.status, DwResultStatus.failed);
+    final result = await caller.call(const EnqueueJob('nope', 'x'));
+    expect(result.status, 500);
   });
 
   test('a recurring job runs on its schedule, and the schedule survives a '
@@ -204,7 +199,7 @@ void main() {
     harness().server = await DwTestServer.start(app.server(config));
     final names = await harness().db.query('SELECT name FROM dw_recurring_job');
     expect(names.map((r) => r['name']), ['dw.cleanup']);
-    connection = await harness().connect();
+    caller = harness().caller();
   });
 
   test(

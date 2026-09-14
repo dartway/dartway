@@ -576,30 +576,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
-  relic:
-    dependency: transitive
-    description:
-      name: relic
-      sha256: "202cef8a41667b35bd93db662e360ab5be5f67493b539121ed6f8899b10d893f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.0-rc.1"
-  relic_core:
-    dependency: transitive
-    description:
-      name: relic_core
-      sha256: "3c15d9655d2c95bdec6620f27ee99c0f2236343fa915ac6cb846cb6430d9c565"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.0-rc.1"
-  relic_io:
-    dependency: transitive
-    description:
-      name: relic_io
-      sha256: "1808fc4fa6fa9580e013af119fe1504eb1ba01ad6db3808053dc18c53dda8c65"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.0-rc.1"
   riverpod:
     dependency: transitive
     description:

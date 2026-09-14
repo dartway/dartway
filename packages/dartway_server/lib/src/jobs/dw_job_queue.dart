@@ -1,9 +1,9 @@
 import 'package:meta/meta.dart';
 
-import '../context/dw_context.dart';
+import '../context/dw_call_context.dart';
 
 /// Enqueues background jobs.
-abstract interface class DwJobs {
+abstract interface class DwJobQueue {
   /// Schedules the job named [name] with [payload] (a JSON object) at [runAt]
   /// (now when omitted). The row is written through the caller's database —
   /// inside a transaction it appears only if the transaction commits.
@@ -28,7 +28,7 @@ Duration dwDefaultJobBackoff(int attempt) {
 /// A background job the server knows how to run.
 ///
 /// Enqueued jobs are declared with the unnamed constructor, recurring ones
-/// with [DwRecurringJob]; both go into `DwServer(jobs: …)`. Names starting
+/// with [DwRecurringJob]; both go into `DwAppServer(jobs: …)`. Names starting
 /// with `dw.` belong to the framework.
 sealed class DwJobDefinition {
   const DwJobDefinition._(this.name);
@@ -42,7 +42,10 @@ sealed class DwJobDefinition {
   /// run again if the process dies mid-job.
   factory DwJobDefinition(
     String name, {
-    required Future<void> Function(DwContext ctx, Map<String, Object?> payload)
+    required Future<void> Function(
+      DwCallContext ctx,
+      Map<String, Object?> payload,
+    )
     handle,
     bool transactional,
     int maxAttempts,
@@ -63,7 +66,7 @@ final class DwQueuedJob extends DwJobDefinition {
     this.lease = const Duration(minutes: 5),
   }) : super._();
 
-  final Future<void> Function(DwContext ctx, Map<String, Object?> payload)
+  final Future<void> Function(DwCallContext ctx, Map<String, Object?> payload)
   handle;
   final bool transactional;
 
@@ -83,7 +86,7 @@ final class DwRecurringJob extends DwJobDefinition {
     : super._();
 
   final Duration every;
-  final Future<void> Function(DwContext ctx) handle;
+  final Future<void> Function(DwCallContext ctx) handle;
 }
 
 @internal

@@ -4,18 +4,18 @@ import 'dart:convert';
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
-import '../alerts/dw_logger.dart';
-import '../context/dw_context.dart';
+import '../alerts/dw_server_logger.dart';
+import '../context/dw_call_context.dart';
 import '../server/dw_runtime.dart';
-import 'dw_jobs.dart';
+import 'dw_job_queue.dart';
 
 /// Enqueues through the context's current database (its transaction, when
 /// there is one).
 @internal
-final class DwContextJobs implements DwJobs {
-  DwContextJobs(this._ctx, this._known);
+final class DwContextJobQueue implements DwJobQueue {
+  DwContextJobQueue(this._ctx, this._known);
 
-  final DwCallContext _ctx;
+  final DwRuntimeContext _ctx;
   final Map<String, Object> _known;
 
   @override
@@ -101,8 +101,8 @@ final class DwJobRunner {
   final int workers;
   final Duration pollInterval;
 
-  DwLogger get _log => runtime.log;
-  DwDb get _db => runtime.db;
+  DwServerLogger get _log => runtime.log;
+  DwDatabaseHandle get _db => runtime.db;
 
   static const _contendedRetry = Duration(milliseconds: 250);
 
@@ -111,7 +111,7 @@ final class DwJobRunner {
   bool _running = false;
   StreamSubscription<String>? _listener;
 
-  DwJobs jobsFor(DwCallContext ctx) => DwContextJobs(ctx, queued);
+  DwJobQueue jobsFor(DwRuntimeContext ctx) => DwContextJobQueue(ctx, queued);
 
   Future<void> start() async {
     await _syncRecurring();
@@ -205,7 +205,7 @@ final class DwJobRunner {
   }
 
   Future<bool> _runRecurring() async {
-    late DwCallContext ctx;
+    late DwRuntimeContext ctx;
     final ran = await _db.transaction((tx) async {
       final rows = await tx.query(
         'SELECT name, every_micros, next_run_at, now() AS now '
@@ -223,7 +223,11 @@ final class DwJobRunner {
       // once, not once per missed slot.
       final missed = now.difference(due).inMicroseconds ~/ every.inMicroseconds;
       final next = due.add(every * (missed + 1));
-      ctx = runtime.context(scope: 'job ${job.name}', db: tx);
+      ctx = runtime.context(
+        scope: 'job ${job.name}',
+        kind: DwContextKind.background,
+        db: tx,
+      );
       try {
         await ctx.transaction((_) => job.handle(ctx));
         await tx.execute(
@@ -250,7 +254,7 @@ final class DwJobRunner {
   }
 
   Future<bool> _runQueued() async {
-    DwCallContext? committed;
+    DwRuntimeContext? committed;
     _Lease? lease;
     final claimed = await _db.transaction((tx) async {
       final rows = await tx.query(
@@ -286,7 +290,11 @@ final class DwJobRunner {
         lease = _Lease(id, job, payload, attempts + 1);
         return true;
       }
-      final ctx = runtime.context(scope: 'job $name #$id', db: tx);
+      final ctx = runtime.context(
+        scope: 'job $name #$id',
+        kind: DwContextKind.background,
+        db: tx,
+      );
       try {
         // A savepoint: a failing handler leaves the claim transaction usable
         // for recording the failure under the same row lock.
@@ -309,7 +317,10 @@ final class DwJobRunner {
 
   Future<void> _runLeased(_Lease lease) async {
     final job = lease.job;
-    final ctx = runtime.context(scope: 'job ${job.name} #${lease.id}');
+    final ctx = runtime.context(
+      scope: 'job ${job.name} #${lease.id}',
+      kind: DwContextKind.background,
+    );
     try {
       await job.handle(ctx, lease.payload);
       await _db.execute(
@@ -334,7 +345,7 @@ final class DwJobRunner {
   /// Intermediate failures are logged with their text stored on the row; the
   /// final one alerts.
   Future<void> _recordFailure(
-    DwDb db,
+    DwDatabaseHandle db,
     DwQueuedJob job,
     int id,
     int attempt,
@@ -368,12 +379,16 @@ final class DwJobRunner {
     );
   }
 
-  Future<void> _markFailed(DwDb db, int id, int attempts, String error) =>
-      db.execute(
-        'UPDATE dw_job SET attempts = @attempts, last_error = @error, '
-        'locked_until = NULL, failed_at = now() WHERE id = @id',
-        params: {'id': id, 'attempts': attempts, 'error': error},
-      );
+  Future<void> _markFailed(
+    DwDatabaseHandle db,
+    int id,
+    int attempts,
+    String error,
+  ) => db.execute(
+    'UPDATE dw_job SET attempts = @attempts, last_error = @error, '
+    'locked_until = NULL, failed_at = now() WHERE id = @id',
+    params: {'id': id, 'attempts': attempts, 'error': error},
+  );
 }
 
 final class _Lease {

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dartway_server/src/alerts/dw_alerts.dart';
+import 'package:dartway_server/src/alerts/dw_alert_sink.dart';
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
@@ -92,7 +92,7 @@ void main() {
       request.response.statusCode = 200;
       await request.response.close();
     });
-    final alerts = DwTelegramAlerts(
+    final alerts = DwTelegramAlertSink(
       botToken: 'TOKEN',
       chatId: '42',
       logger: RecordingLogger(),
@@ -100,7 +100,7 @@ void main() {
       apiBase: Uri.parse('http://127.0.0.1:${server.port}'),
     );
     await alerts.send(
-      DwIncident(
+      DwServerIncident(
         id: 'abc123',
         where: 'command BookSession',
         error: StateError('seats table locked'),
@@ -119,8 +119,10 @@ void main() {
   });
 }
 
-final class _ThrowingAlerts implements DwAlerts {
+final class _ThrowingAlerts implements DwAlertSink {
   @override
-  Future<void> send(DwIncident incident, {String? suppressedNote}) async =>
-      throw StateError('sink down');
+  Future<void> send(
+    DwServerIncident incident, {
+    String? suppressedNote,
+  }) async => throw StateError('sink down');
 }

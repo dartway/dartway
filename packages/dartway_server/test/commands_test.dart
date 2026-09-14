@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:dartway_core/dartway_core.dart';
-import 'package:dartway_server/testing.dart';
+import 'package:dartway_server/dartway_server.dart';
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
@@ -21,44 +20,38 @@ void main() {
     test(
       'a repeated key answers the stored ok outcome without executing',
       () async {
-        final connection = await harness().connect();
-        final first = await connection.command(
-          const Count('repeat-ok'),
-          key: 'r1',
-        );
-        final second = await connection.command(
-          const Count('repeat-ok'),
-          key: 'r1',
-        );
-        expect(first.value, 1);
-        expect(second.status, DwResultStatus.ok);
-        expect(second.value, 1);
+        final caller = harness().caller();
+        final first = await caller.call(const Count('repeat-ok'), key: 'r1');
+        final second = await caller.call(const Count('repeat-ok'), key: 'r1');
+        expect(first.value(const Count('')), 1);
+        expect(second.value(const Count('')), 1);
         expect(await executions('repeat-ok'), 1);
-        // Another connection of the same (anonymous) scope sees the same key.
-        final other = await harness().connect();
+        // Another caller of the same (anonymous) scope sees the same key.
+        final other = harness().caller();
         expect(
-          (await other.command(const Count('repeat-ok'), key: 'r1')).value,
+          (await other.call(
+            const Count('repeat-ok'),
+            key: 'r1',
+          )).value(const Count('')),
           1,
         );
         expect(await executions('repeat-ok'), 1);
-        await connection.close();
-        await other.close();
       },
     );
 
     test('a refusal is stored after the rollback and answered again', () async {
-      final connection = await harness().connect();
-      final first = await connection.command(
+      final caller = harness().caller();
+      final first = await caller.call(
         const Count('repeat-refused', mode: 'refuse'),
         key: 'r2',
       );
+      expect(first.status, 409);
       expect(
         first.refusal,
-        DwRefusal(DwCoreRefusal.conflict, params: {'n': 1}),
+        DwCallRefusal(DwCoreRefusal.conflict, params: {'n': 1}),
       );
-      // The handler's write rolled back with the refusal.
-      expect(await executions('repeat-refused'), 0);
-      final second = await connection.command(
+      expect(await executions('repeat-refused'), 0, reason: 'rolled back');
+      final second = await caller.call(
         const Count('repeat-refused', mode: 'refuse'),
         key: 'r2',
       );
@@ -68,213 +61,309 @@ void main() {
       );
       expect(stored.single['status'], 'refused');
       expect(stored.single['type'], 'Count');
-      await connection.close();
+    });
+
+    test('a handler refusing with an incompatibility is answered 426, and '
+        'so is its replay', () async {
+      final caller = harness().caller();
+      for (var i = 0; i < 2; i++) {
+        final answer = await caller.call(
+          const Count('outdated', mode: 'outdated'),
+          key: 'r-outdated',
+        );
+        expect(answer.status, 426);
+        expect(answer.refusal.isCode(DwCoreRefusal.updateRequired), isTrue);
+      }
     });
 
     test('a failure is not stored: the same key executes again', () async {
-      final connection = await harness().connect();
-      final first = await connection.command(
+      final caller = harness().caller();
+      final first = await caller.call(
         const Count('retry-failed', mode: 'failOnce'),
         key: 'r3',
       );
-      expect(first.status, DwResultStatus.failed);
-      final second = await connection.command(
+      expect(first.status, 500);
+      final second = await caller.call(
         const Count('retry-failed', mode: 'failOnce'),
         key: 'r3',
       );
-      expect(second.value, 1, reason: 'the failed attempt rolled back');
-      await connection.close();
+      expect(second.value(const Count('')), 1, reason: 'the first rolled back');
     });
 
-    test('a serialization failure re-runs the whole transaction', () async {
-      final connection = await harness().connect();
-      final incidents = harness().app.alerts.incidents.length;
-      final result = await connection.command(
-        const Count('conflicted', mode: 'conflictOnce'),
-      );
-      expect(result.status, DwResultStatus.ok);
-      expect(result.value, 1, reason: 'the first attempt rolled back');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(harness().app.alerts.incidents.length, incidents);
-      await connection.close();
-    });
+    test(
+      'a serialization failure re-runs the whole transaction, silently',
+      () async {
+        final incidents = harness().app.alerts.incidents.length;
+        final answer = await harness().caller().call(
+          const Count('conflicted', mode: 'conflictOnce'),
+        );
+        expect(answer.value(const Count('')), 1);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(harness().app.alerts.incidents.length, incidents);
+      },
+    );
 
     test('the same key with another command type is a conflict', () async {
-      final connection = await harness().connect();
-      await connection.command(const Count('typed'), key: 'r4');
-      final other = await connection.command(const Ping(), key: 'r4');
-      expect(other.refusal!.isCode(DwCoreRefusal.conflict), isTrue);
-      expect(other.refusal!.params, {'idempotencyKey': 'reused'});
-      await connection.close();
+      final caller = harness().caller();
+      await caller.call(const Count('typed'), key: 'r4');
+      final other = await caller.call(const Ping(), key: 'r4');
+      expect(other.status, 409);
+      expect(other.refusal.params, {'idempotencyKey': 'reused'});
     });
 
     test('keys are scoped by account', () async {
       final (a, _) = await harness().signedIn('scope-a@example.com');
       final (b, _) = await harness().signedIn('scope-b@example.com');
-      expect((await a.command(const Count('scoped'), key: 'r5')).value, 1);
-      expect((await b.command(const Count('scoped'), key: 'r5')).value, 2);
-      final anonymous = await harness().connect();
-      expect(
-        (await anonymous.command(const Count('scoped'), key: 'r5')).value,
-        3,
-      );
-      for (final c in [a, b, anonymous]) {
-        await c.close();
-      }
+      Future<int> count(DwTestCaller caller) async => (await caller.call(
+        const Count('scoped'),
+        key: 'r5',
+      )).value(const Count(''));
+      expect(await count(a), 1);
+      expect(await count(b), 2);
+      expect(await count(harness().caller()), 3);
+      expect(await count(a), 1);
     });
 
-    test('two sends of one key racing each other execute once', () async {
-      final connections = [
-        for (var i = 0; i < 4; i++) await harness().connect(),
-      ];
-      final results = await Future.wait([
-        for (final c in connections) c.command(const Count('race'), key: 'r6'),
+    test('sends of one key racing each other execute once', () async {
+      final answers = await Future.wait([
+        for (var i = 0; i < 4; i++)
+          harness().caller().call(const Count('race'), key: 'r6'),
       ]);
-      expect(results.map((r) => r.value), everyElement(1));
+      expect(answers.map((a) => a.value(const Count(''))), everyElement(1));
       expect(await executions('race'), 1);
-      for (final c in connections) {
-        await c.close();
-      }
     });
 
     test(
       'a non-transactional command stores its outcome after the handler',
       () async {
-        final connection = await harness().connect();
-        expect(
-          (await connection.command(
+        final caller = harness().caller();
+        for (var i = 0; i < 2; i++) {
+          final answer = await caller.call(
             const CountOutside('outside'),
             key: 'r7',
-          )).value,
-          1,
-        );
-        expect(
-          (await connection.command(
-            const CountOutside('outside'),
-            key: 'r7',
-          )).value,
-          1,
-        );
+          );
+          expect(answer.value(const CountOutside('')), 1);
+        }
         expect(await executions('outside'), 1);
-        await connection.close();
       },
     );
-
-    test('an oversized key is a failure', () async {
-      final connection = await harness().connect();
-      final result = await connection.command(const Ping(), key: 'k' * 129);
-      expect(result.status, DwResultStatus.failed);
-      await connection.close();
-    });
   });
 
-  group('publishing', () {
+  group('updates', () {
     test(
-      'delivered after commit to every subscriber, the author\'s own '
-      'connection included (D-018): one message per channel per call',
+      'without Dw-Live-Connection the response carries every update the '
+      'command published, and every subscriber hears it over the socket',
       () async {
-        final (author, session) = await harness().signedIn(
-          'pub-author@example.com',
-        );
-        final authorOther = await harness().connect();
-        await authorOther.authenticate(session.token);
-        final (stranger, _) = await harness().signedIn(
-          'pub-stranger@example.com',
-        );
-        for (final c in [author, authorOther, stranger]) {
-          expect(await c.subscribe('notes'), isA<DwSubscribedMessage>());
+        final (author, session) = await harness().signedIn('plain@example.com');
+        final authorSocket = await harness().live(token: session.token);
+        for (final channel in ['notes', 'account:${session.id}']) {
+          expect(
+            await authorSocket.subscribe(channel),
+            isA<DwSubscribedMessage>(),
+          );
         }
-        final result = await author.command(const CreateNote('hello'));
-        final note = result.okCommandValue(const CreateNote(''), testProtocol);
+        final (_, listenerSession) = await harness().signedIn(
+          'plain-l@example.com',
+        );
+        final listener = await harness().live(token: listenerSession.token);
+        expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
 
-        for (final c in [author, authorOther, stranger]) {
-          final update = await c.expect<DwUpdateMessage>();
-          expect(update.channel, 'notes');
-          expect(update.items, [note]);
-        }
-        for (final c in [author, authorOther, stranger]) {
-          await c.expectSilence();
-        }
-        // The author's echo is one message, as everyone else's.
+        final answer = await author.call(const CreateNote('plain'));
+        final note = answer.value(const CreateNote(''));
+        expect(answer.updates.objects, [note]);
         expect(
-          author.frames.where((f) => f.contains('"k":"upd"')),
-          hasLength(1),
+          (await authorSocket.expect<DwUpdateMessage>(
+            where: (m) => m.channel == 'notes',
+          )).updates.objects,
+          [note],
+          reason: 'not named, so not relieved of the socket',
         );
-        for (final c in [author, authorOther, stranger]) {
-          await c.close();
-        }
+        expect((await listener.expect<DwUpdateMessage>()).updates.objects, [
+          note,
+        ]);
       },
     );
 
-    test('one message per channel per connection, the author\'s included; '
-        'the latest state of an object travels once', () async {
-      final (author, session) = await harness().signedIn('batch-a@example.com');
-      final listener = await harness().connect();
-      await listener.authenticate(session.token);
-      for (final c in [author, listener]) {
-        expect(await c.subscribe('notes'), isA<DwSubscribedMessage>());
+    test('with Dw-Live-Connection the response carries what that connection '
+        'listens to, the connection hears nothing of it over the socket, and '
+        'others do — one message per channel', () async {
+      final (author, session) = await harness().signedIn('named@example.com');
+      final authorSocket = await harness().live(token: session.token);
+      expect(await authorSocket.subscribe('notes'), isA<DwSubscribedMessage>());
+      author.liveConnection = authorSocket.connectionId;
+
+      final otherDevice = await harness().live(token: session.token);
+      for (final channel in ['notes', 'account:${session.id}']) {
         expect(
-          await c.subscribe('account:${session.id}'),
+          await otherDevice.subscribe(channel),
           isA<DwSubscribedMessage>(),
         );
       }
-      final listenerFrames = listener.frames.length;
-      final authorFrames = author.frames.length;
-      await author.command(const CreateNote('batched', extraPublishes: 2));
-      for (final c in [listener, author]) {
-        final notes = await c.expect<DwUpdateMessage>(
-          where: (m) => m.channel == 'notes',
-        );
-        final account = await c.expect<DwUpdateMessage>(
-          where: (m) => m.channel == 'account:${session.id}',
-        );
-        expect(notes.items, hasLength(1));
-        expect((notes.items.single as NoteView).text, 'batched #1');
-        expect((account.items.single as NoteView).text, 'batched');
-        await c.expectSilence();
-      }
-      expect(listener.frames.length - listenerFrames, 2);
-      // Two updates and the command's result.
-      expect(author.frames.length - authorFrames, 3);
-      final wire =
-          jsonDecode(listener.frames[listenerFrames]) as Map<String, Object?>;
-      expect(wire.keys, unorderedEquals(['k', 'ch', 'items']));
-      await author.close();
-      await listener.close();
+
+      final answer = await author.call(
+        const CreateNote('named', extraPublishes: 2),
+      );
+      final note = answer.value(const CreateNote(''));
+      // Subscribed to `notes` only: the `account:<id>` publication is not
+      // this connection's business. The note published three times travels
+      // once, as it ended.
+      expect(answer.updates.objects, [
+        NoteView(id: note.id, text: 'named #1', ownerId: session.id),
+      ]);
+      final wire = answer.json! as Map<String, Object?>;
+      expect(wire['updates'], {
+        'NoteView': [
+          {'id': note.id, 'text': 'named #1', 'ownerId': session.id},
+        ],
+      });
+
+      final notes = await otherDevice.expect<DwUpdateMessage>(
+        where: (m) => m.channel == 'notes',
+      );
+      final account = await otherDevice.expect<DwUpdateMessage>(
+        where: (m) => m.channel == 'account:${session.id}',
+      );
+      expect((notes.updates.objects.single as NoteView).text, 'named #1');
+      expect(account.updates.objects, [note]);
+      await otherDevice.expectSilence();
+      await authorSocket.expectSilence();
+      expect(authorSocket.frames.where((f) => f.contains('"upd"')), isEmpty);
     });
+
+    test('a named connection subscribed to nothing gets a response without '
+        'updates', () async {
+      final (author, session) = await harness().signedIn('bare@example.com');
+      final socket = await harness().live(token: session.token);
+      author.liveConnection = socket.connectionId;
+      final answer = await author.call(const CreateNote('bare'));
+      expect(answer.updates.isEmpty, isTrue);
+      expect((answer.json! as Map).containsKey('updates'), isFalse);
+    });
+
+    test(
+      'an unknown connection id, or one of another account, is ignored: '
+      'the response carries everything and no connection is relieved',
+      () async {
+        final (author, _) = await harness().signedIn('ignored-a@example.com');
+        final (_, strangerSession) = await harness().signedIn(
+          'ignored-s@example.com',
+        );
+        final stranger = await harness().live(token: strangerSession.token);
+        expect(await stranger.subscribe('notes'), isA<DwSubscribedMessage>());
+
+        for (final id in ['no-such-connection', stranger.connectionId]) {
+          author.liveConnection = id;
+          final answer = await author.call(CreateNote('ignored $id'));
+          final note = answer.value(const CreateNote(''));
+          expect(answer.updates.objects, [note]);
+          expect(
+            (await stranger.expect<DwUpdateMessage>()).updates.objects,
+            [note],
+            reason: 'naming someone else\'s connection must not silence it',
+          );
+        }
+      },
+    );
+
+    test(
+      'an anonymous connection is not bound to a signed-in caller',
+      () async {
+        final (author, _) = await harness().signedIn('anon-bind@example.com');
+        final anonymousSocket = await harness().live();
+        author.liveConnection = anonymousSocket.connectionId;
+        final answer = await author.call(const CreateNote('to all'));
+        // Everything, not the anonymous connection's nothing: one note, sent
+        // to two channels, travels once.
+        expect(answer.updates.objects, [answer.value(const CreateNote(''))]);
+      },
+    );
 
     test('a refused or failed transaction publishes nothing', () async {
-      final (author, _) = await harness().signedIn('rollback-a@example.com');
-      final (listener, _) = await harness().signedIn('rollback-l@example.com');
+      final (author, session) = await harness().signedIn(
+        'rollback@example.com',
+      );
+      final (_, listenerSession) = await harness().signedIn(
+        'rollback-l@example.com',
+      );
+      final listener = await harness().live(token: listenerSession.token);
       expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
-      expect(
-        (await author.command(const PublishAndEnd('refuse'))).status,
-        DwResultStatus.refused,
-      );
-      expect(
-        (await author.command(const PublishAndEnd('fail'))).status,
-        DwResultStatus.failed,
-      );
+      final socket = await harness().live(token: session.token);
+      author.liveConnection = socket.connectionId;
+      expect((await author.call(const PublishAndEnd('refuse'))).status, 409);
+      expect((await author.call(const PublishAndEnd('fail'))).status, 500);
       await listener.expectSilence();
       final rows = await harness().db.query(
-        "SELECT count(*) AS n FROM note WHERE text IN ('refused', 'failed')",
+        "SELECT count(*) AS n FROM note WHERE text IN ('refuse', 'fail')",
       );
       expect(rows.single['n'], 0);
-      await author.close();
-      await listener.close();
     });
 
-    test('outside a transactional command, what a committed transaction '
-        'published is delivered even when the handler then fails', () async {
-      final author = await harness().connect();
-      final (listener, _) = await harness().signedIn('committed-l@example.com');
-      expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
-      final result = await author.command(const CountOutside('fail-after'));
-      expect(result.status, DwResultStatus.failed);
-      final update = await listener.expect<DwUpdateMessage>();
-      expect((update.items.single as NoteView).text, 'outside fail-after');
-      await author.close();
-      await listener.close();
+    test(
+      'a non-transactional command that committed and then failed: its '
+      'updates reach every subscriber over the socket, the named '
+      'connection included, since the failed response carries none',
+      () async {
+        final (author, session) = await harness().signedIn(
+          'committed@example.com',
+        );
+        final socket = await harness().live(token: session.token);
+        expect(await socket.subscribe('notes'), isA<DwSubscribedMessage>());
+        author.liveConnection = socket.connectionId;
+        final answer = await author.call(const CountOutside('fail-after'));
+        expect(answer.status, 500);
+        final update = await socket.expect<DwUpdateMessage>();
+        expect(
+          (update.updates.objects.single as NoteView).text,
+          'outside fail-after',
+        );
+      },
+    );
+
+    test('a revocation goes first: the revoked subscriber hears nothing of '
+        'the same command, and a named author revoked from a channel gets '
+        'only what it still listens to', () async {
+      final (admin, adminSession) = await harness().signedIn(
+        'revoker@example.com',
+      );
+      final adminSocket = await harness().live(token: adminSession.token);
+      for (final channel in ['notes', 'public']) {
+        expect(
+          await adminSocket.subscribe(channel),
+          isA<DwSubscribedMessage>(),
+        );
+      }
+      admin.liveConnection = adminSocket.connectionId;
+      final (_, victimSession) = await harness().signedIn('victim@example.com');
+      final victim = await harness().live(token: victimSession.token);
+      expect(await victim.subscribe('notes'), isA<DwSubscribedMessage>());
+
+      final revokeVictim = await admin.call(RevokeNotes(victimSession.id));
+      expect(revokeVictim.updates.objects, hasLength(1));
+      expect((await victim.expect<DwChannelClosedMessage>()).channel, 'notes');
+      await victim.expectSilence();
+
+      final revokeSelf = await admin.call(RevokeNotes(adminSession.id));
+      expect(
+        (await adminSocket.expect<DwChannelClosedMessage>()).channel,
+        'notes',
+      );
+      // The note went to `notes` and `public`; only `public` is still heard.
+      final [note] = revokeSelf.updates.objects;
+      expect((note as NoteView).text, 'after revoke');
+      await adminSocket.expectSilence();
+    });
+
+    test('a replayed command answers its result without updates', () async {
+      final (author, _) = await harness().signedIn('replay@example.com');
+      final first = await author.call(const CreateNote('once'), key: 'rp');
+      expect(first.updates.isEmpty, isFalse);
+      final again = await author.call(const CreateNote('once'), key: 'rp');
+      expect(
+        again.value(const CreateNote('')),
+        first.value(const CreateNote('')),
+      );
+      expect(again.updates.isEmpty, isTrue);
+      expect(jsonDecode(again.text), isNot(contains('updates')));
     });
   });
 }

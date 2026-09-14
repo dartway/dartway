@@ -1,0 +1,175 @@
+import 'dart:convert';
+
+import 'package:dartway_core/dartway_core.dart';
+import 'package:meta/meta.dart';
+
+import 'dw_live_connection.dart';
+
+/// The in-process registry of live connections, their sessions and
+/// subscriptions, and the place publications fan out. Single isolate by
+/// design (D-014): this state exists once.
+@internal
+final class DwLiveHub {
+  final Map<String, DwLiveConnection> _byId = {};
+  final Map<String, Set<DwLiveConnection>> _subscribers = {};
+  final Map<int, Set<DwLiveConnection>> _byAccount = {};
+  final Map<int, Set<DwLiveConnection>> _byKey = {};
+
+  Iterable<DwLiveConnection> get connections => _byId.values;
+
+  void add(DwLiveConnection connection) => _byId[connection.id] = connection;
+
+  /// Forgets a closed connection.
+  void remove(DwLiveConnection connection) {
+    if (!identical(_byId[connection.id], connection)) return;
+    _byId.remove(connection.id);
+    for (final name in connection.subscriptions) {
+      _removeFrom(_subscribers, name, connection);
+    }
+    connection.subscriptions.clear();
+    _setSession(connection, null, null);
+  }
+
+  /// The open connection a call named in `Dw-Live-Connection`, when it acts
+  /// for the same account as the call ([accountId], `null` for anonymous).
+  ///
+  /// A connection of another account is not the caller's: honouring it would
+  /// let one account filter or suppress another's updates, so it is treated
+  /// as if no connection had been named.
+  DwLiveConnection? connectionOf(String? id, int? accountId) {
+    if (id == null) return null;
+    final connection = _byId[id];
+    if (connection == null ||
+        connection.isClosing ||
+        connection.accountId != accountId) {
+      return null;
+    }
+    return connection;
+  }
+
+  /// Binds [connection] to a session (or to none). Changing the account closes
+  /// every subscription: access was checked for the previous one.
+  void authenticate(DwLiveConnection connection, int? accountId, int? keyId) {
+    if (connection.accountId != accountId) {
+      closeAllSubscriptions(connection);
+      connection.authEpoch++;
+    }
+    _setSession(connection, accountId, keyId);
+  }
+
+  void _setSession(DwLiveConnection connection, int? accountId, int? keyId) {
+    if (connection.accountId case final previous?) {
+      _removeFrom(_byAccount, previous, connection);
+    }
+    if (connection.keyId case final previous?) {
+      _removeFrom(_byKey, previous, connection);
+    }
+    connection
+      ..accountId = accountId
+      ..keyId = keyId;
+    if (accountId != null) (_byAccount[accountId] ??= {}).add(connection);
+    if (keyId != null) (_byKey[keyId] ??= {}).add(connection);
+  }
+
+  void subscribe(DwLiveConnection connection, String wireName) {
+    if (connection.subscriptions.add(wireName)) {
+      (_subscribers[wireName] ??= {}).add(connection);
+    }
+  }
+
+  void unsubscribe(DwLiveConnection connection, String wireName) {
+    if (connection.subscriptions.remove(wireName)) {
+      _removeFrom(_subscribers, wireName, connection);
+    }
+  }
+
+  /// Closes every subscription of [connection], telling the client.
+  void closeAllSubscriptions(DwLiveConnection connection) {
+    for (final name in List.of(connection.subscriptions)) {
+      unsubscribe(connection, name);
+      connection.send(DwChannelClosedMessage(name));
+    }
+  }
+
+  /// A session key was revoked: every connection holding it loses its
+  /// subscriptions and its session, and is told its token was rejected —
+  /// except [author], the connection of the caller who signed out, which
+  /// asked for it.
+  void revokeKey(int keyId, {DwLiveConnection? author}) {
+    for (final connection in List.of(_byKey[keyId] ?? const {})) {
+      authenticate(connection, null, null);
+      if (!identical(connection, author)) {
+        connection.send(const DwAuthenticatedMessage.rejected());
+      }
+    }
+  }
+
+  /// Closes [accountId]'s subscription to [channel], telling its connections.
+  void revokeChannel(DwLiveChannel channel, int accountId) {
+    final name = channel.wireName;
+    for (final connection in List.of(_byAccount[accountId] ?? const {})) {
+      if (connection.subscriptions.contains(name)) {
+        unsubscribe(connection, name);
+        connection.send(DwChannelClosedMessage(name));
+      }
+    }
+  }
+
+  /// Fans [publications] out over the live sockets and returns what the
+  /// caller's response carries.
+  ///
+  /// [author] is the caller's own connection when its response carries the
+  /// updates: it is left out of the broadcast, and the response carries only
+  /// what it listens to — the objects published to channels it is subscribed
+  /// to. Without an author the response carries every publication and every
+  /// subscriber is sent its channels.
+  ///
+  /// One message per channel, encoded once for all its subscribers; within it,
+  /// and within the response, an object travels once, as it ended.
+  DwUpdateTransport publish(
+    List<(DwLiveChannel, DwWireObject)> publications, {
+    DwLiveConnection? author,
+  }) {
+    if (publications.isEmpty) return DwUpdateTransport.empty;
+    final byChannel = <String, List<DwWireObject>>{};
+    for (final (channel, item) in publications) {
+      (byChannel[channel.wireName] ??= []).add(item);
+    }
+    for (final MapEntry(key: name, value: items) in byChannel.entries) {
+      final subscribers = _subscribers[name];
+      if (subscribers == null ||
+          (subscribers.length == 1 && identical(subscribers.first, author))) {
+        continue;
+      }
+      final frame = jsonEncode(
+        DwUpdateMessage(
+          channel: name,
+          updates: DwUpdateTransport(items),
+        ).toJson(),
+      );
+      // Iterated in place: `sendFrame` never changes subscriptions
+      // synchronously — a slow consumer's close leaves the hub on `done`.
+      for (final connection in subscribers) {
+        if (!identical(connection, author)) connection.sendFrame(frame);
+      }
+    }
+    if (author == null) {
+      return DwUpdateTransport([for (final (_, item) in publications) item]);
+    }
+    return DwUpdateTransport([
+      for (final (channel, item) in publications)
+        if (author.subscriptions.contains(channel.wireName)) item,
+    ]);
+  }
+
+  static void _removeFrom<K>(
+    Map<K, Set<DwLiveConnection>> index,
+    K key,
+    DwLiveConnection connection,
+  ) {
+    final set = index[key];
+    if (set == null) return;
+    set.remove(connection);
+    if (set.isEmpty) index.remove(key);
+  }
+}

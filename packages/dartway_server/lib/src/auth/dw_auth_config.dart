@@ -1,14 +1,14 @@
 import 'package:dartway_core/dartway_core.dart';
 
-import '../context/dw_context.dart';
+import '../context/dw_call_context.dart';
 
 /// Sign-in by one-time code, configured by the project.
 ///
 /// The framework owns accounts, identities and session keys; the project owns
 /// what an identifier looks like ([normalize]), how a code reaches a person
 /// ([deliverCode]) and what an account means to it ([onAccountCreated]).
-final class DwAuth {
-  const DwAuth({
+final class DwAuthConfig {
+  const DwAuthConfig({
     required this.normalize,
     required this.deliverCode,
     this.fixedCode,
@@ -33,7 +33,7 @@ final class DwAuth {
   /// the ticket: when delivery throws, no ticket exists and the request does
   /// not count against the limit. Never log the code.
   final Future<void> Function(
-    DwContext ctx,
+    DwCallContext ctx,
     DwIdentifierKind kind,
     String identifier,
     String code,
@@ -44,7 +44,7 @@ final class DwAuth {
   /// and test accounts. [accountId] is the account the identifier belongs to,
   /// or `null`. Returning a code skips delivery.
   final Future<String?> Function(
-    DwContext ctx,
+    DwCallContext ctx,
     DwIdentifierKind kind,
     String identifier,
     int? accountId,
@@ -55,7 +55,7 @@ final class DwAuth {
   /// the place to insert the project's profile. [registration] is what the
   /// client sent with the code.
   final Future<void> Function(
-    DwContext ctx,
+    DwCallContext ctx,
     int accountId,
     DwIdentifierKind kind,
     String identifier,
@@ -79,6 +79,6 @@ final class DwAuth {
   final Duration resendDelay;
 
   /// `last_used_at` of a session key is written at most once per this
-  /// interval, not on every connection.
+  /// interval, not on every call.
   final Duration keyTouchInterval;
 }

@@ -7,6 +7,7 @@ import 'package:test/test.dart';
 
 import 'dtos.dart';
 
+export 'package:dartway_server/testing.dart';
 export 'dtos.dart';
 
 /// The Postgres server the suites run against: `DW_DATABASE_*` from the
@@ -24,19 +25,19 @@ DwDatabaseConfig adminConfig() {
 }
 
 /// Alerts recorded for assertions.
-final class RecordingAlerts implements DwAlerts {
-  final List<DwIncident> incidents = [];
+final class RecordingAlerts implements DwAlertSink {
+  final List<DwServerIncident> incidents = [];
   final List<String?> notes = [];
 
   @override
-  Future<void> send(DwIncident incident, {String? suppressedNote}) async {
+  Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
     incidents.add(incident);
     notes.add(suppressedNote);
   }
 }
 
 /// Log lines recorded for assertions (and echoed when DW_TEST_LOG is set).
-final class RecordingLogger implements DwLogger {
+final class RecordingLogger implements DwServerLogger {
   RecordingLogger([this.scope]);
 
   final String? scope;
@@ -57,11 +58,11 @@ final class RecordingLogger implements DwLogger {
   }
 
   @override
-  DwLogger scoped(String scope) =>
+  DwServerLogger scoped(String scope) =>
       RecordingLogger(this.scope == null ? scope : '${this.scope} $scope');
 }
 
-final class _AppMigration extends DwMigration {
+final class _AppMigration extends DwDatabaseMigration {
   const _AppMigration();
 
   @override
@@ -73,6 +74,12 @@ final class _AppMigration extends DwMigration {
   @override
   Future<void> up(DwMigrationContext m) => m.sql('''
     CREATE TABLE note (id bigserial PRIMARY KEY, text text NOT NULL, owner_id bigint);
+    CREATE TABLE message (
+      id bigserial PRIMARY KEY,
+      room text NOT NULL,
+      text text NOT NULL,
+      sent_at timestamptz NOT NULL
+    );
     CREATE TABLE profile (
       account_id bigint PRIMARY KEY REFERENCES dw_account (id),
       name text NOT NULL,
@@ -84,7 +91,7 @@ final class _AppMigration extends DwMigration {
 
   @override
   Future<void> down(DwMigrationContext m) =>
-      m.sql('DROP TABLE job_log, counter, profile, note');
+      m.sql('DROP TABLE job_log, counter, profile, message, note');
 }
 
 /// The test application: its handlers, channels and hooks, with everything a
@@ -103,11 +110,20 @@ final class TestApp {
   final Set<String> failingDelivery = {};
   final List<int> createdAccounts = [];
 
-  /// Accounts that pass `SecretNotes`' access check.
-  final Set<int> secretReaders = {};
+  /// Accounts that may read anyone's notes (`NotesOfOwner`).
+  final Set<int> staff = {};
+
+  /// How many times the access check of `NotesOfOwner` ran.
+  int ownerChecks = 0;
 
   /// Labels of `Count(mode: failOnce)` that have failed already.
   final Set<String> failedOnce = {};
+
+  /// Every read a window handler was asked for, in order.
+  final List<DwWindowInput<DateTime, int>> windowReads = [];
+
+  /// How many times the table handler's count ran.
+  int tableCounts = 0;
 
   /// Job name → how many times it should still fail.
   final Map<String, int> jobFailures = {};
@@ -116,11 +132,12 @@ final class TestApp {
 
   static const reviewer = 'reviewer@example.com';
 
-  DwAuth auth({
+  DwAuthConfig auth({
     Duration resendDelay = const Duration(seconds: 30),
     int maxRequestsPerWindow = 3,
     int maxAttempts = 3,
-  }) => DwAuth(
+    Duration keyTouchInterval = const Duration(minutes: 10),
+  }) => DwAuthConfig(
     normalize: (kind, raw) {
       final value = raw.trim().toLowerCase();
       return switch (kind) {
@@ -154,9 +171,14 @@ final class TestApp {
     maxRequestsPerWindow: maxRequestsPerWindow,
     requestWindow: const Duration(minutes: 10),
     resendDelay: resendDelay,
+    keyTouchInterval: keyTouchInterval,
   );
 
-  static Future<NoteView> _insertNote(DwDb db, String text, int? owner) async {
+  static Future<NoteView> insertNote(
+    DwDatabaseHandle db,
+    String text, [
+    int? owner,
+  ]) async {
     final row = (await db.query(
       'INSERT INTO note (text, owner_id) VALUES (@text, @owner::int8) '
       'RETURNING id',
@@ -165,130 +187,184 @@ final class TestApp {
     return NoteView(id: row.get<int>('id'), text: text, ownerId: owner);
   }
 
-  static NoteView _note(DwRow row) => NoteView(
+  static NoteView _note(DwResultRow row) => NoteView(
     id: row.get<int>('id'),
     text: row.get<String>('text'),
     ownerId: row['owner_id'] as int?,
   );
 
-  Future<int> _count(DwDb db, String label) async => (await db.query(
-    'INSERT INTO counter (label, n) VALUES (@label, 1) '
-    'ON CONFLICT (label) DO UPDATE SET n = counter.n + 1 RETURNING n',
-    params: {'label': label},
-  )).single.get<int>('n');
+  static Future<List<NoteView>> _notes(
+    DwDatabaseHandle db,
+    String sql, [
+    Map<String, Object?> params = const {},
+  ]) async => [
+    for (final row in await db.query(sql, params: params)) _note(row),
+  ];
 
-  List<DwHandler> handlers() => [
-    DwHandler.request<ListNotes, List<NoteView>>(
-      access: DwAccess.anonymous,
-      handle: (ctx, request) async => [
-        for (final row in await ctx.db.query(
-          'SELECT * FROM note WHERE @owner::int8 IS NULL OR owner_id = @owner '
-          'ORDER BY id',
-          params: {'owner': request.ownerId},
-        ))
-          _note(row),
-      ],
-    ),
-    DwHandler.request<LiveNotes, List<NoteView>>(
-      access: DwAccess.signedIn,
-      handle: (ctx, request) async => [
-        for (final row in await ctx.db.query('SELECT * FROM note ORDER BY id'))
-          _note(row),
-      ],
-    ),
-    DwHandler.request<MyNotes, List<NoteView>>(
-      access: DwAccess.signedIn,
-      handle: (ctx, request) async => [
-        for (final row in await ctx.db.query(
-          'SELECT * FROM note WHERE owner_id = @owner ORDER BY id',
-          params: {'owner': ctx.requireAccountId},
-        ))
-          _note(row),
-      ],
-    ),
-    DwHandler.request<SecretNotes, List<NoteView>>(
-      access: DwAccess.check(
-        (ctx) async => secretReaders.contains(ctx.accountId),
+  Future<int> _count(DwDatabaseHandle db, String label) async =>
+      (await db.query(
+        'INSERT INTO counter (label, n) VALUES (@label, 1) '
+        'ON CONFLICT (label) DO UPDATE SET n = counter.n + 1 RETURNING n',
+        params: {'label': label},
+      )).single.get<int>('n');
+
+  List<DwCallHandler> handlers() => [
+    DwCallHandler.list<ListNotes, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request) => _notes(
+        ctx.db,
+        'SELECT * FROM note WHERE @owner::int8 IS NULL OR owner_id = @owner '
+        'ORDER BY id',
+        {'owner': request.ownerId},
       ),
-      handle: (ctx, request) async => const [],
     ),
-    DwHandler.request<GetNote, NoteView>(
-      access: DwAccess.anonymous,
-      handle: (ctx, request) async {
-        final rows = await ctx.db.query(
-          'SELECT * FROM note WHERE id = @id',
-          params: {'id': request.noteId},
-        );
-        return rows.isEmpty
-            ? ctx.refuse(DwCoreRefusal.notFound)
-            : _note(rows.single);
-      },
+    DwCallHandler.list<MyNotes, NoteView>(
+      access: DwAccessRule.signedIn,
+      handle: (ctx, request) => _notes(
+        ctx.db,
+        'SELECT * FROM note WHERE owner_id = @owner ORDER BY id',
+        {'owner': ctx.requireAccountId},
+      ),
     ),
-    DwHandler.request<FindNote, NoteView?>(
-      access: DwAccess.anonymous,
-      handle: (ctx, request) async {
-        final rows = await ctx.db.query(
-          'SELECT * FROM note WHERE id = @id',
-          params: {'id': request.noteId},
-        );
-        return rows.isEmpty ? null : _note(rows.single);
-      },
+    DwCallHandler.list<NotesOfOwner, NoteView>(
+      access: DwAccessRule.check<NotesOfOwner>((ctx, request) async {
+        ownerChecks++;
+        return request.ownerId == ctx.accountId ||
+            staff.contains(ctx.accountId);
+      }),
+      handle: (ctx, request) => _notes(
+        ctx.db,
+        'SELECT * FROM note WHERE owner_id = @owner ORDER BY id',
+        {'owner': request.ownerId},
+      ),
     ),
-    DwHandler.page<FeedNotes, NoteView>(
-      access: DwAccess.anonymous,
+    DwCallHandler.single<GetNote, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request) async => (await _notes(
+        ctx.db,
+        'SELECT * FROM note WHERE id = @id',
+        {'id': request.noteId},
+      )).firstOrNull,
+    ),
+    DwCallHandler.maybe<FindNote, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request) async => (await _notes(
+        ctx.db,
+        'SELECT * FROM note WHERE id = @id',
+        {'id': request.noteId},
+      )).firstOrNull,
+    ),
+    DwCallHandler.page<FeedNotes, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request, page) => _notes(
+        ctx.db,
+        'SELECT * FROM note WHERE text LIKE @prefix ORDER BY id '
+        'LIMIT @limit OFFSET @offset',
+        {
+          'prefix': '${request.prefix}%',
+          'limit': page.fetchLimit,
+          'offset': page.offset,
+        },
+      ),
+    ),
+    DwCallHandler.page<GreedyFeed, NoteView>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, request, page) async => [
-        for (final row in await ctx.db.query(
-          'SELECT * FROM note WHERE text LIKE @prefix ORDER BY id '
-          'LIMIT @limit OFFSET @offset',
-          params: {
-            'prefix': '${request.prefix}%',
-            'limit': page.fetchLimit,
-            'offset': page.offset,
-          },
-        ))
-          _note(row),
+        for (var i = 0; i < page.fetchLimit + 1; i++)
+          NoteView(id: i, text: 'greedy'),
       ],
     ),
-    DwHandler.page<NoteHistory, NoteView>(
-      access: DwAccess.anonymous,
-      handle: (ctx, request, page) async => [
-        for (final row in await ctx.db.query(
-          'SELECT * FROM note WHERE text LIKE @prefix '
-          'AND (@before::int8 IS NULL OR id < @before) '
-          'ORDER BY id DESC LIMIT @limit',
-          params: {
-            'prefix': '${request.prefix}%',
-            'before': page.before,
-            'limit': page.fetchLimit,
-          },
-        ))
-          _note(row),
-      ],
+    DwCallHandler.table<TableNotes, NoteView>(
+      access: DwAccessRule.anonymous,
+      rows: (ctx, request, table) => _notes(
+        ctx.db,
+        'SELECT * FROM note WHERE text LIKE @prefix ORDER BY id '
+        'LIMIT @limit OFFSET @offset',
+        {
+          'prefix': '${request.prefix}%',
+          'limit': table.fetchLimit,
+          'offset': table.offset,
+        },
+      ),
+      count: (ctx, request) async {
+        tableCounts++;
+        return (await ctx.db.query(
+          'SELECT count(*) AS n FROM note WHERE text LIKE @prefix',
+          params: {'prefix': '${request.prefix}%'},
+        )).single.get<int>('n');
+      },
     ),
-    DwHandler.request<ExplodingRequest, List<NoteView>>(
-      access: DwAccess.anonymous,
+    DwCallHandler.window<ChatWindow, MessageView, DateTime, int>(
+      access: DwAccessRule.anonymous,
+      positionOf: (message) => (sortValue: message.sentAt, id: message.id),
+      handle: (ctx, request, window) async {
+        windowReads.add(window);
+        final older = window.direction == DwWindowDirection.older;
+        final position = window.position;
+        final comparison = older ? (window.includesPosition ? '<=' : '<') : '>';
+        final order = older ? 'DESC' : 'ASC';
+        final rows = await ctx.db.query(
+          'SELECT id, text, sent_at FROM message WHERE room = @room '
+          '${position == null ? '' : 'AND (sent_at, id) $comparison (@sort::timestamptz, @id::int8)'} '
+          'ORDER BY sent_at $order, id $order LIMIT @limit',
+          params: {
+            'room': request.room,
+            if (position != null) ...{
+              'sort': position.sortValue,
+              'id': position.id,
+            },
+            'limit': window.fetchLimit,
+          },
+        );
+        return [
+          for (final row in rows)
+            MessageView(
+              id: row.get<int>('id'),
+              text: row.get<String>('text'),
+              sentAt: row.get<DateTime>('sent_at'),
+            ),
+        ];
+      },
+    ),
+    DwCallHandler.window<NotesByText, NoteView, String, int>(
+      access: DwAccessRule.anonymous,
+      positionOf: (note) => (sortValue: note.text, id: note.id),
+      handle: (ctx, request, window) async => const [],
+    ),
+    DwCallHandler.list<ExplodingRequest, NoteView>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, request) async =>
           throw StateError('database password is ${request.secret}'),
     ),
-    DwHandler.request<SlowRequest, List<NoteView>>(
-      access: DwAccess.anonymous,
+    DwCallHandler.list<PublishingRequest, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request) async {
+        ctx.publish(
+          const DwLiveChannel(TestChannel.notes),
+          const NoteView(id: 1, text: 'from a read'),
+        );
+        return const [];
+      },
+    ),
+    DwCallHandler.list<SlowRequest, NoteView>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, request) async {
         await Future<void>.delayed(Duration(milliseconds: request.millis));
         return const [];
       },
     ),
-    DwHandler.command<CreateNote, NoteView>(
-      access: DwAccess.signedIn,
+    DwCallHandler.command<CreateNote, NoteView>(
+      access: DwAccessRule.signedIn,
       handle: (ctx, command) async {
-        final note = await _insertNote(
+        final note = await insertNote(
           ctx.db,
           command.text,
           ctx.requireAccountId,
         );
-        ctx.publish(const DwChannel(TestChannel.notes), note);
+        ctx.publish(const DwLiveChannel(TestChannel.notes), note);
         for (var i = 0; i < command.extraPublishes; i++) {
           ctx.publish(
-            const DwChannel(TestChannel.notes),
+            const DwLiveChannel(TestChannel.notes),
             NoteView(
               id: note.id,
               text: '${note.text} #$i',
@@ -296,34 +372,37 @@ final class TestApp {
             ),
           );
         }
-        ctx.publish(DwChannel(TestChannel.account, ctx.requireAccountId), note);
+        ctx.publish(
+          DwLiveChannel(TestChannel.account, ctx.requireAccountId),
+          note,
+        );
         return note;
       },
     ),
-    DwHandler.command<PublishAndEnd, void>(
-      access: DwAccess.signedIn,
+    DwCallHandler.command<PublishAndEnd, void>(
+      access: DwAccessRule.signedIn,
       handle: (ctx, command) async {
+        final note = await insertNote(ctx.db, command.ending);
+        ctx.publish(const DwLiveChannel(TestChannel.notes), note);
         switch (command.ending) {
           case 'refuse':
-            final note = await _insertNote(ctx.db, 'refused', null);
-            ctx.publish(const DwChannel(TestChannel.notes), note);
             ctx.refuse(DwCoreRefusal.conflict);
           case 'fail':
-            final note = await _insertNote(ctx.db, 'failed', null);
-            ctx.publish(const DwChannel(TestChannel.notes), note);
             throw StateError('after publish');
           default:
             throw ArgumentError(command.ending);
         }
       },
     ),
-    DwHandler.command<Count, int>(
-      access: DwAccess.anonymous,
+    DwCallHandler.command<Count, int>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, command) async {
         final n = await _count(ctx.db, command.label);
         switch (command.mode) {
           case 'refuse':
             ctx.refuse(DwCoreRefusal.conflict, params: {'n': n});
+          case 'outdated':
+            ctx.refuse(DwCoreRefusal.updateRequired);
           case 'failOnce' when failedOnce.add(command.label):
             throw StateError('first execution fails');
           case 'conflictOnce' when failedOnce.add(command.label):
@@ -332,54 +411,55 @@ final class TestApp {
         return n;
       },
     ),
-    DwHandler.command<CountOutside, int>(
-      access: DwAccess.anonymous,
+    DwCallHandler.command<CountOutside, int>(
+      access: DwAccessRule.anonymous,
       transactional: false,
       handle: (ctx, command) async {
         if (ctx.db.inTransaction) throw StateError('expected no transaction');
         final n = await ctx.transaction((tx) => _count(tx, command.label));
         final note = await ctx.transaction(
-          (tx) => _insertNote(tx, 'outside ${command.label}', null),
+          (tx) => insertNote(tx, 'outside ${command.label}'),
         );
-        ctx.publish(const DwChannel(TestChannel.notes), note);
+        ctx.publish(const DwLiveChannel(TestChannel.notes), note);
         if (command.label.startsWith('fail')) {
           throw StateError('after a committed transaction');
         }
         return n;
       },
     ),
-    DwHandler.command<Ping, String>(
-      access: DwAccess.anonymous,
+    DwCallHandler.command<Ping, String>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, command) async => 'pong',
     ),
-    DwHandler.command<NeedsAccount, int>(
-      access: DwAccess.anonymous,
+    DwCallHandler.command<NeedsAccount, int>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, command) async => ctx.requireAccountId,
     ),
-    DwHandler.command<RevokeNotes, void>(
-      access: DwAccess.signedIn,
+    DwCallHandler.command<RevokeNotes, void>(
+      access: DwAccessRule.signedIn,
       handle: (ctx, command) async {
-        ctx.revoke(const DwChannel(TestChannel.notes), command.accountId);
-        final note = await _insertNote(ctx.db, 'after revoke', null);
-        ctx.publish(const DwChannel(TestChannel.notes), note);
+        ctx.revoke(const DwLiveChannel(TestChannel.notes), command.accountId);
+        final note = await insertNote(ctx.db, 'after revoke');
+        ctx.publish(const DwLiveChannel(TestChannel.notes), note);
+        ctx.publish(const DwLiveChannel(TestChannel.public), note);
       },
     ),
-    DwHandler.command<RevokeSessions, void>(
-      access: DwAccess.signedIn,
+    DwCallHandler.command<RevokeSessions, void>(
+      access: DwAccessRule.signedIn,
       handle: (ctx, command) async {
         await ctx.accounts.revokeKeys(command.accountId);
         if (command.ending == 'refuse') ctx.refuse(DwCoreRefusal.conflict);
       },
     ),
-    DwHandler.command<EnsureAccount, int>(
-      access: DwAccess.anonymous,
+    DwCallHandler.command<EnsureAccount, int>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, command) async => (await ctx.accounts.ensure(
         DwIdentifierKind.email,
         command.email,
       )).accountId,
     ),
-    DwHandler.command<EnqueueJob, bool>(
-      access: DwAccess.anonymous,
+    DwCallHandler.command<EnqueueJob, bool>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, command) async {
         final enqueued = await ctx.jobs.enqueue(
           command.name,
@@ -395,16 +475,35 @@ final class TestApp {
         return enqueued;
       },
     ),
-    DwHandler.command<Burst, void>(
-      access: DwAccess.anonymous,
+    DwCallHandler.command<Burst, void>(
+      access: DwAccessRule.anonymous,
       handle: (ctx, command) async {
         for (var i = 0; i < command.count; i++) {
           ctx.publish(
-            const DwChannel(TestChannel.public),
+            const DwLiveChannel(TestChannel.public),
             NoteView(id: i, text: 'x' * command.size),
           );
         }
       },
+    ),
+    DwCallHandler.command<SlowNote, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, command) async {
+        await Future<void>.delayed(Duration(milliseconds: command.millis));
+        final note = await insertNote(ctx.db, command.text);
+        ctx.publish(const DwLiveChannel(TestChannel.notes), note);
+        return note;
+      },
+    ),
+    DwCallHandler.command<SmallUpload, int>(
+      access: DwAccessRule.anonymous,
+      maxBodyBytes: 64,
+      handle: (ctx, command) async => command.data.length,
+    ),
+    DwCallHandler.command<LargeUpload, int>(
+      access: DwAccessRule.anonymous,
+      maxBodyBytes: 4 << 20,
+      handle: (ctx, command) async => command.data.length,
     ),
   ];
 
@@ -426,7 +525,7 @@ final class TestApp {
     ),
   ];
 
-  Future<void> _logJob(DwContext ctx, String name, Object? tag) async {
+  Future<void> _logJob(DwCallContext ctx, String name, Object? tag) async {
     await ctx.db.execute(
       'INSERT INTO job_log (name, tag) VALUES (@name, @tag::text)',
       params: {'name': name, 'tag': tag},
@@ -483,20 +582,20 @@ final class TestApp {
       ),
   ];
 
-  DwServer server(
+  DwAppServer server(
     DwDatabaseConfig database, {
-    DwAuth? auth,
+    DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(
       jobPollInterval: Duration(seconds: 30),
     ),
-    List<DwHandler>? handlers,
+    List<DwCallHandler>? handlers,
     List<DwChannelRule>? channels,
     List<DwJobDefinition>? jobs,
     List<DwRoute> routes = const [],
-    List<DwMigration>? migrations,
-    DwProtocol? protocol,
-    DwSchema? schema,
-  }) => DwServer(
+    List<DwDatabaseMigration>? migrations,
+    DwWireProtocol? protocol,
+    DwDatabaseSchema? schema,
+  }) => DwAppServer(
     protocol: protocol ?? testProtocol,
     schema: schema,
     migrations: migrations ?? const [_AppMigration()],
@@ -511,20 +610,15 @@ final class TestApp {
     settings: settings,
   );
 
-  /// Signs [identifier] in through the wire and returns the session.
-  Future<DwSession> signIn(
-    DwTestConnection connection,
+  /// Signs [identifier] in over HTTP and returns the session.
+  Future<DwAuthSession> signIn(
+    DwTestCaller caller,
     String identifier, {
     DwIdentifierKind kind = DwIdentifierKind.email,
     Map<String, String> registration = const {},
   }) async {
-    final ticketResult = await connection.command(
-      DwRequestCode(kind: kind, identifier: identifier),
-    );
-    final ticket = ticketResult.okCommandValue(
-      DwRequestCode(kind: kind, identifier: identifier),
-      testProtocol,
-    );
+    final request = DwRequestCode(kind: kind, identifier: identifier);
+    final ticket = (await caller.call(request)).value(request);
     final normalized = identifier.trim().toLowerCase();
     final code = normalized == reviewer ? '000000' : delivered[normalized]!;
     final verify = DwVerifyCode(
@@ -532,11 +626,16 @@ final class TestApp {
       code: code,
       registration: registration,
     );
-    return (await connection.command(
-      verify,
-    )).okCommandValue(verify, testProtocol);
+    return (await caller.call(verify)).value(verify);
   }
 }
+
+// Not yet here: a `connectClient()` returning a real `DwAppClient` over this
+// server, for end-to-end tests of client and server together. It returns once
+// `dartway_client` is rewritten for the HTTP transport (revision 2, stage 2
+// of the client); until then these suites speak the wire directly through
+// `DwTestCaller` and `DwTestLiveSocket`, which is what the server's contract
+// is anyway.
 
 /// A database and a started server for one test file; torn down after it.
 final class Harness {
@@ -545,10 +644,12 @@ final class Harness {
   final TestApp app;
   final DwTestDatabase database;
   DwTestServer server;
+  final List<DwTestCaller> _callers = [];
+  final List<DwTestLiveSocket> _sockets = [];
 
   static Future<Harness> start({
     TestApp? app,
-    DwServer Function(TestApp app, DwDatabaseConfig config)? build,
+    DwAppServer Function(TestApp app, DwDatabaseConfig config)? build,
   }) async {
     final testApp = app ?? TestApp();
     final database = await DwTestDatabase.create(
@@ -567,20 +668,41 @@ final class Harness {
     }
   }
 
-  DwDb get db => server.db;
+  DwDatabaseHandle get db => server.db;
 
-  Future<DwTestConnection> connect() => server.connect();
+  /// An anonymous caller, closed with the harness.
+  DwTestCaller caller({String? token}) {
+    final caller = server.caller(token: token);
+    _callers.add(caller);
+    return caller;
+  }
 
-  /// A connection signed in as [identifier].
-  Future<(DwTestConnection, DwSession)> signedIn(String identifier) async {
-    final connection = await connect();
-    final session = await app.signIn(connection, identifier);
-    final authed = await connection.authenticate(session.token);
-    expect(authed.accountId, session.id);
-    return (connection, session);
+  /// A live socket, closed with the harness; authenticated when [token] is
+  /// given.
+  Future<DwTestLiveSocket> live({String? token}) async {
+    final socket = await server.openLive();
+    _sockets.add(socket);
+    if (token != null) {
+      final authed = await socket.authenticate(token);
+      expect(authed.accountId, isNotNull, reason: 'the token was rejected');
+    }
+    return socket;
+  }
+
+  /// A caller signed in as [identifier], and its session.
+  Future<(DwTestCaller, DwAuthSession)> signedIn(String identifier) async {
+    final anonymous = caller();
+    final session = await app.signIn(anonymous, identifier);
+    return (caller(token: session.token), session);
   }
 
   Future<void> stop() async {
+    for (final caller in _callers) {
+      caller.close();
+    }
+    for (final socket in _sockets) {
+      if (!socket.isClosed) await socket.close();
+    }
     await server.stop();
     await database.drop();
   }
@@ -588,7 +710,7 @@ final class Harness {
 
 /// Registers a harness for the enclosing test file.
 Harness Function() useHarness({
-  DwServer Function(TestApp app, DwDatabaseConfig config)? build,
+  DwAppServer Function(TestApp app, DwDatabaseConfig config)? build,
 }) {
   Harness? harness;
   setUpAll(() async => harness = await Harness.start(build: build));

@@ -11,13 +11,13 @@ const String dwFrameworkNamespace = 'dw';
 ///
 /// Append-only: an applied migration is never edited (its checksum is in every
 /// database that ran it); a change is a new migration in this list.
-final List<DwMigration> dwFrameworkMigrations = List.unmodifiable([
+final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
   const _DwSqlMigration('20260913_000000_dw_initial', _initialUp, _initialDown),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
 /// of those statements, so editing an applied one is caught by the ledger.
-final class _DwSqlMigration extends DwMigration {
+final class _DwSqlMigration extends DwDatabaseMigration {
   const _DwSqlMigration(this.id, this._up, this._down);
 
   @override

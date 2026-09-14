@@ -1,5 +1,5 @@
 // DTOs of the test application, written by hand in the shape `dartway
-// generate` produces (tagging, omission of absent fields, value equality).
+// generate` produces (omission of absent fields, value equality).
 import 'package:dartway_server/dartway_server.dart';
 
 enum TestChannel with DwChannelKind { notes, account, public, broken, nobody }
@@ -19,7 +19,7 @@ final class NoteView extends DwDataObject {
   Map<String, Object?> toJson() => {
     'id': id,
     'text': text,
-    if (ownerId != null) 'ownerId': ownerId,
+    'ownerId': ?ownerId,
   };
 
   static NoteView fromJson(Map<String, Object?> json) => NoteView(
@@ -42,6 +42,45 @@ final class NoteView extends DwDataObject {
   String toString() => 'NoteView($id, $text, $ownerId)';
 }
 
+final class MessageView extends DwDataObject {
+  const MessageView({
+    required this.id,
+    required this.text,
+    required this.sentAt,
+  });
+
+  @override
+  final int id;
+  final String text;
+  final DateTime sentAt;
+
+  @override
+  String get dwTypeName => 'MessageView';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'text': text,
+    'sentAt': DwJsonCodec.encodeDateTime(sentAt),
+  };
+
+  static MessageView fromJson(Map<String, Object?> json) => MessageView(
+    id: json['id']! as int,
+    text: json['text']! as String,
+    sentAt: DwJsonCodec.decodeDateTime(json['sentAt']),
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is MessageView && other.id == id && other.text == text;
+
+  @override
+  int get hashCode => Object.hash(id, text);
+
+  @override
+  String toString() => 'MessageView($id, $text)';
+}
+
 /// All notes, or the notes of [ownerId].
 final class ListNotes extends DwListRequest<NoteView> {
   const ListNotes({this.ownerId});
@@ -52,7 +91,7 @@ final class ListNotes extends DwListRequest<NoteView> {
   String get dwTypeName => 'ListNotes';
 
   @override
-  Map<String, Object?> toJson() => {if (ownerId != null) 'ownerId': ownerId};
+  Map<String, Object?> toJson() => {'ownerId': ?ownerId};
 
   static ListNotes fromJson(Map<String, Object?> json) =>
       ListNotes(ownerId: json['ownerId'] as int?);
@@ -71,17 +110,27 @@ final class MyNotes extends DwListRequest<NoteView> {
   static MyNotes fromJson(Map<String, Object?> json) => const MyNotes();
 }
 
-/// Access by check.
-final class SecretNotes extends DwListRequest<NoteView> {
-  const SecretNotes();
+/// The notes of [ownerId]: the owner or a staff member may read them — an
+/// access check on the request's own parameter.
+final class NotesOfOwner extends DwListRequest<NoteView>
+    implements DwSelfValidating {
+  const NotesOfOwner(this.ownerId);
+
+  final int ownerId;
 
   @override
-  String get dwTypeName => 'SecretNotes';
+  List<DwCallRefusal> validate() => [
+    if (ownerId < 1) DwCallRefusal(DwCoreRefusal.invalid, field: 'ownerId'),
+  ];
 
   @override
-  Map<String, Object?> toJson() => const {};
+  String get dwTypeName => 'NotesOfOwner';
 
-  static SecretNotes fromJson(Map<String, Object?> json) => const SecretNotes();
+  @override
+  Map<String, Object?> toJson() => {'ownerId': ownerId};
+
+  static NotesOfOwner fromJson(Map<String, Object?> json) =>
+      NotesOfOwner(json['ownerId']! as int);
 }
 
 final class GetNote extends DwSingleRequest<NoteView> {
@@ -105,6 +154,9 @@ final class FindNote extends DwMaybeRequest<NoteView> {
   final int noteId;
 
   @override
+  bool matches(NoteView item) => item.id == noteId;
+
+  @override
   String get dwTypeName => 'FindNote';
 
   @override
@@ -114,14 +166,11 @@ final class FindNote extends DwMaybeRequest<NoteView> {
       FindNote(json['noteId']! as int);
 }
 
-/// Offset pages of notes with [prefix], by id.
+/// Offset pages of notes with [prefix], by id: 3 per page, up to 5 a call.
 final class FeedNotes extends DwPageRequest<NoteView> {
-  const FeedNotes(this.prefix);
+  const FeedNotes(this.prefix) : super(pageSize: 3, maxPageSize: 5);
 
   final String prefix;
-
-  @override
-  int get pageSize => 3;
 
   @override
   String get dwTypeName => 'FeedNotes';
@@ -133,23 +182,77 @@ final class FeedNotes extends DwPageRequest<NoteView> {
       FeedNotes(json['prefix']! as String);
 }
 
-/// Cursor pages of notes with [prefix], newest first.
-final class NoteHistory extends DwCursorRequest<NoteView> {
-  const NoteHistory(this.prefix);
+/// A page request whose handler ignores its fetch limit.
+final class GreedyFeed extends DwPageRequest<NoteView> {
+  const GreedyFeed() : super(pageSize: 2);
+
+  @override
+  String get dwTypeName => 'GreedyFeed';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static GreedyFeed fromJson(Map<String, Object?> json) => const GreedyFeed();
+}
+
+/// Numbered pages of notes with [prefix], at most 4 per page.
+final class TableNotes extends DwTableRequest<NoteView> {
+  const TableNotes(this.prefix, {this.page = 1, this.pageSize = 2})
+    : super(maxPageSize: 4);
 
   final String prefix;
 
   @override
-  int get pageSize => 2;
+  final int page;
 
   @override
-  String get dwTypeName => 'NoteHistory';
+  final int pageSize;
 
   @override
-  Map<String, Object?> toJson() => {'prefix': prefix};
+  String get dwTypeName => 'TableNotes';
 
-  static NoteHistory fromJson(Map<String, Object?> json) =>
-      NoteHistory(json['prefix']! as String);
+  @override
+  Map<String, Object?> toJson() => {
+    'prefix': prefix,
+    'page': page,
+    'pageSize': pageSize,
+  };
+
+  static TableNotes fromJson(Map<String, Object?> json) => TableNotes(
+    json['prefix']! as String,
+    page: json['page']! as int,
+    pageSize: json['pageSize']! as int,
+  );
+}
+
+/// The messages of [room], newest first: 4 per load, up to 10 a call.
+final class ChatWindow extends DwWindowRequest<MessageView> {
+  const ChatWindow(this.room) : super(pageSize: 4, maxPageSize: 10);
+
+  final String room;
+
+  @override
+  String get dwTypeName => 'ChatWindow';
+
+  @override
+  Map<String, Object?> toJson() => {'room': room};
+
+  static ChatWindow fromJson(Map<String, Object?> json) =>
+      ChatWindow(json['room']! as String);
+}
+
+/// A window over notes sorted by text: its cursors carry a String sort
+/// value, not a ChatWindow's DateTime.
+final class NotesByText extends DwWindowRequest<NoteView> {
+  const NotesByText() : super(pageSize: 2);
+
+  @override
+  String get dwTypeName => 'NotesByText';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static NotesByText fromJson(Map<String, Object?> json) => const NotesByText();
 }
 
 /// A request whose handler throws with [secret] in the message.
@@ -166,6 +269,20 @@ final class ExplodingRequest extends DwListRequest<NoteView> {
 
   static ExplodingRequest fromJson(Map<String, Object?> json) =>
       ExplodingRequest(json['secret']! as String);
+}
+
+/// A request whose handler publishes, which a read may not.
+final class PublishingRequest extends DwListRequest<NoteView> {
+  const PublishingRequest();
+
+  @override
+  String get dwTypeName => 'PublishingRequest';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static PublishingRequest fromJson(Map<String, Object?> json) =>
+      const PublishingRequest();
 }
 
 /// Waits [millis] and answers.
@@ -199,7 +316,7 @@ final class OrphanRequest extends DwListRequest<NoteView> {
 }
 
 /// Without a handler, like [OrphanRequest].
-final class OrphanCommand extends DwCommand<void> {
+final class OrphanCommand extends DwActionCommand<void> {
   const OrphanCommand();
 
   @override
@@ -212,9 +329,20 @@ final class OrphanCommand extends DwCommand<void> {
       const OrphanCommand();
 }
 
+/// Not registered in the protocol at all.
+final class UnregisteredRequest extends DwListRequest<NoteView> {
+  const UnregisteredRequest();
+
+  @override
+  String get dwTypeName => 'UnregisteredRequest';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+}
+
 /// Revokes every session of [accountId] through `ctx.accounts`, then ends as
 /// [ending]: `ok` or `refuse` (rolling the revocation back).
-final class RevokeSessions extends DwCommand<void> {
+final class RevokeSessions extends DwActionCommand<void> {
   const RevokeSessions(this.accountId, {this.ending = 'ok'});
 
   final int accountId;
@@ -233,7 +361,7 @@ final class RevokeSessions extends DwCommand<void> {
 }
 
 /// `ctx.accounts.ensure` for an e-mail, answering the account id.
-final class EnsureAccount extends DwCommand<int> {
+final class EnsureAccount extends DwActionCommand<int> {
   const EnsureAccount(this.email);
 
   final String email;
@@ -248,20 +376,10 @@ final class EnsureAccount extends DwCommand<int> {
       EnsureAccount(json['email']! as String);
 }
 
-/// Not registered in the protocol at all.
-final class UnregisteredRequest extends DwListRequest<NoteView> {
-  const UnregisteredRequest();
-
-  @override
-  String get dwTypeName => 'UnregisteredRequest';
-
-  @override
-  Map<String, Object?> toJson() => const {};
-}
-
 /// Creates a note owned by the caller and publishes it to `notes`, and to
 /// `account:<owner>`.
-final class CreateNote extends DwCommand<NoteView> implements DwValidatable {
+final class CreateNote extends DwActionCommand<NoteView>
+    implements DwSelfValidating {
   const CreateNote(this.text, {this.extraPublishes = 0});
 
   final String text;
@@ -270,10 +388,10 @@ final class CreateNote extends DwCommand<NoteView> implements DwValidatable {
   final int extraPublishes;
 
   @override
-  List<DwRefusal> validate() => [
-    if (text.isEmpty) DwRefusal(DwCoreRefusal.invalid, field: 'text'),
+  List<DwCallRefusal> validate() => [
+    if (text.isEmpty) DwCallRefusal(DwCoreRefusal.invalid, field: 'text'),
     if (text.length > 50)
-      DwRefusal(DwCoreRefusal.invalid, field: 'text', params: {'max': 50}),
+      DwCallRefusal(DwCoreRefusal.invalid, field: 'text', params: {'max': 50}),
   ];
 
   @override
@@ -291,33 +409,25 @@ final class CreateNote extends DwCommand<NoteView> implements DwValidatable {
   );
 }
 
-/// Publishes a note to `notes`, then ends as [ending].
-final class PublishAndEnd extends DwCommand<void> {
-  const PublishAndEnd(this.ending, {this.transactional = true});
+/// Publishes a note to `notes`, then ends as [ending]: `refuse` or `fail`.
+final class PublishAndEnd extends DwActionCommand<void> {
+  const PublishAndEnd(this.ending);
 
-  /// `refuse`, `fail`, or `commitThenFail` (non-transactional: publishes in a
-  /// committed `ctx.transaction`, then throws).
   final String ending;
-  final bool transactional;
 
   @override
   String get dwTypeName => 'PublishAndEnd';
 
   @override
-  Map<String, Object?> toJson() => {
-    'ending': ending,
-    if (!transactional) 'transactional': false,
-  };
+  Map<String, Object?> toJson() => {'ending': ending};
 
-  static PublishAndEnd fromJson(Map<String, Object?> json) => PublishAndEnd(
-    json['ending']! as String,
-    transactional: json['transactional'] as bool? ?? true,
-  );
+  static PublishAndEnd fromJson(Map<String, Object?> json) =>
+      PublishAndEnd(json['ending']! as String);
 }
 
 /// Counts executions of [label] in the `counter` table and returns the count.
-/// `mode`: `ok`, `refuse`, `failOnce` (fails the first execution).
-final class Count extends DwCommand<int> {
+/// `mode`: `ok`, `refuse`, `outdated`, `failOnce`, `conflictOnce`.
+final class Count extends DwActionCommand<int> {
   const Count(this.label, {this.mode = 'ok'});
 
   final String label;
@@ -333,8 +443,9 @@ final class Count extends DwCommand<int> {
       Count(json['label']! as String, mode: json['mode']! as String);
 }
 
-/// Like [Count], as a non-transactional command.
-final class CountOutside extends DwCommand<int> {
+/// Like [Count], as a non-transactional command that also publishes from a
+/// committed transaction; a label starting with `fail` throws afterwards.
+final class CountOutside extends DwActionCommand<int> {
   const CountOutside(this.label);
 
   final String label;
@@ -350,7 +461,7 @@ final class CountOutside extends DwCommand<int> {
 }
 
 /// Another command type, for key reuse across types.
-final class Ping extends DwCommand<String> {
+final class Ping extends DwActionCommand<String> {
   const Ping();
 
   @override
@@ -363,7 +474,7 @@ final class Ping extends DwCommand<String> {
 }
 
 /// Anonymous access, but the handler requires an account.
-final class NeedsAccount extends DwCommand<int> {
+final class NeedsAccount extends DwActionCommand<int> {
   const NeedsAccount();
 
   @override
@@ -376,8 +487,9 @@ final class NeedsAccount extends DwCommand<int> {
       const NeedsAccount();
 }
 
-/// Revokes [accountId]'s subscription to `notes`.
-final class RevokeNotes extends DwCommand<void> {
+/// Revokes [accountId]'s subscription to `notes`, then publishes a note to
+/// `notes` and to `public`.
+final class RevokeNotes extends DwActionCommand<void> {
   const RevokeNotes(this.accountId);
 
   final int accountId;
@@ -393,7 +505,7 @@ final class RevokeNotes extends DwCommand<void> {
 }
 
 /// Enqueues job [name] with {'tag': tag}; refuses afterwards when [refuse].
-final class EnqueueJob extends DwCommand<bool> {
+final class EnqueueJob extends DwActionCommand<bool> {
   const EnqueueJob(
     this.name,
     this.tag, {
@@ -415,9 +527,9 @@ final class EnqueueJob extends DwCommand<bool> {
   Map<String, Object?> toJson() => {
     'name': name,
     'tag': tag,
-    if (key != null) 'key': key,
+    'key': ?key,
     if (refuse) 'refuse': true,
-    if (delayMillis != null) 'delayMillis': delayMillis,
+    'delayMillis': ?delayMillis,
   };
 
   static EnqueueJob fromJson(Map<String, Object?> json) => EnqueueJob(
@@ -430,7 +542,7 @@ final class EnqueueJob extends DwCommand<bool> {
 }
 
 /// Publishes [count] notes of [size] characters to `public`.
-final class Burst extends DwCommand<void> {
+final class Burst extends DwActionCommand<void> {
   const Burst(this.count, this.size);
 
   final int count;
@@ -446,49 +558,90 @@ final class Burst extends DwCommand<void> {
       Burst(json['count']! as int, json['size']! as int);
 }
 
-/// All notes, live on the `notes` channel.
-final class LiveNotes extends DwListRequest<NoteView> {
-  const LiveNotes();
+/// A command whose handler allows only a small body.
+final class SmallUpload extends DwActionCommand<int> {
+  const SmallUpload(this.data);
+
+  final String data;
 
   @override
-  List<DwChannel> get channels => const [DwChannel(TestChannel.notes)];
+  String get dwTypeName => 'SmallUpload';
 
   @override
-  String get dwTypeName => 'LiveNotes';
+  Map<String, Object?> toJson() => {'data': data};
 
-  @override
-  Map<String, Object?> toJson() => const {};
-
-  static LiveNotes fromJson(Map<String, Object?> json) => const LiveNotes();
-
-  @override
-  bool operator ==(Object other) => other is LiveNotes;
-
-  @override
-  int get hashCode => (LiveNotes).hashCode;
+  static SmallUpload fromJson(Map<String, Object?> json) =>
+      SmallUpload(json['data']! as String);
 }
 
-final DwProtocol testProtocol = DwProtocol([
-  DwDtoEntry(LiveNotes, 'LiveNotes', LiveNotes.fromJson),
-  DwDtoEntry(NoteView, 'NoteView', NoteView.fromJson),
-  DwDtoEntry(ListNotes, 'ListNotes', ListNotes.fromJson),
-  DwDtoEntry(MyNotes, 'MyNotes', MyNotes.fromJson),
-  DwDtoEntry(SecretNotes, 'SecretNotes', SecretNotes.fromJson),
-  DwDtoEntry(GetNote, 'GetNote', GetNote.fromJson),
-  DwDtoEntry(FindNote, 'FindNote', FindNote.fromJson),
-  DwDtoEntry(FeedNotes, 'FeedNotes', FeedNotes.fromJson),
-  DwDtoEntry(NoteHistory, 'NoteHistory', NoteHistory.fromJson),
-  DwDtoEntry(ExplodingRequest, 'ExplodingRequest', ExplodingRequest.fromJson),
-  DwDtoEntry(SlowRequest, 'SlowRequest', SlowRequest.fromJson),
-  DwDtoEntry(RevokeSessions, 'RevokeSessions', RevokeSessions.fromJson),
-  DwDtoEntry(EnsureAccount, 'EnsureAccount', EnsureAccount.fromJson),
-  DwDtoEntry(CreateNote, 'CreateNote', CreateNote.fromJson),
-  DwDtoEntry(PublishAndEnd, 'PublishAndEnd', PublishAndEnd.fromJson),
-  DwDtoEntry(Count, 'Count', Count.fromJson),
-  DwDtoEntry(CountOutside, 'CountOutside', CountOutside.fromJson),
-  DwDtoEntry(Ping, 'Ping', Ping.fromJson),
-  DwDtoEntry(NeedsAccount, 'NeedsAccount', NeedsAccount.fromJson),
-  DwDtoEntry(RevokeNotes, 'RevokeNotes', RevokeNotes.fromJson),
-  DwDtoEntry(EnqueueJob, 'EnqueueJob', EnqueueJob.fromJson),
-  DwDtoEntry(Burst, 'Burst', Burst.fromJson),
-], include: DwProtocol.core);
+/// A command whose handler allows a body over the server's limit.
+final class LargeUpload extends DwActionCommand<int> {
+  const LargeUpload(this.data);
+
+  final String data;
+
+  @override
+  String get dwTypeName => 'LargeUpload';
+
+  @override
+  Map<String, Object?> toJson() => {'data': data};
+
+  static LargeUpload fromJson(Map<String, Object?> json) =>
+      LargeUpload(json['data']! as String);
+}
+
+/// Waits [millis], then creates a note with [text] and publishes it to
+/// `notes`.
+final class SlowNote extends DwActionCommand<NoteView> {
+  const SlowNote(this.text, this.millis);
+
+  final String text;
+  final int millis;
+
+  @override
+  String get dwTypeName => 'SlowNote';
+
+  @override
+  Map<String, Object?> toJson() => {'text': text, 'millis': millis};
+
+  static SlowNote fromJson(Map<String, Object?> json) =>
+      SlowNote(json['text']! as String, json['millis']! as int);
+}
+
+final DwWireProtocol testProtocol = DwWireProtocol([
+  DwProtocolEntry<NoteView>('NoteView', NoteView.fromJson),
+  DwProtocolEntry<MessageView>('MessageView', MessageView.fromJson),
+  DwProtocolEntry<ListNotes>('ListNotes', ListNotes.fromJson),
+  DwProtocolEntry<MyNotes>('MyNotes', MyNotes.fromJson),
+  DwProtocolEntry<NotesOfOwner>('NotesOfOwner', NotesOfOwner.fromJson),
+  DwProtocolEntry<GetNote>('GetNote', GetNote.fromJson),
+  DwProtocolEntry<FindNote>('FindNote', FindNote.fromJson),
+  DwProtocolEntry<FeedNotes>('FeedNotes', FeedNotes.fromJson),
+  DwProtocolEntry<GreedyFeed>('GreedyFeed', GreedyFeed.fromJson),
+  DwProtocolEntry<TableNotes>('TableNotes', TableNotes.fromJson),
+  DwProtocolEntry<ChatWindow>('ChatWindow', ChatWindow.fromJson),
+  DwProtocolEntry<NotesByText>('NotesByText', NotesByText.fromJson),
+  DwProtocolEntry<ExplodingRequest>(
+    'ExplodingRequest',
+    ExplodingRequest.fromJson,
+  ),
+  DwProtocolEntry<PublishingRequest>(
+    'PublishingRequest',
+    PublishingRequest.fromJson,
+  ),
+  DwProtocolEntry<SlowRequest>('SlowRequest', SlowRequest.fromJson),
+  DwProtocolEntry<RevokeSessions>('RevokeSessions', RevokeSessions.fromJson),
+  DwProtocolEntry<EnsureAccount>('EnsureAccount', EnsureAccount.fromJson),
+  DwProtocolEntry<CreateNote>('CreateNote', CreateNote.fromJson),
+  DwProtocolEntry<PublishAndEnd>('PublishAndEnd', PublishAndEnd.fromJson),
+  DwProtocolEntry<Count>('Count', Count.fromJson),
+  DwProtocolEntry<CountOutside>('CountOutside', CountOutside.fromJson),
+  DwProtocolEntry<Ping>('Ping', Ping.fromJson),
+  DwProtocolEntry<NeedsAccount>('NeedsAccount', NeedsAccount.fromJson),
+  DwProtocolEntry<RevokeNotes>('RevokeNotes', RevokeNotes.fromJson),
+  DwProtocolEntry<EnqueueJob>('EnqueueJob', EnqueueJob.fromJson),
+  DwProtocolEntry<Burst>('Burst', Burst.fromJson),
+  DwProtocolEntry<SmallUpload>('SmallUpload', SmallUpload.fromJson),
+  DwProtocolEntry<LargeUpload>('LargeUpload', LargeUpload.fromJson),
+  DwProtocolEntry<SlowNote>('SlowNote', SlowNote.fromJson),
+], include: DwWireProtocol.core);

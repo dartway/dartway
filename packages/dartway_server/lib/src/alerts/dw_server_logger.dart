@@ -8,7 +8,7 @@ enum DwLogLevel { debug, info, warning, error }
 ///
 /// Never pass codes, tokens or DTO contents: the framework itself logs type
 /// names and ids only, and a handler that logs a secret has leaked it.
-abstract interface class DwLogger {
+abstract interface class DwServerLogger {
   void log(
     DwLogLevel level,
     String message, {
@@ -17,11 +17,11 @@ abstract interface class DwLogger {
   });
 
   /// A logger that prefixes every line with [scope] (a call, a job).
-  DwLogger scoped(String scope);
+  DwServerLogger scoped(String scope);
 }
 
-/// Convenience methods over [DwLogger.log].
-extension DwLoggerLevels on DwLogger {
+/// Convenience methods over [DwServerLogger.log].
+extension DwLoggerLevels on DwServerLogger {
   void debug(String message) => log(DwLogLevel.debug, message);
   void info(String message) => log(DwLogLevel.info, message);
   void warning(String message, {Object? error, StackTrace? stackTrace}) =>
@@ -32,8 +32,8 @@ extension DwLoggerLevels on DwLogger {
 
 /// Writes to stdout (below warning) and stderr (warning and above), one line
 /// per entry plus the stack trace when there is one.
-final class DwStdLogger implements DwLogger {
-  const DwStdLogger({this.minLevel = DwLogLevel.info, this.scope});
+final class DwConsoleLogger implements DwServerLogger {
+  const DwConsoleLogger({this.minLevel = DwLogLevel.info, this.scope});
 
   final DwLogLevel minLevel;
   final String? scope;
@@ -59,7 +59,7 @@ final class DwStdLogger implements DwLogger {
   }
 
   @override
-  DwLogger scoped(String scope) => DwStdLogger(
+  DwServerLogger scoped(String scope) => DwConsoleLogger(
     minLevel: minLevel,
     scope: this.scope == null ? scope : '${this.scope} $scope',
   );

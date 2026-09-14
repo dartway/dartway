@@ -1,12 +1,11 @@
 import 'dart:io';
 
 import 'package:dartway_server/dartway_server.dart';
-import 'package:dartway_server/testing.dart';
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
 
-final class _FailingMigration extends DwMigration {
+final class _FailingMigration extends DwDatabaseMigration {
   const _FailingMigration();
 
   @override
@@ -31,7 +30,7 @@ void main() {
   );
 
   group('validation happens before anything is opened', () {
-    Future<List<String>> problems(DwServer server) async {
+    Future<List<String>> problems(DwAppServer server) async {
       try {
         await DwTestServer.start(server);
       } on DwStartupException catch (error) {
@@ -44,27 +43,35 @@ void main() {
       final found = await problems(
         app.server(
           unused,
-          protocol: DwProtocol([
-            DwDtoEntry(OrphanRequest, 'OrphanRequest', OrphanRequest.fromJson),
-            DwDtoEntry(OrphanCommand, 'OrphanCommand', OrphanCommand.fromJson),
+          protocol: DwWireProtocol([
+            DwProtocolEntry<OrphanRequest>(
+              'OrphanRequest',
+              OrphanRequest.fromJson,
+            ),
+            DwProtocolEntry<OrphanCommand>(
+              'OrphanCommand',
+              OrphanCommand.fromJson,
+            ),
           ], include: testProtocol),
           handlers: [
-            ...app.handlers().where((h) => h.type != NoteHistory),
-            DwHandler.request<ListNotes, List<NoteView>>(
-              access: DwAccess.anonymous,
+            ...app.handlers(),
+            DwCallHandler.list<ListNotes, NoteView>(
+              access: DwAccessRule.anonymous,
               handle: (ctx, request) async => const [],
             ),
-            DwHandler.request<UnregisteredRequest, List<NoteView>>(
-              access: DwAccess.anonymous,
+            DwCallHandler.list<UnregisteredRequest, NoteView>(
+              access: DwAccessRule.anonymous,
               handle: (ctx, request) async => const [],
             ),
-            DwHandler.request<NoteHistory, DwPage<NoteView>>(
-              access: DwAccess.anonymous,
-              handle: (ctx, request) async => const DwPage([], hasMore: false),
-            ),
-            DwHandler.command<DwSignOut, void>(
-              access: DwAccess.signedIn,
+            DwCallHandler.command<DwSignOut, void>(
+              access: DwAccessRule.signedIn,
               handle: (ctx, command) async {},
+            ),
+            DwCallHandler.list<ListNotes, NoteView>(
+              access: DwAccessRule.check<NotesOfOwner>(
+                (ctx, request) async => true,
+              ),
+              handle: (ctx, request) async => const [],
             ),
           ],
           channels: [
@@ -85,18 +92,23 @@ void main() {
             ),
           ],
           routes: [
-            DwRoute.get('/dw', (ctx, request) => Response.ok()),
-            DwRoute.post('/hook', (ctx, request) => Response.ok()),
-            DwRoute.post('/hook', (ctx, request) => Response.ok()),
+            for (final path in ['/dw', '/dw/live', '/dw/ListNotes', '/health'])
+              DwRoute.get(path, (ctx, request) => DwHttpResponse.empty()),
+            DwRoute.post('hook', (ctx, request) => DwHttpResponse.empty()),
+            DwRoute.post('/hook', (ctx, request) => DwHttpResponse.empty()),
+            DwRoute.post('/hook', (ctx, request) => DwHttpResponse.empty()),
+            DwRoute.any('/hook', (ctx, request) => DwHttpResponse.empty()),
           ],
         ),
       );
       expect(found, [
         'ListNotes has more than one handler',
-        'a handler is registered for UnregisteredRequest, which the protocol '
-            'does not know',
-        'NoteHistory is paginated: register it with DwHandler.page',
+        'the list(UnregisteredRequest) handler answers UnregisteredRequest, '
+            'which the protocol does not register',
         'DwSignOut has a built-in handler and cannot have another',
+        'ListNotes has more than one handler',
+        'the access check of the list(ListNotes) handler is written for '
+            'NotesOfOwner',
         'OrphanRequest is a registered request without a handler',
         'OrphanCommand is a registered command without a handler',
         'channel kind "notes" has more than one rule',
@@ -104,8 +116,40 @@ void main() {
         'job "twin" is declared more than once',
         'recurring job "never" needs a positive interval',
         'route GET /dw is reserved by the framework',
+        'route GET /dw/live is reserved by the framework',
+        'route GET /dw/ListNotes is reserved by the framework',
+        'route GET /health is reserved by the framework',
+        'route POST hook: a path starts with "/"',
         'route POST /hook is declared twice',
       ]);
+    });
+
+    test('a window handler whose position cannot be a cursor fails where it '
+        'is declared', () {
+      expect(
+        () => DwCallHandler.window<ChatWindow, MessageView, double, int>(
+          access: DwAccessRule.anonymous,
+          positionOf: (m) => (sortValue: 1.0, id: m.id),
+          handle: (ctx, request, window) async => const [],
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => DwCallHandler.window<ChatWindow, MessageView, DateTime, Object>(
+          access: DwAccessRule.anonymous,
+          positionOf: (m) => (sortValue: m.sentAt, id: m.id),
+          handle: (ctx, request, window) async => const [],
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => DwCallHandler.list<ListNotes, NoteView>(
+          access: DwAccessRule.anonymous,
+          maxBodyBytes: 0,
+          handle: (ctx, request) async => const [],
+        ),
+        throwsArgumentError,
+      );
     });
   });
 
@@ -139,13 +183,13 @@ void main() {
     });
 
     test('the framework migration rolls back and applies again', () async {
-      final opened = await DwDatabase.open(database.config);
+      final opened = await DwPostgresDatabase.open(database.config);
       try {
-        final migrator = DwMigrator(
+        final runner = DwMigrationRunner(
           opened.db,
-          migrations: {'dw': DwServer.frameworkMigrations},
+          migrations: {'dw': DwAppServer.frameworkMigrations},
         );
-        await migrator.apply();
+        await runner.apply();
         Future<List<String>> tables() async => [
           for (final row in await opened.db.query(
             "SELECT tablename FROM pg_tables WHERE tablename LIKE 'dw\\_%' "
@@ -162,9 +206,9 @@ void main() {
           'dw_job',
           'dw_recurring_job',
         ]);
-        await migrator.rollback(batch: 1);
+        await runner.rollback(batch: 1);
         expect(await tables(), isEmpty);
-        await migrator.apply();
+        await runner.apply();
         expect(await tables(), hasLength(7));
       } finally {
         await opened.close();
@@ -174,8 +218,8 @@ void main() {
     test('a declared schema must exist after migrating: missing tables and '
         'columns stop the start, everything else is not the server\'s '
         'business', () async {
-      DwSchema schema(List<DwTableSchema> tables) =>
-          DwSchema.fromTables(tables);
+      DwDatabaseSchema schema(List<DwTableSchema> tables) =>
+          DwDatabaseSchema.fromTables(tables);
       final note = DwTableSchema(
         'note',
         columns: [
@@ -214,8 +258,6 @@ void main() {
       );
       expect(() => missing.boundPort, throwsStateError);
 
-      // Present tables with extra columns (profile.identifier), extra tables
-      // (counter, the framework's) and other types: the start goes on.
       final present = await DwTestServer.start(
         app.server(database.config, schema: schema([note])),
       );
@@ -234,8 +276,7 @@ void main() {
           throwsA(isA<Exception>()),
         );
         expect(() => server.boundPort, throwsStateError);
-        // The framework migration committed before the app one failed.
-        final opened = await DwDatabase.open(database.config);
+        final opened = await DwPostgresDatabase.open(database.config);
         final ledger = await opened.db.query(
           'SELECT namespace FROM dw_migrations',
         );
@@ -252,4 +293,27 @@ void main() {
       throwsA(anyOf(isA<DwDatabaseException>(), isA<SocketException>())),
     );
   });
+
+  test(
+    'a port already taken fails the start and releases the database',
+    () async {
+      final database = await DwTestDatabase.create(
+        admin: adminConfig(),
+        prefix: 'server_test',
+      );
+      addTearDown(database.drop);
+      final taken = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(taken.close);
+      final server = app.server(database.config);
+      await expectLater(
+        server.startOn(
+          port: taken.port,
+          address: InternetAddress.loopbackIPv4,
+          handleSignals: false,
+        ),
+        throwsA(isA<SocketException>()),
+      );
+      expect(() => server.boundPort, throwsStateError);
+    },
+  );
 }
