@@ -4,6 +4,47 @@
 
 The rewrite (see docs/1.0).
 
+- **Accounts, keys and identities without SQL (D-042 – D-050).** A project
+  never queries `dw_account`, `dw_identity` or `dw_auth_key`; `ctx.accounts`
+  (`DwAccountService`) covers them:
+  - **session keys**: `issueKey(accountId, label:, kind: personal)` →
+    `({DwSessionKeyInfo key, String token})` — the token exists only in that
+    answer (stored as SHA-256; a command whose handler minted one stores no
+    successful outcome, so a retry runs again); `listKeys(accountId)`;
+    `revokeKey(keyId, {accountId})` → `bool`, at once in this process — the
+    token cache forgets the key and live connections on it lose their
+    subscriptions with `rejected`, as after a sign-out; other processes within
+    `tokenCacheTtl`. Sign-in keys are `DwSessionKeyKind.app`, labelled
+    `Dw-App-Version · User-Agent` (sanitised, 200 characters).
+  - **`ctx.sessionKey`** (`DwSessionKeyInfo?`): the key that authenticated
+    the call — its id, kind and label — on calls, channel subscription checks
+    and routes. **`DwRoute.get/post/any(..., auth: DwRouteAuth.optional |
+    required)`** reads `Authorization: Bearer` (401 for an unknown, revoked or
+    required-but-missing token; 400 for a malformed header); the default
+    `none` reads nothing, as before.
+  - **identities**: `listIdentities`, `listIdentitiesOf` (batch),
+    `accountsMatching(fragment, {kinds})`, `moveIdentities(from, to,
+    {kinds})` and `removeIdentities(accountId, {kinds})` — transactional,
+    under the per-identifier locks sign-in takes, revoking nothing.
+  - **built-in `DwRequestIdentifierCode` / `DwConfirmIdentifier`**: a
+    signed-in caller attaches an identifier, or changes theirs (`replace`), by
+    one-time code without signing in again — sign-in's normalization, limits
+    (shared per identifier), `fixedCode` and `deliverCode` (`ctx.accountId` is
+    the caller). Tickets are bound to their purpose and account. Another
+    account's identifier is refused `dw.identifierTaken` only after the right
+    code.
+  - **`DwAuthConfig.onIdentifierChanged(ctx, DwIdentifierChange)`**, in the
+    same transaction, for every change to an existing account's identifiers
+    (confirm, move, remove); a throw rolls the change back.
+- **Breaking: `onAccountCreated`'s last argument is `DwAccountOrigin`** —
+  `DwSignInOrigin(registration)` or `DwToolOrigin()` from
+  `DwAccountService.ensure` — instead of a registration map that was empty for
+  a tool. `ensure`'s identities are unverified (`verifiedAt == null`) until
+  they sign in.
+- **Framework migration `20260914_220000_dw_keys_and_identities`**:
+  `dw_auth_key.kind`, `label`; `dw_identity.verified_at`;
+  `dw_code_ticket.purpose`, `account_id`.
+
 - **Publications keep their channel through delivery (D-036).** The response
   transport groups what a command published by channel, filtered by the named
   live connection's subscriptions by exact channel.

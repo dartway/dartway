@@ -23,6 +23,11 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _storedFileBucketUp,
     _storedFileBucketDown,
   ),
+  const _DwSqlMigration(
+    '20260914_220000_dw_keys_and_identities',
+    _keysAndIdentitiesUp,
+    _keysAndIdentitiesDown,
+  ),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -190,6 +195,42 @@ const List<String> _storedFileBucketDown = [
   'ALTER TABLE dw_stored_file ADD CONSTRAINT dw_stored_file_object_key '
       'UNIQUE (object_key)',
   'ALTER TABLE dw_stored_file DROP COLUMN bucket',
+];
+
+// Session keys say what they are (an app's sign-in or a personal key made on
+// purpose) and carry a label for people; identities say when a code last
+// proved them; a code ticket says what its code is for and, for an identifier
+// being attached, whose it is.
+//
+// The defaults exist only to fill rows that predate this migration and are
+// dropped at once: the framework writes every one of these columns
+// explicitly, and a forgotten write must fail rather than default.
+const List<String> _keysAndIdentitiesUp = [
+  "ALTER TABLE dw_auth_key ADD COLUMN kind text NOT NULL DEFAULT 'app' "
+      "CHECK (kind IN ('app', 'personal'))",
+  "ALTER TABLE dw_auth_key ADD COLUMN label text NOT NULL DEFAULT ''",
+  'ALTER TABLE dw_auth_key ALTER COLUMN kind DROP DEFAULT',
+  'ALTER TABLE dw_auth_key ALTER COLUMN label DROP DEFAULT',
+  // Which rows predate the migration's verification cannot be known, so none
+  // is claimed verified.
+  'ALTER TABLE dw_identity ADD COLUMN verified_at timestamptz',
+  "ALTER TABLE dw_code_ticket ADD COLUMN purpose text NOT NULL DEFAULT 'signIn' "
+      "CHECK (purpose IN ('signIn', 'attach'))",
+  'ALTER TABLE dw_code_ticket ALTER COLUMN purpose DROP DEFAULT',
+  // The account attaching the identifier; `NULL` for a sign-in ticket.
+  'ALTER TABLE dw_code_ticket ADD COLUMN account_id bigint '
+      'REFERENCES dw_account (id) ON DELETE CASCADE',
+  "ALTER TABLE dw_code_ticket ADD CONSTRAINT dw_code_ticket_purpose_account "
+      "CHECK ((purpose = 'attach') = (account_id IS NOT NULL))",
+];
+
+const List<String> _keysAndIdentitiesDown = [
+  'ALTER TABLE dw_code_ticket DROP CONSTRAINT dw_code_ticket_purpose_account',
+  'ALTER TABLE dw_code_ticket DROP COLUMN account_id',
+  'ALTER TABLE dw_code_ticket DROP COLUMN purpose',
+  'ALTER TABLE dw_identity DROP COLUMN verified_at',
+  'ALTER TABLE dw_auth_key DROP COLUMN label',
+  'ALTER TABLE dw_auth_key DROP COLUMN kind',
 ];
 
 const List<String> _initialDown = [

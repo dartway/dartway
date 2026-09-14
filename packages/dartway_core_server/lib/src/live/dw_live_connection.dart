@@ -39,8 +39,12 @@ final class DwLiveConnection {
 
   // --- session -------------------------------------------------------------
 
-  int? accountId;
-  int? keyId;
+  /// The session key the connection authenticated with; `null` while
+  /// anonymous.
+  DwSessionKeyInfo? sessionKey;
+
+  int? get accountId => sessionKey?.accountId;
+  int? get keyId => sessionKey?.id;
 
   /// Bumped on every change of [accountId]; a subscription check that started
   /// under an older epoch does not take effect.

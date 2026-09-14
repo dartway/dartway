@@ -222,7 +222,15 @@ final class DwHttpFront {
       });
     }
     final where = 'route $route';
-    final ctx = runtime.context(scope: where, kind: DwContextKind.background);
+    final (sessionKey, refused) = await _routeSession(request, route, where);
+    if (refused != null) {
+      return (refused.status, refused.headers, refused.body);
+    }
+    final ctx = runtime.context(
+      scope: where,
+      kind: DwContextKind.background,
+      sessionKey: sessionKey,
+    );
     DwHttpResponse response;
     try {
       response = await route.handle(
@@ -256,6 +264,55 @@ final class DwHttpFront {
     return (response.status, response.headers, response.body);
   }
 
+  /// The session key of a route that authenticates, or the response that
+  /// answers the request instead: 400 for an `Authorization` header that is
+  /// not one bearer token, 401 for a token that is unknown or revoked (and for
+  /// none, when the route requires one), 500 when resolving fails.
+  Future<(DwSessionKeyInfo?, DwHttpResponse?)> _routeSession(
+    HttpRequest request,
+    DwRoute route,
+    String where,
+  ) async {
+    if (route.auth == DwRouteAuth.none) return (null, null);
+    const challenge = {'www-authenticate': 'Bearer'};
+    final String? token;
+    try {
+      final values = request.headers[DwHttpContract.authorizationHeader];
+      if (values != null && values.length > 1) {
+        throw const _MalformedAuthorization('the header is repeated');
+      }
+      token = dwBearerToken(
+        values?.single,
+        (what) => throw _MalformedAuthorization(what),
+      );
+    } on _MalformedAuthorization catch (error) {
+      _log.warning('$where: malformed Authorization: ${error.what}');
+      return (
+        null,
+        DwHttpResponse.text('malformed Authorization', status: 400),
+      );
+    }
+    if (token == null) {
+      return route.auth == DwRouteAuth.required
+          ? (null, DwHttpResponse.empty(status: 401, headers: challenge))
+          : (null, null);
+    }
+    try {
+      final key = await calls.authService.resolve(token);
+      if (key == null) {
+        return (null, DwHttpResponse.empty(status: 401, headers: challenge));
+      }
+      return (key, null);
+    } catch (error, stackTrace) {
+      final incident = runtime.alerts.report(
+        where: '$where authenticate',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return (null, DwHttpResponse.json({'incident': incident}, status: 500));
+    }
+  }
+
   static (int, Map<String, String>, List<int>) _text(
     int status,
     String text, [
@@ -265,4 +322,10 @@ final class DwHttpFront {
     {'content-type': 'text/plain; charset=utf-8', ...headers},
     utf8.encode(text),
   );
+}
+
+final class _MalformedAuthorization implements Exception {
+  const _MalformedAuthorization(this.what);
+
+  final String what;
 }

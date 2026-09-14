@@ -41,6 +41,38 @@ void main() {
     expect(profile.valueOrThrow.phone, '79990000010');
   });
 
+  test('a member changes the phone they sign in with by code, without signing '
+      'in again; the profile on screen follows', () async {
+    final nina = await club.member('79990000070', 'Nina');
+    final profile = nina.client.watch(const GetMyProfile());
+    addTearDown(profile.close);
+    await eventually(() => profile.isLive);
+
+    final ticket = await nina.client.command(
+      const DwRequestIdentifierCode(
+        kind: DwIdentifierKind.phone,
+        identifier: '+7 999 000-00-71',
+      ),
+    );
+    final identity = await nina.client.command(
+      DwConfirmIdentifier(
+        ticketId: ticket.valueOrThrow.id,
+        code: club.delivered['79990000071']!,
+        replace: true,
+      ),
+    );
+    expect(identity.valueOrThrow.value, '79990000071');
+    expect(identity.valueOrThrow.accountId, nina.accountId);
+    expect(dataOf(profile.state)!.phone, '79990000071');
+
+    final accounts = club.server.server.accounts;
+    expect(
+      await accounts.find(DwIdentifierKind.phone, '79990000071'),
+      nina.accountId,
+    );
+    expect(await accounts.find(DwIdentifierKind.phone, '79990000070'), isNull);
+  });
+
   test('the last spot goes to one member: the other schedule follows over the '
       "socket, the author's bookings follow from the response alone", () async {
     final session = await sessionWithSpots(1);

@@ -34,8 +34,8 @@ Future<void> main() async {
         DwAuthConfig(
           normalize: exampleAuth.normalize,
           deliverCode: exampleAuth.deliverCode,
-          onAccountCreated: (ctx, accountId, kind, identifier, registration) =>
-              createProfile(ctx.db, accountId, identifier, registration),
+          onAccountCreated: (ctx, accountId, kind, identifier, origin) =>
+              createProfile(ctx.db, accountId, identifier, const {}),
         ),
       );
 

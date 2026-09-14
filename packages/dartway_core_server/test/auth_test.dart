@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
@@ -64,6 +65,14 @@ void main() {
     )).value(anyVerify);
     expect(session.isNewAccount, isTrue);
     expect(app().createdAccounts, contains(session.id));
+    expect(
+      app().accountOrigins[session.id],
+      isA<DwSignInOrigin>().having(
+        (origin) => origin.registration,
+        'registration',
+        {'name': 'Ann'},
+      ),
+    );
     final profile = await harness().db.query(
       'SELECT name, identifier FROM profile WHERE account_id = @id',
       params: {'id': session.id},
@@ -222,6 +231,15 @@ void main() {
     expect(app().deliveredTo.length, deliveries);
     final session = (await verify(ticket.id, '000000')).value(anyVerify);
     expect(session.isNewAccount, isTrue);
+    expect(
+      app().accountOrigins[session.id],
+      isA<DwSignInOrigin>().having(
+        (origin) => origin.registration,
+        'registration',
+        isEmpty,
+      ),
+      reason: 'a sign-up that sent nothing is still a sign-in',
+    );
   });
 
   test('two tickets of one new identifier verified at once create one '

@@ -4,6 +4,16 @@
 
 The rewrite (see docs/1.0).
 
+- **Identity and session key DTOs (D-042, D-045).** Built into
+  `DwWireProtocol.core`: `DwRequestIdentifierCode(kind, identifier)` →
+  `DwCodeTicket` and `DwConfirmIdentifier(ticketId, code, replace)` →
+  `DwIdentityInfo` — attach or change an identifier by one-time code while
+  signed in; data objects `DwIdentityInfo` (id, accountId, kind, value,
+  createdAt, verifiedAt) and `DwSessionKeyInfo` (id, accountId, kind, label,
+  createdAt, lastUsedAt, revokedAt — never a token); `DwSessionKeyKind { app,
+  personal }`; `DwAuthRefusal.identifierTaken` (`dw.identifierTaken`), a
+  separate enum from `DwCoreRefusal`.
+
 - **Updates carry their channel (D-036).** A response's `updates` are grouped
   by channel wire name, then by type —
   `{"bookings:7": {"SessionBooking": [...]}, "schedule": {"ClubSession": [...]}}`

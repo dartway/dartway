@@ -6,6 +6,7 @@ import 'package:meta/meta.dart';
 
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_service.dart';
+import '../auth/dw_auth_store.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 
@@ -33,6 +34,18 @@ abstract class DwCallContext {
   /// The signed-in account; throws [DwNotAuthenticatedException] (answered as
   /// `unauthenticated`) when there is none.
   int get requireAccountId;
+
+  /// The session key that authenticated this call, or `null` for an
+  /// anonymous one: which key it is, its kind and its label.
+  ///
+  /// The server's own record, never something the client said: this is how a
+  /// handler tells a personal key made for a tool
+  /// ([DwSessionKeyKind.personal]) from the app. Present on calls, on channel
+  /// subscription checks (the key the live socket authenticated with) and on
+  /// routes declared with `DwRouteAuth.optional` or `DwRouteAuth.required`;
+  /// `null` in jobs. Its `lastUsedAt` is as of when the token was resolved
+  /// and may lag by `DwAuthConfig.keyTouchInterval`.
+  DwSessionKeyInfo? get sessionKey;
 
   /// The database. Inside a transactional command, and inside the body of
   /// [transaction], this is the transaction.
@@ -157,11 +170,14 @@ final class DwRuntimeContext extends DwCallContext {
     required DwJobQueue Function(DwRuntimeContext ctx) jobs,
     required DwAccountService Function(DwRuntimeContext ctx) accounts,
     DwFileService Function(DwRuntimeContext ctx)? files,
-    this.accountId,
-    this.keyId,
+    this.sessionKey,
+    String? clientAppVersion,
+    String? clientUserAgent,
   }) : _root = _Scope(db),
        _jobs = jobs,
        _accounts = accounts,
+       _clientAppVersion = clientAppVersion,
+       _clientUserAgent = clientUserAgent,
        _files = files ?? ((_) => const DwUnconfiguredFiles());
 
   final _Scope _root;
@@ -174,10 +190,30 @@ final class DwRuntimeContext extends DwCallContext {
   final DwContextKind kind;
 
   @override
-  final int? accountId;
+  final DwSessionKeyInfo? sessionKey;
 
-  /// The session key the caller authenticated with, for sign-out.
-  final int? keyId;
+  @override
+  int? get accountId => sessionKey?.accountId;
+
+  final String? _clientAppVersion;
+  final String? _clientUserAgent;
+
+  /// What the calling app said about itself, as the label of a key a sign-in
+  /// makes (`DwAuthStore.appLabel`); empty outside commands. Built on first
+  /// use: only a sign-in reads it.
+  late final String clientLabel = DwAuthStore.appLabel(
+    appVersion: _clientAppVersion,
+    userAgent: _clientUserAgent,
+  );
+
+  /// Whether the call made a secret its result may carry — a session key's
+  /// token (`DwAccountService.issueKey`). A command that did never stores its
+  /// successful outcome for idempotency: the outcome table must not hold a
+  /// token, so a retried send runs again instead of replaying.
+  bool get madeSecret => _madeSecret;
+  bool _madeSecret = false;
+
+  void markSecret() => _madeSecret = true;
 
   @override
   final DwWireProtocol protocol;

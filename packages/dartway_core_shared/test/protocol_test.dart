@@ -132,6 +132,74 @@ void main() {
       expect(wire(verify, session), session);
     });
 
+    test('the identity and session key DTOs round-trip, absent optional '
+        'fields omitted, and never carry a token', () {
+      final created = DateTime.utc(2026, 9, 14, 12);
+      final identity = DwIdentityInfo(
+        id: 3,
+        accountId: 7,
+        kind: DwIdentifierKind.phone,
+        value: '+15550001111',
+        createdAt: created,
+      );
+      expect(identity.toJson().containsKey('verifiedAt'), isFalse);
+      const confirm = DwConfirmIdentifier(ticketId: 't', code: '1234');
+      expect(wire(confirm, identity), identity);
+      final verified = DwIdentityInfo(
+        id: 3,
+        accountId: 7,
+        kind: DwIdentifierKind.phone,
+        value: '+15550001111',
+        createdAt: created,
+        verifiedAt: created.add(const Duration(minutes: 1)),
+      );
+      expect(wire(confirm, verified), verified);
+
+      final key = DwSessionKeyInfo(
+        id: 9,
+        accountId: 7,
+        kind: DwSessionKeyKind.personal,
+        label: 'Claude Code',
+        createdAt: created,
+        lastUsedAt: created,
+      );
+      expect(key.toJson().keys, [
+        'id',
+        'accountId',
+        'kind',
+        'label',
+        'createdAt',
+        'lastUsedAt',
+      ]);
+      expect(DwSessionKeyInfo.fromJson(key.toJson()), key);
+      expect(protocol.decodeValue<DwSessionKeyInfo>(key.toJson()), key);
+      final revoked = DwSessionKeyInfo(
+        id: 9,
+        accountId: 7,
+        kind: DwSessionKeyKind.personal,
+        label: 'Claude Code',
+        createdAt: created,
+        lastUsedAt: created,
+        revokedAt: created,
+      );
+      expect(DwSessionKeyInfo.fromJson(revoked.toJson()), revoked);
+      expect(revoked.isRevoked, isTrue);
+
+      for (final command in [
+        const DwRequestIdentifierCode(
+          kind: DwIdentifierKind.email,
+          identifier: 'a@b.c',
+        ),
+        confirm,
+        const DwConfirmIdentifier(ticketId: 't', code: '1', replace: true),
+      ]) {
+        final entry = protocol.entryNamed(command.dwTypeName)!;
+        expect(entry.fromJson(command.toJson()), command);
+      }
+      expect(confirm.toJson().containsKey('replace'), isFalse);
+      expect(DwAuthRefusal.identifierTaken.code, 'dw.identifierTaken');
+    });
+
     test('primitives, nullable primitives and void', () {
       expect(wire(const _Command<int>(), 42), 42);
       expect(wire(const _Command<String>(), 'ok'), 'ok');
@@ -194,6 +262,10 @@ void main() {
         'DwVerifyCode',
         'DwAuthSession',
         'DwSignOut',
+        'DwRequestIdentifierCode',
+        'DwConfirmIdentifier',
+        'DwIdentityInfo',
+        'DwSessionKeyInfo',
         'DwStartUpload',
         'DwUploadTicket',
         'DwFinishUpload',
@@ -214,6 +286,10 @@ void main() {
           'DwVerifyCode': DwWireObjectKind.command,
           'DwAuthSession': DwWireObjectKind.dataObject,
           'DwSignOut': DwWireObjectKind.command,
+          'DwRequestIdentifierCode': DwWireObjectKind.command,
+          'DwConfirmIdentifier': DwWireObjectKind.command,
+          'DwIdentityInfo': DwWireObjectKind.dataObject,
+          'DwSessionKeyInfo': DwWireObjectKind.dataObject,
           'DwStartUpload': DwWireObjectKind.command,
           'DwUploadTicket': DwWireObjectKind.dataObject,
           'DwFinishUpload': DwWireObjectKind.command,

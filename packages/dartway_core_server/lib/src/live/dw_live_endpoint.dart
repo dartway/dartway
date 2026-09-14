@@ -215,7 +215,7 @@ final class DwLiveEndpoint {
     await previous;
     if (connection.isClosing) return;
     if (token == null) {
-      _hub.authenticate(connection, null, null);
+      _hub.authenticate(connection, null);
       connection.send(const DwAuthenticatedMessage.anonymous());
       return;
     }
@@ -223,11 +223,11 @@ final class DwLiveEndpoint {
       final session = await authService.resolve(token);
       if (connection.isClosing) return;
       if (session == null) {
-        _hub.authenticate(connection, null, null);
+        _hub.authenticate(connection, null);
         connection.send(const DwAuthenticatedMessage.rejected());
         return;
       }
-      _hub.authenticate(connection, session.accountId, session.keyId);
+      _hub.authenticate(connection, session);
       connection.send(DwAuthenticatedMessage.account(session.accountId));
     } catch (error, stackTrace) {
       // Neither "anonymous" nor "rejected" would be true: the client must try
@@ -237,7 +237,7 @@ final class DwLiveEndpoint {
         error: error,
         stackTrace: stackTrace,
       );
-      _hub.authenticate(connection, null, null);
+      _hub.authenticate(connection, null);
       await connection.close(DwCloseCode.internalError, 'dw.failed:$incident');
     }
   }
@@ -294,8 +294,7 @@ final class DwLiveEndpoint {
     final ctx = runtime.context(
       scope: 'subscribe ${parsed.kind}',
       kind: DwContextKind.subscription,
-      accountId: connection.accountId,
-      keyId: connection.keyId,
+      sessionKey: connection.sessionKey,
     );
     final bool allowed;
     try {

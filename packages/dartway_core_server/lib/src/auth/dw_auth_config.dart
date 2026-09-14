@@ -13,6 +13,7 @@ final class DwAuthConfig {
     required this.deliverCode,
     this.fixedCode,
     this.onAccountCreated,
+    this.onIdentifierChanged,
     this.codeLength = 6,
     this.codeLifetime = const Duration(minutes: 10),
     this.maxAttempts = 5,
@@ -32,6 +33,11 @@ final class DwAuthConfig {
   /// Sends [code] to [identifier]. Runs inside the transaction that records
   /// the ticket: when delivery throws, no ticket exists and the request does
   /// not count against the limit. Never log the code.
+  ///
+  /// Called for sign-in codes (`DwRequestCode`, `ctx.accountId` is `null`)
+  /// and for codes confirming an identifier a signed-in account attaches
+  /// (`DwRequestIdentifierCode`, `ctx.accountId` is that account) — the place
+  /// to word the two messages differently.
   final Future<void> Function(
     DwCallContext ctx,
     DwIdentifierKind kind,
@@ -43,6 +49,11 @@ final class DwAuthConfig {
   /// A code that is accepted instead of a delivered one — for store reviewers
   /// and test accounts. [accountId] is the account the identifier belongs to,
   /// or `null`. Returning a code skips delivery.
+  ///
+  /// Asked for sign-in codes and for the codes of `DwRequestIdentifierCode`
+  /// alike; in the second case `ctx.accountId` is the signed-in caller
+  /// attaching the identifier (it is `null` for a sign-in), as it is in
+  /// [deliverCode].
   final Future<String?> Function(
     DwCallContext ctx,
     DwIdentifierKind kind,
@@ -51,17 +62,36 @@ final class DwAuthConfig {
   )?
   fixedCode;
 
-  /// Runs in the sign-in transaction when an identifier gets a new account:
-  /// the place to insert the project's profile. [registration] is what the
-  /// client sent with the code.
+  /// Runs in the transaction that creates an account for an identifier: the
+  /// place to insert the project's profile. [origin] says who created it — a
+  /// sign-in, with what the client sent with the code
+  /// ([DwSignInOrigin.registration]), or a tool through
+  /// `DwAccountService.ensure` ([DwToolOrigin]), which has accepted nothing
+  /// on anyone's behalf.
+  ///
+  /// Refusing here refuses the sign-in, and nothing is created.
   final Future<void> Function(
     DwCallContext ctx,
     int accountId,
     DwIdentifierKind kind,
     String identifier,
-    Map<String, String> registration,
+    DwAccountOrigin origin,
   )?
   onAccountCreated;
+
+  /// Runs in the transaction that changes an existing account's identifiers
+  /// through the framework — `DwConfirmIdentifier`, and
+  /// `DwAccountService.moveIdentities` / `removeIdentities` — once per account
+  /// and identifier affected, after the change: the place to mirror an
+  /// identifier into the project's own rows. Throwing (or refusing) undoes the
+  /// change.
+  ///
+  /// Not called for the identity an account is created with
+  /// ([onAccountCreated] sees it), nor when a sign-in merely confirms an
+  /// identifier the account already has. The framework publishes nothing
+  /// about identifiers; publishing is the hook's to do.
+  final Future<void> Function(DwCallContext ctx, DwIdentifierChange change)?
+  onIdentifierChanged;
 
   /// Digits in a delivered code.
   final int codeLength;
@@ -81,4 +111,77 @@ final class DwAuthConfig {
   /// `last_used_at` of a session key is written at most once per this
   /// interval, not on every call.
   final Duration keyTouchInterval;
+}
+
+/// Who created an account: the argument of `DwAuthConfig.onAccountCreated`.
+sealed class DwAccountOrigin {
+  const DwAccountOrigin();
+
+  /// A sign-in by one-time code to an identifier without an account.
+  const factory DwAccountOrigin.signIn(Map<String, String> registration) =
+      DwSignInOrigin;
+
+  /// `DwAccountService.ensure`: a seed, an admin bootstrap, an import.
+  const factory DwAccountOrigin.tool() = DwToolOrigin;
+}
+
+/// An account created by signing in.
+final class DwSignInOrigin extends DwAccountOrigin {
+  const DwSignInOrigin(this.registration);
+
+  /// What the client sent with the code (`DwVerifyCode.registration`) — the
+  /// project's sign-up fields; empty when it sent none.
+  final Map<String, String> registration;
+
+  @override
+  String toString() => 'DwSignInOrigin(${registration.keys.join(', ')})';
+}
+
+/// An account created by `DwAccountService.ensure`, outside any sign-in.
+final class DwToolOrigin extends DwAccountOrigin {
+  const DwToolOrigin();
+
+  @override
+  String toString() => 'DwToolOrigin()';
+}
+
+/// Why an account's identifiers changed.
+enum DwIdentifierChangeCause {
+  /// The account's owner confirmed a code (`DwConfirmIdentifier`).
+  confirmed,
+
+  /// `DwAccountService.moveIdentities` moved it between accounts.
+  moved,
+
+  /// `DwAccountService.removeIdentities` removed it.
+  removed,
+}
+
+/// One identifier of one account changed: the argument of
+/// `DwAuthConfig.onIdentifierChanged`.
+///
+/// [previous] is the value the account had and [current] the value it has:
+/// an attached identifier has no [previous], a removed one no [current], a
+/// replaced one both. A move is two changes — removed from the account it
+/// left, attached to the account it joined.
+final class DwIdentifierChange {
+  const DwIdentifierChange({
+    required this.accountId,
+    required this.kind,
+    required this.cause,
+    this.previous,
+    this.current,
+  }) : assert(previous != null || current != null);
+
+  final int accountId;
+  final DwIdentifierKind kind;
+  final DwIdentifierChangeCause cause;
+  final String? previous;
+  final String? current;
+
+  /// Without the values: an identifier is personal data, and a change is the
+  /// kind of thing that ends up in a log line.
+  @override
+  String toString() =>
+      'DwIdentifierChange(account $accountId, ${kind.name}, ${cause.name})';
 }

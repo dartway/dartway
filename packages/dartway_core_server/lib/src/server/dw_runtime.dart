@@ -46,8 +46,9 @@ final class DwRuntime {
     required String scope,
     required DwContextKind kind,
     DwDatabaseHandle? db,
-    int? accountId,
-    int? keyId,
+    DwSessionKeyInfo? sessionKey,
+    String? clientAppVersion,
+    String? clientUserAgent,
   }) => DwRuntimeContext(
     db: db ?? this.db,
     kind: kind,
@@ -56,8 +57,9 @@ final class DwRuntime {
     jobs: jobsFor,
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
-    accountId: accountId,
-    keyId: keyId,
+    sessionKey: sessionKey,
+    clientAppVersion: clientAppVersion,
+    clientUserAgent: clientUserAgent,
   );
 
   /// Delivers the committed effects of [ctx] and returns the updates its

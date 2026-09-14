@@ -11,6 +11,10 @@ enum TestChannel with DwChannelKind {
 
   /// Keyed by the subscriber's account: `DwChannelRule.ofCaller`.
   inbox,
+
+  /// Open to live sockets authenticated with a personal key only: a
+  /// subscription check reading `ctx.sessionKey`.
+  tools,
 }
 
 final class NoteView extends DwDataObject {
@@ -694,6 +698,87 @@ final class SlowNote extends DwActionCommand<NoteView> {
       SlowNote(json['text']! as String, json['millis']! as int);
 }
 
+/// Answers the session key that authenticated the call, `null` when anonymous.
+final class WhichKey extends DwActionCommand<DwSessionKeyInfo?> {
+  const WhichKey();
+
+  @override
+  String get dwTypeName => 'WhichKey';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static WhichKey fromJson(Map<String, Object?> json) => const WhichKey();
+}
+
+/// The caller's session key, as a read.
+final class CurrentKey extends DwSingleRequest<DwSessionKeyInfo> {
+  const CurrentKey();
+
+  @override
+  String get dwTypeName => 'CurrentKey';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static CurrentKey fromJson(Map<String, Object?> json) => const CurrentKey();
+}
+
+/// A key the caller made, with its token: what a project's "new access key"
+/// command answers once.
+final class IssuedKey extends DwDataObject {
+  const IssuedKey({required this.id, required this.token});
+
+  @override
+  final int id;
+  final String token;
+
+  @override
+  String get dwTypeName => 'IssuedKey';
+
+  @override
+  Map<String, Object?> toJson() => {'id': id, 'token': token};
+
+  static IssuedKey fromJson(Map<String, Object?> json) =>
+      IssuedKey(id: json['id']! as int, token: json['token']! as String);
+}
+
+/// `ctx.accounts.issueKey` for the caller.
+final class IssueKey extends DwActionCommand<IssuedKey> {
+  const IssueKey(this.label, {this.ending = 'ok'});
+
+  final String label;
+
+  /// `ok`, or `refuse` after issuing (the key is rolled back).
+  final String ending;
+
+  @override
+  String get dwTypeName => 'IssueKey';
+
+  @override
+  Map<String, Object?> toJson() => {'label': label, 'ending': ending};
+
+  static IssueKey fromJson(Map<String, Object?> json) =>
+      IssueKey(json['label']! as String, ending: json['ending']! as String);
+}
+
+/// `ctx.accounts.revokeKey` of the caller's own key; answers whether one was
+/// revoked.
+final class RevokeMyKey extends DwActionCommand<bool> {
+  const RevokeMyKey(this.keyId);
+
+  final int keyId;
+
+  @override
+  String get dwTypeName => 'RevokeMyKey';
+
+  @override
+  Map<String, Object?> toJson() => {'keyId': keyId};
+
+  static RevokeMyKey fromJson(Map<String, Object?> json) =>
+      RevokeMyKey(json['keyId']! as int);
+}
+
 final DwWireProtocol testProtocol = DwWireProtocol([
   DwProtocolEntry<NoteView>('NoteView', NoteView.fromJson),
   DwProtocolEntry<MessageView>('MessageView', MessageView.fromJson),
@@ -733,4 +818,9 @@ final DwWireProtocol testProtocol = DwWireProtocol([
   DwProtocolEntry<SmallUpload>('SmallUpload', SmallUpload.fromJson),
   DwProtocolEntry<LargeUpload>('LargeUpload', LargeUpload.fromJson),
   DwProtocolEntry<SlowNote>('SlowNote', SlowNote.fromJson),
+  DwProtocolEntry<WhichKey>('WhichKey', WhichKey.fromJson),
+  DwProtocolEntry<CurrentKey>('CurrentKey', CurrentKey.fromJson),
+  DwProtocolEntry<IssuedKey>('IssuedKey', IssuedKey.fromJson),
+  DwProtocolEntry<IssueKey>('IssueKey', IssueKey.fromJson),
+  DwProtocolEntry<RevokeMyKey>('RevokeMyKey', RevokeMyKey.fromJson),
 ], include: DwWireProtocol.core);

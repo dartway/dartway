@@ -4,6 +4,8 @@
 >
 > **As built after the example port (D-036, D-037):** response `updates` are grouped by channel wire name, then by type (`DwUpdateTransport` of `DwChannelUpdates`), collapsed by (channel, type, id); the socket `upd` keeps naming its channel beside one channel's type groups. The client applies an object only to entries whose request declares that channel, caller channels resolved for the entry's account; a request without channels hears no updates. `DwLiveChannel.ofCaller(kind)` is resolved by the client to `kind:<accountId>`; the server's `DwChannelRule.ofCaller(kind)` allows only the caller's own key and a handler publishes with `DwLiveChannel.forAccount(kind, accountId)` (publishing an unresolved caller channel throws). `DwTableRequest` answers `matches ? upsert : remove`: an object on the page is replaced in place, an upsert of an object not on the page and every removal re-read the page (coalesced). The live socket's origin check compares full origins (scheme, host, port): the origin the upgrade was sent to (its `Host`) and `allowedOrigins`, which are full origins checked at startup.
 
+> **As built for accounts, keys and identities (D-042 – D-050):** session keys are `app` (sign-in) or `personal` (`DwAccountService.issueKey`) with a label; `ctx.sessionKey` names the key of every authenticated context, routes authenticate by `DwRouteAuth`; one key is revoked with `revokeKey`, at once in-process. Identifiers are attached or changed by code with the built-in `DwRequestIdentifierCode` / `DwConfirmIdentifier`, mirrored by `onIdentifierChanged`, moved and removed by `DwAccountService`; `onAccountCreated` receives a `DwAccountOrigin`. §3.3 is current.
+
 **This section supersedes everything below it where they disagree.** It records the decisions of the morning review; the build is being redone to match. Sections below remain valid where untouched.
 
 ## R2.1 Naming — no name shorter than two words
@@ -161,7 +163,7 @@ Window cursors are opaque strings the server builds from the sort value and the 
 
 ## R2.6 External doors
 
-`DwRoute.get/post/any(path, (DwRouteContext ctx, DwHttpRequest request) async => DwHttpResponse)` — framework types over the HTTP server. **No relic (D-028): the server runs directly on `dart:io` `HttpServer`** with a thin layer of its own — routing `/dw/<type>`, `/dw/live`, `/health` and project doors by map lookup, body reading with a limit, the few headers it needs, response writing, graceful stop.
+`DwRoute.get/post/any(path, (DwRouteContext ctx, DwHttpRequest request) async => DwHttpResponse, {auth: DwRouteAuth.none|optional|required})` — `auth` reads `Authorization: Bearer` as a call does and fills `ctx.accountId`/`ctx.sessionKey` (D-042); framework types over the HTTP server. **No relic (D-028): the server runs directly on `dart:io` `HttpServer`** with a thin layer of its own — routing `/dw/<type>`, `/dw/live`, `/health` and project doors by map lookup, body reading with a limit, the few headers it needs, response writing, graceful stop.
 
 ## R2.7 Web and deploy (for the deploy milestone)
 
@@ -481,20 +483,50 @@ Projects add their notions by extension: `extension ExampleContext on DwContext 
 
 ### 3.3 Auth
 
-Framework tables (framework migrations, namespace `dw`): `dw_account`, `dw_identity(account_id, kind, value, unique(kind, value))`, `dw_auth_key(account_id, token_hash unique, created_at, last_used_at, revoked_at)`, `dw_code_ticket`, `dw_command_outcome`, `dw_job`, `dw_recurring_job`.
+Framework tables (framework migrations, namespace `dw`): `dw_account`, `dw_identity(account_id, kind, value, verified_at, unique(kind, value))`, `dw_auth_key(account_id, token_hash unique, kind app|personal, label, created_at, last_used_at, revoked_at)`, `dw_code_ticket(…, purpose signIn|attach, account_id)`, `dw_command_outcome`, `dw_job`, `dw_recurring_job`, `dw_stored_file`. **A project never queries them**: `DwAccountService` (`ctx.accounts`, `server.accounts`, or over a bare database) is the whole surface.
 
 ```dart
-final exampleAuth = DwAuth(
+final exampleAuth = DwAuthConfig(
   normalize: (kind, raw) => …,                       // required: String? (null = invalid identifier → dw.invalid)
-  deliverCode: (ctx, kind, identifier, code) async { … },
-  fixedCode: (ctx, kind, identifier, accountId) async => null,   // reviewer/test codes
-  onAccountCreated: (ctx, accountId, kind, identifier, registration) async { … },   // same transaction
+  deliverCode: (ctx, kind, identifier, code) async { … },        // ctx.accountId: null for sign-in, the attaching account otherwise
+  fixedCode: (ctx, kind, identifier, accountId) async => null,   // reviewer/test codes; asked for both purposes
+  onAccountCreated: (ctx, accountId, kind, identifier, origin) async { … },   // same transaction; origin: DwSignInOrigin(registration) | DwToolOrigin()
+  onIdentifierChanged: (ctx, change) async { … },    // same transaction; DwIdentifierChange(accountId, kind, cause, previous, current)
   codeLength: 6, codeLifetime: Duration(minutes: 10),
   maxAttempts: 5, maxRequestsPerWindow: 5, requestWindow: Duration(minutes: 10),
 );
 ```
 
-Handlers for `DwRequestCode`, `DwVerifyCode`, `DwSignOut` are built in. `DwVerifyCode` returns a `DwSession` whose token the client sends in `DwAuthenticateMessage`. Tokens are stored hashed. Sign-out revokes the key and closes the connection's subscriptions.
+Built-in commands (`DwWireProtocol.core`):
+
+| Command | Access | Result | Notes |
+|---|---|---|---|
+| `DwRequestCode(kind, identifier)` | anonymous | `DwCodeTicket` | sign-in ticket; answer does not reveal whether an account exists |
+| `DwVerifyCode(ticketId, code, registration)` | anonymous | `DwAuthSession` | sign-in tickets only; creates the account when needed; the session is a new `app` key labelled `Dw-App-Version · User-Agent`; success never stored as an outcome |
+| `DwSignOut()` | signed in | `void` | revokes the caller's key |
+| `DwRequestIdentifierCode(kind, identifier)` | signed in | `DwCodeTicket` | attach ticket bound to the caller; limits per identifier shared with sign-in |
+| `DwConfirmIdentifier(ticketId, code, replace)` | signed in | `DwIdentityInfo` | the caller's attach tickets only; `dw.identifierTaken` (field `code`) when another account owns it, told only after the right code; `replace` changes the oldest identity of the kind in place and removes the others |
+
+Tokens are 256 random bits, stored as SHA-256, never logged; a command whose handler minted one (`issueKey`) stores no successful outcome (D-043). A sign-out and a revocation made through a server take effect at once in its process — the next call is 401 and live connections on the key lose their subscriptions with `rejected` — and in other processes within `DwServerSettings.tokenCacheTtl`.
+
+```dart
+// accounts
+ctx.accounts.ensure(kind, raw) → ({int accountId, bool created})      // DwToolOrigin
+ctx.accounts.find(kind, raw) → int?
+// identities
+ctx.accounts.listIdentities(accountId) → List<DwIdentityInfo>          // id, accountId, kind, value, createdAt, verifiedAt
+ctx.accounts.listIdentitiesOf(accountIds) → Map<int, List<DwIdentityInfo>>
+ctx.accounts.accountsMatching(fragment, {kinds}) → Set<int>
+ctx.accounts.moveIdentities(from, to, {kinds}) → List<DwIdentityInfo>  // transactional, identifier locks, revokes nothing
+ctx.accounts.removeIdentities(accountId, {kinds}) → List<DwIdentityInfo>
+// session keys
+ctx.accounts.issueKey(accountId, label:, kind: personal) → ({DwSessionKeyInfo key, String token})   // token shown once
+ctx.accounts.listKeys(accountId) → List<DwSessionKeyInfo>              // id, accountId, kind, label, createdAt, lastUsedAt, revokedAt
+ctx.accounts.revokeKey(keyId, {accountId}) → bool
+ctx.accounts.revokeKeys(accountId)
+// the call's key
+ctx.sessionKey → DwSessionKeyInfo?                                      // calls, subscription checks, DwRoute(auth: optional|required)
+```
 
 ### 3.4 Channels
 

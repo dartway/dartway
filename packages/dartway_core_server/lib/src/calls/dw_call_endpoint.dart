@@ -8,7 +8,6 @@ import 'package:meta/meta.dart';
 import '../alerts/dw_alert_sink.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_auth_service.dart';
-import '../auth/dw_session_cache.dart';
 import '../context/dw_call_context.dart';
 import '../handlers/dw_call_handler.dart';
 import '../http/dw_request_body.dart';
@@ -57,10 +56,6 @@ final class DwCallEndpoint {
 
   static const int _maxTransactionAttempts = 3;
   static const int maxIdempotencyKeyLength = 128;
-
-  /// `b64token` of RFC 6750: what a token can be, and not two tokens folded
-  /// into one header by a proxy.
-  static final RegExp _bearerTokenPattern = RegExp(r'^[A-Za-z0-9\-._~+/]+=*$');
 
   DwWireProtocol get _protocol => runtime.protocol;
   DwServerLogger get _log => runtime.log;
@@ -158,7 +153,10 @@ final class DwCallEndpoint {
       );
     }
     final liveConnectionId = _header(http, DwHttpContract.liveConnectionHeader);
-    final token = _bearerToken(http, path);
+    final token = dwBearerToken(
+      _header(http, DwHttpContract.authorizationHeader),
+      (what) => _malformed(path, what),
+    );
     final query = _query(http, path);
     final call = await _decode(http, body, entry!, handler, path);
 
@@ -184,7 +182,7 @@ final class DwCallEndpoint {
     }
 
     // 3. Who calls.
-    DwResolvedSession? session;
+    DwSessionKeyInfo? session;
     if (token != null) {
       session = await authService.resolve(token);
       if (session == null) return const DwApiResponse.unauthenticated();
@@ -202,6 +200,7 @@ final class DwCallEndpoint {
           session,
           liveConnectionId,
           name,
+          (appVersion, _header(http, HttpHeaders.userAgentHeader)),
         ),
       _ => throw StateError('unreachable'),
     };
@@ -211,15 +210,14 @@ final class DwCallEndpoint {
     DwRequestHandler handler,
     DwDataRequest<Object?> request,
     Object? prepared,
-    DwResolvedSession? session,
+    DwSessionKeyInfo? session,
     String name,
   ) async {
     final where = 'request $name';
     final ctx = runtime.context(
       scope: where,
       kind: DwContextKind.request,
-      accountId: session?.accountId,
-      keyId: session?.keyId,
+      sessionKey: session,
     );
     try {
       _requireSignIn(handler.access, ctx);
@@ -235,17 +233,19 @@ final class DwCallEndpoint {
     DwCommandHandler handler,
     DwActionCommand<Object?> command,
     String key,
-    DwResolvedSession? session,
+    DwSessionKeyInfo? session,
     String? liveConnectionId,
     String name,
+    (String?, String?) client,
   ) async {
     final where = 'command $name';
     final accountId = session?.accountId;
     final ctx = runtime.context(
       scope: where,
       kind: DwContextKind.command,
-      accountId: accountId,
-      keyId: session?.keyId,
+      sessionKey: session,
+      clientAppVersion: client.$1,
+      clientUserAgent: client.$2,
     );
     DwApiResponse response;
     try {
@@ -292,7 +292,7 @@ final class DwCallEndpoint {
       if (!handler.transactional) {
         await _check(handler.access, ctx, command);
         final value = await handler.run(ctx, command);
-        if (handler.recordsSuccess) {
+        if (handler.recordsSuccess && !ctx.madeSecret) {
           await _record(runtime.db, key, accountId, typeName, 'ok', value);
         }
         return DwApiResponse.ok(value);
@@ -310,7 +310,7 @@ final class DwCallEndpoint {
             if (stored != null) return _replay(stored, typeName);
             await _check(handler.access, ctx, command);
             final value = await handler.run(ctx, command);
-            if (handler.recordsSuccess) {
+            if (handler.recordsSuccess && !ctx.madeSecret) {
               await _record(tx, key, accountId, typeName, 'ok', value);
             }
             return DwApiResponse.ok(value);
@@ -440,24 +440,6 @@ final class DwCallEndpoint {
     }
   }
 
-  String? _bearerToken(HttpRequest http, String path) {
-    final value = _header(http, DwHttpContract.authorizationHeader);
-    if (value == null) return null;
-    final prefix = DwHttpContract.bearerPrefix;
-    // The scheme is case-insensitive (RFC 9110), the token is not.
-    if (value.length <= prefix.length ||
-        value.substring(0, prefix.length).toLowerCase() !=
-            prefix.toLowerCase()) {
-      _malformed(path, 'Authorization is not a Bearer token');
-    }
-    final token = value.substring(prefix.length);
-    if (token.length > DwAuthService.maxTokenLength ||
-        !_bearerTokenPattern.hasMatch(token)) {
-      _malformed(path, 'Authorization does not carry one bearer token');
-    }
-    return token;
-  }
-
   Map<String, String> _query(HttpRequest http, String path) {
     final all = http.uri.queryParametersAll;
     if (all.isEmpty) return const {};
@@ -571,3 +553,28 @@ final class _StoredOutcome {
   final String status;
   final Object? result;
 }
+
+/// The token of an `Authorization: Bearer` header [value], or `null` when
+/// there is no header. Anything else — another scheme, no token, two tokens
+/// folded into one header by a proxy, a token longer than
+/// [DwAuthService.maxTokenLength] — goes to [malformed], which throws.
+@internal
+String? dwBearerToken(String? value, Never Function(String what) malformed) {
+  if (value == null) return null;
+  final prefix = DwHttpContract.bearerPrefix;
+  // The scheme is case-insensitive (RFC 9110), the token is not.
+  if (value.length <= prefix.length ||
+      value.substring(0, prefix.length).toLowerCase() != prefix.toLowerCase()) {
+    malformed('Authorization is not a Bearer token');
+  }
+  final token = value.substring(prefix.length);
+  if (token.length > DwAuthService.maxTokenLength ||
+      !_bearerTokenPattern.hasMatch(token)) {
+    malformed('Authorization does not carry one bearer token');
+  }
+  return token;
+}
+
+/// `b64token` of RFC 6750: what a token can be, and not two tokens folded
+/// into one header by a proxy.
+final RegExp _bearerTokenPattern = RegExp(r'^[A-Za-z0-9\-._~+/]+=*$');

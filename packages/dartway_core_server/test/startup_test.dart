@@ -196,6 +196,7 @@ void main() {
         // migration runs after an earlier app one.
         'dw/20260914_000000_dw_stored_file',
         'dw/20260914_180000_dw_stored_file_bucket',
+        'dw/20260914_220000_dw_keys_and_identities',
       ]);
       await server.stop();
 

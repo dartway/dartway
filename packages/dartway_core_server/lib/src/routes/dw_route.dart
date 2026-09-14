@@ -4,9 +4,10 @@ import '../context/dw_call_context.dart';
 import '../http/dw_http_request.dart';
 import '../http/dw_http_response.dart';
 
-/// The context of a project route: a [DwCallContext] without an account.
-/// Publications and jobs are allowed; they are delivered when the route
-/// answers.
+/// The context of a project route: a [DwCallContext], with the caller's
+/// account and session key when the route authenticates ([DwRouteAuth]), and
+/// without them otherwise. Publications and jobs are allowed; they are
+/// delivered when the route answers.
 typedef DwRouteContext = DwCallContext;
 
 /// Handles one external HTTP door.
@@ -30,21 +31,51 @@ typedef DwRouteHandler =
 /// `DwNotAuthenticatedException` with 401, and anything else with 500 and
 /// the incident id only — and an alert.
 final class DwRoute {
-  const DwRoute._(this.method, this.path, this.handle);
+  const DwRoute._(this.method, this.path, this.handle, this.auth);
 
-  DwRoute.get(String path, DwRouteHandler handle) : this._('GET', path, handle);
+  DwRoute.get(
+    String path,
+    DwRouteHandler handle, {
+    DwRouteAuth auth = DwRouteAuth.none,
+  }) : this._('GET', path, handle, auth);
 
-  DwRoute.post(String path, DwRouteHandler handle)
-    : this._('POST', path, handle);
+  DwRoute.post(
+    String path,
+    DwRouteHandler handle, {
+    DwRouteAuth auth = DwRouteAuth.none,
+  }) : this._('POST', path, handle, auth);
 
   /// Every method; a route of the same path with a specific method wins.
-  DwRoute.any(String path, DwRouteHandler handle) : this._(null, path, handle);
+  DwRoute.any(
+    String path,
+    DwRouteHandler handle, {
+    DwRouteAuth auth = DwRouteAuth.none,
+  }) : this._(null, path, handle, auth);
 
   /// Upper case, or `null` for [DwRoute.any].
   final String? method;
   final String path;
   final DwRouteHandler handle;
 
+  /// Whether the route reads `Authorization: Bearer <token>` as a call does.
+  final DwRouteAuth auth;
+
   @override
   String toString() => '${method ?? 'ANY'} $path';
+}
+
+/// How a route treats `Authorization: Bearer <token>` — the same session
+/// tokens calls carry, app and personal keys alike.
+enum DwRouteAuth {
+  /// The header is not read: `ctx.accountId` and `ctx.sessionKey` are `null`.
+  /// For doors whose callers prove themselves otherwise (a signed webhook).
+  none,
+
+  /// A valid token signs the route's context in; no header leaves it
+  /// anonymous. A token that is unknown or revoked is answered 401 before the
+  /// handler runs, as on a call — a caller holding a dead token must learn it.
+  optional,
+
+  /// As [optional], and no header is answered 401 too.
+  required,
 }

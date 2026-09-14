@@ -10,7 +10,7 @@ export 'src/alerts/dw_alert_sink.dart'
     show DwAlertSink, DwLogAlertSink, DwServerIncident, DwTelegramAlertSink;
 export 'src/alerts/dw_server_logger.dart';
 export 'src/auth/dw_account_service.dart'
-    show DwAccountService, DwEnsuredAccount;
+    show DwAccountService, DwEnsuredAccount, DwIssuedKey;
 export 'src/auth/dw_auth_config.dart';
 export 'src/channels/dw_channel_rule.dart' show DwChannelRule;
 export 'src/files/dw_file_service.dart' show DwFileService;

@@ -1,10 +1,7 @@
 import 'dart:collection';
 
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:meta/meta.dart';
-
-/// A session a token resolved to.
-@internal
-typedef DwResolvedSession = ({int accountId, int keyId});
 
 /// Tokens already resolved to sessions, so that a call — every call is an
 /// HTTP request now — authenticates without a query in the common case.
@@ -46,7 +43,7 @@ final class DwSessionCache {
     final entry = _entries.remove(hash);
     if (entry == null) return null;
     if (!now.isBefore(entry.expiresAt)) {
-      _hashOfKey.remove(entry.session.keyId);
+      _hashOfKey.remove(entry.key.id);
       return null;
     }
     _entries[hash] = entry;
@@ -56,17 +53,17 @@ final class DwSessionCache {
   /// Remembers a session read from the database, unless its key was revoked
   /// while the read was in flight — then returns `false`, and the session
   /// must not be used either.
-  bool store(String hash, DwResolvedSession session, DateTime touchedAt) {
-    if (wasRecentlyRevoked(session.keyId)) return false;
+  bool store(String hash, DwSessionKeyInfo key, DateTime touchedAt) {
+    if (wasRecentlyRevoked(key.id)) return false;
     if (capacity == 0) return true;
     _entries.remove(hash);
     if (_entries.length >= capacity) {
       final oldest = _entries.keys.first;
       final evicted = _entries.remove(oldest)!;
-      _hashOfKey.remove(evicted.session.keyId);
+      _hashOfKey.remove(evicted.key.id);
     }
-    _entries[hash] = DwCachedSession(session, now.add(ttl), touchedAt);
-    _hashOfKey[session.keyId] = hash;
+    _entries[hash] = DwCachedSession(key, now.add(ttl), touchedAt);
+    _hashOfKey[key.id] = hash;
     return true;
   }
 
@@ -96,9 +93,11 @@ final class DwSessionCache {
 
 @internal
 final class DwCachedSession {
-  DwCachedSession(this.session, this.expiresAt, this.touchedAt);
+  DwCachedSession(this.key, this.expiresAt, this.touchedAt);
 
-  final DwResolvedSession session;
+  /// The key the token belongs to, with `lastUsedAt` as this process last
+  /// wrote it.
+  DwSessionKeyInfo key;
   final DateTime expiresAt;
 
   /// When `last_used_at` was last written, as far as this process knows.

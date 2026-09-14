@@ -35,6 +35,7 @@ final class ClubHarness {
         auth: DwAuthConfig(
           normalize: exampleAuth.normalize,
           onAccountCreated: exampleAuth.onAccountCreated,
+          onIdentifierChanged: exampleAuth.onIdentifierChanged,
           deliverCode: (ctx, kind, identifier, code) async =>
               harness.delivered[identifier] = code,
         ),

@@ -27,7 +27,7 @@ final class DwLiveHub {
       _removeFrom(_subscribers, name, connection);
     }
     connection.subscriptions.clear();
-    _setSession(connection, null, null);
+    _setSession(connection, null);
   }
 
   /// The open connection a call named in `Dw-Live-Connection`, when it acts
@@ -49,26 +49,26 @@ final class DwLiveHub {
 
   /// Binds [connection] to a session (or to none). Changing the account closes
   /// every subscription: access was checked for the previous one.
-  void authenticate(DwLiveConnection connection, int? accountId, int? keyId) {
-    if (connection.accountId != accountId) {
+  void authenticate(DwLiveConnection connection, DwSessionKeyInfo? sessionKey) {
+    if (connection.accountId != sessionKey?.accountId) {
       closeAllSubscriptions(connection);
       connection.authEpoch++;
     }
-    _setSession(connection, accountId, keyId);
+    _setSession(connection, sessionKey);
   }
 
-  void _setSession(DwLiveConnection connection, int? accountId, int? keyId) {
+  void _setSession(DwLiveConnection connection, DwSessionKeyInfo? sessionKey) {
     if (connection.accountId case final previous?) {
       _removeFrom(_byAccount, previous, connection);
     }
     if (connection.keyId case final previous?) {
       _removeFrom(_byKey, previous, connection);
     }
-    connection
-      ..accountId = accountId
-      ..keyId = keyId;
-    if (accountId != null) (_byAccount[accountId] ??= {}).add(connection);
-    if (keyId != null) (_byKey[keyId] ??= {}).add(connection);
+    connection.sessionKey = sessionKey;
+    if (sessionKey != null) {
+      (_byAccount[sessionKey.accountId] ??= {}).add(connection);
+      (_byKey[sessionKey.id] ??= {}).add(connection);
+    }
   }
 
   void subscribe(DwLiveConnection connection, String wireName) {
@@ -97,7 +97,7 @@ final class DwLiveHub {
   /// asked for it.
   void revokeKey(int keyId, {DwLiveConnection? author}) {
     for (final connection in List.of(_byKey[keyId] ?? const {})) {
-      authenticate(connection, null, null);
+      authenticate(connection, null);
       if (!identical(connection, author)) {
         connection.send(const DwAuthenticatedMessage.rejected());
       }

@@ -106,9 +106,23 @@ final class TestApp {
   final Map<String, String> delivered = {};
   final List<String> deliveredTo = [];
 
+  /// identifier → `ctx.accountId` of the last `deliverCode` or `fixedCode`
+  /// for it: the caller attaching it, `null` for a sign-in.
+  final Map<String, int?> codeCallers = {};
+
   /// Identifiers whose delivery throws.
   final Set<String> failingDelivery = {};
   final List<int> createdAccounts = [];
+
+  /// Account id → the origin `onAccountCreated` was given.
+  final Map<int, DwAccountOrigin> accountOrigins = {};
+
+  /// Every `onIdentifierChanged`, in order.
+  final List<DwIdentifierChange> identifierChanges = [];
+
+  /// Identifier values whose change makes `onIdentifierChanged` throw, after
+  /// it has written the profile.
+  final Set<String> failingIdentifierChanges = {};
 
   /// Accounts that may read anyone's notes (`NotesOfOwner`).
   final Set<int> staff = {};
@@ -152,20 +166,42 @@ final class TestApp {
       }
       delivered[identifier] = code;
       deliveredTo.add(identifier);
+      codeCallers[identifier] = ctx.accountId;
     },
-    fixedCode: (ctx, kind, identifier, accountId) async =>
-        identifier == reviewer ? '000000' : null,
-    onAccountCreated: (ctx, accountId, kind, identifier, registration) async {
+    fixedCode: (ctx, kind, identifier, accountId) async {
+      if (identifier != reviewer) return null;
+      codeCallers[identifier] = ctx.accountId;
+      return '000000';
+    },
+    onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
       createdAccounts.add(accountId);
+      accountOrigins[accountId] = origin;
       await ctx.db.execute(
         'INSERT INTO profile (account_id, name, identifier) '
         'VALUES (@account, @name, @identifier)',
         params: {
           'account': accountId,
-          'name': registration['name'] ?? '',
+          'name': switch (origin) {
+            DwSignInOrigin(:final registration) => registration['name'] ?? '',
+            DwToolOrigin() => '',
+          },
           'identifier': identifier,
         },
       );
+    },
+    // Mirrors the latest identifier into the profile, as a project showing it
+    // on its own rows would.
+    onIdentifierChanged: (ctx, change) async {
+      identifierChanges.add(change);
+      if (change.current case final current?) {
+        await ctx.db.execute(
+          'UPDATE profile SET identifier = @identifier WHERE account_id = @id',
+          params: {'identifier': current, 'id': change.accountId},
+        );
+        if (failingIdentifierChanges.contains(current)) {
+          throw StateError('profile mirror is down');
+        }
+      }
     },
     maxAttempts: maxAttempts,
     maxRequestsPerWindow: maxRequestsPerWindow,
@@ -476,6 +512,32 @@ final class TestApp {
         if (command.ending == 'refuse') ctx.refuse(DwCoreRefusal.conflict);
       },
     ),
+    DwCallHandler.command<WhichKey, DwSessionKeyInfo?>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, command) async => ctx.sessionKey,
+    ),
+    DwCallHandler.single<CurrentKey, DwSessionKeyInfo>(
+      access: DwAccessRule.signedIn,
+      handle: (ctx, request) async => ctx.sessionKey,
+    ),
+    DwCallHandler.command<IssueKey, IssuedKey>(
+      access: DwAccessRule.signedIn,
+      handle: (ctx, command) async {
+        final (:key, :token) = await ctx.accounts.issueKey(
+          ctx.requireAccountId,
+          label: command.label,
+        );
+        if (command.ending == 'refuse') ctx.refuse(DwCoreRefusal.conflict);
+        return IssuedKey(id: key.id, token: token);
+      },
+    ),
+    DwCallHandler.command<RevokeMyKey, bool>(
+      access: DwAccessRule.signedIn,
+      handle: (ctx, command) => ctx.accounts.revokeKey(
+        command.keyId,
+        accountId: ctx.requireAccountId,
+      ),
+    ),
     DwCallHandler.command<EnsureAccount, int>(
       access: DwAccessRule.anonymous,
       handle: (ctx, command) async => (await ctx.accounts.ensure(
@@ -549,6 +611,11 @@ final class TestApp {
       canSubscribe: (ctx) async => false,
     ),
     DwChannelRule.ofCaller(TestChannel.inbox),
+    DwChannelRule.single(
+      TestChannel.tools,
+      canSubscribe: (ctx) async =>
+          ctx.sessionKey?.kind == DwSessionKeyKind.personal,
+    ),
   ];
 
   Future<void> _logJob(DwCallContext ctx, String name, Object? tag) async {

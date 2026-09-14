@@ -22,6 +22,11 @@ void main() {
       );
       expect(created.created, isTrue);
       expect(harness().app.createdAccounts, contains(created.accountId));
+      expect(
+        harness().app.accountOrigins[created.accountId],
+        isA<DwToolOrigin>(),
+        reason: 'a tool, not a sign-in without registration',
+      );
       final profile = await harness().db.query(
         'SELECT name, identifier FROM profile WHERE account_id = @id',
         params: {'id': created.accountId},
@@ -154,12 +159,11 @@ void main() {
       final auth = DwAuthConfig(
         normalize: base.normalize,
         deliverCode: base.deliverCode,
-        onAccountCreated:
-            (ctx, accountId, kind, identifier, registration) async =>
-                ctx.publish(
-                  const DwLiveChannel(TestChannel.notes),
-                  NoteView(id: accountId, text: 'welcome'),
-                ),
+        onAccountCreated: (ctx, accountId, kind, identifier, origin) async =>
+            ctx.publish(
+              const DwLiveChannel(TestChannel.notes),
+              NoteView(id: accountId, text: 'welcome'),
+            ),
       );
       final service = DwAccountService(harness().db, auth);
       await expectLater(
