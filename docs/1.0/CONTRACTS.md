@@ -123,7 +123,7 @@ Window cursors are opaque strings the server builds from the sort value and the 
 
 ## R2.6 External doors
 
-`DwRoute.get/post/any(path, (DwRouteContext ctx, DwHttpRequest request) async => DwHttpResponse)` — framework types over the HTTP server; relic stays an implementation detail of `dartway_server` and does not appear in any project import.
+`DwRoute.get/post/any(path, (DwRouteContext ctx, DwHttpRequest request) async => DwHttpResponse)` — framework types over the HTTP server. **No relic (D-028): the server runs directly on `dart:io` `HttpServer`** with a thin layer of its own — routing `/dw/<type>`, `/dw/live`, `/health` and project doors by map lookup, body reading with a limit, the few headers it needs, response writing, graceful stop.
 
 ## R2.7 Web and deploy (for the deploy milestone)
 
