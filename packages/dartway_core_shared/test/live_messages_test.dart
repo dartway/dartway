@@ -142,10 +142,11 @@ void main() {
       );
     });
 
-    test('upd carries a transport, typed on arrival', () {
+    test('upd names its channel and carries its objects by type, typed on '
+        'arrival', () {
       final message = DwUpdateMessage(
         channel: 'myBookings:3',
-        updates: DwUpdateTransport([
+        updates: DwChannelUpdates([
           booking,
           DwDeletedObject.of<ClubBooking>(8, protocol),
         ]),

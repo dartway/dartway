@@ -6,12 +6,13 @@ import '../dw_core.dart';
 
 /// The signed-in member's profile, live: `AsyncData(null)` while signed out.
 ///
-/// It follows the member's profile channel, so a role an admin changes or a
-/// name edited on another device arrives here without a refetch.
+/// It follows the member's own profile channel, so a role an admin changes or
+/// a name edited on another device arrives here without a refetch. The
+/// request names no account: the client keeps its state per signed-in
+/// account and resolves the channel for it.
 final myProfileProvider = Provider<AsyncValue<UserProfile?>>((ref) {
-  final accountId = ref.watch(dw.accountId);
-  if (accountId == null) return const AsyncData(null);
-  return ref.watch(dw.request(GetMyProfile(accountId: accountId)));
+  if (ref.watch(dw.accountId) == null) return const AsyncData(null);
+  return ref.watch(dw.request(const GetMyProfile()));
 });
 
 /// Hands the signed-in profile to the screens below it, loaded.

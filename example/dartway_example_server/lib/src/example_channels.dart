@@ -19,16 +19,9 @@ final exampleChannels = <DwChannelRule>[
     parseKey: int.parse,
     canSubscribe: (ctx, channelId) => ctx.isStaff,
   ),
-  DwChannelRule.keyed<int>(
-    ExampleChannel.bookings,
-    parseKey: int.parse,
-    canSubscribe: _ownAccount,
-  ),
-  DwChannelRule.keyed<int>(
-    ExampleChannel.profile,
-    parseKey: int.parse,
-    canSubscribe: _ownAccount,
-  ),
+  // "My" channels: a member subscribes to their own account's only.
+  DwChannelRule.ofCaller(ExampleChannel.bookings),
+  DwChannelRule.ofCaller(ExampleChannel.profile),
   DwChannelRule.single(
     ExampleChannel.admin,
     canSubscribe: (ctx) => ctx.isAdmin,
@@ -37,5 +30,12 @@ final exampleChannels = <DwChannelRule>[
 
 Future<bool> _anyMember(DwCallContext ctx) async => true;
 
-Future<bool> _ownAccount(DwCallContext ctx, int accountId) async =>
-    ctx.accountId == accountId;
+/// The bookings channel of [accountId]'s member: where their "my bookings"
+/// hears a booking of theirs, whoever changed it.
+DwLiveChannel bookingsOf(int accountId) =>
+    DwLiveChannel.forAccount(ExampleChannel.bookings, accountId);
+
+/// The profile channel of [accountId]'s member: where their own profile
+/// hears a change to it, whoever made it.
+DwLiveChannel profileOf(int accountId) =>
+    DwLiveChannel.forAccount(ExampleChannel.profile, accountId);

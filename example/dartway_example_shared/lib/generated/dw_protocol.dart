@@ -49,7 +49,6 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol([
     $ListUserProfilesFromJson,
   ),
   DwProtocolEntry<MarkAttended>('MarkAttended', $MarkAttendedFromJson),
-  DwProtocolEntry<MemberCount>('MemberCount', $MemberCountFromJson),
   DwProtocolEntry<NewsPost>('NewsPost', $NewsPostFromJson),
   DwProtocolEntry<PersonCard>('PersonCard', $PersonCardFromJson),
   DwProtocolEntry<PublishNews>('PublishNews', $PublishNewsFromJson),

@@ -4,6 +4,24 @@
 
 The rewrite (see docs/1.0).
 
+- **Updates carry their channel (D-036).** A response's `updates` are grouped
+  by channel wire name, then by type —
+  `{"bookings:7": {"SessionBooking": [...]}, "schedule": {"ClubSession": [...]}}`
+  — and collapse by (channel, type, id): `DwUpdateTransport(Iterable<(String,
+  DwWireObject)>)`, `channels`, `objectsOn(channel)`. One channel's type groups
+  are `DwChannelUpdates`, the body of a live `upd` message, which names its
+  channel beside them. The channel is the only fact that says whose data an
+  object is: routed by type alone, a member's profile in an admin's answer
+  landed in the admin's own "my profile".
+- **Caller channels (D-037).** `DwLiveChannel.ofCaller(kind)` — a channel keyed
+  by whoever watches — for "my" requests, which carry no account id;
+  `resolvedFor(accountId)` and `DwLiveChannel.forAccount(kind, accountId)`.
+  An unresolved caller channel has no `wireName` (throws `StateError`).
+- **`DwTableRequest` refetches on a new matching object (D-037).** Default
+  `matches ? upsert : remove` (new `matches`, default every object): an object
+  on the page is replaced in place; one not on the page, one that stops
+  matching and a deletion read the page again, so the total and the paging
+  stay true.
 - **File uploads (D-034): the wire half.** `DwUploadPurpose` — the mixin a
   project's purposes enum takes, as channels take `DwChannelKind`. Built into
   `DwWireProtocol.core`: `DwStartUpload` → `DwUploadTicket` (a presigned PUT,

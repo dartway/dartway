@@ -342,7 +342,7 @@ extension on DwAppClient {
         // feeds state: an update for a released or closed channel may have
         // been checked for another account.
         if (state == _SubState.subscribing || state == _SubState.active) {
-          _applyTransport(updates.objects);
+          _applyUpdates([(channel, updates.objects)]);
         }
       case DwChannelClosedMessage(:final channel):
         _onChannelClosed(channel);

@@ -53,6 +53,7 @@ export 'src/core/logic/dw_plugin.dart';
 // error pipeline.
 export 'src/bootstrap/dw_app_runner.dart';
 export 'src/bootstrap/logic/dw_app_loading_options.dart';
+export 'src/bootstrap/widgets/dw_app_bootstrapper.dart';
 
 // ui/actions: the policy (DwUiAction, built via `dw.action`) and the
 // widget-agnostic guard that runs it.

@@ -4,12 +4,14 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import '../../generated/dw_schema.dart';
 import '../club_objects.dart';
 import '../entities/people.dart';
+import '../example_channels.dart';
 import '../example_context.dart';
 import 'admin_handlers.dart';
 
 final profileHandlers = <DwCallHandler>[
   DwCallHandler.single<GetMyProfile, UserProfile>(
-    access: ExampleAccess.ownAccount<GetMyProfile>((r) => r.accountId),
+    // "My" profile names no account: the caller's is the only one it reads.
+    access: DwAccessRule.signedIn,
     handle: (ctx, request) async => ClubObjects.profile(await ctx.profile),
   ),
 
@@ -27,10 +29,7 @@ final profileHandlers = <DwCallHandler>[
       );
       final profile = ClubObjects.profile(updated);
       ctx
-        ..publish(
-          DwLiveChannel(ExampleChannel.profile, updated.accountId),
-          profile,
-        )
+        ..publish(profileOf(updated.accountId), profile)
         ..publish(adminChannel, profile);
       return profile;
     },

@@ -382,6 +382,28 @@ final class TestApp {
         return note;
       },
     ),
+    DwCallHandler.list<MyInbox, NoteView>(
+      access: DwAccessRule.signedIn,
+      handle: (ctx, request) async => const [],
+    ),
+    DwCallHandler.command<SendToInbox, NoteView>(
+      access: DwAccessRule.signedIn,
+      handle: (ctx, command) async {
+        final note = await insertNote(
+          ctx.db,
+          command.text,
+          ctx.requireAccountId,
+        );
+        ctx.publish(switch (command.accountId) {
+          final accountId? => DwLiveChannel.forAccount(
+            TestChannel.inbox,
+            accountId,
+          ),
+          null => const DwLiveChannel.ofCaller(TestChannel.inbox),
+        }, note);
+        return note;
+      },
+    ),
     DwCallHandler.command<PublishAndEnd, void>(
       access: DwAccessRule.signedIn,
       handle: (ctx, command) async {
@@ -526,6 +548,7 @@ final class TestApp {
       TestChannel.nobody,
       canSubscribe: (ctx) async => false,
     ),
+    DwChannelRule.ofCaller(TestChannel.inbox),
   ];
 
   Future<void> _logJob(DwCallContext ctx, String name, Object? tag) async {

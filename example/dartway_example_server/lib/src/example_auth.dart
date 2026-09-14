@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../generated/dw_schema.dart';
+import 'club_objects.dart';
 import 'entities/people.dart';
 import 'handlers/admin_handlers.dart';
 
@@ -32,13 +32,18 @@ final exampleAuth = DwAuthConfig(
   // The profile is created with the account, in the same transaction: a
   // signed-in account without a profile cannot exist.
   onAccountCreated: (ctx, accountId, kind, identifier, registration) async {
-    await createProfile(ctx.db, accountId, identifier, registration);
-    // The dashboard counts the newcomer, and the members table reads its page
-    // again.
-    final counters = await countAdminCounters(ctx);
+    final profile = await createProfile(
+      ctx.db,
+      accountId,
+      identifier,
+      registration,
+    );
+    // The newcomer goes to the admins: the dashboard counts them, and a
+    // members table page reads itself again — a new row moves the paging and
+    // the total, which only the server can compute.
     ctx
-      ..publish(adminChannel, counters)
-      ..publish(adminChannel, MemberCount(count: counters.members));
+      ..publish(adminChannel, await countAdminCounters(ctx))
+      ..publish(adminChannel, ClubObjects.profile(profile));
   },
 );
 

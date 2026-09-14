@@ -55,20 +55,9 @@ void main() {
 
   test('a server package on dartway_core_server gets its generated code '
       'importing that, not the ORM it re-exports', () async {
-    final project = TempProject.create(['app_server']);
     // As a project declares it (D-030): the ORM is not a dependency of its
     // own, so an import of it would be `depend_on_referenced_packages`.
-    project.writeFile(
-      'app_server/pubspec.yaml',
-      'name: app_server\n'
-          'publish_to: none\n'
-          'environment:\n'
-          '  sdk: ^3.11.0\n'
-          'dependencies:\n'
-          '  dartway_core_server: any\n'
-          'dev_dependencies:\n'
-          '  lints: any\n',
-    );
+    final project = TempProject.create(['app_server'], serverOnCore: true);
     project.writeFile('app_server/lib/src/memo_row.dart', '''
 import 'package:dartway_core_server/dartway_core_server.dart';
 
@@ -154,10 +143,12 @@ final class MemoRow extends DwTableRow with _\$MemoRow {
   test(
     'the example server entities generate and analyze clean',
     () async {
+      // The example's server imports ORM types from dartway_core_server, as
+      // every project's does.
       final project = TempProject.create([
         'dartway_example_server',
         'dartway_example_shared',
-      ]);
+      ], serverOnCore: true);
       void copy(String package, String directory) {
         final source = Directory(p.join(example, package, directory));
         for (final entity in source.listSync(recursive: true)) {

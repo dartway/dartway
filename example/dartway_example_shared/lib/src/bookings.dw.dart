@@ -128,28 +128,25 @@ extension SessionBookingCopyWith on SessionBooking {
 }
 
 mixin _$ListMyBookings on DwListRequest<SessionBooking> {
-  ListMyBookings get _self => this as ListMyBookings;
-
   @override
   String get dwTypeName => 'ListMyBookings';
 
   @override
-  Map<String, Object?> toJson() => {'accountId': _self.accountId};
+  Map<String, Object?> toJson() => const {};
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ListMyBookings && other.accountId == _self.accountId;
+      identical(this, other) || other is ListMyBookings;
 
   @override
-  int get hashCode => Object.hash(ListMyBookings, _self.accountId);
+  int get hashCode => (ListMyBookings).hashCode;
 
   @override
-  String toString() => 'ListMyBookings(accountId: ${_self.accountId})';
+  String toString() => 'ListMyBookings()';
 }
 
 ListMyBookings $ListMyBookingsFromJson(Map<String, Object?> json) =>
-    ListMyBookings(accountId: json['accountId']! as int);
+    const ListMyBookings();
 
 mixin _$BookSession on DwActionCommand<SessionBooking> {
   BookSession get _self => this as BookSession;

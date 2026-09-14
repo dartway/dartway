@@ -169,7 +169,11 @@ void main() {
 
         final answer = await author.call(const CreateNote('plain'));
         final note = answer.value(const CreateNote(''));
-        expect(answer.updates.objects, [note]);
+        // Every publication, each under the channel it went to (D-036).
+        expect(
+          answer.updates,
+          DwUpdateTransport([('notes', note), ('account:${session.id}', note)]),
+        );
         expect(
           (await authorSocket.expect<DwUpdateMessage>(
             where: (m) => m.channel == 'notes',
@@ -206,14 +210,17 @@ void main() {
       // Subscribed to `notes` only: the `account:<id>` publication is not
       // this connection's business. The note published three times travels
       // once, as it ended.
-      expect(answer.updates.objects, [
+      expect(answer.updates.channels.keys, ['notes']);
+      expect(answer.updates.objectsOn('notes'), [
         NoteView(id: note.id, text: 'named #1', ownerId: session.id),
       ]);
       final wire = answer.json! as Map<String, Object?>;
       expect(wire['updates'], {
-        'NoteView': [
-          {'id': note.id, 'text': 'named #1', 'ownerId': session.id},
-        ],
+        'notes': {
+          'NoteView': [
+            {'id': note.id, 'text': 'named #1', 'ownerId': session.id},
+          ],
+        },
       });
 
       final notes = await otherDevice.expect<DwUpdateMessage>(
@@ -254,7 +261,8 @@ void main() {
           author.liveConnection = id;
           final answer = await author.call(CreateNote('ignored $id'));
           final note = answer.value(const CreateNote(''));
-          expect(answer.updates.objects, [note]);
+          expect(answer.updates.objectsOn('notes'), [note]);
+          expect(answer.updates.channels, hasLength(2));
           expect(
             (await stranger.expect<DwUpdateMessage>()).updates.objects,
             [note],
@@ -267,13 +275,23 @@ void main() {
     test(
       'an anonymous connection is not bound to a signed-in caller',
       () async {
-        final (author, _) = await harness().signedIn('anon-bind@example.com');
+        final (author, session) = await harness().signedIn(
+          'anon-bind@example.com',
+        );
         final anonymousSocket = await harness().live();
         author.liveConnection = anonymousSocket.connectionId;
         final answer = await author.call(const CreateNote('to all'));
         // Everything, not the anonymous connection's nothing: one note, sent
-        // to two channels, travels once.
-        expect(answer.updates.objects, [answer.value(const CreateNote(''))]);
+        // to two channels, travels under each of them.
+        final note = answer.value(const CreateNote(''));
+        expect(answer.updates.channels.keys, [
+          'notes',
+          'account:${session.id}',
+        ]);
+        expect(
+          answer.updates.channels.values.map((updates) => updates.objects),
+          everyElement([note]),
+        );
       },
     );
 
@@ -337,7 +355,7 @@ void main() {
       expect(await victim.subscribe('notes'), isA<DwSubscribedMessage>());
 
       final revokeVictim = await admin.call(RevokeNotes(victimSession.id));
-      expect(revokeVictim.updates.objects, hasLength(1));
+      expect(revokeVictim.updates.channels.keys, ['notes', 'public']);
       expect((await victim.expect<DwChannelClosedMessage>()).channel, 'notes');
       await victim.expectSilence();
 
@@ -347,7 +365,8 @@ void main() {
         'notes',
       );
       // The note went to `notes` and `public`; only `public` is still heard.
-      final [note] = revokeSelf.updates.objects;
+      expect(revokeSelf.updates.channels.keys, ['public']);
+      final [note] = revokeSelf.updates.objectsOn('public');
       expect((note as NoteView).text, 'after revoke');
       await adminSocket.expectSilence();
     });

@@ -6,7 +6,8 @@ enum ExampleChannel with DwChannelKind {
   /// The club schedule and service catalogue: every signed-in member.
   schedule,
 
-  /// One member's bookings. Key: the member's account id. Its owner only.
+  /// One member's bookings: a caller channel (`DwLiveChannel.ofCaller`),
+  /// keyed by the member's account. Its owner only.
   bookings,
 
   /// News posts: every signed-in member.
@@ -21,7 +22,8 @@ enum ExampleChannel with DwChannelKind {
   /// App settings: every signed-in member.
   settings,
 
-  /// One member's own profile. Key: the member's account id. Its owner only.
+  /// One member's own profile: a caller channel, keyed by the member's
+  /// account. Its owner only.
   profile,
 
   /// What the admin dashboard and the members table show. Admins only.

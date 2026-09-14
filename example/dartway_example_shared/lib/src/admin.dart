@@ -32,24 +32,14 @@ final class GetAdminCounters extends DwSingleRequest<AdminCounters>
   ];
 }
 
-/// How many members the club has, published when someone joins.
-///
-/// A numbered page never grows by an update — a new row may belong on any
-/// page, and every later row moves — so the members table reads its page
-/// again when this arrives, and only then.
-final class MemberCount extends DwDataObject with _$MemberCount {
-  const MemberCount({required this.count});
-
-  @override
-  String get id => 'member-count';
-
-  final int count;
-}
-
 /// One numbered page of the members table, by name. Admins only.
 ///
 /// [search] narrows by name or phone and [role] by role; both are part of
 /// the request, so every filter and page is its own live state.
+///
+/// Live by the kind's default: a profile on the page is replaced in place;
+/// a new member — or any profile not on the page — reads the page again, so
+/// the total and the paging stay true.
 final class ListUserProfiles extends DwTableRequest<UserProfile>
     with _$ListUserProfiles {
   const ListUserProfiles({
@@ -73,15 +63,18 @@ final class ListUserProfiles extends DwTableRequest<UserProfile>
     DwLiveChannel(ExampleChannel.admin),
   ];
 
-  /// A profile on the page is replaced in place (the kind's default); a
-  /// changed member count reads the page again.
+  /// The server's filter, on one profile: a row on the page that leaves it
+  /// (a role changed under a role filter) makes the page read again instead
+  /// of staying on it.
   @override
-  bool acceptsItem(Object? item) =>
-      item is MemberCount || super.acceptsItem(item);
-
-  @override
-  DwUpdateAction onUpdate(Object item) =>
-      item is MemberCount ? DwUpdateAction.refetch : super.onUpdate(item);
+  bool matches(UserProfile item) {
+    if (role != null && item.role != role) return false;
+    final text = search.trim().toLowerCase();
+    if (text.isEmpty) return true;
+    return item.firstName.toLowerCase().contains(text) ||
+        (item.lastName?.toLowerCase().contains(text) ?? false) ||
+        item.phone.contains(text);
+  }
 }
 
 /// Changes someone's role. Admins only.

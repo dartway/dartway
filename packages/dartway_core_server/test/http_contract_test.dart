@@ -31,6 +31,7 @@ void main() {
     test('ok: 200, JSON, never cached', () async {
       final answer = await anonymous.call(const ListNotes(ownerId: -1));
       expect(answer.status, 200);
+      expect(answer.reasonPhrase, 'OK');
       expect(answer.response, isA<DwApiOk>());
       expect(answer.json, {'status': 'ok', 'result': <Object?>[]});
       expect(answer.headers.contentType?.mimeType, 'application/json');
@@ -41,6 +42,8 @@ void main() {
     test('a validation refusal: 422', () async {
       final answer = await signed.call(const CreateNote(''));
       expect(answer.status, 422);
+      // dart:io has no phrase for 422 and would write "Status 422".
+      expect(answer.reasonPhrase, 'Unprocessable Content');
       expect(
         answer.refusal,
         DwCallRefusal(DwCoreRefusal.invalid, field: 'text'),
@@ -74,6 +77,7 @@ void main() {
       expect((await anonymous.call(request)).status, 200);
       final answer = await anonymous.call(request);
       expect(answer.status, 429);
+      expect(answer.reasonPhrase, 'Too Many Requests');
       final retryAfter = int.parse(answer.headers.value('retry-after')!);
       expect(retryAfter, inInclusiveRange(28, 30));
       expect(answer.refusal.retryAfter, Duration(seconds: retryAfter));
@@ -150,6 +154,7 @@ void main() {
         headers: {DwHttpContract.protocolHeader: '2'},
       );
       expect(other.status, 426);
+      expect(other.reasonPhrase, 'Upgrade Required');
       expect(other.response, isA<DwApiIncompatible>());
       expect(other.refusal.isCode(DwCoreRefusal.protocolUnsupported), isTrue);
     });

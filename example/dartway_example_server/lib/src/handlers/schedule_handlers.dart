@@ -4,6 +4,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import '../../generated/dw_schema.dart';
 import '../club_objects.dart';
 import '../entities/club.dart';
+import '../example_channels.dart';
 import '../example_context.dart';
 import 'admin_handlers.dart';
 
@@ -104,10 +105,7 @@ final scheduleHandlers = <DwCallHandler>[
       );
       for (final booking in affected) {
         ctx.publish(
-          DwLiveChannel(
-            ExampleChannel.bookings,
-            clients[booking.clientProfileId]!,
-          ),
+          bookingsOf(clients[booking.clientProfileId]!),
           DwDeletedObject.of<SessionBooking>(booking.id!, ctx.protocol),
         );
       }

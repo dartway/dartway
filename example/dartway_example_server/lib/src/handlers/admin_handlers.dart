@@ -4,6 +4,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import '../../generated/dw_schema.dart';
 import '../club_objects.dart';
 import '../entities/people.dart';
+import '../example_channels.dart';
 import '../example_context.dart';
 
 const adminChannel = DwLiveChannel(ExampleChannel.admin);
@@ -80,10 +81,9 @@ final adminHandlers = <DwCallHandler>[
       final profile = ClubObjects.profile(updated);
       ctx
         ..publish(adminChannel, profile)
-        ..publish(
-          DwLiveChannel(ExampleChannel.profile, updated.accountId),
-          profile,
-        );
+        // To the admins' table, and to the member's own profile — not to the
+        // admin's, whose "my profile" does not declare that channel.
+        ..publish(profileOf(updated.accountId), profile);
       // Access is checked once, at subscription: a role taken away closes
       // what it opened.
       final account = updated.accountId;

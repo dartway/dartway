@@ -314,8 +314,46 @@ void main() {
   test('channel wire names', () {
     expect(dwParseChannelName('chat:7'), (kind: 'chat', key: '7'));
     expect(dwParseChannelName('news'), (kind: 'news', key: null));
+    expect(const DwLiveChannel(_Channel.chat, 7).wireName, 'chat:7');
+    expect(const DwLiveChannel(_Channel.news).wireName, 'news');
+  });
+
+  group('caller channels (D-037)', () {
+    const mine = DwLiveChannel.ofCaller(_Channel.bookings);
+
+    test('resolve to the account that watches', () {
+      expect(mine.isOfCaller, isTrue);
+      expect(mine.key, isNull);
+      final resolved = mine.resolvedFor(7);
+      expect(resolved.wireName, 'bookings:7');
+      expect(resolved.isOfCaller, isFalse);
+      expect(resolved, const DwLiveChannel.forAccount(_Channel.bookings, 7));
+      expect(resolved, const DwLiveChannel(_Channel.bookings, 7));
+    });
+
+    test('any other channel resolves to itself', () {
+      const chat = DwLiveChannel(_Channel.chat, 3);
+      expect(chat.resolvedFor(7), same(chat));
+    });
+
+    test('have no wire name until resolved', () {
+      expect(() => mine.wireName, throwsStateError);
+      expect(mine.toString(), 'DwLiveChannel.ofCaller(bookings)');
+    });
+
+    test('are equal by kind, and never to a keyed channel', () {
+      expect(mine, const DwLiveChannel.ofCaller(_Channel.bookings));
+      expect(
+        mine.hashCode,
+        const DwLiveChannel.ofCaller(_Channel.bookings).hashCode,
+      );
+      expect(mine, isNot(const DwLiveChannel(_Channel.bookings)));
+      expect(mine, isNot(const DwLiveChannel.ofCaller(_Channel.chat)));
+    });
   });
 }
+
+enum _Channel with DwChannelKind { chat, news, bookings }
 
 final class _Command<R> extends DwActionCommand<R> {
   const _Command();

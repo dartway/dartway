@@ -4,6 +4,18 @@
 
 The rewrite (see docs/1.0).
 
+- **Updates are routed by channel (D-036).** An object from a response or the
+  live socket is applied only to entries whose request declares the channel it
+  was published to — an entry on several of them absorbs it once. A request
+  without channels hears no updates at all. The fake server carries its
+  response transport by channel and, like the real server, honours a named
+  live connection only for the caller's own account, looked up after the
+  handler.
+- **Caller channels are resolved per account (D-037):** an entry subscribes to
+  `kind:<accountId>` for `DwLiveChannel.ofCaller(kind)`; signed out, it has no
+  such channel.
+- **A table page never inserts:** an upsert of an object not on the page reads
+  the page again (coalesced), as a removal does.
 - **`client.files`** (`DwFileClient`): `upload(purpose, DwUploadSource.bytes(...)
   | DwUploadSource.stream(open, byteSize:), fileName:, contentType:,
   onProgress:)` → `DwCallResult<DwStoredFile>` — ticket, a streamed PUT straight

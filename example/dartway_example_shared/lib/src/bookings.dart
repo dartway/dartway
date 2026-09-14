@@ -46,27 +46,22 @@ final class SessionBooking extends DwDataObject with _$SessionBooking {
   final SessionReview? review;
 }
 
-/// The signed-in member's bookings, newest first, live on their bookings
+/// The signed-in member's bookings, newest first, live on their own bookings
 /// channel.
 ///
-/// [accountId] must be the caller's own account: the server refuses any other
-/// with `dw.forbidden` and reads the caller's bookings. It is a field because
-/// the channel is keyed by it, and because a booking that arrives in a
-/// command's updates — a staff member marking someone's visit attended — must
-/// be told apart from the caller's own: see `GetMyProfile`.
+/// It names no account: the server reads the caller's bookings, and the
+/// channel is the caller's. Every booking published to it is the caller's —
+/// a staff member marking someone's visit attended publishes to that
+/// member's channel, which this request on the staff member's device does not
+/// declare — so every booking on it belongs in the list.
 final class ListMyBookings extends DwListRequest<SessionBooking>
     with _$ListMyBookings {
-  const ListMyBookings({required this.accountId});
-
-  final int accountId;
+  const ListMyBookings();
 
   @override
-  List<DwLiveChannel> get channels => [
-    DwLiveChannel(ExampleChannel.bookings, accountId),
+  List<DwLiveChannel> get channels => const [
+    DwLiveChannel.ofCaller(ExampleChannel.bookings),
   ];
-
-  @override
-  bool matches(SessionBooking item) => item.accountId == accountId;
 
   @override
   int Function(SessionBooking a, SessionBooking b) get sort =>

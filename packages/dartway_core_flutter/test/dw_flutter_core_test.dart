@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
-import 'package:dartway_core_flutter/src/bootstrap/widgets/dw_app_bootstrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

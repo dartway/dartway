@@ -61,11 +61,19 @@ sealed class _Entry {
       invalid = true;
     }
     localRefusal = refusal;
+    final account = key.$1;
     channels = localRefusal != null || invalid
         // Nothing will ever be fetched, so nothing is worth subscribing to.
         ? const []
         : List.unmodifiable({
-            for (final channel in request.channels) channel.wireName,
+            for (final channel in request.channels)
+              // A caller channel is the account's own: the entry is scoped by
+              // account, so it resolves here (D-037). Signed out there is no
+              // caller, and every subscription needs one anyway (D-020).
+              if (!channel.isOfCaller)
+                channel.wireName
+              else if (account != null)
+                channel.resolvedFor(account).wireName,
           });
   }
 
@@ -81,7 +89,9 @@ sealed class _Entry {
   /// Whether validating the request threw.
   bool invalid = false;
 
-  /// Wire names of the channels the request declares, without repeats.
+  /// Wire names of the channels the request declares, without repeats, caller
+  /// channels resolved for the entry's account. Updates reach the entry only
+  /// on these (D-036).
   late final List<String> channels;
 
   final Set<_Watch<Object?>> watches = {};
@@ -378,8 +388,8 @@ sealed class _Entry {
 
   // --- updates -------------------------------------------------------------
 
-  /// Offers the objects of one transport: takes those the request accepts,
-  /// asks the request what each does, and applies them.
+  /// Offers objects that arrived on the entry's channels: takes those the
+  /// request accepts, asks the request what each does, and applies them.
   void absorb(List<DwWireObject> objects) {
     if (disposed) return;
     final protocol = client.protocol;

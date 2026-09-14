@@ -40,21 +40,20 @@ void main() {
   test('every data object, request and command travels and comes back '
       'equal', () {
     final calls = <DwWireObject>[
-      const GetMyProfile(accountId: 42),
+      const GetMyProfile(),
       const UpdateMyProfile(
         firstName: 'Vera',
         lastName: DwFieldPatch.clear(),
         gender: DwFieldPatch.set(UserGender.female),
       ),
       ListUpcomingSessions(from: DateTime.utc(2026, 9, 14)),
-      const ListMyBookings(accountId: 42),
+      const ListMyBookings(),
       const ListUserProfiles(page: 2, pageSize: 10, search: 'ver'),
       const ListUserProfiles(role: UserRole.staff),
       const ListChatMessages(channelId: 1),
       const SendChatMessage(channelId: 1, text: 'hi'),
       booking(id: 5, accountId: 42),
       profile(),
-      const MemberCount(count: 3),
       const AdminCounters(members: 3, upcomingSessions: 2, newsPosts: 1),
     ];
     for (final call in calls) {
@@ -99,31 +98,46 @@ void main() {
     );
   });
 
-  test("a member's own requests live on their account's channels and take "
-      'only their own objects', () {
-    const bookings = ListMyBookings(accountId: 42);
-    expect(bookings.channels.single.wireName, 'bookings:42');
+  test("a member's own requests name no account: they live on the caller's "
+      'channels, resolved for whoever is signed in', () {
+    const bookings = ListMyBookings();
+    expect(
+      bookings.channels.single,
+      const DwLiveChannel.ofCaller(ExampleChannel.bookings),
+    );
+    expect(bookings.channels.single.resolvedFor(42).wireName, 'bookings:42');
     expect(
       bookings.onUpdate(booking(id: 1, accountId: 42)),
       DwUpdateAction.upsert,
     );
     expect(
-      bookings.onUpdate(booking(id: 2, accountId: 43)),
-      DwUpdateAction.remove,
-      reason: "someone else's booking is never inserted",
-    );
-    expect(
-      const GetMyProfile(accountId: 42).channels.single.wireName,
+      const GetMyProfile().channels.single.resolvedFor(42).wireName,
       'profile:42',
     );
   });
 
-  test('the members table replaces its rows in place and reads its page '
-      'again when the member count changes', () {
+  test('the members table upserts matching profiles — in place on the page, '
+      'a read of the page otherwise — and a profile leaving its filter is '
+      'removed', () {
     const table = ListUserProfiles();
-    expect(table.onUpdate(profile()), DwUpdateAction.update);
-    expect(table.onUpdate(const MemberCount(count: 4)), DwUpdateAction.refetch);
+    expect(table.onUpdate(profile()), DwUpdateAction.upsert);
     expect(table.onUpdate(const NewsPostCounter()), DwUpdateAction.ignore);
+
+    const staff = ListUserProfiles(role: UserRole.staff, search: ' VER ');
+    expect(
+      staff.onUpdate(profile(role: UserRole.staff)),
+      DwUpdateAction.upsert,
+    );
+    expect(staff.onUpdate(profile()), DwUpdateAction.remove);
+    expect(
+      const ListUserProfiles(search: '0000').onUpdate(profile()),
+      DwUpdateAction.upsert,
+      reason: 'by phone',
+    );
+    expect(
+      const ListUserProfiles(search: 'oleg').onUpdate(profile()),
+      DwUpdateAction.remove,
+    );
   });
 
   test('the chat window orders by the time sent, then by id', () {

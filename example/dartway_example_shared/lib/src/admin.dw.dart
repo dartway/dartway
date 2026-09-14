@@ -71,34 +71,6 @@ mixin _$GetAdminCounters on DwSingleRequest<AdminCounters> {
 GetAdminCounters $GetAdminCountersFromJson(Map<String, Object?> json) =>
     const GetAdminCounters();
 
-mixin _$MemberCount on DwDataObject {
-  MemberCount get _self => this as MemberCount;
-
-  @override
-  String get dwTypeName => 'MemberCount';
-
-  @override
-  Map<String, Object?> toJson() => {'count': _self.count};
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MemberCount && other.count == _self.count;
-
-  @override
-  int get hashCode => _self.count.hashCode;
-
-  @override
-  String toString() => 'MemberCount(count: ${_self.count})';
-}
-
-MemberCount $MemberCountFromJson(Map<String, Object?> json) =>
-    MemberCount(count: json['count']! as int);
-
-extension MemberCountCopyWith on MemberCount {
-  MemberCount copyWith({int? count}) => MemberCount(count: count ?? this.count);
-}
-
 mixin _$ListUserProfiles on DwTableRequest<UserProfile> {
   ListUserProfiles get _self => this as ListUserProfiles;
 

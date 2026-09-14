@@ -14,6 +14,7 @@ import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
 import 'dw_http_request.dart';
 import 'dw_http_response.dart';
+import 'dw_reason_phrase.dart';
 import 'dw_request_body.dart';
 
 /// The server's one port: `dart:io`'s `HttpServer` and a routing table of
@@ -104,7 +105,7 @@ final class DwHttpFront {
       } catch (error) {
         _log.debug('live upgrade failed: $error');
         try {
-          request.response.statusCode = 400;
+          dwSetStatus(request.response, 400);
           await request.response.close();
         } catch (_) {
           // The connection is gone or already detached.
@@ -156,7 +157,7 @@ final class DwHttpFront {
     List<int> bytes,
   ) async {
     final response = request.response;
-    response.statusCode = status;
+    dwSetStatus(response, status);
     headers.forEach(response.headers.set);
     response.contentLength = bytes.length;
     if (_stopping) response.persistentConnection = false;

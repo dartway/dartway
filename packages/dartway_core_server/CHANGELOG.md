@@ -4,6 +4,23 @@
 
 The rewrite (see docs/1.0).
 
+- **Publications keep their channel through delivery (D-036).** The response
+  transport groups what a command published by channel, filtered by the named
+  live connection's subscriptions by exact channel.
+- **`DwChannelRule.ofCaller(kind)` (D-037):** a connection subscribes to its
+  own account's key only; handlers publish with
+  `DwLiveChannel.forAccount(kind, accountId)`. `ctx.publish` / `ctx.revoke` of
+  an unresolved `DwLiveChannel.ofCaller` throw `ArgumentError`.
+- **Live-socket origin check compares full origins** — scheme, host and port.
+  The origin the upgrade was sent to (its `Host`) is allowed;
+  `DwServerSettings.allowedOrigins` entries are full origins
+  (`https://app.example.com`, `http://localhost:5000`), and the server refuses
+  to start with one that is not. Previously any port or scheme of an allowed
+  host passed.
+- **Standard reason phrases** on every status line: `dart:io` wrote
+  `Status 422` / `Status 426` / `Status 429`; now `Unprocessable Content`,
+  `Upgrade Required`, `Too Many Requests` (RFC 9110/6585, `413` is
+  `Content Too Large`). `DwTestAnswer.reasonPhrase`.
 - **File uploads (D-034): the bytes never pass through the app server.**
   `DwAppServer(files: DwFileStorage(DwFileStorageConfig(...), rules: [...]))`
   for one bucket of any S3-compatible storage; `DwFileStorageConfig.fromEnvironment`

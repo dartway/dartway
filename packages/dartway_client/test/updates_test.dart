@@ -220,32 +220,127 @@ void main() {
     );
   });
 
-  group('routing', () {
-    test(
-      'every accepting entry gets every object, whatever carried it',
-      () async {
-        final h = Harness()..serveRooms();
-        await h.start();
-        final live = h.client.watch(const ListRooms());
-        final offline = h.client.watch(const ListRoomsOffline());
-        final byRank = h.client.watch(const ListRoomsByRank());
-        await settle();
+  group('routing by channel (D-036)', () {
+    test('every entry on the channel gets the objects it accepts, from a '
+        'response and from the socket; an entry without the channel gets '
+        'nothing', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      final live = h.client.watch(const ListRooms());
+      final offline = h.client.watch(const ListRoomsOffline());
+      final byRank = h.client.watch(const ListRoomsByRank());
+      await settle();
 
-        await h.client.command(const RenameRoom(roomId: 1, name: 'a2'));
-        const renamed = RoomView(id: 1, name: 'a2', rank: 10);
-        expect(dataOf(live.state), [renamed, b]);
-        expect(dataOf(offline.state), [renamed, b]);
-        expect(dataOf(byRank.state), [renamed, b]);
+      await h.client.command(const RenameRoom(roomId: 1, name: 'a2'));
+      const renamed = RoomView(id: 1, name: 'a2', rank: 10);
+      expect(dataOf(live.state), [renamed, b]);
+      expect(dataOf(byRank.state), [renamed, b]);
+      expect(dataOf(offline.state), [a, b], reason: 'no channel, no update');
 
-        h.server.publish(roomsChannel, [c]);
-        await settle();
-        expect(
-          dataOf(offline.state),
-          [c, renamed, b],
-          reason: 'a socket update reaches an entry without channels too',
-        );
-      },
-    );
+      h.server.publish(roomsChannel, [c]);
+      await settle();
+      expect(dataOf(live.state), [c, renamed, b]);
+      expect(dataOf(offline.state), [a, b]);
+    });
+
+    test("a response carrying another account's object of the same type does "
+        "not reach the caller's own request", () async {
+      final h = Harness()..serveRooms();
+      h.notes = {
+        7: [const NoteView(id: 1, text: 'mine')],
+      };
+      // No socket: the call names no live connection, so the response carries
+      // every publication — the case where only the channel tells them apart.
+      h.server.acceptsConnections = false;
+      h.server.onCommand<RenameRoom>((command, call) {
+        call
+          ..publish(DwLiveChannel.forAccount(AppChannel.notes, bob.id), [
+            const NoteView(id: 1, text: "bob's edit of his note 1"),
+          ])
+          ..publish(DwLiveChannel.forAccount(AppChannel.notes, alice.id), [
+            const NoteView(id: 2, text: 'for alice'),
+          ]);
+        return const DwCallOk(RoomView(id: 1, name: 'a'));
+      });
+      await h.start();
+      final mine = h.client.watch(const ListMyNotes());
+      await settle();
+      expect(dataOf(mine.state), [const NoteView(id: 1, text: 'mine')]);
+
+      await h.client.command(const RenameRoom(roomId: 1, name: 'a'));
+      final response =
+          h.server.callsOf<RenameRoom>().single.response as DwApiOk;
+      expect(response.updates.channels.keys, ['notes:8', 'notes:7']);
+      expect(dataOf(mine.state), [
+        const NoteView(id: 2, text: 'for alice'),
+        const NoteView(id: 1, text: 'mine'),
+      ]);
+    });
+
+    test('the fake server, like a real one, refuses to publish to an '
+        'unresolved caller channel', () async {
+      final h = Harness()..serveRooms();
+      h.server.onCommand<RenameRoom>((command, call) {
+        call.publish(myNotesChannel, [const NoteView(id: 1, text: 'whose?')]);
+        return const DwCallOk(RoomView(id: 1, name: 'a'));
+      });
+      await h.start();
+      final result = await h.client.command(
+        const RenameRoom(roomId: 1, name: 'a'),
+      );
+      expect(result, isA<DwCallFailed<RoomView>>());
+      expect(h.server.errors.single, isA<ArgumentError>());
+      h.server.errors.clear();
+    });
+
+    test('a socket update is applied only to entries on its channel, '
+        'whatever the type', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      final mine = h.client.watch(const ListMyNotes());
+      await settle();
+      expect(mine.isLive, isTrue);
+      h.server.publish(roomsChannel, [const NoteView(id: 5, text: 'stray')]);
+      h.server.publish(DwLiveChannel.forAccount(AppChannel.notes, alice.id), [
+        const NoteView(id: 6, text: 'mine'),
+      ]);
+      await settle();
+      expect(dataOf(mine.state), [const NoteView(id: 6, text: 'mine')]);
+    });
+
+    test('an entry on two channels applies an object published to both '
+        'once', () async {
+      final protocol = DwWireProtocol([
+        const DwProtocolEntry<_RoomsAndRoom3>(
+          'RoomsAndRoom3',
+          _RoomsAndRoom3.fromJson,
+        ),
+      ], include: roomsProtocol);
+      const renamed = RoomView(id: 3, name: 'c3');
+      final server = DwFakeServer(protocol: protocol)
+        ..registerToken(alice.token, alice.id)
+        ..onRequest<_RoomsAndRoom3>((r, call) => const DwCallOk([a, b]))
+        ..onCommand<RenameRoom>((command, call) {
+          call
+            ..publish(roomsChannel, [renamed])
+            ..publish(const DwLiveChannel(AppChannel.room, 3), [renamed]);
+          return const DwCallOk(renamed);
+        });
+      final client = server.newClient(tokenStore: DwMemoryTokenStore(alice));
+      addTearDown(client.stop);
+      await client.start();
+      final both = client.watch(const _RoomsAndRoom3());
+      await settle();
+      expect(both.isLive, isTrue);
+      final states = DwStreamRecording(both.states);
+
+      await client.command(const RenameRoom(roomId: 3, name: 'c3'));
+      final response = server.callsOf<RenameRoom>().single.response as DwApiOk;
+      expect(response.updates.channels.keys, ['rooms', 'room:3']);
+      expect(dataOf(both.state), [renamed, a, b]);
+      expect(states.values, hasLength(2), reason: 'replayed, then one change');
+      expect(server.errors, isEmpty);
+    });
 
     test('an update that arrives while a fetch is in flight survives the '
         'answer', () async {
@@ -275,9 +370,38 @@ void main() {
   });
 }
 
+/// Rooms live on `rooms` and on `room:3`.
+final class _RoomsAndRoom3 extends DwListRequest<RoomView> {
+  const _RoomsAndRoom3();
+
+  static _RoomsAndRoom3 fromJson(Map<String, Object?> json) =>
+      const _RoomsAndRoom3();
+
+  @override
+  List<DwLiveChannel> get channels => const [
+    roomsChannel,
+    DwLiveChannel(AppChannel.room, 3),
+  ];
+
+  @override
+  String get dwTypeName => 'RoomsAndRoom3';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  @override
+  bool operator ==(Object other) => other is _RoomsAndRoom3;
+
+  @override
+  int get hashCode => 1;
+}
+
 /// A list whose onUpdate throws for one object.
 final class _ThrowingList extends DwListRequest<RoomView> {
   const _ThrowingList();
+
+  @override
+  List<DwLiveChannel> get channels => const [roomsChannel];
 
   static _ThrowingList fromJson(Map<String, Object?> json) =>
       const _ThrowingList();

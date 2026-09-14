@@ -13,7 +13,7 @@ void main() {
       settings: const DwServerSettings(
         outboundLimitBytes: 256 * 1024,
         maxLiveMessageBytes: 1024,
-        allowedOrigins: {'app.example.com'},
+        allowedOrigins: {'https://app.example.com', 'http://localhost:5000'},
       ),
     ),
   );
@@ -31,22 +31,43 @@ void main() {
 
   group('origin', () {
     test('a foreign browser origin is refused before the upgrade', () async {
-      await expectLater(
-        harness().server.openLive(headers: {'Origin': 'https://evil.example'}),
-        throwsA(isA<WebSocketException>()),
-      );
+      final server = harness().server;
+      final port = server.port;
+      for (final origin in [
+        'https://evil.example',
+        // The allow-list names full origins: the same host on another scheme
+        // or port is another site.
+        'http://app.example.com',
+        'https://app.example.com:8443',
+        // The server's own host on another port.
+        'http://127.0.0.1:${port + 1}',
+        // Opaque and malformed origins.
+        'null',
+        'file://',
+        'app.example.com',
+        'https://app.example.com/path',
+      ]) {
+        await expectLater(
+          server.openLive(headers: {'Origin': origin}),
+          throwsA(isA<WebSocketException>()),
+          reason: origin,
+        );
+      }
     });
 
-    test('the server\'s own host and the allow-list may connect, and so may '
-        'a native app without Origin', () async {
+    test('the origin the upgrade was sent to and the allow-list may connect, '
+        'and so may a native app without Origin', () async {
+      final server = harness().server;
+      final port = server.port;
       for (final origin in [
-        'http://127.0.0.1:1234',
+        'http://127.0.0.1:$port',
+        'HTTP://127.0.0.1:$port',
         'https://app.example.com',
+        'https://APP.example.com:443',
+        'http://localhost:5000',
         null,
       ]) {
-        final socket = await harness().server.openLive(
-          headers: {'Origin': ?origin},
-        );
+        final socket = await server.openLive(headers: {'Origin': ?origin});
         expect(socket.connectionId, isNotEmpty, reason: '$origin');
         await socket.close();
       }

@@ -32,13 +32,4 @@ abstract final class ExampleAccess {
   static final DwAccessRule admin = DwAccessRule.check<DwServerCall<Object?>>(
     (ctx, _) => ctx.isAdmin,
   );
-
-  /// A "my" call names the caller's own account ([accountOf]); any other
-  /// account is `dw.forbidden`. The handler then reads the caller, never the
-  /// field.
-  static DwAccessRule ownAccount<C extends DwServerCall<Object?>>(
-    int Function(C call) accountOf,
-  ) => DwAccessRule.check<C>(
-    (ctx, call) async => accountOf(call) == ctx.accountId,
-  );
 }

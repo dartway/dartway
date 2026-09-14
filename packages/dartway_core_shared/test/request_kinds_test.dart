@@ -86,10 +86,17 @@ void main() {
       });
     });
 
-    test('table: update, never insert; a deletion refetches the page', () {
+    test('table: matches ? upsert : remove (the page decides what that '
+        'means); a deletion refetches the page', () {
       expect(actions(const ListBookingTable()), {
-        'matching': DwUpdateAction.update,
-        'notMatching': DwUpdateAction.update,
+        'matching': DwUpdateAction.upsert,
+        'notMatching': DwUpdateAction.upsert,
+        'deletion': DwUpdateAction.refetch,
+        'foreign': DwUpdateAction.ignore,
+      });
+      expect(actions(const ListBookingTable(bookedOnly: true)), {
+        'matching': DwUpdateAction.upsert,
+        'notMatching': DwUpdateAction.remove,
         'deletion': DwUpdateAction.refetch,
         'foreign': DwUpdateAction.ignore,
       });

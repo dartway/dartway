@@ -35,6 +35,7 @@ void main() {
         ),
         DwRoute.post('/any', (ctx, request) => DwHttpResponse.text('specific')),
         DwRoute.get('/unread', (ctx, request) => DwHttpResponse.empty()),
+        DwRoute.get('/unusual', (ctx, request) => DwHttpResponse(299)),
         DwRoute.post('/publish', (ctx, request) async {
           final note = await TestApp.insertNote(ctx.db, 'from a route');
           ctx.publish(const DwLiveChannel(TestChannel.public), note);
@@ -98,8 +99,17 @@ void main() {
     expect((small.status, small.text), (200, '3'));
     final large = await caller.raw('POST', '/limited', body: List.filled(9, 1));
     expect(large.status, 413);
+    expect(large.reasonPhrase, 'Content Too Large');
     final notJson = await caller.raw('POST', '/echo', body: utf8.encode('{'));
     expect(notJson.status, 400);
+  });
+
+  test('a status line carries the standard reason phrase; a status without '
+      'one keeps the default of dart:io', () async {
+    final unusual = await caller.raw('GET', '/unusual');
+    expect((unusual.status, unusual.reasonPhrase), (299, 'Status 299'));
+    final slow = await caller.raw('GET', '/slow-down');
+    expect((slow.status, slow.reasonPhrase), (429, 'Too Many Requests'));
   });
 
   test('a body the route never reads does not break the connection', () async {

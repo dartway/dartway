@@ -51,9 +51,9 @@ void main() {
     expect(
       booking.response,
       isA<DwApiOk>().having(
-        (ok) => ok.updates.objects,
-        'updates',
-        hasLength(2),
+        (ok) => ok.updates.channels.keys,
+        'updates by channel',
+        ['schedule', 'bookings:${testSession.id}'],
       ),
     );
     expect(find.text('You are booked!'), findsOneWidget);
@@ -73,7 +73,8 @@ void main() {
 
   testWidgets('the schedule is asked from the start of today, once, with the '
       "member's own bookings", (tester) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final club = FakeClub();
+    final app = await ExampleTestApp.start(tester, club);
 
     final now = DateTime.now();
     final request = app.server.requestsOf<ListUpcomingSessions>().single;
@@ -84,7 +85,12 @@ void main() {
     );
     expect(
       app.server.requestsOf<ListMyBookings>().single,
-      ListMyBookings(accountId: testSession.id),
+      const ListMyBookings(),
+    );
+    expect(
+      app.server.subscribeCount(club.bookingsChannel),
+      1,
+      reason: "the caller channel resolved to the member's own account",
     );
     expect(find.text('No upcoming sessions yet'), findsOneWidget);
 

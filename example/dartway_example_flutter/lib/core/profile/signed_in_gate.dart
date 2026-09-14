@@ -54,9 +54,7 @@ class SignedInGate extends HookConsumerWidget {
             : LoadFailedMessage(
                 onRetry: dw.action(
                   (_) => ref
-                      .read(
-                        dw.request(GetMyProfile(accountId: accountId)).notifier,
-                      )
+                      .read(dw.request(const GetMyProfile()).notifier)
                       .refetch(),
                 ),
               ),

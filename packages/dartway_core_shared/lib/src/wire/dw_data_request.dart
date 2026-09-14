@@ -9,8 +9,10 @@ enum DwUpdateAction {
   /// Replace the object with the same id where it stands; insert it when
   /// absent — by the request's `sort` when it declares one, otherwise at the
   /// head. Insertion is further bounded by the kind: a page request drops an
-  /// object that sorts past its loaded pages while more pages exist, and a
-  /// window inserts by its `positionOf` only inside the range it has loaded.
+  /// object that sorts past its loaded pages while more pages exist, a window
+  /// inserts by its `positionOf` only inside the range it has loaded, and a
+  /// table page reads itself again instead of inserting (its total and every
+  /// later row change).
   upsert,
 
   /// Replace the object with the same id where it stands; never insert.
@@ -41,8 +43,10 @@ enum _DwUpdatePolicy {
   /// An object or a deletion → refetch.
   refetch,
 
-  /// An object → update; a deletion → refetch: numbered pages shift when a
-  /// row disappears, so the page is read again.
+  /// An object → `matches ? upsert : remove`; a deletion → refetch. On a
+  /// table page an upsert of an absent object and every removal read the page
+  /// again: numbered pages and their total shift when a row appears or
+  /// disappears.
   table,
 }
 
@@ -55,7 +59,7 @@ enum _DwUpdatePolicy {
 /// | [DwMaybeRequest] | `T?` | `matches ? upsert : remove` |
 /// | [DwListRequest] | `List<T>` | `matches ? upsert : remove`; `.updateOnly()`, `.refetchOnUpdate()` |
 /// | [DwPageRequest] | [DwPageResult] | `matches ? upsert : remove`; `.updateOnly()` |
-/// | [DwTableRequest] | [DwTablePage] | update; a deletion refetches |
+/// | [DwTableRequest] | [DwTablePage] | present → update; new or not matching → refetch |
 /// | [DwWindowRequest] | [DwWindowResult] | `matches ? upsert : remove` |
 ///
 /// A request has no side effects: the client may retry it, cache its result
@@ -105,8 +109,8 @@ sealed class DwDataRequest<R> extends DwServerCall<R> {
     }
     if (!acceptsItem(item)) return DwUpdateAction.ignore;
     return switch (_policy) {
-      _DwUpdatePolicy.update || _DwUpdatePolicy.table => DwUpdateAction.update,
-      _DwUpdatePolicy.matching =>
+      _DwUpdatePolicy.update => DwUpdateAction.update,
+      _DwUpdatePolicy.matching || _DwUpdatePolicy.table =>
         _matchesItem(item) ? DwUpdateAction.upsert : DwUpdateAction.remove,
       _DwUpdatePolicy.refetch => DwUpdateAction.refetch,
     };
@@ -317,9 +321,15 @@ abstract class DwPageRequest<T extends DwDataObject>
 /// [maxPageSize] is a constant of the class; the server serves
 /// [servedPageSize] and answers the size it served in [DwTablePage.pageSize].
 ///
-/// Default update: an object on the page is replaced, nothing is inserted (a
-/// numbered page never grows by an update); a deletion re-reads the page,
-/// since every later row moves up.
+/// Default update: `matches ? upsert : remove`, applied to a page — an object
+/// on the page is replaced in place; a matching object not on the page reads
+/// the page again, and so do one that stops matching and a deletion. A
+/// numbered page never grows by an update: a new row may belong on any page,
+/// every later row moves, and the total changes, so the page asks the server.
+/// The client cannot tell a new row from one on another page, so an update of
+/// a row elsewhere reads the page again too; rereads triggered together are
+/// coalesced into one call. Narrow [matches] to the request's filter, so a
+/// row on the page that leaves the filter is not kept on it.
 abstract class DwTableRequest<T extends DwDataObject>
     extends DwDataRequest<DwTablePage<T>> {
   const DwTableRequest({required this.maxPageSize})
@@ -368,6 +378,13 @@ abstract class DwTableRequest<T extends DwDataObject>
   @override
   bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
+
+  /// Whether [item] belongs to this table under the request's filter. By
+  /// default every object of type [T] on the request's channels does.
+  bool matches(T item) => true;
+
+  @override
+  bool _matchesItem(Object item) => matches(item as T);
 
   @override
   Object? encodeResult(DwTablePage<T> result, DwWireProtocol protocol) =>

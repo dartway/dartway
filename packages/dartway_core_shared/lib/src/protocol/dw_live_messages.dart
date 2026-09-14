@@ -14,7 +14,7 @@ import 'dw_update_transport.dart';
 // ← {"k":"authed","account":7} / {"k":"authed","rejected":true} / {"k":"authed"}
 // → {"k":"sub","ch":"bookings:7"} / {"k":"unsub","ch":"…"}
 // ← {"k":"subok","ch":"…"} / {"k":"subno","ch":"…", …}
-// ← {"k":"upd","ch":"schedule","updates":{<transport>}}
+// ← {"k":"upd","ch":"schedule","updates":{"ClubSession":[…]}}
 // ← {"k":"closed","ch":"…"}
 // ```
 
@@ -125,7 +125,7 @@ sealed class DwServerMessage {
         dwRejectUnknownKeys(map, const {'k', 'ch', 'updates'}, what);
         return DwUpdateMessage(
           channel: dwReadString(map['ch'], 'The channel'),
-          updates: DwUpdateTransport.fromJson(map['updates'], protocol),
+          updates: DwChannelUpdates.fromJson(map['updates'], protocol),
         );
       case 'closed':
         return DwChannelClosedMessage(_channel(map, what));
@@ -243,7 +243,9 @@ final class DwSubscriptionRefusedMessage extends DwServerMessage {
   };
 }
 
-/// What one command published to a channel, in one message.
+/// What one command published to a channel, in one message: the channel's
+/// objects grouped by type ([DwChannelUpdates]), the channel named beside
+/// them.
 ///
 /// Not sent to the connection named in the command's `Dw-Live-Connection`:
 /// it has the same updates in the command's response.
@@ -252,7 +254,7 @@ final class DwUpdateMessage extends DwServerMessage {
 
   final String channel;
 
-  final DwUpdateTransport updates;
+  final DwChannelUpdates updates;
 
   @override
   Map<String, Object?> toJson() => {

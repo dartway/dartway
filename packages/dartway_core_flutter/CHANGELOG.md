@@ -4,6 +4,9 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwAppBootstrapper` is exported**, so a widget test can mount the app as
+  `DwAppRunner` mounts it — initializers, loading and error screens, and the
+  "update the app" screen over everything — instead of rebuilding that by hand.
 - **Uploads:** `dw.files` (the client's `DwFileClient`) and `dw.uploader()` — a
   `DwUploadNotifier`, a `ValueNotifier` of `DwUploadIdle` / `DwUploadProgress`
   / `DwUploadDone` / `DwUploadError` for one upload slot of a screen. Refusals,

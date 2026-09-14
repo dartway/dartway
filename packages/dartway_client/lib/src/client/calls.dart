@@ -315,7 +315,7 @@ extension on DwAppClient {
         // Updates computed for the caller the call went out as. Once the
         // session changed they describe someone else's view: the entries now
         // on screen ask for their own.
-        if (call.sentToken == _session?.token) _applyTransport(updates.objects);
+        if (call.sentToken == _session?.token) _applyTransport(updates);
       case DwApiUnauthenticated():
         final token = call.sentToken;
         // Only the session the call carried is over; a call that went out
@@ -340,10 +340,34 @@ extension on DwAppClient {
     }
   }
 
-  /// Offers [objects] to every entry; each takes what its request accepts.
-  void _applyTransport(List<DwWireObject> objects) {
-    for (final entry in _entries.values.toList()) {
-      if (!entry.disposed) entry.absorb(objects);
+  /// Offers each channel's objects of [transport] to the entries whose
+  /// requests declare that channel; each takes what its request accepts.
+  void _applyTransport(DwUpdateTransport transport) => _applyUpdates([
+    for (final MapEntry(key: channel, value: updates)
+        in transport.channels.entries)
+      (channel, updates.objects),
+  ]);
+
+  /// Delivers objects by the channel they were published to (D-036): only an
+  /// entry whose request declares the channel hears of them. The channel is
+  /// the only fact that says whose data an object is — an admin's command
+  /// answers with a member's profile, published to that member's channel,
+  /// and routing by type alone would put it into the admin's own profile.
+  ///
+  /// An entry on several of the channels absorbs once, each object in it
+  /// once: the same object published to two channels is one update.
+  void _applyUpdates(Iterable<(String channel, List<DwWireObject>)> updates) {
+    final byEntry = <_Entry, List<DwWireObject>>{};
+    for (final (channel, objects) in updates) {
+      for (final entry in _channels[channel]?.entries ?? const <_Entry>{}) {
+        (byEntry[entry] ??= []).addAll(objects);
+      }
+    }
+    for (final MapEntry(key: entry, value: objects) in byEntry.entries) {
+      if (entry.disposed) continue;
+      entry.absorb(
+        objects.length == 1 ? objects : DwChannelUpdates(objects).objects,
+      );
     }
   }
 

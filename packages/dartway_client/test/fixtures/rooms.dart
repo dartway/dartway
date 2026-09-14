@@ -7,7 +7,9 @@ import 'package:dartway_client/dartway_client.dart';
 enum AppChannel with DwChannelKind { rooms, room, notes, chat }
 
 const roomsChannel = DwLiveChannel(AppChannel.rooms);
-const notesChannel = DwLiveChannel(AppChannel.notes);
+
+/// The signed-in account's notes: `notes:<account id>`, resolved by the client.
+const myNotesChannel = DwLiveChannel.ofCaller(AppChannel.notes);
 const chatChannel = DwLiveChannel(AppChannel.chat);
 
 // --- data objects ------------------------------------------------------------
@@ -190,8 +192,9 @@ mixin _$ListRoomsByRank on DwListRequest<RoomView> {
 ListRoomsByRank $ListRoomsByRankFromJson(Map<String, Object?> json) =>
     const ListRoomsByRank();
 
-/// Rooms without channels: fresh as its last fetch, and still updated by the
-/// transport of a response.
+/// Rooms without channels: fresh as its last fetch. No update reaches it — not
+/// over the socket, not in a response: an object applies only to requests on
+/// the channel it was published to (D-036).
 final class ListRoomsOffline extends DwListRequest<RoomView>
     with _$ListRoomsOffline {
   const ListRoomsOffline();
@@ -256,12 +259,13 @@ mixin _$ListRoomStats on DwListRequest<RoomView> {
 ListRoomStats $ListRoomStatsFromJson(Map<String, Object?> json) =>
     const ListRoomStats();
 
-/// The caller's own notes: "my" data, no account id in the request.
+/// The caller's own notes: "my" data, no account id in the request — its
+/// channel is the caller's (D-037).
 final class ListMyNotes extends DwListRequest<NoteView> with _$ListMyNotes {
   const ListMyNotes();
 
   @override
-  List<DwLiveChannel> get channels => const [notesChannel];
+  List<DwLiveChannel> get channels => const [myNotesChannel];
 }
 
 mixin _$ListMyNotes on DwListRequest<NoteView> {
@@ -363,14 +367,19 @@ mixin _$FeedRooms on DwPageRequest<RoomView> {
 FeedRooms $FeedRoomsFromJson(Map<String, Object?> json) =>
     FeedRooms(sorted: json['sorted'] as bool? ?? true);
 
-/// Numbered pages of rooms.
+/// Numbered pages of rooms, of at least [minRank].
 final class RoomsTable extends DwTableRequest<RoomView> with _$RoomsTable {
-  const RoomsTable({this.page = 1, this.pageSize = 2}) : super(maxPageSize: 10);
+  const RoomsTable({this.page = 1, this.pageSize = 2, this.minRank = 0})
+    : super(maxPageSize: 10);
 
   @override
   final int page;
   @override
   final int pageSize;
+  final int minRank;
+
+  @override
+  bool matches(RoomView item) => item.rank >= minRank;
 
   @override
   List<DwLiveChannel> get channels => const [roomsChannel];
@@ -384,19 +393,25 @@ mixin _$RoomsTable on DwTableRequest<RoomView> {
   Map<String, Object?> toJson() => {
     'page': _self.page,
     'pageSize': _self.pageSize,
+    'minRank': _self.minRank,
   };
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is RoomsTable &&
           other.page == _self.page &&
-          other.pageSize == _self.pageSize;
+          other.pageSize == _self.pageSize &&
+          other.minRank == _self.minRank;
   @override
-  int get hashCode => Object.hash(RoomsTable, _self.page, _self.pageSize);
+  int get hashCode =>
+      Object.hash(RoomsTable, _self.page, _self.pageSize, _self.minRank);
 }
 
-RoomsTable $RoomsTableFromJson(Map<String, Object?> json) =>
-    RoomsTable(page: json['page']! as int, pageSize: json['pageSize']! as int);
+RoomsTable $RoomsTableFromJson(Map<String, Object?> json) => RoomsTable(
+  page: json['page']! as int,
+  pageSize: json['pageSize']! as int,
+  minRank: json['minRank']! as int,
+);
 
 /// The chat, read as a window: three lines per load.
 final class ReadChat extends DwWindowRequest<ChatLine, int, int>

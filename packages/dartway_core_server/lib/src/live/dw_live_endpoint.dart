@@ -10,11 +10,13 @@ import 'package:meta/meta.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_auth_service.dart';
 import '../channels/dw_channel_rule.dart';
+import '../http/dw_reason_phrase.dart';
 import '../context/dw_call_context.dart';
 import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
 import 'dw_live_connection.dart';
 import 'dw_live_hub.dart';
+import 'dw_web_origin.dart';
 
 /// Serves `GET /dw/live`: the upgrade, the connection's identity and
 /// authentication, and its subscriptions.
@@ -49,7 +51,7 @@ final class DwLiveEndpoint {
   Future<void> upgrade(HttpRequest request, {required bool stopping}) async {
     final response = request.response;
     Future<void> refuse(int status, String text, [Map<String, String>? h]) {
-      response.statusCode = status;
+      dwSetStatus(response, status);
       h?.forEach(response.headers.set);
       response.headers.contentType = ContentType.text;
       response.write(text);
@@ -74,8 +76,8 @@ final class DwLiveEndpoint {
     if (origin != null && !_originAllowed(origin, request)) {
       return refuse(403, 'origin not allowed');
     }
+    dwSetStatus(response, HttpStatus.switchingProtocols);
     response
-      ..statusCode = HttpStatus.switchingProtocols
       ..headers.set(HttpHeaders.connectionHeader, 'Upgrade')
       ..headers.set(HttpHeaders.upgradeHeader, 'websocket')
       ..headers.set(
@@ -154,21 +156,24 @@ final class DwLiveEndpoint {
     }
   }
 
-  /// The server's own host is always allowed: a web app served from it (the
-  /// proxied `/dw/` of R2.7) is same-origin.
+  /// Whether a browser page of [origin] may open the live socket: when it is
+  /// the origin the request was sent to (the proxied `/dw/` of R2.7 serves the
+  /// web app and the socket from one host), or one of
+  /// `DwServerSettings.allowedOrigins`. Scheme, host and port are all
+  /// compared: another port on the same host is another site. An origin that
+  /// does not parse — `null`, sent by sandboxed and `file:` pages — is refused.
   bool _originAllowed(String origin, HttpRequest request) {
-    final Uri uri;
-    try {
-      uri = Uri.parse(origin);
-    } on FormatException {
-      return false;
-    }
-    final originHost = uri.host.toLowerCase();
-    if (originHost.isEmpty) return false;
-    final host = request.headers.host?.toLowerCase();
-    return originHost == host ||
-        settings.allowedOrigins.any((h) => h.toLowerCase() == originHost);
+    final parsed = DwWebOrigin.parse(origin);
+    if (parsed == null) return false;
+    return parsed.isHostOf(request.headers.value(HttpHeaders.hostHeader)) ||
+        _allowedOrigins.contains(parsed);
   }
+
+  /// [DwServerSettings.allowedOrigins], parsed once. Entries that do not
+  /// parse never reach here: the server refuses to start with them.
+  late final Set<DwWebOrigin> _allowedOrigins = {
+    for (final entry in settings.allowedOrigins) ?DwWebOrigin.parse(entry),
+  };
 
   void _onMessage(DwLiveConnection connection, Object? data) {
     if (connection.isClosing) return;

@@ -144,28 +144,25 @@ extension UserProfileCopyWith on UserProfile {
 }
 
 mixin _$GetMyProfile on DwSingleRequest<UserProfile> {
-  GetMyProfile get _self => this as GetMyProfile;
-
   @override
   String get dwTypeName => 'GetMyProfile';
 
   @override
-  Map<String, Object?> toJson() => {'accountId': _self.accountId};
+  Map<String, Object?> toJson() => const {};
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is GetMyProfile && other.accountId == _self.accountId;
+      identical(this, other) || other is GetMyProfile;
 
   @override
-  int get hashCode => Object.hash(GetMyProfile, _self.accountId);
+  int get hashCode => (GetMyProfile).hashCode;
 
   @override
-  String toString() => 'GetMyProfile(accountId: ${_self.accountId})';
+  String toString() => 'GetMyProfile()';
 }
 
 GetMyProfile $GetMyProfileFromJson(Map<String, Object?> json) =>
-    GetMyProfile(accountId: json['accountId']! as int);
+    const GetMyProfile();
 
 mixin _$UpdateMyProfile on DwActionCommand<UserProfile> {
   UpdateMyProfile get _self => this as UpdateMyProfile;

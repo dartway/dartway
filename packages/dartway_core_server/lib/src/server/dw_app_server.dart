@@ -21,6 +21,7 @@ import '../jobs/dw_job_queue.dart';
 import '../jobs/dw_job_runner.dart';
 import '../live/dw_live_endpoint.dart';
 import '../live/dw_live_hub.dart';
+import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
 import '../routes/dw_route.dart';
 import 'dw_runtime.dart';
@@ -352,6 +353,15 @@ final class DwAppServer {
       }
       if (job case DwQueuedJob(:final maxAttempts) when maxAttempts < 1) {
         problems.add('job "${job.name}" needs at least one attempt');
+      }
+    }
+    for (final origin in settings.allowedOrigins) {
+      if (DwWebOrigin.parse(origin) == null) {
+        problems.add(
+          'allowed origin "$origin" is not a full origin: scheme, host and '
+          'an optional port, as a browser sends it (https://app.example.com, '
+          'http://localhost:5000)',
+        );
       }
     }
     if (files case final storage?) problems.addAll(storage.problems);

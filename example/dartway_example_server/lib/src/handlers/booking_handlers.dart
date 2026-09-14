@@ -5,12 +5,14 @@ import '../../generated/dw_schema.dart';
 import '../club_objects.dart';
 import '../entities/club.dart';
 import '../entities/people.dart';
+import '../example_channels.dart';
 import '../example_context.dart';
 import 'schedule_handlers.dart';
 
 final bookingHandlers = <DwCallHandler>[
   DwCallHandler.list<ListMyBookings, SessionBooking>(
-    access: ExampleAccess.ownAccount<ListMyBookings>((r) => r.accountId),
+    // "My" bookings name no account: the caller's are the only ones read.
+    access: DwAccessRule.signedIn,
     handle: (ctx, request) async {
       final me = await ctx.profile;
       return ClubObjects.bookings(
@@ -108,7 +110,7 @@ final bookingHandlers = <DwCallHandler>[
         booking.copyWith(status: BookingStatus.attended),
       );
       final object = (await ClubObjects.bookings(ctx.db, [attended])).single;
-      ctx.publish(_bookingsOf(object.accountId), object);
+      ctx.publish(bookingsOf(object.accountId), object);
       return object;
     },
   ),
@@ -137,14 +139,11 @@ final bookingHandlers = <DwCallHandler>[
       final object = (await ClubObjects.bookings(ctx.db, [
         booking,
       ], client: me)).single;
-      ctx.publish(_bookingsOf(me.accountId), object);
+      ctx.publish(bookingsOf(me.accountId), object);
       return object;
     },
   ),
 ];
-
-DwLiveChannel _bookingsOf(int accountId) =>
-    DwLiveChannel(ExampleChannel.bookings, accountId);
 
 /// The session's new spots go to everyone on the schedule, the booking to its
 /// member's devices.
@@ -163,6 +162,6 @@ Future<SessionBooking> _publishBookingChange(
   )).single;
   ctx
     ..publish(scheduleChannel, sessionObject)
-    ..publish(_bookingsOf(client.accountId), object);
+    ..publish(bookingsOf(client.accountId), object);
   return object;
 }

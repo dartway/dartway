@@ -377,8 +377,9 @@ final class DwAppClient {
   }
 
   /// Watches one numbered page of a table: its rows and the total. Each page
-  /// is its own request, so each is its own entry; rows on it are updated
-  /// live, nothing is inserted, and a deletion reads the page again.
+  /// is its own request, so each is its own entry. A row on it is updated in
+  /// place; nothing is inserted — an object not on the page, and a deletion,
+  /// read the page again, since its rows and total may have moved.
   DwRequestWatch<DwTablePage<T>> watchTable<T extends DwDataObject>(
     DwTableRequest<T> request,
   ) {

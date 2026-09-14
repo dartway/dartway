@@ -396,7 +396,7 @@ void main() {
     test('is applied to watched state before the call completes', () async {
       final h = Harness()..serveRooms();
       await h.start();
-      final watch = h.client.watch(const ListRoomsOffline());
+      final watch = h.client.watch(const ListRooms());
       await settle();
       expect(dataOf(watch.state), [a, b]);
 
@@ -405,13 +405,13 @@ void main() {
       );
       // No settle: the state changed before the future completed.
       expect(dataOf(watch.state), [a, result.valueOrNull]);
-      expect(h.server.requestsOf<ListRoomsOffline>(), hasLength(1));
+      expect(h.server.requestsOf<ListRooms>(), hasLength(1));
     });
 
     test('carries deletions', () async {
       final h = Harness()..serveRooms();
       await h.start();
-      final watch = h.client.watch(const ListRoomsOffline());
+      final watch = h.client.watch(const ListRooms());
       await settle();
       await h.client.command(const DeleteRoom(1));
       expect(dataOf(watch.state), [b]);
@@ -422,6 +422,9 @@ void main() {
       () async {
         final h = Harness()..serveRooms();
         final gate = Gate();
+        // No socket: nothing but the response could carry the update to
+        // Bob's list.
+        h.server.acceptsConnections = false;
         await h.start();
         h.server.onCommand<RenameRoom>((command, call) async {
           await gate.passed;
@@ -434,10 +437,13 @@ void main() {
         );
         await settle();
         await h.client.signIn(bob);
-        final watch = h.client.watch(const ListRoomsOffline());
+        final watch = h.client.watch(const ListRooms());
         await settle();
         gate.open();
         await pending;
+        final response =
+            h.server.callsOf<RenameRoom>().single.response as DwApiOk;
+        expect(response.updates.objectsOn('rooms'), hasLength(1));
         expect(dataOf(watch.state), [
           a,
           b,

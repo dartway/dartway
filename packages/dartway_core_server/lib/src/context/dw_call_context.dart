@@ -53,12 +53,20 @@ abstract class DwCallContext {
   ///
   /// A command's publications are answered in its response to the caller and
   /// sent over the live socket to every other subscriber, one message per
-  /// channel. A request has no side effects: publishing from one throws
-  /// [StateError].
+  /// channel. The channel travels with the item (D-036): a client applies it
+  /// only to requests that declare that channel. A request has no side
+  /// effects: publishing from one throws [StateError].
+  ///
+  /// A "my …" request declares `DwLiveChannel.ofCaller(kind)`; publish to it
+  /// by naming whose it is, `DwLiveChannel.forAccount(kind, accountId)`. An
+  /// unresolved caller channel throws [ArgumentError]: on a server it could
+  /// only mean the caller, and a command changing someone else's data is
+  /// exactly where that reading goes wrong.
   void publish(DwLiveChannel channel, DwWireObject item);
 
   /// Closes [accountId]'s subscriptions to [channel], after commit. Throws
-  /// [StateError] in a request, as [publish].
+  /// [StateError] in a request, as [publish], and [ArgumentError] for an
+  /// unresolved caller channel.
   void revoke(DwLiveChannel channel, int accountId);
 
   /// Refuses the call.
@@ -222,6 +230,7 @@ final class DwRuntimeContext extends DwCallContext {
   @override
   void publish(DwLiveChannel channel, DwWireObject item) {
     requireSideEffects('publish');
+    _requireResolved(channel);
     if (item is! DwDataObject && item is! DwDeletedObject) {
       throw ArgumentError.value(
         item.runtimeType,
@@ -253,7 +262,20 @@ final class DwRuntimeContext extends DwCallContext {
   @override
   void revoke(DwLiveChannel channel, int accountId) {
     requireSideEffects('revoke');
+    _requireResolved(channel);
     _current.effects.revocations.add((channel, accountId));
+  }
+
+  static void _requireResolved(DwLiveChannel channel) {
+    if (channel.isOfCaller) {
+      throw ArgumentError.value(
+        channel,
+        'channel',
+        'A caller channel is resolved by the client for whoever watches. '
+            'Name the account: DwLiveChannel.forAccount('
+            '${channel.kind.channelName}, accountId)',
+      );
+    }
   }
 
   /// Records a revoked session key, delivered with the other effects.

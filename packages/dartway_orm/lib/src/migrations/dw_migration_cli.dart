@@ -14,6 +14,7 @@ import 'dw_migration_checksum.dart';
 import 'dw_draft_writer.dart';
 import 'dw_database_migration.dart';
 import 'dw_migration_errors.dart';
+import 'dw_migration_project.dart';
 import 'dw_migration_runner.dart';
 
 /// The migration command line of a project, run from `bin/migrate.dart`:
@@ -255,7 +256,12 @@ usage: migrate <command>
     final file = File(p.join(directory, DwDraftWriter.fileName(id)));
     if (file.existsSync()) throw StateError('${file.path} already exists');
     await file.writeAsString(
-      DwDraftWriter.migration(id: id, className: className, changes: changes),
+      DwDraftWriter.migration(
+        id: id,
+        className: className,
+        changes: changes,
+        project: DwMigrationProject.of(directory),
+      ),
     );
     await _writeRegistration();
 
@@ -286,6 +292,7 @@ usage: migrate <command>
       DwDraftWriter.registration(
         variable: '${namespace}Migrations',
         classesById: classes,
+        project: DwMigrationProject.of(directory),
       ),
     );
   }

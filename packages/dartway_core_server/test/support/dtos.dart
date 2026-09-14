@@ -2,7 +2,16 @@
 // generate` produces (omission of absent fields, value equality).
 import 'package:dartway_core_server/dartway_core_server.dart';
 
-enum TestChannel with DwChannelKind { notes, account, public, broken, nobody }
+enum TestChannel with DwChannelKind {
+  notes,
+  account,
+  public,
+  broken,
+  nobody,
+
+  /// Keyed by the subscriber's account: `DwChannelRule.ofCaller`.
+  inbox,
+}
 
 final class NoteView extends DwDataObject {
   const NoteView({required this.id, required this.text, this.ownerId});
@@ -117,6 +126,32 @@ final class LiveNotes extends DwListRequest<NoteView> {
 
   @override
   int get hashCode => (LiveNotes).hashCode;
+}
+
+/// The caller's inbox: live on the caller's own `inbox:<account>`, with no
+/// account id of its own (D-037). The server answers it empty; notes arrive
+/// live.
+final class MyInbox extends DwListRequest<NoteView> {
+  const MyInbox();
+
+  @override
+  List<DwLiveChannel> get channels => const [
+    DwLiveChannel.ofCaller(TestChannel.inbox),
+  ];
+
+  @override
+  String get dwTypeName => 'MyInbox';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static MyInbox fromJson(Map<String, Object?> json) => const MyInbox();
+
+  @override
+  bool operator ==(Object other) => other is MyInbox;
+
+  @override
+  int get hashCode => (MyInbox).hashCode;
 }
 
 /// Needs a signed-in account.
@@ -620,6 +655,27 @@ final class LargeUpload extends DwActionCommand<int> {
       LargeUpload(json['data']! as String);
 }
 
+/// Creates a note with [text] and publishes it to the inbox of [accountId]
+/// (`DwLiveChannel.forAccount`); without an account, to the unresolved
+/// `DwLiveChannel.ofCaller`, which a server refuses to publish to.
+final class SendToInbox extends DwActionCommand<NoteView> {
+  const SendToInbox(this.text, {this.accountId});
+
+  final String text;
+  final int? accountId;
+
+  @override
+  String get dwTypeName => 'SendToInbox';
+
+  @override
+  Map<String, Object?> toJson() => {'text': text, 'accountId': ?accountId};
+
+  static SendToInbox fromJson(Map<String, Object?> json) => SendToInbox(
+    json['text']! as String,
+    accountId: json['accountId'] as int?,
+  );
+}
+
 /// Waits [millis], then creates a note with [text] and publishes it to
 /// `notes`.
 final class SlowNote extends DwActionCommand<NoteView> {
@@ -644,6 +700,8 @@ final DwWireProtocol testProtocol = DwWireProtocol([
   DwProtocolEntry<ListNotes>('ListNotes', ListNotes.fromJson),
   DwProtocolEntry<LiveNotes>('LiveNotes', LiveNotes.fromJson),
   DwProtocolEntry<MyNotes>('MyNotes', MyNotes.fromJson),
+  DwProtocolEntry<MyInbox>('MyInbox', MyInbox.fromJson),
+  DwProtocolEntry<SendToInbox>('SendToInbox', SendToInbox.fromJson),
   DwProtocolEntry<NotesOfOwner>('NotesOfOwner', NotesOfOwner.fromJson),
   DwProtocolEntry<GetNote>('GetNote', GetNote.fromJson),
   DwProtocolEntry<FindNote>('FindNote', FindNote.fromJson),

@@ -110,9 +110,10 @@ void main() {
 
         final call = h.server.callsOf<RenameRoom>().single;
         expect(call.liveConnectionId, connection.id);
-        expect((call.response as DwApiOk).updates.objects, [
-          result.valueOrNull,
-        ]);
+        expect(
+          (call.response as DwApiOk).updates,
+          DwUpdateTransport([('rooms', result.valueOrNull!)]),
+        );
         expect(
           h.server.sent.whereType<DwUpdateMessage>().length,
           updatesBefore,
@@ -152,7 +153,7 @@ void main() {
         final watch = h.client.watch(const ListRooms());
         await settle();
         h.server.connections.single.send(
-          DwUpdateMessage(channel: 'notes', updates: DwUpdateTransport([c])),
+          DwUpdateMessage(channel: 'notes', updates: DwChannelUpdates([c])),
         );
         await settle();
         expect(dataOf(watch.state), [a, b]);
@@ -218,7 +219,12 @@ void main() {
 
         // Fetched without waiting out the settle timeout: the socket failed.
         expect(watch.state, const DwRequestData([a, b]));
-        expect(h.client.connectionStatus, DwConnectionStatus.disconnected);
+        // Retried every few milliseconds: between two attempts it is
+        // disconnected, during one connecting — never connected.
+        expect(
+          h.client.connectionStatus,
+          anyOf(DwConnectionStatus.disconnected, DwConnectionStatus.connecting),
+        );
         expect((await h.client.fetch(const GetRoom(1))).valueOrNull, a);
 
         h.rooms = [c, a, b];

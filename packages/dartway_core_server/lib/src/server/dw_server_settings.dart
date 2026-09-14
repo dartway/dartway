@@ -65,11 +65,17 @@ final class DwServerSettings {
   /// How long `stop()` waits for running calls and jobs.
   final Duration stopTimeout;
 
-  /// Hosts (as in `Origin`) allowed to open the live socket from a browser in
-  /// addition to the server's own host. Upgrades without `Origin` (native
-  /// apps) are always allowed. Calls need no such list: they are same-origin
-  /// by deployment (R2.7), and a cross-origin browser call cannot pass the
-  /// JSON content-type preflight, which the server never answers.
+  /// Browser origins allowed to open the live socket in addition to the
+  /// origin the upgrade was sent to — full origins, as a browser sends them in
+  /// `Origin`: `https://app.example.com`, `http://localhost:5000`. Scheme,
+  /// host and port are all compared; the server refuses to start with an
+  /// entry that is not a full origin (a bare host would silently allow every
+  /// port and scheme of it).
+  ///
+  /// Upgrades without `Origin` (native apps) are always allowed. Calls need no
+  /// such list: they are same-origin by deployment (R2.7), and a cross-origin
+  /// browser call cannot pass the JSON content-type preflight, which the
+  /// server never answers.
   final Set<String> allowedOrigins;
 
   /// Session tokens resolved to accounts kept in memory, so a call costs no

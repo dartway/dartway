@@ -1,14 +1,24 @@
 import 'dart:io';
 
+import 'package:dart_style/dart_style.dart';
+
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:dartway_orm/src/migrations/dw_migration_checksum.dart';
 import 'package:dartway_orm/src/migrations/dw_draft_writer.dart';
+import 'package:dartway_orm/src/migrations/dw_migration_project.dart';
 import 'package:path/path.dart' as p;
+import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart';
 
 import 'fixtures/generated/dw_schema.dart';
 import 'support/test_database.dart';
 import 'support/test_migration.dart';
+
+/// [source] without whitespace and trailing commas: what a call says,
+/// whatever the formatter made of its layout.
+String withoutLayout(String source) => source
+    .replaceAll(RegExp(r'\s+'), '')
+    .replaceAllMapped(RegExp(r',([)\]}])'), (match) => match[1]!);
 
 DwTableSchema noteTable({bool withTitle = true}) => DwTableSchema(
   'note',
@@ -220,13 +230,24 @@ final class M$id extends DwDatabaseMigration {
       ];
       expect(order, ['club_service', 'app_setting', 'club_session']);
       expect(source, contains("await m.dropTable('club_session');"));
+      // The formatter splits this call over lines; its content is what counts.
       expect(
-        source,
+        withoutLayout(source),
         contains(
-          "DwColumnSchema('featured_service_id', 'bigint', nullable: true, unique: true, "
-          "references: DwForeignKey('club_service', onDelete: DwOnDelete.setNull))",
+          withoutLayout(
+            "DwColumnSchema('featured_service_id', 'bigint', nullable: true, "
+            "unique: true, references: DwForeignKey('club_service', "
+            'onDelete: DwOnDelete.setNull))',
+          ),
         ),
       );
+      // Outside a server project (here: the ORM's own package), the ORM
+      // itself, and the file as `dart format` leaves it.
+      expect(
+        source,
+        contains("import 'package:dartway_orm/dartway_orm.dart';"),
+      );
+      expect(DwMigrationProject.of(migrationsDir()).format(source), source);
 
       final registration = File(
         p.join(migrationsDir(), 'migrations.dart'),
@@ -238,6 +259,61 @@ final class M$id extends DwDatabaseMigration {
       );
       expect(registration, contains('  const M20260914083005Initial(),'));
       expect(out.toString(), contains('create table club_session'));
+    });
+
+    test('in a server project imports dartway_core_server and is written as '
+        "that project's dart format leaves it, then sealed", () async {
+      File(p.join(sandbox.path, 'pubspec.yaml')).writeAsStringSync('''
+name: app_server
+environment:
+  sdk: ^3.11.0
+dependencies:
+  dartway_core_server: ^0.20.0-dev.1
+dev_dependencies:
+  dartway_orm: ^0.20.0-dev.1
+''');
+      expect(
+        await cli(schema: fixtureSchema).run(['create', 'initial']),
+        DwMigrationCli.exitOk,
+      );
+      final source = File(
+        p.join(migrationsDir(), 'm20260914_083005_initial.dart'),
+      ).readAsStringSync();
+      final registration = File(
+        p.join(migrationsDir(), 'migrations.dart'),
+      ).readAsStringSync();
+      const serverImport =
+          "import 'package:dartway_core_server/dartway_core_server.dart';";
+      for (final file in [source, registration]) {
+        expect(file, contains(serverImport));
+        expect(file, isNot(contains('package:dartway_orm')));
+        final formatter = DartFormatter(languageVersion: Version(3, 11, 0));
+        expect(formatter.format(file), file, reason: 'already formatted');
+      }
+      // Sealed after formatting: the checksum is of the file as written.
+      expect(
+        DwMigrationChecksum.declared(source),
+        DwMigrationChecksum.of(source),
+      );
+    });
+
+    test('a project that declares dartway_core_server only as a dev '
+        'dependency imports dartway_orm', () {
+      final project = DwMigrationProject.fromPubspec('''
+name: tool
+dependencies:
+  dartway_orm: any
+dev_dependencies:
+  dartway_core_server: any
+''');
+      expect(project.ormLibrary, DwMigrationProject.ormPackageLibrary);
+      expect(project.languageVersion, DartFormatter.latestLanguageVersion);
+      expect(
+        DwMigrationProject.fromPubspec(
+          'name: x\nenvironment:\n  sdk: ">=3.8.2 <4.0.0"\n',
+        ).languageVersion,
+        Version(3, 8, 0),
+      );
     });
 
     test('marks decisions and offers the rename', () async {
@@ -504,8 +580,9 @@ final class M$id extends DwDatabaseMigration {
       DwDraftWriter.registration(
         variable: 'pushMigrations',
         classesById: const {},
+        project: DwMigrationProject.standalone,
       ),
-      contains('final List<DwDatabaseMigration> pushMigrations = [\n];'),
+      contains('final List<DwDatabaseMigration> pushMigrations = [];'),
     );
   });
 }

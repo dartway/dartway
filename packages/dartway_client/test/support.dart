@@ -90,7 +90,9 @@ final class Harness {
         return DwCallOk(dwFakeOffsetPage(ordered, request, call.page));
       })
       ..onRequest<RoomsTable>(
-        (request, call) => DwCallOk(dwFakeTablePage(rooms, request)),
+        (request, call) => DwCallOk(
+          dwFakeTablePage(rooms.where(request.matches).toList(), request),
+        ),
       )
       ..onRequest<ListMyNotes>((request, call) {
         final account = call.accountId;

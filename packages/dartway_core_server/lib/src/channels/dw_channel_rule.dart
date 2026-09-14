@@ -25,6 +25,20 @@ sealed class DwChannelRule {
     required Future<bool> Function(DwCallContext ctx, K key) canSubscribe,
   }) => DwKeyedChannelRule<K>._(kind, parseKey, canSubscribe);
 
+  /// A kind keyed by the account of its subscriber (`bookings:7`): the
+  /// server side of `DwLiveChannel.ofCaller` (D-037). A connection may
+  /// subscribe to its own account's key only; any other key is refused with
+  /// `dw.forbidden`, and a key that is not a canonical account id with
+  /// `dw.invalid`.
+  ///
+  /// Publish to it with `DwLiveChannel.forAccount(kind, accountId)`.
+  static DwChannelRule ofCaller(DwChannelKind kind) =>
+      DwKeyedChannelRule<int>._(
+        kind,
+        int.parse,
+        (ctx, accountId) async => ctx.accountId == accountId,
+      );
+
   /// A kind with one instance (`news`).
   static DwChannelRule single(
     DwChannelKind kind, {

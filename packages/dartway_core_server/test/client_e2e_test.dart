@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:test/test.dart';
 
@@ -83,6 +84,44 @@ void main() {
         reason: "the author's socket does not echo its own command's updates",
       );
       expect(texts(bobNotes.state).where((t) => t == 'from bob'), hasLength(1));
+    },
+  );
+
+  test(
+    "a caller channel (D-037) carries each account's own data, and a "
+    "response carrying another account's never reaches mine (D-036)",
+    () async {
+      final alice = await connect();
+      // Bob's socket never opens, so his calls name no live connection and
+      // their responses carry every publication: only the channel tells whose
+      // an object is.
+      final bob = await connect(liveConnector: const _UnreachableConnector());
+      final aliceSession = await signIn(alice, 'e2e-inbox-a@example.com');
+      final bobSession = await signIn(bob, 'e2e-inbox-b@example.com');
+
+      final aliceInbox = alice.watch(const MyInbox());
+      final bobInbox = bob.watch(const MyInbox());
+      await eventually(
+        () => aliceInbox.isLive && bobInbox.state is DwRequestData,
+      );
+      expect(texts(bobInbox.state), isEmpty);
+
+      final toAlice = await bob.command(
+        SendToInbox('hi alice', accountId: aliceSession.id),
+      );
+      expect(toAlice, isA<DwCallOk<NoteView>>());
+      await eventually(() => texts(aliceInbox.state).contains('hi alice'));
+      expect(
+        texts(bobInbox.state),
+        isEmpty,
+        reason:
+            "the response carried Alice's inbox:${aliceSession.id}, which "
+            "Bob's inbox does not declare",
+      );
+
+      await bob.command(SendToInbox('to self', accountId: bobSession.id));
+      expect(texts(bobInbox.state), ['to self'], reason: 'from the response');
+      expect(texts(aliceInbox.state), ['hi alice']);
     },
   );
 
@@ -328,6 +367,15 @@ final class _RecordingConnection implements DwLiveConnection {
 
   @override
   Future<void> close([int? code, String? reason]) => _inner.close(code, reason);
+}
+
+/// A live socket that never opens, as behind a network that drops WebSockets.
+final class _UnreachableConnector implements DwLiveConnector {
+  const _UnreachableConnector();
+
+  @override
+  Future<DwLiveConnection> connect(Uri url) =>
+      Future.error(const SocketException('unreachable in this test'));
 }
 
 /// Real HTTP, except that the answer to the next call of one DTO is received

@@ -171,17 +171,69 @@ void main() {
       expect(dataOf(first.state), isA<DwTablePage<RoomView>>());
     });
 
-    test('rows are updated in place; nothing is inserted', () async {
+    test('a row on the page is updated in place, without reading the page '
+        'again', () async {
       final h = Harness()..serveRooms();
       await h.start();
       final table = h.client.watchTable(const RoomsTable());
       await settle();
       const renamed = RoomView(id: 2, name: 'b2', rank: 20);
-      h.server.publish(roomsChannel, [c, renamed]);
+      h.server.publish(roomsChannel, [renamed]);
       await settle();
       expect(dataOf(table.state).items, [a, renamed]);
       expect(dataOf(table.state), isA<DwTablePage<RoomView>>());
       expect(h.server.requestsOf<RoomsTable>(), hasLength(1));
+    });
+
+    test('a new matching row is never inserted: the page is read again, so '
+        'the total and the paging stay true — once for a burst', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      final first = h.client.watchTable(const RoomsTable());
+      final second = h.client.watchTable(const RoomsTable(page: 2));
+      await settle();
+      expect(dataOf(second.state).items, isEmpty);
+      expect(dataOf(first.state).total, 2);
+
+      const newest = RoomView(id: 9, name: 'aa', rank: 5);
+      const others = [
+        RoomView(id: 10, name: 'x', rank: 40),
+        RoomView(id: 11, name: 'y', rank: 50),
+        RoomView(id: 12, name: 'z', rank: 60),
+      ];
+      h.rooms = [newest, a, b, ...others];
+      // Published one by one: each arrives as its own update.
+      for (final room in [newest, ...others]) {
+        h.server.publish(roomsChannel, [room]);
+      }
+      await settle();
+      expect(dataOf(first.state).items, [newest, a]);
+      expect(dataOf(first.state).total, 6);
+      expect(dataOf(second.state).items, [b, others.first]);
+      expect(
+        h.server.requestsOf<RoomsTable>().where((r) => r.page == 1).length,
+        lessThanOrEqualTo(3),
+        reason: 'one read in flight and one after it, however many rows came',
+      );
+    });
+
+    test('a row on the page that stops matching reads the page again; an '
+        'update of a row that matches nothing on it still does, since it may '
+        'have left an earlier page', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c];
+      await h.start();
+      final table = h.client.watchTable(const RoomsTable(minRank: 15));
+      await settle();
+      expect(dataOf(table.state).items, [b, c]);
+
+      const demoted = RoomView(id: 2, name: 'b', rank: 1);
+      h.rooms = [a, demoted, c];
+      h.server.publish(roomsChannel, [demoted]);
+      await settle();
+      expect(dataOf(table.state).items, [c]);
+      expect(dataOf(table.state).total, 1);
+      expect(h.server.requestsOf<RoomsTable>(), hasLength(2));
     });
 
     test('a deletion reads the page again, since later rows move up', () async {

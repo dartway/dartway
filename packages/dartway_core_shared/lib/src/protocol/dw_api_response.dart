@@ -26,7 +26,7 @@ enum DwFailureKind {
 /// The body of every answer to `POST /dw/<name>`:
 ///
 /// ```json
-/// {"status":"ok","result":<encoded by the call's class>,"updates":{<transport>}}
+/// {"status":"ok","result":<encoded by the call's class>,"updates":{"bookings:7":{"SessionBooking":[…]}}}
 /// {"status":"refused","refusal":{"code":"noSpotsLeft"}}
 /// {"status":"unauthenticated"}
 /// {"status":"failed","incidentId":"…"}
@@ -34,9 +34,10 @@ enum DwFailureKind {
 /// ```
 ///
 /// `result` is never tagged (its type is the call's) and is omitted when
-/// `null`; `updates` is omitted when empty. The HTTP status is a function of
-/// the body ([dwHttpStatusFor]) declared here, so the server writes and the
-/// client checks the same mapping.
+/// `null`; `updates` ([DwUpdateTransport]) groups what the call published by
+/// channel, then by type, and is omitted when empty. The HTTP status is a
+/// function of the body ([dwHttpStatusFor]) declared here, so the server
+/// writes and the client checks the same mapping.
 sealed class DwApiResponse {
   const DwApiResponse();
 

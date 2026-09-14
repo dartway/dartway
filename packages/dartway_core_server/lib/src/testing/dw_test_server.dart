@@ -194,9 +194,18 @@ const DwClientOptions dwTestClientOptions = DwClientOptions(
 /// What a raw call came back with: the HTTP status and headers, the body,
 /// and the body read as a `DwApiResponse`.
 final class DwTestAnswer {
-  DwTestAnswer._(this.status, this.headers, this.text, this._protocol);
+  DwTestAnswer._(
+    this.status,
+    this.reasonPhrase,
+    this.headers,
+    this.text,
+    this._protocol,
+  );
 
   final int status;
+
+  /// The reason phrase of the status line, as the peer sent it.
+  final String reasonPhrase;
   final HttpHeaders headers;
   final String text;
   final DwWireProtocol _protocol;
@@ -311,6 +320,7 @@ final class DwTestCaller {
     final text = await utf8.decodeStream(response);
     return DwTestAnswer._(
       response.statusCode,
+      response.reasonPhrase,
       response.headers,
       text,
       protocol,

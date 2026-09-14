@@ -56,22 +56,19 @@ final class UserProfile extends DwDataObject with _$UserProfile {
   final bool agreedForMarketing;
 }
 
-/// The signed-in member's own profile, live on their profile channel.
+/// The signed-in member's own profile, live on their own profile channel.
 ///
-/// [accountId] must be the caller's own account: the server refuses any other
-/// with `dw.forbidden` and reads the profile of the caller, never of the
-/// field. The field exists because a live request names its channel by its
-/// own fields, and this one lives on `profile:<account>`: a channel keyed by
-/// "whoever is signed in" is not something a request can declare.
+/// It names no account: the server reads the caller's profile, and the
+/// channel is the caller's (`profile:<account>`, resolved by the client for
+/// whoever is signed in). A profile published to someone else's channel — an
+/// admin changing a member's role — never reaches it.
 final class GetMyProfile extends DwSingleRequest<UserProfile>
     with _$GetMyProfile {
-  const GetMyProfile({required this.accountId});
-
-  final int accountId;
+  const GetMyProfile();
 
   @override
-  List<DwLiveChannel> get channels => [
-    DwLiveChannel(ExampleChannel.profile, accountId),
+  List<DwLiveChannel> get channels => const [
+    DwLiveChannel.ofCaller(ExampleChannel.profile),
   ];
 }
 

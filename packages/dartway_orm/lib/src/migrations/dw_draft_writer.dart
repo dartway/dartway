@@ -4,6 +4,7 @@ import '../entity/dw_annotations.dart';
 import '../schema/dw_database_schema.dart';
 import '../schema/dw_schema_diff.dart';
 import 'dw_migration_checksum.dart';
+import 'dw_migration_project.dart';
 
 /// Writes migration drafts and the registration list as Dart source.
 ///
@@ -19,12 +20,19 @@ abstract final class DwDraftWriter {
   /// library name, and an id starts with its date.
   static String fileName(String id) => 'm$id.dart';
 
-  /// The source of a migration moving the schema by [changes], sealed with
-  /// its checksum.
+  /// The source of a migration moving the schema by [changes], importing
+  /// [project]'s ORM library, formatted for [project] and then sealed with its
+  /// checksum.
+  ///
+  /// Formatted before sealing, so the file is written as the project's
+  /// `dart format` leaves it: formatting it again changes nothing, and nobody
+  /// is tempted to reformat a sealed file by hand. (The checksum ignores
+  /// whitespace either way.)
   static String migration({
     required String id,
     required String className,
     required List<DwSchemaChange> changes,
+    required DwMigrationProject project,
   }) {
     final decisions = changes.where((change) => change.requiresDecision).length;
     final buffer = StringBuffer()
@@ -45,7 +53,7 @@ abstract final class DwDraftWriter {
         ..writeln('// compile until then.');
     }
     buffer
-      ..writeln("import 'package:dartway_orm/dartway_orm.dart';")
+      ..writeln("import '${project.ormLibrary}';")
       ..writeln()
       ..writeln('final class $className extends DwDatabaseMigration {')
       ..writeln('  const $className();')
@@ -79,14 +87,15 @@ abstract final class DwDraftWriter {
       buffer.writeln('  }');
     }
     buffer.writeln('}');
-    return DwMigrationChecksum.seal(buffer.toString());
+    return DwMigrationChecksum.seal(project.format(buffer.toString()));
   }
 
-  /// The registration file: every migration of [files] (id → class name), in
-  /// id order.
+  /// The registration file: every migration of [classesById] (id → class
+  /// name), in id order, importing and formatted as [project] needs.
   static String registration({
     required String variable,
     required Map<String, String> classesById,
+    required DwMigrationProject project,
   }) {
     final ids = classesById.keys.toList()..sort();
     final buffer = StringBuffer()
@@ -94,7 +103,7 @@ abstract final class DwDraftWriter {
         '// Maintained by `migrate create`: one entry per migration file in this',
       )
       ..writeln('// directory, in id order.')
-      ..writeln("import 'package:dartway_orm/dartway_orm.dart';")
+      ..writeln("import '${project.ormLibrary}';")
       ..writeln();
     for (final id in ids) {
       buffer.writeln("import '${fileName(id)}';");
@@ -106,7 +115,7 @@ abstract final class DwDraftWriter {
       buffer.writeln('  const ${classesById[id]}(),');
     }
     buffer.writeln('];');
-    return buffer.toString();
+    return project.format(buffer.toString());
   }
 
   static void _write(

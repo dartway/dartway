@@ -62,12 +62,25 @@ final class DwFakeCall {
   /// does.
   ///
   /// When the call succeeds, every subscribed connection receives them over
-  /// the socket except the one the call named, and the response carries them:
+  /// the socket except the one the call named, and the response carries them
+  /// under [channel] (D-036):
   /// all of them when the call named no connection, those of channels the
   /// named connection is subscribed to otherwise. When it does not, the
   /// response carries nothing and every subscriber — the named connection
   /// included — receives them over the socket.
+  ///
+  /// An unresolved `DwLiveChannel.ofCaller` throws [ArgumentError], as on a
+  /// real server: publish to `DwLiveChannel.forAccount(kind, accountId)`.
   void publish(DwLiveChannel channel, List<DwWireObject> objects) {
+    if (channel.isOfCaller) {
+      throw ArgumentError.value(
+        channel,
+        'channel',
+        'A caller channel is resolved by the client for whoever watches. '
+            'Name the account: DwLiveChannel.forAccount('
+            '${channel.kind.channelName}, accountId)',
+      );
+    }
     _published.add((channel, objects));
   }
 
@@ -362,7 +375,7 @@ final class DwFakeServer {
     List<DwWireObject> objects, {
     required DwFakeConnection? except,
   }) {
-    final updates = DwUpdateTransport(objects);
+    final updates = DwChannelUpdates(objects);
     if (updates.isEmpty) return;
     for (final connection in openConnections.toList()) {
       if (identical(connection, except)) continue;
@@ -605,12 +618,21 @@ final class DwFakeServer {
           errors.add(error);
           return const DwApiResponse.failed('fake-result-does-not-encode');
         }
-        final named = context.liveConnection;
-        final carried = <DwWireObject>[];
+        // Looked up after the handler, and only for the caller's own account,
+        // as a real server does: the connection may have closed or signed in
+        // as someone else while the call ran, and a connection of another
+        // account must not filter or suppress this one's updates.
+        final liveId =
+            context.headers[DwHttpContract.liveConnectionHeader.toLowerCase()];
+        final named = openConnections
+            .where((c) => c.id == liveId && c.accountId == context.accountId)
+            .firstOrNull;
+        final carried = <(String, DwWireObject)>[];
         for (final (channel, objects) in context._published) {
-          _broadcast(channel.wireName, objects, except: named);
-          if (named == null || named.subscriptions.contains(channel.wireName)) {
-            carried.addAll(objects);
+          final name = channel.wireName;
+          _broadcast(name, objects, except: named);
+          if (named == null || named.subscriptions.contains(name)) {
+            carried.addAll([for (final object in objects) (name, object)]);
           }
         }
         return DwApiResponse.ok(encoded, updates: DwUpdateTransport(carried));

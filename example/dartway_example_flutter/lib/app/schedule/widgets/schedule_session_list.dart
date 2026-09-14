@@ -2,7 +2,6 @@ import 'package:dartway_example_flutter/app/schedule/logic/today_provider.dart';
 import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -55,9 +54,7 @@ class ScheduleSessionList extends ConsumerWidget implements DwFeature {
     final sessionsRequest = ListUpcomingSessions(
       from: ref.watch(todayProvider),
     );
-    final bookingsRequest = ListMyBookings(
-      accountId: context.profile.accountId,
-    );
+    const bookingsRequest = ListMyBookings();
     final sessions = ref.watch(dw.request(sessionsRequest));
     final bookings = ref.watch(dw.request(bookingsRequest));
 

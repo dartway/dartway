@@ -121,11 +121,13 @@ final class DwLiveHub {
   /// [author] is the caller's own connection when its response carries the
   /// updates: it is left out of the broadcast, and the response carries only
   /// what it listens to — the objects published to channels it is subscribed
-  /// to. Without an author the response carries every publication and every
-  /// subscriber is sent its channels.
+  /// to, by exact channel. Without an author the response carries every
+  /// publication and every subscriber is sent its channels.
   ///
-  /// One message per channel, encoded once for all its subscribers; within it,
-  /// and within the response, an object travels once, as it ended.
+  /// Every object keeps the channel it was published to, on the socket and in
+  /// the response (D-036): the client applies it only to the requests that
+  /// declare that channel. One message per channel, encoded once for all its
+  /// subscribers; within a channel an object travels once, as it ended.
   DwUpdateTransport publish(
     List<(DwLiveChannel, DwWireObject)> publications, {
     DwLiveConnection? author,
@@ -144,7 +146,7 @@ final class DwLiveHub {
       final frame = jsonEncode(
         DwUpdateMessage(
           channel: name,
-          updates: DwUpdateTransport(items),
+          updates: DwChannelUpdates(items),
         ).toJson(),
       );
       // Iterated in place: `sendFrame` never changes subscriptions
@@ -153,12 +155,10 @@ final class DwLiveHub {
         if (!identical(connection, author)) connection.sendFrame(frame);
       }
     }
-    if (author == null) {
-      return DwUpdateTransport([for (final (_, item) in publications) item]);
-    }
     return DwUpdateTransport([
-      for (final (channel, item) in publications)
-        if (author.subscriptions.contains(channel.wireName)) item,
+      for (final MapEntry(key: name, value: items) in byChannel.entries)
+        if (author == null || author.subscriptions.contains(name))
+          for (final item in items) (name, item),
     ]);
   }
 

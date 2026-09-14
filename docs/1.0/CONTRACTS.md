@@ -1,6 +1,8 @@
 # Revision 2 — the owner's review of 2026-09-14
 
 > **As built after stage 2:** packages are `dartway_core_shared` (pure Dart), `dartway_core_server` (re-exports shared and `dartway_orm`), `dartway_core_flutter` (re-exports shared, `dartway_client`, `dartway_router`) at `0.20.0-dev.1`. `DwWindowRequest<T, S, I>` declares `positionOf(T) → DwWindowPosition<S, I>` (sort value + id) — order is defined once, on the request, and the server builds cursors from it; the client places a new window item by that position only inside the loaded range (at the head when the window shows the newest, counted as unseen otherwise). Anonymous clients do not open the live socket. A replayed command answer carries `"replayed": true` and the client re-reads its live state.
+>
+> **As built after the example port (D-036, D-037):** response `updates` are grouped by channel wire name, then by type (`DwUpdateTransport` of `DwChannelUpdates`), collapsed by (channel, type, id); the socket `upd` keeps naming its channel beside one channel's type groups. The client applies an object only to entries whose request declares that channel, caller channels resolved for the entry's account; a request without channels hears no updates. `DwLiveChannel.ofCaller(kind)` is resolved by the client to `kind:<accountId>`; the server's `DwChannelRule.ofCaller(kind)` allows only the caller's own key and a handler publishes with `DwLiveChannel.forAccount(kind, accountId)` (publishing an unresolved caller channel throws). `DwTableRequest` answers `matches ? upsert : remove`: an object on the page is replaced in place, an upsert of an object not on the page and every removal re-read the page (coalesced). The live socket's origin check compares full origins (scheme, host, port): the origin the upgrade was sent to (its `Host`) and `allowedOrigins`, which are full origins checked at startup.
 
 **This section supersedes everything below it where they disagree.** It records the decisions of the morning review; the build is being redone to match. Sections below remain valid where untouched.
 
@@ -78,14 +80,14 @@ GET  /health               liveness + database reachability
 ### ApiResponse (always the body)
 
 ```json
-{"status":"ok","result":<encoded by the request/command class>,"updates":{"ClubSession":[{…}],"DwDeletedObject":[{"type":"X","id":1}]}}
+{"status":"ok","result":<encoded by the request/command class>,"updates":{"schedule":{"ClubSession":[{…}]},"bookings:7":{"SessionBooking":[{…}],"DwDeletedObject":[{"type":"SessionBooking","id":1}]}}}
 {"status":"refused","refusal":{"code":"noSpotsLeft","params":{},"field":null}}
 {"status":"unauthenticated"}
 {"status":"failed","incidentId":"…"}
 {"status":"incompatible","refusal":{"code":"dw.updateRequired"}}
 ```
 
-`result` is never tagged (its type is the request's or command's); `updates` is the **transport** — objects grouped by wire name, the only place a type name stands next to objects. `updates` is omitted when empty.
+`result` is never tagged (its type is the request's or command's); `updates` is the **transport** — objects grouped by the channel they were published to, then by wire name, the only place a type name stands next to objects. The channel travels because it is the only fact that says whose data an object is (D-036): the client applies an object only to requests that declare its channel. `updates` is omitted when empty.
 
 ### Honest HTTP statuses
 
@@ -112,7 +114,7 @@ Refusals never alert; 5xx alert.
 ← {"k":"authed","account":7} / {"k":"authed","rejected":true}
 → {"k":"sub","ch":"bookings:7"} / {"k":"unsub","ch":"…"}
 ← {"k":"subok","ch":"…"} / {"k":"subno","ch":"…", …}
-← {"k":"upd","ch":"schedule","updates":{<transport>}}
+← {"k":"upd","ch":"schedule","updates":{"ClubSession":[{…}]}}
 ← {"k":"closed","ch":"…"}
 ```
 
@@ -136,7 +138,7 @@ No `auto`. Every kind's `onUpdate(Object item)` returns an explicit action; scen
 | `DwMaybeRequest<T>` | `T?` | `matches ? upsert : remove` | — |
 | `DwListRequest<T>` | `List<T>` | `matches ? upsert : remove` | `.updateOnly()`, `.refetchOnUpdate()` |
 | `DwPageRequest<T>` (offset, accumulating feed) | `DwPage<T>` (items, hasMore) | `matches ? upsert : remove`; an insert sorting past the loaded pages is dropped while more pages exist | `.updateOnly()` |
-| `DwTableRequest<T>` (numbered pages) | `DwTablePage<T>` (items, total, page, pageSize) | `update` (a table page never inserts; `refetch` when an item is removed) | — |
+| `DwTableRequest<T>` (numbered pages) | `DwTablePage<T>` (items, total, page, pageSize) | `matches ? upsert : remove` on a page: present → replaced in place; not on the page, or removed → `refetch` (coalesced), so the total and paging stay true (D-037) | — |
 | `DwWindowRequest<T>` (anchored, both directions) | `DwWindow<T>` (items newest-first, hasOlder, hasNewer, olderCursor, newerCursor) | present → `update`; new + `matches` → insert **only when `hasNewer == false`** (otherwise the window counts it as unseen); not matches → `remove` | — |
 
 `DwCursorRequest` is removed (a window without anchor opens at the newest).
@@ -150,7 +152,7 @@ Window cursors are opaque strings the server builds from the sort value and the 
 ## R2.4 Access and account scoping
 
 - `validate()` (`DwValidatable`) knows only the DTO's fields and runs on both sides; **who calls** is decided on the server only.
-- Client state is always scoped by account: a sign-in as a different account never sees the previous account's entries. "My …" requests carry no account or profile id; the server uses the caller.
+- Client state is always scoped by account: a sign-in as a different account never sees the previous account's entries. "My …" requests carry no account or profile id; the server uses the caller, and their channels are `DwLiveChannel.ofCaller(kind)` (D-037).
 - `DwAccess.check((ctx, request) async => bool)` receives the request for rules on real parameters (staff viewing a client's bookings).
 
 ## R2.5 Versions

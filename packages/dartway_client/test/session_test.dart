@@ -74,10 +74,12 @@ void main() {
 
       await h.client.signIn(bob);
       await settle();
+      // A caller channel is the account's own: another account, another
+      // channel (D-037).
       expect(h.server.received.skip(before).map((m) => m.toJson()).toList(), [
-        {'k': 'unsub', 'ch': 'notes'},
+        {'k': 'unsub', 'ch': 'notes:7'},
         {'k': 'auth', 'token': 'token-8'},
-        {'k': 'sub', 'ch': 'notes'},
+        {'k': 'sub', 'ch': 'notes:8'},
       ]);
       expect(h.server.connections.single.accountId, bob.id);
     });

@@ -49,14 +49,32 @@ void main() {
       [1, 2],
     );
 
+    // The server publishes the newcomer's profile to the admins. It is not on
+    // this page, so the page is read again: only the server knows the new
+    // total and where the row falls.
     members.add(member(24));
-    app.server.publish(adminChannel, [MemberCount(count: members.length)]);
+    app.server.publish(adminChannel, [members.last]);
     await app.settle(tester);
     expect(find.text('Page 2 of 3 · 24 members'), findsOneWidget);
     expect(app.server.requestsOf<ListUserProfiles>(), hasLength(3));
 
     await app.tap(tester, find.byTooltip('Previous page'));
     expect(find.text('Page 1 of 3 · 24 members'), findsOneWidget);
+    final pageReads = app.server.requestsOf<ListUserProfiles>().length;
+
+    // A member on the page changes: replaced in place, not read again.
+    members[0] = UserProfile(
+      id: members[0].id,
+      accountId: members[0].accountId,
+      phone: members[0].phone,
+      firstName: 'Member 01 renamed',
+      role: members[0].role,
+      agreedForMarketing: false,
+    );
+    app.server.publish(adminChannel, [members[0]]);
+    await app.settle(tester);
+    expect(find.text('Member 01 renamed'), findsOneWidget);
+    expect(app.server.requestsOf<ListUserProfiles>(), hasLength(pageReads));
 
     await app.stop(tester);
   });

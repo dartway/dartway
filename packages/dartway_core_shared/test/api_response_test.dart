@@ -8,10 +8,11 @@ void main() {
       DwApiResponse.fromJson(roundTrip(response.toJson()), protocol);
 
   group('JSON (R2.2)', () {
-    test('ok: the result untagged, updates as a transport', () {
+    test('ok: the result untagged, updates grouped by channel then type', () {
       final updates = DwUpdateTransport([
-        booking,
-        DwDeletedObject.of<ClubBooking>(3, protocol),
+        ('myBookings:3', booking),
+        ('myBookings:3', DwDeletedObject.of<ClubBooking>(3, protocol)),
+        ('notes', const CoachNote(1)),
       ]);
       final response = DwApiResponse.ok(
         const ListMyBookings().encodeResult([booking], protocol),
@@ -21,10 +22,17 @@ void main() {
         'status': 'ok',
         'result': [booking.toJson()],
         'updates': {
-          'ClubBooking': [booking.toJson()],
-          'DwDeletedObject': [
-            {'type': 'ClubBooking', 'id': 3},
-          ],
+          'myBookings:3': {
+            'ClubBooking': [booking.toJson()],
+            'DwDeletedObject': [
+              {'type': 'ClubBooking', 'id': 3},
+            ],
+          },
+          'notes': {
+            'CoachNote': [
+              {'id': 1},
+            ],
+          },
         },
       });
       final decoded = back(response) as DwApiOk;

@@ -141,8 +141,11 @@ final class FeedBookingsUpdateOnly extends DwPageRequest<ClubBooking> {
 }
 
 final class ListBookingTable extends DwTableRequest<ClubBooking> {
-  const ListBookingTable({this.page = 1, this.pageSize = 20})
-    : super(maxPageSize: 50);
+  const ListBookingTable({
+    this.page = 1,
+    this.pageSize = 20,
+    this.bookedOnly = false,
+  }) : super(maxPageSize: 50);
 
   @override
   final int page;
@@ -150,11 +153,21 @@ final class ListBookingTable extends DwTableRequest<ClubBooking> {
   @override
   final int pageSize;
 
+  final bool bookedOnly;
+
+  @override
+  bool matches(ClubBooking item) =>
+      !bookedOnly || item.status == BookingStatus.booked;
+
   @override
   String get dwTypeName => 'ListBookingTable';
 
   @override
-  Map<String, Object?> toJson() => {'page': page, 'pageSize': pageSize};
+  Map<String, Object?> toJson() => {
+    'page': page,
+    'pageSize': pageSize,
+    if (bookedOnly) 'bookedOnly': true,
+  };
 }
 
 final class BookingHistory extends DwWindowRequest<ClubBooking, DateTime, int> {

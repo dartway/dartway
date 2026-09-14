@@ -35,9 +35,7 @@ void main() {
 
   test('signing up creates the profile, named at registration', () async {
     final vera = await club.member('+7 999 000-00-10', 'Vera');
-    final profile = await vera.client.fetch(
-      GetMyProfile(accountId: vera.accountId),
-    );
+    final profile = await vera.client.fetch(const GetMyProfile());
     expect(profile.valueOrThrow.firstName, 'Vera');
     expect(profile.valueOrThrow.role, UserRole.client);
     expect(profile.valueOrThrow.accountId, vera.accountId);
@@ -52,9 +50,7 @@ void main() {
     final from = DateTime.now().subtract(const Duration(hours: 1));
 
     final olegSchedule = oleg.client.watch(ListUpcomingSessions(from: from));
-    final veraBookings = vera.client.watch(
-      ListMyBookings(accountId: vera.accountId),
-    );
+    final veraBookings = vera.client.watch(const ListMyBookings());
     final veraSchedule = vera.client.watch(ListUpcomingSessions(from: from));
     addTearDown(() {
       olegSchedule.close();
@@ -156,12 +152,8 @@ void main() {
     expect(missing.status, 404);
     expect(missing.refusal.isCode(DwCoreRefusal.notFound), isTrue);
 
-    // Someone else's account in a "my" request, and a staff call: 403.
-    final foreign = await caller.call(
-      ListMyBookings(accountId: vera.accountId + 1000),
-    );
-    expect(foreign.status, 403);
-    expect(foreign.refusal.isCode(DwCoreRefusal.forbidden), isTrue);
+    // A staff call: 403. ("My" requests name no account, so there is no
+    // one else's to ask for.)
     final staffOnly = await caller.call(
       const SendChatMessage(channelId: 1, text: 'hi'),
     );
@@ -186,37 +178,66 @@ void main() {
     final chat = vera.client.watchWindow(
       ListChatMessages(channelId: channel.id!),
     );
-    final foreign = vera.client.watch(
-      ListMyBookings(accountId: oleg.accountId),
-    );
-    addTearDown(() {
-      chat.close();
-      foreign.close();
-    });
-    await eventually(
-      () => chat.state is DwRequestRefused && foreign.state is DwRequestRefused,
-    );
+    addTearDown(chat.close);
+    await eventually(() => chat.state is DwRequestRefused);
     expect(
       (chat.state as DwRequestRefused).refusal.isCode(DwCoreRefusal.forbidden),
       isTrue,
     );
-    expect(
-      (foreign.state as DwRequestRefused).refusal.isCode(
-        DwCoreRefusal.forbidden,
-      ),
-      isTrue,
-    );
     await eventually(
-      () =>
-          vera.live
-              .refusalsOf(DwLiveChannel(ExampleChannel.staffChat, channel.id))
-              .isNotEmpty &&
-          vera.live
-              .refusalsOf(
-                DwLiveChannel(ExampleChannel.bookings, oleg.accountId),
-              )
-              .isNotEmpty,
-      reason: 'the channels refuse the subscription too',
+      () => vera.live
+          .refusalsOf(DwLiveChannel(ExampleChannel.staffChat, channel.id))
+          .isNotEmpty,
+      reason: 'the channel refuses the subscription too',
+    );
+
+    // Oleg's bookings: no request names them, and his channel is his alone.
+    final socket = await club.server.openLive();
+    addTearDown(socket.close);
+    await socket.authenticate(vera.session.token);
+    final foreign =
+        await socket.subscribe('bookings:${oleg.accountId}')
+            as DwSubscriptionRefusedMessage;
+    expect(foreign.refusal?.isCode(DwCoreRefusal.forbidden), isTrue);
+    expect(
+      await socket.subscribe('bookings:${vera.accountId}'),
+      isA<DwSubscribedMessage>(),
+    );
+  });
+
+  test("an admin changing a member's role: the member's own profile follows "
+      "live, and the admin's own profile is not touched by it", () async {
+    final admin = await club.memberWithRole(
+      '79990000023',
+      'Anna',
+      UserRole.admin,
+    );
+    final member = await club.member('79990000024', 'Pavel');
+    final adminProfile = admin.client.watch(const GetMyProfile());
+    final memberProfile = member.client.watch(const GetMyProfile());
+    addTearDown(() {
+      adminProfile.close();
+      memberProfile.close();
+    });
+    await eventually(() => adminProfile.isLive && memberProfile.isLive);
+    final before = dataOf(adminProfile.state)!;
+    expect(before.role, UserRole.admin);
+
+    final changed = await admin.client.command(
+      ChangeRole(
+        profileId: dataOf(memberProfile.state)!.id,
+        role: UserRole.staff,
+      ),
+    );
+    expect(changed.valueOrThrow.accountId, member.accountId);
+    await eventually(() => dataOf(memberProfile.state)?.role == UserRole.staff);
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    expect(
+      dataOf(adminProfile.state),
+      before,
+      reason:
+          "a UserProfile went to profile:${member.accountId}, which the "
+          "admin's own profile does not declare",
     );
   });
 

@@ -87,7 +87,7 @@ void main() {
         jsonEncode(
           DwUpdateMessage(
             channel: 'rooms',
-            updates: DwUpdateTransport([c]),
+            updates: DwChannelUpdates([c]),
           ).toJson(),
         ),
       );

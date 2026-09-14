@@ -174,9 +174,12 @@ abstract final class _UpdateRules {
     }
   }
 
-  /// A numbered page never grows by an update: upsert and update replace an
-  /// item on the page; a removal reads the page again, because every later
-  /// row moves up — whether or not the removed one was on this page.
+  /// A numbered page never grows by an update. Upsert and update replace an
+  /// item on the page. An upsert of an object not on the page reads the page
+  /// again: it may be a new row, which moves every later row and changes the
+  /// total — the client cannot tell it from a row on another page, so either
+  /// way the server answers. A removal reads the page again, because every
+  /// later row moves up, whether or not the removed one was on this page.
   static _Outcome _table(
     _Entry entry,
     DwTablePage page,
@@ -184,6 +187,11 @@ abstract final class _UpdateRules {
     DwUpdateAction action,
   ) {
     if (action == DwUpdateAction.remove) return _refetch;
+    if (action == DwUpdateAction.upsert &&
+        object is DwDataObject &&
+        !page.items.any((item) => item.id == object.id)) {
+      return _refetch;
+    }
     final changed = items(
       entry,
       page.items,

@@ -99,6 +99,15 @@ void main() {
             DwRoute.post('/hook', (ctx, request) => DwHttpResponse.empty()),
             DwRoute.any('/hook', (ctx, request) => DwHttpResponse.empty()),
           ],
+          settings: const DwServerSettings(
+            allowedOrigins: {
+              'https://app.example.com',
+              'http://localhost:5000',
+              'app.example.com',
+              'https://app.example.com/',
+              'ftp://files.example.com',
+            },
+          ),
         ),
       );
       expect(found, [
@@ -115,6 +124,14 @@ void main() {
         'job "dw.mine": names starting with "dw." are the framework\'s',
         'job "twin" is declared more than once',
         'recurring job "never" needs a positive interval',
+        for (final origin in [
+          'app.example.com',
+          'https://app.example.com/',
+          'ftp://files.example.com',
+        ])
+          'allowed origin "$origin" is not a full origin: scheme, host and an '
+              'optional port, as a browser sends it (https://app.example.com, '
+              'http://localhost:5000)',
         'route GET /dw is reserved by the framework',
         'route GET /dw/live is reserved by the framework',
         'route GET /dw/ListNotes is reserved by the framework',

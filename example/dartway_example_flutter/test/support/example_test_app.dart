@@ -41,12 +41,11 @@ final class FakeClub {
       ) {
     server
       ..registerToken(testSession.token, testSession.id)
+      // "My" requests read the caller, as the real handlers do.
       ..onRequest<GetMyProfile>(
-        (request, call) => call.accountId == request.accountId
-            ? DwCallOk<UserProfile>(profile)
-            : DwCallRefused<UserProfile>(
-                DwCallRefusal(DwCoreRefusal.forbidden),
-              ),
+        (request, call) => call.accountId == null
+            ? const DwNotAuthenticated<UserProfile>()
+            : DwCallOk<UserProfile>(profile),
       )
       ..onRequest<ListUpcomingSessions>(
         (request, call) => DwCallOk(<ClubSession>[...sessions]),
@@ -64,11 +63,13 @@ final class FakeClub {
   final bookings = <SessionBooking>[];
   final news = <NewsPost>[];
 
+  /// The signed-in member's profile channel, as the server publishes to it.
   DwLiveChannel get profileChannel =>
-      DwLiveChannel(ExampleChannel.profile, testSession.id);
+      DwLiveChannel.forAccount(ExampleChannel.profile, testSession.id);
 
+  /// The signed-in member's bookings channel, as the server publishes to it.
   DwLiveChannel get bookingsChannel =>
-      DwLiveChannel(ExampleChannel.bookings, testSession.id);
+      DwLiveChannel.forAccount(ExampleChannel.bookings, testSession.id);
 }
 
 /// A running example app over a [FakeClub]: the app's own core, built for this
@@ -89,11 +90,17 @@ final class ExampleTestApp {
 
   /// Builds a core against [club], signed in as [session] (or signed out),
   /// and pumps the app at phone size.
+  ///
+  /// With [bootstrap], the app is mounted as `DwAppRunner` mounts it — under
+  /// the framework's `DwAppBootstrapper`, which runs `dw.init` and puts the
+  /// screens that cover the whole app in place — instead of pumping the app
+  /// widget over a core started here.
   static Future<ExampleTestApp> start(
     WidgetTester tester,
     FakeClub club, {
     DwAuthSession? session = testSession,
     Size size = const Size(390, 844),
+    bool bootstrap = false,
   }) async {
     tester.view
       ..physicalSize = size * 3
@@ -117,9 +124,24 @@ final class ExampleTestApp {
     // Disposing twice is harmless; this one is for a test that failed before
     // [stop], so the next test can build its own core.
     addTearDown(core.dispose);
-    await core.init();
 
-    await tester.pumpWidget(const ProviderScope(child: ExampleApp()));
+    if (bootstrap) {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: DwAppBootstrapper(
+            appInitializers: [core.init],
+            useNativeSplash: false,
+            onError: (error, stackTrace) => logs.add('$error\n$stackTrace'),
+            errorScreenBuilder: DwAppLoadingOptions.defaultErrorScreen,
+            loadingScreen: const SizedBox.shrink(),
+            child: const ExampleApp(),
+          ),
+        ),
+      );
+    } else {
+      await core.init();
+      await tester.pumpWidget(const ProviderScope(child: ExampleApp()));
+    }
     final app = ExampleTestApp._(club, core, logs, printed);
     await app.settle(tester);
     return app;

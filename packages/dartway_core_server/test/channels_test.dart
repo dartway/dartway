@@ -60,6 +60,89 @@ void main() {
     );
   });
 
+  group('caller channels (D-037)', () {
+    test(
+      'ofCaller: a connection subscribes to its own account\'s key only',
+      () async {
+        final (_, session, socket) = await signedSocket('inbox@example.com');
+        expect(
+          await socket.subscribe('inbox:${session.id}'),
+          isA<DwSubscribedMessage>(),
+        );
+        final other = await socket.subscribe('inbox:${session.id + 1000}');
+        expect(
+          (other as DwSubscriptionRefusedMessage).refusal,
+          DwCallRefusal(DwCoreRefusal.forbidden),
+        );
+        for (final name in [
+          'inbox',
+          'inbox:me',
+          'inbox:0${session.id}',
+          'inbox:+${session.id}',
+        ]) {
+          final answer = await socket.subscribe(name);
+          expect(
+            (answer as DwSubscriptionRefusedMessage).refusal,
+            DwCallRefusal(DwCoreRefusal.invalid, field: 'channel'),
+            reason: name,
+          );
+        }
+      },
+    );
+
+    test(
+      'forAccount publishes to that account\'s caller channel only',
+      () async {
+        final (_, recipient, recipientSocket) = await signedSocket(
+          'inbox-r@example.com',
+        );
+        final (_, _, bystander) = await signedSocket('inbox-b@example.com');
+        final (sender, senderSession) = await harness().signedIn(
+          'inbox-s@example.com',
+        );
+        final senderSocket = await harness().live(token: senderSession.token);
+        expect(
+          await recipientSocket.subscribe('inbox:${recipient.id}'),
+          isA<DwSubscribedMessage>(),
+        );
+        expect(
+          await senderSocket.subscribe('inbox:${senderSession.id}'),
+          isA<DwSubscribedMessage>(),
+        );
+        sender.liveConnection = senderSocket.connectionId;
+
+        final answer = await sender.call(
+          SendToInbox('for you', accountId: recipient.id),
+        );
+        final update = await recipientSocket.expect<DwUpdateMessage>();
+        expect(update.channel, 'inbox:${recipient.id}');
+        expect((update.updates.objects.single as NoteView).text, 'for you');
+        // The sender listens to its own inbox, not the recipient's: the
+        // response carries nothing, and nothing reaches anyone else.
+        expect(answer.updates.isEmpty, isTrue);
+        await senderSocket.expectSilence();
+        await bystander.expectSilence();
+      },
+    );
+
+    test('publishing to an unresolved caller channel is a failure where it '
+        'is made', () async {
+      final (sender, _) = await harness().signedIn('inbox-x@example.com');
+      final answer = await sender.call(const SendToInbox('whose?'));
+      expect(answer.status, 500);
+      final incident = harness().app.alerts.incidents.last;
+      expect(incident.id, (answer.response as DwApiFailed).incidentId);
+      expect(
+        incident.error,
+        isA<ArgumentError>().having(
+          (e) => e.message,
+          'message',
+          contains('DwLiveChannel.forAccount(inbox, accountId)'),
+        ),
+      );
+    });
+  });
+
   test(
     'a throwing rule is a failure with an incident, not a forbidden',
     () async {
@@ -113,7 +196,7 @@ void main() {
     );
   });
 
-  test('an update message is one channel and its transport', () async {
+  test('an update message is one channel and its objects by type', () async {
     final (_, _, socket) = await signedSocket('wire@example.com');
     expect(await socket.subscribe('public'), isA<DwSubscribedMessage>());
     final (author, _) = await harness().signedIn('wire-a@example.com');
