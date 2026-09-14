@@ -23,7 +23,8 @@ final class DwChannel {
   final Object? key;
 
   /// The channel's name on the wire: `chat:7`, or `news`.
-  String get wireName => key == null ? kind.channelName : '${kind.channelName}:$key';
+  String get wireName =>
+      key == null ? kind.channelName : '${kind.channelName}:$key';
 
   @override
   bool operator ==(Object other) =>
@@ -40,5 +41,8 @@ final class DwChannel {
 ({String kind, String? key}) dwParseChannelName(String wireName) {
   final index = wireName.indexOf(':');
   if (index < 0) return (kind: wireName, key: null);
-  return (kind: wireName.substring(0, index), key: wireName.substring(index + 1));
+  return (
+    kind: wireName.substring(0, index),
+    key: wireName.substring(index + 1),
+  );
 }

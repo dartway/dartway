@@ -334,8 +334,8 @@ final class _Run {
       ) !=
       null;
 
-  /// Entities feed one schema and one `DwDb` extension, so their table names,
-  /// class names, index names and repository getters must not collide.
+  /// Row classes feed one schema and one `DwDb` extension, so their table
+  /// names, class names, index names and repository getters must not collide.
   void _checkEntities() {
     final entities = <EntityClass>[];
     for (final library in libraries) {
@@ -345,8 +345,8 @@ final class _Run {
           diagnostics.add(
             DwDiagnostic.at(
               element,
-              'entity `${entity.name}` is declared in '
-              '`${library.package.name}`; entities belong in the *_server '
+              'row class `${entity.name}` is declared in '
+              '`${library.package.name}`; row classes belong in the *_server '
               'package, whose schema lists them',
             ),
           );
@@ -371,7 +371,7 @@ final class _Run {
           diagnostics.add(
             DwDiagnostic.at(
               owner.element,
-              '$what `$key` of entity `${owner.name}` is also used at '
+              '$what `$key` of row class `${owner.name}` is also used at '
               '$others',
             ),
           );
@@ -404,7 +404,7 @@ final class _Run {
         diagnostics.add(
           DwDiagnostic.at(
             entity.element,
-            'the repository getter of entity `${entity.name}` would be '
+            'the repository getter of row class `${entity.name}` would be '
             '`${entity.repositoryGetter}`, which DwDb already declares; rename '
             'the class',
           ),
@@ -426,7 +426,7 @@ final class _Run {
     'DwJsonListType': 'dartway_orm',
     'DwJsonMapType': 'dartway_orm',
     'DwTableDef': 'dartway_orm',
-    'DwRow': 'dartway_orm',
+    'DwResultRow': 'dartway_orm',
     'DwReferences': 'dartway_orm',
     'DwOnDelete': 'dartway_orm',
     'DwDefault': 'dartway_orm',
@@ -445,7 +445,7 @@ final class _Run {
       final visible = scope.lookup(name).getter;
       if (visible != null && DwFramework.isFramework(visible)) continue;
       missing.add('`$name`');
-      // dartway_orm re-exports what entity parts need from dartway_core.
+      // dartway_orm re-exports what row class parts need from dartway_core.
       packages.add(hasEntities ? 'dartway_orm' : package);
     }
     if (missing.isEmpty) return;

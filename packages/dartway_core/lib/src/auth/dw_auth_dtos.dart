@@ -1,4 +1,4 @@
-import '../dto/dw_command.dart';
+import '../dto/dw_server_call.dart';
 import '../dto/dw_dto.dart';
 import '../protocol/dw_json.dart';
 import '../protocol/dw_protocol.dart';
@@ -21,7 +21,10 @@ final class DwRequestCode extends DwCommand<DwCodeTicket> {
   String get dwTypeName => 'DwRequestCode';
 
   @override
-  Map<String, Object?> toJson() => {'kind': kind.name, 'identifier': identifier};
+  Map<String, Object?> toJson() => {
+    'kind': kind.name,
+    'identifier': identifier,
+  };
 
   static DwRequestCode fromJson(Map<String, Object?> json) => DwRequestCode(
     kind: DwJson.decodeEnum(json['kind'], DwIdentifierKind.values),
@@ -118,7 +121,8 @@ final class DwVerifyCode extends DwCommand<DwSession> {
   int get hashCode => Object.hash(ticketId, code);
 }
 
-/// A signed-in session: the account and the token the client keeps.
+/// A signed-in session: the account and the token the client keeps and sends
+/// as `Authorization: Bearer <token>` and in the live `auth` message.
 final class DwSession extends DwDataObject {
   const DwSession({
     required this.id,
@@ -156,7 +160,8 @@ final class DwSession extends DwDataObject {
   int get hashCode => Object.hash(id, token);
 }
 
-/// Revokes the connection's session key and closes its subscriptions.
+/// Revokes the caller's session key; the server closes the live
+/// subscriptions of connections authenticated with it.
 final class DwSignOut extends DwCommand<void> {
   const DwSignOut();
 
@@ -176,10 +181,10 @@ final class DwSignOut extends DwCommand<void> {
 }
 
 /// The auth DTOs, registered in [DwProtocol.core].
-final List<DwDtoEntry> dwAuthDtoEntries = [
-  DwDtoEntry(DwRequestCode, 'DwRequestCode', DwRequestCode.fromJson),
-  DwDtoEntry(DwCodeTicket, 'DwCodeTicket', DwCodeTicket.fromJson),
-  DwDtoEntry(DwVerifyCode, 'DwVerifyCode', DwVerifyCode.fromJson),
-  DwDtoEntry(DwSession, 'DwSession', DwSession.fromJson),
-  DwDtoEntry(DwSignOut, 'DwSignOut', DwSignOut.fromJson),
+const List<DwDtoEntry> dwAuthDtoEntries = [
+  DwDtoEntry<DwRequestCode>('DwRequestCode', DwRequestCode.fromJson),
+  DwDtoEntry<DwCodeTicket>('DwCodeTicket', DwCodeTicket.fromJson),
+  DwDtoEntry<DwVerifyCode>('DwVerifyCode', DwVerifyCode.fromJson),
+  DwDtoEntry<DwSession>('DwSession', DwSession.fromJson),
+  DwDtoEntry<DwSignOut>('DwSignOut', DwSignOut.fromJson),
 ];

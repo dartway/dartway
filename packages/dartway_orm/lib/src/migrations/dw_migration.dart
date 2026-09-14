@@ -1,7 +1,7 @@
 import 'package:meta/meta.dart';
 
 import '../db/dw_db.dart';
-import '../db/dw_row.dart';
+import '../db/dw_result_row.dart';
 import '../entity/dw_annotations.dart';
 import '../schema/dw_ddl.dart';
 import '../schema/dw_schema.dart';
@@ -9,7 +9,7 @@ import 'dw_migration_errors.dart';
 
 /// One migration: Dart code that moves the schema (and data) one step.
 ///
-/// A migration never imports entity classes — they change, and an old
+/// A migration never imports row classes — they change, and an old
 /// migration must still run in six months. It describes tables with schema
 /// literals and works on data with SQL.
 abstract class DwMigration {
@@ -78,7 +78,7 @@ final class DwMigrationContext {
   Future<int> sql(String sql, {Map<String, Object?> params = const {}}) =>
       _db.execute(sql, params: params);
 
-  Future<List<DwRow>> query(
+  Future<List<DwResultRow>> query(
     String sql, {
     Map<String, Object?> params = const {},
   }) => _db.query(sql, params: params);

@@ -22,7 +22,7 @@ import 'dw_migrator.dart';
 /// apply                          apply pending migrations
 /// rollback [--batch N | --id X]  roll back the last batch, a batch, or one migration
 /// status                         list applied, pending, dirty, changed and missing
-/// create <name>                  write a draft migration from the entities' schema
+/// create <name>                  write a draft migration from the row classes' schema
 /// check                          verify files, schema parity and up/down/up
 /// rehash [id ...]                re-seal checksums of edited, unapplied migrations
 /// ```
@@ -56,7 +56,7 @@ final class DwMigrationCli {
 
   static const exitUsage = 64;
 
-  /// The schema the entities declare.
+  /// The schema the row classes declare.
   final DwSchema schema;
 
   /// The project's migrations, registered in [directory]/migrations.dart.
@@ -313,17 +313,17 @@ usage: migrate <command>
       final replayed = await _replay(scratch);
       final target = await _canonical(scratch, schema);
       for (final note in {...replayed.unmodelled}) {
-        _out.writeln('note: not modelled by entities: $note');
+        _out.writeln('note: not modelled by row classes: $note');
       }
       final drift = DwSchemaDiff.compare(
         from: replayed.schema,
         to: target.schema,
       );
       if (drift.isEmpty) {
-        _out.writeln('ok   migrations produce the entities\' schema');
+        _out.writeln('ok   migrations produce the row classes\' schema');
       } else {
         fail(
-          'migrations do not produce the entities\' schema; missing changes:',
+          'migrations do not produce the row classes\' schema; missing changes:',
         );
         for (final change in drift) {
           _out.writeln('       $change');
@@ -517,7 +517,7 @@ usage: migrate <command>
 
   /// The target schema as Postgres itself spells it: created in a separate
   /// schema of the scratch database and introspected, so defaults and types
-  /// compare in canonical form rather than as the entity author typed them.
+  /// compare in canonical form rather than as the row class author typed them.
   Future<DwIntrospection> _canonical(DwDatabase scratch, DwSchema target) =>
       scratch.db.pinned((db) async {
         await db.execute(

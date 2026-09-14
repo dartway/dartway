@@ -114,24 +114,52 @@ final class FindItem extends DwMaybeRequest<Item> with _$FindItem {
 
   final String? title;
   final List<Color> colors;
+
+  /// Not serialised: a method.
+  @override
+  bool matches(Item item) => item.title == title;
 }
 
+/// Page sizes are super-constructor arguments: constants, not serialised.
 final class ListItems extends DwPageRequest<Item> with _$ListItems {
-  const ListItems({this.color, this.since, this.labels});
+  const ListItems({this.color, this.since, this.labels})
+    : super(pageSize: 20, maxPageSize: 100);
 
   final Color? color;
   final DateTime? since;
   final Map<String, String>? labels;
-
-  @override
-  int get pageSize => 20;
 }
 
-final class FeedItems extends DwCursorRequest<Item> with _$FeedItems {
-  const FeedItems();
+/// A named super constructor, and an optional super parameter that stays off
+/// the wire.
+final class FeedItems extends DwPageRequest<Item> with _$FeedItems {
+  const FeedItems({super.maxPageSize}) : super.updateOnly(pageSize: 40);
+}
+
+final class ListPinnedItems extends DwListRequest<Item> with _$ListPinnedItems {
+  const ListPinnedItems({required this.pinnedBy}) : super.refetchOnUpdate();
+
+  final String pinnedBy;
+}
+
+/// A table's page and page size are ordinary fields: they are its key.
+final class ItemTable extends DwTableRequest<Item> with _$ItemTable {
+  const ItemTable({this.page = 1, this.pageSize = 25, this.color})
+    : super(maxPageSize: 100);
 
   @override
-  int get pageSize => 40;
+  final int page;
+
+  @override
+  final int pageSize;
+
+  final Color? color;
+}
+
+final class ItemHistory extends DwWindowRequest<Item> with _$ItemHistory {
+  const ItemHistory({required this.itemId}) : super(pageSize: 50);
+
+  final int itemId;
 }
 
 final class EditItem extends DwCommand<Item> with _$EditItem {

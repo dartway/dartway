@@ -8,7 +8,7 @@ import '../db/dw_errors.dart';
 
 /// How one Dart type is stored in one SQL type.
 ///
-/// Every conversion between an entity value and a statement parameter or a
+/// Every conversion between a row value and a statement parameter or a
 /// result cell goes through exactly one of these, so a type is never encoded
 /// one way in `insert` and another in `where`.
 ///

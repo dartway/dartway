@@ -13,8 +13,8 @@ enum ClubServiceKind { group, personal }
 /// list, a `now()` default, a nullable `DateTime`, nullable bytes, and a
 /// boolean with an SQL default.
 @DwTable('club_service')
-final class ClubService extends DwEntity with _$ClubService {
-  const ClubService({
+final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
+  const ClubServiceRow({
     this.id,
     required this.title,
     required this.kind,

@@ -1,6 +1,6 @@
 import 'package:meta/meta_meta.dart';
 
-/// Declares a class as a database entity stored in the table [name].
+/// Declares a row class (`<Name>Row extends DwTableRow`) stored in the table [name].
 ///
 /// The generator reads the class and writes its table definition, codecs and
 /// schema into the part file; the annotation itself carries only what cannot
@@ -15,7 +15,7 @@ final class DwTable {
   final List<DwIndex> indexes;
 }
 
-/// An index over entity fields, named by their Dart names.
+/// An index over row class fields, named by their Dart names.
 final class DwIndex {
   const DwIndex(this.fields, {this.unique = false, this.name});
 
@@ -76,8 +76,8 @@ final class DwColumnName {
 
 /// A database-side default for the column.
 ///
-/// The default applies to rows the entity does not write: rows that existed
-/// when the column was added, and raw SQL inserts. An entity insert always
+/// The default applies to rows written without the column: rows that existed
+/// when the column was added, and raw SQL inserts. A repository insert always
 /// writes every column.
 @Target({TargetKind.field})
 final class DwDefault {

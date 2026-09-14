@@ -57,8 +57,8 @@ final class EntityIndex {
   final bool unique;
 }
 
-/// An entity class the generator writes a mixin, a `copyWith` and a table
-/// definition for.
+/// A row class (`<Entity>Row extends DwTableRow`) the generator writes a
+/// mixin, a `copyWith` and a table definition for.
 final class EntityClass {
   const EntityClass({
     required this.name,
@@ -83,11 +83,33 @@ final class EntityClass {
 
   final ClassElement element;
 
-  String get tableClass => '${name}Table';
+  /// The entity the row class stores: its name without the `Row` suffix,
+  /// which the reader has checked is there.
+  String get entityName => entityNameOf(name)!;
 
-  /// The repository getter on the project's `DwDb` extension.
-  String get repositoryGetter => pluralCamelCase(name);
+  /// `SessionBookingRow` → `SessionBookingTable`.
+  String get tableClass => '${entityName}Table';
+
+  /// The repository getter on the project's `DwDb` extension:
+  /// `SessionBookingRow` → `sessionBookings`.
+  String get repositoryGetter => pluralCamelCase(entityName);
 }
+
+/// The suffix every row class name carries.
+const rowSuffix = 'Row';
+
+/// `SessionBookingRow` → `SessionBooking`; `null` for a name that is not a
+/// row class name (no `Row` suffix, or nothing before it).
+///
+/// The suffix is required rather than stripped when present: a row class and
+/// the data object shown to clients would otherwise be free to share a name
+/// (`SessionBooking` on both sides), and the table and repository names are
+/// derived from the entity name, which must not depend on whether an author
+/// remembered a convention.
+String? entityNameOf(String className) =>
+    className.length > rowSuffix.length && className.endsWith(rowSuffix)
+    ? className.substring(0, className.length - rowSuffix.length)
+    : null;
 
 /// `ClubSession` → `clubSessions`, `Category` → `categories`, `Address` →
 /// `addresses`.

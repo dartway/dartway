@@ -3,19 +3,19 @@ import 'package:postgres/postgres.dart' as pg;
 
 import '../db/dw_db.dart';
 import '../db/dw_errors.dart';
-import '../entity/dw_entity.dart';
+import '../entity/dw_table_row.dart';
 import '../entity/dw_table_def.dart';
 import 'dw_column.dart';
 import 'dw_lock.dart';
 
-/// Typed access to one entity table through a [DwDb].
+/// Typed access to the table of one row class through a [DwDb].
 ///
 /// Every method is one statement and one round trip (two inside a
 /// transaction, where the driver closes the portal). Statement text depends
 /// only on the *shape* of a call — which columns, which operators — never on
 /// the values, so each shape is prepared once per connection: limits,
 /// offsets and `inList` values are all parameters.
-final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
+final class DwRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   @internal
   DwRepository.internal(this._db, this.table);
 
@@ -28,7 +28,7 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
   ///
   /// Without [orderBy] the order is whatever the database returns; paging
   /// with [limit] and [offset] needs an order to be stable.
-  Future<List<E>> find({
+  Future<List<R>> find({
     DwExpression Function(T t)? where,
     List<DwOrder> Function(T t)? orderBy,
     int? limit,
@@ -56,7 +56,7 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
     return _decode(await _run(writer));
   }
 
-  Future<E?> findFirst({
+  Future<R?> findFirst({
     DwExpression Function(T t)? where,
     List<DwOrder> Function(T t)? orderBy,
     DwLock? lock,
@@ -70,7 +70,7 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<E?> findById(int id, {DwLock? lock}) async {
+  Future<R?> findById(int id, {DwLock? lock}) async {
     _checkLock(lock);
     final result = await _db.run(
       lock == null ? _sql.selectById : '${_sql.selectById}${lock.sql}',
@@ -83,7 +83,7 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
   /// The rows with [ids], in one statement whatever their number. Missing ids
   /// are absent from the result; the order is unspecified — index the result
   /// by id.
-  Future<List<E>> findByIds(Iterable<int> ids) async {
+  Future<List<R>> findByIds(Iterable<int> ids) async {
     final distinct = ids.toSet();
     if (distinct.isEmpty) return const [];
     final result = await _db.run(
@@ -110,40 +110,38 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
     return result.first.first! as bool;
   }
 
-  /// Inserts [entity] and returns it as stored, with its id and every value
+  /// Inserts [row] and returns it as stored, with its id and every value
   /// read back from the database.
-  Future<E> insert(E entity) async {
-    final result = await _insert(entity, '');
+  Future<R> insert(R row) async {
+    final result = await _insert(row, '');
     return _decode(result).first;
   }
 
-  /// Inserts [entity] unless it conflicts; returns `null` when the row was
+  /// Inserts [row] unless it conflicts; returns `null` when the row was
   /// skipped.
-  Future<E?> tryInsert(E entity, {required DwOnConflict<T> onConflict}) async {
-    final result = await _insert(entity, onConflict.sql(table));
+  Future<R?> tryInsert(R row, {required DwOnConflict<T> onConflict}) async {
+    final result = await _insert(row, onConflict.sql(table));
     return result.isEmpty ? null : _decode(result).first;
   }
 
-  /// Inserts all [entities] in one statement and returns them as stored, in
-  /// the same order.
+  /// Inserts all [rows] in one statement and returns them as stored, in the
+  /// same order.
   ///
-  /// Either every entity has an id or none has: the statement binds one array
+  /// Either every row has an id or none has: the statement binds one array
   /// per column, and a column cannot be half defaulted.
-  Future<List<E>> insertAll(Iterable<E> entities) async {
-    final list = entities.toList(growable: false);
+  Future<List<R>> insertAll(Iterable<R> rows) async {
+    final list = rows.toList(growable: false);
     if (list.isEmpty) return const [];
     final withId = list.first.id != null;
-    if (list.any((entity) => (entity.id != null) != withId)) {
-      throw ArgumentError(
-        'insertAll: either every entity has an id or none has',
-      );
+    if (list.any((row) => (row.id != null) != withId)) {
+      throw ArgumentError('insertAll: either every row has an id or none has');
     }
     final columns = _sql.insertColumns(withId: withId);
     final arrays = [for (final _ in columns) <Object?>[]];
-    for (final entity in list) {
-      final row = _rowOf(entity);
+    for (final row in list) {
+      final values = _valuesOf(row);
       for (final (position, column) in columns.indexed) {
-        final value = row[column.name];
+        final value = values[column.name];
         arrays[position].add(
           value == null ? null : column.type.encodeArrayElement(value),
         );
@@ -155,16 +153,16 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
     return _decode(result);
   }
 
-  /// Writes every column of [entity] by its id and returns the stored row.
+  /// Writes every column of [row] by its id and returns the stored row.
   ///
-  /// Throws [DwEntityNotFound] when no row has that id: an update that
+  /// Throws [DwRowNotFound] when no row has that id: an update that
   /// changed nothing is a failure, not a quiet success.
-  Future<E> update(E entity) async {
-    final id = entity.id;
+  Future<R> update(R row) async {
+    final id = row.id;
     if (id == null) {
-      throw ArgumentError('update: the entity has no id; insert it first');
+      throw ArgumentError('update: the row has no id; insert it first');
     }
-    final row = _rowOf(entity);
+    final values = _valuesOf(row);
     final columns = _sql.insertColumns(withId: false);
     final result = await _db.run(
       _sql.updateById,
@@ -172,9 +170,9 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
         for (final column in columns) column.type.parameterType,
         pg.Type.bigInteger,
       ],
-      [for (final column in columns) _encode(column, row[column.name]), id],
+      [for (final column in columns) _encode(column, values[column.name]), id],
     );
-    if (result.isEmpty) throw DwEntityNotFound(table.name, id);
+    if (result.isEmpty) throw DwRowNotFound(table.name, id);
     return _decode(result).first;
   }
 
@@ -209,27 +207,27 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
     return (await _run(writer)).affectedRows;
   }
 
-  Future<pg.Result> _insert(E entity, String onConflict) {
-    final withId = entity.id != null;
-    final row = _rowOf(entity);
+  Future<pg.Result> _insert(R row, String onConflict) {
+    final withId = row.id != null;
+    final values = _valuesOf(row);
     final columns = _sql.insertColumns(withId: withId);
     return _db.run(
       '${_sql.insert(withId: withId)}$onConflict${_sql.returning}',
       [for (final column in columns) column.type.parameterType],
-      [for (final column in columns) _encode(column, row[column.name])],
+      [for (final column in columns) _encode(column, values[column.name])],
     );
   }
 
-  Map<String, Object?> _rowOf(E entity) {
-    final row = table.toRow(entity);
-    for (final column in _sql.insertColumns(withId: entity.id != null)) {
-      if (!row.containsKey(column.name)) {
+  Map<String, Object?> _valuesOf(R row) {
+    final values = table.toRow(row);
+    for (final column in _sql.insertColumns(withId: row.id != null)) {
+      if (!values.containsKey(column.name)) {
         throw StateError(
           '${table.name}.toRow has no value for "${column.name}"; regenerate the table',
         );
       }
     }
-    return row;
+    return values;
   }
 
   Object? _encode(DwColumn<Object?> column, Object? value) =>
@@ -253,7 +251,7 @@ final class DwRepository<E extends DwEntity, T extends DwTableDef<E>> {
   Future<pg.Result> _run(DwSqlWriter writer) =>
       _db.run(writer.sql, writer.types, writer.values);
 
-  List<E> _decode(pg.Result result) => [
+  List<R> _decode(pg.Result result) => [
     for (final row in dwRows(result)) table.fromRow(row),
   ];
 
@@ -323,7 +321,7 @@ final class _DwTableSql {
       withId ? _insertAllWithId : _insertAllWithoutId;
 
   /// One array per column, zipped by `unnest` and kept in input order by
-  /// its ordinality, so the returned rows line up with the entities given.
+  /// its ordinality, so the returned rows line up with the rows given.
   String _insertAllInto(List<DwColumn<Object?>> columns) {
     final names = columns.map((column) => column.sql).join(', ');
     final aliases = [for (var i = 1; i <= columns.length; i++) 'c$i'];

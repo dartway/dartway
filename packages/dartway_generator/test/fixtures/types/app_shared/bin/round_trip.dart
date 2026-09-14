@@ -15,8 +15,14 @@ void main() {
   Object? wire(Object? json) => jsonDecode(jsonEncode(json));
 
   T roundTrip<T extends DwDto>(T dto) {
-    final tagged = wire(appProtocol.encodeTagged(dto));
-    final back = appProtocol.decodeTagged(tagged) as T;
+    // Untagged, as the wire carries it: the type comes from the registry,
+    // once by the static type and once by the wire name.
+    final json = wire(dto.toJson());
+    final back = appProtocol.decodeAs<T>(json);
+    check(
+      appProtocol.decodeNamed(dto.dwTypeName, json) == dto,
+      '$T decodes by its wire name',
+    );
     check(back == dto, '$T round trip equality');
     check(back.hashCode == dto.hashCode, '$T round trip hash');
     return back;
@@ -154,9 +160,25 @@ void main() {
   roundTrip(const GetItem(id: 1));
   roundTrip(const FindItem());
   roundTrip(const FindItem(title: 't', colors: [Color.green]));
-  roundTrip(ListItems(color: Color.red, since: DateTime.utc(2026), labels: const {}));
+  roundTrip(
+    ListItems(color: Color.red, since: DateTime.utc(2026), labels: const {}),
+  );
   roundTrip(const ListItems());
   roundTrip(const FeedItems());
+  check(
+    const FeedItems(maxPageSize: 400).toJson().isEmpty &&
+        const FeedItems().pageSize == 40,
+    'super arguments and super parameters are not serialised',
+  );
+  roundTrip(const ListPinnedItems(pinnedBy: 'me'));
+  roundTrip(const ItemTable());
+  roundTrip(const ItemTable(page: 3, pageSize: 10, color: Color.blue));
+  check(
+    const ItemTable(page: 2).toJson()['page'] == 2 &&
+        const ItemTable(page: 2) != const ItemTable(page: 3),
+    'a table page is a serialised field and part of the key',
+  );
+  roundTrip(const ItemHistory(itemId: 4));
   roundTrip(const WideRequest(a1: 1, a20: 20));
   check(
     const WideRequest(a1: 1) != const WideRequest(a2: 1),
@@ -183,10 +205,13 @@ void main() {
     check(back.dimensions == patch, 'patch $patch survives');
   }
   final keptJson = const EditItem(itemId: 1).toJson();
-  check(keptJson.keys.toList().join(',') == 'itemId', 'kept patches are absent');
-  final clearedJson = wire(
-    const EditItem(itemId: 1, color: DwPatch.clear()).toJson(),
-  ) as Map<String, Object?>;
+  check(
+    keptJson.keys.toList().join(',') == 'itemId',
+    'kept patches are absent',
+  );
+  final clearedJson =
+      wire(const EditItem(itemId: 1, color: DwPatch.clear()).toJson())
+          as Map<String, Object?>;
   check(
     clearedJson.containsKey('color') && clearedJson['color'] == null,
     'a cleared patch is an explicit null',

@@ -1,21 +1,21 @@
-import '../db/dw_row.dart';
+import '../db/dw_result_row.dart';
 import '../query/dw_column.dart';
 import '../schema/dw_schema.dart';
-import 'dw_entity.dart';
+import 'dw_table_row.dart';
 
-/// The generated description of an entity's table: its columns, its schema
-/// and the codec between rows and entities.
+/// The generated description of a row class's table: its columns, its
+/// schema and the codec between result rows and row objects.
 ///
-/// An entity declares `static const table = <Name>Table();`; the subclass is
-/// written by `dartway generate` into the entity's part file. Instances are
-/// `const`, so each table is one canonical object the ORM can attach its
-/// prepared SQL to.
-abstract class DwTableDef<E extends DwEntity> {
+/// A row class `<Name>Row` declares `static const table = <Name>Table();`;
+/// the subclass is written by `dartway generate` into the row class's part
+/// file. Instances are `const`, so each table is one canonical object the ORM
+/// can attach its prepared SQL to.
+abstract class DwTableDef<R extends DwTableRow> {
   const DwTableDef(this.name);
 
   final String name;
 
-  /// The primary key every entity table has.
+  /// The primary key every table has.
   DwColumn<int> get id => DwColumn.id;
 
   /// Every column in declaration order, [id] first.
@@ -29,11 +29,11 @@ abstract class DwTableDef<E extends DwEntity> {
     indexes: indexSchemas,
   );
 
-  E fromRow(DwRow row);
+  R fromRow(DwResultRow row);
 
-  /// Dart values by SQL column name; `id` is absent when the entity has none
+  /// Dart values by SQL column name; `id` is absent when the row has none
   /// yet. The ORM encodes each value through its column's type.
-  Map<String, Object?> toRow(E entity);
+  Map<String, Object?> toRow(R row);
 
   @override
   String toString() => 'DwTableDef($name)';

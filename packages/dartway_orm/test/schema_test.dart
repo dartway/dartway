@@ -47,7 +47,7 @@ void main() {
   }
 
   group('introspection', () {
-    test('reads back exactly what the entities declare', () async {
+    test('reads back exactly what the row classes declare', () async {
       await create(fixtureSchema);
       final introspection = await DwIntrospector.read(db());
       expect(introspection.schema, fixtureSchema);

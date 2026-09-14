@@ -1,7 +1,7 @@
 /// Typed PostgreSQL access, schema and migrations for DartWay servers.
 library;
 
-// Generated entity code uses these; re-exported so an entity file needs one
+// Generated row code uses these; re-exported so a row class file needs one
 // import.
 export 'package:dartway_core/dartway_core.dart'
     show DwClear, DwKeep, DwPatch, DwSet, dwListEquals, dwMapEquals;
@@ -13,13 +13,13 @@ export 'src/db/dw_errors.dart'
     show
         DwDatabaseException,
         DwDecodeException,
-        DwEntityNotFound,
+        DwRowNotFound,
         DwForeignKeyViolation,
         DwSerializationFailure,
         DwUniqueViolation;
-export 'src/db/dw_row.dart' show DwRow;
+export 'src/db/dw_result_row.dart' show DwResultRow;
 export 'src/entity/dw_annotations.dart';
-export 'src/entity/dw_entity.dart';
+export 'src/entity/dw_table_row.dart';
 export 'src/entity/dw_table_def.dart';
 export 'src/entity/dw_type.dart';
 export 'src/migrations/dw_migration.dart';

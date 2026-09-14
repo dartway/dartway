@@ -2,8 +2,8 @@ import '../emit/source_text.dart';
 import '../emit/value_class_writer.dart';
 import 'entity_model.dart';
 
-/// Writes the generated code of one entity: the value mixin, `copyWith` and
-/// the table definition (the shape of `packages/dartway_orm/test/fixtures`).
+/// Writes the generated code of one row class: the value mixin, `copyWith`
+/// and the table definition (the shape of `packages/dartway_orm/test/fixtures`).
 abstract final class EntityEmitter {
   static String emit(EntityClass entity) => [
     _mixin(entity),
@@ -38,13 +38,13 @@ abstract final class EntityEmitter {
       if (entity.indexes.isNotEmpty)
         '@override\nList<DwIndexSchema> get indexSchemas => ['
             '${entity.indexes.map(_index).join(', ')}];',
-      '@override\n$name fromRow(DwRow row) => $name('
+      '@override\n$name fromRow(DwResultRow row) => $name('
           '${entity.fields.map((field) => '${field.name}: row.decode(${field.name})').join(', ')});',
-      '@override\nMap<String, Object?> toRow($name entity) => {'
+      '@override\nMap<String, Object?> toRow($name row) => {'
           '${[
             // Absent before insert: the database assigns it.
-            "if (entity.id != null) 'id': entity.id",
-            for (final field in columns) '${dartString(field.column!.sqlName)}: entity.${field.name}',
+            "if (row.id != null) 'id': row.id",
+            for (final field in columns) '${dartString(field.column!.sqlName)}: row.${field.name}',
           ].join(', ')}};',
     ];
     return 'final class ${entity.tableClass} extends DwTableDef<$name> {\n'

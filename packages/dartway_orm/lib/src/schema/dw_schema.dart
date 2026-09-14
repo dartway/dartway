@@ -7,7 +7,7 @@ import '../entity/dw_table_def.dart';
 
 /// A database schema: the tables an application owns.
 ///
-/// Built from entity tables it is the *target* the migrations must reach;
+/// Built from the tables of row classes it is the *target* the migrations must reach;
 /// built by introspection it is what a database *has*. Both are the same
 /// value type so they compare with `==` and diff with one function.
 final class DwSchema {

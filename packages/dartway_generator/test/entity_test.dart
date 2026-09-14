@@ -68,6 +68,18 @@ void main() {
   );
 
   group('naming', () {
+    test('a row class is <Entity>Row; table and getter use the entity', () {
+      expect(entityNameOf('SessionBookingRow'), 'SessionBooking');
+      expect(entityNameOf('ClubSessionRow'), 'ClubSession');
+      expect(entityNameOf('ClubSession'), isNull);
+      expect(entityNameOf('Row'), isNull);
+      expect(entityNameOf('Rows'), isNull);
+      expect(
+        pluralCamelCase(entityNameOf('SessionBookingRow')!),
+        'sessionBookings',
+      );
+    });
+
     test('repository getters are the camelCase plural of the class', () {
       expect(pluralCamelCase('ClubSession'), 'clubSessions');
       expect(pluralCamelCase('AppSetting'), 'appSettings');

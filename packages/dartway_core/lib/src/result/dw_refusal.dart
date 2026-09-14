@@ -1,3 +1,5 @@
+import '../protocol/dw_read.dart';
+
 /// A reason the server can refuse for. Declared by the project as an enum in its
 /// shared package:
 ///
@@ -41,7 +43,26 @@ enum DwCoreRefusal implements DwRefusalCode {
   /// A one-time code can no longer be verified — its ticket is unknown, used,
   /// expired or out of attempts; [DwRefusal.field] is `code`. The user needs
   /// a new code, not another try.
-  codeExpired;
+  codeExpired,
+
+  /// The app build is below the server's minimum (`Dw-App-Version`). An
+  /// incompatibility, not a rule: it answers `incompatible` with `426`, and
+  /// the app shows a full-screen "update the app" page.
+  updateRequired,
+
+  /// The client speaks a protocol version the server does not
+  /// (`Dw-Protocol`). An incompatibility, as [updateRequired].
+  protocolUnsupported;
+
+  /// The codes that mean "this build cannot talk to this server" rather than
+  /// "no": answered as `incompatible`, never as `refused`. A family of two
+  /// codes rather than one code with a parameter, because the cause differs —
+  /// an app older than the project allows is sent to the store; a protocol
+  /// mismatch is a framework version skew, which the operator resolves.
+  static const Set<DwCoreRefusal> incompatibilities = {
+    updateRequired,
+    protocolUnsupported,
+  };
 
   // There is deliberately no `failed` code. A refusal is an answer for the
   // user and never alerts; a failure is an incident with no detail. A
@@ -96,6 +117,9 @@ final class DwRefusal {
   /// Whether this refusal carries [candidate].
   bool isCode(DwRefusalCode candidate) => code == candidate.code;
 
+  /// Whether this is one of [DwCoreRefusal.incompatibilities].
+  bool get isIncompatibility => DwCoreRefusal.incompatibilities.any(isCode);
+
   /// How long to wait before asking again: set on
   /// [DwCoreRefusal.tooManyRequests], `null` on every other refusal (and on
   /// one whose parameter does not read as seconds).
@@ -111,15 +135,27 @@ final class DwRefusal {
     if (field != null) 'field': field,
   };
 
-  static DwRefusal fromJson(Map<String, Object?> json) => DwRefusal.raw(
-    json['code']! as String,
-    params:
-        (json['params'] as Map<String, Object?>?)?.map(
-          (key, value) => MapEntry(key, value! as String),
-        ) ??
-        const {},
-    field: json['field'] as String?,
-  );
+  /// Reads a refusal. Throws [FormatException] for anything but a code with
+  /// string parameters and an optional field.
+  static DwRefusal fromJson(Object? json) {
+    const what = 'A refusal';
+    final map = dwReadMap(json, what);
+    dwRejectUnknownKeys(map, const {'code', 'params', 'field'}, what);
+    final params = map['params'];
+    return DwRefusal.raw(
+      dwReadString(map['code'], 'The refusal code'),
+      params: params == null
+          ? const {}
+          : {
+              for (final MapEntry(:key, :value) in dwReadMap(
+                params,
+                'Refusal params',
+              ).entries)
+                key: dwReadString(value, 'The refusal param "$key"'),
+            },
+      field: dwReadOptionalString(map['field'], 'The refusal field'),
+    );
+  }
 
   @override
   bool operator ==(Object other) =>

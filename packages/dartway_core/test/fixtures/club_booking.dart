@@ -1,13 +1,13 @@
 import 'package:dartway_core/dartway_core.dart';
 
-part 'booking_view.dw.dart';
+part 'club_booking.dw.dart';
 
 enum BookingStatus { booked, cancelled }
 
 /// Hand-written in the exact shape `dartway generate` produces, so the core's
 /// contract with generated code is exercised without the generator.
-final class BookingView extends DwDataObject with _$BookingView {
-  const BookingView({
+final class ClubBooking extends DwDataObject with _$ClubBooking {
+  const ClubBooking({
     required this.id,
     required this.status,
     required this.startsAt,
@@ -23,18 +23,21 @@ final class BookingView extends DwDataObject with _$BookingView {
   final List<String> tags;
 }
 
-final class ListMyBookings extends DwListRequest<BookingView>
+final class ListMyBookings extends DwListRequest<ClubBooking>
     with _$ListMyBookings {
   const ListMyBookings({this.status});
 
   final BookingStatus? status;
 
   @override
-  bool matches(BookingView object) => status == null || object.status == status;
+  bool matches(ClubBooking item) => status == null || item.status == status;
 }
 
-final class RenameBooking extends DwCommand<BookingView> with _$RenameBooking {
-  const RenameBooking({required this.bookingId, this.note = const DwPatch.keep()});
+final class RenameBooking extends DwCommand<ClubBooking> with _$RenameBooking {
+  const RenameBooking({
+    required this.bookingId,
+    this.note = const DwPatch.keep(),
+  });
 
   final int bookingId;
   final DwPatch<String> note;

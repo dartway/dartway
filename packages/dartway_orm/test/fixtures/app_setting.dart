@@ -9,8 +9,8 @@ part 'app_setting.dw.dart';
 /// keywords (`key`, `value`), which only work because every identifier is
 /// quoted.
 @DwTable('app_setting')
-final class AppSetting extends DwEntity with _$AppSetting {
-  const AppSetting({
+final class AppSettingRow extends DwTableRow with _$AppSettingRow {
+  const AppSettingRow({
     this.id,
     required this.key,
     required this.value,

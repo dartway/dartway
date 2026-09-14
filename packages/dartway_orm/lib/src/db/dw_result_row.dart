@@ -9,9 +9,9 @@ import 'dw_errors.dart';
 /// decoded, with typed reads that fail loudly.
 ///
 /// Rows of one result share a single name index, built once per result.
-final class DwRow extends MapBase<String, Object?> {
+final class DwResultRow extends MapBase<String, Object?> {
   @internal
-  DwRow(this._index, this._values);
+  DwResultRow(this._index, this._values);
 
   final Map<String, int> _index;
   final List<Object?> _values;
@@ -68,11 +68,12 @@ final class DwRow extends MapBase<String, Object?> {
 
   @override
   void operator []=(String key, Object? value) =>
-      throw UnsupportedError('a DwRow is read-only');
+      throw UnsupportedError('a DwResultRow is read-only');
 
   @override
-  void clear() => throw UnsupportedError('a DwRow is read-only');
+  void clear() => throw UnsupportedError('a DwResultRow is read-only');
 
   @override
-  Object? remove(Object? key) => throw UnsupportedError('a DwRow is read-only');
+  Object? remove(Object? key) =>
+      throw UnsupportedError('a DwResultRow is read-only');
 }

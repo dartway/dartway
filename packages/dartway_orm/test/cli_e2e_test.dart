@@ -37,7 +37,7 @@ final List<DwMigration> appMigrations = [];
       ),
       from: project.path,
     );
-    // v2 of the entities: club_session loses its note, club_service gains a
+    // v2 of the row classes: club_session loses its note, club_service gains a
     // required level. Both are decisions.
     await File(p.join(project.path, 'migrate.dart')).writeAsString('''
 import 'dart:io';

@@ -12,8 +12,8 @@ part 'columns.dw.dart';
     DwIndex(['title']),
   ],
 )
-final class Columns extends DwEntity with _$Columns {
-  const Columns({
+final class ColumnsRow extends DwTableRow with _$ColumnsRow {
+  const ColumnsRow({
     this.id,
     required this.title,
     required this.view,
@@ -43,8 +43,8 @@ final class Columns extends DwEntity with _$Columns {
 }
 
 @DwTable('shared_name')
-final class SameTableA extends DwEntity with _$SameTableA {
-  const SameTableA({this.id});
+final class SameTableARow extends DwTableRow with _$SameTableARow {
+  const SameTableARow({this.id});
 
   @override
   final int? id;
@@ -53,8 +53,8 @@ final class SameTableA extends DwEntity with _$SameTableA {
 }
 
 @DwTable('shared_name')
-final class SameTableB extends DwEntity with _$SameTableB {
-  const SameTableB({this.id});
+final class SameTableBRow extends DwTableRow with _$SameTableBRow {
+  const SameTableBRow({this.id});
 
   @override
   final int? id;
@@ -63,8 +63,8 @@ final class SameTableB extends DwEntity with _$SameTableB {
 }
 
 @DwTable('a_table_name_that_is_far_too_long_for_postgres_to_keep_in_one_piece')
-final class LongName extends DwEntity with _$LongName {
-  const LongName({this.id});
+final class LongNameRow extends DwTableRow with _$LongNameRow {
+  const LongNameRow({this.id});
 
   @override
   final int? id;

@@ -5,7 +5,7 @@ import '../entity/dw_annotations.dart';
 import '../entity/dw_type.dart';
 import '../schema/dw_schema.dart';
 
-/// A column of an entity table, typed by the Dart value it holds.
+/// A column of a table, typed by the Dart value it holds.
 ///
 /// A column is the single declaration of everything about one field: its SQL
 /// name, how its values are stored, and its schema (nullability comes from
@@ -29,7 +29,7 @@ final class DwColumn<T> {
       defaultValue = null,
       references = null;
 
-  /// The `id bigserial primary key` every entity table has.
+  /// The `id bigserial primary key` every table has.
   static const DwColumn<int> id = DwColumn<int>._primaryKey(
     'id',
     DwType.bigint,

@@ -2,7 +2,7 @@ import '../emit/source_text.dart';
 import 'entity_model.dart';
 
 /// Writes `lib/generated/dw_schema.dart` of the server package: the schema
-/// and the `DwDb` extension with one repository getter per entity.
+/// and the `DwDb` extension with one repository getter per row class.
 abstract final class SchemaEmitter {
   static String emit({
     required String baseName,

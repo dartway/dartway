@@ -14,8 +14,8 @@ part 'club_session.dw.dart';
     DwIndex(['serviceId', 'startsAt'], unique: true),
   ],
 )
-final class ClubSession extends DwEntity with _$ClubSession {
-  const ClubSession({
+final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
+  const ClubSessionRow({
     this.id,
     required this.serviceId,
     this.previousSessionId,

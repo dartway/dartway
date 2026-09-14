@@ -11,8 +11,8 @@ void main() {
   final database = useTestDatabase(maxConnections: 6);
   DwDb db() => database().db;
 
-  AppSetting setting(String key, [String value = 'v']) =>
-      AppSetting(key: key, value: value, updatedAt: DateTime.utc(2026));
+  AppSettingRow setting(String key, [String value = 'v']) =>
+      AppSettingRow(key: key, value: value, updatedAt: DateTime.utc(2026));
 
   Future<List<String>> keys() async => [
     for (final s in await db().appSettings.find(orderBy: (t) => [t.key.asc()]))

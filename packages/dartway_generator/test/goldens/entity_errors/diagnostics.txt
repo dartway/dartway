@@ -1,17 +1,19 @@
-app_server/lib/src/columns.dart:15:13: an index of entity `Columns` names `missing`, which is not a column field of `Columns` (indexes name Dart fields, not SQL columns)
-app_server/lib/src/columns.dart:15:13: entity `Columns` declares index `columns_title_idx` twice
-app_server/lib/src/columns.dart:30:19: field `view` of entity `Columns` cannot be a column: `ValueView` is a DTO, which is not stored; store its fields as columns (or ids of other entities) and map it in the handler
-app_server/lib/src/columns.dart:31:24: field `dates` of entity `Columns` cannot be a column: `List<DateTime>` is stored as jsonb, whose elements are read back as plain JSON: they must be int, double, String or bool
-app_server/lib/src/columns.dart:32:18: field `set` of entity `Columns` cannot be a column: `Set<int>` cannot be stored; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, List<T> or Map<String, T> of int, double, String or bool (jsonb), or a nullable one of these
-app_server/lib/src/columns.dart:35:16: field `ownerName` of entity `Columns` references another table, so it holds that row's id and must be `int` or `int?`
-app_server/lib/src/columns.dart:40:13: fields `same` and `alsoSame` of entity `Columns` both map to column `same`
-app_server/lib/src/columns.dart:46:13: table name `shared_name` of entity `SameTableA` is also used at columns.dart:56:13
-app_server/lib/src/columns.dart:56:13: table name `shared_name` of entity `SameTableB` is also used at columns.dart:46:13
+app_server/lib/src/columns.dart:15:13: an index of row class `ColumnsRow` names `missing`, which is not a column field of `ColumnsRow` (indexes name Dart fields, not SQL columns)
+app_server/lib/src/columns.dart:15:13: row class `ColumnsRow` declares index `columns_title_idx` twice
+app_server/lib/src/columns.dart:30:19: field `view` of row class `ColumnsRow` cannot be a column: `ValueView` is a DTO, which is not stored; store its fields as columns (or ids of other rows) and map it in the handler
+app_server/lib/src/columns.dart:31:24: field `dates` of row class `ColumnsRow` cannot be a column: `List<DateTime>` is stored as jsonb, whose elements are read back as plain JSON: they must be int, double, String or bool
+app_server/lib/src/columns.dart:32:18: field `set` of row class `ColumnsRow` cannot be a column: `Set<int>` cannot be stored; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, List<T> or Map<String, T> of int, double, String or bool (jsonb), or a nullable one of these
+app_server/lib/src/columns.dart:35:16: field `ownerName` of row class `ColumnsRow` references another table, so it holds that row's id and must be `int` or `int?`
+app_server/lib/src/columns.dart:40:13: fields `same` and `alsoSame` of row class `ColumnsRow` both map to column `same`
+app_server/lib/src/columns.dart:46:13: table name `shared_name` of row class `SameTableARow` is also used at columns.dart:56:13
+app_server/lib/src/columns.dart:56:13: table name `shared_name` of row class `SameTableBRow` is also used at columns.dart:46:13
 app_server/lib/src/columns.dart:66:13: the table name `a_table_name_that_is_far_too_long_for_postgres_to_keep_in_one_piece` is longer than 63 bytes, and Postgres would silently truncate it
-app_server/lib/src/declarations.dart:5:13: entity `NoTable` needs its table: annotate it with `@DwTable('no_table')`
-app_server/lib/src/declarations.dart:15:13: entity `NoStaticTable` must declare its table: add `static const table = NoStaticTableTable();`
-app_server/lib/src/declarations.dart:27:13: the id of entity `WrongId` must be `int?` (a bigserial key, null before insert), not `int`
-app_server/lib/src/declarations.dart:38:16: field `name` of entity `Shadowing` would shadow `DwTableDef.name` in the generated table class; rename the field (the column can keep its name with `@DwColumnName('...')`)
-app_server/lib/src/declarations.dart:39:13: field `columns` of entity `Shadowing` would shadow `DwTableDef.columns` in the generated table class; rename the field (the column can keep its name with `@DwColumnName('...')`)
-app_server/lib/src/prefixed.dart:6:13: the generated part uses `DwPatch`, `DwColumn`, `DwTableDef`, `DwRow`, which `prefixed.dart` does not import without a prefix; add `import 'package:dartway_orm/dartway_orm.dart';`
-app_shared/lib/misplaced.dart:6:13: entity `Misplaced` is declared in `app_shared`; entities belong in the *_server package, whose schema lists them
+app_server/lib/src/declarations.dart:5:13: row class `NoTableRow` needs its table: annotate it with `@DwTable('no_table')`
+app_server/lib/src/declarations.dart:15:13: row class `NoStaticTableRow` must declare its table: add `static const table = NoStaticTableTable();`
+app_server/lib/src/declarations.dart:27:13: the id of row class `WrongIdRow` must be `int?` (a bigserial key, null before insert), not `int`
+app_server/lib/src/declarations.dart:38:16: field `name` of row class `ShadowingRow` would shadow `DwTableDef.name` in the generated table class; rename the field (the column can keep its name with `@DwColumnName('...')`)
+app_server/lib/src/declarations.dart:39:13: field `columns` of row class `ShadowingRow` would shadow `DwTableDef.columns` in the generated table class; rename the field (the column can keep its name with `@DwColumnName('...')`)
+app_server/lib/src/declarations.dart:46:13: row class `ClubSession` must be named `<Entity>Row` (`ClubSessionRow`): its table class is `<Entity>Table` and its repository getter `db.<entities>`, and a row never shares a name with the data object clients see
+app_server/lib/src/declarations.dart:57:13: row class `Row` must be named `<Entity>Row` (`SomeRow`): its table class is `<Entity>Table` and its repository getter `db.<entities>`, and a row never shares a name with the data object clients see
+app_server/lib/src/prefixed.dart:6:13: the generated part uses `DwPatch`, `DwColumn`, `DwTableDef`, `DwResultRow`, which `prefixed.dart` does not import without a prefix; add `import 'package:dartway_orm/dartway_orm.dart';`
+app_shared/lib/misplaced.dart:6:13: row class `MisplacedRow` is declared in `app_shared`; row classes belong in the *_server package, whose schema lists them

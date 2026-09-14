@@ -345,7 +345,7 @@ final class M$id extends DwMigration {
       expect(code, DwMigrationCli.exitOk, reason: out.toString());
       expect(
         out.toString(),
-        contains("ok   migrations produce the entities' schema"),
+        contains("ok   migrations produce the row classes' schema"),
       );
       expect(
         out.toString(),

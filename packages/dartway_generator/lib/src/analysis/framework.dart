@@ -12,7 +12,7 @@ abstract final class DwFramework {
       element.library?.uri.toString().startsWith('package:$package/') ?? false;
 
   /// Whether [element] belongs to a framework package: those classes are the
-  /// ends of a DTO or entity hierarchy and are never generated for.
+  /// ends of a DTO or row class hierarchy and are never generated for.
   static bool isFramework(Element element) =>
       isFrom(element, corePackage) || isFrom(element, ormPackage);
 
@@ -39,9 +39,10 @@ abstract final class DwFramework {
     return extendsDto ? DtoKind.bare : null;
   }
 
-  /// Whether [element] is a database entity (extends `DwEntity`).
-  static bool isEntity(InterfaceElement element) =>
-      element.allSupertypes.any((type) => isOrmClass(type.element, 'DwEntity'));
+  /// Whether [element] is a row class (extends `DwTableRow`).
+  static bool isEntity(InterfaceElement element) => element.allSupertypes.any(
+    (type) => isOrmClass(type.element, 'DwTableRow'),
+  );
 
   static bool isPatch(InterfaceType type) =>
       isCoreClass(type.element, 'DwPatch');

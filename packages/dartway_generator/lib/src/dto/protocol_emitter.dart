@@ -33,7 +33,10 @@ abstract final class ProtocolEmitter {
       sorted
           .map(
             (entry) =>
-                'DwDtoEntry(${entry.name}, ${dartString(entry.name)}, '
+                // The type argument is written out: inside the list literal
+                // Dart would infer `DwDto` from the list, not the class from
+                // the factory, and the protocol refuses such an entry.
+                'DwDtoEntry<${entry.name}>(${dartString(entry.name)}, '
                 '\$${entry.name}FromJson)',
           )
           .join(', '),

@@ -1,15 +1,13 @@
 import 'dart:io';
 
-import 'package:dart_style/dart_style.dart';
 import 'package:path/path.dart' as p;
-import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart';
 
 import 'support/temp_project.dart';
 
 void main() {
   group('dartway_core reference fixture', () {
-    test('booking_view.dw.dart is reproduced from booking_view.dart', () async {
+    test('club_booking.dw.dart is reproduced from club_booking.dart', () async {
       final project = TempProject.create(['app_shared']);
       final fixtures = p.join(
         frameworkPackages,
@@ -18,25 +16,16 @@ void main() {
         'fixtures',
       );
       project.writeFile(
-        'app_shared/lib/src/booking_view.dart',
-        File(p.join(fixtures, 'booking_view.dart')).readAsStringSync(),
+        'app_shared/lib/src/club_booking.dart',
+        File(p.join(fixtures, 'club_booking.dart')).readAsStringSync(),
       );
       await project.generateClean();
 
-      // The reference is hand-written "in dart format output"; one of its
-      // declarations (`$RenameBookingFromJson`, an 81-column line) is not what
-      // `dart format` produces. The generator's contract is dart-formatted
-      // output, so the comparison is with the reference after a format pass —
-      // which changes exactly that one declaration and nothing else.
-      final reference = File(
-        p.join(fixtures, 'booking_view.dw.dart'),
-      ).readAsStringSync();
-      final formattedReference = DartFormatter(
-        languageVersion: Version(3, 11, 0),
-      ).format(reference);
+      // The reference is hand-written in `dart format` output, so the
+      // generator must reproduce it byte for byte.
       expect(
-        project.readFile('app_shared/lib/src/booking_view.dw.dart'),
-        formattedReference,
+        project.readFile('app_shared/lib/src/club_booking.dw.dart'),
+        File(p.join(fixtures, 'club_booking.dw.dart')).readAsStringSync(),
       );
       expect(await project.analyze('app_shared'), isNull);
     });

@@ -13,7 +13,7 @@ import '../diagnostic.dart';
 import '../emit/source_text.dart';
 import 'entity_model.dart';
 
-/// Reads one concrete entity class (CONTRACTS §2.2) into an [EntityClass].
+/// Reads one concrete row class (CONTRACTS §2.2, R2.1) into an [EntityClass].
 final class EntityReader {
   EntityReader(this.names, this.diagnostics)
     : types = WireTypeReader(names, forEntity: true);
@@ -35,10 +35,27 @@ final class EntityReader {
         DwDiagnostic.at(
           element,
           element.typeParameters.isNotEmpty
-              ? '`$name` is generic; an entity class cannot have type '
+              ? '`$name` is generic; a row class cannot have type '
                     'parameters'
-              : '`$name` must extend DwEntity; implementing or mixing it in '
+              : '`$name` must extend DwTableRow; implementing or mixing it in '
                     'is not supported',
+        ),
+      );
+      return null;
+    }
+
+    final entityName = entityNameOf(name);
+    if (entityName == null) {
+      final suggested = name == rowSuffix
+          ? 'Some$rowSuffix'
+          : '$name$rowSuffix';
+      diagnostics.add(
+        DwDiagnostic.at(
+          element,
+          'row class `$name` must be named `<Entity>$rowSuffix` (`$suggested`): '
+          'its table class is `<Entity>Table` and its repository getter '
+          '`db.<entities>`, and a row never shares a name with the data object '
+          'clients see',
         ),
       );
       return null;
@@ -50,8 +67,8 @@ final class EntityReader {
       diagnostics.add(
         DwDiagnostic.at(
           element,
-          'entity `$name` needs its table: annotate it with '
-          "`@DwTable('${snakeCase(name)}')`",
+          'row class `$name` needs its table: annotate it with '
+          "`@DwTable('${snakeCase(entityName)}')`",
         ),
       );
       return null;
@@ -62,8 +79,8 @@ final class EntityReader {
       diagnostics.add(
         DwDiagnostic.at(
           element,
-          'entity `$name` must declare its table: add '
-          '`static const table = ${name}Table();`',
+          'row class `$name` must declare its table: add '
+          '`static const table = ${entityName}Table();`',
         ),
       );
       valid = false;
@@ -93,7 +110,7 @@ final class EntityReader {
           diagnostics.add(
             DwDiagnostic.at(
               location,
-              'the id of entity `$name` must be `int?` (a bigserial key, '
+              'the id of row class `$name` must be `int?` (a bigserial key, '
               'null before insert), not `${type.getDisplayString()}`',
             ),
           );
@@ -115,7 +132,7 @@ final class EntityReader {
         diagnostics.add(
           DwDiagnostic.at(
             location,
-            'field `$fieldName` of entity `$name` would shadow '
+            'field `$fieldName` of row class `$name` would shadow '
             '`DwTableDef.$fieldName` in the generated table class; rename the '
             "field (the column can keep its name with `@DwColumnName('...')`)",
           ),
@@ -131,7 +148,7 @@ final class EntityReader {
         diagnostics.add(
           DwDiagnostic.at(
             location,
-            'field `$fieldName` of entity `$name` cannot be a column: '
+            'field `$fieldName` of row class `$name` cannot be a column: '
             '${problem.reason}',
           ),
         );
@@ -143,7 +160,7 @@ final class EntityReader {
         diagnostics.add(
           DwDiagnostic.at(
             location,
-            'field `$fieldName` of entity `$name` has a type this library does '
+            'field `$fieldName` of row class `$name` has a type this library does '
             'not import, and the generated part can only use the library\'s '
             'imports',
           ),
@@ -164,7 +181,7 @@ final class EntityReader {
         diagnostics.add(
           DwDiagnostic.at(
             location,
-            'fields `$previous` and `$fieldName` of entity `$name` both map to '
+            'fields `$previous` and `$fieldName` of row class `$name` both map to '
             'column `$sqlName`',
           ),
         );
@@ -191,7 +208,7 @@ final class EntityReader {
           diagnostics.add(
             DwDiagnostic.at(
               location,
-              'field `$fieldName` of entity `$name` references another table, '
+              'field `$fieldName` of row class `$name` references another table, '
               'so it holds that row\'s id and must be `int` or `int?`',
             ),
           );
@@ -237,7 +254,7 @@ final class EntityReader {
       diagnostics.add(
         DwDiagnostic.at(
           element,
-          'entity `$name` must declare `@override final int? id;` with a '
+          'row class `$name` must declare `@override final int? id;` with a '
           'named constructor parameter `this.id`',
         ),
       );
@@ -257,8 +274,8 @@ final class EntityReader {
           DwDiagnostic.at(
             element,
             fieldNames.isEmpty
-                ? 'an index of entity `$name` names no fields'
-                : 'an index of entity `$name` names `${unknown.first}`, which '
+                ? 'an index of row class `$name` names no fields'
+                : 'an index of row class `$name` names `${unknown.first}`, which '
                       'is not a column field of `$name` (indexes name Dart '
                       'fields, not SQL columns)',
           ),
@@ -275,7 +292,7 @@ final class EntityReader {
         diagnostics.add(
           DwDiagnostic.at(
             element,
-            'entity `$name` declares index `$indexName` twice',
+            'row class `$name` declares index `$indexName` twice',
           ),
         );
         valid = false;
@@ -360,7 +377,7 @@ final class EntityReader {
       type != null;
       type = type.element.supertype
     ) {
-      if (DwFramework.isOrmClass(type.element, 'DwEntity')) return true;
+      if (DwFramework.isOrmClass(type.element, 'DwTableRow')) return true;
     }
     return false;
   }

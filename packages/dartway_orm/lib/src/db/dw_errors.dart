@@ -60,8 +60,8 @@ final class DwSerializationFailure extends DwDatabaseException {
 }
 
 /// `update` addressed a row that does not exist.
-final class DwEntityNotFound extends DwDatabaseException {
-  DwEntityNotFound(this.table, this.id)
+final class DwRowNotFound extends DwDatabaseException {
+  DwRowNotFound(this.table, this.id)
     : super(null, 'no row in "$table" with id $id');
 
   final String table;
@@ -69,7 +69,7 @@ final class DwEntityNotFound extends DwDatabaseException {
 }
 
 /// A value read from the database does not fit the Dart type expecting it —
-/// the schema and the entity have drifted apart.
+/// the schema and the row class have drifted apart.
 final class DwDecodeException extends DwDatabaseException {
   DwDecodeException(String message) : super(null, message);
 }

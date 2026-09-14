@@ -6,7 +6,7 @@ import 'dw_ddl.dart';
 import 'dw_schema.dart';
 
 /// What a live database has, as a [DwSchema], plus everything in it that
-/// entities cannot declare.
+/// row classes cannot declare.
 final class DwIntrospection {
   const DwIntrospection(this.schema, this.unmodelled);
 

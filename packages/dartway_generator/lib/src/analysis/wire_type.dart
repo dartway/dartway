@@ -123,7 +123,7 @@ final class WireTypeReader {
       case DtoWire():
         throw UnsupportedType(
           '`$display` is a DTO, which is not stored; store its fields as '
-          'columns (or ids of other entities) and map it in the handler',
+          'columns (or ids of other rows) and map it in the handler',
         );
       case PatchWire():
         throw UnsupportedType(

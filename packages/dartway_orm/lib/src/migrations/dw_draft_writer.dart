@@ -139,7 +139,7 @@ abstract final class DwDraftWriter {
         decide(
           'drop table ${schema.name}',
           [
-            'The entities no longer declare it. Dropping loses its rows; if it was',
+            'The row classes no longer declare it. Dropping loses its rows; if it was',
             'renamed, rename it with m.sql(\'ALTER TABLE ... RENAME TO ...\') instead.',
           ],
           ['dropTable(${_string(schema.name)})'],
@@ -166,7 +166,7 @@ abstract final class DwDraftWriter {
         decide(
           'drop column ${change.table}.${column.name}',
           [
-            'The entities no longer declare it. Dropping loses its values; if it',
+            'The row classes no longer declare it. Dropping loses its values; if it',
             'was renamed, rename it (and delete the matching add below).',
           ],
           [

@@ -1,26 +1,31 @@
-import '../protocol/dw_protocol.dart';
-import 'dw_dto.dart';
+part of 'dw_server_call.dart';
 
 /// A change. Its fields are its input; [R] is what the server answers with.
 ///
 /// The client sends every command with an idempotency key it generates once
-/// per intent; the server stores the outcome per key and answers a repeat with
-/// the stored outcome instead of executing again. A command therefore survives
-/// a lost response without creating a second row (#105).
+/// per intent (`Dw-Idempotency-Key`); the server stores the outcome per key and
+/// answers a repeat with the stored outcome instead of executing again. A
+/// command therefore survives a lost response without creating a second row
+/// (#105).
 ///
-/// A command's result is a single value: a DTO, a JSON primitive or `null`
-/// (`DwCommand<void>`). Collections are wrapped in a DTO.
+/// **The result is one value, untagged:** a DTO, a JSON primitive (`int`,
+/// `double`, `num`, `String`, `bool`) or `null` — `DwCommand<void>` answers
+/// nothing, and a nullable `R` may answer `null`. The type on the wire is the
+/// command's `R`, so nothing names it: a DTO result is decoded by looking `R`
+/// up in the protocol (a registered DTO class, or its nullable form).
+/// Collections are wrapped in a DTO (D-006): a generic `List<T>` cannot be
+/// decoded from an erased type argument.
 ///
 /// An input never carries a field the server decides — the owner, timestamps,
 /// status, storage keys. The handler derives those from its context.
-abstract class DwCommand<R> extends DwDto {
+abstract class DwCommand<R> extends DwServerCall<R> {
   const DwCommand();
 
-  /// Encodes a result of this command for the wire (server side).
+  @override
   Object? encodeResult(R result, DwProtocol protocol) =>
       protocol.encodeValue(result);
 
-  /// Decodes a result of this command from the wire (client side).
+  @override
   R decodeResult(Object? json, DwProtocol protocol) =>
-      protocol.decodeValue(json) as R;
+      protocol.decodeValue<R>(json);
 }

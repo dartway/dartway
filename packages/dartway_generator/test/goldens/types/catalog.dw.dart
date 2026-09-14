@@ -445,7 +445,7 @@ ListItems $ListItemsFromJson(Map<String, Object?> json) => ListItems(
       : DwJson.decodeMap(json['labels'], (v) => v! as String),
 );
 
-mixin _$FeedItems on DwCursorRequest<Item> {
+mixin _$FeedItems on DwPageRequest<Item> {
   @override
   String get dwTypeName => 'FeedItems';
 
@@ -464,6 +464,92 @@ mixin _$FeedItems on DwCursorRequest<Item> {
 }
 
 FeedItems $FeedItemsFromJson(Map<String, Object?> json) => const FeedItems();
+
+mixin _$ListPinnedItems on DwListRequest<Item> {
+  ListPinnedItems get _self => this as ListPinnedItems;
+
+  @override
+  String get dwTypeName => 'ListPinnedItems';
+
+  @override
+  Map<String, Object?> toJson() => {'pinnedBy': _self.pinnedBy};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ListPinnedItems && other.pinnedBy == _self.pinnedBy;
+
+  @override
+  int get hashCode => Object.hash(ListPinnedItems, _self.pinnedBy);
+
+  @override
+  String toString() => 'ListPinnedItems(pinnedBy: ${_self.pinnedBy})';
+}
+
+ListPinnedItems $ListPinnedItemsFromJson(Map<String, Object?> json) =>
+    ListPinnedItems(pinnedBy: json['pinnedBy']! as String);
+
+mixin _$ItemTable on DwTableRequest<Item> {
+  ItemTable get _self => this as ItemTable;
+
+  @override
+  String get dwTypeName => 'ItemTable';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'page': _self.page,
+    'pageSize': _self.pageSize,
+    if (_self.color != null) 'color': _self.color!.name,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ItemTable &&
+          other.page == _self.page &&
+          other.pageSize == _self.pageSize &&
+          other.color == _self.color;
+
+  @override
+  int get hashCode =>
+      Object.hash(ItemTable, _self.page, _self.pageSize, _self.color);
+
+  @override
+  String toString() =>
+      'ItemTable(page: ${_self.page}, pageSize: ${_self.pageSize}, color: ${_self.color})';
+}
+
+ItemTable $ItemTableFromJson(Map<String, Object?> json) => ItemTable(
+  page: json['page']! as int,
+  pageSize: json['pageSize']! as int,
+  color: json['color'] == null
+      ? null
+      : DwJson.decodeEnum(json['color'], Color.values),
+);
+
+mixin _$ItemHistory on DwWindowRequest<Item> {
+  ItemHistory get _self => this as ItemHistory;
+
+  @override
+  String get dwTypeName => 'ItemHistory';
+
+  @override
+  Map<String, Object?> toJson() => {'itemId': _self.itemId};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ItemHistory && other.itemId == _self.itemId;
+
+  @override
+  int get hashCode => Object.hash(ItemHistory, _self.itemId);
+
+  @override
+  String toString() => 'ItemHistory(itemId: ${_self.itemId})';
+}
+
+ItemHistory $ItemHistoryFromJson(Map<String, Object?> json) =>
+    ItemHistory(itemId: json['itemId']! as int);
 
 mixin _$EditItem on DwCommand<Item> {
   EditItem get _self => this as EditItem;

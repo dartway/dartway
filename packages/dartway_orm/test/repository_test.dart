@@ -13,7 +13,7 @@ void main() {
   final database = useTestDatabase();
   DwDb db() => database().db;
 
-  ClubService service({
+  ClubServiceRow service({
     String title = 'Yoga',
     ClubServiceKind kind = ClubServiceKind.group,
     double? price,
@@ -23,7 +23,7 @@ void main() {
     DateTime? archivedAt,
     Uint8List? cover,
     bool active = true,
-  }) => ClubService(
+  }) => ClubServiceRow(
     title: title,
     kind: kind,
     price: price,
@@ -107,7 +107,7 @@ void main() {
     test('jsonb map, keyword-named columns, unique foreign key', () async {
       final yoga = await db().clubServices.insert(service());
       final setting = await db().appSettings.insert(
-        AppSetting(
+        AppSettingRow(
           key: 'limits',
           value: 'text value',
           limits: {'daily': 3, 'weekly': 10},
@@ -122,17 +122,20 @@ void main() {
       expect(found, setting);
     });
 
-    test('a decoded row that does not fit the entity fails loudly', () async {
-      await db().execute(
-        "INSERT INTO club_service (title, kind, duration, tags, created_at) "
-        "VALUES ('x', 'unknown', 1, '[]', now())",
-      );
-      expect(db().clubServices.find(), throwsA(isA<DwDecodeException>()));
-    });
+    test(
+      'a decoded row that does not fit the row class fails loudly',
+      () async {
+        await db().execute(
+          "INSERT INTO club_service (title, kind, duration, tags, created_at) "
+          "VALUES ('x', 'unknown', 1, '[]', now())",
+        );
+        expect(db().clubServices.find(), throwsA(isA<DwDecodeException>()));
+      },
+    );
   });
 
   group('find', () {
-    late List<ClubService> services;
+    late List<ClubServiceRow> services;
 
     setUp(() async {
       services = await db().clubServices.insertAll([
@@ -349,7 +352,7 @@ void main() {
       final yoga = await db().clubServices.insert(service());
       final sessions = await db().clubSessions.insertAll([
         for (var i = 0; i < 4; i++)
-          ClubSession(
+          ClubSessionRow(
             serviceId: yoga.id!,
             startsAt: DateTime.utc(2026, 1, i + 1),
             capacity: i,
@@ -386,8 +389,8 @@ void main() {
     test('nullable columns in insertAll are SQL NULL', () async {
       final yoga = await db().clubServices.insert(service());
       await db().appSettings.insertAll([
-        AppSetting(key: 'a', value: 'x', updatedAt: DateTime.utc(2026)),
-        AppSetting(
+        AppSettingRow(key: 'a', value: 'x', updatedAt: DateTime.utc(2026)),
+        AppSettingRow(
           key: 'b',
           value: 'y',
           limits: {'n': 1},
@@ -420,7 +423,7 @@ void main() {
 
   group('tryInsert', () {
     test('returns null when the unique key conflicts', () async {
-      final setting = AppSetting(
+      final setting = AppSettingRow(
         key: 'k',
         value: '1',
         updatedAt: DateTime.utc(2026),
@@ -445,7 +448,7 @@ void main() {
 
     test('a multi-column unique index is a conflict target', () async {
       final yoga = await db().clubServices.insert(service());
-      final session = ClubSession(
+      final session = ClubSessionRow(
         serviceId: yoga.id!,
         startsAt: DateTime.utc(2026, 10, 1, 9),
         capacity: 10,
@@ -466,7 +469,7 @@ void main() {
     test(
       'an empty target accepts a conflict on any unique constraint',
       () async {
-        final setting = AppSetting(
+        final setting = AppSettingRow(
           key: 'k',
           value: '1',
           updatedAt: DateTime.utc(2026),
@@ -497,12 +500,12 @@ void main() {
       expect(await db().clubServices.findById(stored.id!), changed);
     });
 
-    test('update of a missing row throws DwEntityNotFound', () async {
+    test('update of a missing row throws DwRowNotFound', () async {
       final ghost = service().copyWith(id: const DwPatch.set(12345));
       await expectLater(
         db().clubServices.update(ghost),
         throwsA(
-          isA<DwEntityNotFound>()
+          isA<DwRowNotFound>()
               .having((e) => e.id, 'id', 12345)
               .having((e) => e.table, 'table', 'club_service'),
         ),
@@ -555,7 +558,7 @@ void main() {
     test('a cascading reference deletes children; set null clears', () async {
       final yoga = await db().clubServices.insert(service());
       final first = await db().clubSessions.insert(
-        ClubSession(
+        ClubSessionRow(
           serviceId: yoga.id!,
           startsAt: DateTime.utc(2026),
           capacity: 1,
@@ -563,7 +566,7 @@ void main() {
       );
       final other = await db().clubServices.insert(service(title: 'other'));
       final second = await db().clubSessions.insert(
-        ClubSession(
+        ClubSessionRow(
           serviceId: other.id!,
           previousSessionId: first.id,
           startsAt: DateTime.utc(2026),
@@ -581,7 +584,7 @@ void main() {
 
   group('errors', () {
     test('a unique violation names its constraint', () async {
-      final setting = AppSetting(
+      final setting = AppSettingRow(
         key: 'dup',
         value: '1',
         updatedAt: DateTime.utc(2026),
@@ -600,7 +603,7 @@ void main() {
     test('a foreign key violation names its constraint', () async {
       await expectLater(
         db().clubSessions.insert(
-          ClubSession(
+          ClubSessionRow(
             serviceId: 404,
             startsAt: DateTime.utc(2026),
             capacity: 1,

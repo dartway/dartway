@@ -1,4 +1,4 @@
-/// Close codes of the app WebSocket.
+/// Close codes of the live WebSocket (`/dw/live`).
 ///
 /// The server closes with them and the client decides by them whether to
 /// reconnect at once, back off, or stop; one declaration keeps the two sides
@@ -11,32 +11,27 @@ abstract final class DwCloseCode {
   /// do about it.
   static const int unsupportedData = 1003;
 
-  /// An inbound message over the server's `maxInboundMessageBytes`. A client
-  /// bug, like [unsupportedData].
+  /// An inbound message over the server's limit. A client bug, like
+  /// [unsupportedData].
   static const int messageTooBig = 1009;
 
-  /// The server failed while authenticating the connection; the reason names
-  /// the incident (`dw.failed:<incident>`). Reconnect.
+  /// The server failed while serving the connection; the reason names the
+  /// incident (`dw.failed:<incident>`). Reconnect.
   static const int internalError = 1011;
 
-  /// A message the server cannot parse as the wire protocol. A client bug:
+  /// A message the server cannot parse as a live message. A client bug:
   /// reconnecting sends it again, so the client backs off.
   static const int protocolError = 4000;
 
-  /// The client speaks another wire version (`?v=` on the upgrade URL). The
-  /// reason names the server's version (`dw.wireVersion:<n>`). Terminal:
-  /// reconnecting cannot help, only another build of the app can.
-  static const int unsupportedVersion = 4001;
+  /// This build cannot talk to this server — the live counterpart of an HTTP
+  /// `426`, since a browser cannot read the status of a refused upgrade. The
+  /// reason is the refusal code (`dw.updateRequired` or
+  /// `dw.protocolUnsupported`). Terminal: reconnecting cannot help, only
+  /// another build of the app can.
+  static const int incompatible = 4026;
 
   /// The client did not read its messages fast enough and the outbound queue
   /// passed its ceiling. Reconnect with backoff: at once would meet the same
   /// backlog.
   static const int slowConsumer = 4008;
-
-  /// More calls waiting for a slot than the server's `maxWaitingCalls`.
-  /// Reconnect with backoff, for the same reason as [slowConsumer].
-  static const int tooManyCalls = 4029;
-
-  /// The reason prefix of [unsupportedVersion].
-  static const String wireVersionReason = 'dw.wireVersion:';
 }

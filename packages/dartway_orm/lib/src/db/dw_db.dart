@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:meta/meta.dart';
 import 'package:postgres/postgres.dart' as pg;
 
-import '../entity/dw_entity.dart';
+import '../entity/dw_table_row.dart';
 import '../entity/dw_table_def.dart';
 import '../query/dw_lock.dart';
 import '../query/dw_repository.dart';
 import 'dw_connection.dart';
 import 'dw_errors.dart';
-import 'dw_row.dart';
+import 'dw_result_row.dart';
 
 /// A handle to run statements: bound to the pool, or to one connection inside
 /// a transaction.
@@ -44,12 +44,12 @@ sealed class DwDb {
   });
 
   /// The typed repository of [table].
-  DwRepository<E, T> repository<E extends DwEntity, T extends DwTableDef<E>>(
+  DwRepository<R, T> repository<R extends DwTableRow, T extends DwTableDef<R>>(
     T table,
   ) => DwRepository.internal(this, table);
 
   /// Runs a statement with `@name` parameters and returns its rows.
-  Future<List<DwRow>> query(
+  Future<List<DwResultRow>> query(
     String sql, {
     Map<String, Object?> params = const {},
   }) async {
@@ -130,13 +130,13 @@ sealed class DwDb {
 
 /// Wraps result rows, sharing one column index across the rows.
 @internal
-List<DwRow> dwRows(pg.Result result) {
+List<DwResultRow> dwRows(pg.Result result) {
   if (result.isEmpty) return const [];
   final index = <String, int>{};
   for (final (position, column) in result.schema.columns.indexed) {
     index[column.columnName ?? '?column?'] = position;
   }
-  return [for (final row in result) DwRow(index, row)];
+  return [for (final row in result) DwResultRow(index, row)];
 }
 
 /// The pool-bound handle: every statement borrows a connection for exactly
