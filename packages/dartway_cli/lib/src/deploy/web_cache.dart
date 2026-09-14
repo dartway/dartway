@@ -154,6 +154,26 @@ class DwNginxLocation {
     expires: _directiveValue(body, _expiresDirective),
   );
 
+  /// The `Cache-Control` value a response served by this block carries, or
+  /// `null` when it adds none — what `dartway dev proxy --web-dir` sends, so a
+  /// build served locally is kept by the browser the way the deployed one is.
+  ///
+  /// An `expires` that revalidates reads as `no-cache`, the header Nginx emits
+  /// for it; a duration is not translated, since `deploy check` refuses one on
+  /// every name a Flutter build emits.
+  String? get cacheControl {
+    final stated = _directiveValue(body, _cacheControlDirective);
+    if (stated != null) return stated;
+    final expires = _directiveValue(body, _expiresDirective);
+    return _reuseOfExpires(expires) == DwCacheReuse.revalidated
+        ? 'no-cache'
+        : null;
+  }
+
+  /// Whether a missing file falls back to another one (`try_files`) rather
+  /// than being answered 404.
+  bool get triesFiles => RegExp(r'(?:^|[;{\s])try_files\s').hasMatch(body);
+
   static final RegExp _cacheControlDirective = RegExp(
     'add_header'
     r'\s+'

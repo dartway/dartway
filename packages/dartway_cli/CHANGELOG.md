@@ -54,6 +54,16 @@
   `doctor` no longer checks a Serverpod CLI; `create` no longer writes a `passwords.yaml`; a
   project needs no `*_client` package to be recognised.
 
+- **`dartway dev` — the web app and the server on one origin, as deployed (D-039).** `dev proxy`
+  serves `http://localhost:8000`: `/dw/*` (the `/dw/live` socket included) and `/health` to the
+  server, everything else to a Flutter web dev server (`--web`) or a build (`--web-dir`, with the
+  `index.html` fallback and the `Cache-Control` of the project's web image `nginx.conf`). `dev web`
+  runs `flutter run -d web-server` compiled against that origin with the proxy in front, and stops
+  both together. The browser's `Host` is passed on as the deployed Nginx passes it, so the live
+  socket's origin check passes without `DW_ALLOWED_ORIGINS`; sockets — the live one and Flutter's
+  hot-reload one — are tunnelled as bytes, close codes included, and responses stream unbuffered.
+  Replaces the proxy each project wrote for itself.
+
 ## 0.10.1
 
 - **The image check builds against the tree it is checking.** A created project resolves from

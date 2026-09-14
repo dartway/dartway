@@ -326,6 +326,53 @@ no longer has anything to do with tests.
 Widget tests in the `*_flutter` package need no database and are not this command's business —
 `flutter test` runs them.
 
+## `dartway dev` — the web app and the server on one origin
+
+```bash
+dartway dev web                                   # from the project root: flutter run + the proxy
+dartway dev web --api http://localhost:8080 -- --profile   # after -- goes to `flutter run`
+
+dartway dev proxy                                 # the origin alone, in front of servers you run
+dartway dev proxy --web http://localhost:5000     # a `flutter run -d web-server --web-port 5000`
+dartway dev proxy --web-dir my_app_flutter/build/web   # a built app instead
+```
+
+The server answers no CORS, on purpose: a deployed web app reaches `/dw/*` and `/health` on its own
+origin, because the front Nginx serves the app and proxies those paths beside it. `flutter run -d
+chrome` breaks that on a laptop — the app is served from a port of its own and every call is
+cross-origin. `dartway dev` restores the deployed shape locally: **one origin,
+`http://localhost:8000` by default**, where `/dw/*` (the `/dw/live` socket included) and `/health`
+go to the server and everything else goes to the web app.
+
+`dev web` runs `flutter run -d web-server` in the `*_flutter` package on a free port, compiled with
+`--dart-define=DW_BACKEND_URL=http://localhost:8000`, starts the proxy in front of it, and prints the
+address to open once Flutter's server is up. **Open that address, not the one Flutter prints.** Hot
+reload works through the proxy — Flutter's own socket is forwarded like any other. Ctrl+C (or `q`)
+stops Flutter and the proxy together. The Flutter command is the project's FVM SDK when one is
+linked (`.fvm/flutter_sdk`), `fvm flutter` when `.fvmrc` pins a version, `flutter` otherwise;
+`--flutter` names another.
+
+`dev proxy` is the same origin without Flutter: point `--web` at a web dev server you run yourself,
+or `--web-dir` at a build. A build is served the way the web image serves it — `index.html` for any
+path that is not a file, and the `Cache-Control` of the project's own `nginx.conf` (the template's
+rules when there is none), with an `ETag` — so what the browser keeps locally is what it keeps after
+a deploy.
+
+**Why no `DW_ALLOWED_ORIGINS` is needed.** The server lets a browser open the live socket when the
+page's `Origin` is the host the request was sent to. Through the proxy the page's origin is
+`http://localhost:8000`, and the proxy passes the browser's `Host: localhost:8000` on unchanged —
+what the deployed Nginx does with `proxy_set_header Host $http_host` — so the two match. A proxy that
+rewrote `Host` to the server's own address would make every browser socket cross-origin.
+`X-Forwarded-For`, `X-Real-IP` and `X-Forwarded-Proto` are added as Nginx adds them. Sockets pass
+through as bytes, so frames and close codes arrive as the server sent them.
+
+Two things to know:
+
+- **`localhost` and `127.0.0.1` are different origins** to a browser. The app is built against the
+  origin the command prints; opened under the other name, its calls are cross-origin again.
+- **The server is started separately**, as usual. Until it listens, the proxy answers `/dw/*` with
+  `502` and says once in the terminal that nothing answers; calls go through as soon as it is up.
+
 ## `dartway deploy` — the server, without a folder of shell scripts
 
 ```bash
