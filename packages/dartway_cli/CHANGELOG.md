@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased — DartWay 1.0
+
+- **BREAKING: `dartway deploy` deploys the 1.0 stack, and nothing of Serverpod is left in it.**
+  One server process configured by its environment alone, behind one front proxy serving three
+  hosts (R2.7): `app` — the Flutter web image, with `/dw/` (the `/dw/live` WebSocket upgrade
+  included) and `/health` proxied to the server on the same origin; `api` — the server for mobile
+  apps and webhooks; and an optional static `site`. Postgres 17, an optional MinIO with its bucket
+  and the CORS rule a browser needs for a presigned PUT, certbot. The Serverpod configuration
+  reader, `passwords.yaml`, the insights and web-server ports, Redis and the migration-output
+  parser are gone.
+
+  `deploy/config.yaml` describes the whole environment — `api_domain`, `app_domain`, `site`,
+  `storage: minio|external` with `storage_domain` — and refuses a key it does not know, so an
+  older config fails naming `web_app_domain` rather than deploying without it. Every problem is
+  reported at once.
+
+- **The secret store is an environment file.** `~/.config/<project>/secrets.env` on the server,
+  `KEY='value'` lines Compose takes literally. Every deploy renders the checkout's `.env` from it
+  and refuses — by key name, never by value — a missing or empty required secret, a malformed
+  line, a duplicate, or a name the compose file sets itself and would silently override.
+  `secret init` generates `DW_DATABASE_PASSWORD` (and the MinIO keys); `set`, `list`, `put-file`,
+  `push` and `pull` keep their shape, the last two against a git-ignored `deploy/secrets.yaml`.
+  Secret files are mounted at `/run/secrets/<name>`.
+
+- **The migration outcome is the server's exit.** The server applies its migrations as it starts
+  and exits non-zero when one fails, so `run` starts the new image *beside* the serving one and
+  waits for `/health`; an exit prints the server's own log and stops the deploy with the previous
+  version still answering. Only then is the server replaced, and waited for.
+
+- **`run` ends by asking from outside**, with the same probes `deploy check` uses: `/health` 200
+  through both hosts, the Flutter `index.html` on the app host with a revalidating cache policy,
+  the cache policy of the build's entry points, `/dw/live` upgrading through both hosts with the
+  server answering on the socket, the site, and the storage preflight from the app's origin.
+  Before the proxy restart it compares every upstream of the rendered configuration and the
+  snippets with the applied stack, runs `nginx -t` inside the running proxy, and after the
+  restart checks the proxy is still running.
+
+- **New local checks**: the server image receives SIGTERM itself (exec-form `ENTRYPOINT`); the web
+  image declares `ARG DW_BACKEND_URL`; a deployed site directory is committed; required secret
+  names are not ones the compose file sets. `.dockerignore` may admit packages by role glob
+  (`!*_server/`), and the template and example ignore files do — they no longer restate the package
+  list. The example's ignore file had admitted a package that no longer exists and kept out the
+  shared one both its images copy.
+
+- **A local proof of the whole deployment**: `dart test -t docker --run-skipped
+  test/deploy_local_stack_test.dart` renders the example's stack in plain-HTTP mode, runs the
+  deploy steps through a local shell, and verifies it — a real sign-in and DTO call through both
+  hosts, a presigned upload through the storage host, a failing candidate that leaves the
+  running server serving, and a graceful stop.
+
+- **`dartway test` passes `DW_DATABASE_*`** (the maintenance database, TLS off) to the suite;
+  `doctor` no longer checks a Serverpod CLI; `create` no longer writes a `passwords.yaml`; a
+  project needs no `*_client` package to be recognised.
+
 ## 0.10.1
 
 - **The image check builds against the tree it is checking.** A created project resolves from

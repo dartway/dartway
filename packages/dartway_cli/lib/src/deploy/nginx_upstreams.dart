@@ -1,7 +1,8 @@
 /// The hosts an Nginx snippet sends traffic to, and which of them a Compose
 /// stack has to declare.
 ///
-/// A snippet under `deploy/nginx.d/` names Compose services as upstreams —
+/// The rendered configuration and every snippet under `deploy/nginx.d/` name
+/// Compose services as upstreams —
 /// `proxy_pass http://minio:9000` — and nothing used to check that those
 /// services are in the stack that was actually applied. Nginx resolves an
 /// upstream once, at start, so the mismatch is not felt until something
@@ -26,8 +27,11 @@ class DwNginxUpstreams {
   /// `upstream name {` — an alias defined in the file itself, not a service.
   static final RegExp _upstreamBlock = RegExp(r'\bupstream\s+([^\s{]+)\s*\{');
 
-  /// `server host:9000;` inside an upstream block.
-  static final RegExp _server = RegExp(r'\bserver\s+([^;\s]+)');
+  /// `server host:9000 weight=5;` inside an upstream block. It has to reach
+  /// its `;` before any `{`, which is what tells it from a `server {` block of
+  /// a whole configuration — read here too, since the deploy checks the
+  /// rendered file alongside the snippets.
+  static final RegExp _server = RegExp(r'\bserver\s+([^;\s{]+)[^;{]*;');
 
   static final RegExp _comment = RegExp(r'#[^\n]*');
 

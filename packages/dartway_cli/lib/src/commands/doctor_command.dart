@@ -4,18 +4,16 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
-import '../project_layout.dart';
 import '../pub_host.dart';
 import '../version_check.dart';
 
 /// Checks that this machine can actually create and run a DartWay project.
 ///
 /// It exists because the first failure a newcomer meets is never DartWay's: it
-/// is a Docker daemon that is not running, a `serverpod_cli` that drifted from
-/// the version the project pins, or a pub cache that is not on PATH. Each of
-/// those surfaces much later — as a connection refused during migrations, as
-/// generated code that compiles and then misbehaves, as `dartway: not found` —
-/// and each is trivially detectable up front.
+/// is a Docker daemon that is not running, or a pub cache that is not on PATH.
+/// Each of those surfaces much later — as a connection refused when the
+/// database is started, as `dartway: not found` — and each is trivially
+/// detectable up front.
 ///
 /// Two of the checks below are here because doctor once passed a machine that
 /// could not get past the first command of the setup brief. A route to the pub
@@ -30,11 +28,6 @@ class DoctorCommand extends Command<int> {
   /// and here in the same change.
   static const _minDartVersion = '3.11.0';
   static const _minFlutterVersion = '3.41.0';
-
-  /// The Serverpod CLI a project expects when nothing better can be read.
-  /// Inside a project the pin is read from the server package instead — the
-  /// generator must match the runtime, and only the project knows its runtime.
-  static const _defaultServerpodCli = '3.4.11';
 
   /// Long enough for a slow but working link, short enough that doctor stays a
   /// command you run without planning for it.
@@ -52,14 +45,12 @@ class DoctorCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final expectedServerpodCli = _expectedServerpodCli();
     final checks = [
       _checkDart(),
       _checkFlutter(),
       _checkGit(),
       await _checkPubHost(),
       _checkDocker(),
-      _checkServerpodCli(expectedServerpodCli),
       _checkPubGlobalBinOnPath(),
     ];
 
@@ -248,38 +239,6 @@ class DoctorCommand extends Command<int> {
     return _Check.ok('Docker', 'daemon responding');
   }
 
-  _Check _checkServerpodCli(String expected) {
-    final result = _run('dart', ['pub', 'global', 'list']);
-    if (result == null) {
-      return _Check.warn(
-        'serverpod_cli',
-        'could not run `dart pub global list`',
-      );
-    }
-    final installed = RegExp(
-      r'^serverpod_cli (\S+)',
-      multiLine: true,
-    ).firstMatch(result.stdout as String)?.group(1);
-    if (installed == null) {
-      return _Check.fail(
-        'serverpod_cli',
-        'not installed  (need exactly $expected)',
-        fix: 'dart pub global activate serverpod_cli $expected',
-      );
-    }
-    if (installed != expected) {
-      return _Check.fail(
-        'serverpod_cli',
-        '$installed does not match the project pin $expected',
-        fix:
-            'dart pub global activate serverpod_cli $expected  '
-            '(the generator writes code for its own version; a drifted CLI '
-            'produces a protocol that compiles and then misbehaves)',
-      );
-    }
-    return _Check.ok('serverpod_cli', '$installed  (matches the project pin)');
-  }
-
   /// `dart pub global activate` puts executables in a directory that is not on
   /// PATH by default on a fresh machine — the first symptom being
   /// `dartway: command not found` right after a successful install.
@@ -318,25 +277,6 @@ class DoctorCommand extends Command<int> {
     final home = Platform.environment['HOME'];
     if (home == null) return null;
     return p.normalize(p.join(home, '.pub-cache', 'bin'));
-  }
-
-  /// The Serverpod version the current project pins, when run inside one.
-  String _expectedServerpodCli() {
-    try {
-      final layout = ProjectLayout.detect(Directory.current);
-      final pubspec = File(
-        p.join(Directory.current.path, layout.serverPackage, 'pubspec.yaml'),
-      );
-      if (!pubspec.existsSync()) return _defaultServerpodCli;
-      final pinned = RegExp(
-        r'^\s+serverpod:\s*(\d+\.\d+\.\d+)\s*$',
-        multiLine: true,
-      ).firstMatch(pubspec.readAsStringSync())?.group(1);
-      return pinned ?? _defaultServerpodCli;
-    } on StateError {
-      // Not inside a project — the default pin is the best answer available.
-      return _defaultServerpodCli;
-    }
   }
 
   /// Runs a command, returning null when the executable is not on PATH.

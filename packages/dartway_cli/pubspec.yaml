@@ -1,10 +1,10 @@
 name: dartway_cli
-description: "DartWay command-line tool: print the agent setup brief, check prerequisites, create projects from the canonical template, install the AI toolkit, run convention checks."
+description: "DartWay command-line tool: print the agent setup brief, check prerequisites, create projects from the canonical template, install the AI toolkit, run convention checks, deploy."
 version: 0.10.1
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
-topics: [dartway, cli, serverpod, flutter, fullstack]
+topics: [dartway, cli, flutter, fullstack, deploy]
 resolution: workspace
 
 environment:
@@ -19,4 +19,7 @@ dependencies:
   yaml: ^3.1.2
 
 dev_dependencies:
+  # The local stack proof signs a presigned S3 upload the way the framework
+  # does, to prove the rendered storage host lets one through.
+  crypto: ^3.0.0
   test: ^1.25.0

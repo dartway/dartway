@@ -26,9 +26,9 @@ If `dartway` is not on PATH, every command below also works as:
 
     dartway doctor
 
-It reports Dart, Flutter, git, a reachable pub host, a running Docker daemon and the
-Serverpod CLI pin, and prints the exact fix for whatever is missing. Ask the human to
-install or start what it names.
+It reports Dart, Flutter, git, a reachable pub host, a running Docker daemon and whether
+globally activated executables are on PATH, and prints the exact fix for whatever is
+missing. Ask the human to install or start what it names.
 
 **Do not work around a stopped Docker** — the database comes from it, and there is no
 second path. Docker Desktop cannot be installed unattended; that one is the human's job.

@@ -2,12 +2,11 @@ import 'dart:io';
 
 import 'package:dartway_cli/src/checker/dw_check_type.dart';
 import 'package:dartway_cli/src/deploy/deploy_check.dart';
-import 'package:dartway_cli/src/deploy/deploy_target.dart';
-import 'package:dartway_cli/src/deploy/remote_checks.dart';
-import 'package:dartway_cli/src/deploy/serverpod_config.dart';
 import 'package:dartway_cli/src/deploy/web_cache.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+
+import 'support/deploy_fixtures.dart';
 
 /// The configuration the template ships, and the two ways of getting it wrong
 /// that this whole file exists for: a rule that says "immutable" over a name a
@@ -338,41 +337,8 @@ EXPOSE 80
       (c) => c.id == 'web-cache-policy',
     );
 
-    DwDeployContext contextIn(Directory root) => DwDeployContext(
-      projectRoot: root,
-      serverPackage: 'shop_server',
-      flutterPackage: 'shop_flutter',
-      target: DwDeployTarget(
-        environment: 'staging',
-        host: '203.0.113.10',
-        sshUser: 'root',
-        deployUser: 'deployer',
-        os: 'ubuntu',
-        repo: 'git@github.com:acme/shop.git',
-        branch: 'master',
-        sslEmail: 'ops@example.com',
-        webAppDomain: 'app.example.com',
-      ),
-      serverpod: DwServerpodConfig(
-        environment: 'staging',
-        relativePath: 'shop_server/config/staging.yaml',
-        apiServer: DwServerEndpoint(
-          name: 'apiServer',
-          port: 8080,
-          publicHost: 'api.example.com',
-          publicPort: 443,
-          publicScheme: 'https',
-        ),
-        insightsServer: null,
-        webServer: null,
-        databaseHost: 'postgres',
-        databasePort: 5432,
-        databaseName: 'shop',
-        databaseUser: 'shop',
-        redisEnabled: false,
-        redisHost: null,
-      ),
-    );
+    DwDeployContext contextIn(Directory root) =>
+        DwDeployContext(projectRoot: root, stack: stackFrom());
 
     void writeWebImage(String configuration) {
       File(p.join(root.path, 'shop_flutter', 'nginx.conf'))
@@ -417,27 +383,10 @@ EXPOSE 80
 
     // Reading configuration text can miss things a running server would show —
     // an include outside the build context, a header a front proxy adds — so
-    // this one warns and `web-cache-headers`, which observed the response,
+    // this one warns, and the outside check, which observes the response,
     // errors.
     test('warns rather than blocking a deploy', () {
       expect(check.severity, DwCheckSeverity.warning);
-      expect(
-        dwRemoteDeployChecks
-            .firstWhere((c) => c.id == 'web-cache-headers')
-            .severity,
-        DwCheckSeverity.error,
-      );
-    });
-
-    // The header check asks the site, not the server, so it needs no SSH — and
-    // must still run when the SSH checks have failed.
-    test('the deployed site is asked over HTTP, not over SSH', () {
-      expect(
-        dwRemoteDeployChecks
-            .firstWhere((c) => c.id == 'web-cache-headers')
-            .requiresSsh,
-        isFalse,
-      );
     });
   });
 
@@ -455,13 +404,17 @@ EXPOSE 80
       ),
     );
 
-    test('revalidates every entry point a build overwrites', () {
-      final policies = dwEntryPointPolicies(shipped.readAsStringSync());
-      final notRevalidated = policies.entries
-          .where((entry) => entry.value != DwCacheReuse.revalidated)
-          .map((entry) => '${entry.key} -> ${entry.value.name}')
-          .toList();
-      expect(notRevalidated, isEmpty);
-    }, skip: shipped.existsSync() ? null : 'not running inside the monorepo');
+    test(
+      'revalidates every entry point a build overwrites',
+      () {
+        final policies = dwEntryPointPolicies(shipped.readAsStringSync());
+        final notRevalidated = policies.entries
+            .where((entry) => entry.value != DwCacheReuse.revalidated)
+            .map((entry) => '${entry.key} -> ${entry.value.name}')
+            .toList();
+        expect(notRevalidated, isEmpty);
+      },
+      skip: shipped.existsSync() ? null : 'not running inside the monorepo',
+    );
   });
 }

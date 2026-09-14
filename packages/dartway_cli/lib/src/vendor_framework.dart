@@ -32,7 +32,9 @@ List<String> vendorFramework({
 }) {
   final packagesDir = Directory(p.join(monorepo.path, 'packages'));
   if (!packagesDir.existsSync()) {
-    throw ArgumentError('No packages/ in ${monorepo.path} — is this the monorepo?');
+    throw ArgumentError(
+      'No packages/ in ${monorepo.path} — is this the monorepo?',
+    );
   }
 
   final vendored = _copyPackages(packagesDir, project);

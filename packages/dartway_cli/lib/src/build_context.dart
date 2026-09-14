@@ -71,7 +71,12 @@ BuildContextReads readsOf(File dockerfile) {
   return (wholeContext: wholeContext, directories: directories);
 }
 
-/// Top-level directories a `.dockerignore` lets back into the context.
+/// Top-level directory patterns a `.dockerignore` lets back into the context:
+/// names (`app`) or globs (`*_server`), as the file writes them.
+///
+/// A glob is how an ignore file avoids restating the package list at all —
+/// `!*_server/` admits the server package whatever the project is called, so
+/// the file has nothing to update when a package is added or renamed.
 ///
 /// Returns null when the file is absent or does not deny by default — then
 /// everything is in the context already and there is nothing to admit.
@@ -84,11 +89,28 @@ Set<String>? admittedBy(File ignoreFile) {
     final line = raw.trim();
     if (line.isEmpty || line.startsWith('#')) continue;
     if (line == '**' || line == '*') deniesEverything = true;
-    if (RegExp(r'^!([a-z0-9_]+)/').firstMatch(line) case final match?) {
+    if (RegExp(r'^!([a-z0-9_*?]+)/').firstMatch(line) case final match?) {
       admitted.add(match.group(1)!);
     }
   }
   return deniesEverything ? admitted : null;
+}
+
+/// Whether [patterns], as [admittedBy] read them, admit [directory].
+///
+/// `*` and `?` as `.dockerignore` reads them within one path segment.
+bool admits(Set<String> patterns, String directory) {
+  for (final pattern in patterns) {
+    final regex = RegExp(
+      '^${pattern.split('').map((c) => switch (c) {
+        '*' => '[^/]*',
+        '?' => '[^/]',
+        _ => RegExp.escape(c),
+      }).join()}\$',
+    );
+    if (regex.hasMatch(directory)) return true;
+  }
+  return false;
 }
 
 /// Sibling packages [pubspec] depends on by path, by directory name.
@@ -160,7 +182,9 @@ List<String> buildContextProblems({
 
     if (admitted != null) {
       final wanted = reads.wholeContext ? needed : reads.directories;
-      final excluded = (wanted.difference(admitted)).toList()..sort();
+      final excluded =
+          wanted.where((directory) => !admits(admitted, directory)).toList()
+            ..sort();
       if (excluded.isNotEmpty) {
         problems.add(
           '.dockerignore keeps ${excluded.join(', ')} out of the '

@@ -62,10 +62,10 @@ void main() {
   test('one commit across every package says nothing', () {
     writeLock('my_flutter', [
       gitEntry('dartway_core_flutter', resolvedRef: 'a' * 40),
-      gitEntry('dartway_serverpod_core_flutter', resolvedRef: 'a' * 40),
+      gitEntry('dartway_core_shared', resolvedRef: 'a' * 40),
     ]);
     writeLock('my_server', [
-      gitEntry('dartway_serverpod_core_server', resolvedRef: 'a' * 40),
+      gitEntry('dartway_core_server', resolvedRef: 'a' * 40),
     ]);
 
     expect(findings(), isEmpty);
@@ -76,10 +76,7 @@ void main() {
       gitEntry('dartway_core_flutter', resolvedRef: 'abcdef1${'0' * 33}'),
     ]);
     writeLock('my_server', [
-      gitEntry(
-        'dartway_serverpod_core_server',
-        resolvedRef: '9876543${'0' * 33}',
-      ),
+      gitEntry('dartway_core_server', resolvedRef: '9876543${'0' * 33}'),
     ]);
 
     final reported = findings();
@@ -88,10 +85,7 @@ void main() {
     expect(reported.single, contains('abcdef1'));
     expect(reported.single, contains('9876543'));
     expect(reported.single, contains('dartway_core_flutter in my_flutter'));
-    expect(
-      reported.single,
-      contains('dartway_serverpod_core_server in my_server'),
-    );
+    expect(reported.single, contains('dartway_core_server in my_server'));
     // The fix is a command, and a command has to be run somewhere.
     expect(reported.single, contains('my_flutter, my_server'));
   });

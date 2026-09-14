@@ -1,162 +1,647 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
 import 'deploy_target.dart';
-import 'serverpod_config.dart';
-import 'templates.dart';
+import 'stack.dart';
 
-/// Renders the infrastructure files a deployment needs.
+/// Renders the two infrastructure files of a deployment: the compose file and
+/// the front proxy's configuration.
 ///
-/// Values come from the Serverpod configuration wherever Serverpod has an
-/// opinion, so a domain or port exists in exactly one place.
-class DwInfraRenderer {
-  DwInfraRenderer({
-    required this.projectRoot,
-    required this.target,
-    required this.serverpod,
-    required this.serverPackage,
-    required this.flutterPackage,
+/// Built in code rather than substituted into a text template, because the
+/// stack has optional parts — a site, a storage, TLS or not — and a template
+/// with conditional sections is a second language nobody tests. The output is
+/// still plain text meant to be read on the server while debugging, so it is
+/// laid out and commented as if written by hand.
+///
+/// A project changes it without forking it: `deploy/compose.override.yml` is
+/// merged by Compose itself, and `deploy/nginx.d/{http,api,app}/*.conf` are
+/// included by the proxy.
+class DwStackRenderer {
+  DwStackRenderer({
+    required this.stack,
+    this.projectRoot,
+    this.buildContext = '.',
   });
 
-  final Directory projectRoot;
-  final DwDeployTarget target;
-  final DwServerpodConfig serverpod;
-  final String serverPackage;
-  final String flutterPackage;
+  final DwStack stack;
 
-  /// Compose pulls base images through this prefix when a mirror is set.
-  String get _registryPrefix {
-    final mirror = target.registryMirror;
-    return mirror == null ? '' : '$mirror/';
-  }
+  /// The working copy, for the optional project files. Null when rendering
+  /// for a project that is not on this machine.
+  final Directory? projectRoot;
 
-  Map<DwTemplateToken, String> get _values => {
-    DwTemplateToken.serverpodEnv: target.environment,
-    DwTemplateToken.serverPackage: serverPackage,
-    DwTemplateToken.flutterPackage: flutterPackage,
-    DwTemplateToken.runtimeConfigDir: target.runtimeConfigDir,
-    DwTemplateToken.databaseName: serverpod.databaseName ?? '',
-    DwTemplateToken.databaseUser: serverpod.databaseUser ?? '',
-    DwTemplateToken.apiPort: '${serverpod.apiServer.port ?? 8080}',
-    DwTemplateToken.insightsPort: '${serverpod.insightsServer?.port ?? 8081}',
-    DwTemplateToken.webServerPort: '${serverpod.webServer?.port ?? 8082}',
-    DwTemplateToken.apiDomain: serverpod.apiServer.publicHost ?? '',
-    DwTemplateToken.insightsDomain: serverpod.insightsServer?.publicHost ?? '',
-    DwTemplateToken.webServerDomain: serverpod.webServer?.publicHost ?? '',
-    DwTemplateToken.webAppDomain: target.webAppDomain,
-    // One certificate covers every domain of the environment; it is named
-    // after the API host, which is the one guaranteed to exist.
-    DwTemplateToken.certName: serverpod.apiServer.publicHost ?? '',
-    DwTemplateToken.registryPrefix: _registryPrefix,
-    DwTemplateToken.secretFileMounts: secretFileMounts,
+  /// The build context and site root as the compose file names them. `.` on a
+  /// server, where the compose file sits in the checkout root; an absolute
+  /// path when the stack is rendered somewhere else, as the local proof does.
+  final String buildContext;
+
+  DwDeployTarget get _target => stack.target;
+
+  String get _mirror => switch (_target.registryMirror) {
+    final mirror? => '$mirror/',
+    null => '',
   };
 
-  /// One read-only mount per file declared under `requires.files`.
-  ///
-  /// Appended to the `passwords.yaml` line rather than given a line of its
-  /// own, so a deployment declaring no files renders exactly the compose file
-  /// it rendered before.
-  String get secretFileMounts {
-    const indent = '\n      - ';
-    return [
-      for (final name in target.requiredSecretFiles)
-        '$indent${target.runtimeConfigDir}/${_mountable(name)}'
-            ':$dwContainerConfigDir/$name:ro',
-    ].join();
-  }
+  bool get _tls => stack.front is DwTlsFront;
 
-  /// A declared file is mounted by name, so the name has to be one.
-  ///
-  /// The store is flat — `secret put-file` writes a basename into it — and a
-  /// bind mount names one path on each side. A pattern would render a mount
-  /// Docker takes literally, creating a directory called `*.json` inside the
-  /// container: the same silent failure one step further along.
-  String _mountable(String name) {
-    if (name.contains('*') || name.contains('?') || name.contains('/')) {
-      throw StateError(
-        'requires.files entry "$name" is not a file name. Each entry names one '
-        'file in the runtime store, and that file is what gets mounted into '
-        'the container; a pattern or a path cannot be.',
-      );
-    }
-    return name;
-  }
+  /// A path inside the build context, as a bind-mount source. Relative ones
+  /// keep their `./`: Compose reads a bare `app_site/build:/srv/site` as a
+  /// named volume and refuses the whole project.
+  String _context(String relative) => buildContext == '.'
+      ? './$relative'
+      : p.posix.join(buildContext, relative);
 
-  /// Replaces every token and refuses to return text that still holds one.
+  /// A YAML scalar that means exactly [value]: a JSON string is a valid YAML
+  /// double-quoted scalar, and quoting everything spares the reader every rule
+  /// about which bare words YAML turns into booleans.
+  static String _q(String value) => jsonEncode(value);
+
+  /// A Compose interpolation that refuses to render without its value.
   ///
-  /// A leftover `__TOKEN__` reaching a server produces an error far from its
-  /// cause — a container that will not start, or an Nginx that serves the
-  /// wrong host.
-  String _render(String template) {
-    var text = template;
-    for (final entry in _values.entries) {
-      text = text.replaceAll(entry.key.placeholder, entry.value);
-    }
-    final leftover = RegExp(r'__[A-Z_]+__').firstMatch(text);
-    if (leftover != null) {
-      throw StateError(
-        'Template still holds ${leftover.group(0)} after rendering. '
-        'Every placeholder must have a value.',
-      );
-    }
-    return text;
-  }
+  /// `:?` turns a missing secret into an error naming it on every Compose
+  /// command, instead of a Postgres initialised with an empty password.
+  static String _secret(String key) =>
+      '\${$key:?$key is missing from ${DwStack.envFile} - '
+      'dartway deploy renders it from the secret store}';
 
   String get composeFile {
-    final buffer = StringBuffer(dwComposeTemplate);
-    if (serverpod.managesRedis) {
-      // Appended rather than always present: an unused Redis container is a
-      // service to monitor, restart and explain for no reason.
-      final marker = '\nvolumes:';
-      final text = buffer.toString();
-      final withRedis = text.replaceFirst(
-        marker,
-        '${dwComposeRedisService.trimRight()}\n$marker',
-      );
-      return _render(withRedis);
+    final minio = _target.storage == DwStorageMode.minio;
+    final site = _target.site;
+    final buffer = StringBuffer()
+      ..writeln(
+        '# Rendered by "dartway deploy setup" from deploy/config.yaml '
+        '[${_target.environment}].',
+      )
+      ..writeln(
+        '# Do not edit: project additions belong in '
+        'deploy/compose.override.yml, which',
+      )
+      ..writeln('# every deploy merges over this file.')
+      ..writeln()
+      ..writeln('services:');
+
+    // --- postgres
+    buffer
+      ..writeln('  ${DwStack.postgresService}:')
+      ..writeln('    image: ${_q('$_mirror${DwStack.postgresImage}')}')
+      ..writeln('    restart: unless-stopped')
+      ..writeln('    environment:')
+      ..writeln('      POSTGRES_DB: ${_q(stack.databaseName)}')
+      ..writeln('      POSTGRES_USER: ${_q(stack.databaseName)}')
+      ..writeln(
+        '      POSTGRES_PASSWORD: ${_q(_secret(DwStack.databasePasswordKey))}',
+      )
+      ..writeln('    volumes:')
+      ..writeln('      - ${_q('postgres_data:/var/lib/postgresql/data')}')
+      ..writeln('    healthcheck:')
+      ..writeln(
+        '      test: ["CMD-SHELL", '
+        '${_q('pg_isready -U ${stack.databaseName} -d ${stack.databaseName}')}]',
+      )
+      ..writeln('      interval: 5s')
+      ..writeln('      timeout: 5s')
+      ..writeln('      retries: 30')
+      ..writeln();
+
+    // --- server
+    buffer
+      ..writeln('  ${DwStack.serverService}:')
+      ..writeln('    build:')
+      ..writeln('      context: ${_q(buildContext)}')
+      ..writeln('      dockerfile: ${_q('${stack.serverPackage}/Dockerfile')}')
+      ..writeln('    restart: unless-stopped')
+      ..writeln(
+        '    # Secrets, rendered from the secret store by every deploy. The '
+        'derived',
+      )
+      ..writeln(
+        '    # values below win over a key of the same name there, which is '
+        'why the',
+      )
+      ..writeln('    # store refuses those names.')
+      ..writeln('    env_file:')
+      ..writeln('      - ${_q(DwStack.envFile)}')
+      ..writeln('    environment:');
+    for (final MapEntry(:key, :value) in stack.serverEnvironment.entries) {
+      buffer.writeln('      $key: ${_q(value)}');
     }
-    return _render(buffer.toString());
+    buffer
+      ..writeln('    expose:')
+      ..writeln('      - ${_q('${DwStack.serverPort}')}')
+      ..writeln(
+        '    # SIGTERM is a graceful stop: calls in flight are answered, live '
+        'sockets',
+      )
+      ..writeln(
+        '    # closed, jobs finished — each bounded by the server\'s stop '
+        'timeout.',
+      )
+      ..writeln('    stop_grace_period: 45s')
+      ..writeln('    healthcheck:')
+      ..writeln(
+        '      # 200 once migrated and serving, 503 while the database is '
+        'unreachable.',
+      )
+      ..writeln(
+        '      test: ["CMD", "wget", "-q", "-O", "/dev/null", '
+        '${_q('http://127.0.0.1:${DwStack.serverPort}/health')}]',
+      )
+      ..writeln('      interval: 5s')
+      ..writeln('      timeout: 5s')
+      ..writeln('      retries: 3')
+      ..writeln(
+        '      # Migrations run before the port opens; a long one is not a '
+        'failure.',
+      )
+      ..writeln('      start_period: 600s')
+      ..writeln('      start_interval: 2s');
+    final files = _target.requiredSecretFiles;
+    if (files.isNotEmpty) {
+      buffer
+        ..writeln(
+          '    # Every file declared under requires.files, read-only. A file '
+          'delivered to',
+        )
+        ..writeln(
+          '    # the server and not mounted here is a file the application '
+          'does not have.',
+        )
+        ..writeln('    volumes:');
+      for (final name in files) {
+        if (!dwIsSecretFileName(name)) {
+          throw StateError(
+            'requires.files entry "$name" is not a file name and cannot be '
+            'mounted.',
+          );
+        }
+        buffer.writeln(
+          '      - ${_q('${_target.runtimeConfigDir}/$name:'
+          '${DwStack.secretFilesDir}/$name:ro')}',
+        );
+      }
+    }
+    buffer
+      ..writeln('    depends_on:')
+      ..writeln('      ${DwStack.postgresService}:')
+      ..writeln('        condition: service_healthy');
+    if (minio) {
+      buffer
+        ..writeln('      ${DwStack.minioInitService}:')
+        ..writeln('        condition: service_completed_successfully');
+    }
+    buffer.writeln();
+
+    // --- web
+    buffer
+      ..writeln('  ${DwStack.webService}:')
+      ..writeln('    build:')
+      ..writeln('      context: ${_q(buildContext)}')
+      ..writeln('      dockerfile: ${_q('${stack.flutterPackage}/Dockerfile')}')
+      ..writeln('      args:')
+      ..writeln(
+        '        # The app calls its own origin: /dw/ and /health on it '
+        'reach the server.',
+      )
+      ..writeln('        DW_BACKEND_URL: ${_q(stack.appOrigin)}')
+      ..writeln('    restart: unless-stopped')
+      ..writeln('    expose:')
+      ..writeln('      - "80"')
+      ..writeln('    healthcheck:')
+      ..writeln(
+        '      test: ["CMD", "wget", "-q", "-O", "/dev/null", '
+        '"http://127.0.0.1/"]',
+      )
+      ..writeln('      interval: 10s')
+      ..writeln('      timeout: 5s')
+      ..writeln('      retries: 3')
+      ..writeln();
+
+    // --- minio
+    if (minio) {
+      buffer
+        ..writeln('  ${DwStack.minioService}:')
+        ..writeln('    image: ${_q('$_mirror${DwStack.minioImage}')}')
+        ..writeln('    restart: unless-stopped')
+        ..writeln('    command: ["server", "/data"]')
+        ..writeln('    environment:')
+        ..writeln(
+          '      MINIO_ROOT_USER: ${_q(_secret(DwStack.storageAccessKey))}',
+        )
+        ..writeln(
+          '      MINIO_ROOT_PASSWORD: ${_q(_secret(DwStack.storageSecretKey))}',
+        )
+        ..writeln(
+          '      # The CORS rule a browser needs for a presigned PUT from the '
+          'app. MinIO\'s',
+        )
+        ..writeln(
+          '      # community edition does not implement bucket CORS '
+          '(PutBucketCors answers',
+        )
+        ..writeln(
+          '      # NotImplemented), so it is set here, for the one bucket this '
+          'server holds.',
+        )
+        ..writeln('      MINIO_API_CORS_ALLOW_ORIGIN: ${_q(stack.appOrigin)}')
+        ..writeln('      MINIO_BROWSER: "off"')
+        ..writeln('    volumes:')
+        ..writeln('      - "minio_data:/data"')
+        ..writeln('    expose:')
+        ..writeln('      - "9000"')
+        ..writeln('    healthcheck:')
+        ..writeln(
+          '      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", '
+          '"http://127.0.0.1:9000/minio/health/live"]',
+        )
+        ..writeln('      interval: 5s')
+        ..writeln('      timeout: 5s')
+        ..writeln('      retries: 30')
+        ..writeln()
+        ..writeln('  ${DwStack.minioInitService}:')
+        ..writeln('    image: ${_q('$_mirror${DwStack.minioClientImage}')}')
+        ..writeln('    restart: "no"')
+        ..writeln('    depends_on:')
+        ..writeln('      ${DwStack.minioService}:')
+        ..writeln('        condition: service_healthy')
+        ..writeln('    environment:')
+        ..writeln(
+          '      ${DwStack.storageAccessKey}: '
+          '${_q(_secret(DwStack.storageAccessKey))}',
+        )
+        ..writeln(
+          '      ${DwStack.storageSecretKey}: '
+          '${_q(_secret(DwStack.storageSecretKey))}',
+        )
+        ..writeln('    entrypoint: ["/bin/sh", "-c"]')
+        ..writeln(
+          '    # Idempotent: an existing bucket is kept, objects and all. '
+          r'"$$" is a literal',
+        )
+        ..writeln('    # dollar for the shell rather than a Compose variable.')
+        ..writeln('    command:')
+        ..writeln(
+          '      - ${_q('set -e; '
+          'mc alias set dw http://${DwStack.minioService}:9000 '
+          '"\$\$${DwStack.storageAccessKey}" '
+          '"\$\$${DwStack.storageSecretKey}" >/dev/null; '
+          'mc mb --ignore-existing dw/${stack.bucketName}; '
+          'mc stat dw/${stack.bucketName} >/dev/null; '
+          'echo "bucket ${stack.bucketName} is ready"')}',
+        )
+        ..writeln();
+    }
+
+    // --- nginx
+    buffer
+      ..writeln('  ${DwStack.nginxService}:')
+      ..writeln('    image: ${_q('$_mirror${DwStack.nginxImage}')}')
+      ..writeln('    restart: unless-stopped')
+      ..writeln('    ports:');
+    switch (stack.front) {
+      case DwTlsFront():
+        buffer
+          ..writeln('      - "80:80"')
+          ..writeln('      - "443:443"');
+      case DwPlainHttpFront(:final port):
+        buffer.writeln('      - ${_q('127.0.0.1:$port:$port')}');
+    }
+    buffer
+      ..writeln('    volumes:')
+      ..writeln('      - "./nginx.conf:/etc/nginx/conf.d/default.conf:ro"')
+      ..writeln('      - "./nginx.d:/etc/nginx/dartway:ro"');
+    if (_tls) {
+      buffer
+        ..writeln('      - "certbot_data:/etc/letsencrypt:ro"')
+        ..writeln('      - "certbot_www:/var/www/certbot:ro"');
+    }
+    if (site != null && site.deployed) {
+      buffer.writeln('      - ${_q('${_context(site.source!)}:/srv/site:ro')}');
+    }
+    buffer
+      ..writeln('    depends_on:')
+      ..writeln('      - ${DwStack.serverService}')
+      ..writeln('      - ${DwStack.webService}');
+    if (minio) {
+      buffer
+        ..writeln('      - ${DwStack.minioService}')
+        ..writeln(
+          '    # The server reaches storage by the same URL a browser signs '
+          'for: inside',
+        )
+        ..writeln(
+          '    # the network that host is this proxy, so there is no second '
+          'address to',
+        )
+        ..writeln('    # configure and no hairpin through the public IP.')
+        ..writeln('    networks:')
+        ..writeln('      default:')
+        ..writeln('        aliases:')
+        ..writeln('          - ${_q(_target.storageDomain!)}');
+    }
+    buffer.writeln();
+
+    // --- certbot
+    if (_tls) {
+      buffer
+        ..writeln('  ${DwStack.certbotService}:')
+        ..writeln('    image: ${_q('$_mirror${DwStack.certbotImage}')}')
+        ..writeln('    restart: unless-stopped')
+        ..writeln('    volumes:')
+        ..writeln('      - "certbot_data:/etc/letsencrypt"')
+        ..writeln('      - "certbot_www:/var/www/certbot"')
+        ..writeln('    entrypoint: /bin/sh')
+        ..writeln('    command:')
+        ..writeln('      - -c')
+        ..writeln(
+          r'      # $$ is how Compose passes a literal dollar down instead of '
+          'substituting a variable.',
+        )
+        ..writeln(
+          r'      - "trap exit TERM; while :; do certbot renew --webroot -w '
+          r'/var/www/certbot; sleep 12h & wait $${!}; done"',
+        )
+        ..writeln();
+    }
+
+    buffer
+      ..writeln('volumes:')
+      ..writeln('  postgres_data:');
+    if (minio) buffer.writeln('  minio_data:');
+    if (_tls) {
+      buffer
+        ..writeln('  certbot_data:')
+        ..writeln('  certbot_www:');
+    }
+    return buffer.toString();
   }
 
-  String get nginxFile => _render(dwNginxTemplate);
-
-  /// Environment file consumed by Compose interpolation.
+  /// The largest request body the proxy accepts on the server's hosts.
   ///
-  /// Passwords land here rather than inside `docker-compose.yml` so the
-  /// compose file itself carries no secret and can be read while debugging.
-  String environmentFile({
-    required String databasePassword,
-    required String redisPassword,
-  }) {
-    final lines = [
-      '# Rendered by "dartway deploy setup". Contains secrets; mode 0600.',
-      'DB_PASSWORD=$databasePassword',
-      if (serverpod.managesRedis) 'REDIS_PASSWORD=$redisPassword',
-    ];
-    return '${lines.join('\n')}\n';
+  /// Above the server's own default limit (1 MiB) on purpose: the server
+  /// refuses an oversized call with its own answer, which a client reads, while
+  /// a refusal here would be an nginx HTML page no client can decode. Uploads
+  /// never come this way — they go to storage directly (D-034) — so a call body
+  /// past this is a mistake, not a use case; a project that means it raises
+  /// the limit in a `nginx.d/app` or `nginx.d/api` snippet.
+  static const String bodyLimit = '16m';
+
+  /// Where the certificate of every served host lives. One lineage, named
+  /// after the API host.
+  String get _certificateDirectory =>
+      '/etc/letsencrypt/live/${_target.apiDomain}';
+
+  String get nginxFile {
+    final buffer = StringBuffer()
+      ..writeln(
+        '# Rendered by "dartway deploy setup" from deploy/config.yaml '
+        '[${_target.environment}].',
+      )
+      ..writeln(
+        '# Project additions belong in deploy/nginx.d/{http,api,app}/*.conf.',
+      )
+      ..writeln()
+      ..writeln(
+        '# Connection: upgrade only on a real upgrade; close for an ordinary '
+        'request.',
+      )
+      ..writeln(r'map $http_upgrade $connection_upgrade {')
+      ..writeln('    default upgrade;')
+      ..writeln('    ""      close;')
+      ..writeln('}')
+      ..writeln()
+      ..writeln('include /etc/nginx/dartway/http/*.conf;')
+      ..writeln();
+
+    final servedNames = _target.servedDomains.join(' ');
+    if (_tls) {
+      buffer
+        ..writeln('server {')
+        ..writeln('    listen 80;')
+        ..writeln('    server_name $servedNames;')
+        ..writeln()
+        ..writeln('    location /.well-known/acme-challenge/ {')
+        ..writeln('        root /var/www/certbot;')
+        ..writeln('    }')
+        ..writeln()
+        ..writeln('    location / {')
+        ..writeln(r'        return 301 https://$host$request_uri;')
+        ..writeln('    }')
+        ..writeln('}')
+        ..writeln();
+    }
+
+    // --- app
+    _openServer(buffer, _target.appDomain);
+    buffer
+      ..writeln('    client_max_body_size $bodyLimit;')
+      ..writeln()
+      ..writeln(
+        '    # Caching of the app is decided inside the web image and passed '
+        'through.',
+      )
+      ..writeln(
+        '    # Do not add an `expires` in a snippet: a Flutter build reuses '
+        'every file',
+      )
+      ..writeln(
+        '    # name, so it would freeze the files every deploy changes.',
+      )
+      ..writeln('    include /etc/nginx/dartway/app/*.conf;')
+      ..writeln()
+      ..writeln(
+        '    # The live socket: an upgrade, and a connection that stays open '
+        'far longer',
+      )
+      ..writeln(
+        '    # than a call. The server pings every 20 s; the timeout only ends '
+        'a dead one.',
+      )
+      ..writeln('    location = /dw/live {');
+    _live(buffer);
+    buffer
+      ..writeln('    }')
+      ..writeln()
+      ..writeln('    # Calls, on the app\'s own origin: no CORS, no preflight.')
+      ..writeln('    location /dw/ {');
+    _proxy(buffer);
+    buffer
+      ..writeln('    }')
+      ..writeln()
+      ..writeln('    location = /health {');
+    _proxy(buffer);
+    buffer
+      ..writeln('    }')
+      ..writeln()
+      ..writeln('    location / {')
+      ..writeln('        proxy_pass http://${DwStack.webService}:80;')
+      ..writeln(r'        proxy_set_header Host $http_host;')
+      ..writeln(r'        proxy_set_header X-Forwarded-Proto $scheme;')
+      ..writeln('    }')
+      ..writeln('}')
+      ..writeln();
+
+    // --- api
+    _openServer(buffer, _target.apiDomain);
+    buffer
+      ..writeln('    client_max_body_size $bodyLimit;')
+      ..writeln()
+      ..writeln('    location = /dw/live {');
+    _live(buffer);
+    buffer
+      ..writeln('    }')
+      ..writeln()
+      ..writeln('    location / {')
+      ..writeln(
+        '        # Inside the location: what a project adds here — a '
+        'webhook\'s longer',
+      )
+      ..writeln(
+        '        # timeout, a header — only has an effect on the proxied '
+        'request itself.',
+      )
+      ..writeln('        include /etc/nginx/dartway/api/*.conf;');
+    _proxy(buffer);
+    buffer
+      ..writeln('    }')
+      ..writeln('}')
+      ..writeln();
+
+    // --- site
+    final site = _target.site;
+    if (site != null && site.deployed) {
+      _openServer(buffer, site.domain);
+      buffer
+        ..writeln('    root /srv/site;')
+        ..writeln('    index index.html;')
+        ..writeln('    etag on;')
+        ..writeln()
+        ..writeln(
+          '    # Static files served from the checkout as the deployed '
+          'revision has them.',
+        )
+        ..writeln(
+          '    # Revalidated, because nothing here knows which names carry a '
+          'content hash.',
+        )
+        ..writeln('    location / {')
+        ..writeln(r'        try_files $uri $uri/ =404;')
+        ..writeln('        add_header Cache-Control "no-cache";')
+        ..writeln('    }')
+        ..writeln('}')
+        ..writeln();
+    }
+
+    // --- storage
+    if (_target.storage == DwStorageMode.minio) {
+      _openServer(buffer, _target.storageDomain!);
+      buffer
+        ..writeln(
+          '    # Browsers upload here directly. The presigned URL bounds the '
+          'size, so the',
+        )
+        ..writeln(
+          '    # proxy does not, and streams the body instead of spooling it '
+          'to disk.',
+        )
+        ..writeln('    client_max_body_size 0;')
+        ..writeln('    proxy_request_buffering off;')
+        ..writeln('    proxy_buffering off;')
+        ..writeln()
+        ..writeln('    location / {')
+        ..writeln('        proxy_pass http://${DwStack.minioService}:9000;')
+        ..writeln('        proxy_http_version 1.1;')
+        ..writeln(r'        proxy_set_header Connection "";')
+        ..writeln(
+          '        # The signature covers the host exactly as the client '
+          'sent it, port included.',
+        )
+        ..writeln(r'        proxy_set_header Host $http_host;')
+        ..writeln(r'        proxy_set_header X-Real-IP $remote_addr;')
+        ..writeln(
+          r'        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;',
+        )
+        ..writeln(r'        proxy_set_header X-Forwarded-Proto $scheme;')
+        ..writeln('    }')
+        ..writeln('}')
+        ..writeln();
+    }
+
+    return buffer.toString();
+  }
+
+  void _openServer(StringBuffer buffer, String domain) {
+    buffer.writeln('server {');
+    switch (stack.front) {
+      case DwTlsFront():
+        buffer
+          ..writeln('    listen 443 ssl;')
+          ..writeln('    server_name $domain;')
+          ..writeln(
+            '    ssl_certificate     $_certificateDirectory/fullchain.pem;',
+          )
+          ..writeln(
+            '    ssl_certificate_key $_certificateDirectory/privkey.pem;',
+          );
+      case DwPlainHttpFront(:final port):
+        buffer
+          ..writeln('    listen $port;')
+          ..writeln('    server_name $domain;');
+    }
+    buffer.writeln();
+  }
+
+  /// Headers of a proxied request to the server.
+  ///
+  /// `Host` is `$http_host`, port included: the live socket admits a browser
+  /// whose `Origin` is the host the upgrade was sent to, and an origin carries
+  /// its port.
+  static void _proxy(StringBuffer buffer) {
+    buffer
+      ..writeln(
+        '        proxy_pass http://${DwStack.serverService}:${DwStack.serverPort};',
+      )
+      ..writeln('        proxy_http_version 1.1;')
+      ..writeln(r'        proxy_set_header Upgrade $http_upgrade;')
+      ..writeln(r'        proxy_set_header Connection $connection_upgrade;')
+      ..writeln(r'        proxy_set_header Host $http_host;')
+      ..writeln(r'        proxy_set_header X-Real-IP $remote_addr;')
+      ..writeln(
+        r'        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;',
+      )
+      ..writeln(r'        proxy_set_header X-Forwarded-Proto $scheme;');
+  }
+
+  static void _live(StringBuffer buffer) {
+    _proxy(buffer);
+    buffer
+      ..writeln('        proxy_read_timeout 1h;')
+      ..writeln('        proxy_send_timeout 1h;')
+      ..writeln('        proxy_buffering off;');
   }
 
   File? get composeOverride {
-    final file = File(
-      p.join(projectRoot.path, 'deploy', 'compose.override.yml'),
-    );
+    final root = projectRoot;
+    if (root == null) return null;
+    final file = File(p.join(root.path, 'deploy', 'compose.override.yml'));
     return file.existsSync() ? file : null;
   }
 
   /// Extra Nginx snippets, keyed by their path under `deploy/nginx.d/`.
   Map<String, File> get nginxSnippets {
-    final root = Directory(p.join(projectRoot.path, 'deploy', 'nginx.d'));
-    if (!root.existsSync()) {
+    final root = projectRoot;
+    if (root == null) return const {};
+    final dir = Directory(p.join(root.path, 'deploy', 'nginx.d'));
+    if (!dir.existsSync()) {
       return const {};
     }
     final snippets = <String, File>{};
-    for (final entity in root.listSync(recursive: true)) {
+    for (final entity in dir.listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.conf')) {
         continue;
       }
       final relative = p
-          .relative(entity.path, from: root.path)
+          .relative(entity.path, from: dir.path)
           .replaceAll(r'\', '/');
       snippets[relative] = entity;
     }

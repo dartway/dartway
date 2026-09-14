@@ -116,22 +116,27 @@ class EphemeralDatabase {
   final int port;
   final String password;
 
-  /// The coordinates, in the form Serverpod reads over `config/test.yaml`.
+  /// The coordinates, in the names the server reads — `DW_DATABASE_*`, as
+  /// `DwDatabaseConfig.fromEnvironment` takes them.
   ///
-  /// `ServerpodConfig.load` reads the run mode's YAML and then applies
-  /// `Platform.environment` on top, and `TestServerpod` builds an ordinary
-  /// `Serverpod` — so these reach the test server exactly as they reach a
-  /// deployed one. The environment is also the one channel a test file cannot
-  /// bypass, which a per-file config override is not.
-  Map<String, String> serverpodEnvironment({
+  /// [name] is the maintenance database: a suite's `DwTestDatabase` creates a
+  /// throwaway database of its own per test file from there and drops it
+  /// afterwards, which is why the user is the container's superuser. The
+  /// container serves no TLS, and the driver requires it unless told not to.
+  ///
+  /// The environment is the one channel a test file cannot bypass: it is a
+  /// property of the process, where a per-file override is one a file can
+  /// forget.
+  Map<String, String> databaseEnvironment({
     required String name,
     required String user,
   }) => {
-    'SERVERPOD_DATABASE_HOST': 'localhost',
-    'SERVERPOD_DATABASE_PORT': '$port',
-    'SERVERPOD_DATABASE_NAME': name,
-    'SERVERPOD_DATABASE_USER': user,
-    'SERVERPOD_DATABASE_PASSWORD': password,
+    'DW_DATABASE_HOST': 'localhost',
+    'DW_DATABASE_PORT': '$port',
+    'DW_DATABASE_NAME': name,
+    'DW_DATABASE_USER': user,
+    'DW_DATABASE_PASSWORD': password,
+    'DW_DATABASE_SSL': 'false',
   };
 }
 

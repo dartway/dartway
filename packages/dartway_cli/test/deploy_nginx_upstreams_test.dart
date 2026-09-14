@@ -14,20 +14,23 @@ location /files/ {
       );
     });
 
-    test('an address or a domain is not a service, and neither is a variable', () {
-      // Each of these is a legitimate proxy target that no Compose stack
-      // declares. A check that reported them would be switched off in a week.
-      expect(
-        DwNginxUpstreams.namesIn('''
+    test(
+      'an address or a domain is not a service, and neither is a variable',
+      () {
+        // Each of these is a legitimate proxy target that no Compose stack
+        // declares. A check that reported them would be switched off in a week.
+        expect(
+          DwNginxUpstreams.namesIn('''
 proxy_pass http://127.0.0.1:8080;
 proxy_pass https://files.example.com;
 proxy_pass http://localhost:3000;
 proxy_pass http://\$upstream_from_map;
 proxy_pass unix:/var/run/app.sock;
 '''),
-        isEmpty,
-      );
-    });
+          isEmpty,
+        );
+      },
+    );
 
     test('an alias the file defines is read through its own servers', () {
       // `storage` is not a service — it is a name this file invents. What has
@@ -52,6 +55,22 @@ location / {
         isEmpty,
       );
     });
+
+    // The deploy reads the rendered configuration too, whose `server {`
+    // blocks and `server_name` lines are not upstreams.
+    test(
+      'a whole configuration yields its proxy targets, not its server blocks',
+      () {
+        expect(
+          DwNginxUpstreams.namesIn(
+            'server {\n    listen 443 ssl;\n    server_name api.example.com;\n'
+            '    location / { proxy_pass http://server:8080; }\n}\n'
+            'upstream pool {\n    server web:80 weight=5;\n}\n',
+          ),
+          {'server', 'web'},
+        );
+      },
+    );
 
     test('grpc and fastcgi name backends the same way', () {
       expect(
@@ -89,9 +108,10 @@ location / {
   });
 
   test('a compose --services listing is one name per line', () {
-    expect(
-      DwNginxUpstreams.servicesInListing('backend\nminio\nnginx\n\n'),
-      {'backend', 'minio', 'nginx'},
-    );
+    expect(DwNginxUpstreams.servicesInListing('backend\nminio\nnginx\n\n'), {
+      'backend',
+      'minio',
+      'nginx',
+    });
   });
 }

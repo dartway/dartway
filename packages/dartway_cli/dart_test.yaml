@@ -1,0 +1,8 @@
+tags:
+  # Builds the example's images and runs the rendered stack in local Docker:
+  # minutes, and a Docker daemon. Not part of `tool/checks.sh`, which needs no
+  # services; run it by name:
+  #   dart test -t docker --run-skipped test/deploy_local_stack_test.dart
+  docker:
+    skip: "needs Docker and builds images; run with -t docker --run-skipped"
+    timeout: 40m

@@ -54,9 +54,9 @@ FROM alpine:latest
 COPY --from=build /server /app/server
 COPY shop_server/config/ /app/config/
 ''');
-  File(p.join(root.path, '.dockerignore')).writeAsStringSync(
-    '**\n\n!shop_server/\n!shop_server/**\n',
-  );
+  File(
+    p.join(root.path, '.dockerignore'),
+  ).writeAsStringSync('**\n\n!shop_server/\n!shop_server/**\n');
   return root;
 }
 
@@ -79,7 +79,12 @@ void main() {
 
     expect(
       File(
-        p.join(project.path, vendorDirName, 'dartway_core_shared', 'pubspec.yaml'),
+        p.join(
+          project.path,
+          vendorDirName,
+          'dartway_core_shared',
+          'pubspec.yaml',
+        ),
       ).existsSync(),
       isTrue,
     );
@@ -87,7 +92,12 @@ void main() {
     // multiply the build context by the number of packages.
     expect(
       Directory(
-        p.join(project.path, vendorDirName, 'dartway_core_shared', '.dart_tool'),
+        p.join(
+          project.path,
+          vendorDirName,
+          'dartway_core_shared',
+          '.dart_tool',
+        ),
       ).existsSync(),
       isFalse,
     );
@@ -100,7 +110,12 @@ void main() {
     // one — the copy would refuse to resolve with it.
     expect(
       File(
-        p.join(project.path, vendorDirName, 'dartway_core_shared', 'pubspec.yaml'),
+        p.join(
+          project.path,
+          vendorDirName,
+          'dartway_core_shared',
+          'pubspec.yaml',
+        ),
       ).readAsStringSync(),
       isNot(contains('resolution: workspace')),
     );
@@ -124,7 +139,9 @@ void main() {
   test('a package with no framework dependency is not touched', () {
     final plain = Directory(p.join(project.path, 'shop_shared'))
       ..createSync(recursive: true);
-    File(p.join(plain.path, 'pubspec.yaml')).writeAsStringSync('name: shop_shared\n');
+    File(
+      p.join(plain.path, 'pubspec.yaml'),
+    ).writeAsStringSync('name: shop_shared\n');
 
     final report = vendorFramework(project: project, monorepo: monorepo);
 

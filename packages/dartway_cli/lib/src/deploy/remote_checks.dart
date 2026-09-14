@@ -5,16 +5,17 @@ import 'package:yaml/yaml.dart';
 import '../checker/dw_check_type.dart';
 import 'compose_files.dart';
 import 'deploy_check.dart';
-import 'master_passwords_file.dart';
+import 'local_secrets_file.dart';
+import 'outside_probe.dart';
 import 'secret_store.dart';
-import 'templates.dart';
-import 'web_cache.dart';
+import 'stack.dart';
 
-/// Checks that need the network: DNS, and the server itself over SSH.
+/// Checks that need the network: DNS, the server over SSH, and the deployed
+/// site over HTTPS.
 const List<DwDeployCheck> dwRemoteDeployChecks = [
   DwDeployCheck(
     id: 'dns-public-hosts',
-    title: 'Every public domain resolves to the deployment host',
+    title: 'Every served domain resolves to the deployment host',
     stage: DwDeployCheckStage.remote,
     severity: DwCheckSeverity.error,
     evaluate: _checkDnsPublicHosts,
@@ -45,7 +46,7 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
   ),
   DwDeployCheck(
     id: 'runtime-secrets',
-    title: 'Runtime secrets are present on the server',
+    title: 'Every required secret is in the server store, with a value',
     stage: DwDeployCheckStage.remote,
     severity: DwCheckSeverity.error,
     requiresSsh: true,
@@ -53,30 +54,28 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
   ),
   DwDeployCheck(
     id: 'secret-files',
-    title: 'Declared secret files reach the application',
+    title: 'Declared secret files reach the server container',
     stage: DwDeployCheckStage.remote,
     severity: DwCheckSeverity.error,
     requiresSsh: true,
     evaluate: _checkSecretFiles,
   ),
   DwDeployCheck(
-    id: 'secrets-match-master',
-    title: 'The server and the local master file hold the same keys',
+    id: 'secrets-match-local',
+    title: 'The server store and the local secrets file hold the same keys',
     stage: DwDeployCheckStage.remote,
     severity: DwCheckSeverity.warning,
     requiresSsh: true,
-    evaluate: _checkSecretsMatchMaster,
+    evaluate: _checkSecretsMatchLocal,
   ),
   DwDeployCheck(
-    id: 'web-cache-headers',
-    title: 'The deployed web app tells browsers to revalidate its entry points',
+    id: 'outside',
+    title: 'The deployed hosts answer as a browser and an app expect',
     stage: DwDeployCheckStage.remote,
-    // An observation, not a reading: this is the header the browser was
-    // actually handed. There is nothing left to interpret, so it errors.
+    // An observation, not a reading: these are the answers a browser gets.
     severity: DwCheckSeverity.error,
-    // HTTP, not SSH — the question is what the site answers, and the answer is
-    // the same one a browser gets.
-    evaluate: _checkWebCacheHeaders,
+    // HTTPS, not SSH — and it must still run when the SSH checks have failed.
+    evaluate: _checkOutside,
   ),
 ];
 
@@ -103,13 +102,7 @@ Future<DwDeployVerdict> _checkDnsPublicHosts(DwDeployContext context) async {
     );
   }
 
-  final domains = <String>[
-    ...context.serverpod.endpoints
-        .map((endpoint) => endpoint.publicHost)
-        .whereType<String>(),
-    context.target.webAppDomain,
-  ];
-
+  final domains = context.target.servedDomains;
   final unresolved = <String>[];
   final mismatched = <String>[];
   for (final domain in domains) {
@@ -135,7 +128,7 @@ Future<DwDeployVerdict> _checkDnsPublicHosts(DwDeployContext context) async {
     ].join(' | '),
     fix:
         'Certificate issuance fails for a domain that does not reach this '
-        'host, and repeated failures hit the Let\'s Encrypt rate limit. '
+        "host, and repeated failures hit the Let's Encrypt rate limit. "
         'Resolved through the local resolver, so a record changed minutes '
         'ago may still be cached here.',
   );
@@ -165,7 +158,7 @@ Future<DwDeployVerdict> _checkDeployUser(DwDeployContext context) async {
   return DwDeployVerdict.fail(
     'no user "$user" on the server',
     fix:
-        'Run the server bootstrap first — it creates the unprivileged user '
+        'Run "dartway deploy setup" first — it creates the unprivileged user '
         'the deployment runs as.',
   );
 }
@@ -181,66 +174,63 @@ Future<DwDeployVerdict> _checkDockerAvailable(DwDeployContext context) async {
   return DwDeployVerdict.fail(
     result.firstLine.isEmpty ? 'docker compose unavailable' : result.firstLine,
     fix:
-        'Docker must be installed and the deployment user must belong to '
-        'the docker group.',
+        'Docker must be installed and the deployment user must belong to the '
+        'docker group.',
   );
 }
 
 Future<DwDeployVerdict> _checkRuntimeSecrets(DwDeployContext context) async {
   final store = DwSecretStore(ssh: context.ssh!, target: context.target);
-  final environment = context.target.environment;
-  final file = store.passwordsFile;
-
-  // Serverpod merges "shared" under the run mode section, so a key present in
-  // either one is resolvable at startup.
-  final result = await store.readKeyNames(sections: ['shared', environment]);
-  if (!result.ok) {
+  final present = await store.readKeyNames();
+  if (!present.ok) {
     return DwDeployVerdict.fail(
-      'no readable $file',
+      'no readable ${store.file}',
       fix:
-          'Create the store with "dartway deploy secret init" — runtime '
-          'secrets are generated on the server and never live in Git.',
+          'Create the store with "dartway deploy secret init --env '
+          '${context.target.environment}" — secrets are generated on the '
+          'server and never live in Git.',
     );
   }
+  final filled = await store.readNonEmptyKeyNames();
 
-  final required = <String>{
-    ...context.serverpod.requiredPasswordKeys,
-    ...context.target.requiredSecrets,
-  };
-  final missing = required.difference(result.names).toList()..sort();
+  final required = context.stack.requiredSecretKeys;
+  final missing = required
+      .where((key) => !present.names.contains(key))
+      .toList();
+  final empty = required
+      .where((key) => present.names.contains(key))
+      .where((key) => !filled.names.contains(key))
+      .toList();
+  final reserved =
+      present.names.where(context.stack.reservedSecretKeys.contains).toList()
+        ..sort();
 
-  if (missing.isEmpty) {
+  if (missing.isEmpty && empty.isEmpty && reserved.isEmpty) {
     return DwDeployVerdict.pass(
-      '${result.names.length} keys across shared and "$environment"',
+      '${required.length} required of ${present.names.length} stored, '
+      'every one set',
     );
   }
   return DwDeployVerdict.fail(
-    'missing: ${missing.join(', ')}',
+    [
+      if (missing.isNotEmpty) 'missing: ${missing.join(', ')}',
+      if (empty.isNotEmpty) 'empty: ${empty.join(', ')}',
+      if (reserved.isNotEmpty)
+        'set by the compose file, must not be stored: ${reserved.join(', ')}',
+    ].join(' | '),
     fix:
-        'Deliver them with "dartway deploy secret set". Generated keys come '
-        'from "secret init"; the rest are yours to provide. A key supplied '
-        'through a SERVERPOD_PASSWORD_ environment variable is invisible to '
-        'this check.',
+        'Generated keys come from "dartway deploy secret init"; the rest are '
+        'yours to deliver with "dartway deploy secret set <KEY>". The deploy '
+        'refuses to render the environment until this passes.',
   );
 }
 
 /// Whether a declared file is where the application will look for it.
 ///
-/// "Is it on the server?" is the question this check used to ask, and it is
-/// not the one the deploy dies on. A file can be delivered to the runtime
-/// store, reported present, and still be invisible from inside the container —
-/// which is a green check standing directly in front of a red deploy, and
-/// worse than no check at all, because people read it.
-///
-/// So the answer comes from the configuration Compose itself will run: the
-/// rendered file on the server merged with the project's override, asked for
-/// on the server, with the file's own path in it. A bind mount of a file that
-/// exists is visibility; there is nothing further to establish.
-///
-/// It stops short of running a container. `docker compose run` builds the
-/// image when it is absent, which would turn a check into a ten-minute build,
-/// and probing the container that happens to be up answers about the *previous*
-/// deploy rather than the one about to happen.
+/// "Is it on the server?" is not the question the deploy dies on: a file can
+/// be delivered and still be invisible from inside the container. So the
+/// answer comes from the configuration Compose itself will run — the rendered
+/// file merged with the project's override — with the file's own path in it.
 Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
   final declared = context.target.requiredSecretFiles;
   if (declared.isEmpty) {
@@ -248,29 +238,15 @@ Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
   }
 
   final store = DwSecretStore(ssh: context.ssh!, target: context.target);
-
-  // A mount names one path on each side, and the store is flat. An entry that
-  // is a pattern or a path can be delivered but never mounted, so it is a
-  // failure here rather than a surprise on the server.
-  final unmountable = declared
-      .where(
-        (name) =>
-            name.contains('*') || name.contains('?') || name.contains('/'),
-      )
-      .toList();
-  if (unmountable.isNotEmpty) {
+  final listing = await store.listFiles();
+  if (!listing.ok) {
     return DwDeployVerdict.fail(
-      'not file names: ${unmountable.join(', ')}',
-      fix:
-          'Each requires.files entry names one file in the runtime store, and '
-          'that file is mounted into the container under the same name. '
-          'Name it exactly, the way "dartway deploy secret put-file" stored it.',
+      'cannot list ${store.directory}',
+      fix: 'Run "dartway deploy setup", which creates the store.',
     );
   }
-
-  final delivered = (await store.listFiles()).toSet();
   final undelivered = declared
-      .where((name) => !delivered.contains(name))
+      .where((name) => !listing.names.contains(name))
       .toList();
   if (undelivered.isNotEmpty) {
     return DwDeployVerdict.fail(
@@ -290,21 +266,18 @@ Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
       fix:
           'The deploy runs whatever this command prints, so until it answers, '
           'nothing can be said about what the container will see. A server '
-          'with no rendered ${DwComposeFiles.rendered} needs '
-          '"dartway deploy setup --env ${context.target.environment}"; '
-          'otherwise the fault is in ${DwComposeFiles.projectOverride}, which '
-          'Compose merges over it.',
+          'with no rendered ${DwComposeFiles.rendered} needs "dartway deploy '
+          'setup --env ${context.target.environment}"; otherwise the fault is '
+          'in ${DwComposeFiles.projectOverride}.',
     );
   }
 
   final Map<String, String> mounts;
   try {
-    mounts = _backendMounts(configuration.stdout);
+    mounts = dwServiceMounts(configuration.stdout, DwStack.serverService);
   } on YamlException catch (error) {
     return DwDeployVerdict.fail(
       'the compose configuration is unreadable: ${error.message}',
-      fix:
-          'Report this: "docker compose config" produced something unexpected.',
     );
   }
 
@@ -318,29 +291,26 @@ Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
     return DwDeployVerdict.pass('${declared.length} file(s) mounted: $where');
   }
   return DwDeployVerdict.fail(
-    'delivered but not mounted into the backend: ${unmounted.join(', ')}',
+    'delivered but not mounted into ${DwStack.serverService}: '
+    '${unmounted.join(', ')}',
     fix:
-        'The file is on the server and the container cannot see it, which is '
-        'the shape of a deploy that passes every check and then dies applying '
-        'migrations. The rendered ${DwComposeFiles.rendered} on the server '
-        'predates the mount — re-render it with "dartway deploy setup --env '
+        'The rendered ${DwComposeFiles.rendered} on the server predates the '
+        'declaration. Re-render it with "dartway deploy setup --env '
         '${context.target.environment}", which is idempotent and safe on a '
-        'live server. Each declared file is then mounted read-only at '
-        '$dwContainerConfigDir/<name>.',
+        'live server; each declared file is then mounted read-only at '
+        '${DwStack.secretFilesDir}/<name>.',
   );
 }
 
-/// Bind-mount sources of the backend service, mapped to where they land inside
-/// the container, as Compose itself resolves them.
-///
-/// Both spellings are accepted: `docker compose config` normalises volumes to
-/// the long form, but a short `source:target:ro` string from an older Compose
-/// must not read as "nothing is mounted".
-Map<String, String> _backendMounts(String configuration) {
+/// Bind-mount sources of [service], mapped to where they land inside the
+/// container, as Compose itself resolves them. Both spellings are accepted:
+/// `docker compose config` normalises volumes to the long form, and a short
+/// `source:target:ro` string must not read as "nothing is mounted".
+Map<String, String> dwServiceMounts(String configuration, String service) {
   final document = loadYaml(configuration);
   final services = document is YamlMap ? document['services'] : null;
-  final backend = services is YamlMap ? services['backend'] : null;
-  final volumes = backend is YamlMap ? backend['volumes'] : null;
+  final definition = services is YamlMap ? services[service] : null;
+  final volumes = definition is YamlMap ? definition['volumes'] : null;
   final mounts = <String, String>{};
   if (volumes is! YamlList) {
     return mounts;
@@ -363,34 +333,31 @@ Map<String, String> _backendMounts(String configuration) {
 }
 
 /// Compares key names only. A routine check has no business moving secret
-/// values across the network just to notice a drift; whether the values agree
-/// is answered by `secret pull`, which transfers them anyway.
-Future<DwDeployVerdict> _checkSecretsMatchMaster(
-  DwDeployContext context,
-) async {
-  final master = DwMasterPasswordsFile(context.passwordsFile);
-  if (!master.exists) {
-    return const DwDeployVerdict.skip('no local master file');
+/// values across the network just to notice a drift.
+Future<DwDeployVerdict> _checkSecretsMatchLocal(DwDeployContext context) async {
+  final local = DwLocalSecretsFile.of(context.projectRoot);
+  if (!local.exists) {
+    return const DwDeployVerdict.skip('no local secrets file');
+  }
+  final Set<String> localKeys;
+  try {
+    localKeys = (local.read()![context.target.environment] ?? const {}).keys
+        .toSet();
+  } on StateError catch (error) {
+    return DwDeployVerdict.fail(error.message);
   }
 
-  final local = DwMasterPasswordsFile.effective(
-    master.read()!,
-    context.target.environment,
-  ).keys.toSet();
-
   final store = DwSecretStore(ssh: context.ssh!, target: context.target);
-  final remote = await store.readKeyNames(
-    sections: ['shared', context.target.environment],
-  );
+  final remote = await store.readKeyNames();
   if (!remote.ok) {
     return const DwDeployVerdict.skip('no readable store on the server');
   }
 
-  final onlyServer = remote.names.difference(local).toList()..sort();
-  final onlyLocal = local.difference(remote.names).toList()..sort();
+  final onlyServer = remote.names.difference(localKeys).toList()..sort();
+  final onlyLocal = localKeys.difference(remote.names).toList()..sort();
 
   if (onlyServer.isEmpty && onlyLocal.isEmpty) {
-    return DwDeployVerdict.pass('${local.length} keys on both sides');
+    return DwDeployVerdict.pass('${localKeys.length} keys on both sides');
   }
   return DwDeployVerdict.fail(
     [
@@ -404,94 +371,24 @@ Future<DwDeployVerdict> _checkSecretsMatchMaster(
   );
 }
 
-/// What the deployed site actually tells a browser to do with the files a
-/// build overwrites.
-///
-/// The reading of the configuration text is `web-cache-policy`, and it is not
-/// the same question. A configuration can be right while a CDN, an
-/// `add_header` in the front proxy, or an image nobody rebuilt says something
-/// else — and it is the response header, not the file, that decides whether a
-/// redeploy reaches anybody. So this asks the site itself, over HTTPS, exactly
-/// as a browser would.
-///
-/// It stops short of comparing bodies between deploys: what is being judged is
-/// the policy, not the contents, and a policy is visible in one HEAD.
-Future<DwDeployVerdict> _checkWebCacheHeaders(DwDeployContext context) async {
-  final domain = context.target.webAppDomain;
-  final client = HttpClient()
-    ..connectionTimeout = const Duration(seconds: 10)
-    // The certificate is somebody else's check. Refusing here would make this
-    // one silently skip on a server that has just been provisioned and still
-    // carries the one-day self-signed certificate `setup` installs — which is
-    // the deployment most likely to be serving a configuration nobody has
-    // looked at yet.
-    ..badCertificateCallback = (_, _, _) => true;
-
-  final freely = <String>[];
-  final unstated = <String>[];
-  var answered = 0;
-  try {
-    for (final path in dwProbedEntryPoints) {
-      final String? cacheControl;
-      try {
-        final request = await client.headUrl(Uri.https(domain, path));
-        final response = await request.close().timeout(
-          const Duration(seconds: 15),
-        );
-        await response.drain<void>();
-        // 404 means this build does not emit that path — a `--wasm` build has
-        // no main.dart.js — and says nothing about caching.
-        if (response.statusCode != 200) {
-          continue;
-        }
-        cacheControl = response.headers.value(HttpHeaders.cacheControlHeader);
-      } on Exception {
-        continue;
-      }
-      answered++;
-      switch (dwCacheReuse(cacheControl: cacheControl)) {
-        case DwCacheReuse.freely:
-          freely.add('$path: $cacheControl');
-        case DwCacheReuse.unstated:
-          unstated.add(path);
-        case DwCacheReuse.revalidated:
-          break;
-      }
-    }
-  } finally {
-    client.close(force: true);
-  }
-
-  if (answered == 0) {
-    return DwDeployVerdict.skip('nothing answered on https://$domain/');
-  }
-  if (freely.isEmpty) {
-    final note = unstated.isEmpty
-        ? ''
-        : ' (no policy stated for ${unstated.join(', ')} — the browser '
-              'falls back to a heuristic of its own)';
-    return DwDeployVerdict.pass(
-      '$answered entry point(s) revalidate before reuse$note',
-    );
+/// The questions `deploy run` asks at its end, asked of whatever is deployed
+/// now: health on both hosts, the app page and its cache policy, the live
+/// socket through both hosts, and — where they exist — the site and the
+/// storage CORS rule.
+Future<DwDeployVerdict> _checkOutside(DwDeployContext context) async {
+  final results = [
+    for (final probe in dwOutsideProbes(context.stack, DwOutsideProbe()))
+      await probe(),
+  ];
+  final failed = results.where((result) => !result.passed).toList();
+  if (failed.isEmpty) {
+    return DwDeployVerdict.pass('${results.length} answers as expected');
   }
   return DwDeployVerdict.fail(
-    'served for reuse without revalidation: ${freely.join('; ')}',
+    failed.map((result) => '${result.title}: ${result.detail}').join(' | '),
     fix:
-        'A Flutter web build hashes nothing — these names are identical in '
-        'every build — so this is a browser being told to keep the current '
-        'bundle and not ask again. The next deploy will not reach it, and '
-        'nothing will report that: the server serves the new files, the '
-        'browser never requests them. Serve every path a build emits with '
-        '"Cache-Control: no-cache" and an ETag, and keep the long-lived, '
-        'immutable rule for names that carry a content hash; the canonical '
-        'configuration ships with the DartWay template as '
-        '${context.flutterPackage}/nginx.conf. '
-        'Then deal with the copies already out there, because fixing the '
-        'server does not reach them: a response taken under a long max-age '
-        'stays fresh for the rest of that window and the browser will not ask. '
-        'Tell whoever you can reach to hard-reload or clear site data; for the '
-        'rest, wait the window out, or move the app to a URL that was never '
-        'poisoned — a URL a browser has not seen is the only thing that gets '
-        'through.',
+        'Nothing has been deployed yet, or the stack is not serving what it '
+        'should. "dartway deploy run" asks the same questions at its end and '
+        'reports each one.',
   );
 }

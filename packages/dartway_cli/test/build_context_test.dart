@@ -83,6 +83,18 @@ COPY --from=build /server /app/server
       });
     });
 
+    test('keeps a role glob as written, and it admits by suffix', () {
+      // The shipped ignore files admit packages by role rather than by name,
+      // so they have nothing to restate when a package is added or renamed.
+      write('.dockerignore', '**\n!*_server/\n!*_server/**\n!*_shared/\n');
+      final admitted = admittedBy(File(p.join(root.path, '.dockerignore')))!;
+      expect(admitted, {'*_server', '*_shared'});
+      expect(admits(admitted, 'shop_server'), isTrue);
+      expect(admits(admitted, 'shop_shared'), isTrue);
+      expect(admits(admitted, 'shop_flutter'), isFalse);
+      expect(admits(admitted, 'server'), isFalse);
+    });
+
     test('answers null when the file does not deny by default', () {
       // Then everything is in the context already: there is nothing to admit
       // and no way to get this wrong, so the check has nothing to say.

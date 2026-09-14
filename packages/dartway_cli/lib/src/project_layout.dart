@@ -23,29 +23,31 @@ Directory findProjectRoot() {
 }
 
 /// DartWay project layout: sibling Dart packages in the project root whose
-/// role is defined by the directory name suffix (`*_server`, `*_client`,
-/// `*_flutter`, optional `*_shared`).
+/// role is defined by the directory name suffix — `*_server`, `*_flutter` and
+/// the optional `*_shared`, the contract both of them speak.
+///
+/// `*_client` is optional and read only for the agent toolkit, which still
+/// names a generated client package in its token table. A 1.0 project has none:
+/// the shared package is the client contract.
 class ProjectLayout {
   ProjectLayout({
     required this.root,
     required this.serverPackage,
-    required this.clientPackage,
     required this.flutterPackage,
+    this.clientPackage,
     this.sharedPackage,
   });
 
   final Directory root;
   final String serverPackage;
-  final String clientPackage;
   final String flutterPackage;
+  final String? clientPackage;
   final String? sharedPackage;
 
   Directory get flutterPackageDir =>
       Directory(p.join(root.path, flutterPackage));
 
   Directory get serverPackageDir => Directory(p.join(root.path, serverPackage));
-
-  Directory get clientPackageDir => Directory(p.join(root.path, clientPackage));
 
   static ProjectLayout detect(Directory root) {
     String? findBySuffix(String suffix, {required bool required}) {
@@ -75,8 +77,8 @@ class ProjectLayout {
     return ProjectLayout(
       root: root,
       serverPackage: findBySuffix('server', required: true)!,
-      clientPackage: findBySuffix('client', required: true)!,
       flutterPackage: findBySuffix('flutter', required: true)!,
+      clientPackage: findBySuffix('client', required: false),
       sharedPackage: findBySuffix('shared', required: false),
     );
   }
@@ -120,7 +122,7 @@ class ProjectLayout {
     '__SERVER_PKG__': serverPackage,
     '__FLUTTER_PKG__': flutterPackage,
     '__FLUTTER_APP_FILE__': flutterAppFile,
-    '__CLIENT_PKG__': clientPackage,
+    '__CLIENT_PKG__': clientPackage ?? '',
     '__SHARED_PKG__': sharedPackage ?? '',
     '__BASE_BRANCH__': baseBranch,
   };

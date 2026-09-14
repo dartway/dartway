@@ -58,19 +58,21 @@ class AppTextStyles {
       expect(findings, contains(DwCheckType.uiKitConstStyle));
     });
 
-    test('an inferred type is the same mistake, and the usual spelling',
-        () async {
-      // `static const muted = Color(0xFF888888)` is how this is written more
-      // often than with the type spelled out; a rule that missed it would
-      // report the rarer half of the problem.
-      final findings = await findingsFor('ui_kit/app_tone.dart', '''
+    test(
+      'an inferred type is the same mistake, and the usual spelling',
+      () async {
+        // `static const muted = Color(0xFF888888)` is how this is written more
+        // often than with the type spelled out; a rule that missed it would
+        // report the rarer half of the problem.
+        final findings = await findingsFor('ui_kit/app_tone.dart', '''
 class AppTone {
   static const muted = Color(0xFF888888);
 }
 ''');
 
-      expect(findings, contains(DwCheckType.uiKitConstStyle));
-    });
+        expect(findings, contains(DwCheckType.uiKitConstStyle));
+      },
+    );
 
     test('Colors.grey is a hardcoded colour like any other', () async {
       // A word boundary after `Color` does not fire on `Colors`, so the
@@ -94,10 +96,12 @@ class AppPalette {
       expect(findings, contains(DwCheckType.uiKitConstStyle));
     });
 
-    test('it is a warning, not a failure — one theme is a legitimate state',
-        () {
-      expect(DwCheckType.uiKitConstStyle.severity, DwCheckSeverity.warning);
-    });
+    test(
+      'it is a warning, not a failure — one theme is a legitimate state',
+      () {
+        expect(DwCheckType.uiKitConstStyle.severity, DwCheckSeverity.warning);
+      },
+    );
   });
 
   group('what the rule must not punish', () {
@@ -114,9 +118,10 @@ class AppTheme {
       expect(findings, isNot(contains(DwCheckType.uiKitConstStyle)));
     });
 
-    test('a colour taken from the context is the shape being asked for',
-        () async {
-      final findings = await findingsFor('ui_kit/app_card.dart', '''
+    test(
+      'a colour taken from the context is the shape being asked for',
+      () async {
+        final findings = await findingsFor('ui_kit/app_card.dart', '''
 class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
@@ -125,8 +130,9 @@ class AppCard extends StatelessWidget {
 }
 ''');
 
-      expect(findings, isNot(contains(DwCheckType.uiKitConstStyle)));
-    });
+        expect(findings, isNot(contains(DwCheckType.uiKitConstStyle)));
+      },
+    );
 
     test('a name that merely contains the word is not a type', () async {
       // `iconColor` is a name. A rule that reported it would be narrowed
@@ -141,19 +147,21 @@ class AppIcon {
       expect(findings, isNot(contains(DwCheckType.uiKitConstStyle)));
     });
 
-    test('a const that is neither a colour nor a text style is not the rule',
-        () async {
-      // Geometry does not depend on the theme and stays constant — the issue
-      // says so explicitly, and a rule that swept it up would be wrong.
-      final findings = await findingsFor('ui_kit/app_metrics.dart', '''
+    test(
+      'a const that is neither a colour nor a text style is not the rule',
+      () async {
+        // Geometry does not depend on the theme and stays constant — the issue
+        // says so explicitly, and a rule that swept it up would be wrong.
+        final findings = await findingsFor('ui_kit/app_metrics.dart', '''
 class AppMetrics {
   static const double cardRadius = 12;
   static const EdgeInsets pagePadding = EdgeInsets.all(16);
 }
 ''');
 
-      expect(findings, isNot(contains(DwCheckType.uiKitConstStyle)));
-    });
+        expect(findings, isNot(contains(DwCheckType.uiKitConstStyle)));
+      },
+    );
 
     test('a mention inside a comment is prose, not a declaration', () async {
       final findings = await findingsFor('ui_kit/app_note.dart', '''

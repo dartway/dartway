@@ -124,14 +124,14 @@ void main() {
         title: 't',
         affects: const {
           'dartway_core_flutter': '0.8.0',
-          'dartway_serverpod_core_server': '0.12.0',
+          'dartway_core_server': '0.12.0',
         },
         body: '',
       );
       expect(
         wide.appliesTo({
           'dartway_core_flutter': '0.8.0',
-          'dartway_serverpod_core_server': '0.11.4',
+          'dartway_core_server': '0.11.4',
         }),
         isTrue,
       );

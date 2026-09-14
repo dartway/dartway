@@ -33,22 +33,21 @@ void main() {
   });
 
   group('EphemeralDatabase', () {
-    test('states the coordinates in the names Serverpod reads', () {
-      // These five keys are the contract with `ServerpodConfig.load`, which
-      // applies the environment over the run mode's YAML. Renaming one here
-      // silently returns the suite to the file's fixed port.
+    test('states the coordinates in the names the server reads', () {
+      // These keys are the contract with `DwDatabaseConfig.fromEnvironment`.
+      // Renaming one here leaves the suite without a database — loudly, since
+      // that config reports every missing key — and `SSL` has to be off: the
+      // container serves no TLS and the driver requires it by default.
       const database = EphemeralDatabase(id: 'abc', port: 54321, password: 'p');
 
-      expect(
-        database.serverpodEnvironment(name: 'app_test', user: 'postgres'),
-        {
-          'SERVERPOD_DATABASE_HOST': 'localhost',
-          'SERVERPOD_DATABASE_PORT': '54321',
-          'SERVERPOD_DATABASE_NAME': 'app_test',
-          'SERVERPOD_DATABASE_USER': 'postgres',
-          'SERVERPOD_DATABASE_PASSWORD': 'p',
-        },
-      );
+      expect(database.databaseEnvironment(name: 'postgres', user: 'postgres'), {
+        'DW_DATABASE_HOST': 'localhost',
+        'DW_DATABASE_PORT': '54321',
+        'DW_DATABASE_NAME': 'postgres',
+        'DW_DATABASE_USER': 'postgres',
+        'DW_DATABASE_PASSWORD': 'p',
+        'DW_DATABASE_SSL': 'false',
+      });
     });
   });
 }

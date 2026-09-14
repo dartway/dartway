@@ -61,19 +61,19 @@ void main() {
 
   group('readFrameworkVersions', () {
     test('reads packages one and two levels deep', () {
-      // The multi-package modules — the core, push, offline — sit a directory
-      // deeper than the single ones, and a walk that stopped at the first level
-      // would silently report the core as absent.
+      // A multi-package module sits a directory deeper than a single
+      // package, and a walk that stopped at the first level would silently
+      // report it as absent.
       writePackage('dartway_core_flutter', 'dartway_core_flutter', '0.8.0');
       writePackage(
-        p.join('dartway_serverpod_core', 'dartway_serverpod_core_server'),
-        'dartway_serverpod_core_server',
+        p.join('dartway_push', 'dartway_push_server'),
+        'dartway_push_server',
         '0.12.1',
       );
 
       expect(readFrameworkVersions(monorepo()), {
         'dartway_core_flutter': '0.8.0',
-        'dartway_serverpod_core_server': '0.12.1',
+        'dartway_push_server': '0.12.1',
       });
     });
 

@@ -1,21 +1,19 @@
 # Copy to config.yaml and fill in. `dartway deploy` reads it; nothing writes it.
 #
-# This file describes the **machine** and nothing else. Domains, ports, the
-# database and Redis live in dartway_starter_server/config/<env>.yaml, the
-# Serverpod configuration you already maintain — the deploy reads that file and
-# never rewrites it. Nothing is duplicated between the two, which is the whole
-# reason neither can quietly go stale.
+# One file describes an environment completely: the machine, the domains and
+# the optional parts of the stack. The server has no configuration file of its
+# own — it is configured by its environment, which the deploy derives from this
+# file (database coordinates, storage endpoint, port) and from the secret store
+# on the server (passwords, keys). A key this file does not know is an error,
+# not a silence.
 #
-# One environment per top-level key, and the key is the Serverpod run mode:
-# `staging` here means config/staging.yaml there.
+# One environment per top-level key.
 
 staging:
   # Where to connect and who to become. The first login provisions the machine
   # (`dartway deploy setup`), which needs root — either by connecting as root
   # or through passwordless sudo, which is what cloud images give their default
-  # user. Everything afterwards runs as the deploy user, who owns the checkout
-  # and needs no privileges beyond it; naming the same user in both lines is a
-  # normal arrangement on a cloud image, where root cannot log in at all.
+  # user. Everything afterwards runs as the deploy user, who owns the checkout.
   host: 203.0.113.10
   ssh_user: root
   deploy_user: your-project-admin
@@ -29,36 +27,62 @@ staging:
   # Where Let's Encrypt writes about expiring certificates.
   ssl_email: ops@example.com
 
-  # Serverpod has no concept of the host serving the Flutter build, so this is
-  # one of the few domains declared on this side. It must differ from every
-  # publicHost in the Serverpod configuration — Nginx routes by server_name.
-  web_app_domain: app.example.com
+  # Three hosts, one server process, one certificate covering all of them.
+  #
+  # api_domain — the server itself, for mobile apps and webhooks: everything
+  #   on it is proxied to the server, the live socket (/dw/live) included.
+  # app_domain — the Flutter web app. The front proxy serves the web image and
+  #   sends /dw/ and /health on this host to the server, so the app talks to
+  #   its own origin: no CORS, no preflight. The web build is given this origin
+  #   as DW_BACKEND_URL.
+  api_domain: api.example.com
+  app_domain: app.example.com
 
-  # Optional. Pull base images through a mirror when Docker Hub rate-limits.
+  # Optional. The marketing site on the root domain: a directory of the
+  # repository served as static files (it must be committed — the server only
+  # has what Git has), or `none` when the site lives elsewhere and this
+  # deployment does not serve it.
+  # site:
+  #   domain: example.com
+  #   source: app_site/build
+
+  # Optional. File storage for uploads (presigned direct uploads, D-034):
+  #
+  #   minio    — a MinIO container in the stack, for staging. Browsers upload
+  #              to it directly, so it needs a host of its own. Its keys are
+  #              generated into the secret store; its CORS rule admits PUT from
+  #              app_domain with the headers a presigned upload is bound to.
+  #   external — an S3-compatible storage somebody else runs. Deliver
+  #              DW_STORAGE_ENDPOINT, DW_STORAGE_BUCKET, DW_STORAGE_ACCESS_KEY and
+  #              DW_STORAGE_SECRET_KEY (and optionally DW_STORAGE_REGION,
+  #              DW_STORAGE_PUBLIC_BASE_URL, DW_STORAGE_PATH_STYLE) with
+  #              `dartway deploy secret set`, and give the bucket a CORS rule
+  #              allowing PUT from https://<app_domain> with the headers
+  #              content-type, content-length and if-none-match.
+  # storage: minio
+  # storage_domain: files.example.com
+
+  # Optional. Pull the stack's base images through a mirror when Docker Hub
+  # rate-limits. The project's own Dockerfiles name their base images
+  # themselves.
   # registry_mirror: mirror.gcr.io
 
   # Optional. Ports to open beyond SSH, 80 and 443.
   # firewall_ports: [5432]
 
-  # Optional. Credentials nobody can generate — an API token, a service account
-  # file. Listing them turns "the container starts and immediately dies" into a
-  # pre-deploy error.
+  # Optional. What nobody can generate.
   #
-  # The split is by shape, not by importance. `secrets` are short values and
-  # live in passwords.yaml; `files` are whole documents — a service-account
-  # JSON, an .env for some integration — which do not belong in a passwords
-  # file at all: that file is the master copy of every environment's secrets,
-  # and an unquoted value starting with `{` is read by YAML as a mapping rather
-  # than as text.
+  # `secrets` are short values the server reads from its environment — an API
+  # token, an SMS key — named as environment variables (upper case). Listing
+  # them turns "the server starts and fails on first use" into a deploy that
+  # refuses to begin. Deliver each with `dartway deploy secret set <KEY>`.
   #
-  # `files` are delivered with `dartway deploy secret put-file` and mounted
-  # read-only into the server container at /app/config/<name>, beside
-  # passwords.yaml — so the application reaches one as `config/<name>`, the
-  # same path it reads locally. Each entry is a file name exactly as the store
-  # holds it: a pattern or a path cannot be mounted, and is refused rather than
-  # rendered.
+  # `files` are whole documents — a service-account JSON — delivered with
+  # `dartway deploy secret put-file` and mounted read-only into the server at
+  # /run/secrets/<name>. Each entry is a file name exactly as the store holds
+  # it; a pattern or a path cannot be mounted and is refused.
   # requires:
   #   secrets:
-  #     - fcmProjectId
+  #     - SMS_API_TOKEN
   #   files:
   #     - fcm-service-account.json

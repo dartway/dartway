@@ -155,7 +155,10 @@ class DwNginxLocation {
   );
 
   static final RegExp _cacheControlDirective = RegExp(
-    'add_header' r'\s+' '["\']?Cache-Control["\']?' r'\s+(.+?);',
+    'add_header'
+    r'\s+'
+    '["\']?Cache-Control["\']?'
+    r'\s+(.+?);',
     caseSensitive: false,
   );
 
@@ -202,7 +205,10 @@ List<DwNginxLocation> dwParseNginxLocations(String configuration) {
 
 final RegExp _locationHeader = RegExp(
   r'(?:^|[\s;{}])location\s+(=|\^~|~\*|~)?\s*'
-  '("[^"]*"' r"|'[^']*'" r'|\S+)' r'\s*\{',
+  '("[^"]*"'
+  r"|'[^']*'"
+  r'|\S+)'
+  r'\s*\{',
   multiLine: true,
 );
 
@@ -321,7 +327,11 @@ String? dwWebServingConfiguration({
 }
 
 final RegExp _copyHeredoc = RegExp(
-  r'COPY\s+<<\s*' '["\']?' r'(\w+)' '["\']?' r'\s+(\S+)',
+  r'COPY\s+<<\s*'
+  '["\']?'
+  r'(\w+)'
+  '["\']?'
+  r'\s+(\S+)',
   caseSensitive: false,
 );
 

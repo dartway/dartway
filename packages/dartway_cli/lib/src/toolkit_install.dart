@@ -150,7 +150,7 @@ Future<ToolkitInstallResult?> installToolkitInto({
   stdout.writeln(
     'Packages: server=${layout.serverPackage} '
     'flutter=${layout.flutterPackage} '
-    'client=${layout.clientPackage} '
+    'client=${layout.clientPackage ?? '<none>'} '
     'shared=${layout.sharedPackage ?? '<none>'}',
   );
   choice.describe(stdout);

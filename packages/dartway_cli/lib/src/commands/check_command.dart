@@ -96,7 +96,12 @@ class CheckCommand extends Command<int> {
       // Flutter package was found standing on its own.
       errorCount += DwGeneratedFormatInspector(
         serverPackageDir: layout?.serverPackageDir,
-        clientPackageDir: layout?.clientPackageDir,
+        clientPackageDir: switch (layout) {
+          ProjectLayout(:final root, clientPackage: final client?) => Directory(
+            p.join(root.path, client),
+          ),
+          _ => null,
+        },
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();

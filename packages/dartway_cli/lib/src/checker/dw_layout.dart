@@ -25,7 +25,8 @@ const dwFlutterZones = {'admin', 'app', 'auth', 'common'};
 /// left on the Flutter side is a helper).
 const dwFlutterLayers = {'core', 'l10n', 'shared', 'ui_kit'};
 
-/// The top level of a Serverpod package's `lib/src/`.
+/// The top level of the server package's `lib/src/` (the 0.x layout; the 1.0
+/// one arrives with the template port).
 ///
 /// The boundary that matters here: **domain** — pure rules over models, no
 /// `Session`/IO/DB; **app** — session-aware workflows that span models. Neither

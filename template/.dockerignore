@@ -2,19 +2,19 @@
 # working copy — Git history, build output, local secrets — is handed to the
 # Docker daemon on every build.
 #
-# Deny everything, then admit the packages the Dockerfiles copy. A new package
-# is invisible to a build until it is listed here, which is the failure mode
-# worth having: loud at build time rather than silently shipped.
+# Deny everything, then admit the packages by their role suffix rather than by
+# name: the list of packages is already written in the pubspecs, and a third
+# copy here is one more place for a new or renamed package to be forgotten.
+# `dartway deploy check` reads the Dockerfiles against the pubspecs and this
+# file, and names a package that cannot reach its image.
 **
 
-!dartway_starter_client/
-!dartway_starter_client/**
-!dartway_starter_flutter/
-!dartway_starter_flutter/**
-!dartway_starter_server/
-!dartway_starter_server/**
-!dartway_starter_shared/
-!dartway_starter_shared/**
+!*_server/
+!*_server/**
+!*_flutter/
+!*_flutter/**
+!*_shared/
+!*_shared/**
 
 **/.dart_tool/
 **/build/
@@ -22,8 +22,5 @@
 **/ephemeral/
 # custom_lint.log alone reaches hundreds of megabytes when the analyzer trips.
 **/*.log
-
-# Runtime secrets never travel in a build context: a credential baked into an
-# image layer is a credential in every copy of that image. The deployment
-# mounts this file from outside the checkout instead.
-**/config/passwords.yaml
+# The rendered server environment holds secrets; it never enters an image.
+**/.env

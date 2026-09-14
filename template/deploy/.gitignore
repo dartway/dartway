@@ -1,0 +1,3 @@
+# The maintainer's copy of every environment's secrets. Never committed:
+# `dartway deploy check` fails when Git tracks it.
+secrets.yaml

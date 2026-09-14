@@ -1,20 +1,20 @@
 import 'dart:io';
 
+import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 
 import '../checker/dw_check_type.dart';
 import '../deploy/deploy_check.dart';
 import '../deploy/deploy_target.dart';
 import '../deploy/remote_checks.dart';
-import '../deploy/serverpod_config.dart';
 import '../deploy/ssh_runner.dart';
+import '../deploy/stack.dart';
+import '../project_layout.dart';
 import 'deploy_run.dart';
 import 'deploy_setup.dart';
 import 'secret_commands.dart';
-import '../project_layout.dart';
 
-/// Deployment commands. Server-side operations land here as they arrive;
-/// `check` comes first because it changes nothing.
+/// Deployment commands.
 class DeployCommand extends Command<int> {
   DeployCommand() {
     addSubcommand(DeploySetupCommand());
@@ -28,6 +28,32 @@ class DeployCommand extends Command<int> {
 
   @override
   String get description => 'Deploy the project to a configured server.';
+}
+
+/// The environment named by `--env`, read and validated, with the project's
+/// packages found by suffix.
+DwStack resolveDeployStack(
+  Command<int> command,
+  ArgResults results,
+  Directory projectRoot,
+) {
+  final environment = results.option('env');
+  if (environment == null) {
+    final known = DwDeployTarget.environmentsIn(projectRoot);
+    command.usageException(
+      'Specify --env.'
+      '${known.isEmpty ? '' : ' Declared in deploy/config.yaml: ${known.join(', ')}.'}',
+    );
+  }
+  final layout = ProjectLayout.detect(projectRoot);
+  return DwStack(
+    target: DwDeployTarget.load(
+      projectRoot: projectRoot,
+      environment: environment,
+    ),
+    serverPackage: layout.serverPackage,
+    flutterPackage: layout.flutterPackage,
+  );
 }
 
 /// Provisions a server and renders the infrastructure it runs on.
@@ -59,7 +85,10 @@ class DeploySetupCommand extends Command<int> {
       'dartway deploy setup --env <environment> [--dry-run]';
 
   @override
-  Future<int> run() => runSetup(this, argResults!);
+  Future<int> run() => runSetup(
+    resolveDeployStack(this, argResults!, Directory.current),
+    argResults!,
+  );
 }
 
 /// Deploys to an already-provisioned server.
@@ -89,22 +118,21 @@ class DeployRunCommand extends Command<int> {
 
   @override
   String get description =>
-      'Update, rebuild, migrate and restart the deployment.';
+      'Update, build, start the server (it migrates on start), the web app and '
+      'the proxy, then verify from outside.';
 
   @override
   String get invocation =>
       'dartway deploy run --env <environment> [--dry-run] [--skip-git-update]';
 
   @override
-  Future<int> run() => runDeploy(this, argResults!);
+  Future<int> run() => runDeploy(
+    resolveDeployStack(this, argResults!, Directory.current),
+    argResults!,
+  );
 }
 
 /// Validates that the project is deployable to the given environment.
-///
-/// The deployment reads the Serverpod configuration rather than generating it,
-/// so most of what can go wrong is a mismatch between that file and the
-/// machine described in `deploy/config.yaml`. Catching it here costs seconds;
-/// catching it after a failed certificate request costs a rate limit.
 class DeployCheckCommand extends Command<int> {
   DeployCheckCommand() {
     argParser
@@ -112,7 +140,7 @@ class DeployCheckCommand extends Command<int> {
       ..addFlag(
         'local',
         negatable: false,
-        help: 'Skip DNS and the server; check the working copy only.',
+        help: 'Skip DNS, the server and the site; check the working copy only.',
       )
       ..addOption(
         'as',
@@ -140,34 +168,14 @@ class DeployCheckCommand extends Command<int> {
   Future<int> run() async {
     final projectRoot = Directory.current;
     final results = argResults!;
-    final environment = results.option('env');
-    if (environment == null) {
-      final known = DwDeployTarget.environmentsIn(projectRoot);
-      usageException(
-        'Specify --env.'
-        '${known.isEmpty ? '' : ' Declared in deploy/config.yaml: ${known.join(', ')}.'}',
-      );
-    }
-
-    final layout = ProjectLayout.detect(projectRoot);
-    final target = DwDeployTarget.load(
-      projectRoot: projectRoot,
-      environment: environment,
-    );
-    final serverpod = DwServerpodConfig.load(
-      projectRoot: projectRoot,
-      serverPackage: layout.serverPackage,
-      environment: environment,
-    );
+    final stack = resolveDeployStack(this, results, projectRoot);
+    final target = stack.target;
 
     final offline = results.flag('local');
     final sshUser = results.option('as') ?? target.sshUser;
     final context = DwDeployContext(
       projectRoot: projectRoot,
-      serverPackage: layout.serverPackage,
-      flutterPackage: layout.flutterPackage,
-      target: target,
-      serverpod: serverpod,
+      stack: stack,
       ssh: offline
           ? null
           : DwSshRunner(
@@ -178,11 +186,25 @@ class DeployCheckCommand extends Command<int> {
     );
 
     stdout
-      ..writeln('Deploy check [$environment]')
+      ..writeln('Deploy check [${target.environment}]')
       ..writeln('  server:    $sshUser@${target.host}')
       ..writeln('  runs as:   ${target.deployUser}')
       ..writeln('  repo:      ${target.repo} [${target.branch}]')
-      ..writeln('  config:    ${serverpod.relativePath}');
+      ..writeln('  packages:  ${stack.serverPackage}, ${stack.flutterPackage}')
+      ..writeln('  api:       ${stack.apiOrigin}')
+      ..writeln('  app:       ${stack.appOrigin}');
+    if (target.site case final site?) {
+      stdout.writeln(
+        '  site:      ${site.deployed ? '${stack.siteOrigin} from ${site.source}/' : '${site.domain} (external, not deployed)'}',
+      );
+    }
+    stdout.writeln(
+      '  storage:   ${switch (target.storage) {
+        DwStorageMode.none => 'none',
+        DwStorageMode.minio => 'MinIO on ${stack.storageOrigin}, bucket ${stack.bucketName}',
+        DwStorageMode.external => 'external (DW_STORAGE_* in the secret store)',
+      }}',
+    );
 
     final tally = _Tally();
 
@@ -192,9 +214,9 @@ class DeployCheckCommand extends Command<int> {
     }
 
     if (offline) {
-      stdout.writeln('\nDNS and server checks skipped (--local).');
+      stdout.writeln('\nDNS, server and site checks skipped (--local).');
     } else {
-      stdout.writeln('\nDNS and server');
+      stdout.writeln('\nDNS, server and site');
       var sshUsable = true;
       for (final check in dwRemoteDeployChecks) {
         if (check.requiresSsh && !sshUsable) {
@@ -233,12 +255,12 @@ class DeployCheckCommand extends Command<int> {
     switch (check.severity) {
       case DwCheckSeverity.error:
         tally.errors++;
-        stdout.writeln('  FAIL  ${check.title}');
+        stdout.writeln('  FAIL  ${check.title} [${check.id}]');
       case DwCheckSeverity.warning:
         tally.warnings++;
-        stdout.writeln('  warn  ${check.title}');
+        stdout.writeln('  warn  ${check.title} [${check.id}]');
       case DwCheckSeverity.info:
-        stdout.writeln('  info  ${check.title}');
+        stdout.writeln('  info  ${check.title} [${check.id}]');
     }
     stdout.writeln('        ${verdict.detail}');
     if (verdict.fix != null) {
