@@ -1,5 +1,7 @@
 # Revision 2 — the owner's review of 2026-09-14
 
+> **As built after stage 2:** packages are `dartway_core_shared` (pure Dart), `dartway_core_server` (re-exports shared and `dartway_orm`), `dartway_core_flutter` (re-exports shared, `dartway_client`, `dartway_router`) at `0.20.0-dev.1`. `DwWindowRequest<T, S, I>` declares `positionOf(T) → DwWindowPosition<S, I>` (sort value + id) — order is defined once, on the request, and the server builds cursors from it; the client places a new window item by that position only inside the loaded range (at the head when the window shows the newest, counted as unseen otherwise). Anonymous clients do not open the live socket. A replayed command answer carries `"replayed": true` and the client re-reads its live state.
+
 **This section supersedes everything below it where they disagree.** It records the decisions of the morning review; the build is being redone to match. Sections below remain valid where untouched.
 
 ## R2.1 Naming — no name shorter than two words
