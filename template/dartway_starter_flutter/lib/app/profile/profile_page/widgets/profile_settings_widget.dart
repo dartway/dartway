@@ -1,164 +1,110 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_client/dartway_starter_client.dart';
-import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/core/user_profile_provider.dart';
-import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
-class ProfileSettingsWidget extends HookConsumerWidget {
+/// The signed-in member's own name and gender.
+class ProfileSettingsWidget extends StatelessWidget {
   const ProfileSettingsWidget({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the current user profile using DartWay data layer
-    final userProfile = ref.watchUserProfile;
-
-    // Initialize form fields with default values
-    final firstNameController = useTextEditingController(
-      text: userProfile.firstName,
+  Widget build(BuildContext context) {
+    final profile = context.profile;
+    // Keyed by the fields it edits: when they change — this member's own save
+    // coming back in its answer, or an edit on another device — the form
+    // starts again from the profile as it now is, rather than keeping a draft
+    // of a value that no longer exists.
+    return _ProfileForm(
+      key: ValueKey((profile.firstName, profile.lastName, profile.gender)),
+      profile: profile,
     );
-    final selectedGender = useState<UserGender?>(userProfile.gender);
+  }
+}
 
-    // Track if any changes have been made
-    final hasChanges = useState<bool>(false);
+class _ProfileForm extends HookWidget {
+  const _ProfileForm({required this.profile, super.key});
 
-    // Update hasChanges whenever form values change
-    useEffect(() {
-      void checkForChanges() {
-        final currentFirstName = firstNameController.text;
-        final currentGender = selectedGender.value;
+  final UserProfile profile;
 
-        final firstNameChanged = currentFirstName != userProfile.firstName;
-        final genderChanged = currentGender != userProfile.gender;
-
-        hasChanges.value = firstNameChanged || genderChanged;
-      }
-
-      firstNameController.addListener(checkForChanges);
-      selectedGender.addListener(checkForChanges);
-
-      return () {
-        firstNameController.removeListener(checkForChanges);
-        selectedGender.removeListener(checkForChanges);
-      };
-    }, []);
-
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final firstName = useState(profile.firstName);
+    final lastName = useState(profile.lastName ?? '');
+    final gender = useState(profile.gender);
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    final trimmedFirst = firstName.value.trim();
+    final trimmedLast = lastName.value.trim();
+    final firstChanged = trimmedFirst != profile.firstName;
+    final lastChanged = trimmedLast != (profile.lastName ?? '');
+    final genderChanged = gender.value != profile.gender;
+
+    return Form(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Photo: pick, upload, store the URL on the profile.
-          //
-          // `DwFileUploadHandler.pickAndUploadImageUrl` is the whole upload —
-          // it opens the picker, sends the bytes to the storage configured on
-          // the server (see cloudStorageConfig) and returns the public URL. What
-          // is left is an ordinary save, so the photo travels the same CRUD path
-          // as any other field.
-          Center(
-            child: DwActionBuilder(
-              action: dw.action((_) async {
-                // `path` is the folder in the bucket. The key itself is
-                // the server's to build — folder, this user's segment, a
-                // timestamp and the picked file's name — so no caller can
-                // name, and overwrite, another user's object.
-                final imageUrl =
-                    await DwFileUploadHandler.pickAndUploadImageUrl(
-                      path: 'avatars',
-                    );
-                // Null means the picker was dismissed — not a failure.
-                if (imageUrl == null) return;
-                await dw.repo.saveModel(
-                  userProfile.copyWith(imageUrl: imageUrl),
-                );
-              }, onSuccessNotification: l10n.profilePhotoUpdated),
-              builder: (context, onPressed, busy) => InkResponse(
-                onTap: onPressed,
-                child: Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 48,
-                      foregroundImage: userProfile.imageUrl == null
-                          ? null
-                          : NetworkImage(userProfile.imageUrl!),
-                      child: busy
-                          ? const CircularProgressIndicator()
-                          : const Icon(Icons.photo_camera_outlined, size: 32),
-                    ),
-                    const Gap(8),
-                    AppText.caption(l10n.profilePhotoHint),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          const Gap(24),
-
-          // First Name Field
           AppTextFormField(
-            value: firstNameController.text,
-            onChanged: (value) => firstNameController.text = value,
+            value: firstName.value,
+            onChanged: (value) => firstName.value = value,
             labelText: l10n.firstNameLabel,
             hintText: l10n.firstNameHint,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return l10n.firstNameRequired;
-              }
-              return null;
-            },
+            validator: (value) =>
+                (value ?? '').trim().isEmpty ? l10n.firstNameRequired : null,
           ),
-
-          const Gap(16),
-
-          // Gender Selector
-          AppText.body(l10n.genderLabel),
-          const Gap(8),
+          const Gap(12),
+          AppTextFormField(
+            value: lastName.value,
+            onChanged: (value) => lastName.value = value,
+            labelText: l10n.lastNameLabel,
+          ),
+          const Gap(12),
           DropdownButtonFormField<UserGender>(
-            initialValue: selectedGender.value,
-            onChanged: (UserGender? newValue) {
-              selectedGender.value = newValue;
-            },
-            decoration: const InputDecoration(border: OutlineInputBorder()),
+            initialValue: gender.value,
+            onChanged: (value) => gender.value = value,
+            decoration: InputDecoration(labelText: l10n.genderLabel),
             items: [
               DropdownMenuItem<UserGender>(
                 value: null,
                 child: Text(l10n.genderNotSpecified),
               ),
-              ...UserGender.values.map<DropdownMenuItem<UserGender>>((
-                UserGender gender,
-              ) {
-                return DropdownMenuItem<UserGender>(
-                  value: gender,
-                  child: Text(l10n.genderValue(gender.name)),
-                );
-              }),
+              for (final value in UserGender.values)
+                DropdownMenuItem<UserGender>(
+                  value: value,
+                  child: Text(l10n.genderValue(value.name)),
+                ),
             ],
           ),
-
-          const Gap(24),
-
-          // Save Button (only shows when there are changes)
-          if (hasChanges.value) ...[
+          if (firstChanged || lastChanged || genderChanged) ...[
+            const Gap(16),
             AppButton.primary(
               l10n.saveChanges,
-              onTap: dw.action((context) async {
-                await dw.repo.saveModel(
-                  userProfile.copyWith(
-                    firstName: firstNameController.text.trim(),
-                    gender: selectedGender.value,
+              requireValidation: true,
+              // Only what changed is sent: an unchanged field is kept, and a
+              // cleared one is cleared rather than being indistinguishable
+              // from leaving it alone.
+              onTap: dw.action(
+                (_) => dw.command(
+                  UpdateMyProfile(
+                    firstName: firstChanged ? trimmedFirst : null,
+                    lastName: switch (trimmedLast) {
+                      _ when !lastChanged => const DwFieldPatch.keep(),
+                      '' => const DwFieldPatch.clear(),
+                      final value => DwFieldPatch.set(value),
+                    },
+                    gender: switch (gender.value) {
+                      _ when !genderChanged => const DwFieldPatch.keep(),
+                      final UserGender value => DwFieldPatch.set(value),
+                      null => const DwFieldPatch.clear(),
+                    },
                   ),
-                );
-                hasChanges.value = false;
-              }, onSuccessNotification: l10n.profileUpdated),
+                ),
+                onSuccessNotification: l10n.profileUpdated,
+              ),
             ),
-            const Gap(16),
           ],
         ],
       ),

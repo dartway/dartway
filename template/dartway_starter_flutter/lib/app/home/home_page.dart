@@ -1,36 +1,37 @@
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
+import 'package:dartway_starter_flutter/core/dev/test_error_button.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
+import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_client/dartway_starter_client.dart';
-import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
-import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
-import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
-import 'package:dartway_starter_flutter/core/app_settings/app_settings_reader.dart';
-import 'package:dartway_starter_flutter/core/user_profile_provider.dart';
-import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
-/// The starter home screen — delete it once your domain has its own.
+/// The first home screen — replace it once your domain has its own.
 ///
-/// It is deliberately not a placeholder: the app name below is read from the
-/// database through the generic CRUD (`AppSetting`), so the very first screen
-/// proves the whole path is alive — Postgres → server config → typed live list
-/// → widget. Change the value in the admin panel and watch it update here
-/// without a reload.
+/// It is deliberately not a placeholder: the app name on it is a setting read
+/// from the server, live, so the very first screen proves the whole path —
+/// Postgres → handler → live request → widget. Change the name in the admin
+/// panel and every open copy of this screen follows without a reload.
 class HomePage extends ConsumerWidget implements DwFeature {
   const HomePage({super.key});
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
     id: 'home/live-settings',
-    title: 'Live app settings',
+    title: 'Home',
     purpose:
-        'The first screen proves the whole path works: Postgres → CRUD config '
-        '→ typed live list → widget.',
+        'The first screen proves the whole path works: Postgres → handler → '
+        'live request → widget.',
     behaviors: [
-      'The app name comes from the database, not from a constant.',
-      'Changing it in the admin panel updates this screen with no reload.',
+      'Greets the member by name.',
+      'The app name comes from the server settings, not from a constant, and '
+          'changing it in the admin panel updates this screen with no reload.',
       'A failed read says so and offers a retry — the one thing this screen '
           'exists to prove must not fail in silence.',
     ],
@@ -39,16 +40,16 @@ class HomePage extends ConsumerWidget implements DwFeature {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final user = ref.watchUserProfile;
-
-    // Named once and used twice: watched below, and thrown away again by the
-    // retry inside the error state. Writing the expression out a second time is
-    // how a retry ends up refreshing a different provider than the one that
-    // failed.
-    final appSettings = dw.repo.modelList<AppSetting>();
+    final settings = dw.request(const ListAppSettings());
 
     return AppScaffold.main(
-      appBar: AppBar(title: AppText.title(l10n.homeTitle)),
+      appBar: AppBar(
+        title: AppText.title(l10n.homeTitle),
+        actions: const [
+          ConnectionStatusIndicator(),
+          if (kDebugMode) TestErrorButton(),
+        ],
+      ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -57,31 +58,21 @@ class HomePage extends ConsumerWidget implements DwFeature {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppText.body(l10n.homeGreeting(user.firstName)),
+                  AppText.title(l10n.helloUser(context.profile.firstName)),
                   const Gap(8),
-                  // A live list from the server: one line, realtime, typed.
                   ref
-                      .watch(appSettings)
-                      .dwBuildListAsync(
-                        loadingItemsCount: 1,
-                        // The default error widget is nothing at all, and this
-                        // read is the one thing the screen exists to prove.
-                        // A decoration may fail in silence; this may not — see
-                        // dartway-clean-code §1.5a.
-                        errorBuilder: (_, _) => LoadFailedMessage(
-                          onRetry: dw.action(
-                            (_) => ref.invalidate(appSettings),
-                          ),
-                        ),
-                        childBuilder: (settings) => AppText.caption(
-                          l10n.homeAppNameFromDatabase(
-                            // Typed read by catalogue entry, not by string
-                            // literal: a setting nobody has changed yet gives
-                            // its declared default instead of a blank.
-                            settings.valueOf(AppSettingKey.appName),
+                      .watch(settings)
+                      .section(
+                        loadingValue: const <AppSetting>[],
+                        onRetry: () => ref.read(settings.notifier).refetch(),
+                        builder: (stored) => AppText.body(
+                          l10n.homeAppName(
+                            stored.valueOf(AppSettingKey.appName),
                           ),
                         ),
                       ),
+                  const Gap(8),
+                  AppText.caption(l10n.homeLiveHint),
                 ],
               ),
             ),

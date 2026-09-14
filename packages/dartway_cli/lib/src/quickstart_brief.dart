@@ -15,8 +15,8 @@ const String quickstartBrief = r'''
 
 You are most likely an AI coding assistant, and this text is the whole instruction.
 Read it, then carry it out. **Report facts** — the applied migrations, the HTTP status
-code, the phone number to sign in with — never assumptions, and never a sign-in code
-you did not read from the server output.
+code, the identifier to sign in with — never assumptions, and never a sign-in code you
+did not read from the server output.
 
 If `dartway` is not on PATH, every command below also works as:
 
@@ -30,8 +30,9 @@ It reports Dart, Flutter, git, a reachable pub host, a running Docker daemon and
 globally activated executables are on PATH, and prints the exact fix for whatever is
 missing. Ask the human to install or start what it names.
 
-**Do not work around a stopped Docker** — the database comes from it, and there is no
-second path. Docker Desktop cannot be installed unattended; that one is the human's job.
+**Do not work around a stopped Docker** — Postgres and the object storage come from it,
+for development and for tests alike, and there is no second path. Docker Desktop cannot
+be installed unattended; that one is the human's job.
 
 **A failing pub host check is also the human's job**, and it stops everything: every step
 below begins with `pub get`, and pub sets no deadline on a connection that opens and then
@@ -40,8 +41,8 @@ step that prints one line and hangs until your session is killed.
 
 ## 2. Create the project
 
-Skip this step if you are already inside a DartWay project — that is a folder holding
-three packages whose names end in `_server`, `_client` and `_flutter`.
+Skip this step if you are already inside a DartWay project — a folder holding packages
+whose names end in `_shared`, `_server` and `_flutter`.
 
 From the folder that should *contain* the project:
 
@@ -52,104 +53,131 @@ and the folder names the project — `dartway-demo/` becomes `dartway_demo`:
 
     dartway create .
 
-The name must be lower_snake_case: it becomes three Dart package names. You get
-`my_app_server` (backend), `my_app_client` (generated protocol — never edited by hand),
+The name must be lower_snake_case: it becomes the package names, the type names and the
+storage bucket names. You get `my_app_shared` (the contract: data objects, requests,
+commands, channels, refusal codes), `my_app_server` (handlers, rows, migrations),
 `my_app_flutter` (the app), an AI toolkit in `.claude/`, and a git repository with an
 initial commit.
 
-What is inside is a skeleton, not somebody's product: passwordless phone auth, a
-`UserProfile` with roles, navigation with zone guards, an admin panel, a UI kit as source
-the project owns — and zero domain models.
+What is inside is a skeleton, not somebody's product: sign-in by a one-time code to a
+phone or an e-mail with the terms accepted on sign-up, a profile with a photo and its
+sign-in identifiers, roles, an admin panel (live counters, a members table, a card per
+member, settings), navigation with zone guards, a UI kit as source the project owns, and
+tests on both sides — and zero domain models.
 
 ## 3. Bring it up
 
 The order is not arbitrary; each line explains why it comes where it does.
 
     cd my_app/my_app_server
-    dart pub get
     docker compose up -d
-    dart bin/main.dart --apply-migrations --role maintenance
-    # set bootstrapAdminIdentifier in config/passwords.yaml — see below
-    dart bin/main.dart
+    dart pub get
+    # the environment below, in the shell that runs the server and the seed
+    dart run bin/server.dart
+    dart run bin/seed_dev.dart     # once, in a second shell with the same environment
 
-- **`docker compose up -d`** starts Postgres for development (host port 8090) and object
-  storage for uploads (8100, console 8101). The first run pulls images and can take minutes.
-  There is no test database among them: `dartway test` creates one for the run, on a port
-  Docker picks, and removes it at the end.
-- **Wait for the database to accept connections before migrating.** A container reported as
-  "Started" is not yet Postgres listening; migrating in that window fails with
-  `connection refused`. Poll for readiness — `docker compose exec -T postgres pg_isready -U postgres`
-  until it succeeds — rather than sleeping a fixed number of seconds.
-- **`--role maintenance` is what makes the migration step finish.** Without it the process
-  applies the schema and then keeps serving, and you wait forever for a command that will
-  never return.
-- **Ask the human to put the phone number they want to be the admin** into
-  `bootstrapAdminIdentifier`, under `development:` in `config/passwords.yaml`, before the last
-  line. Ask rather than choose, and never invent a value: whoever can *receive* the one-time
-  code on that number becomes the administrator, so it is theirs to pick — and that file is
-  one you must not read (see the end of this brief). Left empty, the server still starts and
-  says on boot that the admin panel is out of reach, so this postpones the admin panel rather
-  than blocking anything.
-- **The last line is a long-running process.** Start it in the background. Waiting for it to
-  exit will hang you until the session is killed.
+The server is configured by its environment alone — there is no configuration file:
+
+    DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=8090 DW_DATABASE_NAME=my_app
+    DW_DATABASE_USER=postgres DW_DATABASE_PASSWORD=dartway_dev_pw DW_DATABASE_SSL=false
+    DW_STORAGE_ENDPOINT=http://127.0.0.1:8100
+    DW_STORAGE_ACCESS_KEY=dartway_dev DW_STORAGE_SECRET_KEY=dartway_dev_storage_pw
+    DW_STORAGE_PROVISION=true
+    APP_BOOTSTRAP_ADMIN=<the human's phone or e-mail — see below>
+
+- **`docker compose up -d`** starts Postgres (host port 8090) and MinIO, the object
+  storage for uploads (8100, console 8101). The first run pulls images and can take
+  minutes. There is no test database among them: `dartway test` starts its own.
+- **Wait for the database to accept connections before starting the server.** A
+  container reported as "Started" is not yet Postgres listening. Poll —
+  `docker compose exec -T postgres pg_isready -U postgres` until it succeeds — rather
+  than sleeping a fixed number of seconds.
+- **The server migrates the database as it starts**, and exits non-zero naming the
+  migration when one fails. `DW_STORAGE_PROVISION=true` creates the two buckets on the
+  development MinIO; the server then checks that the public one reads anonymously and
+  the private one does not, and refuses to start otherwise.
+- **Ask the human which phone number or e-mail should be the administrator** and put it
+  in `APP_BOOTSTRAP_ADMIN`. Ask rather than choose, and never invent a value: whoever can
+  *receive* the one-time code on that identifier becomes the administrator. Unset, the
+  server still starts and says on boot that the admin panel is out of reach.
+- **`bin/server.dart` is a long-running process.** Start it in the background. Waiting
+  for it to exit will hang you until the session is killed. Run the seed once the server
+  has logged `listening`: it needs the migrated database.
 
 Then the app, in a separate process:
 
     cd my_app/my_app_flutter
     flutter pub get
-    flutter run          # add `-d chrome` to pin it to the browser
+    flutter run          # desktop, iOS simulator or Android emulator
 
-On an Android device or emulator, `localhost` is the phone rather than the host machine —
-`lib/main.dart` carries a LAN address for that case. Web, desktop and the iOS simulator
-need no change.
+In a browser the app calls its server **on its own origin**, as the deployment serves it
+— there is no CORS to configure. Serve both through the development proxy:
+
+    cd my_app/my_app_flutter
+    dart run dartway_cli:dartway dev web            # flutter's web server + the API on http://localhost:8000
+    # or a release build:
+    flutter build web --dart-define=DW_BACKEND_URL=http://localhost:8000
+    dart run dartway_cli:dartway dev proxy --web-dir build/web
+
+Open `http://localhost:8000` exactly — to a browser `127.0.0.1` is another origin.
 
 ## 4. Verify before reporting success
 
 The server must answer on port 8080:
 
-    curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/
+    curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health
 
 Expect `200`. Use whatever HTTP client your platform actually has — the point is the status
 code, not this exact command line.
 
 ## 5. Hand over the sign-in
 
-The database starts empty — there is no account until someone registers. Tell the human to
-register in the app with the number you put in `bootstrapAdminIdentifier`; the server logs on
-boot whether it created or promoted that administrator, or that the key is unset, so read that
-line and report it. **The one-time code is printed in the server console** — read the real one
-out of the server output and pass it on. Nothing is sent over SMS in development, and telling
-the human to "enter anything" is wrong: the code is checked.
+Nothing is sent over SMS or e-mail in development: **the one-time code is printed in the
+server log** (`Sign-in code for <identifier>: <code>`). Read the real one out of the
+server output and pass it on — telling the human to "enter anything" is wrong: the code
+is checked. The seeded accounts sign in with the code `111111` (the seed prints them).
+Tell the human to sign in with the identifier in `APP_BOOTSTRAP_ADMIN`; the server logs
+on boot whether it created or promoted that administrator.
 
-A good first thing to show: sign in as the admin, set the app name in the admin panel — it
-starts empty, which is a legitimate state and not a missing step — and watch the home screen
-of a second window update without a reload. That is the whole stack — Postgres, a CRUD config,
-a typed live list, a widget — proving itself, the write end included.
+A good first thing to show: sign in as the admin in two browser windows, change a
+member's role or the app name in the admin panel, and watch the other window follow
+without a reload. That is the whole stack — Postgres, a handler, a live channel, a
+widget — proving itself, the write end included.
 
 ## 6. What the project expects from you next
 
 The conventions are not optional; DartWay is opinionated on purpose, and a feature written
 against the grain costs more than it saves.
 
-- `.claude/CLAUDE.md` in the created project states the laws: CRUD configs instead of
-  endpoints, domain-first models, what a feature is, where a building block goes.
-- `.claude/skills/dartway-*` are step-by-step playbooks: bringing the project up, models,
-  CRUD configs, the data layer, navigation, the UI kit, finishing a task. They are markdown
-  — readable by any assistant, not only the one that ships that folder format.
-- `dartway check` grades the Flutter package against those conventions and fails on errors.
+- `README.md` in the created project walks through a feature end to end.
+- `.claude/` holds the toolkit: the laws, and step-by-step skills.
+- `dartway check` grades the project against the conventions and fails on errors —
+  including generated code that is out of date and, with `DW_DATABASE_*` set,
+  migrations that do not produce the schema.
 
-The shape of a feature, end to end: a Serverpod model in `.spy.yaml` → `serverpod generate`
-→ a `DwCrudConfig` registered in `crudConfigurations` → a default instance in
-`lib/core/default_models.dart` → a widget reading `ref.watch(dw.repo.modelList<T>())`.
-No endpoint is written at any point. A model with no config is reachable by nobody: access
-is closed until it is opened, deliberately.
+The shape of a feature, end to end: a data object, the requests that read it and the
+commands that change it in `*_shared` → a row class and one handler per request and
+command, each with its access rule, in `*_server` → `dartway generate` →
+`dart run bin/migrate.dart create <name>` → a widget reading
+`ref.watch(dw.request(MyRequest()))` and a button running
+`dw.action((_) => dw.command(MyCommand()))`. A request or command without a handler stops
+the server from starting, deliberately.
+
+Before reporting a change done:
+
+    dartway generate --check
+    dartway test                   # server acceptance: a Postgres and a MinIO of its own
+    (cd my_app_shared && dart test)
+    (cd my_app_flutter && flutter test)
+    dartway check
 
 ## Two things never to do
 
-- **Never print the contents of `config/passwords.yaml`** — not while diagnosing, not to
-  show what is configured. Name the missing key instead.
-- **Never delete the database volume without asking** (`docker compose down -v` destroys the
-  data). It is a fair fix for a drifted local schema, but it is the human's call.
+- **Never print secrets** — database passwords, storage keys, tokens, a delivered code
+  meant for someone else — not while diagnosing, not to show what is configured. Name
+  the variable instead.
+- **Never delete the database volume without asking** (`docker compose down -v` destroys
+  the data). It is a fair fix for a drifted local schema, but it is the human's call.
 
 Docs: https://dartway.dev · Source: https://github.com/dartway/dartway
 ''';

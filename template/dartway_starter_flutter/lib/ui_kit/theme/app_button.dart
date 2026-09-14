@@ -93,7 +93,9 @@ class AppButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (leading != null) ...[leading!, const SizedBox(width: 8)],
-                Text(label),
+                // Flexible: a label longer than the row — a translation, a
+                // narrow phone — wraps instead of overflowing the button.
+                Flexible(child: Text(label, textAlign: TextAlign.center)),
                 if (trailing != null) ...[const SizedBox(width: 8), trailing!],
               ],
             );

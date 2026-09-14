@@ -1,5 +1,0 @@
-enum: UserRole
-serialized: byName
-values:
-  - user
-  - admin

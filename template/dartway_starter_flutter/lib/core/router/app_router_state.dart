@@ -1,35 +1,33 @@
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../dw_core.dart';
-import '../user_profile_roles.dart';
+import '../profile/my_profile.dart';
 
-/// True once a user profile is loaded (i.e. signed in).
-final isSignedInProvider = Provider<bool>((ref) {
-  return ref.watch(dw.userProfileProvider) != null;
-});
-
-/// True when the signed-in user is an admin — gates the `/admin` zone.
-final isAdminProvider = Provider<bool>((ref) {
-  return ref.watch(dw.userProfileProvider)?.isAdmin ?? false;
-});
-
-/// Refresh listenable for the DartWay router. Tracks sign-in and admin state and
-/// notifies the router so zone guards re-run whenever either changes.
+/// Refresh listenable for the DartWay router: what the zone guards decide by,
+/// notifying the router so the guards re-run whenever it changes.
 class AppRouterState extends ChangeNotifier {
-  AppRouterState(this.ref) {
-    ref.listen<bool>(isSignedInProvider, (_, next) {
-      isSignedIn = next;
+  AppRouterState(Ref ref) {
+    ref.listen<int?>(dw.accountId, (_, accountId) {
+      isSignedIn = accountId != null;
       notifyListeners();
     }, fireImmediately: true);
-    ref.listen<bool>(isAdminProvider, (_, next) {
-      isAdmin = next;
-      notifyListeners();
-    }, fireImmediately: true);
+    ref.listen<UserRole?>(
+      myProfileProvider.select((profile) => profile.value?.role),
+      (_, next) {
+        role = next;
+        notifyListeners();
+      },
+      fireImmediately: true,
+    );
   }
 
-  final Ref ref;
-
+  /// Known from the stored session at start, before the server has answered:
+  /// a signed-in user opens straight into the app.
   bool isSignedIn = false;
-  bool isAdmin = false;
+
+  /// The signed-in user's role — `null` while signed out and while the
+  /// profile has not loaded yet. A role an admin changes arrives live.
+  UserRole? role;
 }

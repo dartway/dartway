@@ -2,13 +2,105 @@
   "@@locale": "en",
   "loadFailed": "Could not load this — check your connection and try again.",
   "retry": "Try again",
+  "actionFailed": "Something went wrong. Please try again.",
+  "notImplementedYet": "Not implemented yet",
+  "connectionOnline": "online",
+  "connectionConnecting": "connecting",
+  "connectionOffline": "offline",
+  "connectionIncompatible": "update the app",
+  "requiredField": "Required field",
+  "continueAction": "Continue",
+  "saveAction": "Save",
+  "saveChanges": "Save changes",
+  "tabHome": "Home",
   "tabProfile": "Profile",
-  "ourServices": "Our services",
+  "homeTitle": "Home",
+  "helloUser": "Hello, {name}",
+  "@helloUser": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeAppName": "You are in {appName}",
+  "@homeAppName": {
+    "placeholders": {
+      "appName": {
+        "type": "String"
+      }
+    }
+  },
+  "homeLiveHint": "The name above is a setting stored on the server: change it in the admin panel and every open screen follows, without a reload.",
+  "homeNextStepTitle": "Your first feature",
+  "homeNextStepBody": "Declare a data object and a request in the shared package, a row and a handler on the server, run dartway generate, and watch the request with dw.request in a widget.",
+  "authStepTitle": "{step, select, identifier{Sign in} code{Confirm} consents{New account} other{}}",
+  "@authStepTitle": {
+    "placeholders": {
+      "step": {
+        "type": "String"
+      }
+    }
+  },
+  "authIntro": "Sign in with your phone number or e-mail. If we do not know it yet, signing in creates your account.",
+  "identifierKind": "{kind, select, phone{Phone} email{E-mail} other{—}}",
+  "@identifierKind": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "phoneLabel": "Phone number",
+  "phoneHint": "+1 555 010 0199",
+  "invalidPhoneNumber": "Enter a number of 10 to 15 digits",
+  "emailLabel": "E-mail",
+  "emailHint": "name@example.com",
+  "invalidEmail": "Enter an e-mail address",
+  "getCodeAction": "Get a code",
+  "codeTitle": "Enter the code",
+  "codeSentTo": "We sent a code to {identifier}",
+  "@codeSentTo": {
+    "placeholders": {
+      "identifier": {
+        "type": "String"
+      }
+    }
+  },
+  "resendCodeIn": "A new code in {seconds} s",
+  "@resendCodeIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "resendCodeAction": "Send a new code",
+  "changeIdentifierAction": "Use another phone or e-mail",
+  "consentsIntro": "{identifier} is new here. Tell us your name and accept the terms to create your account.",
+  "@consentsIntro": {
+    "placeholders": {
+      "identifier": {
+        "type": "String"
+      }
+    }
+  },
+  "nameLabel": "Name",
+  "termsConsentPrefix": "I accept the ",
+  "termsLink": "terms of use",
+  "termsConsentMiddle": " and the ",
+  "privacyLink": "privacy policy",
+  "marketingConsent": "Send me news and offers",
+  "youMustAgree": "Accept the terms to continue",
+  "createAccountAction": "Create account",
+  "whatIsYourName": "What is your name?",
+  "whatIsYourNameHint": "This is how others in the app will see you.",
   "profileTitle": "Profile",
   "adminPanel": "Admin panel",
   "signOutAction": "Sign out",
-  "firstNameLabel": "First Name",
+  "firstNameLabel": "First name",
   "firstNameHint": "Enter your first name",
+  "lastNameLabel": "Last name",
   "firstNameRequired": "First name is required",
   "genderLabel": "Gender",
   "genderNotSpecified": "Not specified",
@@ -20,44 +112,29 @@
       }
     }
   },
-  "saveChanges": "Save Changes",
-  "profileUpdated": "Profile updated successfully!",
+  "profileUpdated": "Profile updated",
+  "profilePhotoHint": "Tap the photo to change it",
   "profilePhotoUpdated": "Photo updated",
-  "profilePhotoHint": "Tap to change your photo",
-  "authStepTitle": "{step, select, greeting{Welcome!} registration{Step 1 of 3} login{Step 1 of 2} registrationConfirmation{Step 2 of 3} loginConfirmation{Step 2 of 2} other{}}",
-  "@authStepTitle": {
+  "profilePhotoRemove": "Remove photo",
+  "profilePhotoRemoved": "Photo removed",
+  "identitySectionTitle": "Signing in",
+  "identityNotSet": "Not added",
+  "identityAddAction": "Add",
+  "identityChangeAction": "Change",
+  "identitySheetTitle": "{kind, select, phone{Your new phone number} email{Your new e-mail} other{}}",
+  "@identitySheetTitle": {
     "placeholders": {
-      "step": {
+      "kind": {
         "type": "String"
       }
     }
   },
-  "completeLoginToContinue": "Complete login or registration to continue",
-  "registrationAction": "Registration",
-  "loginAction": "Login",
-  "fillRegistrationData": "Fill registration data",
-  "enterYourPhone": "Enter your phone number",
-  "nameLabel": "Name",
-  "requiredField": "Required field",
-  "youMustAgree": "You must agree",
-  "agreeTermsPrefix": "I am familiar with and agree to the terms of the",
-  "offerLink": "offer,",
-  "userAgreementLink": "user agreement,",
-  "acceptTermsPrefix": "I accept the terms of the",
-  "dataPolicyLinkComma": "data processing policy,",
-  "iGive": "I give",
-  "consentLink": "consent",
-  "marketingConsentText": "on receiving informational and promotional mailings, therefore I give",
-  "dataProcessingConsentText": "on processing personal data in accordance with the",
-  "dataPolicyLink": "data processing policy",
-  "continueAction": "Continue",
-  "alreadyHaveAccount": "Already have an account? ",
-  "stillNoAccount": "Still no account? ",
-  "enterSmsCode": "Enter the code from SMS",
-  "sentCodeToNumber": "Sent 6-digit code to number\n{phone}",
-  "@sentCodeToNumber": {
+  "identitySheetIntro": "We will send a code to confirm it. Until then nothing changes, and you stay signed in.",
+  "identityConfirmAction": "Confirm",
+  "identitySaved": "{kind, select, phone{Phone number saved} email{E-mail saved} other{Saved}}",
+  "@identitySaved": {
     "placeholders": {
-      "phone": {
+      "kind": {
         "type": "String"
       }
     }
@@ -66,12 +143,14 @@
   "adminUsers": "Users",
   "adminSettings": "Settings",
   "backToApp": "Back to the app",
-  "countersLiveHint": "Counters are live: they update in realtime as the data changes.",
+  "countersLiveHint": "The server counts these, and they change live — no reload.",
   "countMembers": "Members",
+  "countAdmins": "Admins",
+  "countMarketingOptIns": "News subscribers",
   "searchLabel": "Search",
-  "searchHint": "Name or phone",
+  "searchHint": "Name, phone or e-mail",
   "allRoles": "All roles",
-  "roleName": "{role, select, client{Client} staff{Staff} admin{Admin} other{—}}",
+  "roleName": "{role, select, user{User} admin{Admin} other{—}}",
   "@roleName": {
     "placeholders": {
       "role": {
@@ -81,6 +160,22 @@
   },
   "noMembersYet": "No members yet.",
   "noMembersMatch": "No members match.",
+  "membersPage": "Page {page} of {pageCount} · {total} members",
+  "@membersPage": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      },
+      "pageCount": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "previousPage": "Previous page",
+  "nextPage": "Next page",
   "confirmChangeRole": "Change the role of {name} to {role}?",
   "@confirmChangeRole": {
     "placeholders": {
@@ -92,33 +187,93 @@
       }
     }
   },
-  "appSettings": "App settings",
-  "signUpEnabledLabel": "Sign-up enabled",
+  "roleLabel": "Role",
+  "ownRoleHint": "Your own role is changed by another admin.",
+  "userCardNotFound": "There is no such user.",
+  "userCardJoined": "Joined {date}",
+  "@userCardJoined": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "userCardTermsAccepted": "Terms accepted {date}",
+  "@userCardTermsAccepted": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "userCardTermsNotAccepted": "Created by a tool: no terms were accepted",
+  "userCardMarketing": "{agreed, select, true{Subscribed to news and offers} other{Not subscribed to news and offers}}",
+  "@userCardMarketing": {
+    "placeholders": {
+      "agreed": {
+        "type": "String"
+      }
+    }
+  },
+  "userCardIdentifiers": "Signs in with",
+  "identifierVerified": "confirmed {date}",
+  "@identifierVerified": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "identifierNotVerified": "never confirmed",
+  "appSettingsTitle": "App settings",
   "appNameLabel": "App name",
-  "saveAction": "Save",
+  "signUpEnabledLabel": "New accounts can sign up",
   "settingsSaved": "Settings saved",
-  "noSettingsConfigured": "No settings configured.",
-  "networkErrorTryAgain": "Network error. Please try again.",
-  "tabHome": "Home",
-  "homeTitle": "Home",
-  "homeGreeting": "Hello, {name}!",
-  "@homeGreeting": {
+  "refusalGeneric": "The request was refused.",
+  "refusalConsentsRequired": "Accept the terms to create an account.",
+  "refusalSignUpClosed": "New accounts cannot sign up right now.",
+  "refusalFirstNameRequired": "Enter your name.",
+  "refusalSettingKeyUnknown": "This setting does not exist.",
+  "refusalOwnRoleLocked": "Your own role is changed by another admin.",
+  "refusalForbidden": "You are not allowed to do this.",
+  "refusalNotFound": "It no longer exists.",
+  "refusalConflict": "This changed a moment ago — please try again.",
+  "refusalInvalid": "Check what you entered.",
+  "refusalInvalidIdentifier": "Enter a valid phone number or e-mail.",
+  "refusalWrongCode": "Wrong code.",
+  "refusalWrongCodeAttemptsLeft": "Wrong code. Attempts left: {attemptsLeft}",
+  "@refusalWrongCodeAttemptsLeft": {
     "placeholders": {
-      "name": {
-        "type": "String"
+      "attemptsLeft": {
+        "type": "int"
       }
     }
   },
-  "homeAppNameFromDatabase": "App name from the database: {appName}",
-  "@homeAppNameFromDatabase": {
+  "refusalCodeExpired": "This code no longer works — request a new one.",
+  "refusalTooManyRequests": "Too many attempts. Please wait a little.",
+  "refusalTooManyRequestsRetryIn": "Too many attempts. Try again in {seconds} s.",
+  "@refusalTooManyRequestsRetryIn": {
     "placeholders": {
-      "appName": {
-        "type": "String"
+      "seconds": {
+        "type": "int"
       }
     }
   },
-  "homeNoAppName": "No app name configured yet — set it in the admin panel.",
-  "homeNextStepTitle": "Your first feature",
-  "homeNextStepBody": "Describe a model, give it a DwCrudConfig on the server, and read it with dw.repo.modelList in a widget. No endpoints to write.",
-  "countSettings": "Settings"
+  "refusalUnknownChannel": "This version of the app does not match the server — please update it.",
+  "refusalIdentifierTaken": "This is already used by another account.",
+  "refusalUploadTooLarge": "The file is too large: at most {megabytes} MB.",
+  "@refusalUploadTooLarge": {
+    "placeholders": {
+      "megabytes": {
+        "type": "int"
+      }
+    }
+  },
+  "refusalUploadTypeRejected": "This type of file is not accepted.",
+  "refusalUploadFailed": "The file did not upload. Please try again.",
+  "refusalFileNotOwned": "This file cannot be used here.",
+  "updateRequiredTitle": "Update the app",
+  "updateRequiredBody": "This version of the app is no longer supported. Install the latest one to keep using it.",
+  "serverMismatchTitle": "The app cannot reach its server",
+  "serverMismatchBody": "This app and its server speak different versions. We are on it — please try again later."
 }

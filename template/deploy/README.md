@@ -115,3 +115,19 @@ is interpreted — and the store refuses the names the compose file sets itself
 (`DW_DATABASE_HOST` and the like), because that value would silently win.
 A running server keeps the environment it started with; a changed secret takes
 effect on the next `run`.
+
+## What this server reads besides the framework
+
+`../dartway_starter_server/bin/server.dart` lists every variable. Two of them
+are the project's to deliver:
+
+- `APP_BOOTSTRAP_ADMIN` — the phone or e-mail made an administrator on every
+  start: `dartway deploy secret set APP_BOOTSTRAP_ADMIN --env staging`. Whoever
+  receives its codes is the admin, so it has no default; unset, the admin panel
+  is out of reach and the server says so in its log.
+- `DW_MIN_APP_BUILD` — the oldest app build still served; older builds are shown
+  the "update the app" screen. Raise it with `secret set` and a `run`.
+
+Sign-in codes are written to the server log until a delivery is wired into
+`deliverCode` (`../dartway_starter_server/lib/src/auth.dart`); list the gateway's
+keys under `requires.secrets` in `config.yaml` when it is.

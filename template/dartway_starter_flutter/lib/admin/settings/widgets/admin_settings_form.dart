@@ -1,8 +1,8 @@
-import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/admin/settings/widgets/admin_setting_row.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
-import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -17,19 +17,24 @@ class AdminSettingsForm extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ref
-        .watch(dw.repo.modelList<AppSetting>())
-        .dwBuildListAsync(
-          loadingItemsCount: AppSettingKey.values.length,
-          childBuilder: (storedSettings) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final setting in AppSettingKey.values)
-                AdminSettingRow(
-                  setting: setting,
-                  storedSettings: storedSettings,
-                ),
-            ],
-          ),
+        .watch(dw.request(const ListAppSettings()))
+        .section(
+          loadingValue: const <AppSetting>[],
+          onRetry: () =>
+              ref.read(dw.request(const ListAppSettings()).notifier).refetch(),
+          builder: (stored) {
+            final storedValues = {for (final s in stored) s.id: s.value};
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final setting in AppSettingKey.values)
+                  AdminSettingRow(
+                    setting: setting,
+                    storedValue: storedValues[setting.key],
+                  ),
+              ],
+            );
+          },
         );
   }
 }

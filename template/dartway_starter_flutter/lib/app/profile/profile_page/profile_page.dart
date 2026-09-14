@@ -1,17 +1,17 @@
-import 'package:dartway_router/dartway_router.dart';
-import 'package:flutter/material.dart';
-import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_flutter/app/profile/profile_page/widgets/profile_settings_widget.dart';
-import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_starter_flutter/app/profile/identity/profile_identity_section.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
-import 'package:dartway_starter_flutter/core/user_profile_provider.dart';
-import 'package:dartway_starter_flutter/core/user_profile_roles.dart';
+import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
 
-class ProfilePage extends ConsumerWidget implements DwFeature {
+import 'widgets/avatar_picker.dart';
+import 'widgets/profile_settings_widget.dart';
+
+class ProfilePage extends StatelessWidget implements DwFeature {
   const ProfilePage({super.key});
 
   @override
@@ -19,29 +19,41 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
     id: 'profile/my-profile',
     title: 'My profile',
     purpose:
-        'A user manages their own account and finds the way out of the app.',
+        'A member manages their own account — photo, name, how they sign in '
+        '— and finds the way out of the app.',
     behaviors: [
+      'Tapping the photo picks an image, which uploads straight to storage '
+          'and becomes the profile photo; it can be removed again.',
+      'Name and gender are saved only when changed.',
+      'The phone and the e-mail the member signs in with are added or changed '
+          'by a code sent to the new one (see profile/identity).',
       'The way into the admin panel is shown to admins only.',
-      'Signing out returns to the auth flow.',
+      'Signing out returns to the sign-in screen.',
     ],
     requirements: [
       'The admin button is convenience, not access: the route guard and the '
-          'server access filters decide who actually gets in.',
+          "server's access rules decide who actually gets in.",
     ],
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final profile = context.profile;
 
     return AppScaffold.main(
       appBar: AppBar(title: AppText.title(l10n.profileTitle)),
       body: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            AvatarPicker(avatarUrl: profile.avatarUrl),
+            const Gap(16),
             const ProfileSettingsWidget(),
+            const Gap(8),
+            const ProfileIdentitySection(),
             const Gap(24),
-            if (ref.watchUserProfile.isAdmin) ...[
+            if (profile.isAdmin) ...[
               AppButton.secondary(
                 l10n.adminPanel,
                 onTap: dw.action(
@@ -50,14 +62,15 @@ class ProfilePage extends ConsumerWidget implements DwFeature {
                   ).goNamed(AdminNavigationZone.admin.name),
                 ),
               ),
-              const Gap(24),
+              const Gap(16),
             ],
             AppButton.text(
               l10n.signOutAction,
-              onTap: dw.action(
-                (context) => ref.read(dw.sessionProvider!.notifier).signOut(),
-              ),
+              // The router takes it from here: signed out, the guards send
+              // every zone but auth to the sign-in screen.
+              onTap: dw.action((_) => dw.signOut()),
             ),
+            const Gap(24),
           ],
         ),
       ),

@@ -1,45 +1,51 @@
+import 'package:collection/collection.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
+
 /// How a setting is edited in the admin panel.
 ///
-/// The members are exactly the row widgets the kit has, which is why this enum
-/// lives in the app and not in the framework: a project that adds a colour
-/// setting adds a `colour` member and the row widget next to it.
+/// The members are exactly the row widgets the panel has, which is why this
+/// enum lives in the app and not in the framework: a project that adds a
+/// colour setting adds a `colour` member and the row widget next to it.
 enum AppSettingType { toggle, number, text }
 
-/// Every setting this app has, with its storage key, its type and the value it
-/// falls back to.
+/// Every setting this app has, with its key, its type and the value it falls
+/// back to.
 ///
-/// The catalogue is the enum itself: open this file and you see the whole list.
-/// Before it, a setting was found by comparing `settingKey` to a string literal
-/// at each read site — the key was duplicated, the value arrived as a `String`
-/// whatever it meant, and a row missing from the database made every screen
-/// invent its own fallback.
+/// The catalogue is the enum itself: open this file and you see the whole
+/// list. The contract holds the same set of keys (`AppSettingKeys.all`) and
+/// the server refuses any other (`settingKeyUnknown`), so a key is added in
+/// both places — a test holds them equal.
 ///
-/// The type argument is what makes a read typed: `settings.valueOf(appName)`
-/// returns a `String` and `valueOf(signUpEnabled)` a `bool`, checked at compile
-/// time. [type] is a separate question — it answers *how to edit this*, which
-/// only the admin panel asks, and only at runtime.
+/// The type argument is what makes a read typed: `valueOf(appName)` returns a
+/// `String` and `valueOf(signUpEnabled)` a `bool`, checked at compile time.
+/// [type] is a separate question — it answers *how to edit this*, which only
+/// the admin panel asks, and only at runtime.
 enum AppSettingKey<T> {
-  /// Shown in the app bar and on the greeting screen.
-  appName<String>('appName', AppSettingType.text, defaultValue: 'DartWay'),
+  /// The name the app shows for itself.
+  appName<String>(
+    AppSettingKeys.appName,
+    AppSettingType.text,
+    defaultValue: 'DartwayStarter',
+  ),
 
-  /// Whether a new visitor may create an account.
+  /// Whether a new visitor may create an account. The server enforces it.
   signUpEnabled<bool>(
-    'signUpEnabled',
+    AppSettingKeys.signUpEnabled,
     AppSettingType.toggle,
     defaultValue: true,
   );
 
   const AppSettingKey(this.key, this.type, {required this.defaultValue});
 
-  /// Storage key — the `AppSetting.settingKey` of the row holding this value.
-  /// A contract: renaming it orphans the row that is already in the database.
+  /// The setting's key on the wire and in the database — `AppSetting.id`. A
+  /// contract: renaming it orphans the value that is already stored.
   final String key;
 
   final AppSettingType type;
 
-  /// Used when no row exists yet, and when the stored text cannot be read as
-  /// [T]. A setting nobody has touched must not be able to break a screen, so
-  /// there is no failure path here at all.
+  /// Used while nothing is stored yet, and when the stored text cannot be read
+  /// as [T]. A setting nobody has touched must not be able to break a screen,
+  /// so there is no failure path here at all.
   final T defaultValue;
 
   /// Reads the stored text as [T].
@@ -62,7 +68,7 @@ enum AppSettingKey<T> {
     return parsed is T ? parsed : defaultValue;
   }
 
-  /// Serialises a value back into the single text column.
+  /// Serialises a value back into the stored text.
   String format(T value) => value.toString();
 
   /// Accepts what a checkbox, a config file and a hand edit each tend to write.
@@ -71,4 +77,12 @@ enum AppSettingKey<T> {
     'false' || '0' || 'no' => false,
     _ => null,
   };
+}
+
+/// Typed reads over the stored settings a `ListAppSettings` answers with.
+extension AppSettingsReader on List<AppSetting> {
+  /// The value of [setting]: the stored one, or its default while nobody has
+  /// saved it.
+  T valueOf<T>(AppSettingKey<T> setting) =>
+      setting.parse(firstWhereOrNull((row) => row.id == setting.key)?.value);
 }

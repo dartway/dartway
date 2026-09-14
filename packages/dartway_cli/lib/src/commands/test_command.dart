@@ -6,8 +6,10 @@ import 'package:args/command_runner.dart';
 import '../deploy/stack.dart';
 import '../project_layout.dart';
 import '../test_database.dart';
+import '../test_storage.dart';
 
-/// Runs the server package's tests against a database that belongs to the run.
+/// Runs the server package's tests against a database — and an S3-compatible
+/// storage — that belong to the run.
 ///
 /// The arrangement it replaces was the other way round: the database belonged
 /// to the *project*, as a `postgres_test` service on a hardcoded host port, and
@@ -29,7 +31,9 @@ import '../test_database.dart';
 /// started here, published on whatever port Docker has free, and removed when
 /// the run ends. The coordinates arrive as `DW_DATABASE_*` — what
 /// `DwDatabaseConfig.fromEnvironment` reads, and what `DwTestDatabase` creates
-/// each test file's own database from.
+/// each test file's own database from. The storage arrives the same way, as
+/// `DW_STORAGE_ENDPOINT`/`_ACCESS_KEY`/`_SECRET_KEY`, where `DwTestStorage`
+/// creates each test file's buckets.
 ///
 /// **Why the environment.** It is a property of the process; a test file
 /// cannot opt out of it, where a per-file configuration is one a file can
@@ -50,6 +54,19 @@ class TestCommand extends Command<int> {
         help:
             'Postgres image to run. Defaults to the one a deployment runs '
             '(${DwStack.postgresImage}).',
+      )
+      ..addFlag(
+        'storage',
+        defaultsTo: true,
+        help:
+            'Also start a MinIO for the run and pass DW_STORAGE_* to the '
+            'suite. --no-storage for a server without uploads.',
+      )
+      ..addOption(
+        'storage-image',
+        help:
+            'MinIO image to run. Defaults to the one a deployment runs '
+            '(${DwStack.minioImage}).',
       );
   }
 
@@ -71,8 +88,8 @@ class TestCommand extends Command<int> {
 
   @override
   String get description =>
-      'Run the server tests against a database created for this run and '
-      'thrown away with it.';
+      'Run the server tests against a database and a storage created for '
+      'this run and thrown away with it.';
 
   @override
   String get invocation => 'dartway test [-- <dart test arguments>]';
@@ -87,56 +104,81 @@ class TestCommand extends Command<int> {
     }
 
     final image = argResults?['image'] as String? ?? _defaultImage;
+    final withStorage = argResults?['storage'] as bool? ?? true;
+    final storageImage =
+        argResults?['storage-image'] as String? ?? DwStack.minioImage;
+    final keep = argResults?['keep'] as bool? ?? false;
 
     final database = TestDatabase(
       image: image,
       name: _maintenanceDatabase,
       user: _user,
     );
+    final storage = TestStorage(image: storageImage);
 
-    stdout.writeln('Starting $image for this run…');
-    final ephemeral = await database.start();
-    if (ephemeral == null) {
+    stdout.writeln(
+      'Starting $image${withStorage ? ' and $storageImage' : ''} for this '
+      'run…',
+    );
+    final (ephemeral, ephemeralStorage) = await (
+      database.start(),
+      withStorage ? storage.start() : Future<EphemeralStorage?>.value(),
+    ).wait;
+
+    Future<void> cleanUp() async {
+      if (keep) {
+        stdout.writeln(_keptMessage(ephemeral, ephemeralStorage));
+        return;
+      }
+      if (ephemeral != null) await database.remove(ephemeral);
+      if (ephemeralStorage != null) await storage.remove(ephemeralStorage);
+    }
+
+    if (ephemeral == null || (withStorage && ephemeralStorage == null)) {
       stderr.writeln(
-        'Could not start the test database. Is the Docker daemon running? '
-        '`dartway doctor` says which prerequisite is missing.',
+        'Could not start the test ${ephemeral == null ? 'database' : 'storage'}. '
+        'Is the Docker daemon running? `dartway doctor` says which '
+        'prerequisite is missing.',
       );
+      if (ephemeral != null) await database.remove(ephemeral);
+      if (ephemeralStorage != null) await storage.remove(ephemeralStorage);
       return 1;
     }
 
-    final keep = argResults?['keep'] as bool? ?? false;
-
-    // The container has to go even when the run does not end normally: an
-    // abandoned one holds a port and, worse, holds rows that the next run would
-    // find. Ctrl-C is the common case and is not an exception a `finally` sees.
+    // The containers have to go even when the run does not end normally: an
+    // abandoned one holds a port and, worse, holds rows that the next run
+    // would find. Ctrl-C is the common case and is not an exception a
+    // `finally` sees.
     //
     // `--keep` survives the interrupt, because an interrupted run is exactly
     // the one somebody wants to look inside.
     final signals = <StreamSubscription<ProcessSignal>>[
       ProcessSignal.sigint.watch().listen((_) async {
-        if (keep) {
-          stdout.writeln(
-            '\nKept: container ${ephemeral.id} on localhost:${ephemeral.port}. '
-            'Remove it with `docker rm -f ${ephemeral.id}`.',
-          );
-        } else {
-          await database.remove(ephemeral);
-        }
+        await cleanUp();
         exit(130);
       }),
     ];
 
     try {
-      if (!await database.waitUntilReady(ephemeral, _readinessTimeout)) {
+      final (databaseReady, storageReady) = await (
+        database.waitUntilReady(ephemeral, _readinessTimeout),
+        ephemeralStorage == null
+            ? Future.value(true)
+            : storage.waitUntilReady(ephemeralStorage, _readinessTimeout),
+      ).wait;
+      if (!databaseReady || !storageReady) {
         stderr.writeln(
-          'The database container started but never began accepting '
-          'connections within ${_readinessTimeout.inSeconds}s.',
+          'The ${databaseReady ? 'storage' : 'database'} container started '
+          'but never began accepting connections within '
+          '${_readinessTimeout.inSeconds}s.',
         );
         return 1;
       }
       stdout.writeln(
-        'Database ready on localhost:${ephemeral.port}; each test file '
-        'creates and migrates a database of its own.',
+        'Database ready on localhost:${ephemeral.port}'
+        '${ephemeralStorage == null ? '' : ', storage on ${ephemeralStorage.endpoint}'}; '
+        'each test file creates a database${ephemeralStorage == null ? '' : ' and buckets'} '
+        'of its own.',
       );
 
       final test = await Process.start(
@@ -148,6 +190,7 @@ class TestCommand extends Command<int> {
             name: _maintenanceDatabase,
             user: _user,
           ),
+          ...?ephemeralStorage?.storageEnvironment(),
         },
         mode: ProcessStartMode.inheritStdio,
       );
@@ -156,14 +199,21 @@ class TestCommand extends Command<int> {
       for (final signal in signals) {
         await signal.cancel();
       }
-      if (keep) {
-        stdout.writeln(
-          '\nKept: container ${ephemeral.id} on localhost:${ephemeral.port}. '
-          'Remove it with `docker rm -f ${ephemeral.id}`.',
-        );
-      } else {
-        await database.remove(ephemeral);
-      }
+      await cleanUp();
     }
   }
+
+  static String _keptMessage(
+    EphemeralDatabase? database,
+    EphemeralStorage? storage,
+  ) => [
+    '',
+    if (database != null)
+      'Kept: database container ${database.id} on localhost:${database.port}.',
+    if (storage != null)
+      'Kept: storage container ${storage.id} on ${storage.endpoint} '
+          '(access key ${TestStorage.accessKey}).',
+    'Remove them with `docker rm -f '
+        '${[?database?.id, ?storage?.id].join(' ')}`.',
+  ].join('\n');
 }

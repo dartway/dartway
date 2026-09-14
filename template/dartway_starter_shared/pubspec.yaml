@@ -1,20 +1,22 @@
 name: dartway_starter_shared
-description: Rules that must hold identically on the server and in the app.
-publish_to: 'none'
+description: The contract between the server and the app — data objects, requests, commands, channels, refusal codes and the rules both sides apply identically.
+publish_to: none
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
 
-# Deliberately empty, and this is the whole design of the package.
-#
-# It cannot depend on the client package: the server does not depend on it
-# either — it carries its own copy of the generated models under
-# lib/src/generated. A shared package that reached for the protocol would be
-# usable by exactly one of the two sides, which is the opposite of the point.
-# Plain values in, plain values out; each side unpacks its own models at the
-# call site.
+# Pure Dart, and nothing but the framework's shared half: whatever this package
+# declares is compiled into the server and into the app alike, so it cannot
+# reach for Flutter, a database or IO.
 dependencies:
+  dartway_core_shared: ^0.20.0-dev.1
 
 dev_dependencies:
   lints: ^6.0.0
-  test: ^1.24.2
+  test: ^1.26.0
+
+# Inside the monorepo the template builds against the LOCAL framework packages.
+# `dartway create` removes this whole block when it copies the template.
+dependency_overrides:
+  dartway_core_shared:
+    path: ../../packages/dartway_core_shared

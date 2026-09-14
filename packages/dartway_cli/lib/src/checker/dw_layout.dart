@@ -17,30 +17,21 @@ const dwFlutterZones = {'admin', 'app', 'auth', 'common'};
 
 /// The layers of a Flutter app: everything that is not a feature.
 ///
-/// `core/` is the app-wide wiring — the router, `DwCore.init`, app settings,
-/// the Studio bridge binding. `shared/` holds building blocks: widgets and
-/// helpers with no story of their own, extensions on models included. There is
-/// deliberately no `data/` (the data layer is `dw.repo`) and no `domain/`
-/// (in a DartWay app the rules live in CRUD configs on the server, and what is
-/// left on the Flutter side is a helper).
+/// `core/` is the app-wide wiring — the router, the `dw` core, app settings,
+/// the refusal texts. `shared/` holds building blocks: widgets and helpers
+/// with no story of their own, extensions on data objects included. There is
+/// deliberately no `data/` (the data layer is `dw.request` and `dw.command`
+/// over the shared contract) and no `domain/` (the rules live in the shared
+/// package, where both sides apply them, and in the server's handlers).
 const dwFlutterLayers = {'core', 'l10n', 'shared', 'ui_kit'};
 
-/// The top level of the server package's `lib/src/` (the 0.x layout; the 1.0
-/// one arrives with the template port).
+/// The top level of the server package's `lib/`: the library a package is
+/// named for, what the generator writes, and everything else under `src/`.
 ///
-/// The boundary that matters here: **domain** — pure rules over models, no
-/// `Session`/IO/DB; **app** — session-aware workflows that span models. Neither
-/// ships in the skeleton, because until such code exists the folder is empty.
-const dwServerAreas = {
-  'app',
-  'crud',
-  'dartway',
-  'domain',
-  'endpoints',
-  'generated',
-  'models',
-  'web',
-};
+/// `src/` itself stays open — a project arranges its handlers, rows and domain
+/// areas as its domain asks — except for `migrations/`, which `bin/migrate.dart`
+/// writes and reads by that path, so it is a fixed name.
+const dwServerLibFolders = {'generated', 'src'};
 
 /// Validates the declared top level of a DartWay project: the folders that may
 /// exist, and the files that must.
@@ -158,26 +149,29 @@ class DwLayoutInspector {
     final libDir = Directory(p.join(serverDir.path, 'lib'));
     if (!libDir.existsSync()) return;
 
+    final library = '${_packageNameOf(serverDir)}.dart';
     _checkEntries(
       dir: libDir,
       label: '${p.basename(serverDir.path)}/lib',
-      allowedFolders: {'src'},
-      allowedFiles: {'server.dart'},
-      requiredEntries: {'server.dart', 'src'},
-      hint: 'the package exposes server.dart and keeps the rest in src/',
+      allowedFolders: dwServerLibFolders,
+      allowedFiles: {library},
+      requiredEntries: {library, 'src'},
+      hint:
+          'the package exposes $library, the generator writes generated/, and '
+          'the rest lives in src/',
     );
 
     final srcDir = Directory(p.join(libDir.path, 'src'));
     if (!srcDir.existsSync()) return;
-
-    _checkEntries(
-      dir: srcDir,
-      label: '${p.basename(serverDir.path)}/lib/src',
-      allowedFolders: dwServerAreas,
-      allowedFiles: const {},
-      requiredEntries: const {},
-      hint: _sorted(dwServerAreas),
-    );
+    if (!File(
+      p.join(srcDir.path, 'migrations', 'migrations.dart'),
+    ).existsSync()) {
+      _findings.add(
+        '${p.basename(serverDir.path)}/lib/src/migrations/migrations.dart is '
+        'missing — it is a fixed name: `bin/migrate.dart create` writes the '
+        'migrations and their registration there',
+      );
+    }
   }
 
   /// One pass over a directory: nothing beyond [allowedFolders] /

@@ -6,7 +6,7 @@ class AppVersionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      exampleAppVersion,
+      dw.config.appVersion ?? '',
       style: const TextStyle(fontSize: 8, color: Colors.blueGrey),
     );
   }

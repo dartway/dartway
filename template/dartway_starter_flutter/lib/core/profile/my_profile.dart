@@ -1,0 +1,50 @@
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
+import 'package:flutter/widgets.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+import '../dw_core.dart';
+
+/// The signed-in member's profile, live: `AsyncData(null)` while signed out.
+///
+/// It follows the member's own profile channel, so a role an admin changes or
+/// a name edited on another device arrives here without a refetch. The
+/// request names no account: the client keeps its state per signed-in
+/// account and resolves the channel for it.
+final myProfileProvider = Provider<AsyncValue<UserProfile?>>((ref) {
+  if (ref.watch(dw.accountId) == null) return const AsyncData(null);
+  return ref.watch(dw.request(const GetMyProfile()));
+});
+
+/// Hands the signed-in profile to the screens below it, loaded.
+///
+/// Placed by `SignedInGate`, which renders nothing of the app until the
+/// profile is there — so a screen reads `context.profile` and never meets a
+/// loading state or a null.
+class SignedInProfile extends InheritedWidget {
+  const SignedInProfile({
+    required this.profile,
+    required super.child,
+    super.key,
+  });
+
+  /// `null` only while signed out, when no screen that reads it is shown.
+  final UserProfile? profile;
+
+  @override
+  bool updateShouldNotify(SignedInProfile oldWidget) =>
+      profile != oldWidget.profile;
+}
+
+extension SignedInProfileContext on BuildContext {
+  /// The signed-in member's profile. Rebuilds the caller when it changes.
+  UserProfile get profile {
+    final profile =
+        dependOnInheritedWidgetOfExactType<SignedInProfile>()?.profile;
+    assert(
+      profile != null,
+      'context.profile was read outside a signed-in SignedInGate. Only the '
+      'screens of the signed-in zones may read it.',
+    );
+    return profile!;
+  }
+}

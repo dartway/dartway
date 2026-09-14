@@ -1,38 +1,35 @@
 name: dartway_starter_server
-description: Starting point for a Serverpod server.
-# version: 1.0.0
-# homepage: https://www.example.com
+description: The server of the app, on DartWay.
+publish_to: none
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
 
 dependencies:
-  serverpod: 3.4.11
-
-  dartway_serverpod_core_server: ^0.13.0
-  http: ^1.5.0
-
-  # Rules that must hold identically here and in the app. A path dependency,
-  # so both Dockerfiles have to copy this directory too — an image that does
-  # not is unbuildable, and pub says so three layers from the cause.
+  dartway_core_server: ^0.20.0-dev.1
+  # The contract with the app. A path dependency, so the server image copies
+  # this directory too — an image that does not is unbuildable, and pub says
+  # so three layers from the cause.
   dartway_starter_shared:
     path: ../dartway_starter_shared
 
-
-
 dev_dependencies:
+  # `dartway generate` runs the generator this package resolves, so it always
+  # matches the framework the project builds against.
+  dartway_generator: ^0.20.0-dev.1
   lints: ^6.0.0
-  test: '^1.24.2'
-  serverpod_test: 3.4.11
-  # Only the integration suite needs it: the fake "old backend" whose hashes the
-  # legacy-verifier test migrates away from.
-  crypto: ^3.0.0
+  test: ^1.26.0
 
 # Inside the monorepo the template builds against the LOCAL framework packages.
-# `dartway create` removes this whole block when it copies the template, so a
-# standalone project resolves the dependencies declared above from pub.dev.
+# `dartway create` removes this whole block when it copies the template.
 dependency_overrides:
-  dartway_serverpod_core_server:
-    path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_server
-  dartway_serverpod_core_shared:
-    path: ../../packages/dartway_serverpod_core/dartway_serverpod_core_shared
+  dartway_client:
+    path: ../../packages/dartway_client
+  dartway_core_server:
+    path: ../../packages/dartway_core_server
+  dartway_core_shared:
+    path: ../../packages/dartway_core_shared
+  dartway_generator:
+    path: ../../packages/dartway_generator
+  dartway_orm:
+    path: ../../packages/dartway_orm

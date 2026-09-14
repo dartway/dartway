@@ -1,50 +1,95 @@
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
+import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_starter_flutter/shared/widgets/role_picker.dart';
+import 'package:dartway_starter_flutter/shared/widgets/user_avatar.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_client/dartway_starter_client.dart';
-import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
-/// Users table over the generic CRUD: lists every profile (admin-only list
-/// access on the server) and edits the role inline. The server privilege guard
-/// blocks non-admins from role changes, so this UI stays simple. Search and
-/// role filtering are client-side over the live list.
+/// One page of members, with the role editable inline and the pager under it.
+/// The page is live: rows change in place, and a new member reads it again.
 class AdminUsersTable extends ConsumerWidget {
-  const AdminUsersTable({super.key, this.searchQuery = '', this.roleFilter});
+  const AdminUsersTable({
+    required this.request,
+    required this.onPage,
+    super.key,
+  });
 
-  final String searchQuery;
-  final UserRole? roleFilter;
+  final ListUserProfiles request;
 
-  bool _matches(UserProfile user) {
-    if (roleFilter != null && user.role != roleFilter) return false;
-    final query = searchQuery.trim().toLowerCase();
-    if (query.isEmpty) return true;
-    final name = '${user.firstName} ${user.lastName ?? ''}'
-        .trim()
-        .toLowerCase();
-    return name.contains(query) || user.phone.contains(query);
-  }
+  /// Switches to page number `page`.
+  final void Function(int page) onPage;
+
+  static final _placeholder = UserProfile(
+    id: 0,
+    accountId: 0,
+    firstName: 'Member',
+    role: UserRole.user,
+    joinedAt: DateTime(2026),
+    phone: '10000000000',
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final table = dw.table(request);
+
     return ref
-        .watch(dw.repo.modelList<UserProfile>())
-        .dwBuildListAsync(
-          loadingItemsCount: 4,
-          childBuilder: (users) {
-            final visible = [
-              for (final user in users)
-                if (_matches(user)) user,
-            ];
-            if (visible.isEmpty) {
+        .watch(table)
+        .section(
+          loadingValue: DwTablePage(
+            List.filled(4, _placeholder),
+            total: 4,
+            page: 1,
+            pageSize: request.pageSize,
+          ),
+          onRetry: () => ref.read(table.notifier).refetch(),
+          builder: (page) {
+            if (page.items.isEmpty) {
               return AppText.body(
-                users.isEmpty
-                    ? context.l10n.noMembersYet
-                    : context.l10n.noMembersMatch,
+                request.search.isEmpty && request.role == null
+                    ? l10n.noMembersYet
+                    : l10n.noMembersMatch,
               );
             }
-            return ListView(
-              children: [for (final user in visible) _UserRow(user: user)],
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    children: [
+                      for (final user in page.items) _UserRow(user: user),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: l10n.previousPage,
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: page.page > 1
+                          ? () => onPage(page.page - 1)
+                          : null,
+                    ),
+                    Flexible(
+                      child: AppText.body(
+                        l10n.membersPage(page.page, page.pageCount, page.total),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: l10n.nextPage,
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: page.page < page.pageCount
+                          ? () => onPage(page.page + 1)
+                          : null,
+                    ),
+                  ],
+                ),
+              ],
             );
           },
         );
@@ -58,38 +103,18 @@ class _UserRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = '${user.firstName} ${user.lastName ?? ''}'.trim();
-    final displayName = name.isEmpty ? user.phone : name;
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: AppText.body(displayName),
-      subtitle: AppText.body(user.phone),
-      trailing: DropdownButton<UserRole>(
-        value: user.role,
-        underline: const SizedBox.shrink(),
-        onChanged: (role) {
-          if (role == null || role == user.role) return;
-          // Changing someone's role is a rights change — confirm it. The
-          // confirmation + label ride on the standard DwUiAction.
-          dw.action(
-            (_) => dw.repo.saveModel(user.copyWith(role: role)),
-            label: 'changeUserRole',
-            confirmation: DwUiConfirmation(
-              context.l10n.confirmChangeRole(
-                displayName,
-                context.l10n.roleName(role.name),
-              ),
-            ),
-          )(context);
-        },
-        items: [
-          for (final role in UserRole.values)
-            DropdownMenuItem(
-              value: role,
-              child: Text(context.l10n.roleName(role.name)),
-            ),
-        ],
+      leading: UserAvatar(avatarUrl: user.avatarUrl),
+      title: AppText.body(user.displayName),
+      // Both identifiers: the row shows how the person signs in, and whether
+      // they have a second way.
+      subtitle: AppText.caption([?user.phone, ?user.email].join(' · ')),
+      onTap: () => GoRouter.of(context).goNamed(
+        AdminNavigationZone.userCard.name,
+        pathParameters: AdminParams.profileId.set(user.id),
       ),
+      trailing: RolePicker(user: user),
     );
   }
 }

@@ -2,6 +2,39 @@
 
 ## Unreleased — DartWay 1.0
 
+- **BREAKING: `dartway create` hands out the 1.0 skeleton.** Three packages — `*_shared` (the
+  contract), `*_server` and `*_flutter`, no generated client package — with sign-in by a one-time
+  code to a phone or an e-mail, the terms accepted on sign-up, a profile with a photo and its
+  sign-in identifiers, roles, an admin panel with a members table and user cards, migrations, a
+  dev seed and tests on both sides. Everything is named after the project: packages, types, the
+  generated registry and schema (`dartwayStarter…` becomes `myApp…`) and the default storage
+  buckets (`my-app-public`, `my-app-private`, as `dartway deploy` names them). The result is
+  formatted, since the renames move line breaks. A project name must now also fit a bucket name:
+  no leading, trailing or doubled underscore, at most 55 characters.
+
+- **`dartway create --framework-path <monorepo>`** resolves the new project's framework packages
+  from a local checkout by path — `dependency_overrides` onto `<monorepo>/packages` for exactly
+  the packages each pubspec reaches — instead of pub.dev, and takes the template from the same
+  checkout. For building the framework, and for versions not yet published.
+
+- **`dartway test` starts a MinIO beside the Postgres** (`DW_STORAGE_ENDPOINT`/`_ACCESS_KEY`/
+  `_SECRET_KEY`, the image a deployment runs, in memory, on a port Docker picks) so upload
+  suites run like the database ones. `--no-storage` skips it; `--storage-image` picks the image.
+
+- **BREAKING: `dartway check` judges a 1.0 project.** Removed with the Serverpod core:
+  `crudConfigMissing`, `crudConfigUnregistered`, `crudRuleUntested` (there are no CRUD configs)
+  and `generatedCodeUnformatted` (the generator formats its own output). Added:
+  `generatedCodeStale` (error) runs the project's `dartway_generator --check`, and
+  `migrationsDrift` (error) runs `bin/migrate.dart check` when `DW_DATABASE_*` names a Postgres —
+  without one it says it did not run. The server layout rule now expects `lib/<package>.dart`,
+  `lib/generated/` and `lib/src/` with `src/migrations/migrations.dart`, instead of the 0.x
+  `server.dart` and `crud`/`endpoints`/`models` areas. `toolkit_law_list_test` is skipped until the
+  toolkit is rewritten for 1.0 (D-033): its law table still names the removed checks.
+
+- **`dartway quickstart` and `dartway doctor` describe 1.0**: the server configured by its
+  environment and migrating as it starts, Postgres and MinIO from `docker compose`, the dev seed,
+  `APP_BOOTSTRAP_ADMIN`, `dartway dev web` for the browser, and the checks a change passes.
+
 - **BREAKING: `dartway deploy` deploys the 1.0 stack, and nothing of Serverpod is left in it.**
   One server process configured by its environment alone, behind one front proxy serving three
   hosts (R2.7): `app` — the Flutter web image, with `/dw/` (the `/dw/live` WebSocket upgrade

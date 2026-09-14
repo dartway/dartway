@@ -1,15 +1,21 @@
 # dartway_starter_flutter
 
-A new Flutter project with Serverpod.
+The app, on `dartway_core_flutter`. How to run it against the server and in a
+browser: `../README.md`.
 
-## Getting Started
+- `lib/auth/` — signing in by phone or e-mail and code, the terms on sign-up
+- `lib/app/` — the signed-in app: home, profile (photo, name, identifiers)
+- `lib/admin/` — the admin panel: dashboard, members, user card, settings
+- `lib/core/` — the DartWay core (`dw`), the router, the profile gate, the
+  refusal texts, the "update the app" screen
+- `lib/shared/` — building blocks several features use
+- `lib/ui_kit/` — the design system, owned by this app
+- `lib/l10n/` — the texts (English and Russian); `flutter gen-l10n` writes
+  `lib/l10n/gen/`
 
-This project is a starting point for a Flutter application that is using
-Serverpod.
+`lib/app_version.dart` repeats the `version:` of `pubspec.yaml` (a test holds
+them equal): the server compares its build number with `DW_MIN_APP_BUILD`.
 
-A great starting point for learning Serverpod is our documentation site at:
-[https://docs.serverpod.dev](https://docs.serverpod.dev).
-
-To run the project, first make sure that the server is running, then do:
-
-    flutter run
+```bash
+flutter test          # widget tests on the in-memory DwFakeServer
+```

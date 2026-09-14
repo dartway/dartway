@@ -4,6 +4,8 @@
 	<dict>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Your photo library is used to choose a profile photo.</string>
 		<key>CFBundleDisplayName</key>
 		<string>Project Name Flutter</string>
 		<key>CFBundleExecutable</key>

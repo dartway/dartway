@@ -38,23 +38,12 @@ void main() {
     }
   }();
 
-  // The two projects this repository ships images for. The skeleton's app code
-  // is still the 0.x one — its Flutter package depends on a generated client
-  // package the 1.0 images no longer copy — so that one image is skipped, by
-  // name and with the reason, until the template is ported; it is not dropped.
-  const skeletonNotPorted =
-      'template/ app code is not on DartWay 1.0 yet: dartway_starter_flutter '
-      'still depends on dartway_starter_client, which the 1.0 web image does '
-      'not copy. Re-enable with the template port.';
+  // The two projects this repository ships images for, both halves of each.
   final images = [
-    (tree: 'example', package: 'dartway_example_server', skip: null),
-    (tree: 'example', package: 'dartway_example_flutter', skip: null),
-    (tree: 'template', package: 'dartway_starter_server', skip: null),
-    (
-      tree: 'template',
-      package: 'dartway_starter_flutter',
-      skip: skeletonNotPorted,
-    ),
+    (tree: 'example', package: 'dartway_example_server'),
+    (tree: 'example', package: 'dartway_example_flutter'),
+    (tree: 'template', package: 'dartway_starter_server'),
+    (tree: 'template', package: 'dartway_starter_flutter'),
   ];
 
   for (final image in images) {
@@ -87,7 +76,6 @@ void main() {
               'directory that is not there.',
         );
       },
-      skip: image.skip,
     );
 
     test('${image.tree}/$package: .dockerignore admits everything the image '
@@ -131,16 +119,18 @@ void main() {
       );
     }
   });
-  test('the shared package depends on nothing', () {
-    // The constraint is the whole design. The server does not depend on the
-    // client package — it carries its own generated copy — so a shared package
-    // that reached for the protocol would serve exactly one of the two sides.
+  test('the shared package depends on the shared half of the framework '
+      'and nothing else', () {
+    // The constraint is the whole design: whatever the contract package pulls
+    // in is compiled into the server and into the app alike, so a dependency
+    // on either side's half — or on Flutter, or IO — would make it the
+    // contract of one side only.
     final document = loadYaml(
       File(
         p.join(template.path, 'dartway_starter_shared', 'pubspec.yaml'),
       ).readAsStringSync(),
     );
-    final dependencies = (document as YamlMap)['dependencies'];
-    expect(dependencies, anyOf(isNull, isEmpty));
+    final dependencies = (document as YamlMap)['dependencies'] as YamlMap;
+    expect(dependencies.keys, ['dartway_core_shared']);
   });
 }

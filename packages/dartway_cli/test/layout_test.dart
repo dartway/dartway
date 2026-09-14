@@ -120,27 +120,80 @@ void main() {
     );
   });
 
-  test('the server package is checked too', () {
+  /// A server package named `my_server` holding [entries] under `lib/`.
+  Directory serverWith(List<String> entries) {
     final serverDir = Directory(p.join(sandbox.path, 'my_server'))
       ..createSync(recursive: true);
-    for (final entry in ['lib/src/crud', 'lib/src/models', 'lib/src/utils']) {
-      Directory(p.join(serverDir.path, entry)).createSync(recursive: true);
+    File(
+      p.join(serverDir.path, 'pubspec.yaml'),
+    ).writeAsStringSync('name: my_server\n');
+    for (final entry in entries) {
+      final path = p.join(serverDir.path, 'lib', entry);
+      if (entry.endsWith('/')) {
+        Directory(path).createSync(recursive: true);
+      } else {
+        File(path)
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('');
+      }
     }
-    File(p.join(serverDir.path, 'lib', 'server.dart')).writeAsStringSync('');
+    return serverDir;
+  }
 
+  List<String> serverFindings(Directory serverDir) {
     final packageDir = Directory(p.join(sandbox.path, 'my_flutter'))
       ..createSync(recursive: true);
     File(
       p.join(packageDir.path, 'pubspec.yaml'),
     ).writeAsStringSync('name: my_flutter\n');
-
     final inspector = DwLayoutInspector(
       flutterPackageDir: packageDir,
       serverPackageDir: serverDir,
     );
     inspector.run();
+    return inspector.findings;
+  }
 
-    expect(inspector.findings, hasLength(1));
-    expect(inspector.findings.single, contains('my_server/lib/src/utils'));
+  const serverLayout = [
+    'my_server.dart',
+    'generated/dw_schema.dart',
+    'src/entities/people.dart',
+    'src/handlers/profile_handlers.dart',
+    'src/chat/chat_files.dart',
+    'src/auth.dart',
+    'src/migrations/migrations.dart',
+  ];
+
+  test('the server package: its library, generated/ and src/, whatever src/ '
+      'holds besides its migrations', () {
+    expect(serverFindings(serverWith(serverLayout)), isEmpty);
+  });
+
+  test('the server package: anything else beside its library is reported, '
+      'and so is the 0.x layout', () {
+    final findings = serverFindings(
+      serverWith([...serverLayout, 'server.dart', 'utils/']),
+    );
+    expect(findings, hasLength(2));
+    expect(
+      findings.join('\n'),
+      allOf(
+        contains('my_server/lib/server.dart'),
+        contains('my_server/lib/utils'),
+      ),
+    );
+  });
+
+  test('the server package: its library and the migrations registry are '
+      'fixed names', () {
+    final findings = serverFindings(serverWith(['src/handlers/']));
+    expect(findings, hasLength(2));
+    expect(
+      findings.join('\n'),
+      allOf(
+        contains('my_server/lib/my_server.dart is missing'),
+        contains('lib/src/migrations/migrations.dart is missing'),
+      ),
+    );
   });
 }

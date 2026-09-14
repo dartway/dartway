@@ -1,0 +1,29 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
+
+import 'call_context.dart';
+
+/// Who may listen to what. Checked once, at subscription — and only for a
+/// signed-in connection, which every subscription requires: everything
+/// published to a channel is readable by every subscriber of it.
+final appChannels = <DwChannelRule>[
+  // "My" channel: a member subscribes to their own account's only.
+  DwChannelRule.ofCaller(DartwayStarterChannel.profile),
+  DwChannelRule.single(
+    DartwayStarterChannel.settings,
+    canSubscribe: _anyMember,
+  ),
+  DwChannelRule.single(
+    DartwayStarterChannel.admin,
+    canSubscribe: (ctx) => ctx.isAdmin,
+  ),
+];
+
+Future<bool> _anyMember(DwCallContext ctx) async => true;
+
+const adminChannel = DwLiveChannel(DartwayStarterChannel.admin);
+const settingsChannel = DwLiveChannel(DartwayStarterChannel.settings);
+
+/// Where [accountId]'s own profile hears a change to it, whoever made it.
+DwLiveChannel profileOf(int accountId) =>
+    DwLiveChannel.forAccount(DartwayStarterChannel.profile, accountId);

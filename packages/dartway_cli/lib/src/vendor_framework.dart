@@ -286,15 +286,16 @@ Map<String, Set<String>> _dependenciesByPackage(Directory project) {
   };
 }
 
-/// The `dartway_*` packages [pubspec] names as dependencies of its own.
+/// The `dartway_*` packages [pubspec] names as dependencies of its own — and
+/// as dev dependencies too, unless [includeDev] is false.
 ///
 /// Read line by line rather than with a YAML parser: the question is which
 /// names appear as keys under a dependency section, and the answer survives
 /// the pubspecs this repository actually writes. `dependency_overrides` is
 /// skipped — it is what this script writes, and reading it back would make a
 /// second run inherit the first one's reach.
-Set<String> dartwayDependenciesOf(String pubspec) {
-  const sections = {'dependencies:', 'dev_dependencies:'};
+Set<String> dartwayDependenciesOf(String pubspec, {bool includeDev = true}) {
+  final sections = {'dependencies:', if (includeDev) 'dev_dependencies:'};
   final found = <String>{};
   var inSection = false;
   for (final line in pubspec.split('\n')) {

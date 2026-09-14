@@ -1,11 +1,9 @@
 part of '../router.dart';
 
-/// Main app zone. `home` is the zone root. The guard redirects signed-out users
-/// to the auth zone, so no page in this zone gates on auth by itself.
-///
-/// Add your screens here as you build the domain: `simple` for a plain page,
+/// Main app zone. `home` is the zone root. Guard redirects signed-out users to
+/// the auth zone. Add parameterized routes with
 /// `DwNavigationRouteDescriptor.parameterized` + a [DwNavigationParamsMixin]
-/// enum for routes that carry parameters.
+/// enum, as the admin zone's user card does.
 enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
   home(DwNavigationRouteDescriptor.zoneRoot(pageWidget: HomePage())),
   profile(

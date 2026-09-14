@@ -1,50 +1,45 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
-import 'package:dartway_studio_binding/dartway_studio_binding.dart';
-import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_client/dartway_starter_client.dart';
 
 import 'core/app_l10n.dart';
-import 'core/default_models.dart';
 import 'core/dw_core.dart';
+import 'core/profile/signed_in_gate.dart';
 import 'core/router/router.dart';
-import 'core/studio/logic/studio_project_manifest.dart';
 import 'ui_kit/ui_kit.dart';
 
-/// The application: all wiring lives here, while `main` only supplies concrete
-/// development parameters (backend URL, version) and runs it.
+/// The application. All app wiring lives here; `main` only
+/// supplies concrete parameters (server address, version) and runs it.
 class DartwayStarterApp {
-  const DartwayStarterApp({
-    required this.backendUrl,
-    this.appVersion = 'local',
-  });
+  const DartwayStarterApp({required this.baseUrl, required this.appVersion});
 
-  /// Backend base URL the Serverpod client connects to.
-  final String backendUrl;
+  /// Where the server's calls and live socket are: `http://localhost:8080`.
+  final Uri baseUrl;
 
-  /// Version label shown in the corner of every page.
+  /// This build, `<semver>+<build>`: shown in the corner of every page and in
+  /// error reports, and sent with every call.
   final String appVersion;
 
   void run() {
-    exampleAppVersion = appVersion;
-    initExampleDwCore(backendUrl: backendUrl);
+    // Built here, started by the runner: `dw.init()` starts the plugins and
+    // reads the stored session, without waiting for the server — a start
+    // offline is a start.
+    createAppDwCore(baseUrl: baseUrl, appVersion: appVersion);
 
     DwAppRunner(
-      // No onError: uncaught errors flow into the dw pipeline, where DwCore
-      // filters connection blips and alerts everything else with app context
-      // (route, mounted features, action, user) — zero-config alerting.
-      appInitializers: [
-        () =>
-            dw.initDwCore(initRepositoryFunction: DefaultModels.initRepository),
-      ],
-      child: const _ExampleMaterialApp(),
+      // No onError: uncaught errors flow into the dw pipeline, where the app's
+      // `onErrorReport` sorts them out.
+      appInitializers: [dw.init],
+      supportedLocales: AppLocalizations.supportedLocales,
+      child: const AppRoot(),
     ).run();
   }
 }
 
-class _ExampleMaterialApp extends ConsumerWidget {
-  const _ExampleMaterialApp();
+/// The application widget: router, localizations, theme, notifications and
+/// the profile gate. A widget test pumps it inside its own `ProviderScope`
+/// once it has built a core.
+class AppRoot extends ConsumerWidget {
+  const AppRoot({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,51 +52,10 @@ class _ExampleMaterialApp extends ConsumerWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: AppTheme.light,
-      builder: (context, child) {
-        // The Studio binding is inert unless the app runs embedded in the
-        // DartWay Studio preview frame. Everything mechanical about it — the
-        // handshake, the reports, the persona flow — belongs to the package;
-        // what stays here is only what this app alone can answer.
-        final appChild = DwStudioBinding(
-          core: dw,
-          manifest: appStudioManifest,
-          router: router,
-          // Which profile field is the identity Studio matches its personas
-          // against, and which one names the user on screen.
-          describeUser: (profile) =>
-              DwStudioUser(identifier: profile.phone, label: profile.firstName),
-          locale: DwStudioLocale(
-            provider: appLocaleProvider,
-            select: (languageCode) => ref
-                .read(appLocaleProvider.notifier)
-                .selectLanguageCode(languageCode),
-          ),
-          // Accept only a Studio presenting a token signed for this
-          // deployment's own address, so a token taken from here is useless
-          // anywhere else. Empty define = local dev, no check.
-          validateAccessToken: studioSignedAccessValidator(
-            const String.fromEnvironment('STUDIO_APP_ORIGIN'),
-          ),
-          child: DwUserAsyncScope<UserProfile>(
-            skipOnSignIn: false,
-            whenProfileReadyCallback: (_) {},
-            // Subscribed once, for the whole app: anything a CRUD config
-            // broadcasts to this channel (`broadcastTo:` on the server) is routed
-            // by type into every `dw.repo.modelList<T>()` on screen. That is what
-            // makes "one user changed it, everyone sees it" cost one line on the
-            // server and nothing here — a new feature inherits it.
-            child: DwChannelSubscriptionWidget(
-              channel: DwCoreConst.publicUpdatesChannel,
-              child: child ?? const SizedBox.shrink(),
-            ),
-          ),
-        );
-
-        return DwNotificationsListener(
-          handlers: {DwUiNotification: DwUiNotificationHandler()},
-          child: appChild,
-        );
-      },
+      builder: (context, child) => DwNotificationsListener(
+        handlers: {DwUiNotification: DwUiNotificationHandler()},
+        child: SignedInGate(child: child ?? const SizedBox.shrink()),
+      ),
       routerConfig: router.router,
     );
   }

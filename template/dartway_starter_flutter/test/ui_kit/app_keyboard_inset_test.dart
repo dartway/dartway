@@ -35,9 +35,10 @@ class _SheetHostState extends State<_SheetHost> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     builder: (context, child) => MediaQuery(
-      data: MediaQuery.of(
-        context,
-      ).copyWith(size: _screen, viewInsets: EdgeInsets.only(bottom: keyboard)),
+      data: MediaQuery.of(context).copyWith(
+        size: _screen,
+        viewInsets: EdgeInsets.only(bottom: keyboard),
+      ),
       child: child!,
     ),
     home: Scaffold(body: widget.child),
@@ -111,7 +112,10 @@ void main() {
     ) {
       final box = tester.widget<Container>(
         find
-            .ancestor(of: find.byKey(childKey), matching: find.byType(Container))
+            .ancestor(
+              of: find.byKey(childKey),
+              matching: find.byType(Container),
+            )
             .first,
       );
       final padding = tester.widget<Padding>(
@@ -143,9 +147,9 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      tester.state<_SheetHostState>(find.byType(_SheetHost)).raiseKeyboard(
-        _raised,
-      );
+      tester
+          .state<_SheetHostState>(find.byType(_SheetHost))
+          .raiseKeyboard(_raised);
       await tester.pump();
       await tester.pump(AppKeyboardInset.duration ~/ 2);
 

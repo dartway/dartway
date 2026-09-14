@@ -6,16 +6,26 @@
       "type": "dart",
       "request": "launch",
       "cwd": "dartway_starter_server",
-      "program": "bin/main.dart",
-      "args": ["--apply-migrations"]
+      "program": "bin/server.dart",
+      "env": {
+        "DW_DATABASE_HOST": "127.0.0.1",
+        "DW_DATABASE_PORT": "8090",
+        "DW_DATABASE_NAME": "dartway_starter",
+        "DW_DATABASE_USER": "postgres",
+        "DW_DATABASE_PASSWORD": "dartway_dev_pw",
+        "DW_DATABASE_SSL": "false",
+        "DW_STORAGE_ENDPOINT": "http://127.0.0.1:8100",
+        "DW_STORAGE_ACCESS_KEY": "dartway_dev",
+        "DW_STORAGE_SECRET_KEY": "dartway_dev_storage_pw",
+        "DW_STORAGE_PROVISION": "true"
+      }
     },
     {
-      "name": "Flutter (web)",
+      "name": "Flutter",
       "type": "dart",
       "request": "launch",
       "cwd": "dartway_starter_flutter",
-      "program": "lib/main.dart",
-      "args": ["-d", "chrome"]
+      "program": "lib/main.dart"
     }
   ]
 }

@@ -1,4 +1,3 @@
-import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
 
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
@@ -15,8 +14,6 @@ class AdminScaffold extends StatelessWidget implements DwFeature {
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
     id: 'admin/shell',
     title: 'Admin shell',
-    // No purpose: the shell serves the admin zone, it does not carry a
-    // purpose of its own. Delete this spec if you delete the panel.
     behaviors: [
       'From 700 logical pixels wide the sections sit in a navigation rail; '
           'below that, in a bottom bar.',
@@ -45,7 +42,8 @@ class AdminScaffold extends StatelessWidget implements DwFeature {
   String _sectionLabel(AppLocalizations l10n, AdminNavigationZone route) =>
       switch (route) {
         AdminNavigationZone.admin => l10n.adminDashboard,
-        AdminNavigationZone.users => l10n.adminUsers,
+        AdminNavigationZone.users ||
+        AdminNavigationZone.userCard => l10n.adminUsers,
         AdminNavigationZone.settings => l10n.adminSettings,
       };
 

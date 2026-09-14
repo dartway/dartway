@@ -4,17 +4,18 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../checker/dw_check_type.dart';
-import '../checker/dw_crud_coverage.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_framework_lock.dart';
-import '../checker/dw_generated_format.dart';
 import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_layout.dart';
+import '../checker/dw_server_contract.dart';
 import '../project_layout.dart';
 
-/// Runs the built-in DartWay convention checks on the project's Flutter
-/// package. Fails (non-zero exit) only on error-severity findings —
-/// warnings and infos are advisory.
+/// Runs the built-in DartWay convention checks: the Flutter package's
+/// structure and UI kit, the project layout, and the server's contract with
+/// its sources — generated code up to date, migrations producing the schema.
+/// Fails (non-zero exit) only on error-severity findings — warnings and infos
+/// are advisory.
 class CheckCommand extends Command<int> {
   CheckCommand() {
     argParser
@@ -40,7 +41,8 @@ class CheckCommand extends Command<int> {
 
   @override
   String get description =>
-      'Run DartWay convention checks on the Flutter package.';
+      'Run DartWay convention checks: the app, the layout, generated code and '
+      'migrations.';
 
   @override
   String get invocation =>
@@ -91,17 +93,16 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run();
 
-      // Judges the server and client packages, so it is out of scope for a run
-      // narrowed to a folder of the Flutter package, and silent when the
-      // Flutter package was found standing on its own.
-      errorCount += DwGeneratedFormatInspector(
+      // Judge the server package, so they are out of scope for a run narrowed
+      // to a folder of the Flutter package, and silent when the Flutter
+      // package was found standing on its own.
+      errorCount += DwGeneratedCodeInspector(
         serverPackageDir: layout?.serverPackageDir,
-        clientPackageDir: switch (layout) {
-          ProjectLayout(:final root, clientPackage: final client?) => Directory(
-            p.join(root.path, client),
-          ),
-          _ => null,
-        },
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
+      errorCount += DwMigrationsInspector(
+        serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();
@@ -110,14 +111,6 @@ class CheckCommand extends Command<int> {
       // `--dir` for the same reason the layout check is.
       errorCount += DwFrameworkLockInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
-        filterType: filterType,
-        filterSeverity: filterSeverity,
-      ).run();
-
-      // Reads the server's models, configs and tests together — which is the
-      // only way to see what is missing between them.
-      errorCount += DwCrudCoverageInspector(
-        serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();

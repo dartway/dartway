@@ -123,18 +123,30 @@ class _AppTextFormFieldState extends State<AppTextFormField> {
   ///
   /// `oldWidget.value` cannot be stale in that way: it is what the parent held
   /// on the previous build, so a difference means a real external change.
+  ///
+  /// The adoption itself waits for the end of the frame. Writing the controller
+  /// here, during a build, makes the `TextFormField` report the change to its
+  /// enclosing `Form`, which rebuilds — and a `Form` above the widget being
+  /// built may not be marked dirty mid-build: the phone field, putting its
+  /// prefix in on focus, asserted on exactly that.
   @override
   void didUpdateWidget(covariant AppTextFormField oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.value != oldWidget.value && widget.value != _controller.text) {
+    final adopted = widget.value;
+    if (adopted == oldWidget.value || adopted == _controller.text) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Superseded by a newer parent value, or already typed in.
+      if (!mounted || widget.value != adopted || _controller.text == adopted) {
+        return;
+      }
       _adoptingExternalValue = true;
       _syncControllerText(
-        widget.value,
+        adopted,
         placeCursorAtEnd: widget.cursorToEndOnExternalUpdate,
       );
       _adoptingExternalValue = false;
-    }
+    });
   }
 
   void _onControllerChanged() {

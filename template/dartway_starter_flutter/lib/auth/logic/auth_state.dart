@@ -1,115 +1,112 @@
-import 'package:dartway_serverpod_core_flutter/dartway_serverpod_core_flutter.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../core/dw_core.dart';
 import 'auth_state_model.dart';
 import 'auth_step.dart';
 
-/// Drives the phone-based auth flow on top of the DartWay framework auth:
-/// a [DwAuthRequest] (login/register, phone provider) is sent, the server
-/// replies `pendingVerification`, the user enters the code, and a
-/// [DwAuthVerification] exchanges it for an access token that completes the
-/// request and signs the user in.
+/// Drives signing in on DartWay auth, by phone or by e-mail.
+///
+/// [requestCode] sends `DwRequestCode` and keeps the ticket the server answers
+/// with; [verifyCode] sends the typed code against that ticket as
+/// `DwVerifyCode`, and the session it answers with is adopted by `dw.signIn` —
+/// which is what moves the router out of the auth zone.
+///
+/// A code that would create an account is refused with `consentsRequired`
+/// until the terms are accepted: the flow then asks for them and verifies the
+/// same code again, with what it collected.
+///
+/// The commands' results are returned, so that `dw.action` shows a refusal (an
+/// invalid identifier, a wrong or expired code, too many attempts) in the
+/// user's language without any code here.
 class AuthState extends Notifier<AuthStateModel> {
-  DwAuthRequest? _pendingRequest;
+  DwCodeTicket? _ticket;
 
   @override
-  AuthStateModel build() {
-    return const AuthStateModel(
-      currentStep: AuthStep.greeting,
-      firstName: '',
-      phoneRaw: '',
-      otpRaw: '',
-      allDocumentsAccepted: false,
-      marketingAgreed: false,
-    );
-  }
-
-  void goTo(AuthStep step) {
-    state = state.copyWith(currentStep: step);
-  }
+  AuthStateModel build() => const AuthStateModel();
 
   void update({
-    String? firstName,
+    DwIdentifierKind? kind,
     String? phoneRaw,
-    String? otpRaw,
-    bool? allDocumentsAccepted,
+    String? emailRaw,
+    String? codeRaw,
+    String? firstName,
+    bool? termsAccepted,
     bool? marketingAgreed,
-  }) {
-    state = state.copyWith(
-      firstName: firstName ?? state.firstName,
-      phoneRaw: phoneRaw ?? state.phoneRaw,
-      otpRaw: otpRaw ?? state.otpRaw,
-      allDocumentsAccepted: allDocumentsAccepted ?? state.allDocumentsAccepted,
-      marketingAgreed: marketingAgreed ?? state.marketingAgreed,
-    );
+  }) => state = state.copyWith(
+    kind: kind,
+    phoneRaw: phoneRaw,
+    emailRaw: emailRaw,
+    codeRaw: codeRaw,
+    firstName: firstName,
+    termsAccepted: termsAccepted,
+    marketingAgreed: marketingAgreed,
+  );
+
+  /// One step back. Leaving the code step forgets the ticket: another
+  /// identifier needs a code of its own.
+  void back() {
+    final previous = state.step.previousStep;
+    if (previous == null) return;
+    if (previous == AuthStep.identifier) _ticket = null;
+    state = state.copyWith(step: previous);
   }
 
-  /// Requests a one-time code for the entered phone number.
-  Future<void> requestOtp() async {
-    final isRegistration = state.currentStep == AuthStep.registration;
+  /// Asks the server to send a one-time code to the entered identifier.
+  Future<DwCallResult<DwCodeTicket>> requestCode() async {
+    final result = await dw.command(
+      DwRequestCode(
+        kind: state.kind,
+        // The field's validator has let only a valid identifier through; the
+        // server applies the same rule to whatever arrives.
+        identifier: state.identifier ?? state.rawIdentifier,
+      ),
+    );
+    if (result case DwCallOk(value: final ticket)) {
+      _ticket = ticket;
+      state = state.copyWith(
+        step: AuthStep.code,
+        codeRaw: '',
+        resendAvailableAt: ticket.resendAfter,
+      );
+    }
+    return result;
+  }
 
-    final result = await dw.repo.saveModel(
-      DwAuthRequest(
-        requestType: isRegistration
-            ? DwAuthRequestType.register
-            : DwAuthRequestType.login,
-        userIdentifier: state.phoneDigits,
-        authProvider: DwAuthProvider.phone,
-        extraData: isRegistration
+  /// Verifies the entered code and signs in.
+  ///
+  /// Answers `null` when the server asks for the terms first: the consents
+  /// step is the answer, not a refusal to show.
+  Future<DwCallResult<DwAuthSession>?> verifyCode() async {
+    // The code step is only ever entered by a successful [requestCode].
+    final ticket =
+        _ticket ?? (throw StateError('verifyCode ran before requestCode'));
+    final result = await dw.command(
+      DwVerifyCode(
+        ticketId: ticket.id,
+        code: state.codeDigits,
+        registration: state.step == AuthStep.consents
             ? {
-                'firstName': state.firstName,
-                'agreedForMarketingCommunications': state.marketingAgreed
-                    .toString(),
+                RegistrationKeys.terms: '${state.termsAccepted}',
+                RegistrationKeys.marketing: '${state.marketingAgreed}',
+                RegistrationKeys.firstName: state.firstName.trim(),
               }
-            : null,
+            : const {},
       ),
-      apiGroupOverride: DwCoreConst.dartwayInternalApi,
     );
-
-    if (result.status == DwAuthRequestStatus.failed) {
-      dw.notify.error('Could not send the code. Please try again.');
-      return;
+    switch (result) {
+      case DwCallRefused(:final refusal)
+          when refusal.isCode(DartwayStarterRefusal.consentsRequired):
+        state = state.copyWith(step: AuthStep.consents);
+        return null;
+      case DwCallOk(value: final session):
+        await dw.signIn(session);
+        // Signed in: the flow starts from the beginning next time, and what
+        // was typed here does not outlive it.
+        ref.invalidateSelf();
+      default:
     }
-
-    _pendingRequest = result;
-    state = state.copyWith(currentStep: state.currentStep.requestOtpNextStep);
-  }
-
-  /// Confirms the entered code and completes sign-in.
-  Future<bool> verifyOtp() async {
-    final pending = _pendingRequest;
-    if (pending == null) {
-      dw.notify.error('No pending verification request');
-      return false;
-    }
-
-    final verification = await dw.repo.saveModel(
-      DwAuthVerification(
-        dwAuthRequestId: pending.id!,
-        verificationCode: state.otpDigits,
-      ),
-      apiGroupOverride: DwCoreConst.dartwayInternalApi,
-    );
-
-    final accessToken = verification.accessToken;
-    if (accessToken == null) {
-      dw.notify.error('Invalid or expired code. Please try again.');
-      return false;
-    }
-
-    final result = await dw.repo.saveModel(
-      pending.copyWith(accessToken: accessToken),
-      apiGroupOverride: DwCoreConst.dartwayInternalApi,
-    );
-
-    final success =
-        result.status == DwAuthRequestStatus.completed ||
-        result.status == DwAuthRequestStatus.verified;
-    if (!success) {
-      dw.notify.error('Could not complete sign-in. Please try again.');
-    }
-    return success;
+    return result;
   }
 }
 

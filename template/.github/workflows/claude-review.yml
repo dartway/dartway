@@ -39,13 +39,16 @@ jobs:
 
             Review the changes in this pull request (diff against the PR's base branch).
 
-            This project is built on DartWay (Serverpod + Flutter): logic lives in CRUD
-            configs rather than endpoints, models come first, and the generated client
-            package `dartway_starter_client` is never edited by hand. The conventions the
+            This project is built on DartWay (fullstack Dart: a Dart server and a Flutter
+            app): the contract — data objects, requests, commands, channels, refusal codes —
+            lives in `dartway_starter_shared`, every request and command has one handler on
+            the server with an access rule, and the codecs, tables and registries are
+            generated (`dartway generate`) and never edited by hand. The conventions the
             project holds itself to are in `.claude/CLAUDE.md`.
 
-            Do not comment on generated or platform files: `dartway_starter_client/**`,
-            `**/generated/**`, `*.g.dart`, `*.freezed.dart`, `*.mocks.dart`, `*.pb.dart`;
+            Do not comment on generated or platform files: `*.dw.dart`,
+            `**/generated/**`, `**/l10n/gen/**`, `*.g.dart`, `*.freezed.dart`, `*.mocks.dart`,
+            `*.pb.dart`;
             iOS/Android project files (`*.pbxproj`, `*.xcconfig`, `*.xcscheme`, `*.plist`,
             `*.entitlements`, `Podfile.lock`, `Runner.xcodeproj/**`); lockfiles and assets
             (`pubspec.lock`, `*.lock`, `*.png`, `*.jpg`, `*.svg`, `*.webp`). Focus on

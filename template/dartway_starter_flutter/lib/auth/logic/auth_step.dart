@@ -1,21 +1,16 @@
-/// Steps of the auth flow. Titles live in the localizations
+/// Steps of the sign-in flow. Titles live in the localizations
 /// (`authStepTitle`), keyed by the step name.
+///
+/// There is no separate registration: a code verified for an identifier the
+/// server does not know creates the account. What a new account needs — the
+/// terms accepted, a name — is asked only when the server says so
+/// (`consentsRequired`), after the right code, with the same code.
 enum AuthStep {
-  greeting(previousStep: null),
-  registration(previousStep: greeting),
-  login(previousStep: greeting),
-  registrationConfirmation(previousStep: registration),
-  loginConfirmation(previousStep: login);
-
-  final AuthStep? previousStep;
+  identifier(previousStep: null),
+  code(previousStep: identifier),
+  consents(previousStep: code);
 
   const AuthStep({required this.previousStep});
 
-  AuthStep get requestOtpNextStep => switch (this) {
-    AuthStep.registration => AuthStep.registrationConfirmation,
-    AuthStep.login => AuthStep.loginConfirmation,
-    _ => throw StateError(
-      'Incorrect AuthStep $this while requestOtp is called',
-    ),
-  };
+  final AuthStep? previousStep;
 }

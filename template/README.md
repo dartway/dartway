@@ -1,91 +1,116 @@
 # DartwayStarter
 
-A fullstack app built with [DartWay](https://dartway.dev) (Flutter + Serverpod):
+A fullstack app on [DartWay](https://dartway.dev): a Dart server and a Flutter
+app that speak one contract.
 
-- `dartway_starter_server` — Serverpod backend (models, CRUD configs, logic)
-- `dartway_starter_flutter` — Flutter app (features, UI kit, navigation)
-- `dartway_starter_client` — generated API client (**do not edit by hand**)
-- `dartway_starter_shared` — rules that must hold identically on both sides; pure Dart, no dependencies
+- `dartway_starter_shared` — the contract: data objects, requests, commands,
+  live channels, refusal codes, and the rules both sides apply identically
+  (pure Dart, generated codecs in `*.dw.dart`)
+- `dartway_starter_server` — row classes, handlers, access and channel rules,
+  upload rules, migrations, the dev seed
+- `dartway_starter_flutter` — the app: screens on `dw.request` / `dw.table` /
+  `dw.command`, navigation, the UI kit
+
+What is already here: sign-in by a one-time code to a phone number **or** an
+e-mail, with the terms accepted on sign-up; a profile with a name, a photo
+(uploaded straight to object storage) and the sign-in identifiers, each added
+or changed by a code; roles; an admin panel with live counters, a members
+table (search, role filter, pages), a card per member with a live role change,
+and app settings; the "update the app" screen; widget tests on an in-memory
+server and acceptance tests on a real one. Zero domain models — yours go next.
 
 ## Getting started
 
-Open the project in whatever AI assistant you use and ask it to bring the project
-up. `dartway quickstart` prints everything it needs to know — the order of the
-steps, the ports, the verification, how to hand you the sign-in — and
-`dartway doctor` says whether this machine is ready for any of it.
-
-Or press **F5** in VS Code — launch **Server**, then **Flutter (web)**
-(configured in `.vscode/launch.json`).
-
-Or do it by hand, from the terminal:
+Open the project in whatever AI assistant you use and ask it to bring the
+project up: `dartway quickstart` prints everything it needs to know, and
+`dartway doctor` says whether this machine is ready for it. By hand:
 
 ```bash
-# backend
 cd dartway_starter_server
+docker compose up -d          # Postgres on 8090, MinIO on 8100 (console 8101)
+
+export DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=8090 \
+       DW_DATABASE_NAME=dartway_starter DW_DATABASE_USER=postgres \
+       DW_DATABASE_PASSWORD=dartway_dev_pw DW_DATABASE_SSL=false \
+       DW_STORAGE_ENDPOINT=http://127.0.0.1:8100 \
+       DW_STORAGE_ACCESS_KEY=dartway_dev DW_STORAGE_SECRET_KEY=dartway_dev_storage_pw \
+       DW_STORAGE_PROVISION=true \
+       APP_BOOTSTRAP_ADMIN=you@example.com
+
 dart pub get
-docker compose up -d                               # Postgres
-dart bin/main.dart --apply-migrations --role maintenance   # apply the schema
-dart bin/main.dart                                  # run the server
+dart run bin/server.dart      # applies the migrations, serves :8080
+dart run bin/seed_dev.dart    # once, in another terminal with the same DW_DATABASE_*
 ```
 
+`DW_STORAGE_PROVISION=true` creates the two buckets and sets their access on
+the first start. Without `DW_STORAGE_*` the server runs without uploads.
+
+The app, in another terminal:
+
 ```bash
-# app — in another terminal
 cd dartway_starter_flutter
 flutter pub get
-flutter run
+flutter run                   # mobile or desktop: http://localhost:8080 (10.0.2.2 on Android)
 ```
 
-The database starts empty: register from the app with any phone number, and the
-one-time code is printed in the server console — in development nothing is sent
-over SMS.
+In a browser the app calls its server on its own origin, as the deployment
+serves it — no CORS anywhere. Build it for that origin and serve both through
+the development proxy:
 
-**To reach the admin panel**, put your own identifier in
-`bootstrapAdminIdentifier` in `dartway_starter_server/config/passwords.yaml`
-before starting the server. The role is granted by an admin, so the first one is
-declared per environment instead of coming from nowhere; the server prints what
-it did on boot, and says so when the key is empty. Register with that same
-identifier and you are in.
+```bash
+cd dartway_starter_flutter
+flutter build web --dart-define=DW_BACKEND_URL=http://localhost:8000
+dart run dartway_cli:dartway dev proxy --web-dir build/web   # open http://localhost:8000
+# or, with hot restart: dart run dartway_cli:dartway dev web
+```
+
+**Signing in.** Nothing is sent over SMS or e-mail in development: the code is
+printed in the server log (`Sign-in code for …`). The seeded accounts sign in
+with the code **111111**: the admin **79990000001**, the members
+**79990000002** and **boris@example.com**. `APP_BOOTSTRAP_ADMIN` makes the
+phone or e-mail it names an administrator on every start — whoever receives
+its codes is the admin, so there is no default. A real delivery goes into
+`deliverCode` in `dartway_starter_server/lib/src/auth.dart`.
 
 ## Build a feature
 
-Everything an app needs — auth, roles, an admin panel, a live list from the
-database — is already here. Add your domain on top: a model (`.spy.yaml`) →
-`serverpod generate` → a `DwCrudConfig` → a screen with `ref.watch(dw.repo.modelList())`.
-No endpoints to write. The `.claude/` toolkit guides an AI assistant through it.
+1. **Contract** — in `dartway_starter_shared/lib/src/`, a data object
+   (`extends DwDataObject`), the requests that read it (`DwSingleRequest`,
+   `DwListRequest`, `DwTableRequest`, …) with the channels they live on, and
+   the commands that change it (`DwActionCommand`, `DwSelfValidating` for
+   field rules both sides check).
+2. **Server** — a row class in `lib/src/entities/` (`@DwSqlTable`), a handler
+   per request and command in `lib/src/handlers/` with its access rule,
+   publishing what a command changed to the channels that show it.
+3. `dartway generate` — codecs, the protocol registry, tables and the schema.
+4. `dart run bin/migrate.dart create <name>` (with `DW_DATABASE_*` set) — a
+   migration from the row classes; review it, it is yours.
+5. **App** — a screen with `ref.watch(dw.request(MyRequest()))`, a button with
+   `dw.action((_) => dw.command(MyCommand()))`, the texts in `lib/l10n/`.
 
-## Tests
+The `.claude/` toolkit guides an AI assistant through the same steps.
 
-The server carries DartWay's integration suites: the auth limits — attempt caps,
-code expiry, request rate limiting, single-use access tokens — and password
-hashing, including the migration of a legacy hash on the user's next sign-in.
-They run against a real database, because that is the only place the guarantees
-hold: the limits are enforced with database locks, a race cannot be observed in
-a rolled-back transaction, and neither can a hash that must actually be written.
-
-```bash
-dartway test                  # from the project root
-```
-
-`dartway test` creates the database this run needs, on a port Docker picks, and
-removes it when the run ends. Nothing is shared and nothing survives, so two
-projects — or two runs of this one — cannot reach each other's rows, and a row
-written by yesterday's run cannot turn up in today's assertions. The coordinates
-reach the suite as `SERVERPOD_DATABASE_*`, which Serverpod reads over
-`config/test.yaml`. `docker compose up -d` is still what the development
-database and object storage need; it no longer has anything to do with tests.
-
-The app has widget tests of its own, and those need nothing running:
+## Checks and tests
 
 ```bash
-cd dartway_starter_flutter
-flutter test
+dartway generate --check                                  # generated code is up to date
+(cd dartway_starter_server && dart run bin/migrate.dart check)   # migrations produce the schema (DW_DATABASE_*)
+dartway test                                              # server acceptance, real Postgres and MinIO
+(cd dartway_starter_shared && dart test)                  # the contract
+(cd dartway_starter_flutter && flutter test)              # the app on an in-memory server
+dartway check                                             # the conventions
 ```
 
-The suites commit real transactions (`RollbackDatabase.disabled`) and wipe the
-auth tables around themselves, which makes them stateful neighbours rather than
-isolated units: run in parallel they wipe each other's rows mid-test. Files
-therefore run one at a time — pinned in `dart_test.yaml`, not left to whoever
-remembers a flag.
+`dartway test` starts a Postgres and a MinIO for the run, on ports Docker
+picks, and removes them when it ends: nothing is shared with the development
+containers or with another project, and nothing survives. Each test file
+creates its own database and its own buckets.
+
+## Deploy
+
+`deploy/README.md`: one server process configured by its environment, the web
+app on its own host with `/dw/` proxied to the server, Postgres and optional
+MinIO — `dartway deploy setup`, then `dartway deploy`.
 
 ## Continuous integration
 

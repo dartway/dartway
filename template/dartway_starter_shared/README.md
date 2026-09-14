@@ -1,29 +1,21 @@
 # dartway_starter_shared
 
-Pure Dart, no dependencies. Code that has to behave **identically** on the
-server and in the app: format validation, shared enums, computation over
-fields with no IO.
+The contract between the server and the app, in pure Dart: everything the two
+exchange is declared here and nowhere else.
 
-The package exists so a rule both sides enforce is written once. Without it the
-same rule is written twice — once in `_server`, once in `_flutter` — and the
-two copies drift silently, because each side is internally consistent and
-nothing compares them.
+- `lib/src/profile.dart` · `admin.dart` · `settings.dart` — data objects,
+  requests and commands, with their channels and field rules
+- `lib/src/dartway_starter_channel.dart` — the live channels
+- `lib/src/dartway_starter_refusal.dart` — the app's refusal codes (texts live
+  in the app's catalogue)
+- `lib/src/dartway_starter_upload.dart` — upload purposes and their limits
+- `lib/src/auth_identifier.dart` — the one form a phone or an e-mail is stored
+  in, applied by the app before it asks for a code and by the server's
+  `normalize`
+- `*.dw.dart`, `lib/generated/` — written by `dartway generate`; never edited
 
-## What may not go in here
+A rule written twice — once in the server, once in the app — drifts silently,
+because each copy passes its own tests. Written here, it is one rule.
 
-**No dependency on the client package.** The server does not depend on it
-either: it carries its own copy of the generated models under
-`lib/src/generated`. A shared package that reached for the protocol would be
-usable by exactly one of the two sides.
-
-So: plain values in, plain values out. Each side unpacks its own models at the
-call site.
-
-No Flutter, no Serverpod, no `Session`, no IO, no database.
-
-## Adding to it
-
-The public surface is `lib/dartway_starter_shared.dart`; the implementation
-goes under `lib/src/`. Both `_server` and `_flutter` already depend on this
-package, and both Dockerfiles already copy it — a package the images do not
-copy makes them unbuildable with an error three layers from its cause.
+No Flutter, no database, no IO: whatever this package declares is compiled
+into both sides.

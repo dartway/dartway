@@ -33,7 +33,7 @@ class CheckboxFormField extends StatelessWidget {
       enabled: enabled,
       validator: (v) => validator?.call(v ?? false),
       builder: (fieldState) {
-        // Propagate an external change of the notifier into the FormFieldState.
+        // --- Propagating outside changes: VN -> FormFieldState ---
         if ((fieldState.value ?? false) != value) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (fieldState.mounted) fieldState.didChange(value);
@@ -68,7 +68,7 @@ class CheckboxFormField extends StatelessWidget {
               duration: const Duration(milliseconds: 150),
               child: hasError
                   ? Padding(
-                      key: const ValueKey('error'),
+                      key: ValueKey(hasError),
                       padding: const EdgeInsetsDirectional.only(
                         start: 16.0,
                         bottom: 4.0,
@@ -80,7 +80,7 @@ class CheckboxFormField extends StatelessWidget {
                         ),
                       ),
                     )
-                  : const SizedBox(height: 0, key: ValueKey('no_error')),
+                  : SizedBox(height: 0, key: ValueKey(hasError)),
             ),
           ],
         );

@@ -3,18 +3,20 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../framework_overrides.dart';
 import '../monorepo_source.dart';
 import '../project_layout.dart';
 import '../toolkit_installer.dart';
 
 /// Creates a new DartWay project from the `template/` skeleton of the monorepo:
-/// copies it, renames `dartway_starter` to the project name, strips
-/// monorepo-only `dependency_overrides` and installs the AI toolkit.
+/// copies it, names everything after the project — packages, types, the
+/// generated registry and schema, the storage buckets — strips the monorepo's
+/// `dependency_overrides` and installs the AI toolkit.
 ///
-/// The skeleton is deliberately domain-free — auth, roles, navigation, the
-/// admin panel and the UI kit, and no models of anyone else's business. The
-/// full application built on it lives in `example/` of the monorepo, and is a
-/// reference to read, not a project to inherit.
+/// The skeleton is deliberately domain-free — sign-in, profiles, roles,
+/// navigation, the admin panel and the UI kit, and no models of anyone else's
+/// business. The full application built on it lives in `example/` of the
+/// monorepo, and is a reference to read, not a project to inherit.
 class CreateCommand extends Command<int> {
   CreateCommand() {
     argParser
@@ -30,6 +32,17 @@ class CreateCommand extends Command<int> {
         help:
             'Path to a local DartWay monorepo checkout '
             '(skips clone; also read from DARTWAY_MONOREPO_DIR).',
+      )
+      ..addOption(
+        'framework-path',
+        valueHelp: 'monorepo',
+        help:
+            'Build the project against the framework packages of a local '
+            'monorepo checkout, by path: its pubspecs get dependency_overrides '
+            'onto <monorepo>/packages instead of resolving from pub.dev. For '
+            'developing the framework, and for versions not published yet. '
+            'The template and the toolkit come from the same checkout unless '
+            '--local-repo names another.',
       )
       ..addOption(
         'language',
@@ -57,6 +70,17 @@ class CreateCommand extends Command<int> {
   static const _sourceDirectory = 'template';
   static const _sourceProjectName = 'dartway_starter';
   static const _sourceProjectPascalName = 'DartwayStarter';
+  static const _sourceProjectCamelName = 'dartwayStarter';
+
+  /// The template's bucket names are `dartway-starter-public` and
+  /// `dartway-starter-private` — the names `dartway deploy` gives the buckets
+  /// of its MinIO, after the project with dashes (S3 allows no underscore).
+  static const _sourceProjectKebabName = 'dartway-starter';
+
+  /// The longest bucket name S3 accepts, and the longest suffix the template
+  /// puts after the project's name.
+  static const _maxBucketName = 63;
+  static const _longestBucketSuffix = '-private';
 
   static const _skippedDirectories = {
     '.dart_tool',
@@ -89,9 +113,17 @@ class CreateCommand extends Command<int> {
         ? _requireEmptyCurrentDirectory()
         : _requireFreeSubdirectory(projectName);
 
+    final frameworkPath = switch (argResults!['framework-path'] as String?) {
+      final path? when path.isNotEmpty => p.normalize(p.absolute(path)),
+      _ => null,
+    };
+    final frameworkPackages = frameworkPath == null
+        ? null
+        : frameworkPackageDirectories(Directory(frameworkPath));
+
     final source = MonorepoSource(
       branch: argResults!['channel'] as String,
-      localDir: argResults!['local-repo'] as String?,
+      localDir: (argResults!['local-repo'] as String?) ?? frameworkPath,
     );
     final monorepoDir = await source.resolve();
     final templateDir = Directory(p.join(monorepoDir.path, _sourceDirectory));
@@ -103,7 +135,14 @@ class CreateCommand extends Command<int> {
 
     stdout.writeln('Creating $projectName from the DartWay template...');
     _copyProject(templateDir, targetDir, projectName);
-    _rewritePubspecs(targetDir);
+    _formatRenamedCode(targetDir);
+    _rewritePubspecs(targetDir, frameworkPackages);
+    if (frameworkPath != null) {
+      stdout.writeln(
+        'The framework packages resolve from $frameworkPath/packages '
+        '(dependency_overrides).',
+      );
+    }
 
     final layout = ProjectLayout.detect(targetDir);
     await ToolkitInstaller.install(
@@ -206,15 +245,20 @@ class CreateCommand extends Command<int> {
   String _requireValidProjectName(String projectName) {
     if (!_isValidProjectName(projectName)) {
       usageException(
-        'Project name must be a lower_snake_case Dart identifier '
-        '(got "$projectName").',
+        'Project name must be a lower_snake_case Dart identifier of at most '
+        '${_maxBucketName - _longestBucketSuffix.length} characters, without '
+        'a leading, trailing or doubled underscore (got "$projectName").',
       );
     }
     return _rejectTemplateName(projectName);
   }
 
+  /// A Dart package name once `_server` is appended, and a storage bucket
+  /// name once dashed and suffixed: lower-case letters, digits and single
+  /// underscores between them, short enough for the longest bucket.
   bool _isValidProjectName(String candidate) =>
-      RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(candidate);
+      RegExp(r'^[a-z][a-z0-9]*(_[a-z0-9]+)*$').hasMatch(candidate) &&
+      candidate.length + _longestBucketSuffix.length <= _maxBucketName;
 
   String _rejectTemplateName(String projectName) {
     if (projectName == _sourceProjectName) {
@@ -224,7 +268,12 @@ class CreateCommand extends Command<int> {
   }
 
   void _copyProject(Directory source, Directory target, String projectName) {
-    final pascalName = _toPascalCase(projectName);
+    final renames = {
+      _sourceProjectName: projectName,
+      _sourceProjectPascalName: _toPascalCase(projectName),
+      _sourceProjectCamelName: _toCamelCase(projectName),
+      _sourceProjectKebabName: projectName.replaceAll('_', '-'),
+    };
     target.createSync(recursive: true);
 
     for (final entity in source.listSync(recursive: true)) {
@@ -246,7 +295,7 @@ class CreateCommand extends Command<int> {
         Directory(targetPath).createSync(recursive: true);
       } else if (entity is File) {
         File(targetPath).parent.createSync(recursive: true);
-        _copyFileWithRenames(entity, File(targetPath), projectName, pascalName);
+        _copyFileWithRenames(entity, File(targetPath), renames);
       }
     }
   }
@@ -254,8 +303,7 @@ class CreateCommand extends Command<int> {
   void _copyFileWithRenames(
     File source,
     File target,
-    String projectName,
-    String pascalName,
+    Map<String, String> renames,
   ) {
     String content;
     try {
@@ -265,53 +313,87 @@ class CreateCommand extends Command<int> {
       source.copySync(target.path);
       return;
     }
-    target.writeAsStringSync(
-      content
-          .replaceAll(_sourceProjectName, projectName)
-          .replaceAll(_sourceProjectPascalName, pascalName),
-    );
+    for (final MapEntry(key: from, value: to) in renames.entries) {
+      content = content.replaceAll(from, to);
+    }
+    target.writeAsStringSync(content);
+  }
+
+  /// Formats the Dart code of the new project.
+  ///
+  /// The renames change the length of names — `DartwayStarterRefusal` is not
+  /// as long as the project's own — so lines the template had formatted no
+  /// longer are, and `dart format` over the fresh project would rewrite them:
+  /// a first commit that is not formatted, and a generator `--check` that
+  /// depends on where the lines happened to break. Formatting here once makes
+  /// the project the formatter's from its first commit.
+  void _formatRenamedCode(Directory projectRoot) {
+    final paths = [
+      for (final package in projectRoot.listSync().whereType<Directory>())
+        if (File(p.join(package.path, 'pubspec.yaml')).existsSync())
+          for (final folder in const ['bin', 'lib', 'test'])
+            if (Directory(p.join(package.path, folder)).existsSync())
+              p.join(package.path, folder),
+    ];
+    if (paths.isEmpty) return;
+    final ProcessResult result;
+    try {
+      result = Process.runSync(_dart, [
+        'format',
+        '--output=write',
+        ...paths,
+      ], runInShell: Platform.isWindows);
+    } on ProcessException catch (error) {
+      stderr.writeln(
+        'Warning: `dart format` could not run (${error.message}); run it over '
+        'the new project before the first commit.',
+      );
+      return;
+    }
+    if (result.exitCode != 0) {
+      stderr.writeln(
+        'Warning: `dart format` failed — run it over the new project before '
+        'the first commit.\n${result.stderr}',
+      );
+    }
+  }
+
+  /// The `dart` executable: the one running this CLI when it runs as a Dart
+  /// script or snapshot, otherwise the one on `PATH`.
+  static String get _dart {
+    final running = p.basenameWithoutExtension(Platform.resolvedExecutable);
+    return running == 'dart' ? Platform.resolvedExecutable : 'dart';
   }
 
   /// Drops the monorepo-only `dependency_overrides` block (with its leading
   /// comments) from every package pubspec: inside the monorepo those overrides
   /// point at sibling folders, and in a standalone project the same paths lead
   /// nowhere. What is left resolves from pub.dev, like any other dependency.
-  void _rewritePubspecs(Directory projectRoot) {
+  ///
+  /// With [frameworkPackages] (`--framework-path`) each pubspec gets overrides
+  /// onto those packages instead — for exactly the framework packages it
+  /// reaches.
+  void _rewritePubspecs(
+    Directory projectRoot,
+    Map<String, String>? frameworkPackages,
+  ) {
     for (final packageDir in projectRoot.listSync().whereType<Directory>()) {
       final pubspecFile = File(p.join(packageDir.path, 'pubspec.yaml'));
       if (!pubspecFile.existsSync()) {
         continue;
       }
-      final rewritten = _stripDependencyOverrides(
-        pubspecFile.readAsLinesSync(),
-      );
+      final lines = pubspecFile.readAsLinesSync();
+      final rewritten = frameworkPackages == null
+          ? withoutDependencyOverrides(lines)
+          : withFrameworkOverrides(
+              lines,
+              frameworkOverridesFor(
+                withoutDependencyOverrides(lines).join('\n'),
+                frameworkPackages,
+              ),
+            );
       pubspecFile.writeAsStringSync('${rewritten.join('\n')}\n');
     }
-  }
-
-  List<String> _stripDependencyOverrides(List<String> lines) {
-    final blockStart = lines.indexWhere(
-      (line) => line.trimRight() == 'dependency_overrides:',
-    );
-    if (blockStart == -1) {
-      return lines;
-    }
-
-    // Drop contiguous top-level comment lines directly above the block.
-    var start = blockStart;
-    while (start > 0 &&
-        (lines[start - 1].startsWith('#') || lines[start - 1].trim().isEmpty)) {
-      start--;
-    }
-
-    // The block ends at the next top-level line (key or comment).
-    var end = blockStart + 1;
-    while (end < lines.length &&
-        (lines[end].trim().isEmpty || lines[end].startsWith(' '))) {
-      end++;
-    }
-
-    return [...lines.sublist(0, start), ...lines.sublist(end)];
   }
 
   String _toPascalCase(String snakeCaseName) => snakeCaseName
@@ -319,6 +401,11 @@ class CreateCommand extends Command<int> {
       .where((word) => word.isNotEmpty)
       .map((word) => word[0].toUpperCase() + word.substring(1))
       .join();
+
+  String _toCamelCase(String snakeCaseName) {
+    final pascal = _toPascalCase(snakeCaseName);
+    return pascal[0].toLowerCase() + pascal.substring(1);
+  }
 
   void _initGit(Directory projectRoot) {
     // With `create .` the folder may already be a repository — initializing it

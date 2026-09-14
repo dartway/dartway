@@ -1,15 +1,20 @@
 part of '../ui_kit.dart';
 
-class PhoneTextField extends StatefulWidget {
+/// A phone number field: digits, and the characters people type around them —
+/// a leading plus, spaces, dashes, parentheses. No national mask: the number
+/// is read by its digits, so `+44 20 7946 0958` and `8 (999) 123-45-67` both
+/// fit, and the rule deciding what a valid number is stays in one place — the
+/// [validator] a screen passes, usually the shared `AuthIdentifier`.
+class PhoneTextField extends StatelessWidget {
   const PhoneTextField({
     super.key,
     required this.value,
     required this.onChanged,
-    this.additionValidator,
+    this.validator,
     this.enabled,
     this.focusNode,
-    this.labelText = 'Phone',
-    this.hintText = '+7 (___) ___-__-__',
+    this.labelText,
+    this.hintText,
     this.textInputAction,
     this.autofillHints = const [AutofillHints.telephoneNumber],
   });
@@ -17,7 +22,8 @@ class PhoneTextField extends StatefulWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  final String? Function(String value)? additionValidator;
+  /// Why the typed number is not acceptable, or `null` when it is.
+  final String? Function(String value)? validator;
 
   final bool? enabled;
   final FocusNode? focusNode;
@@ -27,92 +33,19 @@ class PhoneTextField extends StatefulWidget {
   final Iterable<String>? autofillHints;
 
   @override
-  State<PhoneTextField> createState() => _PhoneTextFieldState();
-}
-
-class _PhoneTextFieldState extends State<PhoneTextField> {
-  late FocusNode _focusNode;
-  bool _ownFocus = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _attachFocusNode(widget.focusNode);
-  }
-
-  @override
-  void didUpdateWidget(covariant PhoneTextField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusNode != widget.focusNode) {
-      _detachFocusNode();
-      _attachFocusNode(widget.focusNode);
-    }
-  }
-
-  void _attachFocusNode(FocusNode? external) {
-    if (external != null) {
-      _focusNode = external;
-      _ownFocus = false;
-    } else {
-      _focusNode = FocusNode();
-      _ownFocus = true;
-    }
-    _focusNode.addListener(_handleFocusChange);
-  }
-
-  void _detachFocusNode() {
-    _focusNode.removeListener(_handleFocusChange);
-    if (_ownFocus) {
-      _focusNode.dispose();
-    }
-  }
-
-  void _handleFocusChange() {
-    final prefix = RuPhoneMaskFormatter.minText();
-    final text = widget.value;
-
-    if (_focusNode.hasFocus && text.isEmpty) {
-      widget.onChanged(prefix);
-    }
-    if (!_focusNode.hasFocus && text.length == prefix.length) {
-      widget.onChanged('');
-    }
-  }
-
-  @override
-  void dispose() {
-    _detachFocusNode();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return AppTextFormField(
-      value: widget.value,
-      onChanged: widget.onChanged,
-      enabled: widget.enabled,
-      focusNode: _focusNode,
-      labelText: widget.labelText,
-      hintText: widget.hintText,
+      value: value,
+      onChanged: onChanged,
+      enabled: enabled,
+      focusNode: focusNode,
+      labelText: labelText,
+      hintText: hintText,
       keyboardType: TextInputType.phone,
-      textInputAction: widget.textInputAction,
-      autofillHints: widget.autofillHints,
-      inputFormatters: [RuPhoneMaskFormatter()],
-      validator: (value) {
-        final text = value ?? '';
-        final digits = text.replaceAll(RegExp(r'\D'), '');
-        if (text.isEmpty ||
-            text.length == RuPhoneMaskFormatter.minText().length) {
-          return 'Required field';
-        }
-        if (digits.length < 11) {
-          return 'Invalid number';
-        }
-        if (widget.additionValidator != null) {
-          return widget.additionValidator!(text);
-        }
-        return null;
-      },
+      textInputAction: textInputAction,
+      autofillHints: autofillHints,
+      inputFormatters: [PhoneInputFormatter()],
+      validator: (text) => validator?.call(text ?? ''),
     );
   }
 }

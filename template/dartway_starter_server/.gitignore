@@ -8,18 +8,5 @@ build/
 # Directory created by dartdoc
 doc/api/
 
-# The passwords file never enters VCS. `dartway create` writes it from
-# passwords.yaml.example, so a new project still runs out of the box — and the
-# day someone adds a staging password to it, nothing has been published.
-# (It used to be committed with throwaway dev values. The values were harmless;
-# the habit was not, and `dartway deploy check` fails on a tracked copy.)
-config/passwords.yaml
-
-# Firebase service account key for Firebase auth
-config/firebase_service_account_key.json
-
 # Migrations ARE tracked. They are the versioned history of the schema: the same
-# migrations must exist on every machine and in every deployment, and `dartway
-# create` hands a runnable project to a stranger only because they are here.
-# (They used to be ignored, with a note suggesting each machine generate its own.
-# That produced divergent migration ids and a template that could not boot.)
+# migrations must exist on every machine and in every deployment.

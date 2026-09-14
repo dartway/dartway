@@ -1,28 +1,31 @@
 import 'package:flutter/foundation.dart';
 
+import 'core/app_version.dart';
 import 'dartway_starter_app.dart';
 
 void main() {
-  // Concrete development parameters live here; the app itself stays environment
-  // agnostic.
+  // Concrete development parameters live here; the app itself stays
+  // environment agnostic.
   //
-  // A deployed build is compiled against a fixed API address, and the address
-  // is supplied by `dartway deploy`, which reads it from the Serverpod
-  // configuration — the one place a domain is written down. Nothing to add
-  // here when a project gets deployed, and no second copy to keep in step.
+  // A deployed build is compiled against a fixed server address, the origin
+  // the app's calls go to: `--dart-define=DW_BACKEND_URL=https://app.example.com`
+  // (the web app's own host, where `/dw/` is proxied to the server).
   const deployedBackendUrl = String.fromEnvironment('DW_BACKEND_URL');
 
-  // Empty on a local run, where the machine decides instead: Android
-  // devices/emulators reach the dev host via its LAN IP, every other platform
-  // (web, desktop, iOS sim) talks to localhost.
+  // Empty on a local run, where the machine decides instead: the Android
+  // emulator reaches the development host at 10.0.2.2, every other platform
+  // (web, desktop, iOS simulator) at localhost.
   //
   // `defaultTargetPlatform` works on every platform — unlike `dart:io`'s
   // `Platform`, which does not compile for Flutter web.
   final backendUrl = deployedBackendUrl.isNotEmpty
       ? deployedBackendUrl
       : !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-      ? 'http://192.168.0.100:8080/'
-      : 'http://localhost:8080/';
+      ? 'http://10.0.2.2:8080'
+      : 'http://localhost:8080';
 
-  DartwayStarterApp(backendUrl: backendUrl, appVersion: 'local').run();
+  DartwayStarterApp(
+    baseUrl: Uri.parse(backendUrl),
+    appVersion: appBuildVersion,
+  ).run();
 }

@@ -1,10 +1,9 @@
-import 'package:dartway_starter_client/dartway_starter_client.dart';
 import 'package:dartway_starter_flutter/admin/settings/logic/app_setting_label.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
-import 'package:dartway_starter_flutter/core/app_settings/app_settings_reader.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
@@ -17,24 +16,28 @@ class AdminSettingRow extends StatelessWidget {
   const AdminSettingRow({
     super.key,
     required this.setting,
-    required this.storedSettings,
+    required this.storedValue,
   });
 
   final AppSettingKey<Object?> setting;
-  final List<AppSetting> storedSettings;
 
-  /// Saves one row — its own. Two admins editing different settings therefore
-  /// cannot overwrite each other, which is the whole reason a setting is a row
-  /// and not an entry in one shared map.
-  Future<void> _save(String rawValue) => dw.repo.saveModel(
-    storedSettings.rowFor(setting)?.copyWith(settingValue: rawValue) ??
-        AppSetting(settingKey: setting.key, settingValue: rawValue),
+  /// The stored text, or `null` while nobody has saved this setting.
+  final String? storedValue;
+
+  /// Saves this setting alone. Two admins editing different settings
+  /// therefore cannot overwrite each other.
+  DwUiAction<DwCallResult<AppSetting>> _save(
+    BuildContext context,
+    String rawValue,
+  ) => dw.action(
+    (_) => dw.command(SaveAppSetting(key: setting.key, value: rawValue)),
+    onSuccessNotification: context.l10n.settingsSaved,
   );
 
   @override
   Widget build(BuildContext context) {
     final label = setting.label(context.l10n);
-    final value = storedSettings.valueOf(setting);
+    final value = setting.parse(storedValue);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -42,13 +45,15 @@ class AdminSettingRow extends StatelessWidget {
         AppSettingType.toggle => _ToggleRow(
           label: label,
           value: value as bool,
-          onChanged: (isEnabled) => _save(isEnabled.toString()),
+          onChanged: (isEnabled) => _save(context, isEnabled.toString()),
         ),
         AppSettingType.text || AppSettingType.number => _TextRow(
+          // A value saved elsewhere restarts the draft from it.
+          key: ValueKey(value),
           label: label,
           value: value.toString(),
           isNumeric: setting.type == AppSettingType.number,
-          onSave: _save,
+          onSave: (rawValue) => _save(context, rawValue),
         ),
       },
     );
@@ -64,7 +69,7 @@ class _ToggleRow extends StatelessWidget {
 
   final String label;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final DwUiAction<void> Function(bool value) onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +77,12 @@ class _ToggleRow extends StatelessWidget {
       children: [
         Expanded(child: AppText.body(label)),
         // A toggle saves on change: there is nothing to type, so a Save button
-        // would only add a step.
-        AppCheckbox(value: value, onChanged: onChanged),
+        // would only add a step. It shows the stored value, so it flips when
+        // the saved setting comes back.
+        AppCheckbox(
+          value: value,
+          onChanged: (isEnabled) => onChanged(isEnabled)(context),
+        ),
       ],
     );
   }
@@ -85,12 +94,13 @@ class _TextRow extends HookWidget {
     required this.value,
     required this.isNumeric,
     required this.onSave,
+    super.key,
   });
 
   final String label;
   final String value;
   final bool isNumeric;
-  final Future<void> Function(String rawValue) onSave;
+  final DwUiAction<void> Function(String rawValue) onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -112,12 +122,7 @@ class _TextRow extends HookWidget {
         const Gap(12),
         AppButton.primary(
           context.l10n.saveAction,
-          onTap: canSave
-              ? dw.action(
-                  (context) => onSave(trimmed),
-                  onSuccessNotification: context.l10n.settingsSaved,
-                )
-              : null,
+          onTap: canSave ? onSave(trimmed) : null,
         ),
       ],
     );

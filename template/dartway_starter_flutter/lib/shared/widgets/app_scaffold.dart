@@ -1,13 +1,11 @@
-import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
 /// App page scaffold. Pages live in the app navigation zone, which is only
 /// reachable when signed in (see the router redirect guards), so no per-page
-/// auth gating is needed here — the root [DwUserAsyncScope] loads the profile.
+/// auth gating is needed here — `SignedInGate` loads the profile first.
 class AppScaffold extends StatelessWidget {
   const AppScaffold.main({
     super.key,
@@ -54,40 +52,38 @@ class AppScaffold extends StatelessWidget {
   }
 }
 
-class _AppBottomNavigationBar extends ConsumerWidget {
+class _AppBottomNavigationBar extends StatelessWidget {
   const _AppBottomNavigationBar();
 
+  static const _tabs = [
+    (route: AppNavigationZone.home, icon: Icons.home_outlined),
+    (route: AppNavigationZone.profile, icon: Icons.person_outline),
+  ];
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Add a tab per screen as the domain grows. Gate a tab on a role with an
-    // `if (ref.watchUserProfile.isAdmin)` — but remember the tab is only the
-    // UI: the real protection is the access filter on the server.
-    final tabs = [
-      (route: AppNavigationZone.home, icon: Icons.home),
-      (route: AppNavigationZone.profile, icon: Icons.person),
-    ];
-    final currentIndex = tabs.indexWhere((tab) => tab.route.isActive(context));
+  Widget build(BuildContext context) {
+    // The deepest active route wins: the zone root matches every location.
+    final lastActive = _tabs.lastIndexWhere(
+      (tab) => tab.route.isActive(context),
+    );
 
     return BottomNavigationBar(
-      currentIndex: currentIndex < 0 ? 0 : currentIndex,
-      onTap: (index) => GoRouter.of(context).goNamed(tabs[index].route.name),
+      currentIndex: lastActive < 0 ? 0 : lastActive,
+      onTap: (index) => GoRouter.of(context).goNamed(_tabs[index].route.name),
       type: BottomNavigationBarType.fixed,
       // Colours come from AppTheme.light — set once for the whole app, not
       // re-picked by every widget that happens to need them.
       showUnselectedLabels: true,
       items: [
-        for (final tab in tabs)
+        for (final tab in _tabs)
           BottomNavigationBarItem(
             icon: Icon(tab.icon),
-            label: _tabLabel(context.l10n, tab.route),
+            label: switch (tab.route) {
+              AppNavigationZone.home => context.l10n.tabHome,
+              AppNavigationZone.profile => context.l10n.tabProfile,
+            },
           ),
       ],
     );
   }
-
-  String _tabLabel(AppLocalizations l10n, AppNavigationZone route) =>
-      switch (route) {
-        AppNavigationZone.home => l10n.tabHome,
-        AppNavigationZone.profile => l10n.tabProfile,
-      };
 }

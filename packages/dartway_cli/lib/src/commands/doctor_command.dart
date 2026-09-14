@@ -10,7 +10,9 @@ import '../version_check.dart';
 /// Checks that this machine can actually create and run a DartWay project.
 ///
 /// It exists because the first failure a newcomer meets is never DartWay's: it
-/// is a Docker daemon that is not running, or a pub cache that is not on PATH.
+/// is a Docker daemon that is not running — and Postgres and the object storage
+/// come from it, for development and for `dartway test` — or a pub cache that
+/// is not on PATH.
 /// Each of those surfaces much later — as a connection refused when the
 /// database is started, as `dartway: not found` — and each is trivially
 /// detectable up front.
@@ -135,7 +137,8 @@ class DoctorCommand extends Command<int> {
         'not found on PATH',
         fix:
             'Install git — https://git-scm.com/downloads '
-            '(`dartway create` clones the template with it)',
+            '(`dartway create` fetches the template with it and commits the '
+            'new project)',
       );
     }
     final missing = [
@@ -226,14 +229,17 @@ class DoctorCommand extends Command<int> {
         'not found on PATH',
         fix:
             'Install Docker Desktop — https://docs.docker.com/get-docker/ '
-            '(the database runs in it; there is no second path)',
+            '(Postgres and MinIO run in it, for development and for '
+            '`dartway test`; there is no second path)',
       );
     }
     if (result.exitCode != 0) {
       return _Check.fail(
         'Docker',
         'installed, but the daemon is not responding',
-        fix: 'Start Docker Desktop and wait until it reports "running"',
+        fix:
+            'Start Docker Desktop and wait until it reports "running" '
+            '(`docker compose up -d` and `dartway test` need the daemon)',
       );
     }
     return _Check.ok('Docker', 'daemon responding');

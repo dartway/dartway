@@ -107,66 +107,38 @@ enum DwCheckType {
 
   /// A folder or file at the top level of a package that the declared layout
   /// does not name — or a fixed name that is missing. The top level is a
-  /// closed list (`dwFlutterZones` / `dwFlutterLayers` / `dwServerAreas`), and
+  /// closed list (`dwFlutterZones` / `dwFlutterLayers` / `dwServerLibFolders`), and
   /// it is closed because it had been declared in three places that drifted
   /// apart: an undeclared folder is where the next divergence starts.
   invalidTopLevelLayout,
 
-  /// Generated code committed unformatted — the server's `lib/src/generated/`
-  /// or the client's `lib/src/protocol/` differs from what `dart format`
-  /// writes.
+  /// Generated code that no longer matches its sources: a `*.dw.dart` part,
+  /// the protocol registry or the schema that `dartway generate` would write
+  /// differently, or a generated file whose source is gone —
+  /// `dart run dartway_generator --check` in the server package.
   ///
-  /// `serverpod generate` formats its output with the `dart_style` bundled
-  /// with the Serverpod CLI, which is not the `dart format` of the project's
-  /// SDK. Leave the difference in place and every later generation rewrites
-  /// files nobody touched: making one field nullable has arrived at review as
-  /// 29 files and 1900 changed lines, with the two real lines unfindable
-  /// inside it. The rule is therefore "both generated trees are committed
-  /// formatted" — both, because formatting one of them only moves the diff to
-  /// whoever next formats the other, which in one project meant 33 unrelated
-  /// files landing in someone else's pull request.
+  /// An error, with no second reading: the codecs are the wire. A data object
+  /// with a field its generated part does not know compiles, starts and
+  /// travels without that field, and a request missing from the registry is
+  /// refused as unknown by a server that has its handler.
+  generatedCodeStale,
+
+  /// Migrations that do not produce the schema the row classes declare, a
+  /// migration edited after its checksum was sealed or left unregistered, or
+  /// a down that does not undo its up — `dart run bin/migrate.dart check` in
+  /// the server package.
   ///
-  /// A **warning**, not an error, and deliberately so: the comparison is
-  /// against the `dart_style` of whichever SDK ran the check, so a red result
-  /// can mean "your SDK is newer than the one that formatted this" rather than
-  /// "you skipped a step". Failing the build on that would make this the check
-  /// people pass `--type` around to avoid. Hence the finding names the exact
-  /// command and paths instead — the fix has to be runnable by someone who did
-  /// not write the code and does not know why it went red.
-  generatedCodeUnformatted,
+  /// It needs a Postgres to replay the migrations on (`DW_DATABASE_*`, where
+  /// it creates and drops throwaway databases); without one the check says it
+  /// did not run rather than passing. An error: a schema the migrations do not
+  /// produce is a server that refuses to start in the next environment.
+  migrationsDrift,
 
   /// The project's `dartway_*` git dependencies are locked to more than one
   /// commit of the framework. Nothing else says so: `ref: master` is written
   /// once per package and reads as "from master", while the lock pins each one
   /// at whatever master was when *that* package was added.
-  frameworkRefsDiverged,
-
-  /// A model with a table and no `DwCrudConfig`. Generic CRUD is secure by
-  /// default, so an unconfigured model answers `notConfigured` to every read
-  /// and write: it migrates, it exists, and the app cannot reach it.
-  ///
-  /// A **warning**, because the absence has a second, legitimate reading — a
-  /// table the server owns alone and no client should see. The check does not
-  /// know which of the two it is looking at; the person reading it does, and
-  /// answering costs one doc comment.
-  crudConfigMissing,
-
-  /// A `DwCrudConfig` that exists and is not in the `crudConfigurations` list
-  /// passed to `DwCore.init`.
-  ///
-  /// The one of this family with no second reading, and the one that hides
-  /// best: the file is there, it reviews as finished, and the API answers
-  /// exactly as if it had never been written.
-  crudConfigUnregistered,
-
-  /// A `DwCrudConfig` carrying hand-written save or delete logic that no test
-  /// in the server package names.
-  ///
-  /// The rule runs inside a request and touches the database, so nothing below
-  /// the server can hold it — a widget test proving the button is hidden proves
-  /// nothing about who may save. A **warning**: a mention of the model is a
-  /// good enough signal to raise the question, not to fail a build on.
-  crudRuleUntested;
+  frameworkRefsDiverged;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -185,10 +157,7 @@ enum DwCheckType {
     DwCheckType.featureSpecMissing ||
     DwCheckType.forbiddenAssetPath ||
     DwCheckType.unusedFeatureFile ||
-    DwCheckType.generatedCodeUnformatted ||
     DwCheckType.frameworkRefsDiverged ||
-    DwCheckType.crudConfigMissing ||
-    DwCheckType.crudRuleUntested ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

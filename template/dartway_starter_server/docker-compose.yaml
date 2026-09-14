@@ -1,11 +1,14 @@
 services:
-  # Development database. Matches config/development.yaml (localhost:8090,
-  # database "dartway_starter", user "postgres"). Redis is disabled in the
-  # development config, so only Postgres is started here.
+  # Development database. The `DW_DATABASE_*` values in ../README.md point at it
+  # (127.0.0.1:8090, database "dartway_starter", user "postgres").
+  #
+  # No test database here, on purpose: `dartway test` starts one for the run on
+  # a port Docker picks, and each test file creates and drops its own database
+  # on it.
   postgres:
-    image: postgres:16
+    image: postgres:17-alpine
     ports:
-      - '8090:5432'
+      - '127.0.0.1:8090:5432'
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: dartway_starter
@@ -13,42 +16,20 @@ services:
     volumes:
       - dartway_starter_data:/var/lib/postgresql/data
 
-  # No test database here, on purpose. `dartway test` creates one for the run
-  # and removes it afterwards, on a port Docker picks — see the comment in
-  # config/test.yaml. A test database declared as a service is shared, named,
-  # long-lived and on a fixed port, and every one of those is wrong for it:
-  # two projects on one machine fight over the port, the loser silently reads
-  # the winner's rows, and rows outlive the run that wrote them.
-
-  # Object storage for uploads. DartWay's cloud storage speaks S3 through the
-  # minio client, so a local Minio is the same code path production runs — not a
-  # development stand-in that behaves differently once you deploy.
-  # Matches the dwCloudStorage* keys in config/passwords.yaml.
+  # Object storage for uploads: the app uploads straight to it by a presigned
+  # URL the server issues, so a local MinIO is the same path production runs.
+  # The `DW_STORAGE_*` values in ../README.md point at it.
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":8101"
     ports:
-      - '8100:9000' # S3 API — what the server and the app talk to
-      - '8101:8101' # web console, handy for looking at what was uploaded
+      - '127.0.0.1:8100:9000' # S3 API — what the server and the app talk to
+      - '127.0.0.1:8101:8101' # web console, handy for looking at uploads
     environment:
       MINIO_ROOT_USER: dartway_dev
       MINIO_ROOT_PASSWORD: 'dartway_dev_storage_pw'
     volumes:
       - dartway_starter_uploads:/data
-
-  # Creates the bucket on first start and opens it for reading, because the
-  # public URLs the server hands out have to resolve in a browser and an
-  # <Image.network>. Runs to completion and exits; it is not a service.
-  minio_init:
-    image: minio/mc:latest
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set local http://minio:9000 dartway_dev dartway_dev_storage_pw; do sleep 1; done;
-      mc mb --ignore-existing local/uploads;
-      mc anonymous set download local/uploads;
-      "
 
 volumes:
   dartway_starter_data:
