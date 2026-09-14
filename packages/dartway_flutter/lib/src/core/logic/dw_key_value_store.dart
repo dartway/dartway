@@ -9,7 +9,7 @@ import 'dw_plugin.dart';
 /// [DwPlugins.maybeOf].
 ///
 /// ```dart
-/// dw = DwCore(
+/// dw = DwFlutterCore(
 ///   config: ..., client: ...,
 ///   plugins: [DwSharedPreferences()],
 /// );

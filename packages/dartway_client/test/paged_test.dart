@@ -1,292 +1,380 @@
-import 'dart:async';
-
 import 'package:dartway_client/dartway_client.dart';
 import 'package:dartway_client/testing.dart';
 import 'package:test/test.dart';
 
 import 'support.dart';
 
-RoomView room(int id, int rank) => RoomView(id: id, name: 'r$id', rank: rank);
+const d = RoomView(id: 4, name: 'd', rank: 40);
+const e = RoomView(id: 5, name: 'e', rank: 50);
+
+List<ChatLine> lines(int count) => [
+  for (var i = count; i >= 1; i--) ChatLine(id: i, at: i * 10, text: 'line $i'),
+];
+
+List<int> idsOf(List<DwDataObject> items) => [
+  for (final item in items) item.id as int,
+];
 
 void main() {
-  late Harness h;
-
-  /// Ordered by rank for [FeedRooms]; newest (highest id) first for
-  /// [RoomHistory].
-  late List<RoomView> feed;
-
-  setUp(() async {
-    h = Harness();
-    feed = [room(1, 10), room(2, 20), room(3, 30), room(4, 40), room(5, 50)];
-    h.server
-      ..onRequest<FeedRooms>(
-        (r, call) => DwOk(dwFakePage(feed, call.page, pageSize: r.pageSize)),
-      )
-      ..onRequest<RoomHistory>(
-        (r, call) => DwOk(
-          dwFakePage(
-            feed.toList()..sort((x, y) => y.id.compareTo(x.id)),
-            call.page,
-            pageSize: r.pageSize,
-          ),
-        ),
-      );
-    await h.start();
-  });
-
-  List<DwPageParams?> pagesAsked<Q extends DwRequest<Object?>>() => [
-    for (final m in h.server.receivedOf<DwRequestMessage>())
-      if (m.request is Q) m.page,
-  ];
-
-  group('offset pages', () {
-    test(
-      'load the first page, then more by the loaded count, until none',
-      () async {
-        final watch = h.client.watchPages(const FeedRooms());
-        await settle();
-        expect(itemsOf(watch.state), [room(1, 10), room(2, 20)]);
-        expect(watch.hasMore, isTrue);
-
-        await watch.loadMore();
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [1, 2, 3, 4]);
-
-        await watch.loadMore();
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [1, 2, 3, 4, 5]);
-        expect(watch.hasMore, isFalse);
-
-        await watch.loadMore();
-        await settle();
-        expect(
-          pagesAsked<FeedRooms>().map((p) => (p! as DwOffsetParams).offset),
-          [0, 2, 4],
-          reason: 'no request once there is no more',
-        );
-      },
-    );
-
-    test('loadMore is idempotent while in flight', () async {
+  group('pages', () {
+    test('loads the first page, then the next on loadMore', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c, d, e];
+      await h.start();
       final watch = h.client.watchPages(const FeedRooms());
       await settle();
-      final hold = Completer<void>();
-      h.server.onRequest<FeedRooms>((r, call) async {
-        await hold.future;
-        return DwOk(dwFakePage(feed, call.page, pageSize: r.pageSize));
-      });
-      final loads = [watch.loadMore(), watch.loadMore(), watch.loadMore()];
-      await settle();
-      expect(dataOf(watch.state).loadingMore, isTrue);
-      hold.complete();
-      await Future.wait(loads);
-      await settle();
-      expect(pagesAsked<FeedRooms>(), hasLength(2));
-      expect(dataOf(watch.state).loadingMore, isFalse);
+      expect(
+        watch.state,
+        DwRequestData(DwPagedData(const [a, b], hasMore: true), live: true),
+      );
+
+      await watch.loadMore();
+      expect(pagedItems(watch.state), [a, b, c, d]);
+      await watch.loadMore();
+      expect(pagedItems(watch.state), [a, b, c, d, e]);
+      expect(watch.hasMore, isFalse);
+      expect(
+        [for (final call in h.server.callsOf<FeedRooms>()) call.query],
+        [
+          {},
+          {'offset': '2'},
+          {'offset': '4'},
+        ],
+      );
+      await watch.loadMore();
+      expect(h.server.callsOf<FeedRooms>(), hasLength(3), reason: 'no more');
     });
 
-    test('a failed next page keeps the loaded items and says why', () async {
+    test('loadMore is idempotent while a page is on its way', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c, d];
+      await h.start();
+      final watch = h.client.watchPages(const FeedRooms());
+      await settle();
+      final states = DwStreamRecording(watch.states);
+      final loads = [watch.loadMore(), watch.loadMore(), watch.loadMore()];
+      expect(dataOf(watch.state).loadingMore, isTrue);
+      await Future.wait(loads);
+      expect(h.server.callsOf<FeedRooms>(), hasLength(2));
+      expect(dataOf(states.last).loadingMore, isFalse);
+    });
+
+    test('a next page that fails keeps the loaded rows and says why', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c];
+      await h.start();
       final watch = h.client.watchPages(const FeedRooms());
       await settle();
       h.server.onRequest<FeedRooms>(
-        (r, call) => const DwFailed<DwPage<RoomView>>('incident-3'),
+        (request, call) => const DwCallFailed<DwPageResult<RoomView>>('x'),
       );
       await watch.loadMore();
-      await settle();
       final data = dataOf(watch.state);
-      expect(data.items, hasLength(2));
+      expect(data.items, [a, b]);
       expect(
         data.loadMoreError,
-        const DwFailedException('incident-3', call: 'FeedRooms'),
+        const DwFailedException('x', call: 'FeedRooms'),
       );
-      expect(data.hasMore, isTrue);
     });
 
     test(
-      'updates: replace in place, insert by sort, drop past the loaded pages, remove',
+      'an insert sorting past the loaded pages is dropped while more exist',
       () async {
+        final h = Harness()..serveRooms();
+        h.rooms = [a, b, c];
+        await h.start();
         final watch = h.client.watchPages(const FeedRooms());
         await settle();
-        await watch.loadMore();
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [1, 2, 3, 4]);
-
-        h.server.publish(rooms, [
-          room(3, 1), // re-ranked: stays in place
-          room(6, 15), // sorts inside the loaded window: inserted
-          room(7, 99), // sorts past it while more exist: arrives on scroll
-          DwDeleted.of<RoomView>(1, roomsProtocol),
+        h.server.publish(roomsChannel, [
+          const RoomView(id: 9, name: 'late', rank: 99),
+          const RoomView(id: 8, name: 'early', rank: 15),
         ]);
         await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [6, 2, 3, 4]);
+        expect(idsOf(pagedItems(watch.state)), [1, 8, 2]);
       },
     );
 
-    test(
-      'an object shifted into the next page by an insert is not shown twice',
-      () async {
-        final watch = h.client.watchPages(const FeedRooms());
-        await settle();
-        // Inserted on the server and published: the server's offsets shift.
-        final inserted = room(6, 15);
-        feed = [
-          room(1, 10),
-          inserted,
-          room(2, 20),
-          room(3, 30),
-          room(4, 40),
-          room(5, 50),
-        ];
-        h.server.publish(rooms, [inserted]);
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [1, 6, 2]);
-        await watch.loadMore();
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [1, 6, 2, 3, 4]);
-      },
-    );
-
-    test('without sort a new object goes to the head', () async {
+    test('without a sort a new object goes to the head', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c];
+      await h.start();
       final watch = h.client.watchPages(const FeedRooms(sorted: false));
       await settle();
-      h.server.publish(rooms, [room(9, 99)]);
+      h.server.publish(roomsChannel, [d]);
       await settle();
-      expect(itemsOf(watch.state).map((r) => r.id), [9, 1, 2]);
+      expect(pagedItems(watch.state), [d, a, b]);
     });
 
-    test(
-      'reconnect re-runs from the first page up to the loaded count',
-      () async {
-        final watch = h.client.watchPages(const FeedRooms());
-        await settle();
-        await watch.loadMore();
-        await settle();
-        h.server.received.clear();
-
-        feed = [
-          room(1, 10),
-          room(2, 21),
-          room(3, 30),
-          room(4, 40),
-          room(5, 50),
-        ];
-        await h.server.dropConnections();
-        await until(() => watch.isLive && itemsOf(watch.state)[1].rank == 21);
-
-        expect(
-          pagesAsked<FeedRooms>().map((p) => (p! as DwOffsetParams).offset),
-          [0, 2],
-        );
-        expect(itemsOf(watch.state).map((r) => r.id), [1, 2, 3, 4]);
-        expect(watch.hasMore, isTrue);
-      },
-    );
-
-    test(
-      'reconnect during loadMore abandons it and reloads from the top',
-      () async {
-        final watch = h.client.watchPages(const FeedRooms());
-        await settle();
-        var first = true;
-        h.server.onRequest<FeedRooms>((r, call) {
-          if (first &&
-              call.page is DwOffsetParams &&
-              (call.page! as DwOffsetParams).offset == 2) {
-            first = false;
-            return Completer<DwResult<Object?>>().future;
-          }
-          return DwOk(dwFakePage(feed, call.page, pageSize: r.pageSize));
-        });
-        final more = watch.loadMore();
-        await settle();
-        h.server.received.clear();
-        await h.server.dropConnections();
-        await more;
-        await until(() => watch.isLive);
-        await settle();
-        expect(
-          pagesAsked<FeedRooms>()
-              .map((p) => (p! as DwOffsetParams).offset)
-              .first,
-          0,
-        );
-        expect(dataOf(watch.state).loadingMore, isFalse);
-        expect(itemsOf(watch.state).map((r) => r.id), [1, 2]);
-      },
-    );
-
-    test('two watchers share one entry and one subscription', () async {
-      final one = h.client.watchPages(const FeedRooms());
-      final two = h.client.watchPages(const FeedRooms());
+    test('a refetch reloads as many rows as are loaded, in one call up to '
+        'maxPageSize and page by page beyond', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c, d, e];
+      await h.start();
+      final watch = h.client.watchPages(const FeedRooms());
       await settle();
-      expect(pagesAsked<FeedRooms>(), hasLength(1));
-      expect(h.server.subscribeCount(rooms), 1);
-      await one.loadMore();
+      await watch.loadMore();
+      await watch.loadMore();
+      expect(pagedItems(watch.state), hasLength(5));
+      h.server.calls.clear();
+
+      await watch.refetch();
+      expect(pagedItems(watch.state), [a, b, c, d, e]);
+      expect(
+        [for (final call in h.server.callsOf<FeedRooms>()) call.query],
+        [
+          {'pageSize': '3'},
+          {'offset': '3'},
+        ],
+      );
+    });
+
+    test('shows the rows as refreshing while a reload runs', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      final watch = h.client.watchPages(const FeedRooms());
       await settle();
-      expect(itemsOf(two.state), hasLength(4));
-      one.close();
-      two.close();
+      final states = DwStreamRecording(watch.states);
+      await watch.refetch();
       await settle();
-      expect(h.server.unsubscribeCount(rooms), 1);
+      expect(
+        states.values.map((s) => (s as DwRequestData).refreshing).toList(),
+        [false, true, false],
+      );
+    });
+
+    test('loadMore asked during a reload loads after it', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c, d];
+      await h.start();
+      final watch = h.client.watchPages(const FeedRooms());
+      await settle();
+      final reload = watch.refetch();
+      final more = watch.loadMore();
+      await reload;
+      await more;
+      expect(pagedItems(watch.state), [a, b, c, d]);
     });
   });
 
-  group('cursor pages', () {
+  group('table', () {
+    test('each numbered page is its own entry with the total', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c];
+      await h.start();
+      final first = h.client.watchTable(const RoomsTable());
+      final second = h.client.watchTable(const RoomsTable(page: 2));
+      await settle();
+      expect(dataOf(first.state).items, [a, b]);
+      expect(dataOf(second.state).items, [c]);
+      expect(dataOf(first.state).total, 3);
+      expect(dataOf(first.state).pageCount, 2);
+      expect(dataOf(first.state), isA<DwTablePage<RoomView>>());
+    });
+
+    test('rows are updated in place; nothing is inserted', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      final table = h.client.watchTable(const RoomsTable());
+      await settle();
+      const renamed = RoomView(id: 2, name: 'b2', rank: 20);
+      h.server.publish(roomsChannel, [c, renamed]);
+      await settle();
+      expect(dataOf(table.state).items, [a, renamed]);
+      expect(dataOf(table.state), isA<DwTablePage<RoomView>>());
+      expect(h.server.requestsOf<RoomsTable>(), hasLength(1));
+    });
+
+    test('a deletion reads the page again, since later rows move up', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [a, b, c];
+      await h.start();
+      final second = h.client.watchTable(const RoomsTable(page: 2));
+      await settle();
+      expect(dataOf(second.state).items, [c]);
+      await h.client.command(const DeleteRoom(1));
+      await settle();
+      expect(dataOf(second.state).items, isEmpty);
+      expect(dataOf(second.state).total, 2);
+    });
+
+    test('watch refuses paginated kinds, naming the method', () {
+      final h = Harness();
+      expect(() => h.client.watch(const RoomsTable()), throwsArgumentError);
+      expect(() => h.client.watch(const FeedRooms()), throwsArgumentError);
+      expect(() => h.client.watch(const ReadChat()), throwsArgumentError);
+    });
+  });
+
+  group('window', () {
+    test('opens at the newest rows and loads older ones', () async {
+      final h = Harness()..serveRooms();
+      h.chat = lines(8);
+      await h.start();
+      final watch = h.client.watchWindow(const ReadChat());
+      await settle();
+      var data = dataOf(watch.state);
+      expect(idsOf(data.items), [8, 7, 6]);
+      expect((data.hasOlder, data.hasNewer), (true, false));
+
+      final loads = [watch.loadOlder(), watch.loadOlder()];
+      expect(dataOf(watch.state).loadingOlder, isTrue);
+      await Future.wait(loads);
+      data = dataOf(watch.state);
+      expect(idsOf(data.items), [8, 7, 6, 5, 4, 3]);
+      expect(data.prependedCount, 0);
+      expect(h.server.callsOf<ReadChat>(), hasLength(2), reason: 'idempotent');
+      await watch.loadOlder();
+      expect(idsOf(dataOf(watch.state).items), [8, 7, 6, 5, 4, 3, 2, 1]);
+      expect(dataOf(watch.state).hasOlder, isFalse);
+    });
+
+    test('opens at an anchor and loads newer rows, saying how many were '
+        'prepended', () async {
+      final h = Harness()..serveRooms();
+      h.chat = lines(10);
+      await h.start();
+      final anchor = DwWindowCursor.encode(30, 3);
+      final watch = h.client.watchWindow(const ReadChat(), anchor: anchor);
+      await settle();
+      var data = dataOf(watch.state);
+      expect(idsOf(data.items), [4, 3, 2]);
+      expect((data.hasOlder, data.hasNewer), (true, true));
+      expect(h.server.callsOf<ReadChat>().single.query, {'anchor': anchor});
+
+      await watch.loadNewer();
+      data = dataOf(watch.state);
+      expect(idsOf(data.items), [7, 6, 5, 4, 3, 2]);
+      expect(data.prependedCount, 3);
+      await watch.loadNewer();
+      data = dataOf(watch.state);
+      expect(idsOf(data.items).first, 10);
+      expect(data.hasNewer, isFalse);
+    });
+
+    test('a new row is inserted at the head only while the window shows the '
+        'newest rows', () async {
+      final h = Harness()..serveRooms();
+      h.chat = lines(6);
+      await h.start();
+      final newest = h.client.watchWindow(const ReadChat());
+      final anchored = h.client.watchWindow(
+        const ReadChat(),
+        anchor: DwWindowCursor.encode(20, 2),
+      );
+      await settle();
+
+      const line7 = ChatLine(id: 7, at: 70, text: 'line 7');
+      h.chat = [line7, ...h.chat];
+      h.server.publish(chatChannel, [line7]);
+      h.server.publish(chatChannel, [line7]);
+      await settle();
+
+      final top = dataOf(newest.state);
+      expect(idsOf(top.items), [7, 6, 5, 4]);
+      expect(
+        top.prependedCount,
+        1,
+        reason: 'the equal second update changed nothing and emitted nothing',
+      );
+      final middle = dataOf(anchored.state);
+      expect(idsOf(middle.items), [3, 2, 1]);
+      expect(middle.unseenNewerCount, 1, reason: 'counted once');
+
+      await anchored.loadNewer();
+      await anchored.loadNewer();
+      final reached = dataOf(anchored.state);
+      expect(reached.hasNewer, isFalse);
+      expect(reached.unseenNewerCount, 0);
+      expect(idsOf(reached.items).first, 7);
+    });
+
+    test('rows are updated and removed in place; a removed unseen row is '
+        'uncounted', () async {
+      final h = Harness()..serveRooms();
+      h.chat = lines(6);
+      await h.start();
+      final watch = h.client.watchWindow(
+        const ReadChat(),
+        anchor: DwWindowCursor.encode(20, 2),
+      );
+      await settle();
+      const line9 = ChatLine(id: 9, at: 90, text: 'nine');
+      h.server.publish(chatChannel, [
+        const ChatLine(id: 2, at: 20, text: 'edited'),
+        DwDeletedObject.of<ChatLine>(1, roomsProtocol),
+        line9,
+      ]);
+      await settle();
+      var data = dataOf(watch.state);
+      expect(data.items, [
+        const ChatLine(id: 3, at: 30, text: 'line 3'),
+        const ChatLine(id: 2, at: 20, text: 'edited'),
+      ]);
+      expect(data.unseenNewerCount, 1);
+      h.server.publish(chatChannel, [
+        DwDeletedObject.of<ChatLine>(9, roomsProtocol),
+      ]);
+      await settle();
+      data = dataOf(watch.state);
+      expect(data.unseenNewerCount, 0);
+    });
+
+    test('a reconnect reloads the window where it stands', () async {
+      final h = Harness()..serveRooms();
+      h.chat = lines(10);
+      await h.start();
+      final anchor = DwWindowCursor.encode(50, 5);
+      final watch = h.client.watchWindow(const ReadChat(), anchor: anchor);
+      await settle();
+      await watch.loadOlder();
+      expect(dataOf(watch.state).items, hasLength(6));
+      h.server.calls.clear();
+
+      await h.server.dropConnections();
+      await until(() => h.server.calls.isNotEmpty);
+      await settle();
+      expect(h.server.callsOf<ReadChat>().single.query, {
+        'anchor': anchor,
+        'pageSize': '6',
+      });
+      expect(dataOf(watch.state).items, hasLength(6));
+    });
+
     test(
-      'load newest first, then older by the id of the oldest loaded',
+      'windows of one request at different anchors are separate entries',
       () async {
-        final watch = h.client.watchPages(const RoomHistory());
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [5, 4]);
-        await watch.loadMore();
-        await settle();
-        await watch.loadMore();
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [5, 4, 3, 2, 1]);
-        expect(watch.hasMore, isFalse);
-        expect(
-          pagesAsked<RoomHistory>().map((p) => (p! as DwCursorParams).before),
-          [null, 4, 2],
+        final h = Harness()..serveRooms();
+        h.chat = lines(6);
+        await h.start();
+        final first = h.client.watchWindow(const ReadChat());
+        final again = h.client.watchWindow(const ReadChat());
+        final other = h.client.watchWindow(
+          const ReadChat(),
+          anchor: DwWindowCursor.encode(20, 2),
         );
+        await settle();
+        expect(h.server.callsOf<ReadChat>(), hasLength(2));
+        expect(dataOf(first.state), dataOf(again.state));
+        expect(idsOf(dataOf(other.state).items), [3, 2, 1]);
       },
     );
 
-    test(
-      'updates: replace in place, new objects at the head, deletions removed',
-      () async {
-        final watch = h.client.watchPages(const RoomHistory());
-        await settle();
-        h.server.publish(rooms, [
-          const RoomView(id: 4, name: 'edited', rank: 40),
-          room(6, 60),
-          DwDeleted.of<RoomView>(5, roomsProtocol),
-        ]);
-        await settle();
-        expect(itemsOf(watch.state).map((r) => r.id), [6, 4]);
-        expect(itemsOf(watch.state)[1].name, 'edited');
-      },
-    );
+    test('an older load that fails keeps the rows and says why', () async {
+      final h = Harness()..serveRooms();
+      h.chat = lines(6);
+      await h.start();
+      final watch = h.client.watchWindow(const ReadChat());
+      await settle();
+      h.server.onRequest<ReadChat>(
+        (request, call) => DwCallRefused<DwWindowResult<ChatLine>>(
+          DwCallRefusal(DwCoreRefusal.forbidden),
+        ),
+      );
+      await watch.loadOlder();
+      final data = dataOf(watch.state);
+      expect(idsOf(data.items), [6, 5, 4]);
+      expect(data.loadingOlder, isFalse);
+      expect(data.loadError, isA<DwRefusalException>());
+    });
   });
-
-  test('watchPages refuses a request that is not paginated', () {
-    expect(() => h.client.watchPages(const _PageShaped()), throwsArgumentError);
-  });
-}
-
-/// Answers pages without being a page kind.
-final class _PageShaped extends DwRequest<DwPage<RoomView>> {
-  const _PageShaped();
-
-  @override
-  String get dwTypeName => 'FeedRooms';
-
-  @override
-  Map<String, Object?> toJson() => const {};
-
-  @override
-  Object? encodeResult(DwPage<RoomView> result, DwProtocol protocol) => null;
-
-  @override
-  DwPage<RoomView> decodeResult(Object? json, DwProtocol protocol) =>
-      const DwPage([], hasMore: false);
 }

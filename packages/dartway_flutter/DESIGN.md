@@ -24,7 +24,7 @@ contract.
 
 **It collects, it does not deliver.** The error pipeline gathers an error and its context snapshot
 and routes it (`dw.handleError` → `dw.dispatchReport` → the configured hook). It does not deliver:
-Telegram/alert delivery is plugged in by the data layer (`DwCore` overrides `dispatchReport`). The
+Telegram/alert delivery is plugged in by the data layer (`DwFlutterCore` overrides `dispatchReport`). The
 package has no business knowing the channels an error is sent to.
 
 **The core is minimal; optional things are plugins.** This package does not depend on

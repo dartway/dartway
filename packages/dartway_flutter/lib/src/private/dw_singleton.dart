@@ -15,7 +15,7 @@ DwFlutter get dw {
   if (instance == null) {
     throw StateError(
       'Dw is not initialized.\n'
-      'Make sure the app built its core — DwFlutter(config: ...), or DwCore '
+      'Make sure the app built its core — DwFlutter(config: ...), or DwFlutterCore '
       'with the data layer — before anything reached dw. A widget test has to '
       'build one too (and dispose it in tearDown): a feature reaches dw while '
       'building, not on the tap, so the subtree does not render without it.',

@@ -27,7 +27,7 @@ import '../dw_flutter.dart';
 /// list compiles and throws `LateInitializationError` at startup.
 ///
 /// The argument is a [DwFlutter]. An app built on the data layer passes a
-/// `DwCore`, which is one — a plugin that needs the data layer names it and
+/// `DwFlutterCore`, which is one — a plugin that needs the data layer names it and
 /// casts, and thereby says out loud that it does not work on the plain
 /// toolbox.
 abstract class DwPlugin {
@@ -150,7 +150,7 @@ class DwPlugins {
     }
     throw StateError(
       'No $T is registered. Declare it at startup: '
-      'DwFlutter(plugins: [...]) — or DwCore with the data layer.',
+      'DwFlutter(plugins: [...]) — or DwFlutterCore with the data layer.',
     );
   }
 

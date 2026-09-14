@@ -4,229 +4,269 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-const session = DwSession(id: 42, token: 'token-42', isNewAccount: false);
-
 void main() {
-  /// Serves [ListRooms] only to signed-in connections, and [FindRoom] with the
-  /// caller's account in the name, so a re-run under another account shows.
-  void serveAccountData(Harness h) {
-    h.server
-      ..registerToken(session.token, session.id)
-      ..onRequest<ListRooms>(
-        (r, call) => call.accountId == null
-            ? const DwNotAuthenticated<List<RoomView>>()
-            : const DwOk([a, b]),
-      )
-      ..onRequest<FindRoom>(
-        (r, call) =>
-            DwOk<RoomView?>(RoomView(id: 9, name: 'for ${call.accountId}')),
-      );
-  }
+  group('start', () {
+    test('reads the stored session before anything is asked', () async {
+      final h = Harness()..serveRooms();
+      final watch = h.client.watch(const ListRoomsOffline());
+      await settle();
+      expect(watch.state, isA<DwRequestLoading>());
+      expect(h.server.calls, isEmpty);
+      await h.start();
+      expect(h.client.accountId, alice.id);
+      expect(dataOf(watch.state), [a, b]);
+      expect(h.server.calls.single.authorization, 'Bearer token-7');
+    });
 
-  test(
-    'a fresh client is anonymous and sends no authentication at all',
-    () async {
-      final h = Harness();
-      serveAccountData(h);
-      final sessions = DwRecording(h.client.session);
+    test('a store that cannot be read starts signed out, reported', () async {
+      final h = Harness(tokenStore: _BrokenStore())..serveRooms();
       await h.start();
       expect(h.client.accountId, isNull);
-      expect(sessions.values, [null]);
-      expect(h.server.receivedOf<DwAuthenticateMessage>(), isEmpty);
-    },
-  );
+      expect(h.takeReported<StateError>(), hasLength(1));
+    });
+  });
 
-  test(
-    'a stored session authenticates first, before any queued call',
-    () async {
-      final store = DwMemoryTokenStore(session);
-      final h = Harness(tokenStore: store);
-      serveAccountData(h);
-      final result = h.client.fetch(const ListRooms());
-      await h.client.start();
-      expect(
-        h.client.accountId,
-        42,
-        reason: 'known from the store before the server answers',
-      );
-      expect((await result).valueOrNull, [a, b]);
-      expect(h.server.received.first, isA<DwAuthenticateMessage>());
-    },
-  );
-
-  test(
-    'signIn stores the session, authenticates and re-runs watches',
-    () async {
-      final store = DwMemoryTokenStore();
-      final h = Harness(tokenStore: store);
-      serveAccountData(h);
+  group('account scope', () {
+    test("signing in as another account never shows the previous account's "
+        'data', () async {
+      final h = Harness()..serveRooms();
+      h.notes = {
+        7: [const NoteView(id: 1, text: 'alice')],
+        8: [const NoteView(id: 2, text: 'bob')],
+      };
       await h.start();
-      final watch = h.client.watch(const FindRoom('x'));
+      final watch = h.client.watch(const ListMyNotes());
       await settle();
-      expect(dataOf(watch.state)!.name, 'for null');
+      final states = DwStreamRecording(watch.states);
+      expect(dataOf(watch.state), [const NoteView(id: 1, text: 'alice')]);
 
-      final sessions = DwRecording(h.client.session);
-      await h.client.signIn(session);
+      await h.client.signIn(bob);
+      expect(h.client.accountId, bob.id);
+      expect(watch.state, isA<DwRequestLoading>(), reason: 'released at once');
       await settle();
 
-      expect(store.session, session);
-      expect(h.client.accountId, 42);
-      expect(sessions.values, [null, 42]);
-      expect(h.server.openConnections.single.accountId, 42);
-      expect(dataOf(watch.state)!.name, 'for 42');
-    },
-  );
+      expect(dataOf(watch.state), [const NoteView(id: 2, text: 'bob')]);
+      expect(states.values, [
+        isA<DwRequestData>(),
+        isA<DwRequestLoading>(),
+        isA<DwRequestData>(),
+      ]);
+      expect(await h.store.read(), bob);
+      final calls = h.server.callsOf<ListMyNotes>();
+      expect(calls.map((c) => c.authorization), [
+        'Bearer token-7',
+        'Bearer token-8',
+      ]);
+      expect(
+        calls.last.call,
+        const ListMyNotes(),
+        reason: 'no account id in it',
+      );
+    });
 
-  test('signIn while offline authenticates on the next connection', () async {
-    final h = Harness();
-    serveAccountData(h);
-    h.server.acceptsConnections = false;
-    await h.client.start();
-    await h.client.signIn(session);
-    expect(h.client.accountId, 42);
-    h.server.acceptsConnections = true;
-    expect((await h.client.fetch(const ListRooms())).valueOrNull, [a, b]);
-    expect(
-      h.server.receivedOf<DwAuthenticateMessage>().single.token,
-      session.token,
+    test('the previous account\'s subscriptions are released before the socket '
+        'authenticates as the next one', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      h.client.watch(const ListMyNotes());
+      await settle();
+      final before = h.server.received.length;
+
+      await h.client.signIn(bob);
+      await settle();
+      expect(h.server.received.skip(before).map((m) => m.toJson()).toList(), [
+        {'k': 'unsub', 'ch': 'notes'},
+        {'k': 'auth', 'token': 'token-8'},
+        {'k': 'sub', 'ch': 'notes'},
+      ]);
+      expect(h.server.connections.single.accountId, bob.id);
+    });
+
+    test(
+      'an entry in its release delay is released with the account',
+      () async {
+        final h = Harness(
+          options: const DwClientOptions(
+            releaseDelay: Duration(minutes: 1),
+            liveIdleDelay: Duration.zero,
+            retryDelay: Duration(milliseconds: 1),
+          ),
+        )..serveRooms();
+        h.notes = {
+          7: [const NoteView(id: 1, text: 'alice')],
+        };
+        await h.start();
+        h.client.watch(const ListMyNotes()).close();
+        await settle();
+        await h.client.signIn(bob);
+        final watch = h.client.watch(const ListMyNotes());
+        expect(watch.state, isA<DwRequestLoading>());
+        await settle();
+        expect(dataOf(watch.state), isEmpty);
+      },
     );
-  });
 
-  test('signOut revokes, clears, continues anonymously and re-runs', () async {
-    final store = DwMemoryTokenStore(session);
-    final h = Harness(tokenStore: store);
-    serveAccountData(h);
-    await h.start();
-    final watch = h.client.watch(const FindRoom('x'));
-    final list = h.client.watch(const ListRooms());
-    await settle();
-    expect(dataOf(watch.state)!.name, 'for 42');
-    expect(h.server.subscriberCount(rooms), 1);
-
-    await h.client.signOut();
-    await settle();
-
-    expect(h.server.commandsOf<DwSignOut>(), hasLength(1));
-    expect(h.server.isTokenValid(session.token), isFalse);
-    expect(store.session, isNull);
-    expect(h.client.accountId, isNull);
-    // A successful sign-out leaves the connection anonymous: no second
-    // authentication is sent.
-    expect(h.server.receivedOf<DwAuthenticateMessage>(), hasLength(1));
-    expect(h.server.openConnections.single.accountId, isNull);
-    expect(dataOf(watch.state)!.name, 'for null');
-    expect(list.state, const DwRequestUnauthenticated<List<RoomView>>());
-    // The server dropped the subscription with the key; the client made it
-    // again, anonymously.
-    expect(h.server.subscribeCount(rooms), 2);
-    expect(h.server.subscriberCount(rooms), 1);
-  });
-
-  test('signOut while offline ends the local session only', () async {
-    final store = DwMemoryTokenStore(session);
-    final h = Harness(tokenStore: store);
-    serveAccountData(h);
-    h.server.acceptsConnections = false;
-    await h.client.start();
-    await h.client.signOut();
-    expect(h.client.accountId, isNull);
-    expect(store.session, isNull);
-    h.server.acceptsConnections = true;
-    await h.client.fetch(const FindRoom('x'));
-    expect(h.server.commandsOf<DwSignOut>(), isEmpty);
-    expect(h.server.receivedOf<DwAuthenticateMessage>(), isEmpty);
-  });
-
-  test(
-    'a rejected token clears the session and the app continues anonymously',
-    () async {
-      final store = DwMemoryTokenStore(
-        const DwSession(id: 7, token: 'stale', isNewAccount: false),
-      );
-      final h = Harness(tokenStore: store);
-      serveAccountData(h);
-      final sessions = DwRecording(h.client.session);
+    test('signing in again as the same account keeps the data', () async {
+      final h = Harness()..serveRooms();
       await h.start();
-      final watch = h.client.watch(const FindRoom('x'));
+      final watch = h.client.watch(const ListRoomsOffline());
       await settle();
+      h.server.registerToken('token-7b', alice.id);
+      await h.client.signIn(
+        const DwAuthSession(id: 7, token: 'token-7b', isNewAccount: false),
+      );
+      await settle();
+      expect(dataOf(watch.state), [a, b]);
+      expect(h.server.requestsOf<ListRoomsOffline>(), hasLength(1));
+    });
+  });
+
+  group('sign-out', () {
+    test(
+      'ends the session at once and revokes the key with its token',
+      () async {
+        final h = Harness()..serveRooms();
+        await h.start();
+        final notes = h.client.watch(const ListMyNotes());
+        await settle();
+
+        final signingOut = h.client.signOut();
+        expect(h.client.accountId, isNull, reason: 'ended before the answer');
+        await signingOut;
+        await settle();
+
+        final call = h.server.callsOf<DwSignOut>().single;
+        expect(call.authorization, 'Bearer token-7');
+        expect(h.server.isTokenValid(alice.token), isFalse);
+        expect(await h.store.read(), isNull);
+        expect(notes.state, const DwRequestUnauthenticated<List<NoteView>>());
+      },
+    );
+
+    test('a sign-out the server did not carry out is reported; the local '
+        'session is over anyway', () async {
+      final h = Harness()..serveRooms();
+      h.server.onCommand<DwSignOut>(
+        (command, call) => const DwCallFailed<void>('revoke-failed'),
+      );
+      await h.start();
+      await h.client.signOut();
       expect(h.client.accountId, isNull);
-      expect(sessions.values, [null, 7, null]);
-      expect(store.session, isNull);
-      expect(dataOf(watch.state)!.name, 'for null');
       expect(
-        h.server.requestsOf<FindRoom>(),
+        h.takeReported<DwSignOutException>().single.outcome,
+        isA<DwCallFailed>(),
+      );
+    });
+
+    test('while unreachable the sign-out times out, reported', () async {
+      final h = Harness(
+        options: const DwClientOptions(
+          callTimeout: Duration(milliseconds: 40),
+          retryDelay: Duration(milliseconds: 5),
+        ),
+      )..serveRooms();
+      await h.start();
+      h.server.reachable = false;
+      await h.client.signOut();
+      expect(h.client.accountId, isNull);
+      expect(
+        h.takeReported<DwSignOutException>().single.outcome,
+        isA<DwTimeoutException>(),
+      );
+    });
+  });
+
+  group('the server ends a session', () {
+    test('a not-authenticated answer to the current token ends it', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      h.server.revokeToken(alice.token);
+      final result = await h.client.fetch(const ListRoomsOffline());
+      expect(result, isA<DwNotAuthenticated>());
+      expect(h.client.accountId, isNull);
+      expect(await h.store.read(), isNull);
+    });
+
+    test('a not-authenticated answer to an older token does not end the new '
+        'session', () async {
+      final h = Harness()..serveRooms();
+      final gate = Gate();
+      await h.start();
+      h.server.onRequest<GetRoom>((request, call) async {
+        await gate.passed;
+        return const DwNotAuthenticated<RoomView>();
+      });
+      final pending = h.client.fetch(const GetRoom(1));
+      await settle();
+      await h.client.signIn(bob);
+      gate.open();
+      expect(await pending, isA<DwNotAuthenticated>());
+      expect(h.client.accountId, bob.id);
+    });
+
+    test('a revocation elsewhere arrives on the socket and ends it', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      final rooms = h.client.watch(const ListRooms());
+      await settle();
+      final accounts = DwStreamRecording(h.client.accountIdStream);
+      h.server.revokeToken(alice.token);
+      await settle();
+      expect(accounts.values, [alice.id, null]);
+      expect(await h.store.read(), isNull);
+      expect(
+        h.server.receivedOf<DwAuthenticateMessage>(),
         hasLength(1),
-        reason: 'sent after the answer, once',
+        reason: 'the server already unbound the socket',
       );
-    },
-  );
+      expect(
+        rooms.state,
+        const DwRequestData([a, b]),
+        reason: 'fetched again anonymously; not live without an account',
+      );
+    });
 
-  test(
-    'a not-authenticated answer clears the session it was sent under',
-    () async {
-      final store = DwMemoryTokenStore(session);
-      final h = Harness(tokenStore: store);
-      serveAccountData(h);
-      var expired = false;
+    test('a token the socket rejects ends the session', () async {
+      final store = DwMemoryTokenStore(
+        const DwAuthSession(id: 9, token: 'stale', isNewAccount: false),
+      );
+      final h = Harness(tokenStore: store)..serveRooms();
       h.server.onRequest<ListRooms>(
-        (r, call) => expired || call.accountId == null
-            ? const DwNotAuthenticated<List<RoomView>>()
-            : const DwOk([a, b]),
+        (request, call) => DwCallOk(h.rooms.toList()),
       );
       await h.start();
-      final watch = h.client.watch(const ListRooms());
+      h.client.watch(const ListRooms());
       await settle();
-      expect(watch.state, const DwRequestData([a, b], live: true));
-
-      expired = true;
-      final result = await h.client.fetch(const ListRooms());
-      expect(result, isA<DwNotAuthenticated<List<RoomView>>>());
-      await settle();
-
       expect(h.client.accountId, isNull);
       expect(store.session, isNull);
-      expect(watch.state, const DwRequestUnauthenticated<List<RoomView>>());
-      expect(
-        h.server.requestsOf<ListRooms>(),
-        hasLength(3),
-        reason: 'watch, fetch, one re-run',
+    });
+
+    test('the server corrects the account a token belongs to', () async {
+      final store = DwMemoryTokenStore(
+        const DwAuthSession(id: 99, token: 'token-7', isNewAccount: true),
       );
-    },
-  );
-
-  test(
-    'a session revoked elsewhere ends here too, with one re-run per watch',
-    () async {
-      final h = Harness(tokenStore: DwMemoryTokenStore(session));
-      serveAccountData(h);
-      final other = h.server.newClient(tokenStore: DwMemoryTokenStore(session));
-      addTearDown(other.stop);
+      final h = Harness(tokenStore: store)..serveRooms();
       await h.start();
-      await other.start();
-      final watch = h.client.watch(const FindRoom('x'));
+      h.client.watch(const ListRooms());
       await settle();
-      expect(dataOf(watch.state)!.name, 'for 42');
-      expect(watch.isLive, isTrue);
-
-      await other.signOut();
-      await settle();
-
-      expect(h.client.accountId, isNull);
-      expect(dataOf(watch.state)!.name, 'for null');
-      expect(h.server.requestsOf<FindRoom>(), hasLength(2));
-      expect(watch.isLive, isTrue, reason: 'subscribed again, anonymously');
-      expect(h.reported, isEmpty);
-    },
-  );
-
-  test('the server corrects the account a token belongs to', () async {
-    final store = DwMemoryTokenStore(
-      const DwSession(id: 1, token: 'token-42', isNewAccount: false),
-    );
-    final h = Harness(tokenStore: store);
-    serveAccountData(h);
-    await h.start();
-    expect(h.client.accountId, 42);
-    expect(store.session?.id, 42);
+      expect(h.client.accountId, alice.id);
+      expect(store.session?.id, alice.id);
+      expect(
+        h.server.receivedOf<DwAuthenticateMessage>(),
+        hasLength(1),
+        reason: 'the same token needs no second authentication',
+      );
+    });
   });
+}
+
+final class _BrokenStore implements DwTokenStore {
+  @override
+  Future<DwAuthSession?> read() async => throw StateError('broken');
+
+  @override
+  Future<void> write(DwAuthSession session) async {}
+
+  @override
+  Future<void> clear() async {}
 }

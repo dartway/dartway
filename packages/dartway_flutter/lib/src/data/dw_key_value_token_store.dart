@@ -26,19 +26,19 @@ final class DwKeyValueTokenStore implements DwTokenStore {
       throw StateError(
         'No DwKeyValueStorePlugin is declared, so there is nowhere to keep the '
         'session and a sign-in cannot survive a restart. Declare one — '
-        'DwCore(plugins: [DwSharedPreferences()]) — or pass DwCore a '
-        'tokenStore of its own.',
+        'DwFlutterCore(plugins: [DwSharedPreferences()]) — or pass '
+        'DwFlutterCore a tokenStore of its own.',
       );
     }
     return store;
   }
 
   @override
-  Future<DwSession?> read() async {
+  Future<DwAuthSession?> read() async {
     final stored = await _store.getString(key);
     if (stored == null) return null;
     try {
-      return DwSession.fromJson(jsonDecode(stored) as Map<String, Object?>);
+      return DwAuthSession.fromJson(jsonDecode(stored) as Map<String, Object?>);
     } on Object {
       // Unreadable: nobody is signed in, and the key is freed for the next
       // session rather than failing every start.
@@ -48,7 +48,7 @@ final class DwKeyValueTokenStore implements DwTokenStore {
   }
 
   @override
-  Future<void> write(DwSession session) =>
+  Future<void> write(DwAuthSession session) =>
       _store.setString(key, jsonEncode(session.toJson()));
 
   @override

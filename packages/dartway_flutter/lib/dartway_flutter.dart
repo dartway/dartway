@@ -11,7 +11,7 @@
 // `DwUiAction` behind any tappable widget, and `dwBuildAsync` renders
 // loading/error/data uniformly. See DESIGN.md for the design principles.
 //
-// lib/src is grouped into: data (DwCore and the Riverpod bindings over the
+// lib/src is grouped into: data (DwFlutterCore and the Riverpod bindings over the
 // client), core (the ambient dw + config + plugins), bootstrap (app runner), ui
 // (actions, async_ui, notifications, confirmation) and diagnostics (error
 // reporting, feature declarations).
@@ -20,16 +20,22 @@
 // an app on the data layer imports this package and nothing else of ours.
 export 'package:dartway_client/dartway_client.dart';
 
-// data: DwCore — the toolbox plus the client and its Riverpod bindings
-// (`dw.request`, `dw.pages`, `dw.command`, `dw.accountId`).
-export 'src/data/dw_core.dart';
+// data: DwFlutterCore — the toolbox plus the client and its Riverpod bindings
+// (`dw.request`, `dw.pages`, `dw.table`, `dw.window`, `dw.command`,
+// `dw.accountId`, `dw.liveStatus`).
+export 'src/data/dw_flutter_core.dart';
 export 'src/data/dw_request_notifiers.dart'
     show
         DwPagesNotifier,
         DwPagesProvider,
         DwRequestNotifier,
         DwRequestProvider,
-        DwValueProvider;
+        DwStreamValueNotifier,
+        DwTableNotifier,
+        DwTableProvider,
+        DwValueProvider,
+        DwWindowNotifier,
+        DwWindowProvider;
 
 // core: the ambient app root, its config, and the plugin registry
 // (`dw.plugins.<name>`).

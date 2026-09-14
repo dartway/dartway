@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:convert';
 
 import 'package:dartway_client/dartway_client.dart';
 import 'package:dartway_client/testing.dart';
@@ -8,72 +8,111 @@ import 'support.dart';
 
 void main() {
   group('a watch', () {
-    test('loads, then shows data that is live once subscribed', () async {
-      final h = Harness()..serveRooms();
-      await h.start();
-      final watch = h.client.watch(const ListRooms());
-      final states = DwRecording(watch.states);
-      await settle();
-
-      expect(states.values.first, const DwRequestLoading<List<RoomView>>());
-      expect(watch.state, const DwRequestData([a, b], live: true));
-      expect(watch.isLive, isTrue);
-      // Subscribed before fetching: nothing published in between is missed.
-      final kinds = h.server.received
-          .map((m) => m.runtimeType)
-          .where((t) => t == DwSubscribeMessage || t == DwRequestMessage)
-          .toList();
-      expect(kinds, [DwSubscribeMessage, DwRequestMessage]);
-    });
-
-    test('replays the current state to a late listener', () async {
-      final h = Harness()..serveRooms();
-      await h.start();
-      final watch = h.client.watch(const ListRooms());
-      await settle();
-      final late = DwRecording(watch.states);
-      await settle();
-      expect(late.values, [
-        const DwRequestData([a, b], live: true),
-      ]);
-    });
-
-    test('a request without channels is data and never live', () async {
-      final h = Harness();
-      h.server.onRequest<ListRoomsByRank>((r, call) => const DwOk([a]));
-      await h.start();
-      final watch = h.client.watch(const _NoChannels());
-      await settle();
-      expect(watch.state, const DwRequestData([a]));
-      expect(h.server.receivedOf<DwSubscribeMessage>(), isEmpty);
-    });
+    test(
+      'loads, then shows data; a late listener gets the current state',
+      () async {
+        final h = Harness()..serveRooms();
+        await h.start();
+        final watch = h.client.watch(const ListRoomsOffline());
+        final states = DwStreamRecording(watch.states);
+        await settle();
+        expect(states.values, [
+          const DwRequestLoading<List<RoomView>>(),
+          const DwRequestData([a, b]),
+        ]);
+        final late = DwStreamRecording(watch.states);
+        await settle();
+        expect(late.values, [
+          const DwRequestData([a, b]),
+        ]);
+      },
+    );
 
     test('refused, failed and unauthenticated answers are states', () async {
       final h = Harness();
       h.server
         ..onRequest<GetRoom>(
-          (r, call) => DwRefused<RoomView>(DwRefusal(DwCoreRefusal.forbidden)),
+          (r, call) =>
+              DwCallRefused<RoomView>(DwCallRefusal(DwCoreRefusal.forbidden)),
         )
-        ..onRequest<ListRooms>(
-          (r, call) => const DwFailed<List<RoomView>>('incident-7'),
+        ..onRequest<ListRoomsOffline>(
+          (r, call) => const DwCallFailed<List<RoomView>>('incident-7'),
         )
         ..onRequest<FindRoom>(
           (r, call) => const DwNotAuthenticated<RoomView?>(),
         );
       await h.start();
       final refused = h.client.watch(const GetRoom(1));
-      final failed = h.client.watch(const ListRooms());
+      final failed = h.client.watch(const ListRoomsOffline());
       final unauthenticated = h.client.watch(const FindRoom('x'));
       await settle();
       expect(
         refused.state,
-        DwRequestRefused<RoomView>(DwRefusal(DwCoreRefusal.forbidden)),
+        DwRequestRefused<RoomView>(DwCallRefusal(DwCoreRefusal.forbidden)),
       );
       expect(failed.state, const DwRequestFailed<List<RoomView>>('incident-7'));
       expect(
         unauthenticated.state,
         const DwRequestUnauthenticated<RoomView?>(),
       );
+      expect(h.client.accountId, isNull, reason: 'the session ended');
+    });
+
+    test('an invalid request shows its refusal and never fetches or '
+        'subscribes', () async {
+      final h = Harness()..serveRooms();
+      await h.start();
+      final watch = h.client.watch(const ListRooms(minRank: -1));
+      await settle();
+      expect(
+        watch.state,
+        DwRequestRefused<List<RoomView>>(
+          DwCallRefusal(
+            DwCoreRefusal.invalid,
+            field: 'minRank',
+            params: {'min': 0},
+          ),
+        ),
+      );
+      expect(h.server.calls, isEmpty);
+      expect(h.server.connections, isEmpty);
+      await watch.refetch();
+      expect(h.server.calls, isEmpty);
+    });
+
+    test('an answer that does not decode is a failure, reported', () async {
+      final h = Harness();
+      h.server.interceptPost = (post) => DwHttpReply(
+        status: 200,
+        body: jsonEncode(const DwApiResponse.ok([1, 2]).toJson()),
+      );
+      await h.start();
+      final watch = h.client.watch(const ListRoomsOffline());
+      await settle();
+      expect(
+        watch.state,
+        const DwRequestFailed<List<RoomView>>(dwClientIncidentId),
+      );
+      expect(h.takeReported<DwProtocolException>(), hasLength(1));
+    });
+
+    test('with no answer for callTimeout and no data it is unreachable, and '
+        'recovers by itself', () async {
+      final h = Harness(
+        options: const DwClientOptions(
+          callTimeout: Duration(milliseconds: 30),
+          retryDelay: Duration(milliseconds: 5),
+          maxRetryDelay: Duration(milliseconds: 10),
+          releaseDelay: Duration.zero,
+        ),
+      )..serveRooms();
+      await h.start();
+      h.server.reachable = false;
+      final watch = h.client.watch(const ListRoomsOffline());
+      await until(() => watch.state is DwRequestUnreachable);
+      h.server.reachable = true;
+      await until(() => watch.state is DwRequestData);
+      expect(dataOf(watch.state), [a, b]);
     });
 
     test('a paginated request is refused by watch', () {
@@ -84,428 +123,161 @@ void main() {
 
   group('sharing and reference counting', () {
     test(
-      'two watchers of equal requests share one fetch and one subscription',
+      'equal requests share one entry: one fetch, one subscription',
       () async {
         final h = Harness()..serveRooms();
         await h.start();
         final first = h.client.watch(const ListRooms());
         final second = h.client.watch(const ListRooms());
         await settle();
-
         expect(h.server.requestsOf<ListRooms>(), hasLength(1));
-        expect(h.server.subscribeCount(rooms), 1);
+        expect(h.server.subscribeCount(roomsChannel), 1);
         expect(first.state, second.state);
-
         first.close();
         await settle();
-        expect(
-          h.server.unsubscribeCount(rooms),
-          0,
-          reason: 'one watcher remains',
-        );
-
+        expect(h.server.unsubscribeCount(roomsChannel), 0);
         second.close();
         await settle();
-        expect(h.server.unsubscribeCount(rooms), 1);
-        expect(h.server.subscriberCount(rooms), 0);
-      },
-    );
-
-    test(
-      'one subscription is shared across different requests on a channel',
-      () async {
-        final h = Harness()..serveRooms();
-        await h.start();
-        final list = h.client.watch(const ListRooms());
-        final byRank = h.client.watch(const ListRoomsByRank());
-        final find = h.client.watch(const FindRoom('a'));
-        await settle();
-        expect(h.server.subscribeCount(rooms), 1);
-        expect(h.server.requestsOf<DwRequest<Object?>>(), hasLength(3));
-
-        list.close();
-        byRank.close();
-        await settle();
-        expect(h.server.unsubscribeCount(rooms), 0);
-
-        find.close();
-        await settle();
-        expect(h.server.unsubscribeCount(rooms), 1);
-      },
-    );
-
-    test(
-      'updates reach only the entries whose request declares the channel',
-      () async {
-        final h = Harness()..serveRooms();
-        h.server.onRequest<ListNotes>(
-          (r, call) => const DwOk([NoteView(id: 1, text: 'n')]),
-        );
-        await h.start();
-        final roomsWatch = h.client.watch(const ListRooms());
-        final room = h.client.watch(const GetRoom(1));
-        await settle();
-
-        // Published on `room:1` only: the list on `rooms` must not hear it.
-        const renamed = RoomView(id: 2, name: 'b2', rank: 20);
-        h.server.publish(const DwChannel(AppChannel.room, 1), [renamed]);
-        await settle();
-        expect(dataOf(roomsWatch.state), [a, b]);
-        expect(dataOf(room.state), a);
+        expect(h.server.unsubscribeCount(roomsChannel), 1);
       },
     );
 
     test('an entry outlives its last watcher for the release delay', () async {
       final h = Harness(
         options: const DwClientOptions(
-          releaseDelay: Duration(milliseconds: 400),
+          releaseDelay: Duration(milliseconds: 600),
+          liveIdleDelay: Duration.zero,
+          retryDelay: Duration(milliseconds: 1),
         ),
       )..serveRooms();
       await h.start();
       h.client.watch(const ListRooms()).close();
       await settle();
       final again = h.client.watch(const ListRooms());
-      await settle();
       expect(
-        h.server.requestsOf<ListRooms>(),
-        hasLength(1),
-        reason: 'revived, not refetched',
+        again.state,
+        const DwRequestData([a, b], live: true),
+        reason: 'current and live at once, without a fetch',
       );
-      expect(h.server.unsubscribeCount(rooms), 0);
-      expect(again.state, const DwRequestData([a, b], live: true));
-
       again.close();
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 700));
       await settle();
-      expect(h.server.unsubscribeCount(rooms), 1);
-    });
-
-    test('a watch closes its streams; closing twice is harmless', () async {
-      final h = Harness()..serveRooms();
-      await h.start();
-      final watch = h.client.watch(const ListRooms());
-      final states = DwRecording(watch.states);
-      await settle();
-      watch
-        ..close()
-        ..close();
-      await settle();
-      expect(states.isDone, isTrue);
-      expect(watch.isClosed, isTrue);
-      expect(() => watch.refetch(), throwsStateError);
+      expect(h.server.requestsOf<ListRooms>(), hasLength(1));
+      expect(h.server.unsubscribeCount(roomsChannel), 1);
     });
 
     test(
-      'an erased watcher of the same request gets the same state re-typed',
+      'a closed watch closes its streams; closing twice is harmless',
       () async {
         final h = Harness()..serveRooms();
         await h.start();
-        final erased = h.client.watch<Object?>(
-          const ListRooms() as DwRequest<Object?>,
-        );
-        final typed = h.client.watch(const ListRooms());
+        final watch = h.client.watch(const ListRoomsOffline());
+        final states = DwStreamRecording(watch.states);
         await settle();
-        expect(typed.state, isA<DwRequestData<List<RoomView>>>());
-        expect(dataOf(typed.state), [a, b]);
-        expect(dataOf(erased.state), [a, b]);
+        watch
+          ..close()
+          ..close();
+        await settle();
+        expect(states.isDone, isTrue);
+        expect(watch.isClosed, isTrue);
+        expect(watch.state, const DwRequestData([a, b]));
+        expect(() => watch.refetch(), throwsStateError);
+      },
+    );
+
+    test(
+      'a watch typed loosely shares the entry and sees the same values',
+      () async {
+        final h = Harness()..serveRooms();
+        await h.start();
+        final typed = h.client.watch(const ListRoomsOffline());
+        final DwDataRequest<Object?> loose = const ListRoomsOffline();
+        final erased = h.client.watch(loose);
+        await settle();
+        expect(dataOf(erased.state), dataOf(typed.state));
+        expect(h.server.requestsOf<ListRoomsOffline>(), hasLength(1));
       },
     );
   });
 
   group('refetch', () {
     test('is coalesced: one in flight, one after it', () async {
-      final h = Harness();
-      final answers = <Completer<DwResult<Object?>>>[];
-      h.server.onRequest<ListRooms>((r, call) {
-        final answer = Completer<DwResult<Object?>>();
-        answers.add(answer);
-        return answer.future;
+      final h = Harness()..serveRooms();
+      final gate = Gate()..open();
+      h.server.onRequest<ListRoomsOffline>((request, call) async {
+        await gate.passed;
+        return DwCallOk(h.rooms.toList());
       });
       await h.start();
-      final watch = h.client.watch(const ListRooms());
+      final watch = h.client.watch(const ListRoomsOffline());
       await settle();
-      expect(answers, hasLength(1));
-
-      final refetches = [watch.refetch(), watch.refetch(), watch.refetch()];
+      gate.close();
+      final refetches = [for (var i = 0; i < 5; i++) watch.refetch()];
       await settle();
-      expect(
-        answers,
-        hasLength(1),
-        reason: 'nothing more while one is in flight',
-      );
-
-      answers[0].complete(const DwOk([a]));
-      await settle();
-      expect(answers, hasLength(2), reason: 'exactly one pending run follows');
-
-      answers[1].complete(const DwOk([a, b]));
+      gate.open();
       await Future.wait(refetches);
       await settle();
-      expect(answers, hasLength(2));
-      expect(dataOf(watch.state), [a, b]);
+      expect(h.server.requestsOf<ListRoomsOffline>(), hasLength(3));
     });
 
-    test('shows the old data as refreshing meanwhile', () async {
-      final h = Harness();
-      final answers = <Completer<DwResult<Object?>>>[];
-      h.server.onRequest<ListRooms>((r, call) {
-        final answer = Completer<DwResult<Object?>>();
-        answers.add(answer);
-        return answer.future;
-      });
-      await h.start();
-      final watch = h.client.watch(const ListRooms());
-      await settle();
-      answers[0].complete(const DwOk([a]));
-      await settle();
-
-      unawaited(watch.refetch());
-      await settle();
-      expect(
-        watch.state,
-        const DwRequestData([a], refreshing: true, live: true),
-      );
-      answers[1].complete(const DwOk([a]));
-      await settle();
-      expect(watch.state, const DwRequestData([a], live: true));
-    });
-
-    test('an equal answer keeps the value instance', () async {
+    test('shows the old data as refreshing; an equal answer keeps the value '
+        'instance', () async {
       final h = Harness()..serveRooms();
       await h.start();
-      final watch = h.client.watch(const ListRooms());
+      final watch = h.client.watch(const ListRoomsOffline());
       await settle();
       final before = dataOf(watch.state);
+      final states = DwStreamRecording(watch.states);
       await watch.refetch();
-      await settle();
+      expect(states.values, [
+        const DwRequestData([a, b]),
+        const DwRequestData([a, b], refreshing: true),
+        const DwRequestData([a, b]),
+      ]);
       expect(identical(dataOf(watch.state), before), isTrue);
     });
-
-    test(
-      'an update arriving while the answer is in flight survives the answer',
-      () async {
-        final h = Harness();
-        final answers = <Completer<DwResult<Object?>>>[];
-        h.server.onRequest<ListRooms>((r, call) {
-          final answer = Completer<DwResult<Object?>>();
-          answers.add(answer);
-          return answer.future;
-        });
-        await h.start();
-        h.client.watch(const ListRooms());
-        await settle();
-        // Published after the server computed the answer, delivered before it.
-        h.server.publish(rooms, [c]);
-        await settle();
-        answers[0].complete(const DwOk([a, b]));
-        await settle();
-        expect(dataOf(h.client.watch(const ListRooms()).state), [c, a, b]);
-      },
-    );
   });
 
-  group('channel closed', () {
-    test(
-      'keeps the data, stops being live, and refetches the access state',
-      () async {
-        final h = Harness()..serveRooms();
-        var allowed = true;
-        h.server.onRequest<GetRoom>(
-          (r, call) => allowed
-              ? const DwOk(a)
-              : DwRefused<RoomView>(DwRefusal(DwCoreRefusal.forbidden)),
-        );
-        await h.start();
-        final watch = h.client.watch(const GetRoom(1));
-        final states = DwRecording(watch.states);
-        await settle();
-        expect(watch.isLive, isTrue);
-
-        allowed = false;
-        h.server.closeChannel(const DwChannel(AppChannel.room, 1));
-        await settle();
-
-        expect(states.values, contains(const DwRequestData(a)));
-        expect(
-          watch.state,
-          DwRequestRefused<RoomView>(DwRefusal(DwCoreRefusal.forbidden)),
-        );
-        expect(h.server.requestsOf<GetRoom>(), hasLength(2));
-        // Terminal for this account: no resubscription on its own.
-        expect(h.server.subscribeCount(const DwChannel(AppChannel.room, 1)), 1);
-      },
-    );
-
-    test('updates on a closed channel are ignored', () async {
-      final h = Harness()..serveRooms();
+  group('incompatibility', () {
+    test('an update-required answer is terminal: surfaced once, calls fail '
+        'fast, watches show it', () async {
+      final h = Harness(signedIn: false, appVersion: '1.0.0+3')..serveRooms();
+      h.server.minAppBuild = 4;
       await h.start();
-      final watch = h.client.watch(const ListRooms());
+      final incompatibility = DwStreamRecording(h.client.incompatibilityStream);
+      final watch = h.client.watch(const ListRoomsOffline());
       await settle();
-      h.server.closeChannel(rooms);
-      await settle();
-      // A stray update after the close (sent directly, bypassing the fake's
-      // subscription table) changes nothing.
-      h.server.openConnections.single.send(
-        const DwUpdateMessage(channel: 'rooms', items: [c]),
+
+      final refusal = DwCallRefusal(DwCoreRefusal.updateRequired);
+      expect(h.server.calls.single.status, 426);
+      expect(incompatibility.values, [null, refusal]);
+      expect(h.client.connectionStatus, DwConnectionStatus.incompatible);
+      expect(watch.state, DwRequestRefused<List<RoomView>>(refusal));
+
+      expect(
+        (await h.client.command(const RenameRoom(roomId: 1, name: 'x')))
+            as DwCallRefused,
+        isA<DwCallRefused>().having((r) => r.refusal, 'refusal', refusal),
       );
+      final later = h.client.watch(const GetRoom(1));
       await settle();
-      expect(dataOf(watch.state), [a, b]);
-      expect(watch.isLive, isFalse);
+      expect(later.state, DwRequestRefused<RoomView>(refusal));
+      expect(h.server.calls, hasLength(1), reason: 'nothing more reached it');
     });
-  });
 
-  group('subscription refused', () {
-    test(
-      'an unknown channel is reported and the request works, not live',
-      () async {
-        final h = Harness()..serveRooms();
-        h.server.subscriptionRule = (channel, connection) =>
-            DwRefusal(DwCoreRefusal.unknownChannel);
-        await h.start();
-        final watch = h.client.watch(const ListRooms());
-        await settle();
-        expect(watch.state, const DwRequestData([a, b]));
-        expect(h.reported.single, isA<DwChannelRefusedException>());
-        h.reported.clear();
-      },
-    );
-
-    test('an access refusal is not reported', () async {
-      final h = Harness()..serveRooms();
-      h.server.subscriptionRule = (channel, connection) =>
-          DwRefusal(DwCoreRefusal.forbidden);
+    test('a protocol the server does not speak is incompatible too', () async {
+      final h = Harness(signedIn: false)..serveRooms();
+      h.server.protocolVersion = 2;
       await h.start();
-      final watch = h.client.watch(const ListRooms());
-      await settle();
-      expect(watch.isLive, isFalse);
+      final result = await h.client.fetch(const ListRoomsOffline());
+      expect(
+        (result as DwCallRefused).refusal,
+        DwCallRefusal(DwCoreRefusal.protocolUnsupported),
+      );
+      expect(
+        h.client.incompatibility,
+        DwCallRefusal(DwCoreRefusal.protocolUnsupported),
+      );
     });
   });
-
-  group('onUpdate', () {
-    test('refetch re-runs derived data', () async {
-      final h = Harness();
-      var calls = 0;
-      h.server.onRequest<ListNotes>((r, call) {
-        calls++;
-        return DwOk([NoteView(id: 1, text: 'v$calls')]);
-      });
-      await h.start();
-      final watch = h.client.watch(const ListNotes());
-      await settle();
-      h.server.publish(rooms, [a, b]);
-      await settle();
-      expect(calls, 2, reason: 'two updates in one message: one refetch');
-      expect(dataOf(watch.state), [const NoteView(id: 1, text: 'v2')]);
-    });
-
-    test(
-      'a throwing onUpdate is reported and the rest of the message applies',
-      () async {
-        final h = Harness();
-        h.server.onRequest<ListRooms>((r, call) => const DwOk([a]));
-        await h.start();
-        final watch = h.client.watch(const _Throwing());
-        await settle();
-        h.server.publish(rooms, [const NoteView(id: 9, text: 'boom'), c]);
-        await settle();
-        expect(dataOf(watch.state), [c, a]);
-        expect(h.reported.single, isA<StateError>());
-        h.reported.clear();
-      },
-    );
-
-    test(
-      'upsert of an object that is not the item type is reported, not applied',
-      () async {
-        final h = Harness();
-        h.server.onRequest<ListRoomsByRank>((r, call) => const DwOk([a]));
-        await h.start();
-        final watch = h.client.watch(const _UpsertAll());
-        await settle();
-        h.server.publish(rooms, [const NoteView(id: 9, text: 'x')]);
-        await settle();
-        expect(dataOf(watch.state), [a]);
-        expect(h.reported.single, isA<StateError>());
-        h.reported.clear();
-      },
-    );
-  });
-
-  test('an unreadable update is reported and its channel refetched', () async {
-    final h = Harness()..serveRooms();
-    await h.start();
-    final watch = h.client.watch(const ListRooms());
-    await settle();
-    h.rooms = [a, b, c];
-    // A DTO this client does not register.
-    h.server.openConnections.single.sendFrame(
-      '{"k":"upd","ch":"rooms","items":[{"@t":"Unregistered","id":1}]}',
-    );
-    await settle();
-    expect(h.reported.single, isA<DwProtocolException>());
-    h.reported.clear();
-    expect(dataOf(watch.state), [a, b, c]);
-  });
-}
-
-/// A request that extends ListRoomsByRank's handler but declares no channels.
-final class _NoChannels extends DwListRequest<RoomView> {
-  const _NoChannels();
-
-  @override
-  String get dwTypeName => 'ListRoomsByRank';
-
-  @override
-  Map<String, Object?> toJson() => const {};
-
-  @override
-  bool operator ==(Object other) => other is _NoChannels;
-
-  @override
-  int get hashCode => 1;
-}
-
-final class _Throwing extends DwListRequest<RoomView> {
-  const _Throwing();
-
-  @override
-  List<DwChannel> get channels => const [rooms];
-
-  @override
-  DwUpdate onUpdate(DwDto update) =>
-      update is NoteView ? throw StateError('boom') : DwUpdate.auto;
-
-  @override
-  String get dwTypeName => 'ListRooms';
-
-  @override
-  Map<String, Object?> toJson() => const {};
-
-  @override
-  bool operator ==(Object other) => other is _Throwing;
-
-  @override
-  int get hashCode => 2;
-}
-
-final class _UpsertAll extends DwListRequest<RoomView> {
-  const _UpsertAll();
-
-  @override
-  List<DwChannel> get channels => const [rooms];
-
-  @override
-  DwUpdate onUpdate(DwDto update) => DwUpdate.upsert;
-
-  @override
-  String get dwTypeName => 'ListRoomsByRank';
-
-  @override
-  Map<String, Object?> toJson() => const {};
-
-  @override
-  bool operator ==(Object other) => other is _UpsertAll;
-
-  @override
-  int get hashCode => 3;
 }

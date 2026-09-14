@@ -21,7 +21,7 @@ import 'widgets/dw_app_bootstrapper.dart';
 /// - Render loading/error screens during initialization
 ///
 /// This class is intentionally decoupled from the DartWay core (`DwFlutter` /
-/// its data-layer subclass `DwCore`). If you use the core, include its
+/// its data-layer subclass `DwFlutterCore`). If you use the core, include its
 /// `init()` inside `appInitializers`.
 class DwAppRunner {
   /// Optional initialization steps, run in order before the app renders. Each
@@ -39,7 +39,7 @@ class DwAppRunner {
 
   /// Optional custom global error handler. When omitted, uncaught errors go
   /// through the dw error pipeline (`dw.handleError` with zone source) — with
-  /// DwCore that means out-of-the-box alerting with app context.
+  /// DwFlutterCore that means out-of-the-box alerting with app context.
   final void Function(Object error, StackTrace stackTrace)? onError;
 
   /// The actual app widget.

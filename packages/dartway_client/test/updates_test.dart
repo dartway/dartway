@@ -1,219 +1,302 @@
 import 'package:dartway_client/dartway_client.dart';
+import 'package:dartway_client/testing.dart';
 import 'package:test/test.dart';
 
 import 'support.dart';
 
-/// The `auto` defaults of SPEC §4, per request kind, observed through watches.
+DwDeletedObject deleted(int id) =>
+    DwDeletedObject.of<RoomView>(id, roomsProtocol);
+
+/// A started harness with [request] watched and loaded.
+Future<(Harness, DwRequestWatch<R>)> watched<R>(
+  DwDataRequest<R> request, {
+  List<RoomView>? rooms,
+}) async {
+  final h = Harness()..serveRooms();
+  if (rooms != null) h.rooms = rooms;
+  await h.start();
+  final watch = h.client.watch(request);
+  await settle();
+  return (h, watch);
+}
+
 void main() {
-  late Harness h;
-
-  Future<DwWatch<R>> watched<R>(DwRequest<R> request) async {
-    final watch = h.client.watch(request);
-    await settle();
-    return watch;
-  }
-
-  Future<void> publish(List<DwDto> items, [DwChannel channel = rooms]) async {
-    h.server.publish(channel, items);
-    await settle();
-  }
-
-  DwDeleted deleted(Object id) => DwDeleted.of<RoomView>(id, roomsProtocol);
-
-  setUp(() async {
-    h = Harness()..serveRooms();
-    await h.start();
-  });
-
   group('list', () {
-    test(
-      'an object already in the list is replaced in place, never moved',
-      () async {
-        h.rooms = [a, b, c];
-        final watch = await watched(const ListRooms());
-        const lastRenamed = RoomView(id: 3, name: 'c2', rank: 30);
-        await publish([lastRenamed]);
-        expect(dataOf(watch.state), [a, b, lastRenamed]);
-      },
-    );
-
-    test('a new object is inserted at the head without a sort', () async {
-      final watch = await watched(const ListRooms());
-      await publish([c]);
+    test('an upsert of a new object goes to the head without a sort', () async {
+      final (h, watch) = await watched(const ListRooms());
+      h.server.publish(roomsChannel, [c]);
+      await settle();
       expect(dataOf(watch.state), [c, a, b]);
     });
 
-    test(
-      'a new object is inserted by sort when the request declares one',
-      () async {
-        h.rooms = [a, c];
-        final watch = await watched(const ListRoomsByRank());
-        await publish([b]);
-        expect(dataOf(watch.state), [a, b, c]);
-        const last = RoomView(id: 4, name: 'd', rank: 99);
-        const first = RoomView(id: 5, name: 'e', rank: 1);
-        await publish([last, first]);
-        expect(dataOf(watch.state), [first, a, b, c, last]);
-      },
-    );
-
-    test('a re-ranked object keeps its place even with a sort', () async {
-      h.rooms = [a, b, c];
-      final watch = await watched(const ListRoomsByRank());
-      const promoted = RoomView(id: 3, name: 'c', rank: 1);
-      await publish([promoted]);
-      expect(dataOf(watch.state), [a, b, promoted]);
+    test('an upsert of a new object is placed by the sort', () async {
+      final (h, watch) = await watched(const ListRoomsByRank());
+      const middle = RoomView(id: 4, name: 'm', rank: 15);
+      h.server.publish(roomsChannel, [middle, c]);
+      await settle();
+      expect(dataOf(watch.state), [a, middle, b, c]);
     });
 
-    test('a new object that does not match is ignored', () async {
-      h.rooms = [b, c];
-      final watch = await watched(const ListRooms(minRank: 20));
-      await publish([a]);
+    test('a present object is replaced in place, never moved', () async {
+      final (h, watch) = await watched(const ListRoomsByRank());
+      const reranked = RoomView(id: 1, name: 'a', rank: 99);
+      h.server.publish(roomsChannel, [reranked]);
+      await settle();
+      expect(dataOf(watch.state), [reranked, b]);
+    });
+
+    test('an object that stops matching is removed; one that does not match '
+        'is not inserted', () async {
+      final (h, watch) = await watched(
+        const ListRooms(minRank: 15),
+        rooms: [a, b, c],
+      );
       expect(dataOf(watch.state), [b, c]);
+      h.server.publish(roomsChannel, [
+        const RoomView(id: 2, name: 'b', rank: 1),
+        const RoomView(id: 5, name: 'low', rank: 2),
+      ]);
+      await settle();
+      expect(dataOf(watch.state), [c]);
     });
 
     test('a deletion removes', () async {
-      final watch = await watched(const ListRooms());
-      await publish([deleted(1)]);
+      final (h, watch) = await watched(const ListRooms());
+      h.server.publish(roomsChannel, [deleted(1)]);
+      await settle();
       expect(dataOf(watch.state), [b]);
     });
 
-    test(
-      'a deletion of another type with the same id changes nothing',
-      () async {
-        final watch = await watched(const ListRooms());
-        await publish([DwDeleted.of<NoteView>(1, roomsProtocol)]);
-        expect(dataOf(watch.state), [a, b]);
-      },
-    );
+    test('updateOnly replaces but never inserts', () async {
+      final (h, watch) = await watched(const ListPinnedRooms());
+      const renamed = RoomView(id: 2, name: 'b2', rank: 20);
+      h.server.publish(roomsChannel, [c, renamed]);
+      await settle();
+      expect(dataOf(watch.state), [a, renamed]);
+    });
 
-    test('objects of another type are not the list\'s business', () async {
-      final watch = await watched(const ListRooms());
-      await publish([const NoteView(id: 7, text: 'x')]);
+    test('refetchOnUpdate re-runs, coalesced over a burst', () async {
+      final (h, watch) = await watched(const ListRoomStats());
+      h.rooms = [c];
+      for (var i = 0; i < 5; i++) {
+        h.server.publish(roomsChannel, [RoomView(id: 10 + i, name: 'x')]);
+      }
+      await settle();
+      expect(dataOf(watch.state), [c]);
+      expect(
+        h.server.requestsOf<ListRoomStats>().length,
+        lessThanOrEqualTo(3),
+        reason: 'one in flight and one after it, however many updates',
+      );
+    });
+
+    test('objects of another type are not offered', () async {
+      final (h, watch) = await watched(const ListRooms());
+      final states = DwStreamRecording(watch.states);
+      h.server.publish(roomsChannel, [
+        const NoteView(id: 1, text: 'n'),
+        DwDeletedObject.of<NoteView>(1, roomsProtocol),
+      ]);
+      await settle();
+      expect(states.values, hasLength(1), reason: 'only the replayed state');
       expect(dataOf(watch.state), [a, b]);
     });
 
     test('an equal object changes nothing and emits nothing', () async {
-      final watch = await watched(const ListRooms());
-      final before = watch.state;
-      await publish([a]);
-      expect(identical(watch.state, before), isTrue);
-    });
-
-    test('a batch applies in order', () async {
-      final watch = await watched(const ListRooms());
-      const renamed = RoomView(id: 3, name: 'c2', rank: 30);
-      await publish([c, renamed, deleted(1)]);
-      expect(dataOf(watch.state), [renamed, b]);
+      final (h, watch) = await watched(const ListRooms());
+      final before = dataOf(watch.state);
+      final states = DwStreamRecording(watch.states);
+      h.server.publish(roomsChannel, [a]);
+      await settle();
+      expect(states.values, hasLength(1));
+      expect(identical(dataOf(watch.state), before), isTrue);
     });
 
     test('the list keeps its reified item type through changes', () async {
-      final watch = await watched(const ListRooms());
-      await publish([c, deleted(2)]);
+      final (h, watch) = await watched(const ListRooms());
+      h.server.publish(roomsChannel, [c, deleted(1)]);
+      await settle();
       expect(dataOf(watch.state), isA<List<RoomView>>());
     });
+
+    test(
+      'an onUpdate that throws is reported and the rest still applies',
+      () async {
+        final protocol = DwWireProtocol([
+          const DwProtocolEntry<_ThrowingList>(
+            'ThrowingList',
+            _ThrowingList.fromJson,
+          ),
+        ], include: roomsProtocol);
+        final server = DwFakeServer(protocol: protocol)
+          ..registerToken(alice.token, alice.id)
+          ..onRequest<_ThrowingList>((r, call) => const DwCallOk([a]))
+          ..onCommand<RenameRoom>((command, call) {
+            call.publish(roomsChannel, [
+              const RoomView(id: 666, name: 'bad'),
+              c,
+            ]);
+            return const DwCallOk(c);
+          });
+        final reported = <Object>[];
+        final client = server.newClient(
+          tokenStore: DwMemoryTokenStore(alice),
+          onError: (error, stackTrace) => reported.add(error),
+        );
+        addTearDown(client.stop);
+        await client.start();
+        final watch = client.watch(const _ThrowingList());
+        await settle();
+
+        await client.command(const RenameRoom(roomId: 3, name: 'c'));
+        expect(dataOf(watch.state), [c, a]);
+        expect(reported, [isA<StateError>()]);
+        expect(server.errors, isEmpty);
+      },
+    );
   });
 
   group('single', () {
-    test('the same id is replaced', () async {
-      final watch = await watched(const GetRoom(1));
-      const renamed = RoomView(id: 1, name: 'a2', rank: 10);
-      await publish([renamed], const DwChannel(AppChannel.room, 1));
-      expect(dataOf(watch.state), renamed);
+    test('the same id is replaced, another id ignored', () async {
+      final (h, watch) = await watched(const GetRoom(1));
+      h.server.publish(DwLiveChannel(AppChannel.room, 1), [
+        const RoomView(id: 1, name: 'a2'),
+        const RoomView(id: 2, name: 'other'),
+      ]);
+      await settle();
+      expect(dataOf(watch.state), const RoomView(id: 1, name: 'a2'));
     });
 
-    test('another id is ignored', () async {
-      final watch = await watched(const GetRoom(1));
-      await publish([b], const DwChannel(AppChannel.room, 1));
-      expect(dataOf(watch.state), a);
-      expect(h.server.requestsOf<GetRoom>(), hasLength(1));
-    });
-
-    test('a deletion refetches, and the answer is not-found', () async {
-      final watch = await watched(const GetRoom(1));
+    test('a deletion asks again, and the answer is not found', () async {
+      final (h, watch) = await watched(const GetRoom(1));
       h.rooms = [b];
-      await publish([deleted(1)], const DwChannel(AppChannel.room, 1));
-      expect(h.server.requestsOf<GetRoom>(), hasLength(2));
+      h.server.publish(DwLiveChannel(AppChannel.room, 1), [deleted(1)]);
+      await settle();
       expect(
         watch.state,
-        DwRequestRefused<RoomView>(DwRefusal(DwCoreRefusal.notFound)),
+        DwRequestRefused<RoomView>(DwCallRefusal(DwCoreRefusal.notFound)),
       );
+      expect(h.server.requestsOf<GetRoom>(), hasLength(2));
     });
   });
 
   group('maybe', () {
+    test('an empty state is filled by the object it asks for', () async {
+      final (h, watch) = await watched(const FindRoom('c'));
+      expect(dataOf(watch.state), isNull);
+      h.server.publish(roomsChannel, [a, c]);
+      await settle();
+      expect(dataOf(watch.state), c);
+    });
+
     test(
-      'an absent object is filled when a matching one arrives (#242)',
+      'the held object is replaced; one that stops matching empties it',
       () async {
-        h.rooms = [];
-        final watch = await watched(const FindRoom('c'));
-        expect(watch.state, const DwRequestData<RoomView?>(null, live: true));
-        await publish([a]);
-        expect(dataOf(watch.state), isNull, reason: 'does not match');
-        await publish([c]);
-        expect(dataOf(watch.state), c);
+        final (h, watch) = await watched(const FindRoom('a'));
+        h.server.publish(roomsChannel, [
+          const RoomView(id: 1, name: 'a', rank: 5),
+        ]);
+        await settle();
+        expect(dataOf(watch.state), const RoomView(id: 1, name: 'a', rank: 5));
+        h.server.publish(roomsChannel, [
+          const RoomView(id: 1, name: 'renamed'),
+        ]);
+        await settle();
+        expect(dataOf(watch.state), isNull);
       },
     );
 
-    test('the held object is replaced by id, others ignored', () async {
-      final watch = await watched(const FindRoom('a'));
-      const renamed = RoomView(id: 1, name: 'a', rank: 11);
-      await publish([b, renamed]);
-      expect(dataOf(watch.state), renamed);
-    });
-
-    test('a deletion of the held object empties it', () async {
-      final watch = await watched(const FindRoom('a'));
-      await publish([deleted(2)]);
-      expect(dataOf(watch.state), a);
-      await publish([deleted(1)]);
-      expect(dataOf(watch.state), isNull);
-      expect(
-        h.server.requestsOf<FindRoom>(),
-        hasLength(1),
-        reason: 'no refetch',
-      );
-    });
+    test(
+      'a deletion of the held object empties it; of another, nothing',
+      () async {
+        final (h, watch) = await watched(const FindRoom('a'));
+        h.server.publish(roomsChannel, [deleted(2)]);
+        await settle();
+        expect(dataOf(watch.state), a);
+        h.server.publish(roomsChannel, [deleted(1)]);
+        await settle();
+        expect(dataOf(watch.state), isNull);
+      },
+    );
   });
 
-  group('explicit actions', () {
-    test('upsert inserts ignoring matches; remove removes by id', () async {
-      h.server.onRequest<ListRoomsByRank>((r, call) => const DwOk([a]));
-      final watch = await watched(const _Explicit());
-      await publish([b]);
-      expect(dataOf(watch.state), [b, a]);
-      await publish([const RoomView(id: 1, name: 'gone', rank: -1)]);
-      expect(dataOf(watch.state), [b]);
+  group('routing', () {
+    test(
+      'every accepting entry gets every object, whatever carried it',
+      () async {
+        final h = Harness()..serveRooms();
+        await h.start();
+        final live = h.client.watch(const ListRooms());
+        final offline = h.client.watch(const ListRoomsOffline());
+        final byRank = h.client.watch(const ListRoomsByRank());
+        await settle();
+
+        await h.client.command(const RenameRoom(roomId: 1, name: 'a2'));
+        const renamed = RoomView(id: 1, name: 'a2', rank: 10);
+        expect(dataOf(live.state), [renamed, b]);
+        expect(dataOf(offline.state), [renamed, b]);
+        expect(dataOf(byRank.state), [renamed, b]);
+
+        h.server.publish(roomsChannel, [c]);
+        await settle();
+        expect(
+          dataOf(offline.state),
+          [c, renamed, b],
+          reason: 'a socket update reaches an entry without channels too',
+        );
+      },
+    );
+
+    test('an update that arrives while a fetch is in flight survives the '
+        'answer', () async {
+      final h = Harness()..serveRooms();
+      final gate = Gate()..open();
+      h.server.onRequest<ListRooms>((request, call) async {
+        final answer = h.rooms.toList();
+        await gate.passed;
+        return DwCallOk(answer);
+      });
+      await h.start();
+      final watch = h.client.watch(const ListRooms());
+      await settle();
+
+      gate.close();
+      final refetched = watch.refetch();
+      await settle();
+      // The server read [a, b]; then c was created and published.
+      h.rooms = [c, a, b];
+      h.server.publish(roomsChannel, [c]);
+      await settle();
+      gate.open();
+      await refetched;
+      await settle();
+      expect(dataOf(watch.state), [c, a, b]);
     });
   });
 }
 
-/// Upserts rooms; a room with a negative rank removes the room with its id.
-final class _Explicit extends DwListRequest<RoomView> {
-  const _Explicit();
+/// A list whose onUpdate throws for one object.
+final class _ThrowingList extends DwListRequest<RoomView> {
+  const _ThrowingList();
+
+  static _ThrowingList fromJson(Map<String, Object?> json) =>
+      const _ThrowingList();
 
   @override
-  List<DwChannel> get channels => const [rooms];
-
-  @override
-  bool matches(RoomView object) => false;
-
-  @override
-  DwUpdate onUpdate(DwDto update) => switch (update) {
-    RoomView(:final rank) when rank < 0 => DwUpdate.remove,
-    RoomView() => DwUpdate.upsert,
-    _ => DwUpdate.ignore,
-  };
-
-  @override
-  String get dwTypeName => 'ListRoomsByRank';
+  String get dwTypeName => 'ThrowingList';
 
   @override
   Map<String, Object?> toJson() => const {};
 
   @override
-  bool operator ==(Object other) => other is _Explicit;
+  DwUpdateAction onUpdate(Object item) {
+    if (item is RoomView && item.id == 666) throw StateError('bad update');
+    return super.onUpdate(item);
+  }
 
   @override
-  int get hashCode => 4;
+  bool operator ==(Object other) => other is _ThrowingList;
+
+  @override
+  int get hashCode => 0;
 }

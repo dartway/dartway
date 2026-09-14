@@ -1,4 +1,4 @@
-part of 'dw_client.dart';
+part of 'dw_app_client.dart';
 
 /// A value with a stream that starts with the current value — what a new
 /// listener needs to render at once — and then carries each change.

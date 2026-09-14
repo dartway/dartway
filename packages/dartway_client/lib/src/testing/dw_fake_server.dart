@@ -4,48 +4,90 @@ import 'dart:math';
 
 import 'package:dartway_core/dartway_core.dart';
 
-import '../client/dw_client.dart';
+import '../client/dw_app_client.dart';
 import '../dw_client_options.dart';
 import '../session/dw_token_store.dart';
-import '../transport/dw_connection.dart';
+import '../transport/dw_http_transport.dart';
+import '../transport/dw_live_connection.dart';
 
-/// A request handler of the fake server. Returns the result the server
-/// answers; throwing [DwRefusalException] refuses, anything else fails.
+/// A handler of the fake server: the outcome of one call.
 ///
-/// The value of a [DwOk] must have the request's result type exactly —
-/// `DwOk(<RoomView>[])`, not `DwOk([])` — because it is encoded by the
-/// request class, as on a real server.
-typedef DwFakeHandler<M> =
-    FutureOr<DwResult<Object?>> Function(M message, DwFakeCall call);
+/// The value of a [DwCallOk] must have the call's result type exactly —
+/// `DwCallOk(<RoomView>[])`, not `DwCallOk([])` — because it is encoded by the
+/// call's class, as on a real server. Throwing [DwRefusalException] refuses;
+/// throwing anything else fails the call and is recorded in
+/// [DwFakeServer.errors].
+typedef DwFakeHandler<C> =
+    FutureOr<DwCallResult<Object?>> Function(C call, DwFakeCall context);
 
-/// What a fake handler knows about the call.
+/// What a fake handler knows about the call, and how it publishes.
 final class DwFakeCall {
-  const DwFakeCall._(
-    this.connection,
+  DwFakeCall._(
+    this._server,
     this.accountId,
+    this.token,
     this.page,
     this.idempotencyKey,
+    this.liveConnection,
+    this.appVersion,
+    this.headers,
   );
 
-  final DwFakeConnection connection;
+  final DwFakeServer _server;
 
-  /// The account the connection acted for when the call arrived.
+  /// The caller's account; `null` for an anonymous call.
   final int? accountId;
 
+  final String? token;
+
   /// The page a paginated request asked for.
-  final DwPageParams? page;
+  final DwPageQuery? page;
 
   /// The key of a command.
   final String? idempotencyKey;
+
+  /// The live connection the call named in `Dw-Live-Connection`, when it is
+  /// open.
+  final DwFakeConnection? liveConnection;
+
+  final DwAppVersion appVersion;
+
+  /// Every header as it arrived, names in lower case.
+  final Map<String, String> headers;
+
+  final List<(DwLiveChannel, List<DwWireObject>)> _published = [];
+
+  /// Publishes [objects] to [channel] when the call ends, as a real server
+  /// does.
+  ///
+  /// When the call succeeds, every subscribed connection receives them over
+  /// the socket except the one the call named, and the response carries them:
+  /// all of them when the call named no connection, those of channels the
+  /// named connection is subscribed to otherwise. When it does not, the
+  /// response carries nothing and every subscriber — the named connection
+  /// included — receives them over the socket.
+  void publish(DwLiveChannel channel, List<DwWireObject> objects) {
+    _published.add((channel, objects));
+  }
+
+  /// Whether the caller's account is [accountId].
+  bool isAccount(int accountId) => this.accountId == accountId;
+
+  DwFakeServer get server => _server;
 }
 
-/// One client connection as the fake server sees it.
+/// One live connection as the fake server sees it.
 final class DwFakeConnection {
-  DwFakeConnection._(this._server, this._end, this.endpoint);
+  DwFakeConnection._(this._server, this._end, this.url, this.id);
 
   final DwFakeServer _server;
-  final DwConnection _end;
-  final Uri endpoint;
+  final DwLiveConnection _end;
+
+  /// The upgrade URL, query included.
+  final Uri url;
+
+  /// The id sent in `hello`.
+  final String id;
 
   int? accountId;
   String? token;
@@ -57,9 +99,8 @@ final class DwFakeConnection {
   /// Sends [message] to the client as the server would.
   void send(DwServerMessage message) {
     if (!isOpen) return;
-    final encoded = message.toJson(_server.protocol);
     try {
-      _end.send(jsonEncode(encoded));
+      _end.send(jsonEncode(message.toJson()));
       _server.sent.add(message);
     } on StateError {
       // Closed and not yet noticed: the frame is lost, as on a socket.
@@ -77,98 +118,167 @@ final class DwFakeConnection {
   }
 
   /// Drops the connection from the server side, with a WebSocket close
-  /// [code] and [reason] when given (`DwCloseCode.slowConsumer`, say).
+  /// [code] and [reason] when given.
   Future<void> close({int? code, String? reason}) => _end.close(code, reason);
 }
 
-/// An in-memory DartWay server that speaks the wire protocol, for tests of
-/// the client and of the screens on top of it.
+/// One call the fake server answered.
+final class DwFakeRecordedCall {
+  const DwFakeRecordedCall._({
+    required this.wireName,
+    required this.call,
+    required this.headers,
+    required this.query,
+    required this.status,
+    required this.response,
+  });
+
+  final String wireName;
+
+  /// The decoded DTO; `null` when the body did not decode.
+  final DwServerCall<Object?>? call;
+
+  /// Header names in lower case.
+  final Map<String, String> headers;
+  final Map<String, String> query;
+  final int status;
+  final DwApiResponse response;
+
+  String? get idempotencyKey =>
+      headers[DwHttpContract.idempotencyKeyHeader.toLowerCase()];
+
+  String? get liveConnectionId =>
+      headers[DwHttpContract.liveConnectionHeader.toLowerCase()];
+
+  String? get authorization =>
+      headers[DwHttpContract.authorizationHeader.toLowerCase()];
+
+  @override
+  String toString() => 'DwFakeRecordedCall($wireName, $status)';
+}
+
+/// The network failure the fake transport throws while
+/// [DwFakeServer.reachable] is false.
+final class DwFakeNetworkException implements Exception {
+  const DwFakeNetworkException();
+
+  @override
+  String toString() => 'DwFakeNetworkException(the fake server is unreachable)';
+}
+
+/// An in-memory DartWay server for tests of the client and of the screens on
+/// top of it: the HTTP contract through [httpTransport] and the live socket
+/// through [liveConnector].
 ///
 /// Not the real server: handlers are closures registered per DTO type, there
-/// is no database and no access rule beyond what a test declares (a real
-/// server refuses every subscription of an anonymous connection; this one
-/// allows what [subscriptionRule] allows). What it does reproduce is the
-/// protocol as `dartway_server` speaks it — authentication answers, a changed
-/// account closing subscriptions, key revocation, results by id, idempotent
-/// commands, subscriptions and their accounting, publishing and closing
-/// channels — so a client talks to it exactly as to a real one.
+/// is no database and no access rule beyond what a test declares. What it
+/// reproduces is the protocol as `dartway_server` speaks it — headers and
+/// their checks, honest statuses, `426` for an incompatible build,
+/// idempotent commands, the response transport filtered by
+/// `Dw-Live-Connection`, hello and authentication on the socket, a changed
+/// account closing subscriptions, key revocation, subscriptions and their
+/// accounting — so a client talks to it exactly as to a real one.
 ///
 /// ```dart
 /// final server = DwFakeServer(protocol: appProtocol)
-///   ..onRequest<ListRooms>((request, call) => DwOk(rooms));
+///   ..onRequest<ListRooms>((request, call) => DwCallOk(rooms));
 /// final client = server.newClient();
 /// await client.start();
 /// ```
 final class DwFakeServer {
-  DwFakeServer({required this.protocol});
+  DwFakeServer({required this.protocol, this.minAppBuild = 0});
 
-  final DwProtocol protocol;
+  final DwWireProtocol protocol;
 
-  /// The address clients of this server use. Informational: [connector] is
-  /// what reaches it.
-  final Uri endpoint = Uri.parse('memory://dartway/dw');
+  /// Builds below this answer `426` with `dw.updateRequired`, on calls and on
+  /// the live upgrade.
+  int minAppBuild;
 
-  /// Connects clients to this server in memory.
-  late final DwMemoryConnector connector = DwMemoryConnector(_accept);
+  /// The protocol version this server speaks.
+  int protocolVersion = dwProtocolVersion;
 
-  /// While false, connection attempts fail as against an unreachable server.
+  /// The address clients of this server use. Informational: [httpTransport]
+  /// and [liveConnector] are what reach it.
+  final Uri baseUrl = Uri.parse('http://dartway.test');
+
+  /// Carries calls to this server in memory.
+  late final DwMemoryHttpTransport httpTransport = DwMemoryHttpTransport(
+    _onPost,
+  );
+
+  /// Connects live sockets to this server in memory.
+  late final DwMemoryLiveConnector liveConnector = DwMemoryLiveConnector(
+    _accept,
+  );
+
+  /// While false, every call fails on the network.
+  bool reachable = true;
+
+  /// While false, live connection attempts fail as against an unreachable
+  /// server.
   bool acceptsConnections = true;
 
-  /// The wire version this server speaks. A client connecting with another
-  /// `v=` is closed with `DwCloseCode.unsupportedVersion`, as by a real
-  /// server — set it to test what an outdated app does.
-  int wireVersion = dwWireVersion;
+  /// Answers a call before the server does — a proxy's error page, say. A
+  /// `null` answer lets the server handle it.
+  FutureOr<DwHttpReply?> Function(DwHttpPost post)? interceptPost;
 
-  /// Every connection ever accepted, open or not.
+  /// Every live connection ever accepted, open or not.
   final List<DwFakeConnection> connections = [];
 
   Iterable<DwFakeConnection> get openConnections =>
       connections.where((connection) => connection.isOpen);
 
-  /// Every message received from any client, in arrival order.
+  /// Every call answered, in arrival order.
+  final List<DwFakeRecordedCall> calls = [];
+
+  /// Every live message received from any client, in arrival order.
   final List<DwClientMessage> received = [];
 
-  /// Every message sent to any client.
+  /// Every live message sent to any client.
   final List<DwServerMessage> sent = [];
 
-  /// Handler exceptions and calls nobody registered a handler for. A test
-  /// that expects none asserts this is empty: a fake that swallowed them
-  /// would let a broken test pass.
+  /// Handler exceptions, calls nobody registered a handler for, and messages
+  /// that do not decode. A test that expects none asserts this is empty: a
+  /// fake that swallowed them would let a broken test pass.
   final List<Object> errors = [];
 
-  /// Decides a subscription: `null` allows it, a refusal refuses it.
-  DwRefusal? Function(String channel, DwFakeConnection connection)?
+  /// Decides a subscription of a signed-in connection: `null` allows it, a
+  /// refusal refuses it.
+  DwCallRefusal? Function(String channel, DwFakeConnection connection)?
   subscriptionRule;
 
+  /// Every subscription needs a signed-in connection, as on a real server
+  /// (D-020).
+  bool subscriptionsRequireAccount = true;
+
   /// Channels whose subscription check fails, as a throwing rule does on a
-  /// real server: answered as a failure with the incident
-  /// [subscriptionIncident], not as a refusal.
+  /// real server: answered as a failure with [subscriptionIncident].
   final Set<String> failingChannels = {};
 
   static const String subscriptionIncident = 'fake-subscription-failed';
 
   final Map<String, int> _tokens = {};
-  final Map<Type, DwFakeHandler<DwRequest<Object?>>> _requests = {};
-  final Map<Type, DwFakeHandler<DwCommand<Object?>>> _commands = {};
-  final Map<String, DwResultMessage> _outcomes = {};
+  final Map<Type, DwFakeHandler<DwServerCall<Object?>>> _requests = {};
+  final Map<Type, DwFakeHandler<DwServerCall<Object?>>> _commands = {};
+  final Map<String, DwApiResponse> _outcomes = {};
   final Map<String, int> _executions = {};
   final Map<String, int> _subscribes = {};
   final Map<String, int> _unsubscribes = {};
+  int _nextConnection = 1;
 
   /// A client of this server — not started, with timings short enough for
   /// tests unless [options] says otherwise.
-  DwClient newClient({
+  DwAppClient newClient({
     DwTokenStore? tokenStore,
-    DwClientOptions options = const DwClientOptions(
-      reconnectDelay: Duration(milliseconds: 1),
-      maxReconnectDelay: Duration(milliseconds: 10),
-      releaseDelay: Duration.zero,
-    ),
+    String appVersion = '1.0.0+1',
+    DwClientOptions options = dwFakeClientOptions,
     void Function(Object error, StackTrace stackTrace)? onError,
-  }) => DwClient(
+  }) => DwAppClient(
     protocol: protocol,
-    endpoint: endpoint,
-    connector: connector,
+    baseUrl: baseUrl,
+    appVersion: appVersion,
+    httpTransport: httpTransport,
+    liveConnector: liveConnector,
     tokenStore: tokenStore,
     options: options,
     onError: onError,
@@ -180,13 +290,13 @@ final class DwFakeServer {
   // --- handlers -------------------------------------------------------------
 
   /// Answers requests of type [Q].
-  void onRequest<Q extends DwRequest<Object?>>(DwFakeHandler<Q> handle) {
+  void onRequest<Q extends DwDataRequest<Object?>>(DwFakeHandler<Q> handle) {
     _requests[Q] = (request, call) => handle(request as Q, call);
   }
 
-  /// Answers commands of type [C]. A command is run once per idempotency key;
+  /// Answers commands of type [C]. A command runs once per idempotency key;
   /// a repeat answers the stored outcome unless it failed.
-  void onCommand<C extends DwCommand<Object?>>(DwFakeHandler<C> handle) {
+  void onCommand<C extends DwActionCommand<Object?>>(DwFakeHandler<C> handle) {
     _commands[C] = (command, call) => handle(command as C, call);
   }
 
@@ -203,13 +313,15 @@ final class DwFakeServer {
     for (final connection in openConnections.toList()) {
       if (connection.token != token) continue;
       _bind(connection, null, null);
-      connection.send(const DwAuthenticatedMessage(rejected: true));
+      connection.send(const DwAuthenticatedMessage.rejected());
     }
   }
 
-  /// Binds [connection] to an account, or to none. As on a real server, a
-  /// changed account closes every subscription — access was checked for the
-  /// previous one — and says so with `closed`.
+  bool isTokenValid(String token) => _tokens.containsKey(token);
+
+  /// Binds [connection] to an account, or to none. A changed account closes
+  /// every subscription — access was checked for the previous one — and says
+  /// so with `closed`.
   void _bind(DwFakeConnection connection, int? accountId, String? token) {
     if (connection.accountId != accountId) {
       for (final channel in connection.subscriptions.toList()) {
@@ -222,34 +334,43 @@ final class DwFakeServer {
       ..token = token;
   }
 
-  bool isTokenValid(String token) => _tokens.containsKey(token);
-
   // --- channels -------------------------------------------------------------
 
   /// How many `sub` messages arrived for [channel], from any connection.
-  int subscribeCount(DwChannel channel) => _subscribes[channel.wireName] ?? 0;
+  int subscribeCount(DwLiveChannel channel) =>
+      _subscribes[channel.wireName] ?? 0;
 
   /// How many `unsub` messages arrived for [channel].
-  int unsubscribeCount(DwChannel channel) =>
+  int unsubscribeCount(DwLiveChannel channel) =>
       _unsubscribes[channel.wireName] ?? 0;
 
   /// How many open connections are subscribed to [channel].
-  int subscriberCount(DwChannel channel) => openConnections
+  int subscriberCount(DwLiveChannel channel) => openConnections
       .where((c) => c.subscriptions.contains(channel.wireName))
       .length;
 
-  /// Publishes [items] to every open connection subscribed to [channel] —
-  /// the author of a command included, as a real server does (D-018).
-  void publish(DwChannel channel, List<DwDto> items) {
+  /// Publishes [objects] to every open connection subscribed to [channel]:
+  /// an update from someone else, outside any call of the client under test.
+  void publish(DwLiveChannel channel, List<DwWireObject> objects) =>
+      _broadcast(channel.wireName, objects, except: null);
+
+  void _broadcast(
+    String channel,
+    List<DwWireObject> objects, {
+    required DwFakeConnection? except,
+  }) {
+    final updates = DwUpdateTransport(objects);
+    if (updates.isEmpty) return;
     for (final connection in openConnections.toList()) {
-      if (!connection.subscriptions.contains(channel.wireName)) continue;
-      connection.send(DwUpdateMessage(channel: channel.wireName, items: items));
+      if (identical(connection, except)) continue;
+      if (!connection.subscriptions.contains(channel)) continue;
+      connection.send(DwUpdateMessage(channel: channel, updates: updates));
     }
   }
 
   /// Closes [channel] for every subscribed connection, or only for those of
   /// [accountId] — what revoking access does.
-  void closeChannel(DwChannel channel, {int? accountId}) {
+  void closeChannel(DwLiveChannel channel, {int? accountId}) {
     for (final connection in openConnections.toList()) {
       if (accountId != null && connection.accountId != accountId) continue;
       if (!connection.subscriptions.remove(channel.wireName)) continue;
@@ -259,40 +380,295 @@ final class DwFakeServer {
 
   // --- accounting -----------------------------------------------------------
 
-  /// Received messages of type [M].
+  /// Received live messages of type [M].
   List<M> receivedOf<M extends DwClientMessage>() =>
       received.whereType<M>().toList();
 
-  /// Received requests of type [Q], in arrival order.
-  List<Q> requestsOf<Q extends DwRequest<Object?>>() => [
-    for (final message in received)
-      if (message is DwRequestMessage && message.request is Q)
-        message.request as Q,
+  /// Calls whose DTO is a [C], in arrival order.
+  List<DwFakeRecordedCall> callsOf<C extends DwServerCall<Object?>>() => [
+    for (final call in calls)
+      if (call.call is C) call,
   ];
 
-  /// Received command messages carrying a command of type [C].
-  List<DwCommandMessage> commandsOf<C extends DwCommand<Object?>>() => [
-    for (final message in received)
-      if (message is DwCommandMessage && message.command is C) message,
+  /// Requests of type [Q] that arrived, in arrival order.
+  List<Q> requestsOf<Q extends DwDataRequest<Object?>>() => [
+    for (final call in calls)
+      if (call.call case final Q request) request,
   ];
 
   /// How many times the handler ran for the command with [idempotencyKey].
   int executions(String idempotencyKey) => _executions[idempotencyKey] ?? 0;
 
-  /// Drops every open connection from the server side.
-  Future<void> dropConnections() async {
+  /// Drops every open live connection from the server side.
+  Future<void> dropConnections({int? code, String? reason}) async {
     for (final connection in openConnections.toList()) {
-      await connection.close();
+      await connection.close(code: code, reason: reason);
     }
   }
 
-  // --- the protocol ---------------------------------------------------------
+  // --- HTTP -----------------------------------------------------------------
 
-  void _accept(DwConnection end, Uri endpoint) {
+  Future<DwHttpReply> _onPost(DwHttpPost post) async {
+    if (!reachable) throw const DwFakeNetworkException();
+    final intercepted = await interceptPost?.call(post);
+    if (intercepted != null) return intercepted;
+
+    final headers = {
+      for (final MapEntry(:key, :value) in post.headers.entries)
+        key.toLowerCase(): value,
+    };
+    final query = post.url.queryParameters;
+    final wireName = DwHttpContract.wireNameOf(
+      post.url.path.substring(baseUrl.path.length),
+    );
+    DwServerCall<Object?>? dto;
+
+    DwHttpReply answer(DwApiResponse response) {
+      calls.add(
+        DwFakeRecordedCall._(
+          wireName: wireName ?? post.url.path,
+          call: dto,
+          headers: headers,
+          query: query,
+          status: response.httpStatus,
+          response: response,
+        ),
+      );
+      return _reply(response);
+    }
+
+    DwApiResponse malformed(String why) {
+      errors.add(StateError('Malformed call to ${post.url}: $why'));
+      return const DwApiResponse.failed(
+        'fake-malformed',
+        failure: DwFailureKind.malformedCall,
+      );
+    }
+
+    // Versions first: a build that cannot talk to this server learns that
+    // before anything else about its call.
+    final protocolHeader = headers[DwHttpContract.protocolHeader.toLowerCase()];
+    if (protocolHeader == null) {
+      return answer(malformed('no ${DwHttpContract.protocolHeader}'));
+    }
+    if (protocolHeader != '$protocolVersion') {
+      return answer(
+        DwApiResponse.incompatible(
+          DwCallRefusal(DwCoreRefusal.protocolUnsupported),
+        ),
+      );
+    }
+    final versionHeader =
+        headers[DwHttpContract.appVersionHeader.toLowerCase()];
+    final DwAppVersion appVersion;
+    try {
+      appVersion = DwAppVersion.parse(versionHeader ?? '');
+    } on FormatException {
+      return answer(malformed('no valid ${DwHttpContract.appVersionHeader}'));
+    }
+    if (appVersion.build < minAppBuild) {
+      return answer(
+        DwApiResponse.incompatible(DwCallRefusal(DwCoreRefusal.updateRequired)),
+      );
+    }
+
+    final entry = wireName == null ? null : protocol.entryNamed(wireName);
+    if (entry == null ||
+        (entry.kind != DwWireObjectKind.request &&
+            entry.kind != DwWireObjectKind.command)) {
+      errors.add(StateError('Unknown call ${post.url.path}'));
+      return answer(
+        const DwApiResponse.failed(
+          'fake-unknown-call',
+          failure: DwFailureKind.unknownCall,
+        ),
+      );
+    }
+    try {
+      dto =
+          entry.fromJson(jsonDecode(post.body) as Map<String, Object?>)
+              as DwServerCall<Object?>;
+    } catch (error) {
+      return answer(malformed('the body does not decode: $error'));
+    }
+    final call = dto;
+
+    final key = headers[DwHttpContract.idempotencyKeyHeader.toLowerCase()];
+    DwPageQuery? page;
+    switch (call) {
+      case DwActionCommand():
+        if (key == null) return answer(malformed('a command without a key'));
+        if (query.isNotEmpty) {
+          return answer(malformed('a command with page parameters'));
+        }
+      case DwDataRequest():
+        if (key != null) return answer(malformed('a request with a key'));
+        try {
+          page = DwPageQuery.parse(call, query);
+        } on FormatException catch (error) {
+          return answer(malformed('$error'));
+        }
+    }
+
+    final authorization =
+        headers[DwHttpContract.authorizationHeader.toLowerCase()];
+    String? token;
+    int? accountId;
+    if (authorization != null) {
+      if (!authorization.startsWith(DwHttpContract.bearerPrefix)) {
+        return answer(malformed('an Authorization that is not a bearer'));
+      }
+      token = authorization.substring(DwHttpContract.bearerPrefix.length);
+      accountId = _tokens[token];
+      // A key that is not (or no longer) valid is not an anonymous caller.
+      if (accountId == null) {
+        return answer(const DwApiResponse.unauthenticated());
+      }
+    }
+
+    if (key != null) {
+      final stored = _outcomes[key];
+      if (stored != null) {
+        // The stored outcome, answered again without executing: an ok is marked
+        // replayed and carries no updates — they went out when it ran.
+        return answer(switch (stored) {
+          DwApiOk(:final result) => DwApiResponse.ok(result, replayed: true),
+          _ => stored,
+        });
+      }
+    }
+
+    final liveId = headers[DwHttpContract.liveConnectionHeader.toLowerCase()];
+    final named = liveId == null
+        ? null
+        : openConnections.where((c) => c.id == liveId).firstOrNull;
+    final context = DwFakeCall._(
+      this,
+      accountId,
+      token,
+      page,
+      key,
+      named,
+      appVersion,
+      headers,
+    );
+
+    final response = await _handle(call, context);
+    if (key != null && (response is DwApiOk || response is DwApiRefused)) {
+      _outcomes[key] = response;
+    }
+    return answer(response);
+  }
+
+  Future<DwApiResponse> _handle(
+    DwServerCall<Object?> call,
+    DwFakeCall context,
+  ) async {
+    if (call is DwTableRequest) {
+      final refusal = call.checkPage();
+      if (refusal != null) return DwApiResponse.refused(refusal);
+    }
+    if (call case final DwSelfValidating validating) {
+      final refusals = validating.validate();
+      if (refusals.isNotEmpty) return DwApiResponse.refused(refusals.first);
+    }
+    final DwFakeHandler<DwServerCall<Object?>>? handler = switch (call) {
+      DwDataRequest() => _requests[call.runtimeType],
+      DwActionCommand() =>
+        _commands[call.runtimeType] ?? (call is DwSignOut ? _signOut : null),
+    };
+    if (handler == null) {
+      errors.add(StateError('No fake handler for ${call.runtimeType}'));
+      return const DwApiResponse.failed('fake-no-handler');
+    }
+    if (context.idempotencyKey case final key?) {
+      _executions[key] = executions(key) + 1;
+    }
+    final DwCallResult<Object?> result;
+    try {
+      result = await handler(call, context);
+    } on DwRefusalException catch (exception) {
+      return DwApiResponse.refused(exception.refusal);
+    } catch (error) {
+      errors.add(error);
+      return const DwApiResponse.failed('fake-handler-error');
+    }
+    switch (result) {
+      case DwCallOk(:final value):
+        final Object? encoded;
+        try {
+          encoded = call.encodeResult(value, protocol);
+        } catch (error) {
+          errors.add(error);
+          return const DwApiResponse.failed('fake-result-does-not-encode');
+        }
+        final named = context.liveConnection;
+        final carried = <DwWireObject>[];
+        for (final (channel, objects) in context._published) {
+          _broadcast(channel.wireName, objects, except: named);
+          if (named == null || named.subscriptions.contains(channel.wireName)) {
+            carried.addAll(objects);
+          }
+        }
+        return DwApiResponse.ok(encoded, updates: DwUpdateTransport(carried));
+      case DwCallRefused() || DwNotAuthenticated() || DwCallFailed():
+        // Not ok: the response carries no updates, and whatever the handler
+        // published before it gave up reaches every subscriber over the
+        // socket — the caller's named connection included.
+        for (final (channel, objects) in context._published) {
+          _broadcast(channel.wireName, objects, except: null);
+        }
+    }
+    switch (result) {
+      case DwCallOk():
+        throw StateError('unreachable: answered above');
+      case DwCallRefused(:final refusal):
+        return refusal.isIncompatibility
+            ? DwApiResponse.incompatible(refusal)
+            : DwApiResponse.refused(refusal);
+      case DwNotAuthenticated():
+        return const DwApiResponse.unauthenticated();
+      case DwCallFailed(:final incidentId):
+        return DwApiResponse.failed(incidentId);
+    }
+  }
+
+  DwHttpReply _reply(DwApiResponse response) => DwHttpReply(
+    status: response.httpStatus,
+    body: jsonEncode(response.toJson()),
+    headers: {
+      DwHttpContract.contentTypeHeader.toLowerCase():
+          DwHttpContract.jsonContentType,
+      for (final MapEntry(:key, :value) in dwHttpHeadersFor(response).entries)
+        key.toLowerCase(): value,
+    },
+  );
+
+  /// The built-in sign-out, as a real server does it: revokes the key; the
+  /// caller's named live connection loses its subscriptions and becomes
+  /// anonymous without being told (it asked), every other connection bound
+  /// to the key is rejected.
+  DwCallResult<Object?> _signOut(Object command, DwFakeCall call) {
+    final token = call.token;
+    if (token == null) return const DwNotAuthenticated<void>();
+    final named = call.liveConnection;
+    if (named != null && named.token == token) _bind(named, null, null);
+    revokeToken(token);
+    return const DwCallOk<void>(null);
+  }
+
+  // --- live -----------------------------------------------------------------
+
+  void _accept(DwLiveConnection end, Uri url) {
     if (!acceptsConnections) {
       throw StateError('The fake server does not accept connections.');
     }
-    final connection = DwFakeConnection._(this, end, endpoint);
+    final connection = DwFakeConnection._(
+      this,
+      end,
+      url,
+      'fake-${_nextConnection++}',
+    );
     connections.add(connection);
     end.messages.listen(
       (frame) => _onFrame(connection, frame),
@@ -301,25 +677,39 @@ final class DwFakeServer {
         connection.subscriptions.clear();
       },
     );
-    if (endpoint.queryParameters['v'] != '$wireVersion') {
-      // Accepted and closed at once, as the real server upgrades and then
-      // closes: the client learns why from the close code.
+    final refusal = _upgradeRefusal(url);
+    if (refusal != null) {
+      // Upgraded and closed at once: a browser cannot read the status of a
+      // refused upgrade, so the close code carries the answer.
       unawaited(
-        connection.close(
-          code: DwCloseCode.unsupportedVersion,
-          reason: '${DwCloseCode.wireVersionReason}$wireVersion',
-        ),
+        connection.close(code: DwCloseCode.incompatible, reason: refusal.code),
       );
+      return;
     }
+    connection.send(DwHelloMessage(connection.id));
+  }
+
+  DwCallRefusal? _upgradeRefusal(Uri url) {
+    final parameters = url.queryParameters;
+    if (parameters[DwHttpContract.liveProtocolParameter] !=
+        '$protocolVersion') {
+      return DwCallRefusal(DwCoreRefusal.protocolUnsupported);
+    }
+    final app = parameters[DwHttpContract.liveAppVersionParameter];
+    try {
+      if (DwAppVersion.parse(app ?? '').build < minAppBuild) {
+        return DwCallRefusal(DwCoreRefusal.updateRequired);
+      }
+    } on FormatException {
+      return DwCallRefusal(DwCoreRefusal.updateRequired);
+    }
+    return null;
   }
 
   void _onFrame(DwFakeConnection connection, String frame) {
     final DwClientMessage message;
     try {
-      message = DwClientMessage.fromJson(
-        jsonDecode(frame) as Map<String, Object?>,
-        protocol,
-      );
+      message = DwClientMessage.fromJson(jsonDecode(frame));
     } catch (error) {
       errors.add(error);
       return;
@@ -327,19 +717,28 @@ final class DwFakeServer {
     received.add(message);
     switch (message) {
       case DwAuthenticateMessage(:final token):
-        _authenticate(connection, token);
-      case DwRequestMessage():
-        unawaited(_request(connection, message));
-      case DwCommandMessage():
-        unawaited(_command(connection, message));
+        final account = token == null ? null : _tokens[token];
+        _bind(connection, account, account == null ? null : token);
+        connection.send(
+          token == null
+              ? const DwAuthenticatedMessage.anonymous()
+              : account == null
+              ? const DwAuthenticatedMessage.rejected()
+              : DwAuthenticatedMessage.account(account),
+        );
       case DwSubscribeMessage(:final channel):
         _subscribes[channel] = (_subscribes[channel] ?? 0) + 1;
-        final refusal = subscriptionRule?.call(channel, connection);
         if (failingChannels.contains(channel)) {
           connection.send(
             DwSubscriptionRefusedMessage.failed(channel, subscriptionIncident),
           );
-        } else if (refusal != null) {
+        } else if (subscriptionsRequireAccount &&
+            connection.accountId == null) {
+          connection.send(
+            DwSubscriptionRefusedMessage.unauthenticated(channel),
+          );
+        } else if (subscriptionRule?.call(channel, connection)
+            case final refusal?) {
           connection.send(
             DwSubscriptionRefusedMessage.refused(channel, refusal),
           );
@@ -352,204 +751,15 @@ final class DwFakeServer {
         connection.subscriptions.remove(channel);
     }
   }
-
-  void _authenticate(DwFakeConnection connection, String? token) {
-    if (token == null) {
-      _bind(connection, null, null);
-      connection.send(const DwAuthenticatedMessage());
-      return;
-    }
-    final account = _tokens[token];
-    _bind(connection, account, account == null ? null : token);
-    connection.send(
-      account == null
-          ? const DwAuthenticatedMessage(rejected: true)
-          : DwAuthenticatedMessage(accountId: account),
-    );
-  }
-
-  Future<void> _request(
-    DwFakeConnection connection,
-    DwRequestMessage message,
-  ) async {
-    final call = DwFakeCall._(
-      connection,
-      connection.accountId,
-      message.page,
-      null,
-    );
-    final handler = _requests[message.request.runtimeType];
-    final DwResultMessage answer;
-    if (_invalid(message.id, message.request) case final refused?) {
-      answer = refused;
-    } else if (handler == null) {
-      errors.add(
-        StateError('No fake handler for ${message.request.runtimeType}'),
-      );
-      answer = DwResultMessage(
-        id: message.id,
-        status: DwResultStatus.failed,
-        incidentId: 'fake-no-handler',
-      );
-    } else {
-      answer = await _run(
-        message.id,
-        () => handler(message.request, call),
-        (value) => message.request.encodeResult(value, protocol),
-      );
-    }
-    connection.send(answer);
-  }
-
-  Future<void> _command(
-    DwFakeConnection connection,
-    DwCommandMessage message,
-  ) async {
-    final stored = _outcomes[message.idempotencyKey];
-    if (stored != null) {
-      connection.send(
-        DwResultMessage(
-          id: message.id,
-          status: stored.status,
-          value: stored.value,
-          refusal: stored.refusal,
-        ),
-      );
-      return;
-    }
-    final call = DwFakeCall._(
-      connection,
-      connection.accountId,
-      null,
-      message.idempotencyKey,
-    );
-    final command = message.command;
-    final handler =
-        _commands[command.runtimeType] ??
-        (command is DwSignOut ? _signOut : null);
-    final DwResultMessage answer;
-    if (_invalid(message.id, command) case final refused?) {
-      answer = refused;
-    } else if (handler == null) {
-      errors.add(StateError('No fake handler for ${command.runtimeType}'));
-      answer = DwResultMessage(
-        id: message.id,
-        status: DwResultStatus.failed,
-        incidentId: 'fake-no-handler',
-      );
-    } else {
-      _executions[message.idempotencyKey] =
-          executions(message.idempotencyKey) + 1;
-      answer = await _run(
-        message.id,
-        () => handler(command, call),
-        (value) => command.encodeResult(value, protocol),
-      );
-      if (answer.status == DwResultStatus.ok ||
-          answer.status == DwResultStatus.refused) {
-        _outcomes[message.idempotencyKey] = answer;
-      }
-    }
-    connection.send(answer);
-  }
-
-  /// The built-in sign-out, as a real server does it: revokes the key; the
-  /// author connection becomes anonymous (its subscriptions closed, no
-  /// `authed` — it asked), every other connection on the key is rejected.
-  DwResult<Object?> _signOut(DwCommand<Object?> command, DwFakeCall call) {
-    final author = call.connection;
-    final token = author.token;
-    if (token == null) return const DwNotAuthenticated<void>();
-    _bind(author, null, null);
-    revokeToken(token);
-    return const DwOk<void>(null);
-  }
-
-  /// The refusal a real server answers before the handler for a DTO that
-  /// does not validate — reachable only by a client that skipped its own
-  /// check.
-  DwResultMessage? _invalid(int id, DwDto dto) {
-    if (dto case final DwValidatable validatable) {
-      final refusals = validatable.validate();
-      if (refusals.isNotEmpty) {
-        return DwResultMessage(
-          id: id,
-          status: DwResultStatus.refused,
-          refusal: refusals.first,
-        );
-      }
-    }
-    return null;
-  }
-
-  Future<DwResultMessage> _run(
-    int id,
-    FutureOr<DwResult<Object?>> Function() handle,
-    Object? Function(Object? value) encode,
-  ) async {
-    try {
-      final result = await handle();
-      return switch (result) {
-        DwOk(:final value) => DwResultMessage(
-          id: id,
-          status: DwResultStatus.ok,
-          value: encode(value),
-        ),
-        DwRefused(:final refusal) => DwResultMessage(
-          id: id,
-          status: DwResultStatus.refused,
-          refusal: refusal,
-        ),
-        DwNotAuthenticated() => DwResultMessage(
-          id: id,
-          status: DwResultStatus.unauthenticated,
-        ),
-        DwFailed(:final incidentId) => DwResultMessage(
-          id: id,
-          status: DwResultStatus.failed,
-          incidentId: incidentId,
-        ),
-      };
-    } on DwRefusalException catch (exception) {
-      return DwResultMessage(
-        id: id,
-        status: DwResultStatus.refused,
-        refusal: exception.refusal,
-      );
-    } catch (error) {
-      errors.add(error);
-      return DwResultMessage(
-        id: id,
-        status: DwResultStatus.failed,
-        incidentId: 'fake-handler-error',
-      );
-    }
-  }
 }
 
-/// One page of [ordered] for [page], as a DartWay server would answer a
-/// paginated request: offset pages by position; cursor pages hold the objects
-/// after the one with id [DwCursorParams.before] (the list is newest first,
-/// ids descending). Reads one object past the page to learn [DwPage.hasMore].
-DwPage<T> dwFakePage<T extends DwDataObject>(
-  List<T> ordered,
-  DwPageParams? page, {
-  required int pageSize,
-}) {
-  final start = switch (page) {
-    null => 0,
-    DwOffsetParams(:final offset) => offset,
-    DwCursorParams(before: null) => 0,
-    DwCursorParams(:final before) => () {
-      final index = ordered.indexWhere(
-        (item) => (item.id as Comparable).compareTo(before) < 0,
-      );
-      return index < 0 ? ordered.length : index;
-    }(),
-  };
-  final window = ordered.skip(start).take(pageSize + 1).toList();
-  return DwPage<T>(
-    window.take(pageSize).toList(),
-    hasMore: window.length > pageSize,
-  );
-}
+/// Client timings for tests against the fake server: short retries and no
+/// release or idle delay, so a test sees the effects of what it did at once.
+const DwClientOptions dwFakeClientOptions = DwClientOptions(
+  retryDelay: Duration(milliseconds: 1),
+  maxRetryDelay: Duration(milliseconds: 10),
+  releaseDelay: Duration.zero,
+  liveIdleDelay: Duration.zero,
+  liveSettleTimeout: Duration(milliseconds: 200),
+  callTimeout: Duration(seconds: 2),
+);

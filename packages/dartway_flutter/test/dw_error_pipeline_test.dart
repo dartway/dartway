@@ -137,7 +137,7 @@ void main() {
       final context = await pumpApp(tester);
 
       final action = dwInstance.action<void>(
-        (_) => throw DwRefusalException(DwRefusal(_Refusal.messageDeleted)),
+        (_) => throw DwRefusalException(DwCallRefusal(_Refusal.messageDeleted)),
         onErrorNotification: 'Could not delete',
       );
       await action(context);
@@ -172,8 +172,8 @@ void main() {
     ) async {
       final context = await pumpApp(tester);
 
-      final value = await dwInstance.action<DwResult<int>>(
-        (_) async => DwRefused<int>(DwRefusal(_Refusal.messageDeleted)),
+      final value = await dwInstance.action<DwCallResult<int>>(
+        (_) async => DwCallRefused<int>(DwCallRefusal(_Refusal.messageDeleted)),
         onSuccessNotification: 'Deleted',
       )(context);
       await tester.pump();
@@ -190,8 +190,8 @@ void main() {
     ) async {
       final context = await pumpApp(tester);
 
-      await dwInstance.action<DwResult<int>>(
-        (_) async => const DwFailed<int>('incident-9'),
+      await dwInstance.action<DwCallResult<int>>(
+        (_) async => const DwCallFailed<int>('incident-9'),
         onErrorNotification: 'Could not delete',
       )(context);
       await tester.pump();
@@ -206,7 +206,7 @@ void main() {
       final context = await pumpApp(tester);
 
       await dwInstance.action<void>(
-        (_) => throw DwRefusalException(DwRefusal(_Refusal.noAccess)),
+        (_) => throw DwRefusalException(DwCallRefusal(_Refusal.noAccess)),
       )(context);
 
       // The app decides what to do with it — the point of the type is that

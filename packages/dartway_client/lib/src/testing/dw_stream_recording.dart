@@ -3,12 +3,12 @@ import 'dart:async';
 /// Records what a stream emits, for assertions over a sequence of states.
 ///
 /// ```dart
-/// final states = DwRecording(watch.states);
+/// final states = DwStreamRecording(watch.states);
 /// await pumpEventQueue();
-/// expect(states.values.last, isA<DwRequestData<List<RoomView>>>());
+/// expect(states.last, isA<DwRequestData<List<RoomView>>>());
 /// ```
-final class DwRecording<T> {
-  DwRecording(Stream<T> stream) {
+final class DwStreamRecording<T> {
+  DwStreamRecording(Stream<T> stream) {
     _subscription = stream.listen(
       _values.add,
       onError: errors.add,

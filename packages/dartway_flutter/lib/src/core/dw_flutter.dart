@@ -65,7 +65,7 @@ class DwFlutter {
 
   /// Dispatch point for every reported error. The base implementation runs the
   /// configured [DwConfig.onErrorReport] hook, or logs via `debugPrint` when
-  /// none is set; `DwCore` overrides it to alert out of the box when the app
+  /// none is set; `DwFlutterCore` overrides it to alert out of the box when the app
   /// has not installed its own policy.
   void dispatchReport(DwErrorReport report) {
     final onReport = _config.onErrorReport;
@@ -98,7 +98,7 @@ class DwFlutter {
     if (getter == null) {
       throw StateError(
         'DwConfig.defaultModelGetter is not set. '
-        'Provide it in the DwConfig passed to DwFlutter/DwCore.',
+        'Provide it in the DwConfig passed to DwFlutter/DwFlutterCore.',
       );
     }
 

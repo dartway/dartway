@@ -6,12 +6,12 @@ import 'package:flutter/material.dart';
 /// A UI-aware async action: confirmation → run → notify → follow-up → error
 /// report, all in one value.
 ///
-/// **Results are understood.** An action that returns a [DwResult] — as
-/// `(context) => dw.command(...)` does — succeeds only on [DwOk]; any other
+/// **Results are understood.** An action that returns a [DwCallResult] — as
+/// `(context) => dw.command(...)` does — succeeds only on [DwCallOk]; any other
 /// result is treated as its exception (`valueOrThrow`) and handled below. The
 /// caller never has to unwrap a result to get the refusal shown.
 ///
-/// A refusal — a [DwRefused] result, or a [DwRefusalException] thrown by the
+/// A refusal — a [DwCallRefused] result, or a [DwRefusalException] thrown by the
 /// app's own code — is shown to the user through [DwConfig.refusalText], the
 /// project's catalogue, rather than as the action's generic error text. A
 /// not-authenticated answer shows nothing and signs out: the session is over,
@@ -57,7 +57,7 @@ extension DwActionExtension on DwFlutter {
       try {
         final value = await action(context);
         // A result that is not a success is the exception it stands for.
-        if (value is DwResult && value is! DwOk) value.valueOrThrow;
+        if (value is DwCallResult && value is! DwCallOk) value.valueOrThrow;
 
         if (onSuccessNotification != null) {
           notify.success(onSuccessNotification);
@@ -81,6 +81,12 @@ extension DwActionExtension on DwFlutter {
         // over the action's [onErrorNotification], which was written once,
         // for every way the action could fail.
         switch (error) {
+          case DwRefusalException(:final refusal)
+              when refusal.isIncompatibility &&
+                  config.updateRequiredScreen != null:
+            // The update-required page is already the message; a toast over
+            // it would say the same thing worse.
+            break;
           case DwRefusalException(:final refusal):
             final text = config.refusalText?.call(refusal);
             if (text != null) {
@@ -91,7 +97,7 @@ extension DwActionExtension on DwFlutter {
           case DwNotAuthenticatedException():
             // Usually already over: the client drops the session on the
             // answer itself. This covers the exception thrown by app code.
-            if (this case final DwCore core) {
+            if (this case final DwFlutterCore core) {
               try {
                 await core.signOut();
               } catch (signOutError, signOutStackTrace) {

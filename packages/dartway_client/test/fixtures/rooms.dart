@@ -4,7 +4,13 @@
 
 import 'package:dartway_client/dartway_client.dart';
 
-enum AppChannel with DwChannelKind { rooms, room, notes }
+enum AppChannel with DwChannelKind { rooms, room, notes, chat }
+
+const roomsChannel = DwLiveChannel(AppChannel.rooms);
+const notesChannel = DwLiveChannel(AppChannel.notes);
+const chatChannel = DwLiveChannel(AppChannel.chat);
+
+// --- data objects ------------------------------------------------------------
 
 final class RoomView extends DwDataObject with _$RoomView {
   const RoomView({required this.id, required this.name, this.rank = 0});
@@ -65,30 +71,77 @@ mixin _$NoteView on DwDataObject {
       other is NoteView && other.id == _self.id && other.text == _self.text;
   @override
   int get hashCode => Object.hash(_self.id, _self.text);
+  @override
+  String toString() => 'NoteView(${_self.id}, ${_self.text})';
 }
 
 NoteView $NoteViewFromJson(Map<String, Object?> json) =>
     NoteView(id: json['id']! as int, text: json['text']! as String);
 
+/// A chat line: sorted by [at], then id, newest first.
+final class ChatLine extends DwDataObject with _$ChatLine {
+  const ChatLine({required this.id, required this.at, required this.text});
+
+  @override
+  final int id;
+  final int at;
+  final String text;
+}
+
+mixin _$ChatLine on DwDataObject {
+  ChatLine get _self => this as ChatLine;
+  @override
+  String get dwTypeName => 'ChatLine';
+  @override
+  Map<String, Object?> toJson() => {
+    'id': _self.id,
+    'at': _self.at,
+    'text': _self.text,
+  };
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChatLine &&
+          other.id == _self.id &&
+          other.at == _self.at &&
+          other.text == _self.text;
+  @override
+  int get hashCode => Object.hash(_self.id, _self.at, _self.text);
+  @override
+  String toString() => 'ChatLine(${_self.id}, ${_self.text})';
+}
+
+ChatLine $ChatLineFromJson(Map<String, Object?> json) => ChatLine(
+  id: json['id']! as int,
+  at: json['at']! as int,
+  text: json['text']! as String,
+);
+
+// --- requests ----------------------------------------------------------------
+
 /// Every room; new rooms at the head.
 final class ListRooms extends DwListRequest<RoomView>
     with _$ListRooms
-    implements DwValidatable {
+    implements DwSelfValidating {
   const ListRooms({this.minRank});
 
   final int? minRank;
 
   @override
-  List<DwRefusal> validate() => [
+  List<DwCallRefusal> validate() => [
     if (minRank != null && minRank! < 0)
-      DwRefusal(DwCoreRefusal.invalid, field: 'minRank', params: {'min': 0}),
+      DwCallRefusal(
+        DwCoreRefusal.invalid,
+        field: 'minRank',
+        params: {'min': 0},
+      ),
   ];
 
   @override
-  List<DwChannel> get channels => const [DwChannel(AppChannel.rooms)];
+  List<DwLiveChannel> get channels => const [roomsChannel];
 
   @override
-  bool matches(RoomView object) => minRank == null || object.rank >= minRank!;
+  bool matches(RoomView item) => minRank == null || item.rank >= minRank!;
 }
 
 mixin _$ListRooms on DwListRequest<RoomView> {
@@ -116,7 +169,7 @@ final class ListRoomsByRank extends DwListRequest<RoomView>
   const ListRoomsByRank();
 
   @override
-  List<DwChannel> get channels => const [DwChannel(AppChannel.rooms)];
+  List<DwLiveChannel> get channels => const [roomsChannel];
 
   @override
   int Function(RoomView a, RoomView b)? get sort =>
@@ -137,33 +190,93 @@ mixin _$ListRoomsByRank on DwListRequest<RoomView> {
 ListRoomsByRank $ListRoomsByRankFromJson(Map<String, Object?> json) =>
     const ListRoomsByRank();
 
-/// Notes: re-run whenever a room changes (derived data).
-final class ListNotes extends DwListRequest<NoteView> with _$ListNotes {
-  const ListNotes();
-
-  @override
-  List<DwChannel> get channels => const [
-    DwChannel(AppChannel.rooms),
-    DwChannel(AppChannel.notes),
-  ];
-
-  @override
-  DwUpdate onUpdate(DwDto update) =>
-      update is RoomView ? DwUpdate.refetch : DwUpdate.auto;
+/// Rooms without channels: fresh as its last fetch, and still updated by the
+/// transport of a response.
+final class ListRoomsOffline extends DwListRequest<RoomView>
+    with _$ListRoomsOffline {
+  const ListRoomsOffline();
 }
 
-mixin _$ListNotes on DwListRequest<NoteView> {
+mixin _$ListRoomsOffline on DwListRequest<RoomView> {
   @override
-  String get dwTypeName => 'ListNotes';
+  String get dwTypeName => 'ListRoomsOffline';
   @override
   Map<String, Object?> toJson() => const {};
   @override
-  bool operator ==(Object other) => other is ListNotes;
+  bool operator ==(Object other) => other is ListRoomsOffline;
   @override
-  int get hashCode => (ListNotes).hashCode;
+  int get hashCode => (ListRoomsOffline).hashCode;
 }
 
-ListNotes $ListNotesFromJson(Map<String, Object?> json) => const ListNotes();
+ListRoomsOffline $ListRoomsOfflineFromJson(Map<String, Object?> json) =>
+    const ListRoomsOffline();
+
+/// Rooms whose membership only the server decides.
+final class ListPinnedRooms extends DwListRequest<RoomView>
+    with _$ListPinnedRooms {
+  const ListPinnedRooms() : super.updateOnly();
+
+  @override
+  List<DwLiveChannel> get channels => const [roomsChannel];
+}
+
+mixin _$ListPinnedRooms on DwListRequest<RoomView> {
+  @override
+  String get dwTypeName => 'ListPinnedRooms';
+  @override
+  Map<String, Object?> toJson() => const {};
+  @override
+  bool operator ==(Object other) => other is ListPinnedRooms;
+  @override
+  int get hashCode => (ListPinnedRooms).hashCode;
+}
+
+ListPinnedRooms $ListPinnedRoomsFromJson(Map<String, Object?> json) =>
+    const ListPinnedRooms();
+
+/// Derived data: every room update re-runs it.
+final class ListRoomStats extends DwListRequest<RoomView> with _$ListRoomStats {
+  const ListRoomStats() : super.refetchOnUpdate();
+
+  @override
+  List<DwLiveChannel> get channels => const [roomsChannel];
+}
+
+mixin _$ListRoomStats on DwListRequest<RoomView> {
+  @override
+  String get dwTypeName => 'ListRoomStats';
+  @override
+  Map<String, Object?> toJson() => const {};
+  @override
+  bool operator ==(Object other) => other is ListRoomStats;
+  @override
+  int get hashCode => (ListRoomStats).hashCode;
+}
+
+ListRoomStats $ListRoomStatsFromJson(Map<String, Object?> json) =>
+    const ListRoomStats();
+
+/// The caller's own notes: "my" data, no account id in the request.
+final class ListMyNotes extends DwListRequest<NoteView> with _$ListMyNotes {
+  const ListMyNotes();
+
+  @override
+  List<DwLiveChannel> get channels => const [notesChannel];
+}
+
+mixin _$ListMyNotes on DwListRequest<NoteView> {
+  @override
+  String get dwTypeName => 'ListMyNotes';
+  @override
+  Map<String, Object?> toJson() => const {};
+  @override
+  bool operator ==(Object other) => other is ListMyNotes;
+  @override
+  int get hashCode => (ListMyNotes).hashCode;
+}
+
+ListMyNotes $ListMyNotesFromJson(Map<String, Object?> json) =>
+    const ListMyNotes();
 
 final class GetRoom extends DwSingleRequest<RoomView> with _$GetRoom {
   const GetRoom(this.roomId);
@@ -171,7 +284,7 @@ final class GetRoom extends DwSingleRequest<RoomView> with _$GetRoom {
   final int roomId;
 
   @override
-  List<DwChannel> get channels => [DwChannel(AppChannel.room, roomId)];
+  List<DwLiveChannel> get channels => [DwLiveChannel(AppChannel.room, roomId)];
 }
 
 mixin _$GetRoom on DwSingleRequest<RoomView> {
@@ -197,10 +310,10 @@ final class FindRoom extends DwMaybeRequest<RoomView> with _$FindRoom {
   final String name;
 
   @override
-  List<DwChannel> get channels => const [DwChannel(AppChannel.rooms)];
+  List<DwLiveChannel> get channels => const [roomsChannel];
 
   @override
-  bool matches(RoomView object) => object.name == name;
+  bool matches(RoomView item) => item.name == name;
 }
 
 mixin _$FindRoom on DwMaybeRequest<RoomView> {
@@ -219,17 +332,14 @@ mixin _$FindRoom on DwMaybeRequest<RoomView> {
 FindRoom $FindRoomFromJson(Map<String, Object?> json) =>
     FindRoom(json['name']! as String);
 
-/// Offset pages of rooms ordered by rank.
+/// Offset pages of rooms, two per page, ordered by rank (or unsorted).
 final class FeedRooms extends DwPageRequest<RoomView> with _$FeedRooms {
-  const FeedRooms({this.sorted = true});
+  const FeedRooms({this.sorted = true}) : super(pageSize: 2, maxPageSize: 3);
 
   final bool sorted;
 
   @override
-  int get pageSize => 2;
-
-  @override
-  List<DwChannel> get channels => const [DwChannel(AppChannel.rooms)];
+  List<DwLiveChannel> get channels => const [roomsChannel];
 
   @override
   int Function(RoomView a, RoomView b)? get sort =>
@@ -253,48 +363,79 @@ mixin _$FeedRooms on DwPageRequest<RoomView> {
 FeedRooms $FeedRoomsFromJson(Map<String, Object?> json) =>
     FeedRooms(sorted: json['sorted'] as bool? ?? true);
 
-/// Cursor pages of rooms, newest (highest id) first.
-final class RoomHistory extends DwCursorRequest<RoomView> with _$RoomHistory {
-  const RoomHistory();
+/// Numbered pages of rooms.
+final class RoomsTable extends DwTableRequest<RoomView> with _$RoomsTable {
+  const RoomsTable({this.page = 1, this.pageSize = 2}) : super(maxPageSize: 10);
 
   @override
-  int get pageSize => 2;
+  final int page;
+  @override
+  final int pageSize;
 
   @override
-  List<DwChannel> get channels => const [DwChannel(AppChannel.rooms)];
+  List<DwLiveChannel> get channels => const [roomsChannel];
 }
 
-mixin _$RoomHistory on DwCursorRequest<RoomView> {
+mixin _$RoomsTable on DwTableRequest<RoomView> {
+  RoomsTable get _self => this as RoomsTable;
   @override
-  String get dwTypeName => 'RoomHistory';
+  String get dwTypeName => 'RoomsTable';
+  @override
+  Map<String, Object?> toJson() => {
+    'page': _self.page,
+    'pageSize': _self.pageSize,
+  };
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RoomsTable &&
+          other.page == _self.page &&
+          other.pageSize == _self.pageSize;
+  @override
+  int get hashCode => Object.hash(RoomsTable, _self.page, _self.pageSize);
+}
+
+RoomsTable $RoomsTableFromJson(Map<String, Object?> json) =>
+    RoomsTable(page: json['page']! as int, pageSize: json['pageSize']! as int);
+
+/// The chat, read as a window: three lines per load.
+final class ReadChat extends DwWindowRequest<ChatLine> with _$ReadChat {
+  const ReadChat() : super(pageSize: 3, maxPageSize: 20);
+
+  @override
+  List<DwLiveChannel> get channels => const [chatChannel];
+}
+
+mixin _$ReadChat on DwWindowRequest<ChatLine> {
+  @override
+  String get dwTypeName => 'ReadChat';
   @override
   Map<String, Object?> toJson() => const {};
   @override
-  bool operator ==(Object other) => other is RoomHistory;
+  bool operator ==(Object other) => other is ReadChat;
   @override
-  int get hashCode => (RoomHistory).hashCode;
+  int get hashCode => (ReadChat).hashCode;
 }
 
-RoomHistory $RoomHistoryFromJson(Map<String, Object?> json) =>
-    const RoomHistory();
+ReadChat $ReadChatFromJson(Map<String, Object?> json) => const ReadChat();
 
-final class RenameRoom extends DwCommand<RoomView>
+// --- commands ----------------------------------------------------------------
+
+final class RenameRoom extends DwActionCommand<RoomView>
     with _$RenameRoom
-    implements DwValidatable {
+    implements DwSelfValidating {
   const RenameRoom({required this.roomId, required this.name});
 
   final int roomId;
   final String name;
 
   @override
-  List<DwRefusal> validate() => [
-    if (name.isEmpty) DwRefusal(DwCoreRefusal.invalid, field: 'name'),
-    if (name.length > 40)
-      DwRefusal(DwCoreRefusal.invalid, field: 'name', params: {'max': 40}),
+  List<DwCallRefusal> validate() => [
+    if (name.isEmpty) DwCallRefusal(DwCoreRefusal.invalid, field: 'name'),
   ];
 }
 
-mixin _$RenameRoom on DwCommand<RoomView> {
+mixin _$RenameRoom on DwActionCommand<RoomView> {
   RenameRoom get _self => this as RenameRoom;
   @override
   String get dwTypeName => 'RenameRoom';
@@ -313,20 +454,55 @@ mixin _$RenameRoom on DwCommand<RoomView> {
 RenameRoom $RenameRoomFromJson(Map<String, Object?> json) =>
     RenameRoom(roomId: json['roomId']! as int, name: json['name']! as String);
 
+final class DeleteRoom extends DwActionCommand<void> with _$DeleteRoom {
+  const DeleteRoom(this.roomId);
+
+  final int roomId;
+}
+
+mixin _$DeleteRoom on DwActionCommand<void> {
+  DeleteRoom get _self => this as DeleteRoom;
+  @override
+  String get dwTypeName => 'DeleteRoom';
+  @override
+  Map<String, Object?> toJson() => {'roomId': _self.roomId};
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DeleteRoom && other.roomId == _self.roomId;
+  @override
+  int get hashCode => Object.hash(DeleteRoom, _self.roomId);
+}
+
+DeleteRoom $DeleteRoomFromJson(Map<String, Object?> json) =>
+    DeleteRoom(json['roomId']! as int);
+
 enum RoomRefusal with DwRefusalCodes { nameTaken }
 
-final DwProtocol roomsProtocol = DwProtocol([
-  DwDtoEntry(FeedRooms, 'FeedRooms', $FeedRoomsFromJson),
-  DwDtoEntry(FindRoom, 'FindRoom', $FindRoomFromJson),
-  DwDtoEntry(GetRoom, 'GetRoom', $GetRoomFromJson),
-  DwDtoEntry(ListNotes, 'ListNotes', $ListNotesFromJson),
-  DwDtoEntry(ListRooms, 'ListRooms', $ListRoomsFromJson),
-  DwDtoEntry(ListRoomsByRank, 'ListRoomsByRank', $ListRoomsByRankFromJson),
-  DwDtoEntry(NoteView, 'NoteView', $NoteViewFromJson),
-  DwDtoEntry(RenameRoom, 'RenameRoom', $RenameRoomFromJson),
-  DwDtoEntry(RoomHistory, 'RoomHistory', $RoomHistoryFromJson),
-  DwDtoEntry(RoomView, 'RoomView', $RoomViewFromJson),
-], include: DwProtocol.core);
-
-const rooms = DwChannel(AppChannel.rooms);
-const notes = DwChannel(AppChannel.notes);
+final DwWireProtocol roomsProtocol = DwWireProtocol([
+  const DwProtocolEntry<ChatLine>('ChatLine', $ChatLineFromJson),
+  const DwProtocolEntry<DeleteRoom>('DeleteRoom', $DeleteRoomFromJson),
+  const DwProtocolEntry<FeedRooms>('FeedRooms', $FeedRoomsFromJson),
+  const DwProtocolEntry<FindRoom>('FindRoom', $FindRoomFromJson),
+  const DwProtocolEntry<GetRoom>('GetRoom', $GetRoomFromJson),
+  const DwProtocolEntry<ListMyNotes>('ListMyNotes', $ListMyNotesFromJson),
+  const DwProtocolEntry<ListPinnedRooms>(
+    'ListPinnedRooms',
+    $ListPinnedRoomsFromJson,
+  ),
+  const DwProtocolEntry<ListRoomStats>('ListRoomStats', $ListRoomStatsFromJson),
+  const DwProtocolEntry<ListRooms>('ListRooms', $ListRoomsFromJson),
+  const DwProtocolEntry<ListRoomsByRank>(
+    'ListRoomsByRank',
+    $ListRoomsByRankFromJson,
+  ),
+  const DwProtocolEntry<ListRoomsOffline>(
+    'ListRoomsOffline',
+    $ListRoomsOfflineFromJson,
+  ),
+  const DwProtocolEntry<NoteView>('NoteView', $NoteViewFromJson),
+  const DwProtocolEntry<ReadChat>('ReadChat', $ReadChatFromJson),
+  const DwProtocolEntry<RenameRoom>('RenameRoom', $RenameRoomFromJson),
+  const DwProtocolEntry<RoomView>('RoomView', $RoomViewFromJson),
+  const DwProtocolEntry<RoomsTable>('RoomsTable', $RoomsTableFromJson),
+], include: DwWireProtocol.core);

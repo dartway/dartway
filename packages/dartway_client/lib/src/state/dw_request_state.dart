@@ -2,8 +2,9 @@ import 'package:dartway_core/dartway_core.dart';
 
 /// The state of a watched request, as a screen renders it.
 ///
-/// Sealed, so a `switch` over it cannot forget the refusal, the failure or the
-/// signed-out case — the three ways a read ends that are not data.
+/// Sealed, so a `switch` over it cannot forget the refusal, the failure, the
+/// signed-out case or an unreachable server — the ways a read ends that are
+/// not data.
 sealed class DwRequestState<R> {
   const DwRequestState();
 }
@@ -28,17 +29,19 @@ final class DwRequestData<R> extends DwRequestState<R> {
 
   final R value;
 
-  /// The request is being run again (after a reconnect, a sign-in, an update
-  /// that asked for it) and [value] is what it answered last. Rendering it is
-  /// correct; a quiet progress hint is the most a screen owes the user.
+  /// The request is being run again (a pull to refresh, an update that asked
+  /// for it, a reconnected socket) and [value] is what it answered last.
+  /// Rendering it is correct; a quiet progress hint is the most a screen owes
+  /// the user.
   final bool refreshing;
 
   /// Every channel the request declares has a confirmed subscription on the
-  /// current connection, so [value] follows the server as it changes.
+  /// live socket, so [value] follows the server as it changes.
   ///
-  /// False while disconnected, while a subscription is being made, after the
-  /// server refused or closed one, and always for a request that declares no
-  /// channels — such a value is exactly as fresh as its last fetch.
+  /// False while the socket is down, while a subscription is being made,
+  /// after the server refused or closed one, and always for a request that
+  /// declares no channels — such a value is exactly as fresh as its last
+  /// fetch.
   final bool live;
 
   /// Lists compare element-wise — generated DTOs compare by value, and a
@@ -64,11 +67,14 @@ final class DwRequestData<R> extends DwRequestState<R> {
       'DwRequestData($value${refreshing ? ', refreshing' : ''}${live ? ', live' : ''})';
 }
 
-/// The server refused the request: an answer for the user.
+/// The server refused the request: an answer for the user. Also the state of
+/// a request that does not validate (nothing was sent), and of every request
+/// once the client is incompatible with its server (`dw.updateRequired`,
+/// `dw.protocolUnsupported`).
 final class DwRequestRefused<R> extends DwRequestState<R> {
   const DwRequestRefused(this.refusal);
 
-  final DwRefusal refusal;
+  final DwCallRefusal refusal;
 
   @override
   bool operator ==(Object other) =>
@@ -100,7 +106,7 @@ final class DwRequestFailed<R> extends DwRequestState<R> {
   String toString() => 'DwRequestFailed($incidentId)';
 }
 
-/// The request needs a signed-in user and the connection has none.
+/// The request needs a signed-in user and the caller has none.
 final class DwRequestUnauthenticated<R> extends DwRequestState<R> {
   const DwRequestUnauthenticated();
 
@@ -114,11 +120,27 @@ final class DwRequestUnauthenticated<R> extends DwRequestState<R> {
   String toString() => 'DwRequestUnauthenticated()';
 }
 
-/// The incident id of a failure detected on the client rather than reported by
-/// the server. The server never issues it.
+/// The server has not answered for `DwClientOptions.callTimeout` and there is
+/// no data to show. The client keeps retrying: the state becomes data as soon
+/// as an answer arrives.
+final class DwRequestUnreachable<R> extends DwRequestState<R> {
+  const DwRequestUnreachable();
+
+  @override
+  bool operator ==(Object other) => other is DwRequestUnreachable;
+
+  @override
+  int get hashCode => (DwRequestUnreachable).hashCode;
+
+  @override
+  String toString() => 'DwRequestUnreachable()';
+}
+
+/// The incident id of a failure detected on the client rather than reported
+/// by the server. The server never issues it.
 const String dwClientIncidentId = 'client';
 
-/// Loaded pages of a paginated request, merged into one list.
+/// Loaded pages of a `DwPageRequest`, merged into one list.
 final class DwPagedData<T extends DwDataObject> {
   const DwPagedData(
     this.items, {
@@ -138,9 +160,9 @@ final class DwPagedData<T extends DwDataObject> {
 
   /// Why the last attempt to load the next page did not: a
   /// `DwRefusalException`, a `DwFailedException`, a
-  /// `DwNotAuthenticatedException` or a `DwProtocolException`. Cleared by the
-  /// next attempt. [items] are kept: a page that did not arrive does not
-  /// unload the ones that did.
+  /// `DwNotAuthenticatedException`, a `DwTimeoutException` or a
+  /// `DwProtocolException`. Cleared by the next attempt. [items] are kept: a
+  /// page that did not arrive does not unload the ones that did.
   final Exception? loadMoreError;
 
   @override
@@ -160,4 +182,82 @@ final class DwPagedData<T extends DwDataObject> {
       'DwPagedData(${items.length} items${hasMore ? ', more' : ''}'
       '${loadingMore ? ', loading more' : ''}'
       '${loadMoreError == null ? '' : ', $loadMoreError'})';
+}
+
+/// The loaded rows of a `DwWindowRequest`: newest first, grown in both
+/// directions.
+final class DwWindowData<T extends DwDataObject> {
+  const DwWindowData(
+    this.items, {
+    required this.hasOlder,
+    required this.hasNewer,
+    this.loadingOlder = false,
+    this.loadingNewer = false,
+    this.loadError,
+    this.unseenNewerCount = 0,
+    this.prependedCount = 0,
+  });
+
+  /// Newest first, with live updates applied.
+  final List<T> items;
+
+  /// Rows older than the last item exist on the server.
+  final bool hasOlder;
+
+  /// Rows newer than the first item exist on the server. While `false`, a new
+  /// row arriving live is inserted at the head; while `true` it is counted in
+  /// [unseenNewerCount] instead.
+  final bool hasNewer;
+
+  final bool loadingOlder;
+  final bool loadingNewer;
+
+  /// Why the last `loadOlder` or `loadNewer` did not load: the same exception
+  /// types as `DwPagedData.loadMoreError`. Cleared by the next load.
+  final Exception? loadError;
+
+  /// New rows that arrived live while the window did not show the newest
+  /// rows — each counted once, however often it was updated — for a
+  /// "N new ↓" hint. Zero once the window reaches the newest rows.
+  final int unseenNewerCount;
+
+  /// How many rows the change that produced this value put before the
+  /// previous first row: a `loadNewer` page, or new rows inserted live. A
+  /// list that keeps its scroll position compensates by this many rows; `0`
+  /// after a full load, which has no previous position to keep.
+  final int prependedCount;
+
+  @override
+  bool operator ==(Object other) =>
+      other is DwWindowData &&
+      dwListEquals(other.items, items) &&
+      other.hasOlder == hasOlder &&
+      other.hasNewer == hasNewer &&
+      other.loadingOlder == loadingOlder &&
+      other.loadingNewer == loadingNewer &&
+      other.loadError == loadError &&
+      other.unseenNewerCount == unseenNewerCount &&
+      other.prependedCount == prependedCount;
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAll(items),
+    hasOlder,
+    hasNewer,
+    loadingOlder,
+    loadingNewer,
+    loadError,
+    unseenNewerCount,
+    prependedCount,
+  );
+
+  @override
+  String toString() =>
+      'DwWindowData(${items.length} items'
+      '${hasOlder ? ', older' : ''}${hasNewer ? ', newer' : ''}'
+      '${loadingOlder ? ', loading older' : ''}'
+      '${loadingNewer ? ', loading newer' : ''}'
+      '${unseenNewerCount > 0 ? ', $unseenNewerCount unseen' : ''}'
+      '${prependedCount > 0 ? ', +$prependedCount at head' : ''}'
+      '${loadError == null ? '' : ', $loadError'})';
 }

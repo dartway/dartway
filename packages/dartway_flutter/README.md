@@ -22,10 +22,10 @@ The Flutter skeleton of a [DartWay](https://dartway.dev) app — everything an a
   somewhere else that drifts: `DwFeature.scanMounted()` reads it off the running
   app, for error reports, analytics and
   [DartWay Studio](https://dartway.dev) passports.
-- 🔌 **Plugins** — `DwPlugin`: the seam for integrations the framework must not know about. Declare one at startup (`DwFlutter(plugins: [...])`, or `DwCore` when you use the data layer) and reach it as `dw.plugins.<name>` — kept apart from the core's own services. Telegram lives in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) (`dw.plugins.telegram`), local storage in [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) (`dw.plugins.prefs`) — an app that needs neither never downloads them.
+- 🔌 **Plugins** — `DwPlugin`: the seam for integrations the framework must not know about. Declare one at startup (`DwFlutter(plugins: [...])`, or `DwFlutterCore` when you use the data layer) and reach it as `dw.plugins.<name>` — kept apart from the core's own services. Telegram lives in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) (`dw.plugins.telegram`), local storage in [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) (`dw.plugins.prefs`) — an app that needs neither never downloads them.
 
 > **About `dw`.** It is not a global this package hands you — the app declares it once
-> (`late final DwCore<Client, UserProfile> dw;` with the DartWay data layer, or `DwFlutter`
+> (`late final DwFlutterCore dw;` with the DartWay data layer, or `DwFlutter`
 > when this package is used standalone) and reaches it from anywhere afterwards.
 
 ## Riverpod-native by design
@@ -74,7 +74,7 @@ DwActionBuilder(
 ## Quick start
 
 ```dart
-// The app declares the ambient core once (DwFlutter standalone, or DwCore with
+// The app declares the ambient core once (DwFlutter standalone, or DwFlutterCore with
 // the data layer) and reaches it as `dw` anywhere afterwards.
 late final DwFlutter dw;
 

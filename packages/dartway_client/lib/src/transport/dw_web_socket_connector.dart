@@ -2,27 +2,44 @@ import 'dart:async';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'dw_connection.dart';
+import 'dw_live_connection.dart';
 
-/// Connects over a WebSocket — `dart:io` on the VM and mobile, the browser's
-/// socket on the web (`web_socket_channel` picks).
-final class DwWebSocketConnector implements DwConnector {
-  const DwWebSocketConnector({this.closeTimeout = const Duration(seconds: 5)});
+/// Opens the live socket over a WebSocket — `dart:io` on the VM and mobile,
+/// the browser's socket on the web (`web_socket_channel` picks).
+final class DwWebSocketConnector implements DwLiveConnector {
+  const DwWebSocketConnector({
+    this.connectTimeout = const Duration(seconds: 10),
+    this.closeTimeout = const Duration(seconds: 5),
+  });
 
-  /// How long [DwConnection.close] waits for the closing handshake. A server
-  /// that has vanished never answers it, and stopping a client must not hang
-  /// on that.
+  /// How long opening may take. A blackholed port never refuses; without a
+  /// bound the client would wait on it instead of backing off and retrying.
+  final Duration connectTimeout;
+
+  /// How long [DwLiveConnection.close] waits for the closing handshake. A
+  /// server that has vanished never answers it, and stopping a client must
+  /// not hang on that.
   final Duration closeTimeout;
 
   @override
-  Future<DwConnection> connect(Uri endpoint) async {
-    final channel = WebSocketChannel.connect(endpoint);
-    await channel.ready;
+  Future<DwLiveConnection> connect(Uri url) async {
+    final channel = WebSocketChannel.connect(url);
+    try {
+      await channel.ready.timeout(connectTimeout);
+    } catch (_) {
+      unawaited(
+        channel.sink
+            .close()
+            .timeout(closeTimeout, onTimeout: () {})
+            .catchError((Object _) {}),
+      );
+      rethrow;
+    }
     return _WebSocketConnection(channel, closeTimeout);
   }
 }
 
-final class _WebSocketConnection implements DwConnection {
+final class _WebSocketConnection implements DwLiveConnection {
   _WebSocketConnection(this._channel, this._closeTimeout);
 
   final WebSocketChannel _channel;
