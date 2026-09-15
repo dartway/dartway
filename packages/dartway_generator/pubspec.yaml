@@ -24,6 +24,10 @@ dev_dependencies:
     path: ../dartway_core_shared
   dartway_orm:
     path: ../dartway_orm
+  dartway_push_server:
+    path: ../dartway_push_server
+  dartway_push_shared:
+    path: ../dartway_push_shared
   lints: ^6.0.0
   test: ^1.26.0
 
@@ -38,3 +42,7 @@ dependency_overrides:
     path: ../dartway_core_shared
   dartway_orm:
     path: ../dartway_orm
+  dartway_push_server:
+    path: ../dartway_push_server
+  dartway_push_shared:
+    path: ../dartway_push_shared

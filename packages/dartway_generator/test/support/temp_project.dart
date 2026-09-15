@@ -29,22 +29,34 @@ final class TempProject {
   /// then on `dartway_core_server` alone, as a project's server declares it
   /// (D-030), so its code imports ORM types from there, and
   /// `depend_on_referenced_packages` would flag an import of the ORM.
+  ///
+  /// [dependencies] names further framework packages every package declares
+  /// — a satellite a copied project imports (`dartway_push_shared`).
   static TempProject create(
     List<String> packages, {
     bool serverOnCore = false,
+    List<String> dependencies = const [],
   }) {
     final root = Directory.systemTemp
         .createTempSync('dw_generator_')
         .resolveSymbolicLinksSync();
     final project = TempProject._(p.normalize(root));
     for (final package in packages) {
-      project._createPackage(package, serverOnCore: serverOnCore);
+      project._createPackage(
+        package,
+        serverOnCore: serverOnCore,
+        dependencies: dependencies,
+      );
     }
     addTearDown(project.delete);
     return project;
   }
 
-  void _createPackage(String name, {required bool serverOnCore}) {
+  void _createPackage(
+    String name, {
+    required bool serverOnCore,
+    required List<String> dependencies,
+  }) {
     final dir = p.join(root, name);
     Directory(p.join(dir, 'lib')).createSync(recursive: true);
     final isServer = name.endsWith('_server');
@@ -58,6 +70,7 @@ final class TempProject {
       '  dartway_core_shared: any\n'
       '${isServer ? '  ${serverOnCore ? 'dartway_core_server' : 'dartway_orm'}: any\n' : ''}'
       '${isServer ? '  ${name.replaceAll('_server', '_shared')}: any\n' : ''}'
+      '${[for (final dependency in dependencies) '  $dependency: any\n'].join()}'
       'dev_dependencies:\n'
       '  lints: any\n',
     );

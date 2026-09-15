@@ -166,10 +166,11 @@ final class MemoRow extends DwTableRow with _\$MemoRow {
     () async {
       // The example's server imports ORM types from dartway_core_server, as
       // every project's does.
-      final project = TempProject.create([
-        'dartway_example_server',
-        'dartway_example_shared',
-      ], serverOnCore: true);
+      final project = TempProject.create(
+        ['dartway_example_server', 'dartway_example_shared'],
+        serverOnCore: true,
+        dependencies: ['dartway_push_server', 'dartway_push_shared'],
+      );
       void copy(String package, String directory) {
         final source = Directory(p.join(example, package, directory));
         for (final entity in source.listSync(recursive: true)) {

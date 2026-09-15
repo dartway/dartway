@@ -225,7 +225,10 @@ final class Bad extends DwDataObject with _\$Bad {
     'example project',
     () {
       test('the example shared package generates and analyzes clean', () async {
-        final project = TempProject.create(['dartway_example_shared']);
+        final project = TempProject.create(
+          ['dartway_example_shared'],
+          dependencies: ['dartway_push_shared'],
+        );
         final source = Directory(
           p.join(example, 'dartway_example_shared', 'lib'),
         );
