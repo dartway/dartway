@@ -149,53 +149,48 @@ void main() {
   });
 
   group('updates', () {
-    test(
-      'without Dw-Live-Connection the response carries no updates, and every '
-      "subscriber hears them over the socket, the caller's own connections "
-      'included',
-      () async {
-        final (author, session) = await harness().signedIn('plain@example.com');
-        final authorSocket = await harness().live(token: session.token);
-        for (final channel in ['notes', 'account:${session.id}']) {
-          expect(
-            await authorSocket.subscribe(channel),
-            isA<DwSubscribedMessage>(),
-          );
-        }
-        final (_, listenerSession) = await harness().signedIn(
-          'plain-l@example.com',
-        );
-        final listener = await harness().live(token: listenerSession.token);
-        expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
-
-        final answer = await author.call(const CreateNote('plain'));
-        final note = answer.value(const CreateNote(''));
-        // A call naming no live connection has no live state the response
-        // could update, and nothing checked what it may read (D-053).
-        expect(answer.updates.isEmpty, isTrue);
-        expect((answer.json! as Map).containsKey('updates'), isFalse);
-        // Each publication reaches the caller's socket under the channel it
-        // went to (D-036): not named, so not relieved of the socket.
+    test('without Dw-Live-Connection the response carries what the caller may '
+        "read, and every subscriber hears it over the socket — the caller's "
+        'connections included, none of which the call named', () async {
+      final (author, session) = await harness().signedIn('plain@example.com');
+      final authorSocket = await harness().live(token: session.token);
+      for (final channel in ['notes', 'account:${session.id}']) {
         expect(
-          (await authorSocket.expect<DwUpdateMessage>(
-            where: (m) => m.channel == 'notes',
-          )).updates.objects,
-          [note],
+          await authorSocket.subscribe(channel),
+          isA<DwSubscribedMessage>(),
         );
-        expect(
-          (await authorSocket.expect<DwUpdateMessage>(
-            where: (m) => m.channel == 'account:${session.id}',
-          )).updates.objects,
-          [note],
-        );
-        expect((await listener.expect<DwUpdateMessage>()).updates.objects, [
-          note,
-        ]);
-      },
-    );
+      }
+      final (_, listenerSession) = await harness().signedIn(
+        'plain-l@example.com',
+      );
+      final listener = await harness().live(token: listenerSession.token);
+      expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
 
-    test('with Dw-Live-Connection the response carries what that connection '
-        'listens to, the connection hears nothing of it over the socket, and '
+      final answer = await author.call(const CreateNote('plain'));
+      final note = answer.value(const CreateNote(''));
+      // Both channels' rules allow the caller (D-053).
+      expect(answer.updates.channels.keys, ['notes', 'account:${session.id}']);
+      // Each publication reaches the caller's socket under the channel it
+      // went to (D-036): not named, so not relieved of the socket.
+      expect(
+        (await authorSocket.expect<DwUpdateMessage>(
+          where: (m) => m.channel == 'notes',
+        )).updates.objects,
+        [note],
+      );
+      expect(
+        (await authorSocket.expect<DwUpdateMessage>(
+          where: (m) => m.channel == 'account:${session.id}',
+        )).updates.objects,
+        [note],
+      );
+      expect((await listener.expect<DwUpdateMessage>()).updates.objects, [
+        note,
+      ]);
+    });
+
+    test('with Dw-Live-Connection the response carries what the caller may '
+        'read, the connection hears nothing of the call over the socket, and '
         'others do — one message per channel', () async {
       final (author, session) = await harness().signedIn('named@example.com');
       final authorSocket = await harness().live(token: session.token);
@@ -214,10 +209,9 @@ void main() {
         const CreateNote('named', extraPublishes: 2),
       );
       final note = answer.value(const CreateNote(''));
-      // Subscribed to `notes` only: the `account:<id>` publication is not
-      // this connection's business. The note published three times travels
-      // once, as it ended.
-      expect(answer.updates.channels.keys, ['notes']);
+      // `notes` by the connection's subscription, `account:<id>` by its rule.
+      // The note published three times travels once, as it ended.
+      expect(answer.updates.channels.keys, ['notes', 'account:${session.id}']);
       expect(answer.updates.objectsOn('notes'), [
         NoteView(id: note.id, text: 'named #1', ownerId: session.id),
       ]);
@@ -226,6 +220,11 @@ void main() {
         'notes': {
           'NoteView': [
             {'id': note.id, 'text': 'named #1', 'ownerId': session.id},
+          ],
+        },
+        'account:${session.id}': {
+          'NoteView': [
+            {'id': note.id, 'text': 'named', 'ownerId': session.id},
           ],
         },
       });
@@ -243,54 +242,67 @@ void main() {
       expect(authorSocket.frames.where((f) => f.contains('"upd"')), isEmpty);
     });
 
-    test('a named connection subscribed to nothing gets a response without '
-        'updates', () async {
-      final (author, session) = await harness().signedIn('bare@example.com');
-      final socket = await harness().live(token: session.token);
-      author.liveConnection = socket.connectionId;
-      final answer = await author.call(const CreateNote('bare'));
-      expect(answer.updates.isEmpty, isTrue);
-      expect((answer.json! as Map).containsKey('updates'), isFalse);
-    });
+    test(
+      'a named connection subscribed to nothing changes nothing of the '
+      'response: the rules decide it, and the socket hears nothing',
+      () async {
+        final (author, session) = await harness().signedIn('bare@example.com');
+        final socket = await harness().live(token: session.token);
+        author.liveConnection = socket.connectionId;
+        final answer = await author.call(const CreateNote('bare'));
+        expect(answer.updates.channels.keys, [
+          'notes',
+          'account:${session.id}',
+        ]);
+        await socket.expectSilence();
+      },
+    );
 
-    test('an unknown connection id, or one of another account, is ignored: '
-        "the response carries nothing — not that connection's channels — and "
-        'no connection is relieved', () async {
-      final (author, _) = await harness().signedIn('ignored-a@example.com');
-      final (_, strangerSession) = await harness().signedIn(
-        'ignored-s@example.com',
-      );
-      final stranger = await harness().live(token: strangerSession.token);
-      expect(await stranger.subscribe('notes'), isA<DwSubscribedMessage>());
+    test(
+      'an unknown connection id, or one of another account, is ignored: '
+      "the response carries what the caller may read — by its rules, not by "
+      "that connection's subscriptions — and no connection is relieved",
+      () async {
+        final (author, authorSession) = await harness().signedIn(
+          'ignored-a@example.com',
+        );
+        final (_, strangerSession) = await harness().signedIn(
+          'ignored-s@example.com',
+        );
+        final stranger = await harness().live(token: strangerSession.token);
+        expect(await stranger.subscribe('notes'), isA<DwSubscribedMessage>());
 
-      for (final id in ['no-such-connection', stranger.connectionId]) {
-        author.liveConnection = id;
-        final answer = await author.call(CreateNote('ignored $id'));
-        final note = answer.value(const CreateNote(''));
-        expect(
-          answer.updates.isEmpty,
-          isTrue,
-          reason:
-              "naming someone else's connection must not borrow what "
-              'it may read',
-        );
-        expect(
-          (await stranger.expect<DwUpdateMessage>()).updates.objects,
-          [note],
-          reason: "naming someone else's connection must not silence it",
-        );
-      }
-    });
+        for (final id in ['no-such-connection', stranger.connectionId]) {
+          author.liveConnection = id;
+          final answer = await author.call(CreateNote('ignored $id'));
+          final note = answer.value(const CreateNote(''));
+          expect(
+            answer.updates.channels.keys,
+            ['notes', 'account:${authorSession.id}'],
+            reason:
+                "naming someone else's connection must not borrow what "
+                'it may read',
+          );
+          expect(
+            (await stranger.expect<DwUpdateMessage>()).updates.objects,
+            [note],
+            reason: "naming someone else's connection must not silence it",
+          );
+        }
+      },
+    );
 
     test('an anonymous connection is not bound to a signed-in caller: the '
-        'response carries nothing and the socket hears nothing', () async {
-      final (author, _) = await harness().signedIn('anon-bind@example.com');
+        'response carries what the caller may read and the socket hears '
+        'nothing', () async {
+      final (author, session) = await harness().signedIn(
+        'anon-bind@example.com',
+      );
       final anonymousSocket = await harness().live();
       author.liveConnection = anonymousSocket.connectionId;
       final answer = await author.call(const CreateNote('to all'));
       expect(answer.status, 200);
-      expect(answer.updates.isEmpty, isTrue);
-      expect((answer.json! as Map).containsKey('updates'), isFalse);
+      expect(answer.updates.channels.keys, ['notes', 'account:${session.id}']);
       await anonymousSocket.expectSilence();
     });
 

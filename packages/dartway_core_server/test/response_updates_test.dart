@@ -10,10 +10,11 @@ enum StaffChannel with DwChannelKind { staff }
 
 const _staff = DwLiveChannel(StaffChannel.staff);
 
-/// What a command's response may carry (D-053): only the channels its own
-/// named live connection subscribed to — access to those was checked when it
-/// subscribed. A publication to a channel the caller may not read never
-/// travels in its response.
+/// What a command's response carries (D-053): the publications to channels
+/// its caller may read — its connection subscribed to them, or their rule
+/// allows the caller now — whether or not it has a live connection. A
+/// publication to a channel the caller may not read never travels in its
+/// response; subscribers hear it over the socket.
 void main() {
   final harness = useHarness(
     build: (app, config) => app.server(
@@ -22,17 +23,20 @@ void main() {
       handlers: [
         for (final handler in app.handlers())
           if (handler.callType != Ping) handler,
-        // A member's action that the staff dashboard hears of.
+        // A member's action that the staff dashboard hears of, published as
+        // well to a channel nobody may read and to one whose rule throws.
         DwCallHandler.command<Ping, String>(
           access: DwAccessRule.signedIn,
           handle: (ctx, command) async {
             final note = NoteView(
               id: ctx.requireAccountId,
-              text: 'staff-only ${ctx.requireAccountId}',
+              text: 'action ${ctx.requireAccountId}',
             );
             ctx
               ..publish(_staff, note)
-              ..publish(const DwLiveChannel(TestChannel.notes), note);
+              ..publish(const DwLiveChannel(TestChannel.notes), note)
+              ..publish(const DwLiveChannel(TestChannel.nobody), note)
+              ..publish(const DwLiveChannel(TestChannel.broken), note);
             return 'pong';
           },
         ),
@@ -56,6 +60,9 @@ void main() {
     return socket;
   }
 
+  Map<Object?, Object?> updatesOf(DwTestAnswer answer) =>
+      ((answer.json! as Map)['updates'] as Map?) ?? const {};
+
   test("a newcomer's sign-in response carries none of what the sign-in hook "
       'published to staff, and staff hear it over the socket', () async {
     final admin = await staffSocket('leak-admin@example.com');
@@ -77,7 +84,6 @@ void main() {
     expect(answer.status, 200);
     expect((answer.json! as Map).containsKey('updates'), isFalse);
     expect(answer.text, isNot(contains('newcomer $identifier')));
-
     final heard = await admin.expect<DwUpdateMessage>(
       where: (m) => m.channel == 'staff',
     );
@@ -86,81 +92,115 @@ void main() {
     ]);
   });
 
-  test('a command naming no live connection that publishes to a channel the '
-      'caller may not subscribe to answers ok without updates; a subscribed '
-      'staff connection hears the object', () async {
-    final admin = await staffSocket('leak-admin2@example.com');
-    final (member, session) = await harness().signedIn(
-      'leak-member@example.com',
-    );
-    final memberSocket = await harness().live(token: session.token);
-    expect(
-      await memberSocket.subscribe('staff'),
-      isA<DwSubscriptionRefusedMessage>(),
-      reason: 'the member may not read the channel',
-    );
+  test(
+    'a member with no live connection gets in the response the channels '
+    'it may read, not the staff channel; staff hear it over the socket',
+    () async {
+      final admin = await staffSocket('leak-admin2@example.com');
+      final (member, session) = await harness().signedIn(
+        'leak-member@example.com',
+      );
 
-    final answer = await member.call(const Ping());
-    expect(answer.value(const Ping()), 'pong');
-    expect((answer.json! as Map).containsKey('updates'), isFalse);
-    expect(answer.text, isNot(contains('staff-only')));
+      final answer = await member.call(const Ping());
+      expect(answer.value(const Ping()), 'pong');
+      expect(updatesOf(answer), {
+        'notes': {
+          'NoteView': [
+            {'id': session.id, 'text': 'action ${session.id}'},
+          ],
+        },
+      });
 
-    // The member's own sign-in announced them to staff before this.
-    final heard = await admin.expect<DwUpdateMessage>(
-      where: (m) => m.channel == 'staff' && _isAction(m),
-    );
-    expect(
-      (heard.updates.objects.single as NoteView).text,
-      'staff-only ${session.id}',
-    );
-  });
-
-  test('a caller naming its own connection gets only the channels that '
-      'connection subscribed to', () async {
-    final admin = await staffSocket('leak-admin3@example.com');
-    final (member, session) = await harness().signedIn(
-      'leak-named@example.com',
-    );
-    final memberSocket = await harness().live(token: session.token);
-    expect(await memberSocket.subscribe('notes'), isA<DwSubscribedMessage>());
-    member.liveConnection = memberSocket.connectionId;
-
-    final answer = await member.call(const Ping());
-    expect(answer.updates.channels.keys, ['notes']);
-    expect((answer.json! as Map)['updates'], {
-      'notes': {
-        'NoteView': [
-          {'id': session.id, 'text': 'staff-only ${session.id}'},
-        ],
-      },
-    });
-    expect(
-      (await admin.expect<DwUpdateMessage>(
+      final heard = await admin.expect<DwUpdateMessage>(
         where: (m) => m.channel == 'staff' && _isAction(m),
-      )).updates.objects,
-      [NoteView(id: session.id, text: 'staff-only ${session.id}')],
+      );
+      expect(heard.updates.objects, [
+        NoteView(id: session.id, text: 'action ${session.id}'),
+      ]);
+    },
+  );
+
+  test('a rule that refuses keeps its channel out of the response; one that '
+      'throws does too, and is reported', () async {
+    final (member, _) = await harness().signedIn('leak-rules@example.com');
+
+    final answer = await member.call(const Ping());
+    expect(updatesOf(answer).keys, ['notes']);
+    await eventually(
+      () => harness().app.alerts.incidents.any(
+        (i) => i.where.contains('broken') && i.error is StateError,
+      ),
     );
-    await memberSocket.expectSilence();
   });
 
-  test('staff naming a connection subscribed to the staff channel get it in '
-      'the response', () async {
+  test(
+    "a caller naming its own connection gets its channels in the response "
+    'and nothing of the call over that socket; other subscribers hear it',
+    () async {
+      final admin = await staffSocket('leak-admin3@example.com');
+      final (member, session) = await harness().signedIn(
+        'leak-named@example.com',
+      );
+      final memberSocket = await harness().live(token: session.token);
+      expect(await memberSocket.subscribe('notes'), isA<DwSubscribedMessage>());
+      member.liveConnection = memberSocket.connectionId;
+
+      final answer = await member.call(const Ping());
+      expect(updatesOf(answer).keys, ['notes']);
+      expect(
+        (await admin.expect<DwUpdateMessage>(
+          where: (m) => m.channel == 'staff' && _isAction(m),
+        )).updates.objects,
+        [NoteView(id: session.id, text: 'action ${session.id}')],
+      );
+      await memberSocket.expectSilence();
+    },
+  );
+
+  test('staff get the staff channel in the response, with a subscribed '
+      'connection and without one', () async {
     const identifier = 'leak-admin4@example.com';
     final (caller, session) = await harness().signedIn(identifier);
     harness().app.staff.add(session.id);
+
+    final withoutSocket = await caller.call(const Ping());
+    expect(updatesOf(withoutSocket).keys, ['staff', 'notes']);
+
     final socket = await harness().live(token: session.token);
     expect(await socket.subscribe('staff'), isA<DwSubscribedMessage>());
     caller.liveConnection = socket.connectionId;
+    final withSocket = await caller.call(const Ping());
+    expect(updatesOf(withSocket).keys, ['staff', 'notes']);
+    await socket.expectSilence();
+  });
 
-    final answer = await caller.call(const Ping());
-    expect(answer.updates.channels.keys, ['staff']);
+  test('a channel the call revokes for its caller is not in its response, '
+      'while one it still reads is', () async {
+    final (member, session) = await harness().signedIn(
+      'leak-revoked@example.com',
+    );
+    final socket = await harness().live(token: session.token);
+    expect(await socket.subscribe('notes'), isA<DwSubscribedMessage>());
+    member.liveConnection = socket.connectionId;
+
+    final answer = await member.call(RevokeNotes(session.id));
+    expect(answer.status, 200);
+    expect(updatesOf(answer).keys, ['public']);
+    expect(
+      await socket.expect<DwChannelClosedMessage>(),
+      isA<DwChannelClosedMessage>().having(
+        (m) => m.channel,
+        'channel',
+        'notes',
+      ),
+    );
     await socket.expectSilence();
   });
 
   group('the real client', () {
     test("a new account's sign-in by code: the verify response carries no "
-        'staff data, and once live, its own command updates its own list '
-        'from the response it named its connection in', () async {
+        'staff data, and its own command updates its own list from the '
+        'response', () async {
       final admin = await staffSocket('leak-admin5@example.com');
       final transport = _RecordingTransport(DwHttpClientTransport());
       final client = await harness().server.connectClient(
@@ -212,14 +252,17 @@ void main() {
       final post = transport.postTo('CreateNote');
       expect(post.headers[DwHttpContract.liveConnectionHeader], isNotNull);
       final reply = jsonDecode(transport.replyTo('CreateNote').body) as Map;
-      expect((reply['updates'] as Map).keys, ['notes']);
+      expect((reply['updates'] as Map).keys, [
+        'notes',
+        'account:${session.id}',
+      ]);
     });
   });
 }
 
 /// An update of the `Ping` action rather than a newcomer's announcement.
 bool _isAction(DwUpdateMessage message) => message.updates.objects.any(
-  (object) => object is NoteView && object.text.startsWith('staff-only'),
+  (object) => object is NoteView && object.text.startsWith('action '),
 );
 
 /// The fixture's auth, with an account-creation hook that — like the

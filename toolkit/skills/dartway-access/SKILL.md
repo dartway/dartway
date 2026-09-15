@@ -146,11 +146,15 @@ publishes there** — as strict as the strictest handler of a request on that ch
   (`ctx.revoke`).
 
 **A publication reaches only those allowed to read its channel.** The response of a command carries
-only its publications on channels the caller's own live connection is subscribed to — checked at
-subscription — and none when the call names no live connection (D-053). So a member's command may
-publish an object only managers may read: managers hear it over the socket, the member never sees it.
-What still matters is the channel: publish a manager's figure to a managers' channel, never to one the
-member subscribes to.
+its publications on the channels whose rule allows the caller — the same check a subscription runs —
+with or without a live socket; subscribers get them over the socket (D-053). So a member's command may
+publish an object only managers may read: managers hear it, the member never sees it. Two things
+follow:
+
+- **a channel rule answers "may this account read this channel" for any caller.** Never `(ctx) async
+  => true` on a staff channel because only the staff screen subscribes: every command publishing
+  there would hand it to its caller;
+- publish a manager's figure to a managers' channel, never to one the member may read.
 
 ## 6. Files are the third
 

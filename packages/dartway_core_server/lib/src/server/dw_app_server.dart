@@ -13,6 +13,7 @@ import '../auth/dw_auth_service.dart';
 import '../auth/dw_session_cache.dart';
 import '../calls/dw_call_endpoint.dart';
 import '../channels/dw_channel_rule.dart';
+import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../files/dw_file_storage.dart';
 import '../handlers/dw_call_handler.dart';
@@ -202,6 +203,7 @@ final class DwAppServer {
         ),
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),
+        channelRules: DwChannelRules(channels),
         files: fileStore,
         modules: modules,
       );
@@ -241,9 +243,6 @@ final class DwAppServer {
           runtime: runtime,
           authService: authService,
           settings: settings,
-          channelRules: {
-            for (final rule in channels) rule.kind.channelName: rule,
-          },
         ),
         routes: routes,
       );

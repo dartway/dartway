@@ -115,33 +115,23 @@ final class DwLiveHub {
     }
   }
 
-  /// Fans [publications] out over the live sockets and returns what the
-  /// caller's response carries.
+  /// Fans publications, grouped by channel wire name, out over the live
+  /// sockets: one message per channel, encoded once for all its subscribers;
+  /// within a channel an object travels once, as it ended.
   ///
-  /// [author] is the caller's own connection when its response carries the
-  /// updates: it is left out of the broadcast, and the response carries only
-  /// what it listens to — the objects published to channels it is subscribed
-  /// to, by exact channel — access to those was checked when it subscribed.
-  /// Without an author the response carries **no** updates: publications may
-  /// sit on channels the caller is not allowed to read (a newcomer's sign-in
-  /// publishes admin-only counters), and a call that names no live connection
-  /// has no live state to update — a client's live requests subscribe before
-  /// they fetch and re-read after a reconnect. Every subscriber, the caller's
-  /// other connections included, is sent its channels.
+  /// [author] is the caller's own connection when the caller's response
+  /// carries the updates: it is left out of the broadcast, and the response
+  /// carries — among the rest — every channel it is subscribed to (see
+  /// `DwRuntime.answer`). Every other subscriber, the caller's other
+  /// connections included, is sent its channels.
   ///
   /// Every object keeps the channel it was published to, on the socket and in
   /// the response (D-036): the client applies it only to the requests that
-  /// declare that channel. One message per channel, encoded once for all its
-  /// subscribers; within a channel an object travels once, as it ended.
-  DwUpdateTransport publish(
-    List<(DwLiveChannel, DwWireObject)> publications, {
+  /// declare that channel.
+  void publish(
+    Map<String, List<DwWireObject>> byChannel, {
     DwLiveConnection? author,
   }) {
-    if (publications.isEmpty) return DwUpdateTransport.empty;
-    final byChannel = <String, List<DwWireObject>>{};
-    for (final (channel, item) in publications) {
-      (byChannel[channel.wireName] ??= []).add(item);
-    }
     for (final MapEntry(key: name, value: items) in byChannel.entries) {
       final subscribers = _subscribers[name];
       if (subscribers == null ||
@@ -160,11 +150,6 @@ final class DwLiveHub {
         if (!identical(connection, author)) connection.sendFrame(frame);
       }
     }
-    return DwUpdateTransport([
-      for (final MapEntry(key: name, value: items) in byChannel.entries)
-        if (author != null && author.subscriptions.contains(name))
-          for (final item in items) (name, item),
-    ]);
   }
 
   static void _removeFrom<K>(

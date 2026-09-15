@@ -186,20 +186,26 @@ Matcher refusedWith(DwRefusalCode code) => isA<DwCallRefused<Object?>>().having(
   code.code,
 );
 
-/// Real HTTP, counting the calls per wire name.
+/// Real HTTP, counting the calls per wire name and keeping the last answer
+/// to each.
 final class CountingTransport implements DwHttpTransport {
   CountingTransport(this._inner);
 
   final DwHttpTransport _inner;
   final Map<String, int> _posts = {};
+  final Map<String, DwHttpReply> _replies = {};
 
   int posts(String wireName) => _posts[wireName] ?? 0;
 
+  /// The body of the last answer to [wireName], decoded.
+  Map<String, Object?> lastReply(String wireName) =>
+      jsonDecode(_replies[wireName]!.body) as Map<String, Object?>;
+
   @override
-  Future<DwHttpReply> post(DwHttpPost post) {
+  Future<DwHttpReply> post(DwHttpPost post) async {
     final wireName = post.url.pathSegments.last;
     _posts.update(wireName, (n) => n + 1, ifAbsent: () => 1);
-    return _inner.post(post);
+    return _replies[wireName] = await _inner.post(post);
   }
 
   @override

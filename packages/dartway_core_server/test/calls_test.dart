@@ -1,4 +1,5 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_core_server/src/channels/dw_channel_rules.dart';
 import 'package:dartway_core_server/src/context/dw_call_context.dart';
 import 'package:test/test.dart';
 
@@ -408,6 +409,13 @@ void main() {
           log: RecordingLogger(),
           jobs: (_) => _NoJobs(),
           accounts: (ctx) => throw UnimplementedError(),
+          channelRules: DwChannelRules([
+            DwChannelRule.single(
+              TestChannel.notes,
+              canSubscribe: (ctx) async => true,
+            ),
+            DwChannelRule.ofCaller(TestChannel.inbox),
+          ]),
         );
 
     test('memo creates once per key per call', () {
@@ -417,6 +425,41 @@ void main() {
       expect(ctx.memo(#a, () => ++created), 1);
       expect(ctx.memo(#b, () => ++created), 2);
       expect(context().memo(#a, () => 'fresh'), 'fresh');
+    });
+
+    test('publish takes only channels a subscriber could name: a kind with '
+        'a rule, a key where the rule has one, in canonical form', () {
+      final ctx = context();
+      const note = NoteView(id: 1, text: 'x');
+      expect(
+        () => ctx.publish(const DwLiveChannel(TestChannel.public), note),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            contains('No channel rule declares the kind "public"'),
+          ),
+        ),
+      );
+      expect(
+        () => ctx.publish(const DwLiveChannel(TestChannel.inbox), note),
+        throwsArgumentError,
+        reason: 'a keyed kind needs its key',
+      );
+      expect(
+        () => ctx.publish(const DwLiveChannel(TestChannel.inbox, 'x'), note),
+        throwsArgumentError,
+        reason: 'the rule does not parse the key',
+      );
+      expect(
+        () => ctx.publish(const DwLiveChannel(TestChannel.notes, 1), note),
+        throwsArgumentError,
+        reason: 'a single kind takes no key',
+      );
+      ctx
+        ..publish(const DwLiveChannel.forAccount(TestChannel.inbox, 7), note)
+        ..publish(const DwLiveChannel(TestChannel.notes), note);
+      expect(ctx.rootEffects.publications, hasLength(2));
     });
 
     test('publish takes only registered data objects and deletions', () {

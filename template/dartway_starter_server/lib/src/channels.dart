@@ -3,9 +3,11 @@ import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 import 'call_context.dart';
 
-/// Who may listen to what. Checked once, at subscription — and only for a
-/// signed-in connection, which every subscription requires: everything
-/// published to a channel is readable by every subscriber of it.
+/// Who may read what, for a signed-in account: asked when a connection
+/// subscribes, and for every channel a command publishes to, whether the
+/// command's response carries it. So each rule holds for any caller, not only
+/// for the screen that subscribes — and everything published to a channel is
+/// readable by everyone its rule allows.
 final appChannels = <DwChannelRule>[
   // "My" channel: a member subscribes to their own account's only.
   DwChannelRule.ofCaller(DartwayStarterChannel.profile),

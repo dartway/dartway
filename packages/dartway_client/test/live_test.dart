@@ -347,7 +347,7 @@ void main() {
       final h = Harness()..serveRooms();
       h.server
         ..failingChannels.add('room:1')
-        ..subscriptionRule = (channel, connection) => switch (channel) {
+        ..subscriptionRule = (channel, accountId) => switch (channel) {
           'rooms' => DwCallRefusal(DwCoreRefusal.unknownChannel),
           'chat' => DwCallRefusal(DwCoreRefusal.forbidden),
           _ => null,

@@ -266,7 +266,7 @@ final class DwCallEndpoint {
     final author = runtime.hub.connectionOf(liveConnectionId, accountId);
     return DwApiResponse.ok(
       response.result,
-      updates: runtime.deliver(ctx, author: author),
+      updates: await runtime.answer(ctx, author: author),
       replayed: response.replayed,
     );
   }

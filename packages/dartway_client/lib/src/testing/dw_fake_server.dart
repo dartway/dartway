@@ -63,11 +63,13 @@ final class DwFakeCall {
   ///
   /// When the call succeeds, every subscribed connection receives them over
   /// the socket except the one the call named, and the response carries them
-  /// under [channel] (D-036) only when the call named a connection of its own
-  /// account subscribed to [channel] — naming none, it carries nothing
-  /// (D-053). When the call does not succeed, the response carries nothing
-  /// and every subscriber — the named connection included — receives them
-  /// over the socket.
+  /// under [channel] (D-036) when the caller may read [channel] (D-053): the
+  /// call named a connection of its own account subscribed to it, or — for a
+  /// signed-in caller still signed in — the server's
+  /// [DwFakeServer.subscriptionRule] allows it and it is not one of
+  /// [DwFakeServer.failingChannels]. When the call does not succeed, the
+  /// response carries nothing and every subscriber — the named connection
+  /// included — receives them over the socket.
   ///
   /// An unresolved `DwLiveChannel.ofCaller` throws [ArgumentError], as on a
   /// real server: publish to `DwLiveChannel.forAccount(kind, accountId)`.
@@ -256,10 +258,11 @@ final class DwFakeServer {
   /// fake that swallowed them would let a broken test pass.
   final List<Object> errors = [];
 
-  /// Decides a subscription of a signed-in connection: `null` allows it, a
-  /// refusal refuses it.
-  DwCallRefusal? Function(String channel, DwFakeConnection connection)?
-  subscriptionRule;
+  /// Decides whether an account may read a channel — for a subscription, and
+  /// for what a successful call's response carries: `null` allows it, a
+  /// refusal refuses it. The account is `null` only for a subscription when
+  /// [subscriptionsRequireAccount] is off.
+  DwCallRefusal? Function(String channel, int? accountId)? subscriptionRule;
 
   /// Every subscription needs a signed-in connection, as on a real server
   /// (D-020).
@@ -627,13 +630,23 @@ final class DwFakeServer {
         final named = openConnections
             .where((c) => c.id == liveId && c.accountId == context.accountId)
             .firstOrNull;
+        // As the real server: what the caller may read — its connection's
+        // subscriptions, or the rule for a caller still signed in. Nothing
+        // for an anonymous caller, or one the call signed out.
+        final caller =
+            context.token == null || !_tokens.containsKey(context.token)
+            ? null
+            : context.accountId;
+        bool mayRead(String name) =>
+            (named?.subscriptions.contains(name) ?? false) ||
+            (caller != null &&
+                !failingChannels.contains(name) &&
+                subscriptionRule?.call(name, caller) == null);
         final carried = <(String, DwWireObject)>[];
         for (final (channel, objects) in context._published) {
           final name = channel.wireName;
           _broadcast(name, objects, except: named);
-          // As the real server: no named live connection, no updates — the
-          // response would otherwise carry channels the caller may not read.
-          if (named != null && named.subscriptions.contains(name)) {
+          if (caller != null && mayRead(name)) {
             carried.addAll([for (final object in objects) (name, object)]);
           }
         }
@@ -764,7 +777,7 @@ final class DwFakeServer {
           connection.send(
             DwSubscriptionRefusedMessage.unauthenticated(channel),
           );
-        } else if (subscriptionRule?.call(channel, connection)
+        } else if (subscriptionRule?.call(channel, connection.accountId)
             case final refusal?) {
           connection.send(
             DwSubscriptionRefusedMessage.refused(channel, refusal),

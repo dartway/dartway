@@ -313,6 +313,32 @@ void main() {
       h.server.errors.clear();
     });
 
+    test("without a live socket, a command still updates its caller's lists "
+        'from the response: the channels it may read, and no other', () async {
+      final h = Harness()..serveRooms();
+      const renamed = RoomView(id: 1, name: 'a2', rank: 10);
+      h.server
+        ..acceptsConnections = false
+        ..subscriptionRule = ((channel, accountId) =>
+            channel == 'room:1' ? DwCallRefusal(DwCoreRefusal.forbidden) : null)
+        ..onCommand<RenameRoom>((command, call) {
+          call
+            ..publish(roomsChannel, [renamed])
+            ..publish(const DwLiveChannel(AppChannel.room, 1), [renamed]);
+          return const DwCallOk(renamed);
+        });
+      await h.start();
+      final rooms = h.client.watch(const ListRooms());
+      await settle();
+      expect(rooms.isLive, isFalse);
+
+      await h.client.command(const RenameRoom(roomId: 1, name: 'a2'));
+      final call = h.server.callsOf<RenameRoom>().single;
+      expect(call.liveConnectionId, isNull);
+      expect((call.response as DwApiOk).updates.channels.keys, ['rooms']);
+      expect(dataOf(rooms.state), [renamed, b]);
+    });
+
     test('a socket update is applied only to entries on its channel, '
         'whatever the type', () async {
       final h = Harness()..serveRooms();

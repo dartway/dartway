@@ -2,15 +2,21 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import '../context/dw_call_context.dart';
 
-/// Who may subscribe to a channel kind, declared once per kind.
+/// Who may read a channel kind, declared once per kind.
 ///
-/// A kind without a rule refuses every subscription with `dw.unknownChannel`.
-/// Only signed-in connections subscribe (D-020): the check runs with an
-/// account, and an anonymous connection is answered "not authenticated".
+/// Asked when a connection subscribes, and — for every channel a successful
+/// command publishes to that the caller's named connection is not subscribed
+/// to — whether the command's response carries it (D-053). So a rule answers
+/// "may this account read this channel" for any caller, not only for the
+/// screen that subscribes.
 ///
-/// Access is checked once, at subscription; everything published to a channel
-/// must be readable by every subscriber of it. A command that takes access
-/// away revokes it (`ctx.revoke`).
+/// A kind without a rule refuses every subscription with `dw.unknownChannel`,
+/// and publishing to it throws. Rules run for accounts only (D-020): an
+/// anonymous connection is answered "not authenticated", and an anonymous
+/// caller's response carries no updates.
+///
+/// A subscription is checked once; a command that takes access away revokes
+/// it (`ctx.revoke`).
 sealed class DwChannelRule {
   const DwChannelRule._(this.kind);
 

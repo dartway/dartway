@@ -7,6 +7,7 @@ import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_service.dart';
 import '../auth/dw_auth_config.dart';
 import '../auth/dw_session_cache.dart';
+import '../channels/dw_channel_rules.dart';
 import '../context/dw_call_context.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
@@ -28,6 +29,7 @@ final class DwRuntime {
     required this.alerts,
     required this.log,
     required this.jobsFor,
+    required this.channelRules,
     this.files,
     List<DwServerModule> modules = const [],
   }) : modules = {for (final module in modules) module.runtimeType: module};
@@ -40,6 +42,10 @@ final class DwRuntime {
   final DwAlertGate alerts;
   final DwServerLogger log;
   final DwJobQueue Function(DwRuntimeContext ctx) jobsFor;
+
+  /// Who may read which channel: for subscriptions, and for what a command's
+  /// response carries.
+  final DwChannelRules channelRules;
 
   /// The file storage; `null` when the server has none.
   final DwFileStore? files;
@@ -63,31 +69,112 @@ final class DwRuntime {
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
     modules: modules,
+    channelRules: channelRules,
     sessionKey: sessionKey,
     clientAppVersion: clientAppVersion,
     clientUserAgent: clientUserAgent,
   );
 
-  /// Delivers the committed effects of [ctx] and returns the updates its
-  /// caller's response carries.
+  /// Delivers the committed effects of [ctx], whose caller hears them over
+  /// the socket like every other subscriber: a job, a route, account work, or
+  /// a call that did not succeed.
+  void deliver(DwRuntimeContext ctx) {
+    final effects = ctx.rootEffects;
+    if (effects.isEmpty) return;
+    _revoke(effects);
+    hub.publish(_byChannel(effects.publications));
+    effects.clear();
+  }
+
+  /// Delivers the committed effects of a successful command of [ctx] and
+  /// returns the updates its response carries: the publications to channels
+  /// the caller may read (R2.2).
   ///
   /// Revocations go first, so nothing published by the same call reaches a
-  /// subscriber whose access it removed — the caller's own connection
-  /// included, whose response then carries only what it still listens to.
-  /// [author] is the caller's live connection when the response carries the
-  /// updates (see [DwLiveHub.publish]).
-  DwUpdateTransport deliver(DwRuntimeContext ctx, {DwLiveConnection? author}) {
+  /// subscriber whose access it removed. The broadcast follows at once, before
+  /// anything is awaited — a later call's publications must not overtake it —
+  /// and leaves out [author], the caller's own live connection named in the
+  /// call, whose channels the response carries instead: no update reaches the
+  /// caller twice.
+  ///
+  /// The caller may read a channel its connection is subscribed to — access
+  /// was checked when it subscribed — and, for every other published channel,
+  /// one its rule allows now, asked with the caller's session exactly as a
+  /// subscription would be. A channel the call revoked for the caller's
+  /// account is not read, nor is anything once the call revoked the caller's
+  /// own key. Rules run for accounts only (D-020): an anonymous caller's
+  /// response carries none. A rule that throws is reported and read as "no".
+  Future<DwUpdateTransport> answer(
+    DwRuntimeContext ctx, {
+    DwLiveConnection? author,
+  }) async {
     final effects = ctx.rootEffects;
     if (effects.isEmpty) return DwUpdateTransport.empty;
+    _revoke(effects, author: author);
+    final byChannel = _byChannel(effects.publications);
+    hub.publish(byChannel, author: author);
+    final caller = ctx.sessionKey;
+    final revoked = {
+      for (final (channel, accountId) in effects.revocations)
+        if (accountId == caller?.accountId) channel.wireName,
+    };
+    final callerSignedOut = effects.revokedKeys.contains(caller?.id);
+    effects.clear();
+    if (caller == null || callerSignedOut || byChannel.isEmpty) {
+      return DwUpdateTransport.empty;
+    }
+
+    final readable = <String>{};
+    DwRuntimeContext? check;
+    for (final name in byChannel.keys) {
+      if (revoked.contains(name)) continue;
+      if (author?.subscriptions.contains(name) ?? false) {
+        readable.add(name);
+        continue;
+      }
+      // `ctx.publish` let only channels with a rule through.
+      final known = channelRules.lookUp(name) as DwKnownChannel;
+      // One context for every check: rules share its memo.
+      check ??= context(
+        scope: 'response channels',
+        kind: DwContextKind.subscription,
+        sessionKey: caller,
+      );
+      try {
+        if (await known.allows(check)) readable.add(name);
+      } catch (error, stackTrace) {
+        alerts.report(
+          where: 'channel rule ${known.rule.kind.channelName} for a response',
+          error: error,
+          stackTrace: stackTrace,
+          accountId: caller.accountId,
+        );
+      }
+    }
+    return DwUpdateTransport([
+      for (final MapEntry(key: name, value: items) in byChannel.entries)
+        if (readable.contains(name))
+          for (final item in items) (name, item),
+    ]);
+  }
+
+  void _revoke(DwCallEffects effects, {DwLiveConnection? author}) {
     for (final keyId in effects.revokedKeys) {
       revokeKey(keyId, author: author);
     }
     for (final (channel, accountId) in effects.revocations) {
       hub.revokeChannel(channel, accountId);
     }
-    final updates = hub.publish(effects.publications, author: author);
-    effects.clear();
-    return updates;
+  }
+
+  static Map<String, List<DwWireObject>> _byChannel(
+    List<(DwLiveChannel, DwWireObject)> publications,
+  ) {
+    final byChannel = <String, List<DwWireObject>>{};
+    for (final (channel, item) in publications) {
+      (byChannel[channel.wireName] ??= []).add(item);
+    }
+    return byChannel;
   }
 
   /// A session key was revoked and the revocation has committed: the next

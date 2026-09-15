@@ -136,17 +136,31 @@ So the client applies an object only to requests that declare the channel it cam
 channel an object travels once, as it ended: updated twice, it travels once; updated then deleted, it
 travels as its deletion.
 
-The client names its socket in `Dw-Live-Connection` (D-026) when the socket is authenticated as the
-same token. Then the response carries only what that connection subscribes to, and the socket skips it
-for this command. Without the header — no socket yet, or signed in as someone else — the response
-carries **no updates**, and every subscriber, the caller's other devices included, gets the socket
-message. A connection named by a call of another account is ignored the same way.
+**The response carries what the caller may read, socket or not** (D-053). For each channel the
+command published to, the server asks that channel's rule — the same `canSubscribe` a subscription
+asks — for the caller. Allowed: the channel's updates travel in the response. Not allowed: only
+subscribers hear them. A command may publish where its caller may not read — a newcomer's sign-in
+announces them on a staff-only channel — and that never reaches the newcomer; a member's booking
+reaches the member's own lists from the response even with no socket at all. An anonymous caller's
+response carries none: rules run for accounts (D-020).
 
-The response is filtered this way because access to a channel is checked once, when a connection
-subscribes (D-053). A command may publish where its caller may not read — a newcomer's sign-in
-announces them on a staff-only channel — and a response carrying every publication would hand that to
-the caller. A call without a live connection loses nothing by it: a request subscribes before it
-reads, and re-reads after a reconnect.
+The client names its socket in `Dw-Live-Connection` (D-026) when the socket is authenticated as the
+same token. That connection is left out of the socket broadcast of this command, so nothing reaches
+one client twice, and the channels it subscribes to go in the response without asking their rules
+again — access was checked when it subscribed. The caller's other devices get the socket message. A
+connection named by a call of another account is ignored.
+
+Rule checks share one context per response, so a rule reading the caller's profile through
+`ctx.memo` reads it once. A rule that throws is reported and keeps its channel out of the response.
+A channel the command revoked for its caller stays out, and a command that revoked the caller's own
+key (sign-out) carries none.
+
+**So a rule must be honest for any caller**, not only for whoever opens the screen that subscribes: it
+answers "may this account read this channel". A rule that allows everyone because "only the admin
+screen subscribes here" hands the admin channel to every caller whose command publishes to it.
+
+A command may publish only to a channel whose kind has a rule, in a form a subscriber could name (a
+keyed kind with its key, a single kind without): anything else throws `ArgumentError` at `ctx.publish`.
 
 The response's updates are applied before the result is handed on, so the caller's screen never
 changes ahead of the updates that came with it. A replayed command answer carries none

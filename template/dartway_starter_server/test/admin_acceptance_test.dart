@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
@@ -128,6 +130,36 @@ void main() {
       reason: 'newest first',
     );
     await eventually(() => dataOf(counters.state)!.members == members + 1);
+  });
+
+  test("a member's own change: the member's screens update from the response, "
+      "which never carries the admins' copy published with it; the admins "
+      'hear it over the socket', () async {
+    final anna = await app.admin('79990006040', 'Anna');
+    final vera = await app.signUp('79990006041', firstName: 'Vera');
+    final veraProfile = await vera.watch(const GetMyProfile());
+    await anna.watch(const GetAdminCounters());
+
+    (await vera.client.command(
+      const UpdateMyProfile(firstName: 'Veronika'),
+    )).valueOrThrow;
+    expect(
+      dataOf(veraProfile.state)!.firstName,
+      'Veronika',
+      reason: 'applied from the response before the command completed',
+    );
+    final updates = vera.http.lastReply('UpdateMyProfile')['updates']! as Map;
+    expect(updates.keys, ['profile:${vera.accountId}']);
+
+    await eventually(
+      () => anna.live.received.any(
+        (frame) =>
+            frame['k'] == 'upd' &&
+            frame['ch'] == adminChannel.wireName &&
+            jsonEncode(frame).contains('Veronika'),
+      ),
+      reason: 'the admin table hears the change',
+    );
   });
 
   test('settings: an admin saves one and every signed-in member hears it; '

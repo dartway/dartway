@@ -7,6 +7,7 @@ import 'package:meta/meta.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_service.dart';
 import '../auth/dw_auth_store.dart';
+import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../server/dw_server_module.dart';
@@ -65,9 +66,13 @@ abstract class DwCallContext {
   /// the enclosing transaction commits (or when the call ends, outside a
   /// transaction).
   ///
-  /// A command's publications are answered in its response to the caller and
-  /// sent over the live socket to every other subscriber, one message per
-  /// channel. The channel travels with the item (D-036): a client applies it
+  /// A command's response carries the publications to channels its caller
+  /// may read — the channel's rule allows the caller, as it would a
+  /// subscription — and the live socket sends them to every subscriber, one
+  /// message per channel, except the caller's own connection for what its
+  /// response carried. What the caller may not read (a newcomer's sign-in
+  /// telling staff) reaches subscribers only. The channel's kind must have a
+  /// rule: publishing to one without throws [ArgumentError]. The channel travels with the item (D-036): a client applies it
   /// only to requests that declare that channel. A request has no side
   /// effects: publishing from one throws [StateError].
   ///
@@ -177,6 +182,7 @@ final class DwRuntimeContext extends DwCallContext {
     required DwAccountService Function(DwRuntimeContext ctx) accounts,
     DwFileService Function(DwRuntimeContext ctx)? files,
     Map<Type, DwServerModule> modules = const {},
+    required DwChannelRules channelRules,
     this.sessionKey,
     String? clientAppVersion,
     String? clientUserAgent,
@@ -186,6 +192,7 @@ final class DwRuntimeContext extends DwCallContext {
        _clientAppVersion = clientAppVersion,
        _clientUserAgent = clientUserAgent,
        _modules = modules,
+       _channelRules = channelRules,
        _files = files ?? ((_) => const DwUnconfiguredFiles());
 
   final _Scope _root;
@@ -195,6 +202,7 @@ final class DwRuntimeContext extends DwCallContext {
   final DwAccountService Function(DwRuntimeContext ctx) _accounts;
   final DwFileService Function(DwRuntimeContext ctx) _files;
   final Map<Type, DwServerModule> _modules;
+  final DwChannelRules _channelRules;
 
   final DwContextKind kind;
 
@@ -276,6 +284,11 @@ final class DwRuntimeContext extends DwCallContext {
   void publish(DwLiveChannel channel, DwWireObject item) {
     requireSideEffects('publish');
     _requireResolved(channel);
+    // Checked where the mistake is made: nobody could ever subscribe to such
+    // a channel, and no response could carry it.
+    if (_channelRules.publishProblem(channel) case final problem?) {
+      throw ArgumentError.value(channel, 'channel', problem);
+    }
     if (item is! DwDataObject && item is! DwDeletedObject) {
       throw ArgumentError.value(
         item.runtimeType,

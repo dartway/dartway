@@ -65,9 +65,10 @@ abstract final class DwHttpContract {
 
   /// The id the server gave this client's live connection (the `hello`
   /// message). Optional: it excludes that connection from the socket
-  /// broadcast of the call's updates and filters the response's transport to
-  /// the connection's subscriptions. Without it — or naming a connection that
-  /// is not the caller's — the response carries no updates (D-053).
+  /// broadcast of the call's updates, whose channels the response carries
+  /// instead. With it or without, the response carries the channels the
+  /// caller may read (D-053); a connection that is not the caller's is
+  /// ignored.
   static const String liveConnectionHeader = 'Dw-Live-Connection';
 
   /// Whole seconds, on a `429` answer.

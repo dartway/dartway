@@ -134,8 +134,8 @@ void main() {
   );
 
   test(
-    'a signed-in client whose socket never opens names no live connection: '
-    'its responses carry no updates, and a re-read shows its own change',
+    'a signed-in client whose socket never opens names no live connection, '
+    'and still sees its own change at once: the response carries it',
     () async {
       final http = _LosingTransport(DwHttpClientTransport());
       final client = await connect(
@@ -149,10 +149,7 @@ void main() {
 
       final created = await client.command(const CreateNote('unseen'));
       expect(created, isA<DwCallOk<NoteView>>());
-      expect(http.lastReply?.body, isNot(contains('updates')));
-      expect(texts(notes.state), isNot(contains('unseen')));
-
-      await notes.refetch();
+      expect(http.lastReply?.body, contains('updates'));
       expect(texts(notes.state).first, 'unseen');
     },
   );

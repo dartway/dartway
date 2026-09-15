@@ -157,11 +157,14 @@ Future<CustomerInvoice> publishInvoice(DwCallContext ctx, InvoiceRow row) async 
   `ctx.publish(channel, DwDeletedObject.of<CustomerInvoice>(invoiceId, ctx.protocol))`.
 - An object that quotes or embeds a changed one (a card showing its invoice) is republished too —
   its embedded copy changed.
-- **A command may publish where its caller may not read.** The command's response carries only the
-  publications to channels the caller's own live connection is subscribed to — access to those was
-  checked at subscription — and, when the call names no live connection, none. A member's command
-  (a sign-up, a booking) may publish a managers-only figure: managers hear it over the socket, the
-  member's response never carries it.
+- **Publish everything that changed; the server sorts it.** The command's response carries the
+  publications to channels whose rule allows the caller — socket or not — and subscribers hear them
+  over the socket, the caller's own named connection excepted (D-053). A member's command (a sign-up, a
+  booking) may publish a managers-only figure: managers hear it, the member's response never carries
+  it. No "side effect" API: the boundary is the channel rule, so write every rule to be true for any
+  caller, not only for the screen that subscribes.
+- **A channel kind needs a rule** in `DwAppServer(channels:)` before anything is published to it:
+  publishing to a kind without one throws.
 
 Within one call, one object published twice to a channel travels once, as it ended.
 

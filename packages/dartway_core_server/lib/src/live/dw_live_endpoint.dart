@@ -9,7 +9,7 @@ import 'package:meta/meta.dart';
 
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_auth_service.dart';
-import '../channels/dw_channel_rule.dart';
+import '../channels/dw_channel_rules.dart';
 import '../http/dw_reason_phrase.dart';
 import '../context/dw_call_context.dart';
 import '../server/dw_runtime.dart';
@@ -26,15 +26,11 @@ final class DwLiveEndpoint {
     required this.runtime,
     required this.authService,
     required this.settings,
-    required this.channelRules,
   });
 
   final DwRuntime runtime;
   final DwAuthService authService;
   final DwServerSettings settings;
-
-  /// By channel kind name.
-  final Map<String, DwChannelRule> channelRules;
 
   DwLiveHub get _hub => runtime.hub;
   DwServerLogger get _log => runtime.log;
@@ -272,39 +268,31 @@ final class DwLiveEndpoint {
     void unauthenticated() =>
         connection.send(DwSubscriptionRefusedMessage.unauthenticated(name));
 
-    final parsed = dwParseChannelName(name);
-    final rule = channelRules[parsed.kind];
-    if (rule == null) {
+    final lookup = runtime.channelRules.lookUp(name);
+    if (lookup is DwUnknownChannel) {
       return refuse(DwCallRefusal(DwCoreRefusal.unknownChannel));
     }
     if (connection.accountId == null) return unauthenticated();
     if (connection.subscriptions.contains(name)) {
       return connection.send(DwSubscribedMessage(name));
     }
-    final DwLiveChannel? channel = switch (rule) {
-      DwKeyedChannelRule() =>
-        parsed.key == null ? null : rule.channelFor(parsed.key!),
-      DwSingleChannelRule() =>
-        parsed.key == null ? DwLiveChannel(rule.kind) : null,
-    };
-    if (channel == null) {
+    if (lookup is! DwKnownChannel) {
       return refuse(DwCallRefusal(DwCoreRefusal.invalid, field: 'channel'));
     }
+    final known = lookup;
+    final kindName = known.rule.kind.channelName;
     final epoch = connection.authEpoch;
     final ctx = runtime.context(
-      scope: 'subscribe ${parsed.kind}',
+      scope: 'subscribe $kindName',
       kind: DwContextKind.subscription,
       sessionKey: connection.sessionKey,
     );
     final bool allowed;
     try {
-      allowed = switch (rule) {
-        DwKeyedChannelRule() => await rule.canSubscribe(ctx, channel),
-        DwSingleChannelRule() => await rule.canSubscribe(ctx),
-      };
+      allowed = await known.allows(ctx);
     } catch (error, stackTrace) {
       final incident = runtime.alerts.report(
-        where: 'subscribe ${parsed.kind}',
+        where: 'subscribe $kindName',
         error: error,
         stackTrace: stackTrace,
         accountId: connection.accountId,
