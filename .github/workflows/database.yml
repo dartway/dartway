@@ -1,9 +1,10 @@
 name: Database
 
-# Tier two of the checks: the suites that only hold against a real database.
+# The project suites that only hold against a real database: example's and the
+# template's servers, run as a project runs them.
 #
-# `checks.yml` runs everything that needs no services and skips these two by
-# name. What they assert is what the framework is trusted for and what nothing
+# `checks.yml` runs the framework's own suites, the service ones included
+# (`tool/checks.sh services`), and leaves these two to this workflow by name. What they assert is what the framework is trusted for and what nothing
 # else can prove: the auth attempt limit holding under a lock, two parallel
 # redemptions signing in exactly once, a legacy password hash rewritten during a
 # login. Until this workflow they were proved by nobody but a person running

@@ -107,14 +107,14 @@ A new shape is recorded without a bump; a framework DTO without a recorded shape
 
 | Tier | What | Where it runs |
 |---|---|---|
-| 1 | `tool/checks.sh` — `dart analyze` over every resolution root, and every suite it does not skip by name | locally before a PR, and `checks.yml` on every PR |
+| 1 | `tool/checks.sh` — `dart analyze` over every resolution root and every suite that needs no services; `tool/checks.sh services` — the ORM, server and push suites against a Postgres and a MinIO | both locally before a PR, and `checks.yml` on every PR (one job per mode) |
 | 2 | Pure-Dart packages on node: `dart test -p vm,node` in `dartway_core_shared` and `dartway_client` — dart2js rejects what the VM accepts | by hand when the wire or the client changes |
 | 3 | Database and storage suites of the projects: `dartway test` in `example/` and `template/` (a Postgres and a MinIO per run, on ports Docker picks, removed afterwards) | `database.yml` nightly; locally when a change reaches a project's server |
 | 4 | Docker proofs in the CLI: `dart test -t docker --run-skipped test/deploy_local_stack_test.dart` — builds the images and runs the rendered stack | by hand, when deploy changes; `images.yml` builds the template's images from what `dartway create` produces |
 
-**`dartway_orm` and `dartway_core_server` need services for their own suites**: a Postgres through `DW_DATABASE_*` (the ORM's suites default to `127.0.0.1:55460`, user and password `dartway`) and, for the file suites, a MinIO through `DW_STORAGE_ENDPOINT` / `_ACCESS_KEY` / `_SECRET_KEY` (`packages/dartway_core_server/test/support/files.dart` has the `docker run` line). A suite that cannot reach them fails in `setUpAll` — a tier that silently skips is a tier that does not exist. `tool/checks.sh` does not skip them, so it is green only where those services are reachable.
+**`dartway_orm` and `dartway_core_server` need services for their own suites**: a Postgres through `DW_DATABASE_*` (the ORM's suites default to `127.0.0.1:55460`, user and password `dartway`) and, for the file suites, a MinIO through `DW_STORAGE_ENDPOINT` / `_ACCESS_KEY` / `_SECRET_KEY` (`packages/dartway_core_server/test/support/files.dart` has the `docker run` line). A suite that cannot reach them fails in `setUpAll` — a tier that silently skips is a tier that does not exist. They run as `tool/checks.sh services` (with `dartway_push_server`), which refuses to start unless every `DW_DATABASE_*` and `DW_STORAGE_*` variable is set and both ports answer; the plain `tool/checks.sh` leaves them to that mode and says so, so it needs no Docker. The script's header has the `docker run` and `export` lines.
 
-**"I ran the tests" means tier 1 green**, plus tier 2 for a wire or client change and tier 3 for a change that reaches a project's server. Running only the suites you touched is what lets a broken one reach the trunk.
+**"I ran the tests" means tier 1 green, both modes**, plus tier 2 for a wire or client change and tier 3 for a change that reaches a project's server. Running only the suites you touched is what lets a broken one reach the trunk.
 
 ## Standards
 
@@ -203,7 +203,7 @@ Six workflows in `.github/workflows/`:
 
 | File | When | What it does |
 |---|---|---|
-| `checks.yml` | A PR is opened, updated or taken out of draft; push to `master` | `tool/checks.sh analyze` and `tool/checks.sh test` |
+| `checks.yml` | A PR is opened, updated or taken out of draft; push to `master` | `tool/checks.sh analyze`, `tool/checks.sh test`, and `tool/checks.sh services` with a Postgres service container and a MinIO |
 | `database.yml` | Nightly, by hand, and when this workflow's file changes | `dartway test` in `example/` and `template/`, with the CLI activated from the commit. Not on every PR: these suites test races, and a flaky red is how a gate stops being read |
 | `images.yml` | `template/` or the CLI changes, nightly, by hand | Builds the two images of a project **as `dartway create` produces it**, with this tree's packages vendored in (`tool/vendor_framework.dart`) |
 | `web-compile.yml` | A PR is opened or updated; push to `master` | `flutter build web --release` for the targets in its matrix: dart2js rejects code the VM accepts. Its matrix still names the removed offline harness beside `example/` |

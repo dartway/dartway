@@ -175,9 +175,10 @@ throwaway databases on; see [The conventions checker](conventions-checker.md).
 
 The monorepo tests itself in four tiers, split by what a run needs.
 
-**`tool/checks.sh [analyze|test]`** — both by default, and the same command locally and in CI
-(`.github/workflows/checks.yml`, on every pull request and push to `master`, one job per mode). It
-resolves the workspace and every package outside it, then:
+**`tool/checks.sh [analyze|test|services]`** — `analyze` and `test` by default, which need no
+Docker; the same command locally and in CI (`.github/workflows/checks.yml`, on every pull request
+and push to `master`, one job per mode, all three). It resolves the workspace and every package
+outside it, then:
 
 - **analyze**: `dart analyze --no-fatal-warnings` over `packages` and `tool`, and in every package
   that is not a workspace member. Errors fail; warnings do not, because the one standing warning is
@@ -185,15 +186,17 @@ resolves the workspace and every package outside it, then:
 - **test**: every package with a `test/` directory, with `flutter test` where the pubspec names
   `flutter_test` and `dart test` otherwise — plus `dart run custom_lint` in
   `packages/dartway_lints/example`, whose `test/` files violate the rules on purpose and are that
-  package's real suite. A package is skipped only by being named in the script, with its reason:
-  `example/dartway_example_server` and `template/dartway_starter_server` (need a database), and the
-  lints example. Anything new with a `test/` directory runs — the direction that fails loudly.
-
-The framework's own server and ORM suites need services as well and are not on that list:
-`packages/dartway_core_server` reads `DW_DATABASE_*` and, for its file suites, `DW_STORAGE_*`, and
-fails loudly without them; `packages/dartway_orm` connects to `DW_DATABASE_*` (default
-`127.0.0.1:55460`). Start a Postgres and a MinIO and export the variables before `tool/checks.sh
-test`; `packages/dartway_core_server/test/support/files.dart` shows the MinIO command.
+  package's real suite. A package is left out only by being named in the script, with its reason:
+  `example/dartway_example_server` and `template/dartway_starter_server` (project servers, run by
+  `dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
+  directory runs — the direction that fails loudly;
+- **services**: the suites of `packages/dartway_orm`, `packages/dartway_core_server` and
+  `packages/dartway_push_server`, against the Postgres of `DW_DATABASE_*` and the S3-compatible
+  storage of `DW_STORAGE_*`. It is not in the default because it needs two containers, and it is
+  not optional: CI runs it on every pull request with a Postgres service and a MinIO, on the ports
+  the script's header gives with its `docker run` and `export` lines. Asked for without every
+  variable set, or with nothing answering on the database's or the storage's port, it stops before
+  running anything and names what is missing — it never skips.
 
 **The database suites of `example/` and `template/`** run through `dartway test`, exactly as a
 project runs them: `.github/workflows/database.yml` installs the CLI from the commit, resolves the
