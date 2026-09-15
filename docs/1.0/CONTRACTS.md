@@ -76,7 +76,7 @@ GET  /health               liveness + database reachability
   - `Dw-Idempotency-Key: <key>` — required for commands, forbidden for requests;
   - `Dw-Protocol: 1` — required; unsupported → 426;
   - `Dw-App-Version: <semver>+<build>` — sent by the framework client; below the project's `minAppBuild` → 426 `dw.updateRequired`;
-  - `Dw-Live-Connection: <id>` — optional: the id the server gave this client's WebSocket; lets the server exclude that connection from the socket broadcast of this command's updates and filter the response transport to that connection's subscriptions. Without it the response carries every update the command published and nothing is excluded.
+  - `Dw-Live-Connection: <id>` — optional: the id the server gave this client's WebSocket; lets the server exclude that connection from the socket broadcast of this command's updates and filter the response transport to that connection's subscriptions. Without it the response carries no updates and nothing is excluded: the response may carry only channels whose access was checked, at subscription, for that connection (D-053). A named connection that is unknown, closing, or of another account counts as none.
 - Only POST. Body limit 1 MiB by default.
 
 ### ApiResponse (always the body)

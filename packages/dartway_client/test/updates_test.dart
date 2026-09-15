@@ -243,38 +243,58 @@ void main() {
       expect(dataOf(offline.state), [a, b]);
     });
 
-    test("a response carrying another account's object of the same type does "
-        "not reach the caller's own request", () async {
-      final h = Harness()..serveRooms();
-      h.notes = {
-        7: [const NoteView(id: 1, text: 'mine')],
-      };
-      // No socket: the call names no live connection, so the response carries
-      // every publication — the case where only the channel tells them apart.
-      h.server.acceptsConnections = false;
-      h.server.onCommand<RenameRoom>((command, call) {
-        call
-          ..publish(DwLiveChannel.forAccount(AppChannel.notes, bob.id), [
-            const NoteView(id: 1, text: "bob's edit of his note 1"),
-          ])
-          ..publish(DwLiveChannel.forAccount(AppChannel.notes, alice.id), [
-            const NoteView(id: 2, text: 'for alice'),
-          ]);
-        return const DwCallOk(RoomView(id: 1, name: 'a'));
-      });
-      await h.start();
-      final mine = h.client.watch(const ListMyNotes());
+    test("a response carrying another account's object of the same type, on "
+        'a channel the caller listens to for that account, does not reach the '
+        "caller's own request", () async {
+      final protocol = DwWireProtocol([
+        const DwProtocolEntry<_NotesOfBob>('NotesOfBob', _NotesOfBob.fromJson),
+      ], include: roomsProtocol);
+      final server = DwFakeServer(protocol: protocol)
+        ..registerToken(alice.token, alice.id)
+        ..onRequest<ListMyNotes>(
+          (request, call) => const DwCallOk([NoteView(id: 1, text: 'mine')]),
+        )
+        ..onRequest<_NotesOfBob>(
+          (request, call) =>
+              const DwCallOk([NoteView(id: 1, text: "bob's note 1")]),
+        )
+        // An admin's edit of Bob's note, which also tells the admin something
+        // on her own channel.
+        ..onCommand<RenameRoom>((command, call) {
+          call
+            ..publish(DwLiveChannel.forAccount(AppChannel.notes, bob.id), [
+              const NoteView(id: 1, text: "bob's edit of his note 1"),
+            ])
+            ..publish(DwLiveChannel.forAccount(AppChannel.notes, alice.id), [
+              const NoteView(id: 2, text: 'for alice'),
+            ]);
+          return const DwCallOk(RoomView(id: 1, name: 'a'));
+        });
+      final client = server.newClient(tokenStore: DwMemoryTokenStore(alice));
+      addTearDown(client.stop);
+      await client.start();
+      final mine = client.watch(const ListMyNotes());
+      final bobs = client.watch(const _NotesOfBob());
       await settle();
-      expect(dataOf(mine.state), [const NoteView(id: 1, text: 'mine')]);
+      expect(mine.isLive && bobs.isLive, isTrue);
 
-      await h.client.command(const RenameRoom(roomId: 1, name: 'a'));
-      final response =
-          h.server.callsOf<RenameRoom>().single.response as DwApiOk;
-      expect(response.updates.channels.keys, ['notes:8', 'notes:7']);
+      await client.command(const RenameRoom(roomId: 1, name: 'a'));
+      final call = server.callsOf<RenameRoom>().single;
+      expect(call.liveConnectionId, isNotNull);
+      // The named connection listens to both, so the response carries both:
+      // only the channel tells whose note 1 is.
+      expect((call.response as DwApiOk).updates.channels.keys, [
+        'notes:8',
+        'notes:7',
+      ]);
       expect(dataOf(mine.state), [
         const NoteView(id: 2, text: 'for alice'),
         const NoteView(id: 1, text: 'mine'),
       ]);
+      expect(dataOf(bobs.state), [
+        const NoteView(id: 1, text: "bob's edit of his note 1"),
+      ]);
+      expect(server.errors, isEmpty);
     });
 
     test('the fake server, like a real one, refuses to publish to an '
@@ -394,6 +414,30 @@ final class _RoomsAndRoom3 extends DwListRequest<RoomView> {
 
   @override
   int get hashCode => 1;
+}
+
+/// Bob's notes, as a staff screen watches them: on `notes:<bob>`.
+final class _NotesOfBob extends DwListRequest<NoteView> {
+  const _NotesOfBob();
+
+  static _NotesOfBob fromJson(Map<String, Object?> json) => const _NotesOfBob();
+
+  @override
+  List<DwLiveChannel> get channels => [
+    DwLiveChannel.forAccount(AppChannel.notes, bob.id),
+  ];
+
+  @override
+  String get dwTypeName => 'NotesOfBob';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  @override
+  bool operator ==(Object other) => other is _NotesOfBob;
+
+  @override
+  int get hashCode => 2;
 }
 
 /// A list whose onUpdate throws for one object.

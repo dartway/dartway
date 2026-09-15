@@ -114,8 +114,8 @@ provides it:
 
 | Name | What it is for |
 |---|---|
-| `DwFakeServer(protocol:)` | Speaks the protocol as the real server does — headers and their checks, honest statuses, `426` for an old build, idempotent commands, the response transport filtered by `Dw-Live-Connection`, sign-in on the socket, subscriptions requiring an account. Its `httpTransport` and `liveConnector` go to the core |
-| `onRequest<Q>(handler)`, `onCommand<C>(handler)` | Answer a call type with a `DwCallResult`; a handler reads `call.accountId` and publishes with `call.publish(channel, objects)`, which lands in the response and on other sockets as on a real server |
+| `DwFakeServer(protocol:)` | Speaks the protocol as the real server does — headers and their checks, honest statuses, `426` for an old build, idempotent commands, the response transport filtered by `Dw-Live-Connection` (none without it), sign-in on the socket, subscriptions requiring an account. Its `httpTransport` and `liveConnector` go to the core |
+| `onRequest<Q>(handler)`, `onCommand<C>(handler)` | Answer a call type with a `DwCallResult`; a handler reads `call.accountId` and publishes with `call.publish(channel, objects)`, which lands in the response of a caller whose named connection subscribes to the channel and on other sockets, as on a real server |
 | `registerToken`, `revokeToken`, `publish`, `closeChannel`, `dropConnections`, `reachable` | Sessions, someone else's update, revoked access, a lost network |
 | `calls`, `callsOf<C>()`, `requestsOf<Q>()`, `executions(key)`, `subscribeCount(channel)` | What the app actually sent |
 | `errors` | Handler exceptions, calls nobody answers, messages that do not decode. **A test ends by asserting it is empty**: a fake that swallowed a call nobody expected would let a broken test pass |

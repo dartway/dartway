@@ -145,11 +145,12 @@ publishes there** — as strict as the strictest handler of a request on that ch
 - **a subscription is checked once**: a command that removes someone's right revokes it
   (`ctx.revoke`).
 
-**What a command publishes is readable by its caller.** The response of a command carries its
-publications — those on channels the caller's live connection is subscribed to, and every
-publication when the call names no live connection (a client can simply leave the header out). A
-member's command must not publish an object only managers may read; recompute such a figure in a
-manager's read, or publish it from a job.
+**A publication reaches only those allowed to read its channel.** The response of a command carries
+only its publications on channels the caller's own live connection is subscribed to — checked at
+subscription — and none when the call names no live connection (D-053). So a member's command may
+publish an object only managers may read: managers hear it over the socket, the member never sees it.
+What still matters is the channel: publish a manager's figure to a managers' channel, never to one the
+member subscribes to.
 
 ## 6. Files are the third
 

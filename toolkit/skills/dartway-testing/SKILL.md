@@ -241,7 +241,8 @@ memory.
 
   A handler answers a `DwCallResult` whose value has the call's result type exactly
   (`DwCallOk(<Invoice>[])`, not `DwCallOk([])`). `call.accountId` is the caller; `call.publish`
-  publishes as a real command does (in the response, and to other subscribers).
+  publishes as a real command does (in the response when the caller's live connection subscribes
+  to the channel, and to other subscribers).
 - **Assert what left**: `server.callsOf<PayInvoice>()` (each with `.call`, headers, status),
   `server.requestsOf<ListMyInvoices>()`, `server.executions(key)`.
 - **Push from outside**: `server.publish(channel, [object])` is an update someone else caused;

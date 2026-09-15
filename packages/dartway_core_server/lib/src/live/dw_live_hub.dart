@@ -121,8 +121,13 @@ final class DwLiveHub {
   /// [author] is the caller's own connection when its response carries the
   /// updates: it is left out of the broadcast, and the response carries only
   /// what it listens to — the objects published to channels it is subscribed
-  /// to, by exact channel. Without an author the response carries every
-  /// publication and every subscriber is sent its channels.
+  /// to, by exact channel — access to those was checked when it subscribed.
+  /// Without an author the response carries **no** updates: publications may
+  /// sit on channels the caller is not allowed to read (a newcomer's sign-in
+  /// publishes admin-only counters), and a call that names no live connection
+  /// has no live state to update — a client's live requests subscribe before
+  /// they fetch and re-read after a reconnect. Every subscriber, the caller's
+  /// other connections included, is sent its channels.
   ///
   /// Every object keeps the channel it was published to, on the socket and in
   /// the response (D-036): the client applies it only to the requests that
@@ -157,7 +162,7 @@ final class DwLiveHub {
     }
     return DwUpdateTransport([
       for (final MapEntry(key: name, value: items) in byChannel.entries)
-        if (author == null || author.subscriptions.contains(name))
+        if (author != null && author.subscriptions.contains(name))
           for (final item in items) (name, item),
     ]);
   }

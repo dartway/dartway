@@ -139,8 +139,14 @@ travels as its deletion.
 The client names its socket in `Dw-Live-Connection` (D-026) when the socket is authenticated as the
 same token. Then the response carries only what that connection subscribes to, and the socket skips it
 for this command. Without the header — no socket yet, or signed in as someone else — the response
-carries every publication and every subscriber, the caller's other devices included, gets the socket
-message. A connection named by a call of another account is ignored.
+carries **no updates**, and every subscriber, the caller's other devices included, gets the socket
+message. A connection named by a call of another account is ignored the same way.
+
+The response is filtered this way because access to a channel is checked once, when a connection
+subscribes (D-053). A command may publish where its caller may not read — a newcomer's sign-in
+announces them on a staff-only channel — and a response carrying every publication would hand that to
+the caller. A call without a live connection loses nothing by it: a request subscribes before it
+reads, and re-reads after a reconnect.
 
 The response's updates are applied before the result is handed on, so the caller's screen never
 changes ahead of the updates that came with it. A replayed command answer carries none

@@ -422,29 +422,43 @@ void main() {
       () async {
         final h = Harness()..serveRooms();
         final gate = Gate();
-        // No socket: nothing but the response could carry the update to
-        // Bob's list.
-        h.server.acceptsConnections = false;
+        final answered = Completer<void>();
         await h.start();
-        h.server.onCommand<RenameRoom>((command, call) async {
-          await gate.passed;
+        h.server.onCommand<RenameRoom>((command, call) {
           final renamed = RoomView(id: command.roomId, name: command.name);
           call.publish(roomsChannel, [renamed]);
           return DwCallOk(renamed);
         });
+        final alices = h.client.watch(const ListRooms());
+        await settle();
+        expect(alices.isLive, isTrue);
+        // The server answers at once, for Alice's named connection; the
+        // answer is held on the network while the session changes.
+        h.server.interceptPost = (post) async {
+          if (!post.url.path.endsWith('/RenameRoom')) return null;
+          h.server.interceptPost = null;
+          final reply = await h.server.httpTransport.post(post);
+          answered.complete();
+          await gate.passed;
+          return reply;
+        };
         final pending = h.client.command(
           const RenameRoom(roomId: 1, name: 'x'),
         );
-        await settle();
+        await answered.future;
+        final call = h.server.callsOf<RenameRoom>().single;
+        expect(call.liveConnectionId, isNotNull);
+        expect(
+          (call.response as DwApiOk).updates.objectsOn('rooms'),
+          hasLength(1),
+        );
+        alices.close();
         await h.client.signIn(bob);
-        final watch = h.client.watch(const ListRooms());
+        final bobs = h.client.watch(const ListRooms());
         await settle();
         gate.open();
         await pending;
-        final response =
-            h.server.callsOf<RenameRoom>().single.response as DwApiOk;
-        expect(response.updates.objectsOn('rooms'), hasLength(1));
-        expect(dataOf(watch.state), [
+        expect(dataOf(bobs.state), [
           a,
           b,
         ], reason: "bob's list keeps its own data");

@@ -88,22 +88,23 @@ void main() {
   );
 
   test(
-    "a caller channel (D-037) carries each account's own data, and a "
-    "response carrying another account's never reaches mine (D-036)",
+    "a caller channel (D-037) carries each account's own data: another "
+    "account's command reaches it over the socket, my own through my "
+    "response, and my response never carries another account's (D-053)",
     () async {
       final alice = await connect();
-      // Bob's socket never opens, so his calls name no live connection and
-      // their responses carry every publication: only the channel tells whose
-      // an object is.
-      final bob = await connect(liveConnector: const _UnreachableConnector());
+      final bobFrames = _RecordingConnector();
+      final bobHttp = _LosingTransport(DwHttpClientTransport());
+      final bob = await connect(
+        liveConnector: bobFrames,
+        httpTransport: bobHttp,
+      );
       final aliceSession = await signIn(alice, 'e2e-inbox-a@example.com');
       final bobSession = await signIn(bob, 'e2e-inbox-b@example.com');
 
       final aliceInbox = alice.watch(const MyInbox());
       final bobInbox = bob.watch(const MyInbox());
-      await eventually(
-        () => aliceInbox.isLive && bobInbox.state is DwRequestData,
-      );
+      await eventually(() => aliceInbox.isLive && bobInbox.isLive);
       expect(texts(bobInbox.state), isEmpty);
 
       final toAlice = await bob.command(
@@ -112,16 +113,47 @@ void main() {
       expect(toAlice, isA<DwCallOk<NoteView>>());
       await eventually(() => texts(aliceInbox.state).contains('hi alice'));
       expect(
-        texts(bobInbox.state),
-        isEmpty,
+        bobHttp.lastReply?.body,
+        isNot(contains('updates')),
         reason:
-            "the response carried Alice's inbox:${aliceSession.id}, which "
-            "Bob's inbox does not declare",
+            "Bob's connection listens to inbox:${bobSession.id}, not "
+            "Alice's inbox:${aliceSession.id}",
       );
+      expect(texts(bobInbox.state), isEmpty);
 
       await bob.command(SendToInbox('to self', accountId: bobSession.id));
       expect(texts(bobInbox.state), ['to self'], reason: 'from the response');
       expect(texts(aliceInbox.state), ['hi alice']);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(
+        bobFrames.updates,
+        isEmpty,
+        reason: 'nothing of either reached Bob over his socket',
+      );
+    },
+  );
+
+  test(
+    'a signed-in client whose socket never opens names no live connection: '
+    'its responses carry no updates, and a re-read shows its own change',
+    () async {
+      final http = _LosingTransport(DwHttpClientTransport());
+      final client = await connect(
+        liveConnector: const _UnreachableConnector(),
+        httpTransport: http,
+      );
+      await signIn(client, 'e2e-no-socket@example.com');
+      final notes = client.watch(const LiveNotes());
+      await eventually(() => notes.state is DwRequestData);
+      expect(notes.isLive, isFalse);
+
+      final created = await client.command(const CreateNote('unseen'));
+      expect(created, isA<DwCallOk<NoteView>>());
+      expect(http.lastReply?.body, isNot(contains('updates')));
+      expect(texts(notes.state), isNot(contains('unseen')));
+
+      await notes.refetch();
+      expect(texts(notes.state).first, 'unseen');
     },
   );
 
@@ -390,6 +422,9 @@ final class _LosingTransport implements DwHttpTransport {
   String? loseNextAnswerTo;
   int lost = 0;
 
+  /// The last answer received, lost or not.
+  DwHttpReply? lastReply;
+
   int posts(String wireName) => _posts[wireName] ?? 0;
 
   @override
@@ -397,6 +432,7 @@ final class _LosingTransport implements DwHttpTransport {
     final wireName = post.url.pathSegments.last;
     _posts.update(wireName, (n) => n + 1, ifAbsent: () => 1);
     final reply = await _inner.post(post);
+    lastReply = reply;
     if (loseNextAnswerTo == wireName) {
       loseNextAnswerTo = null;
       lost++;

@@ -63,11 +63,11 @@ final class DwFakeCall {
   ///
   /// When the call succeeds, every subscribed connection receives them over
   /// the socket except the one the call named, and the response carries them
-  /// under [channel] (D-036):
-  /// all of them when the call named no connection, those of channels the
-  /// named connection is subscribed to otherwise. When it does not, the
-  /// response carries nothing and every subscriber — the named connection
-  /// included — receives them over the socket.
+  /// under [channel] (D-036) only when the call named a connection of its own
+  /// account subscribed to [channel] — naming none, it carries nothing
+  /// (D-053). When the call does not succeed, the response carries nothing
+  /// and every subscriber — the named connection included — receives them
+  /// over the socket.
   ///
   /// An unresolved `DwLiveChannel.ofCaller` throws [ArgumentError], as on a
   /// real server: publish to `DwLiveChannel.forAccount(kind, accountId)`.
@@ -631,7 +631,9 @@ final class DwFakeServer {
         for (final (channel, objects) in context._published) {
           final name = channel.wireName;
           _broadcast(name, objects, except: named);
-          if (named == null || named.subscriptions.contains(name)) {
+          // As the real server: no named live connection, no updates — the
+          // response would otherwise carry channels the caller may not read.
+          if (named != null && named.subscriptions.contains(name)) {
             carried.addAll([for (final object in objects) (name, object)]);
           }
         }

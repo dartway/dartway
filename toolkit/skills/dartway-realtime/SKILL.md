@@ -157,11 +157,11 @@ Future<CustomerInvoice> publishInvoice(DwCallContext ctx, InvoiceRow row) async 
   `ctx.publish(channel, DwDeletedObject.of<CustomerInvoice>(invoiceId, ctx.protocol))`.
 - An object that quotes or embeds a changed one (a card showing its invoice) is republished too —
   its embedded copy changed.
-- **What a command publishes is readable by its caller.** The command's response carries the
-  publications to the channels the caller's live connection is subscribed to — and, when the call
-  names no live connection, every publication of the call. Publish from a member's command only what
-  that member may read; a figure only managers may see is recomputed by a manager's read, or
-  published from a job.
+- **A command may publish where its caller may not read.** The command's response carries only the
+  publications to channels the caller's own live connection is subscribed to — access to those was
+  checked at subscription — and, when the call names no live connection, none. A member's command
+  (a sign-up, a booking) may publish a managers-only figure: managers hear it over the socket, the
+  member's response never carries it.
 
 Within one call, one object published twice to a channel travels once, as it ended.
 
