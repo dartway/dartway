@@ -7,6 +7,7 @@ environment:
 
 dependencies:
   dartway_core_server: ^0.20.0-dev.1
+  dartway_push_server: ^0.3.0-dev.1
   dartway_example_shared:
     path: ../dartway_example_shared
 
@@ -27,3 +28,7 @@ dependency_overrides:
     path: ../../packages/dartway_generator
   dartway_orm:
     path: ../../packages/dartway_orm
+  dartway_push_server:
+    path: ../../packages/dartway_push_server
+  dartway_push_shared:
+    path: ../../packages/dartway_push_shared

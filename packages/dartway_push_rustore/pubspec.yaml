@@ -1,0 +1,34 @@
+name: dartway_push_rustore
+description: "RuStore push transport for DartWay on Android: tokens, the Android 13 permission prompt, notification taps, and drawing data-only messages with a picture."
+version: 0.3.0-dev.1
+repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, push, notifications, rustore, android]
+publish_to: none
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  dartway_push_flutter: ^0.3.0-dev.1
+
+  flutter_rustore_push: ^7.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: dev.dartway.push.rustore
+        pluginClass: DwRuStorePushPlugin

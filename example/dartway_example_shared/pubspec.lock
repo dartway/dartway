@@ -88,6 +88,13 @@ packages:
       relative: true
     source: path
     version: "0.20.0-dev.1"
+  dartway_push_shared:
+    dependency: "direct main"
+    description:
+      path: "../../packages/dartway_push_shared"
+      relative: true
+    source: path
+    version: "0.3.0-dev.1"
   file:
     dependency: transitive
     description:

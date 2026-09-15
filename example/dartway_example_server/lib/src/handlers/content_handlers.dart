@@ -1,5 +1,6 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:dartway_push_server/dartway_push_server.dart';
 
 import '../../generated/dw_schema.dart';
 import '../club_objects.dart';
@@ -35,6 +36,25 @@ final contentHandlers = <DwCallHandler>[
       final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
       ctx.publish(_news, post);
       await publishAdminCounters(ctx);
+      // Queued in this transaction: a refused or failed publication notifies
+      // nobody. Who of the members receives it is the push eligibility rule's
+      // decision (marketing consent), taken when the delivery is due.
+      final members = await ctx.db.userProfiles.find(
+        where: (t) => t.accountId.notEquals(me.accountId),
+      );
+      await ctx.push.send(
+        [for (final member in members) member.accountId],
+        message: DwPushMessage(
+          title: post.title,
+          body: post.text.length > 140
+              ? '${post.text.substring(0, 139)}…'
+              : post.text,
+          data: NewsAlert(id: post.id),
+          link: '/news',
+        ),
+        category: ExamplePushCategory.news,
+        dedupKey: 'news:${post.id}',
+      );
       return post;
     },
   ),

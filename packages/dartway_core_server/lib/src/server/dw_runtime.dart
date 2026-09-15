@@ -12,6 +12,7 @@ import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../live/dw_live_connection.dart';
 import '../live/dw_live_hub.dart';
+import 'dw_server_module.dart';
 
 /// What the running parts of a server share: the database, the live hub, the
 /// session cache, the alert gate, and the way contexts are made and their
@@ -28,7 +29,8 @@ final class DwRuntime {
     required this.log,
     required this.jobsFor,
     this.files,
-  });
+    List<DwServerModule> modules = const [],
+  }) : modules = {for (final module in modules) module.runtimeType: module};
 
   final DwWireProtocol protocol;
   final DwAuthConfig auth;
@@ -41,6 +43,9 @@ final class DwRuntime {
 
   /// The file storage; `null` when the server has none.
   final DwFileStore? files;
+
+  /// The server's modules by their class, for `ctx.module<M>()`.
+  final Map<Type, DwServerModule> modules;
 
   DwRuntimeContext context({
     required String scope,
@@ -57,6 +62,7 @@ final class DwRuntime {
     jobs: jobsFor,
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
+    modules: modules,
     sessionKey: sessionKey,
     clientAppVersion: clientAppVersion,
     clientUserAgent: clientUserAgent,

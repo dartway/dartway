@@ -9,6 +9,7 @@ import '../context/dw_call_context.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../server/dw_runtime.dart';
+import '../server/dw_server_module.dart';
 import 'dw_auth_config.dart';
 import 'dw_auth_store.dart';
 
@@ -735,6 +736,9 @@ final class _DetachedContext extends DwCallContext {
 
   @override
   DwFileService get files => _noServer('files');
+
+  @override
+  M module<M extends DwServerModule>() => _noServer('module<$M>()');
 
   @override
   Future<T> transaction<T>(Future<T> Function(DwDatabaseHandle tx) body) =>

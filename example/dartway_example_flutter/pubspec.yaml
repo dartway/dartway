@@ -30,6 +30,12 @@ dependencies:
   # claimed the DwKeyValueStorePlugin role, and without one there is nowhere
   # to put the session.
   dartway_shared_preferences: ^0.5.0
+  # Push: the plugin that registers the device and hands over opened
+  # notifications, and FCM as its transport (inert until Firebase is
+  # configured by --dart-define, see main.dart).
+  dartway_push_flutter: ^0.3.0-dev.1
+  dartway_push_firebase: ^0.3.0-dev.1
+  firebase_core: ">=3.13.1 <5.0.0"
 
   flutter_hooks: ^0.21.2
   hooks_riverpod: ^3.0.0
@@ -78,6 +84,12 @@ dependency_overrides:
     path: ../../packages/dartway_core_shared
   dartway_lints:
     path: ../../packages/dartway_lints
+  dartway_push_firebase:
+    path: ../../packages/dartway_push_firebase
+  dartway_push_flutter:
+    path: ../../packages/dartway_push_flutter
+  dartway_push_shared:
+    path: ../../packages/dartway_push_shared
   dartway_router:
     path: ../../packages/dartway_router
   dartway_shared_preferences:

@@ -77,6 +77,7 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol([
   ),
   DwProtocolEntry<MarkAttended>('MarkAttended', $MarkAttendedFromJson),
   DwProtocolEntry<MarkChatRead>('MarkChatRead', $MarkChatReadFromJson),
+  DwProtocolEntry<NewsAlert>('NewsAlert', $NewsAlertFromJson),
   DwProtocolEntry<NewsPost>('NewsPost', $NewsPostFromJson),
   DwProtocolEntry<PersonCard>('PersonCard', $PersonCardFromJson),
   DwProtocolEntry<PinChatMessage>('PinChatMessage', $PinChatMessageFromJson),

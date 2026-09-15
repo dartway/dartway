@@ -4,6 +4,7 @@ import 'package:dartway_example_flutter/app_version.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 export 'package:dartway_client/testing.dart';
 export 'package:dartway_example_shared/dartway_example_shared.dart';
+export 'package:dartway_push_flutter/testing.dart';
 
 /// The session a signed-in test starts with.
 const testSession = DwAuthSession(
@@ -53,10 +55,14 @@ final class FakeClub {
       ..onRequest<ListMyBookings>(
         (request, call) => DwCallOk(<SessionBooking>[...bookings]),
       )
-      ..onRequest<ListNews>((request, call) => DwCallOk(<NewsPost>[...news]));
+      ..onRequest<ListNews>((request, call) => DwCallOk(<NewsPost>[...news]))
+      // The push plugin registers the device of a signed-in member.
+      ..onCommand<DwRegisterPushToken>(
+        (command, call) => const DwCallOk<void>(null),
+      );
   }
 
-  final server = DwFakeServer(protocol: dartwayExampleProtocol);
+  final server = DwFakeServer(protocol: exampleProtocol);
 
   UserProfile profile;
   final sessions = <ClubSession>[];
@@ -101,6 +107,7 @@ final class ExampleTestApp {
     DwAuthSession? session = testSession,
     Size size = const Size(390, 844),
     bool bootstrap = false,
+    List<DwPushTransportClient> pushTransports = const [],
   }) async {
     tester.view
       ..physicalSize = size * 3
@@ -120,6 +127,7 @@ final class ExampleTestApp {
       liveConnector: club.server.liveConnector,
       tokenStore: DwMemoryTokenStore(session),
       clientOptions: dwFakeClientOptions,
+      pushTransports: pushTransports,
     );
     // Disposing twice is harmless; this one is for a test that failed before
     // [stop], so the next test can build its own core.

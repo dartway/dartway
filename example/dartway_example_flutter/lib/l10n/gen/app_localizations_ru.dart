@@ -125,6 +125,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get clubNews => 'Новости клуба';
 
   @override
+  String get notifyAboutNews => 'Уведомлять о новостях';
+
+  @override
   String get noNewsYet => 'Новостей пока нет — следите за обновлениями!';
 
   @override

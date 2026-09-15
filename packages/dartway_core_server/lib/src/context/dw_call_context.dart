@@ -9,6 +9,7 @@ import '../auth/dw_account_service.dart';
 import '../auth/dw_auth_store.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
+import '../server/dw_server_module.dart';
 
 /// Thrown when a call needs a signed-in account and has none. The framework
 /// answers `unauthenticated` (HTTP 401).
@@ -103,6 +104,11 @@ abstract class DwCallContext {
 
   DwServerLogger get log;
 
+  /// The server's module of class [M] — how a module's context extension
+  /// (`ctx.push`) reaches its runtime. Throws [StateError] when the server
+  /// was built without one.
+  M module<M extends DwServerModule>();
+
   /// A per-call cache: [create] runs at most once per [key] per call.
   T memo<T>(Object key, T Function() create);
 }
@@ -170,6 +176,7 @@ final class DwRuntimeContext extends DwCallContext {
     required DwJobQueue Function(DwRuntimeContext ctx) jobs,
     required DwAccountService Function(DwRuntimeContext ctx) accounts,
     DwFileService Function(DwRuntimeContext ctx)? files,
+    Map<Type, DwServerModule> modules = const {},
     this.sessionKey,
     String? clientAppVersion,
     String? clientUserAgent,
@@ -178,6 +185,7 @@ final class DwRuntimeContext extends DwCallContext {
        _accounts = accounts,
        _clientAppVersion = clientAppVersion,
        _clientUserAgent = clientUserAgent,
+       _modules = modules,
        _files = files ?? ((_) => const DwUnconfiguredFiles());
 
   final _Scope _root;
@@ -186,6 +194,7 @@ final class DwRuntimeContext extends DwCallContext {
   final DwJobQueue Function(DwRuntimeContext ctx) _jobs;
   final DwAccountService Function(DwRuntimeContext ctx) _accounts;
   final DwFileService Function(DwRuntimeContext ctx) _files;
+  final Map<Type, DwServerModule> _modules;
 
   final DwContextKind kind;
 
@@ -340,6 +349,18 @@ final class DwRuntimeContext extends DwCallContext {
   }) => throw DwRefusalException(
     DwCallRefusal(code, params: params, field: field),
   );
+
+  @override
+  M module<M extends DwServerModule>() {
+    final exact = _modules[M];
+    if (exact != null) return exact as M;
+    for (final module in _modules.values) {
+      if (module is M) return module;
+    }
+    throw StateError(
+      'This server has no $M: pass it in DwAppServer(modules: [...]).',
+    );
+  }
 
   @override
   T memo<T>(Object key, T Function() create) {

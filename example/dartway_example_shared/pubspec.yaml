@@ -8,6 +8,8 @@ environment:
 
 dependencies:
   dartway_core_shared: ^0.20.0-dev.1
+  # Push categories and the token registration calls the app and server share.
+  dartway_push_shared: ^0.3.0-dev.1
 
 dev_dependencies:
   lints: ^6.0.0
@@ -17,3 +19,5 @@ dev_dependencies:
 dependency_overrides:
   dartway_core_shared:
     path: ../../packages/dartway_core_shared
+  dartway_push_shared:
+    path: ../../packages/dartway_push_shared

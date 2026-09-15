@@ -3,12 +3,14 @@
 library;
 
 export 'package:dartway_core_shared/dartway_core_shared.dart';
+export 'package:dartway_push_shared/dartway_push_shared.dart';
 
 export 'generated/dw_protocol.dart';
 export 'src/admin.dart';
 export 'src/bookings.dart';
 export 'src/chat.dart';
 export 'src/example_channel.dart';
+export 'src/example_push.dart';
 export 'src/example_refusal.dart';
 export 'src/example_upload.dart';
 export 'src/news.dart';

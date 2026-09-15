@@ -125,6 +125,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clubNews => 'Club news';
 
   @override
+  String get notifyAboutNews => 'Notify me about news';
+
+  @override
   String get noNewsYet => 'No news yet — stay tuned!';
 
   @override

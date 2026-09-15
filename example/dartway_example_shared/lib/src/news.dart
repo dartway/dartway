@@ -56,6 +56,16 @@ final class PublishNews extends DwActionCommand<NewsPost>
   ];
 }
 
+/// What a news notification carries to the app: the post it is about. The
+/// app opens the news page on it.
+final class NewsAlert extends DwDataObject with _$NewsAlert {
+  const NewsAlert({required this.id});
+
+  /// The post's id.
+  @override
+  final int id;
+}
+
 /// Removes a post. Staff only.
 final class RemoveNews extends DwActionCommand<void> with _$RemoveNews {
   const RemoveNews({required this.postId});

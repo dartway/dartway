@@ -11,6 +11,11 @@ workspace:
   - packages/dartway_core_shared
   - packages/dartway_lints
   - packages/dartway_orm
+  - packages/dartway_push_firebase
+  - packages/dartway_push_flutter
+  - packages/dartway_push_rustore
+  - packages/dartway_push_server
+  - packages/dartway_push_shared
   - packages/dartway_router
   - packages/dartway_shared_preferences
   - packages/dartway_studio_bridge

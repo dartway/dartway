@@ -106,6 +106,33 @@ mixin _$PublishNews on DwActionCommand<NewsPost> {
 PublishNews $PublishNewsFromJson(Map<String, Object?> json) =>
     PublishNews(title: json['title']! as String, text: json['text']! as String);
 
+mixin _$NewsAlert on DwDataObject {
+  NewsAlert get _self => this as NewsAlert;
+
+  @override
+  String get dwTypeName => 'NewsAlert';
+
+  @override
+  Map<String, Object?> toJson() => {'id': _self.id};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is NewsAlert && other.id == _self.id;
+
+  @override
+  int get hashCode => _self.id.hashCode;
+
+  @override
+  String toString() => 'NewsAlert(id: ${_self.id})';
+}
+
+NewsAlert $NewsAlertFromJson(Map<String, Object?> json) =>
+    NewsAlert(id: json['id']! as int);
+
+extension NewsAlertCopyWith on NewsAlert {
+  NewsAlert copyWith({int? id}) => NewsAlert(id: id ?? this.id);
+}
+
 mixin _$RemoveNews on DwActionCommand<void> {
   RemoveNews get _self => this as RemoveNews;
 

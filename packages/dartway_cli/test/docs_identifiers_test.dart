@@ -136,16 +136,11 @@ void main() {
   });
 }
 
-/// Pages of a subsystem being ported to the rewrite in its own change: push
-/// (D-010, D-033) returns with its code, and its pages and skill are rewritten
-/// by that port. Named one by one so the exception is visible, and checked to
-/// still be needed — a page that passes, or is gone, fails the suite until it
-/// is taken off.
-const _portInFlight = {
-  'docs/3-flutter/push-notifications.md',
-  'docs/4-server/push-delivery.md',
-  'toolkit/skills/dartway-push-delivery/SKILL.md',
-};
+/// Pages of a subsystem being ported to the rewrite in its own change, named
+/// one by one so the exception is visible, and checked to still be needed — a
+/// page that passes, or is gone, fails the suite until it is taken off. Push
+/// (D-010, D-033) is ported, its pages with it: none is excused now.
+const _portInFlight = <String>{};
 
 final _typeName = RegExp(r'\bDw[A-Z][A-Za-z0-9]*\b');
 

@@ -1,0 +1,14 @@
+name: dartway_push_shared
+description: The push contract of DartWay shared by server and app — token registration commands, transports, and the typed data a notification carries.
+version: 0.3.0-dev.1
+repository: https://github.com/dartway/dartway
+license: Apache-2.0
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.11.0
+dependencies:
+  dartway_core_shared: ^0.20.0-dev.1
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.26.0

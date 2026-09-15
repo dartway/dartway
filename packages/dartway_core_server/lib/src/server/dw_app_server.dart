@@ -25,6 +25,7 @@ import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
 import '../routes/dw_route.dart';
 import 'dw_runtime.dart';
+import 'dw_server_module.dart';
 import 'dw_server_settings.dart';
 
 /// The server refused to start: its declaration is inconsistent. Every
@@ -66,6 +67,7 @@ final class DwAppServer {
     this.jobs = const [],
     this.routes = const [],
     this.files,
+    this.modules = const [],
     this.port = 8080,
     InternetAddress? address,
     DwAlertSink? alerts,
@@ -103,6 +105,10 @@ final class DwAppServer {
   /// Without it the framework's file calls fail as incidents and `ctx.files`
   /// throws — the `dw_stored_file` table exists either way.
   final DwFileStorage? files;
+
+  /// Framework satellites (push delivery): their migrations, calls and jobs.
+  /// See [DwServerModule].
+  final List<DwServerModule> modules;
 
   final int port;
   final InternetAddress address;
@@ -169,6 +175,7 @@ final class DwAppServer {
         openedDatabase.db,
         migrations: {
           dwFrameworkNamespace: dwFrameworkMigrations,
+          for (final module in modules) module.namespace: module.migrations,
           'app': migrations,
         },
       ).apply();
@@ -196,11 +203,17 @@ final class DwAppServer {
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),
         files: fileStore,
+        modules: modules,
       );
       final authService = DwAuthService(runtime);
       runner = jobRunner = DwJobRunner(
         runtime: runtime,
-        definitions: [...jobs, _cleanupJob(), ...?fileStore?.jobs()],
+        definitions: [
+          ...jobs,
+          _cleanupJob(),
+          ...?fileStore?.jobs(),
+          for (final module in modules) ...module.jobs,
+        ],
         listen: openedDatabase.listen,
         workers: settings.jobWorkers,
         pollInterval: settings.jobPollInterval,
@@ -219,6 +232,7 @@ final class DwAppServer {
               ...handlers,
               ...authService.handlers(),
               ...fileStore?.handlers() ?? DwFileStore.unconfiguredHandlers(),
+              for (final module in modules) ...module.handlers,
             ])
               handler.callType: handler,
           },
@@ -257,6 +271,9 @@ final class DwAppServer {
       await jobRunner?.stop();
       await openedDatabase?.close();
       fileStore?.close();
+      for (final module in modules) {
+        await module.close();
+      }
       rethrow;
     }
   }
@@ -284,6 +301,9 @@ final class DwAppServer {
         onTimeout: () => logger.warning('jobs still running at stop timeout'),
       );
       await running.front.close();
+      for (final module in modules) {
+        await module.close();
+      }
       await running.database.close();
       running.files?.close();
       logger.info('DartWay server stopped');
@@ -306,10 +326,15 @@ final class DwAppServer {
     // `DwSingleRequest`, `command` a `DwActionCommand`), so a handler of the
     // wrong kind does not compile; what is left to check is the registry.
     final handled = <Type>{};
+    final moduleTypes = <Type>{
+      for (final module in modules)
+        for (final handler in module.handlers) handler.callType,
+    };
     for (final handler in handlers) {
       final type = handler.callType;
       if (DwAuthService.builtInTypes.contains(type) ||
-          DwFileStore.builtInTypes.contains(type)) {
+          DwFileStore.builtInTypes.contains(type) ||
+          moduleTypes.contains(type)) {
         problems.add('$type has a built-in handler and cannot have another');
       } else if (!protocol.knows(type)) {
         problems.add(
@@ -330,7 +355,8 @@ final class DwAppServer {
         continue;
       }
       if (DwAuthService.builtInTypes.contains(entry.type) ||
-          DwFileStore.builtInTypes.contains(entry.type)) {
+          DwFileStore.builtInTypes.contains(entry.type) ||
+          moduleTypes.contains(entry.type)) {
         continue;
       }
       if (!handled.contains(entry.type)) {
@@ -367,6 +393,7 @@ final class DwAppServer {
         problems.add('job "${job.name}" needs at least one attempt');
       }
     }
+    problems.addAll(_moduleProblems());
     for (final origin in settings.allowedOrigins) {
       if (DwWebOrigin.parse(origin) == null) {
         problems.add(
@@ -393,6 +420,55 @@ final class DwAppServer {
     }
     return problems;
   }
+
+  /// Problems of the modules: their names, their jobs and handlers, and what
+  /// each says about itself.
+  List<String> _moduleProblems() {
+    final problems = <String>[];
+    final namespaces = <String>{};
+    final handled = <Type>{};
+    for (final module in modules) {
+      final namespace = module.namespace;
+      if (!_moduleNamespace.hasMatch(namespace) ||
+          namespace == dwFrameworkNamespace ||
+          namespace == 'app') {
+        problems.add(
+          'module ${module.runtimeType}: namespace "$namespace" must be '
+          'lower-case letters, digits and "_", and not "dw" or "app"',
+        );
+      }
+      if (!namespaces.add(namespace)) {
+        problems.add('module namespace "$namespace" is used twice');
+      }
+      for (final job in module.jobs) {
+        if (!job.name.startsWith('dw.$namespace.')) {
+          problems.add(
+            'module "$namespace": job "${job.name}" must be named '
+            '"dw.$namespace.…"',
+          );
+        }
+      }
+      for (final handler in module.handlers) {
+        final type = handler.callType;
+        if (!protocol.knows(type)) {
+          problems.add(
+            'module "$namespace" answers $type, which the protocol does not '
+            'register: add the module\'s protocol entries to the project\'s '
+            'protocol',
+          );
+        } else if (!handled.add(type) ||
+            DwAuthService.builtInTypes.contains(type) ||
+            DwFileStore.builtInTypes.contains(type)) {
+          problems.add('$type has more than one handler');
+        }
+        if (handler.accessProblem case final problem?) problems.add(problem);
+      }
+      problems.addAll(module.problems(protocol));
+    }
+    return problems;
+  }
+
+  static final _moduleNamespace = RegExp(r'^[a-z][a-z0-9_]*$');
 
   /// Tables and columns of [declared] that the database does not have.
   ///

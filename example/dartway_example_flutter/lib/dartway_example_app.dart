@@ -1,16 +1,22 @@
+import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'core/app_l10n.dart';
 import 'core/dw_core.dart';
 import 'core/profile/signed_in_gate.dart';
+import 'core/push/push_opened_listener.dart';
 import 'core/router/router.dart';
 import 'ui_kit/ui_kit.dart';
 
 /// The DartWay example application. All app wiring lives here; `main` only
 /// supplies concrete parameters (server address, version) and runs it.
 class DartwayExampleApp {
-  const DartwayExampleApp({required this.baseUrl, required this.appVersion});
+  const DartwayExampleApp({
+    required this.baseUrl,
+    required this.appVersion,
+    this.pushTransports = const [],
+  });
 
   /// Where the server's calls and live socket are: `http://localhost:8080`.
   final Uri baseUrl;
@@ -19,11 +25,19 @@ class DartwayExampleApp {
   /// error reports, and sent with every call.
   final String appVersion;
 
+  /// How notifications reach this build; `main` passes FCM when Firebase is
+  /// configured.
+  final List<DwPushTransportClient> pushTransports;
+
   void run() {
     // Built here, started by the runner: `dw.init()` starts the plugins and
     // reads the stored session, without waiting for the server — a start
     // offline is a start.
-    createExampleDwCore(baseUrl: baseUrl, appVersion: appVersion);
+    createExampleDwCore(
+      baseUrl: baseUrl,
+      appVersion: appVersion,
+      pushTransports: pushTransports,
+    );
 
     DwAppRunner(
       // No onError: uncaught errors flow into the dw pipeline, where the app's
@@ -54,7 +68,9 @@ class ExampleApp extends ConsumerWidget {
       theme: AppTheme.light,
       builder: (context, child) => DwNotificationsListener(
         handlers: {DwUiNotification: DwUiNotificationHandler()},
-        child: SignedInGate(child: child ?? const SizedBox.shrink()),
+        child: PushOpenedListener(
+          child: SignedInGate(child: child ?? const SizedBox.shrink()),
+        ),
       ),
       routerConfig: router.router,
     );

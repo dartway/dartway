@@ -1,0 +1,38 @@
+// The fake push service's test key (`dwFakePushPrivateKey`, generated with
+// OpenSSL) in its PKCS #1 form, and `openssl dgst -sha256 -sign` of
+// [referenceMessage] with it — an independent implementation to agree with.
+
+const String testPrivateKeyPkcs1 = '''
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAuTwx9zgWqnjgs5iC8LzDmuA4JHjNZyE2IGyigf8lHR21XRJi
+sK6KA4GwuJJJXQBuSUUXgxRJigThBxElG7SPt1HxecANV5YJGc+/YEhlRgxud4Vb
+4AjkLT15Wv164s222X093JLBVw5K/4CrsXLaEcL7TFfgehgL/DLTIlBRrXrUEk4n
+sSjLiktq0x4rRCwW1ZrMv8tdCbuCXv/ZVh7KJgoNEY0GcPelXgLzABFnb/XOJEUg
+mIs5dXdW8AN0yEKrkQxwn//2qvS4SGussdJIXQgeE/V2Vm+RmsM+G2qFRmzJeqnx
+9fH9gVvlOEJTVjR5cL5M4xikfZRIj6cJapbF5wIDAQABAoIBAEGlIQn9UR8J5owP
+NPxO0T1eT9cxDo4JWY7FIRRT0RnP8PmybdIykMusVu4aPbCdWfhSaYI1Gti0YPEp
+tM5sP3BWtG6Szsem7sO8eZSMI4PfHPjzhHtRe1fDDPJfmYCuKapK9bTpN2Z8NLz2
+oyIoUzrvMDK+g9mRExJGCsgC0edZ4JM6By0/NQodb/JNFYU6zF6rYTji79MaTDTq
+Ok3MHsqhPHnMGjKdgloEac1u/3/IqpkWWhdEloQJzdlBfO/bMR0NVvZPYeGSz1rn
+oo8KGYbf+V6NlUodocnLrWhZErvuxvxWbL5Yd288SVzboIwfgH+zfqhhKH33c/pg
+HK1o7PECgYEA8OFGlRxkJ/d/dQ2i67H1gW/sfUp1GDctHTbizimF4C57w2BtWJaE
+8lOxjEv0Yv0q0sZ30KEIYIMV3HPcTor7pivHfCuKRpZamo776pMVNOt2IIqx62y/
+Sgt1Z9sC74yekfBw+kE2DxzgE5Ef0CIO+haBBmqgEeV/oKZuVv/mlVcCgYEAxNzB
+xkXjSJMgrWKIhtgFFifD+HSzkiNxSYQJA3r2MJLT3YpApD1J8c0m5Tm6i1ZIHsGm
+D0wbFz0Ce8Hkq92Are4vKHOHsNSaoowKgdjC5onuAJ3cEmcyFeNmSxahTA1fGfL5
+fpEzgRkWlqSdxtWNTgZxHtuKxDcjuscW98ko6fECgYEAyTXkl7nXj+sV9NknNmq5
+AR5VFXOUzF2KudSXME9PHSy3BUUPEejptOJkdSUdR3Liyp4uh398V+In6LZ/WLyP
+6Qa44+ga4UvG80Rs+k1ScZoeWqCAbn+walGYCODRWvjDnHSUavb+CTG9m5qmUF2i
+1RTnQkze2RQzwCZGFTY9jpECgYEAsJ0NC4Cvw/CbJHJ94dvz1EigvEqWv8kkXbwj
+CghKzpErmlnqXG7P5CsVdhkwjsk9srow7RBuTY7ip3zwVnBGfcRucnATkEVs5d+V
+naCGWqXr7ImzYp9Kg/CbWUpYMw7b/z/JLg++kVecuFG/ax8zwohs/C4idJ6zY2Ix
+7ON/3UECgYArp25pAyNMvMWzpMsRuvmd6OejjsctgqeOMwf3BN9unjkT+4UzkFnA
+NrfZt4zCgurE/kpg6gt32rEMNlXK2YYOpogAj1/+3C3oK5YENXl5FPA9w/KMalDZ
++duDguZbhVHF8BiPT8VppbNpYL4EkIqYn4gHEEDbRW7U4rQ2u87qHg==
+-----END RSA PRIVATE KEY-----
+''';
+
+const String referenceMessage = 'dartway push signing fixture';
+
+const String referenceSignature =
+    'Juykq2xzJ1h0dVbzcMhPiSfQRuHMtI15jRP/aRe0U40lXoYqhSyueBx03elif6MLdL6dytKR9gyk6OnhPUftfvoJFDP0wYJzhuWwVZUPMbsi2kr9byuFSu7RlyAiu8ccJ9fnAqHlJ/IUc95W1pp2rqbONqm/Ss3j7+f8n8nbOkcnlqKv2G1W67CqoUAiZ5RCh6B4Ljvr/qeT8wTp7Yl/ZUyaioTN5FrE+nqMNK5jHnG4awJYpV+IgQEdj4Y44WURmc/nsf57efBCNUnOsSD+d8W2ToucqzNOpCmeotFc0WvE4NwSi1n8zRNeXL3xodOF/QA3r0D5IK2WFFwx5u/Q8g==';

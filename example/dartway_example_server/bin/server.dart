@@ -23,6 +23,10 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 ///   public base URL to the public bucket on the endpoint. At startup the
 ///   server verifies that the public bucket reads anonymously and the private
 ///   one does not (`DW_STORAGE_VERIFY_BUCKETS=false` skips it);
+/// - `FCM_SERVICE_ACCOUNT_FILE`, `FCM_WEB_LINK_BASE`,
+///   `RUSTORE_PUSH_PROJECT_ID`, `RUSTORE_PUSH_SERVICE_TOKEN` — push providers
+///   (see `examplePushProviders`); without them the server queues and records
+///   notifications but has nothing to send them through;
 /// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
 ///   before starting (`DwFileStorageSetup.provision`): for a development
 ///   MinIO the project owns, never for a storage somebody else administers.
@@ -36,6 +40,7 @@ Future<void> main() async {
     database: DwDatabaseConfig.fromEnvironment(env),
     storage: storage,
     port: int.parse(env['PORT'] ?? '8080'),
+    push: examplePush(providers: examplePushProviders(env)),
     settings: DwServerSettings(
       minAppBuild: int.parse(env['DW_MIN_APP_BUILD'] ?? '0'),
       allowedOrigins: {

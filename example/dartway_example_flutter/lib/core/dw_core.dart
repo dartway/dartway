@@ -1,5 +1,6 @@
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
@@ -23,6 +24,9 @@ late DwFlutterCore dw;
 /// [httpTransport] and [liveConnector], an in-memory [tokenStore] and short
 /// [clientOptions] instead — and with a token store of its own the core needs
 /// no storage plugin at all.
+///
+/// [pushTransports] deliver notifications — FCM when Firebase is configured;
+/// a test passes a fake one. With none, push is inert.
 DwFlutterCore createExampleDwCore({
   required Uri baseUrl,
   required String appVersion,
@@ -30,6 +34,7 @@ DwFlutterCore createExampleDwCore({
   DwLiveConnector? liveConnector,
   DwTokenStore? tokenStore,
   DwClientOptions clientOptions = const DwClientOptions(),
+  List<DwPushTransportClient> pushTransports = const [],
 }) => dw = DwFlutterCore(
   config: DwConfig(
     appVersion: appVersion,
@@ -38,13 +43,16 @@ DwFlutterCore createExampleDwCore({
         UpdateRequiredPage(refusal: refusal),
     onErrorReport: _onErrorReport,
   ),
-  protocol: dartwayExampleProtocol,
+  protocol: exampleProtocol,
   baseUrl: baseUrl,
   httpTransport: httpTransport,
   liveConnector: liveConnector,
   tokenStore: tokenStore,
   clientOptions: clientOptions,
-  plugins: [if (tokenStore == null) DwSharedPreferences()],
+  plugins: [
+    if (tokenStore == null) DwSharedPreferences(),
+    DwPush(transports: pushTransports),
+  ],
 );
 
 /// What the app does with an error the framework intercepted.

@@ -1,142 +1,151 @@
-# Push on the device
+# Push on the device: what does the app do, and what does it leave to the framework?
 
-Receiving a notification is one SDK call. Everything around it is not, and that
-is where the afternoons go: which transport this device can actually use, when to
-ask for permission without being refused, keeping the server's copy of the token
-in step with the platform's while people sign in and out, and making sure a tap
-opens the right screen exactly once — whether the app was cold, backgrounded, or
-already on screen.
-
-DartWay puts that part in **`dartway_push_flutter`**, reached as
-`dw.plugins.push`. It carries **no vendor SDK at all**; the transports are
+**The app decides three things: which transports it ships, when to ask for permission, and where
+an opened notification leads.** Everything between — keeping the server's registration in step
+with the token and the signed-in account, holding the notification that started the app until
+something can route it, decoding the payload into the project's own class — is
+`dartway_push_flutter`, reached as `dw.plugins.push`. It carries no vendor SDK; the transports are
 separate packages, so an app downloads only what it ships:
 
 | Package | Transport |
 |---|---|
 | `dartway_push_firebase` | FCM — Android, iOS, web |
-| `dartway_push_rustore` | RuStore — Android |
+| `dartway_push_rustore` | RuStore — Android devices with RuStore |
 
-The other half — the queue, the retries, the fan-out — is
-[`dartway_push_server`](../4-server/push-delivery.md).
+The server half — queue, eligibility, retries — is [Push delivery](../4-server/push-delivery.md).
 
 ## Wiring
 
 ```dart
-dw = DwCore<Client, UserProfile>(
-  // ...
+dw = DwFlutterCore(
+  config: DwConfig(...),
+  protocol: appProtocol, // DwWireProtocol(dwPushProtocolEntries, include: appGeneratedProtocol)
+  baseUrl: baseUrl,
   plugins: [
-    DwPush(
-      config: DwPushConfig(
-        providers: [DwRuStorePush(), DwFirebasePush(webVapidKey: kVapidKey)],
-        onOpened: (opened) => appRouter.go(routeFor(opened.data)),
-      ),
-    ),
+    DwSharedPreferences(),
+    DwPush(transports: [DwRuStorePush(), DwFirebasePush(webVapidKey: webVapidKey)]),
   ],
 );
 ```
 
-and then, around the app's root:
+`main` initializes Firebase before `dw.init()` and registers FCM's background handler:
 
 ```dart
-DwPushScope(push: dw.plugins.push, child: MaterialApp.router(...))
+await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+DwFirebasePush.registerBackgroundHandler();
 ```
 
-The scope exists because nothing about push can happen at bootstrap: a permission
-prompt needs a screen to belong to, and a notification tap needs an app to reach.
+On `dw.init()` the plugin takes **the first transport that supports the platform and is available
+on the device** — the list above means RuStore on Android phones that have it, FCM everywhere else.
+A Firebase transport without an initialized Firebase app is not available, so a build without a
+Firebase project simply has no push. A plugin whose start fails does not block the app
+(`blocksStartup` is false): the failure is reported, and `dw.plugins.maybeOf<DwPush>()` answers
+`null`.
 
-## Declaration order is the policy
+The plugin reads everything it needs from the core it is initialized with — the client, its
+protocol, its session — and never the app's `dw`, which does not exist yet while the `plugins:`
+list is built (#54).
 
-The first transport that both builds for this platform and answers for itself on
-this device wins. The pair above therefore means RuStore on Android, FCM on iOS
-and web — and on an Android phone without the RuStore app, FCM there too. There
-is no platform switch in your code and none in the plugin; the list is the whole
-rule. An app that only knows FCM declares one entry.
+## Registration follows the session
 
-## It does not navigate
+The token and the signed-in account arrive independently and in either order. Whenever both are
+known and that pair has not been registered, the plugin sends `DwRegisterPushToken` — once per
+pair: a start signed in, a sign-in, an account switch and a refreshed token cost one call each,
+and repeats cost none. Nothing is configured about whose device it is: the server takes the caller.
 
-`onOpened` hands you the notification's data map and one guarantee: it fires
-**once per tap, after a frame**, however the app was launched. Turning that map
-into a screen is yours, because the keys and the routes are yours.
+**A sign-out needs no call.** The server binds the registration to the session key the call was
+made with and stops sending when that key is revoked — by this sign-out, by a sign-out on another
+device, by an admin. The next sign-in registers the device under its new key. There is no
+"unregister before signing out" step to forget, and no window in which the previous account's
+notifications reach a phone somebody else now holds.
 
-The guarantee is less obvious than it looks. A cold start delivers the tap before
-there is anything to route it into, so the plugin holds it until the app says it
-is ready. And a tap while the app is already on screen changes no widget — so
-Flutter schedules no frame, a post-frame callback would simply wait, and the
-navigation would land minutes later on an unrelated gesture. The plugin asks for
-that frame itself.
+A registration the server refuses or that fails is reported through the app's error reporting and
+tried again with the next token, sign-in or start.
 
-## Permission, at a moment that makes sense
+## Permission, when the user understands why
 
-By default the plugin asks as soon as it attaches, which is honest for an app
-whose whole point is notifications. For everything else:
+The plugin asks for nothing on its own. Where the app decides:
 
 ```dart
-DwPushConfig(requestPermissionOnAttach: false, /* ... */)
-// later, after the first order / at the end of onboarding:
-final permission = await dw.plugins.push.requestPermission();
+final permission = await dw.plugins.push.requestPermission(); // registers the token on yes
 ```
 
-A refusal is an answer, not an error: the transport stays attached, so a user who
-changes their mind in the system settings becomes reachable without restarting
-the app. `DwPushPermission.permanentlyDenied` is the only state where asking
-again does nothing — send them to the settings screen instead.
+A refusal is an answer, not an error. `DwPushPermission.permanentlyDenied` means only the system
+settings can change it. `dw.plugins.push.permission()` reads the state without asking.
 
-## The token, and signing out
+A user who turns notifications off inside the app calls `dw.plugins.push.pause()`: the device's
+registration is removed and nothing is registered until `resume()`. The choice is the app's to
+keep; `DwPush(isEnabled: ...)` reads it at start, so an app started with notifications off
+registers nothing.
 
-The token and the signed-in user arrive independently and in either order, so the
-plugin sends the pair whenever both exist, once, and re-sends when either
-changes. Registration goes through the push module's CRUD action; an app on
-somebody else's backend passes `registerToken:` instead.
+## Opened notifications
 
-**Who the token belongs to is not something you configure.** The plugin takes
-`dw.signedInUserIdProvider` at `init`, and that is not a convenience: the
-registration carries a token and a provider, never an id, so the recipient the
-server writes down is the one it derives from the authenticated call. The
-session is that same identity — the two sides therefore agree by construction,
-and there is no second source to keep in step.
+```dart
+dw.plugins.push.opened.listen((opened) {
+  if (opened.payloadAs<NewsAlert>() != null) {
+    router.goNamed(AppNavigationZone.news.name);
+  } else if (opened.link case final link?) {
+    router.go(link);
+  }
+});
+```
 
-On the client the id is local bookkeeping only: whether there is anybody to
-register a token for, whether this exact registration has already been made, and
-whether a sign-out invalidated it. Which is why an app that supplied its own is
-not redirecting notifications — it is only desynchronizing that bookkeeping from
-what the server recorded, and the symptom shows up as push going quiet after an
-account switch.
+A `DwPushOpened` carries the server's typed payload (`payload`, `payloadAs<T>()`), its `link` and
+its `source`: `coldStart`, `background` or `webClick`. The payload is decoded by the app's protocol
+with the same `DwPushData` the server encoded it with. A payload this build cannot read — a class
+of a newer server — is reported, and the link still opens.
 
-`DwPushConfig.recipientIdProvider` remains for the one app whose DartWay session
-is permanently empty because it authenticates through an
-`AuthenticationKeyManager` of its own. What it passes must mirror the identity
-its calls are authenticated as.
+**The notification that started the app is held** until the first listener subscribes, so a
+listener attached when the router exists still receives it. The example's `PushOpenedListener`
+wraps the app under `MaterialApp.builder`; the router's guards send a signed-out user to sign in.
 
-**Call `dw.plugins.push.revokeToken()` before signing out**, while the session is
-still valid. Afterwards there is nobody to authenticate the call, and the device
-keeps receiving the previous user's notifications until the server happens to
-find out.
+`dw.plugins.push.received` reports notifications that arrived while the app was on screen, never
+acting on them.
 
-## What stays in the app
+## On the web: the click
 
-The native setup, because it is about your project, not about the framework:
-`Firebase.initializeApp` and `DwFirebasePush.registerBackgroundHandler()` in
-`main()`, `google-services.json` / `GoogleService-Info.plist`, the web service
-worker (there is a template in `dartway_push_firebase`), and the RuStore
-`project_id` and notification icon in the Android manifest. Each package's README
-lists its own.
+Copy `web/firebase-messaging-sw.js` from `dartway_push_firebase` into the app's `web/` and fill in
+the Firebase config — nothing else. The order inside it is the whole point (#78): the Firebase SDK
+registers a `notificationclick` listener that calls `stopImmediatePropagation()`, so a listener
+added after the SDK never runs, on any browser, with no error. The template registers its listener
+before the SDK is even loaded and stops the SDK's instead. With a tab of the app open, it focuses
+that tab and posts the link, which arrives as `DwPushOpenSource.webClick`; with none, it opens the
+link on the app's origin, and the router starts there.
 
-### The tap, on web
+The server also sends the link as `webpush.fcm_options.link`, so the browser opens the right page
+even where no worker handles the click. The package's test executes the template in Node with the
+SDK's behaviour stubbed and clicks a notification: a template with the order swapped fails it.
 
-Two independent paths carry it. The server puts the in-app path into
-`webpush.fcm_options.link`, so a tap opens the right screen even with no service
-worker of yours — in a new tab, every time. The template's `notificationclick`
-handler is the one worth having: it focuses a tab that is already open and hands
-the path to the router.
+## On Android with RuStore
 
-The template takes the click by registering before `firebase.messaging()` and
-calling `stopImmediatePropagation()`, because the SDK installs a handler of its
-own in there and stops propagation the same way. Swapping those two lines costs
-the in-app path and reports nothing: the tap keeps working through the fallback,
-in a new tab, and no error is raised anywhere.
+`dartway_push_rustore` replaces the RuStore SDK's messaging service with its own: it writes each
+message's data down when it arrives (a tap may come back to a process that no longer exists), hands
+taps back without a `MainActivity` override, raises the Android 13 permission prompt, and draws a
+data-only message — the server sends a picture that way, because RuStore ignores an image in its
+notification block. The app's manifest names the RuStore project id and the notification icon and
+colour; the package's README lists the entries. RuStore push runs only on a physical device with
+RuStore installed and signed in.
+
+## Testing
+
+`package:dartway_push_flutter/testing.dart` has `DwFakePushTransport`, a transport the test drives:
+it issues a token, grants permission, and opens or delivers notifications when told. With the
+in-memory `DwFakeServer` answering `DwRegisterPushToken`, a widget test checks what the app sends
+and where an opened notification leads:
+
+```dart
+final transport = DwFakePushTransport(issuedToken: 'device-token');
+final app = await ExampleTestApp.start(tester, FakeClub(), pushTransports: [transport]);
+expect(app.server.callsOf<DwRegisterPushToken>(), hasLength(1));
+
+transport.open(const DwPushData(payload: NewsAlert(id: 1)));
+await app.settle(tester);
+expect(find.byType(NewsPage), findsOneWidget);
+```
+
+The example's `test/app/push_test.dart` holds these, and a cold start that lands on the news.
 
 ## See also
 
-- [Plugins](plugins.md) — how `dw.plugins.<name>` works, and why the accessor
-  lives in the plugin's package.
+- [Plugins](plugins.md) — how `dw.plugins.<name>` works.
 - [Push delivery](../4-server/push-delivery.md) — the server half.

@@ -296,6 +296,12 @@ abstract class AppLocalizations {
   /// **'Club news'**
   String get clubNews;
 
+  /// No description provided for @notifyAboutNews.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify me about news'**
+  String get notifyAboutNews;
+
   /// No description provided for @noNewsYet.
   ///
   /// In en, this message translates to:

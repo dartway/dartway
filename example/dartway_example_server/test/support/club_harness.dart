@@ -6,6 +6,7 @@ import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/entities/people.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:dartway_push_server/dartway_push_server.dart';
 import 'package:test/test.dart';
 
 /// One example server on its own throwaway database for a test file, and
@@ -23,6 +24,7 @@ final class ClubHarness {
   static Future<ClubHarness> start({
     DwServerSettings settings = const DwServerSettings(),
     DwFileStorageConfig? storage,
+    DwPushModule? push,
   }) async {
     final database = await DwTestDatabase.create(prefix: 'dw_example_test');
     late final ClubHarness harness;
@@ -32,6 +34,7 @@ final class ClubHarness {
         storage: storage,
         port: 0,
         settings: settings,
+        push: push,
         auth: DwAuthConfig(
           normalize: exampleAuth.normalize,
           onAccountCreated: exampleAuth.onAccountCreated,
@@ -52,8 +55,12 @@ final class ClubHarness {
   DwDatabaseHandle get db => server.db;
 
   /// A member signed up by phone and code through a real client, with
-  /// [name] collected at registration.
-  Future<ClubMember> member(String phone, String name) async {
+  /// [name] and the [marketing] consent collected at registration.
+  Future<ClubMember> member(
+    String phone,
+    String name, {
+    bool marketing = false,
+  }) async {
     final http = CountingTransport(DwHttpClientTransport());
     final live = RecordingConnector();
     final client = await server.connectClient(
@@ -68,7 +75,7 @@ final class ClubHarness {
       DwVerifyCode(
         ticketId: ticket.valueOrThrow.id,
         code: delivered[normalizePhone(phone)]!,
-        registration: {'firstName': name},
+        registration: {'firstName': name, 'marketing': '$marketing'},
       ),
     );
     await client.signIn(session.valueOrThrow);
@@ -80,9 +87,10 @@ final class ClubHarness {
   Future<ClubMember> memberWithRole(
     String phone,
     String name,
-    UserRole role,
-  ) async {
-    final member = await this.member(phone, name);
+    UserRole role, {
+    bool marketing = false,
+  }) async {
+    final member = await this.member(phone, name, marketing: marketing);
     final row = (await db.userProfiles.findFirst(
       where: (t) => t.accountId.equals(member.accountId),
     ))!;

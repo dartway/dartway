@@ -4,6 +4,13 @@
 
 The rewrite (see docs/1.0).
 
+- **Server modules.** `DwAppServer(modules: [...])` takes `DwServerModule`s —
+  framework satellites such as push — each bringing migrations under its own
+  namespace (applied after `dw`, before `app`), handlers for calls the project
+  may not answer itself, jobs named `dw.<namespace>.…`, startup problems of
+  its own, and `close()` on stop. `ctx.module<M>()` reaches a module's runtime
+  from a handler, which is how `ctx.push` exists without a global.
+
 - **Accounts, keys and identities without SQL (D-042 – D-050).** A project
   never queries `dw_account`, `dw_identity` or `dw_auth_key`; `ctx.accounts`
   (`DwAccountService`) covers them:
