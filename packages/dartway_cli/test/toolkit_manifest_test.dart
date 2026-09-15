@@ -257,10 +257,102 @@ void main() {
       );
     });
 
-    test('neither means a channel', () {
+    test('neither, with no checkout beside the CLI, means a channel', () {
       expect(
-        MonorepoSource(branch: 'stable', environment: const {}).isLocalCheckout,
+        MonorepoSource(
+          branch: 'stable',
+          environment: const {},
+          cliCheckout: () => null,
+        ).isLocalCheckout,
         isFalse,
+      );
+    });
+  });
+
+  group('the checkout the CLI runs from', () {
+    final beside = Directory('/home/dev/dartway');
+
+    test('is the source when no channel was chosen', () {
+      final source = MonorepoSource(
+        branch: 'stable',
+        environment: const {},
+        cliCheckout: () => beside,
+      );
+      expect(source.localDir, beside.path);
+      expect(source.isNamedCheckout, isFalse);
+    });
+
+    test('gives way to a chosen channel', () {
+      expect(
+        MonorepoSource(
+          branch: 'master',
+          channelChosen: true,
+          environment: const {},
+          cliCheckout: () => beside,
+        ).isLocalCheckout,
+        isFalse,
+      );
+    });
+
+    test('gives way to a named checkout', () {
+      final source = MonorepoSource(
+        branch: 'stable',
+        environment: const {'DARTWAY_MONOREPO_DIR': '/from/env'},
+        cliCheckout: () => beside,
+      );
+      expect(source.localDir, '/from/env');
+      expect(source.isNamedCheckout, isTrue);
+    });
+
+    test('is found around this test: it runs from the monorepo', () {
+      final found = MonorepoSource.findCliCheckout();
+      expect(found, isNotNull);
+      expect(
+        File(
+          p.join(found!.path, 'packages', 'dartway_cli', 'pubspec.yaml'),
+        ).existsSync(),
+        isTrue,
+      );
+    });
+
+    test('is not found for a package outside a monorepo, as pub.dev unpacks '
+        'one', () {
+      final cache = Directory.systemTemp.createTempSync('dw_hosted');
+      addTearDown(() => cache.deleteSync(recursive: true));
+      final package = Directory(
+        p.join(cache.path, 'hosted', 'pub.dev', 'dartway_cli-0.10.1'),
+      )..createSync(recursive: true);
+      File(p.join(package.path, 'pubspec.yaml')).writeAsStringSync('name: x\n');
+      Directory(p.join(package.path, 'lib')).createSync();
+
+      expect(
+        MonorepoSource.cliCheckoutAround(
+          Uri.directory(p.join(package.path, 'lib')),
+        ),
+        isNull,
+      );
+    });
+
+    test('a project on a channel is not moved onto it by a default', () {
+      final refusal = channelSwitchRefusal(
+        installed: const ToolkitProvenance(
+          source: 'https://github.com/dartway/dartway.git',
+          channel: 'stable',
+          commit: 'abc',
+          cliVersion: '0.10.0',
+          installedAt: '2026-09-01T00:00:00.000Z',
+        ),
+        requestedChannel: 'stable',
+        channelWasExplicit: false,
+        fromLocalCheckout: false,
+        cliCheckout: beside.path,
+      );
+      expect(
+        refusal,
+        allOf(
+          contains('--channel stable'),
+          contains('--local-repo ${beside.path}'),
+        ),
       );
     });
   });

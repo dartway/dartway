@@ -155,8 +155,9 @@ String? channelSwitchRefusal({
   required String requestedChannel,
   required bool channelWasExplicit,
   required bool fromLocalCheckout,
+  String? cliCheckout,
 }) {
-  // A local checkout ignores the channel entirely — `MonorepoSource` resolves
+  // A named local checkout ignores the channel entirely — `MonorepoSource` resolves
   // to the directory it was handed — and the install that follows records no
   // channel. Judging it against the `--channel` default would block the
   // framework's own development loop (`dartway setup-ai --local-repo ../dartway`)
@@ -166,6 +167,17 @@ String? channelSwitchRefusal({
 
   final recorded = installed?.channel;
   if (recorded == null || channelWasExplicit) return null;
+  // The checkout beside the CLI is a default too, and a quieter one than
+  // `stable`: nothing on the command line mentions it.
+  if (cliCheckout != null) {
+    return 'This project has the toolkit from the "$recorded" channel, and the '
+        'command would install it from the checkout this CLI runs from '
+        '($cliCheckout) — the default for a CLI activated from one. Moving '
+        'off a channel is a decision, so it is not something a default should '
+        'make.\n'
+        'Run it again naming the source you mean: '
+        '--channel $recorded to stay, --local-repo $cliCheckout to switch.';
+  }
   if (recorded == requestedChannel) return null;
   return 'This project has the toolkit from the "$recorded" channel, and the '
       'command would install "$requestedChannel" — the default. Moving between '

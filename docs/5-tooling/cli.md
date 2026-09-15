@@ -27,19 +27,26 @@ database named by `DW_DATABASE_*`. The server also applies them as it starts. Se
 ## Where the CLI takes the framework from
 
 The CLI does not carry the framework inside itself. `create`, `setup-ai` and `update` read the
-DartWay monorepo — `template/` and `toolkit/` — from one of two places:
+DartWay monorepo — `template/` and `toolkit/` — from the first of these that applies:
 
-- a local checkout, named by `--local-repo` or `DARTWAY_MONOREPO_DIR`;
-- otherwise a shallow clone of a branch, cached in `~/.dartway/monorepo` and refreshed with a
-  shallow fetch on every run. The branch is the **channel**: `--channel`, else `DARTWAY_BRANCH`,
-  else `stable`.
+1. a local checkout named by `--local-repo`, `--framework-path` (`create`) or `DARTWAY_MONOREPO_DIR`;
+2. a **channel** that was chosen — `--channel`, `DARTWAY_BRANCH`, or for `update` the channel the
+   project recorded: a shallow clone of that branch, cached in `~/.dartway/monorepo` and refreshed
+   with a shallow fetch on every run;
+3. **the checkout the CLI runs from**, when it runs from one — activated with `--source path` from a
+   checkout, or with `--source git` (pub keeps a clone of the repository at the ref), or run with
+   `dart run` inside the monorepo;
+4. otherwise the channel `stable`.
 
-That is why the version of the CLI you installed does not decide what a project gets — the channel
-does.
+So a CLI that has the framework beside it hands out the template and the toolkit of its own
+revision: activated from the rewrite's branch, `dartway create` makes a project of the rewrite
+rather than of whatever `stable` holds. A CLI with nothing beside it — installed from pub.dev —
+takes the channel. The install prints which source it used and records it in
+`.claude/dartway-toolkit.json`.
 
 | Variable | Meaning |
 |---|---|
-| `DARTWAY_BRANCH` | Default channel for `create`, `setup-ai` and `update` |
+| `DARTWAY_BRANCH` | The channel for `create`, `setup-ai` and `update` when `--channel` is not given; chosen, so it wins over the checkout the CLI runs from |
 | `DARTWAY_MONOREPO_DIR` | A local monorepo checkout to use instead of cloning |
 | `DARTWAY_REPO_URL` | Another monorepo git URL (default `https://github.com/dartway/dartway.git`) |
 
@@ -116,7 +123,7 @@ lands in that repository.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--channel` | `DARTWAY_BRANCH`, else `stable` | Monorepo branch to take the template and the toolkit from |
+| `--channel` | `DARTWAY_BRANCH`, else the checkout the CLI runs from, else `stable` | Monorepo branch to take the template and the toolkit from |
 | `--local-repo` | `DARTWAY_MONOREPO_DIR` | A local monorepo checkout instead of a clone |
 | `--framework-path` | — | Resolve the framework packages from a local monorepo checkout by path: each pubspec gets `dependency_overrides` onto `<monorepo>/packages` for exactly the `dartway_*` packages it reaches. The template and the toolkit come from the same checkout unless `--local-repo` names another |
 | `--language` | `English` | The language the project writes its own texts in — feature specs, doc comments, `docs/dev_notes/` |
@@ -154,7 +161,7 @@ guess.
 | `--base-branch` | `master` | Base branch of **this** project, used by the commit and PR instructions |
 | `--language` | `English` | The language the project writes its own texts in. Package APIs and error strings stay English |
 | `--notes-tracker` | `dartway/dartway` | Where framework findings are filed; `none` keeps them in the project |
-| `--channel` | `DARTWAY_BRANCH`, else `stable` | Monorepo branch to take the toolkit from |
+| `--channel` | `DARTWAY_BRANCH`, else the checkout the CLI runs from, else `stable` | Monorepo branch to take the toolkit from |
 | `--local-repo` | `DARTWAY_MONOREPO_DIR` | A local checkout instead of a clone |
 
 **An explicit flag wins, what the project recorded comes next, the default comes last.** The install
@@ -166,8 +173,9 @@ language and tracker, and the diff would look like any update.
 **A channel switch nobody asked for is refused.** When the project recorded one channel, `--channel`
 was not given, and the default is another, the command stops before fetching anything and names both
 channels. Naming either one proceeds: moving between channels is a decision, and it ends up written
-in the command that ran. A local checkout ignores the channel and records none, so it is never
-refused.
+in the command that ran. A named local checkout ignores the channel and records none, so it is never
+refused. The checkout the CLI runs from is a default like `stable`, and is refused the same way for a
+project that recorded a channel: `--channel <recorded>` stays, `--local-repo <checkout>` switches.
 
 Commit `.claude/` and `docs/dev_notes/` afterwards.
 

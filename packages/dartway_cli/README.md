@@ -12,7 +12,7 @@ Or straight from the monorepo (the `stable` channel):
 dart pub global activate --source git https://github.com/dartway/dartway.git --git-path packages/dartway_cli --git-ref stable
 ```
 
-Note: `dartway create` fetches the project template from the monorepo git repository (`stable` channel) regardless of how the CLI itself was installed.
+`create`, `setup-ai` and `update` take the template and the toolkit from a checkout you name (`--local-repo`, `--framework-path`), else from a channel you choose (`--channel`, `DARTWAY_BRANCH`), else from the monorepo the CLI itself was activated from (`--source path` or `--source git` — its own revision), else from the `stable` channel.
 
 ## Commands
 
@@ -25,7 +25,7 @@ dartway create my_app
 dartway create .        # the current, empty folder names the project
 ```
 
-Options: `--channel` (monorepo branch, default `stable`), `--local-repo` (use a local monorepo checkout), `--framework-path <monorepo>` (resolve the framework packages from a local checkout by path instead of pub.dev — for framework development and unpublished versions; takes the template from the same checkout), `--language`, `--notes-tracker`, `--no-git`.
+Options: `--channel` (monorepo branch; default: the checkout the CLI runs from, else `stable`), `--local-repo` (use a local monorepo checkout), `--framework-path <monorepo>` (resolve the framework packages from a local checkout by path instead of pub.dev — for framework development and unpublished versions; takes the template from the same checkout), `--language`, `--notes-tracker`, `--no-git`.
 
 ### `dartway generate`
 
@@ -73,6 +73,6 @@ dartway stats
 |---|---|
 | `DARTWAY_MONOREPO_DIR` | Local monorepo checkout to use instead of cloning (framework development) |
 | `DARTWAY_REPO_URL` | Override the monorepo git URL |
-| `DARTWAY_BRANCH` | Default channel (branch) for `create` / `setup-ai` |
+| `DARTWAY_BRANCH` | Channel (branch) for `create` / `setup-ai` / `update` when `--channel` is not given; wins over the checkout the CLI runs from |
 
 The monorepo clone is cached in `~/.dartway/monorepo`.

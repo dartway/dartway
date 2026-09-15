@@ -179,6 +179,39 @@ void main() {
     );
   });
 
+  test('without a channel or a checkout named, the project comes from the '
+      'checkout the CLI runs from — its own revision, not a channel', () async {
+    // A home with no clone cache and a repository URL that leads nowhere: a
+    // run that reached for a channel fails instead of quietly using one.
+    final environment = {
+      for (final MapEntry(:key, :value) in Platform.environment.entries)
+        if (key != 'DARTWAY_BRANCH' && key != 'DARTWAY_MONOREPO_DIR')
+          key: value,
+      'HOME': sandbox.path,
+      'DARTWAY_REPO_URL': p.join(sandbox.path, 'nowhere.git'),
+    };
+    Future<ProcessResult> run(List<String> arguments) => Process.run(
+      Platform.resolvedExecutable,
+      [cli, 'create', ...arguments, '--no-git'],
+      workingDirectory: sandbox.path,
+      environment: environment,
+      includeParentEnvironment: false,
+    );
+
+    final created = await run(['shop']);
+    expect(created.exitCode, 0, reason: '${created.stdout}\n${created.stderr}');
+    final manifest = read(
+      Directory(p.join(sandbox.path, 'shop')),
+      '.claude/dartway-toolkit.json',
+    );
+    expect(manifest, contains('"source": "${repository.path}"'));
+    expect(manifest, isNot(contains('"channel"')));
+
+    final onChannel = await run(['other', '--channel', 'stable']);
+    expect(onChannel.exitCode, isNot(0));
+    expect('${onChannel.stderr}', contains('nowhere.git'));
+  });
+
   test('a name that cannot become a bucket name is refused', () async {
     for (final name in ['shop__floor', 'shop_', 'a' * 56]) {
       final result = await dartway(['create', name, '--no-git']);

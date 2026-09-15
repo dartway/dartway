@@ -43,7 +43,10 @@ void addToolkitInstallOptions(
     ..addOption(
       'channel',
       defaultsTo: defaultChannel,
-      help: 'DartWay monorepo branch to take the toolkit from.',
+      help:
+          'DartWay monorepo branch to take the toolkit from. Without it (or '
+          'DARTWAY_BRANCH), a CLI activated from a monorepo checkout takes the '
+          'toolkit from that checkout.',
     )
     ..addOption(
       'local-repo',
@@ -63,6 +66,7 @@ class ToolkitInstallChoice {
     required this.channel,
     required this.localRepo,
     required this.channelWasExplicit,
+    required this.channelChosen,
   });
 
   /// Resolves the three settings in one place, and the order is the point:
@@ -102,6 +106,10 @@ class ToolkitInstallChoice {
           : args['channel'] as String,
       localRepo: args['local-repo'] as String?,
       channelWasExplicit: args.wasParsed('channel'),
+      channelChosen:
+          args.wasParsed('channel') ||
+          Platform.environment.containsKey('DARTWAY_BRANCH') ||
+          (followRecordedChannel && installed?.channel != null),
     );
   }
 
@@ -111,6 +119,12 @@ class ToolkitInstallChoice {
   final String channel;
   final String? localRepo;
   final bool channelWasExplicit;
+
+  /// Whether a channel was chosen at all — by `--channel`, by
+  /// `DARTWAY_BRANCH`, or, for `update`, by the channel the project recorded —
+  /// rather than defaulted. Only a default gives way to the checkout the CLI
+  /// runs from.
+  final bool channelChosen;
 
   Map<String, String> get settings => {
     ToolkitProvenance.baseBranchSetting: baseBranch,
@@ -157,6 +171,7 @@ Future<ToolkitInstallResult?> installToolkitInto({
   final source = MonorepoSource(
     branch: choice.channel,
     localDir: choice.localRepo,
+    channelChosen: choice.channelChosen,
   );
 
   // Before anything is fetched: a channel switch nobody asked for is the one
@@ -166,7 +181,8 @@ Future<ToolkitInstallResult?> installToolkitInto({
     installed: installed,
     requestedChannel: choice.channel,
     channelWasExplicit: choice.channelWasExplicit,
-    fromLocalCheckout: source.isLocalCheckout,
+    fromLocalCheckout: source.isNamedCheckout,
+    cliCheckout: source.isNamedCheckout ? null : source.localDir,
   );
   if (refusal != null) {
     stderr.writeln(refusal);

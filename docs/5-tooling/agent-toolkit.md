@@ -173,7 +173,7 @@ in every project that skipped it. `--notes-tracker owner/repo` sends them to ano
   `dartway-update` skill carries that report out.
 - **`--local-repo <checkout>`** (or `DARTWAY_MONOREPO_DIR`) — install from a local monorepo checkout
   instead of a channel, for working on the framework and a project side by side. It records no
-  channel.
+  channel. A CLI activated from a checkout uses that checkout when no channel is chosen.
 
 A plain re-run that would move a project to another channel is refused and asks for the channel by
 name. The details of both commands are in [The CLI](cli.md).

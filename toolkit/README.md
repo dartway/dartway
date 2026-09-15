@@ -48,7 +48,8 @@ dartway setup-ai                      # in the project root, the first time
 ```
 
 It clones or pulls the `dartway` monorepo (the **`stable`** branch by default — the last verified
-state), takes `toolkit/` from it, detects the packages, substitutes the tokens, fills `.claude/` and
+state; a CLI activated from a monorepo checkout or git ref uses that checkout instead, so its toolkit
+is of its own revision), takes `toolkit/` from it, detects the packages, substitutes the tokens, fills `.claude/` and
 records what it installed in `.claude/dartway-toolkit.json`. Commit `.claude/` afterwards: it is a
 generated-but-committed artifact. `dartway create` installs the toolkit the same way into the project it creates.
 

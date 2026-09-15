@@ -17,6 +17,15 @@
   the packages each pubspec reaches — instead of pub.dev, and takes the template from the same
   checkout. For building the framework, and for versions not yet published.
 
+- **BREAKING: a CLI with the framework beside it hands out its own revision.** `create`,
+  `setup-ai` and `update` without a named checkout or a chosen channel (`--channel`,
+  `DARTWAY_BRANCH`, or the channel a project recorded for `update`) take the template and the
+  toolkit from the monorepo the CLI runs from — activated by path or by git ref, or run inside the
+  monorepo — instead of cloning `stable`. The rewrite's CLI used to create 0.x projects that way.
+  A CLI installed from pub.dev has nothing beside it and still takes `stable`. A project that
+  recorded a channel is not moved onto the checkout by a plain `setup-ai`: it is refused, naming
+  `--channel` and `--local-repo`.
+
 - **BREAKING: the toolkit is installed whole or not at all.** `setup-ai`, `update` and `create`
   require a `*_shared` package beside `*_server` and `*_flutter`, and the installer no longer knows
   `__CLIENT_PKG__` (1.0 has no client package; it filled the token with an empty string, and an

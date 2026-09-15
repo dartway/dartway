@@ -25,7 +25,11 @@ class CreateCommand extends Command<int> {
         defaultsTo:
             Platform.environment['DARTWAY_BRANCH'] ??
             MonorepoSource.defaultBranch,
-        help: 'DartWay monorepo branch to create the project from.',
+        help:
+            'DartWay monorepo branch to create the project from. Without it '
+            '(or DARTWAY_BRANCH), a CLI activated from a monorepo checkout '
+            'creates the project from that checkout — the template of its own '
+            'revision.',
       )
       ..addOption(
         'local-repo',
@@ -124,6 +128,9 @@ class CreateCommand extends Command<int> {
     final source = MonorepoSource(
       branch: argResults!['channel'] as String,
       localDir: (argResults!['local-repo'] as String?) ?? frameworkPath,
+      channelChosen:
+          argResults!.wasParsed('channel') ||
+          Platform.environment.containsKey('DARTWAY_BRANCH'),
     );
     final monorepoDir = await source.resolve();
     final templateDir = Directory(p.join(monorepoDir.path, _sourceDirectory));
