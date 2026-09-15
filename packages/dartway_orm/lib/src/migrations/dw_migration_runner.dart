@@ -161,7 +161,7 @@ final class DwMigrationRunner {
             batch: row.batch,
             appliedAt: row.appliedAt,
           ),
-          final row when row.checksum != entry.migration.checksum =>
+          final row when !_accepts(entry.migration, row.checksum) =>
             DwMigrationStatus(
               entry.ref,
               DwMigrationState.changed,
@@ -319,7 +319,7 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
       if (row.dirty) return DwDirtyMigration(row.ref);
       final entry = registered[row.ref];
       if (entry == null) return DwMissingMigration(row.ref);
-      if (entry.migration.checksum != row.checksum) {
+      if (!_accepts(entry.migration, row.checksum)) {
         return DwChangedMigration(
           row.ref,
           applied: row.checksum,
@@ -334,6 +334,12 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
         if (_migrations.containsKey(row.ref.namespace)) ?check(row),
     ];
   }
+
+  /// Whether a ledger row sealed with [applied] is [migration] as the code
+  /// has it now.
+  static bool _accepts(DwDatabaseMigration migration, String applied) =>
+      applied == migration.checksum ||
+      migration.supersededChecksums.contains(applied);
 
   void _refuseOn(List<DwMigrationProblem> problems) {
     if (problems.isNotEmpty) throw DwMigrationRefused(problems);

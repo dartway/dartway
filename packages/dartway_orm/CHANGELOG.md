@@ -4,6 +4,12 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwDatabaseMigration.supersededChecksums` (D-060):** checksums of earlier
+  texts of a migration that the ledger accepts in place of `checksum` — for
+  correcting a migration that could not apply on some databases while others
+  applied the earlier text with the same outcome. `status` reports such a row
+  `applied`; any other checksum is still `changed` and refuses.
+
 - **Table definition members no row field wants (D-040):** `DwTableDef.name`,
   `columns` and `schema` are now `tableName`, `tableColumns` and
   `tableSchema`, and a row class declares `static const tableDef` (was

@@ -223,7 +223,9 @@ check` is green" proves the migrations only if the output did not say it skipped
 staging server, production. The server refuses to start against a database whose ledger holds a
 different checksum for the same id, and it is right to: the database was built by the old text,
 and nobody knows what the new text would have done. A fix to an applied migration is a **new**
-migration.
+migration. (`supersededChecksums` is not a way around this: it exists for a migration that
+*failed* on some databases and is corrected with the same outcome where it did apply — ask the
+human before reaching for it.)
 
 **Never delete or rename an applied migration's file or id.** The ledger then holds a migration
 the code does not know (`missing`), and the server refuses for the same reason.

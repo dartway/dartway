@@ -6,6 +6,7 @@ final class TestMigration extends DwDatabaseMigration {
   TestMigration(
     this.id, {
     this.checksum = 'sealed',
+    this.supersededChecksums = const {},
     this.dependsOn = const [],
     this.transactional = true,
     required this.onUp,
@@ -16,6 +17,8 @@ final class TestMigration extends DwDatabaseMigration {
   final String id;
   @override
   final String checksum;
+  @override
+  final Set<String> supersededChecksums;
   @override
   final List<DwMigrationRef> dependsOn;
   @override

@@ -26,6 +26,17 @@ abstract class DwDatabaseMigration {
   /// because a compiled server has no sources to hash.
   String get checksum;
 
+  /// Checksums of earlier texts of this migration that the ledger accepts in
+  /// place of [checksum].
+  ///
+  /// For one case only: a migration that **could not apply** on some
+  /// databases is corrected, while others already applied the earlier text —
+  /// and the earlier text, wherever it did apply, left exactly what the
+  /// corrected one leaves. Such databases keep their ledger row, the others
+  /// run the correction. A change to what an applied migration does is never
+  /// this: it is a new migration.
+  Set<String> get supersededChecksums => const {};
+
   /// Migrations that must be applied first; may name other namespaces.
   List<DwMigrationRef> get dependsOn => const [];
 

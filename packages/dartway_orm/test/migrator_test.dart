@@ -318,6 +318,65 @@ void main() {
       );
     });
 
+    test('a corrected migration accepts the checksum it supersedes, and '
+        'only that one', () async {
+      await DwMigrationRunner(
+        db(),
+        migrations: {
+          'app': [createTable('1_a', 'a', checksum: 'v1')],
+        },
+      ).apply();
+
+      final corrected = TestMigration(
+        '1_a',
+        checksum: 'v2',
+        supersededChecksums: const {'v1'},
+        onUp: (m) => throw StateError('an applied migration is not run again'),
+      );
+      final run = await DwMigrationRunner(
+        db(),
+        migrations: {
+          'app': [corrected, createTable('2_b', 'b')],
+        },
+      ).apply();
+      expect(run.migrations, const [DwMigrationRef('app', '2_b')]);
+      expect(
+        (await DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [corrected, createTable('2_b', 'b')],
+          },
+        ).status()).map((s) => s.state),
+        everyElement(DwMigrationState.applied),
+      );
+
+      await expectLater(
+        DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [
+              TestMigration(
+                '1_a',
+                checksum: 'v3',
+                supersededChecksums: const {'v0'},
+                onUp: (m) async {},
+              ),
+              createTable('2_b', 'b'),
+            ],
+          },
+        ).apply(),
+        throwsA(
+          isA<DwMigrationRefused>().having(
+            (e) => e.problems.single,
+            'problem',
+            isA<DwChangedMigration>()
+                .having((p) => p.applied, 'applied', 'v1')
+                .having((p) => p.current, 'current', 'v3'),
+          ),
+        ),
+      );
+    });
+
     test('every problem is reported at once', () async {
       final refused = DwMigrationRunner(
         db(),

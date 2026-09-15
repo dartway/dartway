@@ -22,6 +22,12 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     '20260914_180000_dw_stored_file_bucket',
     _storedFileBucketUp,
     _storedFileBucketDown,
+    // Its first text added the column NOT NULL outright, which fails on a
+    // table with rows; wherever it applied, the table was empty and it left
+    // what this text leaves (D-060).
+    supersededChecksums: {
+      '718954535b1d69401c8392d30a11428e46dc6a94dc6869f75aa845acd0b4b6b6',
+    },
   ),
   const _DwSqlMigration(
     '20260914_220000_dw_keys_and_identities',
@@ -33,10 +39,17 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
 /// A framework migration written as SQL statements. Its checksum is the hash
 /// of those statements, so editing an applied one is caught by the ledger.
 final class _DwSqlMigration extends DwDatabaseMigration {
-  const _DwSqlMigration(this.id, this._up, this._down);
+  const _DwSqlMigration(
+    this.id,
+    this._up,
+    this._down, {
+    this.supersededChecksums = const {},
+  });
 
   @override
   final String id;
+  @override
+  final Set<String> supersededChecksums;
   final List<String> _up;
   final List<String> _down;
 
@@ -181,10 +194,28 @@ const List<String> _storedFileDown = ['DROP TABLE dw_stored_file'];
 
 // Public and private files live in two buckets, so a row names its bucket: a
 // file stays where it was uploaded when the configuration names other buckets
-// later, and its object is found — and deleted — there. No default: which
-// bucket an existing row is in is not something a migration can know.
+// later, and its object is found — and deleted — there.
+//
+// No default and no guess for rows that predate the column: they were uploaded
+// to the single bucket `DW_STORAGE_BUCKET` named then, which is neither of the
+// two buckets a configuration names now (`molodey` became `molodey-public`),
+// and a guessed name would send their links and deletions to a bucket that
+// does not hold them — a delete of a missing key succeeds. So such rows stop
+// the migration with the statement that records the fact, and a table that
+// has them recorded, or has no rows, migrates.
 const List<String> _storedFileBucketUp = [
-  'ALTER TABLE dw_stored_file ADD COLUMN bucket text NOT NULL',
+  'ALTER TABLE dw_stored_file ADD COLUMN IF NOT EXISTS bucket text',
+  r'''
+DO $$
+DECLARE
+  unknown bigint := (SELECT count(*) FROM dw_stored_file WHERE bucket IS NULL);
+BEGIN
+  IF unknown > 0 THEN
+    RAISE EXCEPTION '% rows of dw_stored_file were uploaded before a file recorded its bucket, and which bucket holds their objects is not something a migration can know: the single bucket DW_STORAGE_BUCKET named then. Record it, then start the server again: ALTER TABLE dw_stored_file ADD COLUMN bucket text; UPDATE dw_stored_file SET bucket = ''<that bucket>'';', unknown;
+  END IF;
+END
+$$''',
+  'ALTER TABLE dw_stored_file ALTER COLUMN bucket SET NOT NULL',
   'ALTER TABLE dw_stored_file DROP CONSTRAINT dw_stored_file_object_key',
   'ALTER TABLE dw_stored_file ADD CONSTRAINT dw_stored_file_object '
       'UNIQUE (bucket, object_key)',

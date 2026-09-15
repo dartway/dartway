@@ -61,6 +61,7 @@ reviewed by hand — a column renamed rather than dropped and re-added).
 |---|---|
 | `id` | `YYYYMMDD_HHMMSS_name`, unique in its namespace; the file is `m<id>.dart` |
 | `checksum` | a hash of the file's source, written by `create` and refreshed by `rehash`. The ledger stores it; an applied migration whose checksum changed refuses the next run. It is a declared literal because a compiled server has no sources to hash. Whitespace does not count, so `dart format` does not change it |
+| `supersededChecksums` | checksums of earlier texts the ledger accepts in place of `checksum`. Empty by default, and for one case only: a migration that **could not apply** on some databases is corrected, and the earlier text, wherever it did apply, left exactly what the correction leaves — those databases keep their row, the rest run the correction. A change to what an applied migration does is a new migration |
 | `dependsOn` | `DwMigrationRef(namespace, id)`s that must be applied first; may name another namespace. Empty by default |
 | `transactional` | `true` by default. `false` only for statements Postgres refuses inside a transaction (`CREATE INDEX CONCURRENTLY`); such a migration is recorded `dirty` before it starts, so a crash halfway blocks the next run until someone looks |
 | `up(m)` | the change |
@@ -87,7 +88,8 @@ Before applying anything, the runner compares the ledger with the code and **ref
 `DwMigrationRefused`, nothing applied, every problem listed — when:
 
 - a migration is applied but no longer registered (**missing**);
-- an applied migration's checksum differs from the code's (**changed**: its source was edited);
+- an applied migration's checksum differs from the code's and is not one of its
+  `supersededChecksums` (**changed**: its source was edited);
 - a migration is **dirty** (a non-transactional one started and never finished);
 - a `dependsOn` names an unregistered migration, the dependencies form a cycle, or one id is
   registered twice.
@@ -105,7 +107,12 @@ id.
 
 - `dw` — the framework's own tables: accounts, identities, session keys, code tickets, command
   outcomes, jobs, stored files. Listed as `DwAppServer.frameworkMigrations`. Append-only: a change
-  is a new migration.
+  is a new migration. One migration was corrected in place, because it could not apply where
+  `dw_stored_file` held rows: `20260914_180000_dw_stored_file_bucket` stops on files uploaded
+  before a file recorded its bucket and names the two statements that record it
+  (`ALTER TABLE dw_stored_file ADD COLUMN bucket text; UPDATE dw_stored_file SET bucket = '…'`,
+  the bucket `DW_STORAGE_BUCKET` named then); a database that applied its first text is accepted
+  by `supersededChecksums`.
 - `app` — the project's.
 
 Project tables may reference framework tables — a profile references `dw_account`, an attachment
