@@ -124,7 +124,7 @@ The rewrite (see docs/1.0).
   object is orphaned). Without `files`, the file calls answer as incidents and
   `ctx.files` throws. `DwTestServer.connectClient` takes `storageTransport`.
 - **`20260914_180000_dw_stored_file_bucket` migrates a table that holds files
-  (D-060).** Its first text added `bucket` `NOT NULL` outright and failed on
+  (D-056).** Its first text added `bucket` `NOT NULL` outright and failed on
   any database with a stored file. The column is now added nullable, and rows
   without a bucket stop the migration with the two statements that record the
   bucket their objects are in — the single `DW_STORAGE_BUCKET` of that time,

@@ -24,7 +24,7 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _storedFileBucketDown,
     // Its first text added the column NOT NULL outright, which fails on a
     // table with rows; wherever it applied, the table was empty and it left
-    // what this text leaves (D-060).
+    // what this text leaves (D-056).
     supersededChecksums: {
       '718954535b1d69401c8392d30a11428e46dc6a94dc6869f75aa845acd0b4b6b6',
     },

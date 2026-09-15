@@ -4,7 +4,7 @@
 
 The rewrite (see docs/1.0).
 
-- **`DwDatabaseMigration.supersededChecksums` (D-060):** checksums of earlier
+- **`DwDatabaseMigration.supersededChecksums` (D-056):** checksums of earlier
   texts of a migration that the ledger accepts in place of `checksum` — for
   correcting a migration that could not apply on some databases while others
   applied the earlier text with the same outcome. `status` reports such a row
