@@ -17,6 +17,13 @@
   the packages each pubspec reaches — instead of pub.dev, and takes the template from the same
   checkout. For building the framework, and for versions not yet published.
 
+- **BREAKING: the toolkit is installed whole or not at all.** `setup-ai`, `update` and `create`
+  require a `*_shared` package beside `*_server` and `*_flutter`, and the installer no longer knows
+  `__CLIENT_PKG__` (1.0 has no client package; it filled the token with an empty string, and an
+  older toolkit's skills then named `..//lib/src/protocol`). Before writing anything the installer
+  reads the toolkit and refuses one holding a token it does not fill, or would fill with nothing,
+  naming each token and its file.
+
 - **`dartway test` starts a MinIO beside the Postgres** (`DW_STORAGE_ENDPOINT`/`_ACCESS_KEY`/
   `_SECRET_KEY`, the image a deployment runs, in memory, on a port Docker picks) so upload
   suites run like the database ones. `--no-storage` skips it; `--storage-image` picks the image.

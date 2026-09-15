@@ -145,9 +145,9 @@ Installs the agent toolkit into the project: `.claude/CLAUDE.md`, the `dartway-*
 [The agent toolkit](agent-toolkit.md).
 
 The project root is `git rev-parse --show-toplevel`, or the current directory outside a
-repository. The layout is detected by directory suffix: exactly one `*_server` and one `*_flutter`
-are required, `*_shared` is optional; none or two of a kind stops the command with a layout error
-rather than a guess.
+repository. The layout is detected by directory suffix: exactly one `*_shared`, one `*_server` and one
+`*_flutter` are required; none or two of a kind stops the command with a layout error rather than a
+guess.
 
 | Option | Default | Meaning |
 |---|---|---|

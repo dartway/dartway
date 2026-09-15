@@ -209,6 +209,7 @@ void main() {
       File(p.join(project.path, 'shop_server', 'pubspec.yaml'))
         ..createSync(recursive: true)
         ..writeAsStringSync('name: shop_server\n');
+      Directory(p.join(project.path, 'shop_shared')).createSync();
       File(
         p.join(project.path, 'shop_flutter', 'nginx.conf'),
       ).writeAsStringSync(r'''

@@ -36,7 +36,7 @@ void main() {
   ProjectLayout layoutIn(Directory root) => ProjectLayout(
     root: root,
     serverPackage: 'my_app_server',
-    clientPackage: 'my_app_client',
+    sharedPackage: 'my_app_shared',
     flutterPackage: 'my_app_flutter',
   );
 

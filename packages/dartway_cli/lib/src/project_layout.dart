@@ -22,27 +22,26 @@ Directory findProjectRoot() {
   return Directory.current;
 }
 
-/// DartWay project layout: sibling Dart packages in the project root whose
-/// role is defined by the directory name suffix — `*_server`, `*_flutter` and
-/// the optional `*_shared`, the contract both of them speak.
+/// DartWay project layout: three sibling Dart packages in the project root
+/// whose role is defined by the directory name suffix — `*_server`,
+/// `*_flutter` and `*_shared`, the contract both of them speak.
 ///
-/// `*_client` is optional and read only for the agent toolkit, which still
-/// names a generated client package in its token table. A 1.0 project has none:
-/// the shared package is the client contract.
+/// All three are required. A project without its shared package has no
+/// contract to generate, and every token the agent toolkit names a package by
+/// has to name a real one: an empty `__SHARED_PKG__` turned the skills' paths
+/// into `/lib/src/`.
 class ProjectLayout {
   ProjectLayout({
     required this.root,
     required this.serverPackage,
     required this.flutterPackage,
-    this.clientPackage,
-    this.sharedPackage,
+    required this.sharedPackage,
   });
 
   final Directory root;
   final String serverPackage;
   final String flutterPackage;
-  final String? clientPackage;
-  final String? sharedPackage;
+  final String sharedPackage;
 
   Directory get flutterPackageDir =>
       Directory(p.join(root.path, flutterPackage));
@@ -78,8 +77,7 @@ class ProjectLayout {
       root: root,
       serverPackage: findBySuffix('server', required: true)!,
       flutterPackage: findBySuffix('flutter', required: true)!,
-      clientPackage: findBySuffix('client', required: false),
-      sharedPackage: findBySuffix('shared', required: false),
+      sharedPackage: findBySuffix('shared', required: true)!,
     );
   }
 
@@ -122,8 +120,7 @@ class ProjectLayout {
     '__SERVER_PKG__': serverPackage,
     '__FLUTTER_PKG__': flutterPackage,
     '__FLUTTER_APP_FILE__': flutterAppFile,
-    '__CLIENT_PKG__': clientPackage ?? '',
-    '__SHARED_PKG__': sharedPackage ?? '',
+    '__SHARED_PKG__': sharedPackage,
     '__BASE_BRANCH__': baseBranch,
   };
 }

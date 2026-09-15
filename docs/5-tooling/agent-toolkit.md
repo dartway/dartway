@@ -94,7 +94,7 @@ so the skills talk about `my_app_server`, not about a placeholder:
 
 | Token | Becomes |
 |---|---|
-| `__SHARED_PKG__` | The `*_shared` package, or empty when there is none |
+| `__SHARED_PKG__` | The `*_shared` package |
 | `__SERVER_PKG__` | The `*_server` package |
 | `__FLUTTER_PKG__` | The `*_flutter` package |
 | `__FLUTTER_APP_FILE__` | The app's wiring file, `<project>_app.dart` |
@@ -103,7 +103,10 @@ so the skills talk about `my_app_server`, not about a placeholder:
 | `__NOTES_TRACKER__` | `--notes-tracker` (default `dartway/dartway`), or `none` |
 
 The packages are detected by directory suffix at the project root on every run; exactly one
-`*_server` and one `*_flutter` are required. The three flag settings are recorded in
+`*_shared`, one `*_server` and one `*_flutter` are required. **A token nothing fills stops the
+install before a file is touched**: the installer reads the toolkit first, and a token this CLI does
+not know, or one it would fill with nothing, is named with its file — a toolkit from another
+framework revision than the CLI, rather than a skill that tells the agent about `/lib/src/`. The three flag settings are recorded in
 `.claude/dartway-toolkit.json` and replayed by the next install unless a flag names another value —
 see [The CLI](cli.md).
 

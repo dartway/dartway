@@ -50,6 +50,20 @@ class ToolkitInstaller {
       );
     }
 
+    // Before anything is removed or written: a toolkit naming a token this CLI
+    // does not fill would be installed with the token in its text, and a
+    // token filled with nothing reads as a path like `/lib/src/`. Both are an
+    // installed harness that is wrong without looking wrong.
+    final unresolved = unresolvedTokens(toolkitDir, tokens);
+    if (unresolved.isNotEmpty) {
+      throw StateError(
+        'The toolkit at ${toolkitDir.path} does not fit this CLI '
+        '($dartwayCliVersion) — it would be installed with tokens nothing '
+        'fills:\n  ${unresolved.join('\n  ')}\n'
+        'Install a toolkit from the same framework revision as the CLI.',
+      );
+    }
+
     final claudeDir = Directory(p.join(projectRoot.path, '.claude'));
     final skillsDir = Directory(p.join(claudeDir.path, 'skills'));
     final commandsDir = Directory(p.join(claudeDir.path, 'commands'));
@@ -362,6 +376,47 @@ class ToolkitInstaller {
       }
     }
     return copiedFiles;
+  }
+
+  /// A token as the toolkit writes one: `__SERVER_PKG__`.
+  static final RegExp tokenPattern = RegExp(
+    r'__[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*__',
+  );
+
+  /// Every token the files installed from [toolkitDir] would still hold after
+  /// substituting [tokens], as `<file>: <token>` — a token [tokens] does not
+  /// name, one it names with an empty value, and any token in a file that is
+  /// not substituted (only markdown is). Empty when the install is whole.
+  static List<String> unresolvedTokens(
+    Directory toolkitDir,
+    Map<String, String> tokens,
+  ) {
+    final sources = <File>[
+      for (final folder in const ['skills', 'commands', 'dev_notes'])
+        if (Directory(p.join(toolkitDir.path, folder)).existsSync())
+          ...Directory(
+            p.join(toolkitDir.path, folder),
+          ).listSync(recursive: true).whereType<File>(),
+      for (final name in const ['CLAUDE.md', 'settings.json'])
+        if (File(p.join(toolkitDir.path, name)).existsSync())
+          File(p.join(toolkitDir.path, name)),
+    ];
+    final problems = <String>{};
+    for (final file in sources) {
+      final String content;
+      try {
+        content = file.readAsStringSync();
+      } on FileSystemException {
+        continue; // not text: nothing in it is substituted or read
+      }
+      final substituted = file.path.endsWith('.md');
+      for (final match in tokenPattern.allMatches(content)) {
+        final token = match.group(0)!;
+        if (substituted && (tokens[token]?.isNotEmpty ?? false)) continue;
+        problems.add('${p.relative(file.path, from: toolkitDir.path)}: $token');
+      }
+    }
+    return problems.toList()..sort();
   }
 
   static void _substituteTokens(List<File> files, Map<String, String> tokens) {
