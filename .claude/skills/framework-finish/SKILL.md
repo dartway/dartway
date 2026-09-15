@@ -1,11 +1,11 @@
 ---
 name: framework-finish
-description: The synchronisation audit to run before committing a change to the DartWay framework — checks that a public API change is reflected in example/, template/, toolkit/skills/, docs/ and the CHANGELOG, that a change asking projects to edit their own code carries a migration note in docs/migrations/, and that a bumped package version still satisfies the carets stated for it in example/ and template/, and that the change carries no backward-compatibility scaffolding, which a 0.x framework does not keep. Run it once the package code is done, before the commit or the PR.
+description: The synchronisation audit to run before committing a change to the DartWay framework — checks that a public API change is reflected in example/, template/, generated code, toolkit/, docs/ and the CHANGELOG, that a wire change bumps dwProtocolVersion, that a change asking released projects to edit their own code carries a migration note in docs/migrations/, that a bumped package version still satisfies the carets stated for it in example/ and template/, and that the change carries no backward-compatibility scaffolding, which a 0.x framework does not keep. Run it once the package code is done, before the commit or the PR.
 ---
 
 # framework-finish — the monorepo synchronisation audit
 
-The DartWay monorepo lives by the synchronisation law (see the root `CLAUDE.md`): the public API, `example`, **`template`**, the toolkit skills and the docs evolve together, in one pull request. This skill catches the drift across a diff — and, in step 5, the one mirror that lives outside this repository: the projects built on the framework, which learn what they owe from `docs/migrations/` or not at all.
+The DartWay monorepo lives by the synchronisation law (see the root `CLAUDE.md`): the public API, `example`, **`template`**, the generated code, the wire, the toolkit and the docs evolve together, in one pull request. This skill catches the drift across a diff — and, in step 5, the one mirror that lives outside this repository: the projects built on the framework, which learn what they owe from `docs/migrations/` or not at all.
 
 ## Step 1. Collect the diff
 
@@ -13,18 +13,19 @@ The DartWay monorepo lives by the synchronisation law (see the root `CLAUDE.md`)
 git diff <base>...HEAD --stat        # plus anything uncommitted: git status, git diff
 ```
 
-The base is `master` unless told otherwise. What matters is what changed under `packages/`.
+The base is `master` unless told otherwise (`dartway-1.0` for work on the rewrite). What matters is what changed under `packages/`.
 
 ## Step 2. Decide what counts as a public API change
 
-A package's public API is what it exports: the files reachable through `lib/<package>.dart` and whatever `lib/src/...` re-exports outward. It is an API change when there is:
+A package's public API is what it exports: the files reachable through `lib/<library>.dart` (for the family: `dartway_core_shared.dart`, `dartway_core_server.dart` and its `testing.dart`, `dartway_core_flutter.dart`, and the internal `dartway_orm` / `dartway_client` libraries they re-export), honouring `show` and `hide`, without `@internal` declarations. It is an API change when there is:
 
 - a new, removed or renamed public class, method, parameter or extension;
 - a changed signature, or changed behaviour, of a public method;
-- a changed default in a config (`DwCrudConfig`, `DwSaveConfig`, `DwAuthConfig`, …);
-- a new mandatory initialization step (`DwCore.init`, `setupRepository`, …).
+- a changed default in a config (`DwServerSettings`, `DwAuthConfig`, `DwConfig`, `DwClientOptions`, …);
+- a new mandatory wiring step (a required `DwAppServer` or `DwFlutterCore` parameter, a startup check a project has to satisfy);
+- a change to what the generator writes, or to the framework's own migrations.
 
-Purely internal edits — private code, a refactor with no behaviour change, `zarchive/` — are not API.
+Purely internal edits — private code, a refactor with no behaviour change — are not API.
 
 ## Step 3. Check the mirrors
 
@@ -33,9 +34,11 @@ For each API change, check whether it is reflected in:
 | Mirror | What to look for |
 |---|---|
 | `example/` | Does example use the API that changed; does it compile; does it demonstrate the new capability |
-| `template/` | **Does the skeleton compile.** This is what every new project receives through `dartway create`; nobody runs the template day to day, so it rots quietly and you hear about it from a stranger. If the change touched auth, roles, navigation, the admin panel, the UI kit or `DwCore.init`, the template is almost certainly affected |
-| `toolkit/skills/` | grep for the old names and signatures in `toolkit/skills/*/SKILL.md` and `toolkit/CLAUDE.md` — a skill must not teach an agent an API that is gone |
-| `docs/` | grep for the concepts involved — a page must not contradict the code |
+| `template/` | **Does the skeleton compile, and are its suites green.** This is what every new project receives through `dartway create`; nobody runs the template day to day, so it rots quietly and you hear about it from a stranger. If the change touched auth, accounts, uploads, navigation, the admin panel, the UI kit or the `DwFlutterCore` wiring, the template is almost certainly affected |
+| generated code | **Regenerated in `example/` and `template/`**, shared and server together, when the change reaches the generator's input or output: `dart run dartway_generator --project .. --check` from each project's server package reports `0 out of date, 0 stale`. A row class change in either project comes with a new migration (`dart run bin/migrate.dart create <name>`); an existing migration is never edited |
+| the wire | **A change to how calls, `DwApiResponse`, update transports, live messages or DTO JSON look bumps `dwProtocolVersion`** (D-052). `dart test -p vm,node` in `packages/dartway_core_shared` — `wire_golden_test.dart` fails on a changed encoding at an unchanged version; after the bump, `DW_UPDATE_GOLDENS=1 dart test test/wire_golden_test.dart` refreshes the golden |
+| `toolkit/` | grep for the old names and signatures in `toolkit/skills/*/SKILL.md` and `toolkit/CLAUDE.md` — a skill must not teach an agent an API that is gone. A check whose severity moved changes the law table in `toolkit/CLAUDE.md` (`toolkit_law_list_test.dart`); a skill added or removed changes its list (`toolkit_skill_list_test.dart`) |
+| `docs/` | grep for the concepts involved — a page must not contradict the code. `dart test test/docs_identifiers_test.dart` in `packages/dartway_cli` fails on a `Dw…` type or `dw.` member the prose names and the code no longer declares, and on a broken link; it cannot see a wrong signature |
 | the package's `CHANGELOG.md` | Is there an entry under the current (unreleased) version |
 
 **The mirror outside this repository.** Change `packages/dartway_studio_bridge` and you have changed one side of a contract whose other side lives in a separate repository (`dartway/dartway_studio`). The folders are no longer neighbours, so this item is the only thing holding the check:
@@ -49,17 +52,19 @@ The same applies to `docs/` and the site, but more gently — the site is a cons
 
 Quick additional checks:
 
-- **no compatibility scaffolding.** Read the diff for code whose only job is to keep an older shape alive: a deprecated alias next to its replacement, a second branch for the way it used to be, a check that recognises state written by a previous version and repairs it, a default chosen so that an existing installation keeps working. Under a zero major the framework promises nothing and therefore preserves nothing (root `CLAUDE.md`, "Zero major") — the change fixes the shape going forward, and what an existing project owes is a note in `docs/migrations/` for a human to act on, not a permanent second path in the code. This is a finding even when the scaffolding is three lines and even when it was added in good faith: it is written once and read forever;
+- **no compatibility scaffolding.** Read the diff for code whose only job is to keep an older shape alive: a deprecated alias next to its replacement, a second branch for the way it used to be, a check that recognises state written by a previous version and repairs it, a default chosen so that an existing installation keeps working. Under a zero major the framework promises nothing and therefore preserves nothing (root `CLAUDE.md`, "Zero major") — the change fixes the shape going forward, and what an existing project owes is a note in `docs/migrations/` for a human to act on once releases exist, not a permanent second path in the code. This is a finding even when the scaffolding is three lines and even when it was added in good faith: it is written once and read forever;
+- **the naming rule:** a new public name has at least two words after `Dw` (root `CLAUDE.md`, "Naming");
 - **the toolkit invariant:** the diff under `toolkit/` carries no literals from a specific project, only `__*__` tokens. There is deliberately no grep for this: a pattern listing the projects we remember today will not catch the leak that arrives from the next one, and the previous grep found precisely its own documentation. Read it with your eyes — a name that means something in exactly one project has to be a token or an invented example;
-- **the skeleton invariant:** `template/` holds no domain models — `grep -riE 'club|booking|chat|news|fitness' template/ --include=*.dart --include=*.spy.yaml` comes back empty. Domain leaks into the skeleton unnoticed (a widget copied out of example brings `ClubSession` with it);
-- **the template's migrations and generated code are under version control** (`git ls-files template/dartway_starter_server/migrations/ | head -1` is not empty). They were in `.gitignore` once, and for months `dartway create` handed out a project that would not start: the folder was there locally and missing from the clone;
-- no new files under `zarchive/`/`zarchiv/` sneaked into the diff;
+- **the skeleton invariant:** `template/` holds no domain models — `grep -riE 'club|booking|chat|news|fitness' template/ --include=*.dart` comes back empty. Domain leaks into the skeleton unnoticed (a widget copied out of example brings `ClubSession` with it);
+- **the template's migrations and generated code are under version control** (`git ls-files template/dartway_starter_server/lib/src/migrations/ template/dartway_starter_shared/lib/generated/ | head -1` is not empty). A skeleton whose migrations or registry are missing from the clone is a project that does not start;
 - new user-facing strings in the core are in English;
-- new access configs do not introduce "open to everyone" as a default.
+- nothing new is open by default: every handler declares its access, every channel kind and upload purpose has a rule, and a missing declaration still stops the server rather than allowing.
 
 ## Step 4. Constraints against package versions
 
 **This step runs every time, not only when the API changed.** Its trigger is the package's version rather than its public symbols: bump `version:` and the carets on that package in `example/` and `template/` may have stayed on the previous minor.
+
+**The family moves in lockstep** — `dartway_core_shared`, `dartway_core_server`, `dartway_core_flutter`, `dartway_orm`, `dartway_client` and `dartway_generator` carry one version, so a bump of one is a bump of all six. Satellites move on their own, and the family raises its caret on a satellite only in its own next minor (D-032).
 
 **First check whether the bump was warranted at all** (root `CLAUDE.md`, "Versioning"): a version is the number of the next release, not a count of pull requests, and it moves once per release cycle. `git show origin/stable:packages/<pkg>/pubspec.yaml | grep -m1 '^version:'` — equal to master and this PR moves it; master already ahead and the pending release carries a bump, so a second one is a finding rather than the norm. The one exception is escalation: a breaking change in front of a pending patch raises the minor.
 
@@ -74,7 +79,7 @@ grep -nE '^\s+dartway_[a-z_]+:\s*\^' template/*/pubspec.yaml example/*/pubspec.y
 
 For each package in the first list, find the carets on it in the second and check that the version satisfies them. **The trap is what a caret means for `0.x`:** `^0.6.0` is `>=0.6.0 <0.7.0`, not "0.6.0 and newer". A package at `0.7.1` does **not** satisfy its own `^0.6.0`; under a zero major, a minor behaves like a major. That is exactly how `dartway_studio_bridge` and `dartway_cli` fell a minor behind their own carets while five sibling packages were kept in step.
 
-A mismatch is **a line in the report** of the form `<package> <version> → <file>:<line> ^<constraint>`, and it is fixed by raising the caret to the current version's minor. Packages that simply are not in `template/`/`example/` (`dartway_telegram`, the push transports) are not a finding.
+A mismatch is **a line in the report** of the form `<package> <version> → <file>:<line> ^<constraint>`, and it is fixed by raising the caret to the current version's minor. Packages that simply are not in `template/`/`example/` (`dartway_telegram`) are not a finding.
 
 ### Step 4b. Ask the repository whether it is what it says it is
 
@@ -103,6 +108,10 @@ The mirrors above keep this repository consistent with itself. This step is the 
 outward — to an application that is **behind**, and whose author will read what you write here
 weeks from now with none of today's context.
 
+**Until the rewrite has a release, this step answers "no note" by construction:** nothing is
+preserved (D-031), and a project moves onto the rewrite in its own branch, against the code rather
+than against notes. From the first release on, the rest of this step applies in full.
+
 **The test: would an application on the framework, doing nothing wrong, have to touch its own code
 because of this change?** If yes, the change is not finished until `docs/migrations/` holds a note
 saying what to do. If no, write nothing — a note that asks for nothing teaches people to skim the
@@ -110,8 +119,8 @@ ones that do.
 
 Yes for: a public symbol renamed, removed or re-signatured; a required parameter added; a changed
 default that alters behaviour a project relies on; a new mandatory wiring or initialization step; a
-schema change a project inherits through `create-migration`; a package that has to be declared
-where it did not before.
+schema change a project inherits (a framework migration, a generator change that reaches its
+tables); a package that has to be declared where it did not before.
 
 No for: a fix that only makes an existing call work; anything private; a new capability a project
 may adopt whenever it likes.

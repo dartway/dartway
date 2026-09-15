@@ -9,7 +9,7 @@ Analyze all the changes in the current branch and make a commit with a precise d
 `<type>(<scope>): <short description>`
 
 - `<type>` — `feat`, `fix` or `chore` (lowercase). Determine it from the meaning of the changes.
-- `<scope>` — optional, and welcome where the change belongs to a named part: `feat(session):`, `fix(deploy):`.
+- `<scope>` — optional, and welcome where the change belongs to a named part: `feat(invoices):`, `fix(deploy):`.
 - `<short description>` — terse, what was done, in English.
 
 Examples:

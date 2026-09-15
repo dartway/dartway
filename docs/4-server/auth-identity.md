@@ -1,223 +1,238 @@
-# The auth identifier: when are two typings the same person?
+# Auth and identity: who owns accounts, and what does a project decide?
 
-A DartWay user is found by one string — `UserProfile.userIdentifier`, whatever
-the app decided that is: a phone number, an email address, an external id. Every
-sign-in matches on it, and the match decides something bigger than it looks: an
-identifier that matches nothing is not an error, it is a **registration**.
+**The framework owns accounts, identities, session keys and code tickets** (D-007). It knows that
+someone signed in, with which phone number or e-mail address, and with which key. What that person
+is to the project — a profile, a role, consents — is the project's, in its own tables, referencing
+the account id.
 
-That is the whole subject of this page.
+This split is why a project writes no sign-in code: it states what an identifier looks like, how a
+code reaches a person, and what happens when an account is created. Everything between — tickets,
+rate limits, attempts, locks, tokens, revocation — is built in and the same in every project.
 
-## The failure
+## The pieces
 
-An email address is typed by a person, twice: once when they register, and again
-every time they come back. Nothing keeps the two typings identical — a phone
-capitalises the first letter, a password manager pastes a trailing space, a
-person simply types `Ivan@acme.com` on Tuesday and `ivan@acme.com` on Friday.
-
-Matched byte for byte, Friday's address finds nothing. Nothing is broken, so
-nothing complains:
-
-1. the lookup honestly reports that no profile carries this identifier;
-2. the flow honestly resolves the request as a registration;
-3. the person gets a **second account** — empty, in no team, owning nothing;
-4. no error is raised anywhere, because every step did what it was asked.
-
-They notice days later, when their data is "gone". Support sees two rows that
-look like two different people. This is the expensive shape of bug: silent,
-delayed, and indistinguishable from the user's own mistake.
-
-The same split runs deeper than the account. The per-identifier lock and the
-rate-limit bucket are keyed on the same string, so two spellings are also **two
-rate-limit buckets** — an attacker gets the limit once per spelling.
-
-## The rule is yours to state, and stating it is not optional
-
-DartWay does not fold case on its own, and that is deliberate. The identifier is
-not declared to be an email address; an app may legitimately use one where case
-is significant. So the framework refuses to guess.
-
-**`normalizeIdentifier` is a required parameter.** It shipped with a default
-that changed nothing, and a default that changes nothing is how a defect stays
-open everywhere: the projects that most needed the rule were exactly the ones
-that would not remember to declare it. A question the framework cannot answer is
-not one it may answer quietly — the compiler asks it once, per project.
-
-Two named answers, so the choice reads at the call site:
-
-```dart
-DwCore.init<UserProfile>(
-  // ...
-  dwAuthConfig: DwAuthConfig(
-    passwords: passwords,
-    // Trim and case-fold — what an email address wants, and what a phone
-    // number does not object to. This is what `dartway create` gives you.
-    normalizeIdentifier: DwIdentifierForm.folded,
-  ),
-);
-```
-
-`DwIdentifierForm.asTyped` is the other one: byte for byte, for an identifier
-where case is significant — and the only choice that cannot break identifiers
-already stored in mixed forms. A rule of your own is fine too; it only has to be
-idempotent, because DartWay applies it more than once.
-
-**A new project starts on `folded`.** The skeleton states it, so the day a
-project moves from phone numbers to email addresses nobody has to remember that
-`Ivan@` and `ivan@` were two people.
-
-Declared once, that rule is applied by DartWay everywhere the identifier decides
-*who* someone is:
-
-| Where | What it stops |
+| Table | What it holds |
 |---|---|
-| the auth request, the moment it arrives | the lookup, the lock and the bucket all read this one field afterwards |
-| the profile a registration writes | the row is stored in the form the next sign-in will look for |
-| `dw.getUserProfileByIdentifier` | a lookup the app makes itself |
+| `dw_account` | an id and a creation time — the framework's whole idea of a person |
+| `dw_identity` | identifiers an account signs in with: kind (`phone`, `email`), normalized value, `verified_at`. Unique across accounts |
+| `dw_auth_key` | session keys: the SHA-256 of the token, kind (`app`, `personal`), label, last use, revocation |
+| `dw_code_ticket` | one row per code sent: the SHA-256 of the code, attempts, expiry, purpose (`signIn`, `attach`) |
 
-**Stating it in the framework rather than on the client is the point.** An app
-can normalize on the sign-in screen, and that works — until a second client, a
-seed script, an admin tool or an environment-provisioned first administrator
-writes one row that skipped the rule. Then there are two copies of the rule with
-nothing checking that they agree, and the disagreement surfaces weeks later as a
-duplicate account.
+A project's profile row carries `accountId` as a foreign key to `dw_account` and is created in the
+same transaction as the account (`onAccountCreated`), so an account without a profile cannot exist.
 
-Your own code paths reach the same rule through `dw.normalizeAuthIdentifier`:
+## `DwAuthConfig`
 
 ```dart
-final identifier = dw.normalizeAuthIdentifier(invitation.email);
+DwAuthConfig({
+  required String? Function(DwIdentifierKind kind, String raw) normalize,
+  required Future<void> Function(
+    DwCallContext ctx, DwIdentifierKind kind, String identifier, String code,
+  ) deliverCode,
+  Future<String?> Function(
+    DwCallContext ctx, DwIdentifierKind kind, String identifier, int? accountId,
+  )? fixedCode,
+  Future<void> Function(
+    DwCallContext ctx, int accountId, DwIdentifierKind kind, String identifier,
+    DwAccountOrigin origin,
+  )? onAccountCreated,
+  Future<void> Function(DwCallContext ctx, DwIdentifierChange change)? onIdentifierChanged,
+  int codeLength = 6,
+  Duration codeLifetime = const Duration(minutes: 10),
+  int maxAttempts = 5,
+  int maxRequestsPerWindow = 5,
+  Duration requestWindow = const Duration(minutes: 10),
+  Duration resendDelay = const Duration(seconds: 60),
+  Duration keyTouchInterval = const Duration(minutes: 10),
+})
 ```
 
-## The rule must be idempotent
+| Field | What it decides |
+|---|---|
+| `normalize` | The canonical form of an identifier (`79991234567`, a lower-cased e-mail), or `null` when `raw` is not a valid one of that kind — answered `dw.invalid` on field `identifier`. Every lookup, lock and rate limit reads the normalized value, so `Ivan@` and `ivan@` cannot become two accounts or two rate-limit buckets. The app should normalize with the same function; the skeleton shares `AuthIdentifier.normalize` from its shared package. |
+| `deliverCode` | Sends the code. Runs inside the transaction that records the ticket: when it throws, no ticket exists and the request does not count against the limit. `ctx.accountId` is `null` for a sign-in and the caller's account for an identifier being attached — the place to word the two messages differently. Never log the code. |
+| `fixedCode` | A code accepted instead of a delivered one, for store reviewers, demo personas and end-to-end tests; `accountId` is the account the identifier belongs to, or `null`. Returning a code skips delivery. |
+| `onAccountCreated` | Runs in the transaction that creates an account: the place to insert the profile. Refusing here refuses the sign-in, nothing is created, and the code stays usable. `origin` says who created the account (below). |
+| `onIdentifierChanged` | Runs in the transaction that changes an existing account's identifiers, once per account and identifier affected, after the change: the place to mirror an identifier into project rows, or to publish. Throwing undoes the change. Not called for the identity an account is created with, nor when a sign-in re-verifies an identifier the account already has. |
+| `codeLength` | Digits in a delivered code, 4 to 12. |
+| `codeLifetime` | How long a ticket accepts its code. |
+| `maxAttempts` | Wrong codes per ticket before it is dead. |
+| `maxRequestsPerWindow`, `requestWindow` | Code requests per identifier in the window, counted across sign-in and attach. |
+| `resendDelay` | Minimum time between two requests for one identifier; announced as `DwCodeTicket.resendAfter` and enforced. |
+| `keyTouchInterval` | A key's `last_used_at` is written at most once per interval, not on every call. |
 
-DartWay applies it at more than one point on purpose, so `f(f(x))` has to equal
-`f(x)`. `trim().toLowerCase()` is idempotent. Anything that appends, wraps or
-counts is not.
+How long a resolved token is trusted without a query is a server setting, not an auth one
+(`tokenCacheSize`, `tokenCacheTtl` in [`DwServerSettings`](app-server.md#dwserversettings)).
 
-## Turning it on over live data is a migration
+### `DwAccountOrigin`
 
-`normalizeIdentifier` changes how identifiers are **matched and written from now
-on**. It does not touch rows that are already stored.
+`onAccountCreated` receives either:
 
-So an existing row written as `Ivan@acme.com` stops being found the moment the
-rule lowercases the incoming address — and it fails the way this page opened
-with: as a registration, not as an error. Switching the rule on over a live
-database therefore means bringing the stored identifiers to the same form in the
-same release:
+- `DwSignInOrigin(registration)` — a sign-in by code to an identifier without an account;
+  `registration` is the map the client sent with `DwVerifyCode` (name, consents), empty when it sent
+  none;
+- `DwToolOrigin()` — `DwAccountService.ensure`: a seed, an admin bootstrap, an import. It has
+  accepted nothing on anyone's behalf.
 
-```sql
-UPDATE user_profile SET "userIdentifier" = lower(trim("userIdentifier"));
-```
-
-Run that and you will find out whether your table already holds two rows for one
-person. It probably does — there is no unique index on `userIdentifier`, so
-nothing has been stopping it. Merge them before you add the constraint, not
-after.
-
-A new project has none of this to worry about: declare the rule in
-`DwAuthConfig` on day one and the question never arises. `dartway create` ships
-`template/` with it already declared.
-
-## When one account has two identifiers
-
-Everything above assumes one account is reached by one string. Some products are
-not shaped that way: sign in by phone **or** by email, with both belonging to
-the same person. Matching a single column cannot express that, and the failure
-is the one this page opened with, arriving by a different road — the second
-channel matches nothing, so it registers a second account.
-
-`DwAuthConfig.findUserProfileByIdentifier` hands the lookup to the app:
+The skeleton's `createProfile` (`template/dartway_starter_server/lib/src/auth.dart`) shows why the
+difference matters:
 
 ```dart
-DwAuthConfig(
-  passwords: passwords,
-  normalizeIdentifier: DwIdentifierForm.folded,
-  findUserProfileByIdentifier: (session, identifier, {transaction}) =>
-      UserProfile.db.findFirstRow(
-        session,
-        where: (t) => t.phone.equals(identifier) | t.email.equals(identifier),
-        transaction: transaction,
+switch (origin) {
+  case DwSignInOrigin(:final registration):
+    if (!await isSignUpEnabled(ctx.db)) {
+      ctx.refuse(DartwayStarterRefusal.signUpClosed, field: 'identifier');
+    }
+    if (registration[RegistrationKeys.terms] != 'true') {
+      ctx.refuse(DartwayStarterRefusal.consentsRequired, field: 'consents');
+    }
+    return ctx.db.userProfiles.insert(
+      UserProfileRow(
+        accountId: accountId,
+        firstName: registration[RegistrationKeys.firstName]?.trim() ?? '',
+        agreedForMarketing:
+            registration[RegistrationKeys.marketing] == 'true',
+        termsAcceptedAt: now,
+        createdAt: now,
       ),
-);
+    );
+  case DwToolOrigin():
+    return ctx.db.userProfiles.insert(
+      UserProfileRow(accountId: accountId, createdAt: now),
+    );
+}
 ```
 
-The identifier arrives already normalized, so the rule is still stated once —
-do not apply it again inside the query. With this set, the `userIdentifier`
-column is never read and is no longer required to exist: an app answering the
-question itself has no use for a column nothing consults.
+A sign-up without the terms accepted is refused `consentsRequired`, nothing is created, and the app
+asks for consent and verifies the same code again. An account made by the bootstrap accepted no
+terms: its `termsAcceptedAt` stays empty.
 
-**What you take on with it.** The framework can no longer see the shape of the
-lookup, so three things stop being its problem and become yours, and none of
-them raises an error when it is wrong:
+### `DwIdentifierChange`
 
-| What | What it costs to skip |
-|---|---|
-| a unique index on **every** column the query searches | two accounts claim one address, and `findFirstRow` resolves to whichever row the database hands back first |
-| the query reaches the account by every value that can **create** one | a channel written at registration but missing from the query is a door in with no way back — the person registers again on their second visit |
-| the query carries its own `include:` | relations the app expects loaded arrive null; the core applies its own include only to the lookup it performs itself |
+`onIdentifierChanged` receives `accountId`, `kind`, `cause` (`DwIdentifierChangeCause.confirmed`,
+`moved` or `removed`), `previous` and `current`. An attached identifier has no `previous`, a removed
+one no `current`, a replaced one both. A move is two changes: removed from the account it left,
+attached to the one it joined.
 
-The second row is the one that bites, because it looks like it works. A
-registration writes the identifier into whichever column matches the provider —
-so if the query searches `email` but a phone registration wrote only `phone`,
-the account exists and cannot be found. **Write and read the same set of
-columns.**
+The framework publishes nothing about identifiers. The skeleton republishes the profile, which
+shows identifiers read from the framework; the example mirrors the phone into its profile row in
+the same transaction (`example/dartway_example_server/lib/src/example_auth.dart`).
 
-## Acquiring the second identifier
+## Built-in commands
 
-**Being able to sign in by two values is not the same as having two values.** A
-person who registered by phone has an empty `email` column until something puts
-one there, and until then the email door is shut for them specifically.
+Registered by the framework in every server; a project may not register handlers for them.
 
-`DwAuthRequestType.changeIdentifier` is that something, and it is the sign-in
-flow run backwards. A **signed-in** caller names a new phone number or address;
-DartWay sends a code to it and verifies it exactly as it would a sign-in; the
-app then writes it wherever it keeps it:
+| Command | Access | Result | What it does |
+|---|---|---|---|
+| `DwRequestCode(kind, identifier)` | anonymous | `DwCodeTicket` | normalizes, applies the limits, creates a ticket and delivers the code |
+| `DwVerifyCode(ticketId, code, registration)` | anonymous | `DwAuthSession` | checks the code; creates the account when the identifier has none; makes an `app` session key |
+| `DwSignOut()` | signed in | none | revokes the caller's session key |
+| `DwRequestIdentifierCode(kind, identifier)` | signed in | `DwCodeTicket` | a code to an identifier the caller wants to attach, or change theirs to |
+| `DwConfirmIdentifier(ticketId, code, replace)` | signed in | `DwIdentityInfo` | attaches the identifier or, with `replace`, puts it in place of the caller's identifiers of that kind |
 
-```dart
-DwAuthConfig(
-  // ...
-  attachVerifiedIdentifier:
-      (session, {required userProfile, required verifiedRequest}) =>
-          UserProfile.db.updateRow(
-            session,
-            verifiedRequest.authProvider == DwAuthProvider.email
-                ? userProfile.copyWith(email: verifiedRequest.userIdentifier)
-                : userProfile.copyWith(phone: verifiedRequest.userIdentifier),
-          ),
-);
-```
+**A code request answers the same whether the identifier belongs to an account or not.** Otherwise
+the command would tell anyone which phone numbers are registered. `DwAuthSession.isNewAccount` is
+told only to whoever received the code.
 
-Return the profile as it now stands: it travels back to the caller, so the
-screen that asked shows the new value without a second read.
+Refusals:
 
-**The two inversions are the whole of it**, and both are the opposite of a
-sign-in:
+- `dw.invalid` on `identifier` — `normalize` rejected it;
+- `dw.tooManyRequests` with `retryAfter` — the window's limit or the resend delay (`429` with a
+  `Retry-After` header);
+- `dw.invalid` on `code`, with `attemptsLeft` — a wrong code; the attempt is committed even though
+  the answer is a refusal;
+- `dw.codeExpired` on `code` — unknown, used, expired or out of attempts: the user needs a new code,
+  not another try;
+- `dw.identifierTaken` (`DwAuthRefusal.identifierTaken`) on `code` — `DwConfirmIdentifier` with a
+  right code for an identifier of another account. Refused only after the right code (D-045), so
+  requesting a code reveals nothing; the ticket is used up.
 
-- **the identifier must be free.** Finding an account is the failure here
-  (`userAlreadyExists`), not the happy path. Two people cannot hold one address,
-  because the sign-in lookup would then resolve them arbitrarily;
-- **the account is read from the session, never from the request.** `userId`
-  arrives on a model the client sends. Taken at its word, it would let anyone
-  write their address onto anyone's profile — so it is overwritten with the
-  caller's own id before anything else looks at it.
+A ticket is confirmed only by the command of its purpose: a sign-in ticket reads as expired to
+`DwConfirmIdentifier`, an attach ticket as expired to `DwVerifyCode`, and a ticket of another
+account as expired too — guessing at someone else's ticket learns nothing and burns none of its
+attempts.
 
-**Unset, the flow is refused before a code is sent**, not after. An identifier
-verified and then dropped on the floor is the worst of the three outcomes: the
-person watched the code arrive, typed it, was told nothing went wrong, and their
-address did not change.
+An account may hold several identifiers of one kind. With `replace`, the oldest identity of the
+kind takes the new value (its id stays) and the others of the kind are removed.
 
-What DartWay checks before calling you: the caller is signed in, the identifier
-is normalized, nobody else holds it, and the code came back correct. What it
-cannot check is whether *your* rules allow this person that identifier — a
-corporate domain, a blocked number, a plan that permits one channel. That check
-belongs in the callback, before the write.
+On the client, the app sends these commands like any other and keeps the answered session with
+`dw.signIn(session)` ([Flutter core](../3-flutter/flutter-core.md)).
 
-And one trap worth naming twice: **writing a column the sign-in query does not
-search** leaves the owner a door they cannot come back through. The pair has to
-agree.
+## Session keys
 
-### Still not implemented
+Every token the server accepts is a session key of an account. A token is 256 random bits, shown
+once — in `DwAuthSession.token` or the answer of `DwAccountService.issueKey` — and stored only as
+its SHA-256: a leaked table signs nobody in.
 
-`addAuthProvider` and `removeAuthProvider` remain `UnimplementedError`. They are
-a different subject — linking and unlinking an **external** credential (Apple,
-Google, Telegram), where there is no code to send and the provider's token is
-the proof.
+- **Kind.** `DwSessionKeyKind.app` is made by a sign-in: an installation of the app.
+  `DwSessionKeyKind.personal` is made on purpose by `issueKey`, for a tool (an MCP client, a
+  script). The kind is the server's record, so a handler can tell a tool from the app without
+  trusting anything the client sends.
+- **Label.** For people choosing which key to revoke. An app key's label is what the app said about
+  itself — its `Dw-App-Version` and user agent — cleaned and cut to 200 characters
+  (`DwSessionKeyInfo.maxLabelLength`). A personal key's label is required. A label comes from the
+  client and describes; it never identifies.
+- **No expiry** (D-021). Mobile apps expect to stay signed in, and expiry without refresh tokens
+  signs people out at random. A key lives until it is revoked.
+- **Revocation is immediate in the process that commits it** (D-044): the token cache forgets the
+  key, and every live connection authenticated with it loses its subscriptions. Another process —
+  or a running server, when `DwAccountService` over a bare database wrote the revocation — notices
+  within `DwServerSettings.tokenCacheTtl`, one minute by default.
+- Revoked keys stay listed until the framework's hourly cleanup removes them, a day after
+  revocation.
+
+`ctx.sessionKey` is the `DwSessionKeyInfo` of the key that authenticated the call — `id`,
+`accountId`, `kind`, `label`, `createdAt`, `lastUsedAt` (lagging by up to `keyTouchInterval`),
+`revokedAt`. It is set on calls, on channel subscription checks and on routes declared with
+`DwRouteAuth.optional` or `DwRouteAuth.required` ([routes](routes.md)); it is `null` for an
+anonymous call and in jobs.
+
+## `DwAccountService`
+
+Everything a project needs from the framework's tables beyond sign-in: seeding, bootstrapping an
+admin, personal keys, merging accounts, an admin's search box, ending someone's sessions.
+
+Three ways to get one, by where the code runs:
+
+- `ctx.accounts` in a handler, job or route — writes join the call's transaction, and revoked
+  sessions close after it commits;
+- `server.accounts` next to a running server — a startup bootstrap
+  ([app server](app-server.md#work-after-start-serveraccounts-and-serverdb));
+- `DwAccountService(db, auth)` over a bare database, where no server runs in the process — a seed
+  script (`template/dartway_starter_server/bin/seed_dev.dart`). Its hooks get a context whose
+  `publish`, `revoke` and `jobs` throw rather than drop what they are given (D-022).
+
+| Method | Returns | Notes |
+|---|---|---|
+| `ensure(kind, rawIdentifier)` | `DwEnsuredAccount` (`accountId`, `created`) | The account of an identifier, created with `onAccountCreated(…, DwToolOrigin())` when it has none; its identity is not verified, since no code proved it. Takes the lock sign-in takes, so a sign-in racing it makes one account. An identifier `normalize` rejects throws `ArgumentError`: a bootstrap with a mistyped admin must not start quietly without one. |
+| `find(kind, rawIdentifier)` | `int?` | the account, or `null` |
+| `listIdentities(accountId)` | `List<DwIdentityInfo>` | oldest first |
+| `listIdentitiesOf(accountIds)` | `Map<int, List<DwIdentityInfo>>` | one query for a list of profiles; every account asked for is a key |
+| `accountsMatching(fragment, {kinds})` | `Set<int>` | case-insensitive substring of stored (normalized) identifiers; `%`, `_` and `\` match themselves; an empty fragment throws |
+| `moveIdentities(fromAccountId, toAccountId, {kinds})` | `List<DwIdentityInfo>` | a merge, in one transaction under the per-identifier locks; `onIdentifierChanged` runs for both accounts. Revokes nothing |
+| `removeIdentities(accountId, {kinds})` | `List<DwIdentityInfo>` | a removed identifier is free: a later sign-in with it makes a new account. Revokes nothing |
+| `issueKey(accountId, {label, kind})` | `DwIssuedKey` (`key`, `token`) | a personal key unless `kind` says otherwise. The token exists only in this answer |
+| `listKeys(accountId)` | `List<DwSessionKeyInfo>` | newest first, revoked ones included until cleanup |
+| `revokeKey(keyId, {accountId})` | `bool` | whether a live key was revoked. Pass the caller's account when the key id came from a client, so nobody revokes a key that is not theirs |
+| `revokeKeys(accountId)` | — | every key of the account, app and personal |
+
+**A command that issues a key never stores its successful outcome** (D-043). The outcome table
+would otherwise hold the bearer token for a week. A retried send runs again and makes a second key;
+the first, whose token nobody received, can be listed and revoked.
+
+`revokeKey` and `revokeKeys` throw `StateError` in a request: revoking is a change, made by a
+command.
+
+## No SQL on framework tables
+
+A project never queries or writes `dw_account`, `dw_identity`, `dw_auth_key` or `dw_code_ticket`
+(D-049). Every read and write a project needs is a method above, and the framework keeps its
+invariants — per-identifier locks taken in a fixed order, verification times, hooks, immediate
+revocation — only on its own paths. A project row may reference `dw_account` by foreign key; that
+is all.
+
+## Related
+
+- [Access and roles](../2-core/access-and-roles.md) — who may call what, once signed in.
+- [Channels and realtime](../2-core/channels-and-realtime.md) — every subscription requires sign-in.
+- [Testing](../5-tooling/testing.md) — signing test callers in.

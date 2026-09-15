@@ -12,7 +12,7 @@ description: >-
 
 # DartWay Router — navigation
 
-Navigation rules for DartWay projects. The router is a wrapper over go_router: `dartway_router` **re-exports `go_router`**, so `GoRouter`, `context.go` and the rest are available from the same import. See also `__FLUTTER_PKG__/CLAUDE.md`.
+Navigation rules for DartWay projects. The router is a wrapper over go_router: `dartway_router` **re-exports `go_router`**, so `GoRouter`, `context.go` and the rest are available from the same import — and `dartway_core_flutter` re-exports `dartway_router`, so a project imports neither separately. See also `.claude/CLAUDE.md`.
 
 ## Hard rules
 
@@ -34,6 +34,7 @@ lib/core/router/
   navigation_zones/
     app_navigation_zone.dart        // part of '../router.dart'
     admin_navigation_zone.dart
+    admin_params.dart               // the admin zone's parameter enum
     auth_navigation_zone.dart
 ```
 
@@ -91,25 +92,45 @@ A role-specific zone — the same guards, one after another:
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
         (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
-        (state) => !state.isAdmin ? AppNavigationZone.home.fullPath : null,
+        // Only once the role is known: an admin opening /admin while the
+        // profile is still loading must not be sent away for it.
+        (state) => state.role != null && state.role != UserRole.admin
+            ? AppNavigationZone.home.fullPath
+            : null,
       ];
 ```
+
+A guard decides what the user is **shown**, never what they may **read**: the admin zone's data is
+kept from everyone else by the server's access rules (`dartway-access`), and a guard that is wrong
+costs a screen, not a leak.
 
 ## Router state
 
 `AppRouterState` is a `ChangeNotifier` the guards watch: it listens to providers and calls `notifyListeners()`, which makes the guards re-run. There is no other link between authorization and navigation.
 
+The skeleton's listens to two things: `dw.accountId` — known from the stored session at start, before the server has answered, so a signed-in user opens straight into the app — and the role on the signed-in profile (`myProfileProvider` in `core/profile/`), which is a live request, so a role an admin changes re-runs the guards without a reload.
+
 ```dart
 class AppRouterState extends ChangeNotifier {
-  AppRouterState(this.ref) {
-    ref.listen<bool>(isSignedInProvider, (_, next) {
-      isSignedIn = next;
+  AppRouterState(Ref ref) {
+    ref.listen<int?>(dw.accountId, (_, accountId) {
+      isSignedIn = accountId != null;
       notifyListeners();
     }, fireImmediately: true);
+    ref.listen<UserRole?>(
+      myProfileProvider.select((profile) => profile.value?.role),
+      (_, next) {
+        role = next;
+        notifyListeners();
+      },
+      fireImmediately: true,
+    );
   }
 
-  final Ref ref;
   bool isSignedIn = false;
+
+  /// `null` while signed out and while the profile has not loaded yet.
+  UserRole? role;
 }
 ```
 
@@ -182,12 +203,10 @@ GoRouter.of(context).goNamed(AdminNavigationZone.admin.name);
 A transition **not started by a gesture in the tree** takes the navigation
 function from the router instead, because at that moment nobody holds a context:
 
-- a tapped push notification — `DwPushConfig.onOpened` is declared in the
-  `plugins:` list of the `DwCore` constructor, which runs before `ProviderScope`,
-  before the first frame and long before the router exists, and it hands over a
-  `Map<String, String>`;
-- a cold start from the same tap — `takeInitialPayload` exists precisely because
-  "the tap happened before there was an app", as its own doc comment puts it;
+- a tapped push notification — its handler lives outside the widget tree, is
+  set up before the first frame and long before the router exists, and what it
+  hands over is a payload, not a place in the tree;
+- a cold start from the same tap — the tap happened before there was an app;
 - a deep link, and a reply from a background handler.
 
 This is not a loophole in the rule above; it is a place the rule does not reach.

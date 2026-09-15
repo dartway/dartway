@@ -5,7 +5,7 @@ description: >-
   self-explanatory naming (min 2 words), single responsibility per file
   (length is a soft signal: >200 lines a nudge, >350 a warning — split by
   responsibility, not by line count), never pass BuildContext or WidgetRef as params, no _buildXxx()
-  widget-returning methods, ref.invalidate only as a user command (retry,
+  widget-returning methods, a re-read (refetch, ref.invalidate) only as a user command (retry,
   pull-to-refresh) and never as a way to propagate data, a load-bearing
   section renders its failure and never the same picture as its loading state
   (no asData?.value), no GlobalKey tree lookups, no
@@ -14,7 +14,7 @@ description: >-
   a feature's constructor is its address (a model or an id) and not data its parent
   computed, the action written in the widget that owns the button and never handed
   down as a callback (no screen-wide busy flag),
-  a Serverpod model rebuilt with copyWith and never by listing
+  a data object or a row rebuilt with copyWith and never by listing
   its fields, no default for a setting whose value belongs to the environment
   (sender address, provider key, admin identifier);
   plus SOLID, KISS, DRY, YAGNI, Law of Demeter, composition over
@@ -65,7 +65,7 @@ class DeliveryCard { final String deliveryStatus; final int itemsCount; final Vo
 
 **Why:** one file — one reason to change. A model + repository + state + UI in one file can be neither read nor reused.
 
-**Length is the weakest of the indicators:** under 200 lines we say nothing; >200 — a reason to look closer; >350 — a warning, the file has probably collected several responsibilities. **A meaningful, coherent 300-line file beats a pointless chop** into pieces with no responsibility of their own. Split by responsibility, not by the line counter — all the more so because a feature file now also holds its `DwFeatureSpec`, and a good description costs a couple dozen lines.
+**Length is the weakest of the indicators:** under 200 lines we say nothing; >200 — a reason to look closer; >350 — a warning, the file has probably collected several responsibilities. **A meaningful, coherent 300-line file beats a pointless chop** into pieces with no responsibility of their own. Split by responsibility, not by the line counter — all the more so because a feature file also holds its `DwFeatureSpec`, and a good description costs a couple dozen lines.
 
 ```
 // ❌ order_screen.dart: OrderItemModel + OrderRepository + OrderState + OrderListScreen
@@ -83,7 +83,7 @@ class DeliveryCard { final String deliveryStatus; final int itemsCount; final Vo
 ## 1.2a Imports: `../` means "next door", not "up the tree"
 
 **Why:** a path made of dots says nothing. `'../../../../ui_kit/ui_kit.dart'` tells the reader neither
-what is imported nor where it lives; `package:my_app_flutter/ui_kit/ui_kit.dart` tells both. The rule
+what is imported nor where it lives; `package:__FLUTTER_PKG__/ui_kit/ui_kit.dart` tells both. The rule
 is about **distance**, not about a blanket `package:` everywhere — a relative import of the file next
 to you is the clearer one.
 
@@ -91,7 +91,7 @@ to you is the clearer one.
 |---|---|
 | Your own internals (`widgets/`, `logic/`) | relative — `import 'widgets/user_list_item.dart';` |
 | A sibling feature in the same group | relative, one or two steps — `import '../user_form/user_form.dart';` |
-| `core/`, `shared/`, `ui_kit/`, another zone | **`package:`** — `import 'package:my_app_flutter/ui_kit/ui_kit.dart';` |
+| `core/`, `shared/`, `ui_kit/`, another zone | **`package:`** — `import 'package:__FLUTTER_PKG__/ui_kit/ui_kit.dart';` |
 
 **Two `../` is the limit**, and `deep_relative_import` (`dartway_lints`, warning) says so in the
 editor. One or two steps read as "the feature next door"; three or four mean you left your group, and
@@ -147,8 +147,8 @@ compliance and costs more than the parameter ever would: the feature ends up wit
 instead of one (the extension at the root, the widget hidden in `widgets/`), the entry point stops
 being the widget, and `context.showCreateUserForm()` no longer says which feature it opens.
 
-What this does **not** forbid: the framework's navigation extensions (`context.pushTo`,
-`context.goNamed`) are the supported way to move between routes, and the UI Kit's own presentation
+What this does **not** forbid: the router's own navigation (`GoRouter.of(context).goNamed(...)`,
+see `dartway-navigation`) is the supported way to move between routes, and the UI Kit's own presentation
 primitives (`context.showAppBottomSheet(child: …)`, theme and l10n accessors) are exactly where a
 `BuildContext` extension belongs — they take any child and name no feature. The line is whether the
 extension names **a screen of yours**: presentation chrome on `BuildContext` is fine, a feature on
@@ -195,11 +195,11 @@ extension UserCourseAccess on UserCourse {
 }
 ```
 
-**Where things go:** creates a value of its own type → **factory constructor**; answers a question about an existing value → **method or getter**; the type is someone else's (a model from the generated client, a framework type) → **extension**; you need a shared utility with no type of its own → a static method on an owner class, not a free function.
+**Where things go:** creates a value of its own type → **factory constructor**; answers a question about an existing value → **method or getter**; the type is someone else's (a data object from `__SHARED_PKG__`, a framework type) → **extension**; you need a shared utility with no type of its own → a static method on an owner class, not a free function.
 
 **Exactly two exceptions, both forced:**
 
-- **codegen provider entry points** — if the project does use `riverpod_generator` after all (by default we don't, see the codegen policy in `CLAUDE.md`): a `@riverpod` function must be top-level, the generator requires it;
+- **codegen provider entry points** — if the project does use `riverpod_generator` after all (by default a DartWay project writes its providers by hand): a `@riverpod` function must be top-level, the generator requires it;
 - **`main()`** and similar runtime entry points.
 
 ## 1.3c A private widget method that computes data is an extension in `logic/`
@@ -213,7 +213,7 @@ spinning up the whole tree.
 ```dart
 // ❌ domain mapping hidden inside a private widget method
 class AdminChatsFiltersBar extends ConsumerWidget {
-  List<AdminSelectOption<int>> _postOptions(List<ChatPostListDto> posts) => [
+  List<AdminSelectOption<int>> _postOptions(List<ChatPostSummary> posts) => [
     for (final post in posts)
       if (post.commentToPostId == null && post.title != null)
         AdminSelectOption(value: post.id, label: post.title!),
@@ -221,7 +221,7 @@ class AdminChatsFiltersBar extends ConsumerWidget {
 }
 
 // ✅ an extension next to the feature, in logic/ — found from the list through the dot
-extension ChatPostFilterOptions on List<ChatPostListDto> {
+extension ChatPostFilterOptions on List<ChatPostSummary> {
   List<AdminSelectOption<int>> get commentParentOptions => [ ... ];
 }
 
@@ -267,39 +267,48 @@ Delete it. History lives in git, while a comment rots silently: one file in a pr
 commented-out lines out of 306 — a whole widget written against an API that no longer
 exists. You can't revive that anyway, and everyone has to read it.
 
-## 1.5 `ref.invalidate(...)` is a user command, not a propagation mechanism
+## 1.5 A re-read is a user command, not a propagation mechanism
 
-**Why:** the harm was never that `invalidate` throws state away — it is that it gets used as a way to
+**Why:** the harm was never that a re-read throws state away — it is that it gets used as a way to
 **move data**, and then the flow of data is invisible: nothing in the code says who updates whom, and
 the reason a list refreshed is three files from the list. When a person taps "retry" or pulls to
 refresh, the reset, the flicker and the lost scroll position are exactly what they asked for.
 
-**Allowed:** the user asked for the state to be thrown away and fetched again — a retry button in an
-error state, pull-to-refresh, "reload".
+**Allowed:** the user asked for the read to be made again — a retry button in an error state,
+pull-to-refresh, "reload".
 
-**Not allowed**, and this is everything else: invalidating after a write so a list catches up;
-invalidating in a listener; invalidating to move data between screens. A write through `dw.repo`
-already updates every list over that model — reaching for `invalidate` after a write means the write
-went outside `dw.repo`, and **that** is what needs fixing (`dartway-crud-config`).
+**Not allowed**, and this is everything else: re-reading after a command so a list catches up;
+re-reading in a listener; re-reading to move data between screens. A command's handler publishes what
+it changed, and every request declaring that channel updates itself — from the command's own response
+for the caller, over the live socket for everyone else. Reaching for a re-read after a command means
+the publication is missing or the request does not declare the channel, and **that** is what needs
+fixing (`dartway-realtime`). A list the client genuinely cannot compute says so on the request
+(`DwListRequest.refetchOnUpdate()`), not in a widget.
 
-**Automatic re-fetching** — on reconnect, on a timer — belongs to the data layer, not to a widget.
+**A `dw.*` read is asked again through its notifier, never with `ref.invalidate`:**
+`ref.read(dw.request(request).notifier).refetch()` (`dw.table`, `dw.pages` and `dw.window` have the
+same `refetch()`). The client keeps a request live for a moment after its last watcher leaves, so a
+provider thrown away and rebuilt reattaches to the same failed state instead of asking again — the
+retry button silently does nothing. `ref.invalidate` stays for the app's own providers, under the same
+rule.
+
+**Automatic re-reading** belongs to the data layer, not to a widget: a reconnected socket already
+re-runs every live request.
 
 ```dart
-// ❌ propagation: the write went outside dw.repo, and the list is patched up by hand
-await api.confirmBooking(booking.id!);
-ref.invalidate(dw.repo.modelList<SessionBooking>());
+// ❌ propagation: the command's publication is missing, and the list is patched up by hand
+await dw.command(PayInvoice(invoiceId: invoice.id));
+await ref.read(dw.request(const ListMyInvoices()).notifier).refetch();
 
 // ❌ propagation in a listener: nothing here says who updates whom
-ref.listen(selectedClubProvider, (_, _) => ref.invalidate(dw.repo.modelList<ClubSession>()));
+ref.listen(selectedCurrencyProvider, (_, _) => ref.invalidate(invoiceTotalsProvider));
 
 // ✅ a user command — the retry is what the person pressed
-//    the provider is named once and used twice: watched, and thrown away
-final sessions = dw.repo.modelList<ClubSession>(
-  backendFilter: AppBackendFilters.upcomingSessions(),
-);
+//    the provider is named once and used twice: watched, and asked again
+final invoices = dw.request(const ListMyInvoices());
 
 return ref
-    .watch(sessions)
+    .watch(invoices)
     .dwBuildListAsync(
       childBuilder: (list) => ...,
       errorBuilder: (_, _) => Column(
@@ -308,19 +317,19 @@ return ref
           AppText.body(context.l10n.loadFailed),
           AppButton.text(
             context.l10n.retry,
-            onTap: dw.action((_) => ref.invalidate(sessions)),
+            onTap: dw.action((_) => ref.read(invoices.notifier).refetch()),
           ),
         ],
       ),
     );
 ```
 
-**Name the provider once.** Writing `dw.repo.modelList<ClubSession>(backendFilter: ...)` out a second
-time inside the `errorBuilder` is how a retry ends up refreshing a *different* provider than the one
-that failed — the two expressions have to stay identical for the config's value equality to match.
+**Name the provider once.** Writing `dw.request(ListMyInvoices(status: ...))` out a second time inside
+the `errorBuilder` is how a retry ends up asking a *different* request than the one that failed — the
+two expressions have to stay equal for the request's value equality to match.
 
-The error state is written out in full here to show where the `invalidate` sits; in a real app it is
-one shared widget, and §1.5a is where it comes from.
+The error state is written out in full here to show where the re-read sits; in a real app it is one
+shared widget, and §1.5a is where it comes from.
 
 **Reviewable by shape:** the call sits under a gesture — an `onPressed`, an `onRefresh`, or inside
 the `dw.action` a button runs. Anywhere else it is a finding.
@@ -344,68 +353,73 @@ has to be the thing that catches it.
 
 ```dart
 // ❌ the list is the whole point of the screen, and a 500 shows as an empty page
-ref.watch(dw.repo.modelList<NewsPost>()).dwBuildListAsync(
+ref.watch(dw.request(const ListNewsPosts())).dwBuildListAsync(
       childBuilder: (posts) => posts.isEmpty
           ? Center(child: AppText.body(context.l10n.noNewsYet))
-          : NewsList(posts: posts),
+          : NewsPostList(posts: posts),
     );
 
 // ✅ "nothing was published" and "we could not ask" are two different pictures
-final newsPosts = dw.repo.modelList<NewsPost>();
+final newsPosts = dw.request(const ListNewsPosts());
 
 ref
     .watch(newsPosts)
     .dwBuildListAsync(
       childBuilder: (posts) => ...,
       errorBuilder: (_, _) => LoadFailedMessage(
-        onRetry: dw.action((_) => ref.invalidate(newsPosts)),
+        onRetry: dw.action((_) => ref.read(newsPosts.notifier).refetch()),
       ),
     );
 ```
 
 **A shared failure widget is the app's, not the framework's** — the copy is user-visible, so it comes
 from `context.l10n` and cannot live in a package. One widget in `lib/shared/widgets/` covers a whole
-app; it takes the retry as a `DwUiAction`, which is the one callback that earns its place under §1.9b
-(only the caller knows which read failed, and a `DwUiAction` is a value the framework means to be
-passed around).
+app — the skeleton ships `LoadFailedMessage` there, with a `section` extension on `AsyncValue` that
+wires it in so a section cannot forget it; it takes the retry as a `DwUiAction`, which is the one
+callback that earns its place under §1.9b (only the caller knows which read failed, and a `DwUiAction`
+is a value the framework means to be passed around).
 
 ### More than one `AsyncValue`: answer every branch
 
 **`asData?.value` answers `null` for loading *and* for error.** It is the shortest thing that
 compiles, it reads as correct, and it turns a failure into a spinner that never stops — a wait shown
 for a request that answered `500` long ago. `.value ?? const []` is the same trap wearing a fallback:
-a failed read becomes "you have no bookings".
+a failed read becomes "you have no invoices".
 
 ```dart
 // ❌ a failed read is now an eternal spinner
-final profile = ref.watch(profileProvider).asData?.value;
-final sessions = ref.watch(sessionsProvider).asData?.value;
-if (profile == null || sessions == null) return const AppSpinner();
+final account = ref.watch(dw.request(const GetMyAccount())).asData?.value;
+final invoices = ref.watch(dw.request(const ListMyInvoices())).asData?.value;
+if (account == null || invoices == null) return const CircularProgressIndicator();
 
 // ✅ each read answers for itself; neither failure hides behind the other's skeleton
+final invoicesRequest = dw.request(const ListMyInvoices());
+final accountRequest = dw.request(const GetMyAccount());
+
 ref
-    .watch(sessionsProvider)
+    .watch(invoicesRequest)
     .dwBuildListAsync(
       errorBuilder: (_, _) => LoadFailedMessage(
-        onRetry: dw.action((_) => ref.invalidate(sessionsProvider)),
+        onRetry: dw.action((_) => ref.read(invoicesRequest.notifier).refetch()),
       ),
-      childBuilder: (sessions) => ref
-          .watch(profileProvider)
+      childBuilder: (invoices) => ref
+          .watch(accountRequest)
           .dwBuildAsync(
             errorBuilder: (_, _) => LoadFailedMessage(
-              onRetry: dw.action((_) => ref.invalidate(profileProvider)),
+              onRetry: dw.action((_) => ref.read(accountRequest.notifier).refetch()),
             ),
-            childBuilder: (profile) =>
-                ScheduleView(sessions: sessions, profile: profile),
+            childBuilder: (account) =>
+                InvoiceOverview(invoices: invoices, account: account),
           ),
     );
 ```
 
 Where a screen genuinely needs both values before it can render anything, answer the branches by
-hand — `hasError` first, then `isLoading`, then `requireValue`. What you may not do is collapse them.
+hand — a `switch` over the pair with the error cases first, then the data case, and loading for the
+rest; a retry then asks again only the read that failed. What you may not do is collapse them.
 
 **Degrading on purpose is allowed; stumbling into it is not.** A secondary read feeding an overlay
-(which sessions you already booked) may fall back to "none" when it fails — say so in the feature's
+(which invoices are already disputed) may fall back to "none" when it fails — say so in the feature's
 `implementationNotes`, and the next reader stops wondering whether it was considered.
 
 **The framework ships no combinator for this, deliberately.** Nesting the builders is the answer, and
@@ -459,7 +473,7 @@ Three things make it worth copying, and each is a rule of its own:
 the element it belongs to, collapsed by default. For a server boundary, the error pipeline. What must
 not happen is the trace being skipped because there was no obvious place to put it.
 
-**This is a default, not a law** (see "Law and default" in `.claude/CLAUDE.md`): `dartway check`
+**This is a default, not a law** (`.claude/CLAUDE.md` draws the line between the two): `dartway check`
 cannot see it, and a project that has a better answer for its own boundary may record one. What is
 not a matter of taste is the failure it prevents — a rejection indistinguishable from every other
 reason nothing arrived.
@@ -510,7 +524,8 @@ Otherwise the refactoring legalizes the violation: the file got cleaner, and the
 
 The same principle as 1.7, but about size: **how much space a widget gets is the parent's call.**
 A widget that inflates itself breaks on the first reuse — and it breaks at runtime, the analyzer
-says nothing about it.
+says nothing about it. `dartway check` fails on the two unarguable shapes — `Expanded` or
+`SizedBox.expand` as the root of `build` (`widgetSizesItself`); the rest is the review's.
 
 ```dart
 // ❌ the widget assigns itself a size and demands a particular parent
@@ -539,7 +554,7 @@ then the size is declared in the kit and visible from the constructor name, not 
 ```
 
 **Exception — a slice of layout extracted so `build` stops growing**, used once in the very same
-file (e.g. `_CounterTile` inside `admin_counters.dart`). It has no value for reuse or a separate
+file (e.g. `_TotalRow` inside `invoice_summary.dart`). It has no value for reuse or a separate
 test, and moving it into a public file is pure noise.
 
 **The exception is bounded by two facts about the class, not by how trivial it looks.** "Trivial" is
@@ -594,9 +609,9 @@ of maps and six callbacks — passes naming, passes file length (the file was 18
 knows how to assemble its arguments.
 
 **A feature is handed what names its subject** — a model, or an identifier of one. Everything else
-it asks for itself: the same `dw.repo` provider its parent watched (§3 of `dartway-data-layer` —
-identical configs are one request, so asking again costs nothing), an extension on the model it was
-already given, its own local state.
+it asks for itself: the same `dw.request(...)` its parent watched (equal requests share one live
+read, so asking again costs nothing — `dartway-data-layer`), an extension on the model it was already
+given, its own local state.
 
 **The question is not "how many parameters" but "could this widget have got it itself?"**
 
@@ -631,7 +646,7 @@ TicketWorkCard(ticket: ticket, task: task, project: project);
 
 **Why:** `dw.action` is described as the thing you write an action *with*, and nowhere as *where* it
 lives — so handing a callback downwards is nobody's violation. In a live feature the cancelling of
-one question travelled from the button to `dw.repo.saveModel` through **six** hand-offs, and every
+one question travelled from the button to the save through **six** hand-offs, and every
 one of them was a parameter on a widget that otherwise had no reason to know about saving.
 
 **A widget with a button does the thing the button promises.** `dw.action` wraps the call right
@@ -675,48 +690,47 @@ under that button. A flag held at the top does not merely duplicate it — it li
 pressing "accept" on one row greyed out "run" on every other row on the screen. If you find yourself
 adding `working: busy` to a constructor, the action is in the wrong place.
 
-## 1.10 A Serverpod model is rebuilt with `copyWith` only
+## 1.10 A data object or a row is rebuilt with `copyWith` only
 
-**Why:** calling the generated constructor and listing the fields is for **creating a new row**. A field
-with `default=`, and any nullable field, is an **optional argument** — so a field you forget is not a
-compile error, it is a silent substitution of the default.
+**Why:** calling the constructor and listing the fields is for **creating** a value that does not exist
+yet. A field with a default (`this.priority = Priority.medium`), and any nullable field, is an
+**optional argument** — so a field you forget is not a compile error, it is a silent substitution of
+the default.
 
 That is not a hypothetical. In a real project a `priority` field was reset to `medium` on **every**
 edit of the record it belonged to — the agent's draft, the manual correction, the approval of the
-requirements — because one method rebuilt the model by naming its fields and the field had been added
+requirements — because one method rebuilt the record by naming its fields and the field had been added
 after that method was written. Priority is what the backlog is sorted by. Neither the compiler, nor a
 test, nor a review can see this.
 
 ```dart
 // ❌ a rebuild by naming the fields — `priority` is not in the list, so it silently becomes the default
-Future<void> approve(FeatureRequest request) => repository.save(FeatureRequest(
-      id: request.id,
-      title: request.title,
-      description: request.description,
-      status: RequestStatus.approved,
-    ));
+await ctx.db.featureRequests.update(FeatureRequestRow(
+  id: row.id,
+  title: row.title,
+  description: row.description,
+  status: RequestStatus.approved,
+  createdAt: row.createdAt,
+));
 
-// ✅ copyWith — a field nobody touched keeps its value, whatever fields the model grows later
-Future<void> approve(FeatureRequest request) =>
-    repository.save(request.copyWith(status: RequestStatus.approved));
+// ✅ copyWith — a field nobody touched keeps its value, whatever fields the row grows later
+await ctx.db.featureRequests.update(row.copyWith(status: RequestStatus.approved));
 ```
 
-**The ban takes nothing away.** The one reason to reach for a field-by-field rebuild — "I need to
-clear a nullable field, and `copyWith` treats null as *not passed*" — does not hold for a generated
-Serverpod `copyWith`: it takes `Object? field = _Undefined` and tests `field is T? ? field : this.field`.
-Pass `null` explicitly and the field is cleared; leave it out and it is kept.
+**The ban takes nothing away.** `dartway generate` writes a `copyWith` for every data object and every
+row. A non-nullable field takes the new value or keeps the old one; a nullable field takes a
+`DwFieldPatch` — `keep` by default — so "leave it" and "clear it" are different calls, and the one
+reason to reach for a field-by-field rebuild ("I need to clear a nullable field") does not exist.
 
 ```dart
-// ✅ clearing a field is copyWith's job too
-request.copyWith(assigneeProfileId: null);
+// ✅ setting and clearing a nullable field is copyWith's job too
+row.copyWith(assigneeProfileId: DwFieldPatch.set(assigneeProfileId));
+row.copyWith(assigneeProfileId: const DwFieldPatch.clear());
 ```
 
-**`model_rebuild_by_constructor`** (`dartway_lints`, warning) says this in the editor: a constructor
-call on a Serverpod model that is passed a real `id:` is a rebuild, because a row being created never
-carries an id — it comes back from the database. The one legitimate hand-built instance in a DartWay
-app is the skeleton default in `core/default_models.dart`, invented from nothing with a synthetic id;
-the rule knows that sentinel — a construction whose `id:` is `dw.repo.mockModelId` is not a row and
-is left alone, so the file needs no `// ignore_for_file:`.
+**Nothing mechanical catches this**, so the review does, by one sign: a constructor call that passes a
+real `id:` is a rebuild. A row being created carries `id: null` — the database gives it one. A
+placeholder built for a loading skeleton is not a stored value and is left alone.
 
 **A doc comment is not a rule.** The method in that project had an honest request written above it —
 *"anything added to the model belongs here too"* — and it changed nothing, because the field was
@@ -758,21 +772,24 @@ to a stranger's endpoint, and nothing anywhere says so. The failure is not that 
 that it *works*, plausibly, pointing at the wrong place.
 
 ```dart
-// ❌ the project that forgets to configure this sends mail as someone else
-final senderAddress = passwords['senderAddress'] ?? 'noreply@example.com';
+// ❌ the deployment that forgets to configure this sends mail as someone else
+final senderAddress =
+    Platform.environment['APP_SENDER_ADDRESS'] ?? 'noreply@example.com';
 
 // ✅ unset is unset, and it says so where it is read
-final senderAddress = passwords['senderAddress'] ??
-    (throw StateError('senderAddress missing in passwords'));
+final senderAddress = Platform.environment['APP_SENDER_ADDRESS'] ??
+    (throw StateError('APP_SENDER_ADDRESS is not set'));
 ```
 
 Empty and an explicit error beats a plausible foreign value. Read the setting at the point of use
 and fail there, or check it on boot — either is fine; what is not fine is a fallback that hides the
-gap.
+gap. A value the server cannot start without also belongs under `requires.secrets` in
+`deploy/config.yaml`: then a deployment missing it refuses to begin instead of failing on first use.
 
-The framework's own template follows this: `bootstrapAdminIdentifier` is deliberately left without
-a default. A default administrator in a public template would mean every project that forgot to
-change it has an administrator whose channel a stranger controls.
+The skeleton follows this: the first administrator, read from the environment in the server's
+`bin/server.dart`, is deliberately left without a default. A default administrator in a public
+template would mean every project that forgot to change it has an administrator whose sign-in codes
+a stranger receives.
 
 Preferences with a genuine neutral value — a page size, a timeout, a retry count — are not this
 rule. The test is whether the value is *about this deployment*. If a wrong value would point the
@@ -947,7 +964,9 @@ final authService = ref.read(authServiceProvider); // -> FirebaseAuthService und
 ```dart
 // ❌ initState() { userName = GlobalAppState.userName; }  save() { GlobalAppState.userName = userName; }
 // ✅ the widget reads and writes directly through the provider — one source of truth
-final userName = ref.watch(dw.requireUserProfileProvider.select((p) => p.name));
+final displayName = ref.watch(
+  dw.request(const GetMyAccount()).select((account) => account.value?.displayName),
+);
 ```
 
 ---
@@ -1031,14 +1050,14 @@ class ItemsListPage extends ConsumerWidget {
 - [ ] **No** `BuildContext`/`WidgetRef` in the parameters of services and functions — and **no `extension on BuildContext` that opens the app's own screens**: showing a feature is a static method on that feature's widget (§1.3).
 - [ ] **No** `_buildXxx()` methods returning a widget — those are separate widget classes (§1.4).
 - [ ] **No** private widget methods that transform the domain — those are extensions in the feature's `logic/` (§1.3c).
-- [ ] **`ref.invalidate(...)` only where the user asked for it** — a retry button, pull-to-refresh, "reload". Not after a write (that means the write left `dw.repo`), not in a listener, not to move data between screens (§1.5).
+- [ ] **A re-read only where the user asked for it** — a retry button, pull-to-refresh, "reload". Not after a command (that means a publication is missing or the request does not declare the channel), not in a listener, not to move data between screens. A `dw.*` read is asked again with its notifier's `refetch()`, never with `ref.invalidate` (§1.5).
 - [ ] **A section that is the point of its screen renders its failure** and offers a way out; blank is a meaning of its own, and the `errorWidget` default is `SizedBox.shrink()`. **No `asData?.value`** (or `.value ?? const []`) to combine several `AsyncValue`s — it answers `null` for loading and for error alike, so a failure becomes an endless spinner (§1.5a).
 - [ ] **A message dropped at a boundary with someone else's system names its own step** — a value per way the thing can be turned away, each carrying what it means, none of them a sentence listing five possibilities. Types, addresses, versions, timestamps; no secrets and no payloads (§1.5b).
 - [ ] **No** `GlobalKey` for looking widgets up in the tree.
 - [ ] **No** outer `padding`/`margin` inside a widget — the parent sets the padding (§1.7). When refactoring someone else's widget the outer padding moves to the caller instead of being "kept as it was".
 - [ ] **No** `Expanded`/`SizedBox(…: double.infinity)` at the root of `build` — the parent gives the widget its space (§1.7a).
 - [ ] **No** private widget classes (`_Foo`) in public feature files. The one exception is a slice of layout — so **no `State` and no callbacks** on a private widget class (§1.8).
-- [ ] **A Serverpod model is rebuilt with `copyWith`**, never by listing its fields in the constructor — a field with `default=` or a nullable one is optional, so a forgotten one is a silent default, not an error. Clearing a nullable field is `copyWith(field: null)` (§1.10). An unavoidable enumeration is driven by `Enum.values` or an exhaustive `switch`, not written out by hand.
+- [ ] **A data object or a row is rebuilt with `copyWith`**, never by listing its fields in the constructor — a field with a default or a nullable one is optional, so a forgotten one is a silent default, not an error. Clearing a nullable field is `copyWith(field: const DwFieldPatch.clear())` (§1.10). An unavoidable enumeration is driven by `Enum.values` or an exhaustive `switch`, not written out by hand.
 - [ ] **A setting whose value belongs to the environment has no default** — sender address, provider key, webhook URL, admin identifier. An unfilled key must be an error, not quiet work with somebody else's credentials (§1.11).
 - [ ] **A building block** — a widget with no product behaviour to describe — lives in `lib/shared/` with a doc comment, not in a zone with an empty `DwFeatureSpec`.
 - [ ] **Imports:** own internals and sibling features are relative and no deeper than two `../`; `core`/`data`/`domain`/`shared`/`ui_kit`/another zone are `package:` (§1.2a).

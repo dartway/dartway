@@ -4,264 +4,263 @@
 dartway create my_app
 ```
 
-Four Dart packages side by side, an agent toolkit, and a git repository with an initial commit.
-The source is `template/` in the DartWay monorepo — a skeleton with auth, roles, navigation, an
-admin panel and a UI kit, and zero domain models.
+Three Dart packages side by side, the files that deploy and review them, an agent toolkit, and a git
+repository with an initial commit. The source is `template/` in the DartWay monorepo — a skeleton
+with sign-in, profiles, roles, an admin panel and a UI kit, and no domain models.
 
 ```
 my_app/
-  my_app_server/     Serverpod backend — models, CRUD configs, business logic
-  my_app_client/     generated protocol + API client — never edited by hand
-  my_app_flutter/    the app — features, UI kit, navigation
-  my_app_shared/     rules both sides must apply identically — pure Dart, no dependencies
-  .claude/           the agent toolkit (installed, then committed)
-  .vscode/           Server / Flutter (web) launch configs
-  .github/           a Claude PR-review workflow (delete it to turn review off)
+  my_app_shared/     the contract: data objects, requests, commands, channels, refusal codes
+  my_app_server/     row classes, handlers, access and channel rules, migrations
+  my_app_flutter/    the app: features, navigation, the UI kit
+  deploy/            the deployment's configuration — dartway deploy reads it
+  .claude/           the agent toolkit, installed by create and committed
+  docs/dev_notes/    the project's own findings, one file per finding
+  CLAUDE.md          the project's own rules for agents — yours, never overwritten
+  README.md          bring-up, a feature end to end, the checks
+  .vscode/           Server and Flutter launch configurations
+  .github/           a Claude review on every pull request (delete it to turn review off)
 ```
 
-**A new project gets no `docs/` folder, deliberately.** What a screen does belongs in its
-[`DwFeatureSpec`](../3-flutter/features-and-specs.md), the server-side rules in doc comments above
-the CRUD config, a cross-cutting registry — analytics events, settings keys, roles — in code under
-`lib/core/`, where the compiler knows the list and a typo is an error. A document sitting apart from
-the code goes stale without anything failing: nothing compiles it, no checker sees it, and the next
-reader — increasingly an agent — believes it.
+## Why three packages
 
-A project may still keep the documents it genuinely needs there, and one kind is known to the
-framework because it keeps being reinvented: **`docs/adr/` — the decisions and what they ruled out**.
-An ADR exists for the one thing that cannot live beside code — the *rejected* alternatives, which
-have no file to sit next to. The rules for writing one (and for never editing it) are in the agent
-toolkit's `CLAUDE.md`; `dartway-plan` reads the folder before proposing an approach.
+`my_app_server` imports `dart:io` and Postgres; `my_app_flutter` imports Flutter. Neither can depend
+on the other. What they must agree on — every call, every object, every refusal code — lives in
+`my_app_shared`, pure Dart, and **both depend on it**. There is no generated client package: the
+shared package is the client contract, compiled into the app and into the server from one source.
 
-## Why four packages
+That is also what makes a shared rule honest. `AuthIdentifier.normalize` in the skeleton's shared
+package is the function the app runs on what a person typed *and* the server's
+`DwAuthConfig.normalize`. Written twice, the copies drift — and since signing in with an unknown
+identifier creates an account, a phone stored as `+7 999…` on one side and `7999…` on the other is a
+second, empty account instead of a sign-in.
 
-`server` and `flutter` cannot depend on each other — one imports `dart:io` and Serverpod, the other
-imports Flutter. `client` holds the generated protocol, and `flutter` depends on it. **The server
-does not:** it carries its own copy of the same models under `lib/src/generated`, which is why the
-protocol is generated on both sides rather than shared through one package — and why a shared
-package must not route through the client, see below.
+## `my_app_shared` — the contract
 
-The fourth, `my_app_shared`, is pure Dart for code that has to behave **identically** on both sides
-— format validation, shared enums, computation over fields with no IO. The skeleton ships it wired
-into both halves, holding one worked example; it used to be a package each project assembled by
-hand, and the guidance for doing so was wrong about the one thing that matters.
+```
+my_app_shared/
+  lib/my_app_shared.dart         the library: re-exports dartway_core_shared and everything below
+  lib/generated/dw_protocol.dart the protocol registry — generated
+  lib/src/
+    profile.dart, admin.dart,    data objects, requests and commands, grouped by area;
+    settings.dart                each with its generated *.dw.dart part
+    my_app_channel.dart          enum MyAppChannel with DwChannelKind — the live channels
+    my_app_refusal.dart          enum MyAppRefusal with DwRefusalCodes — why the server says no
+    my_app_upload.dart           enum MyAppUpload with DwUploadPurpose — what a file is for
+    auth_identifier.dart         rules both sides apply identically
+    registration_keys.dart       the keys a sign-up sends with its code
+  test/contract_test.dart
+```
 
-**It depends on nothing, and that constraint is its design.** It may not depend on the client
-package: the server does not depend on that package either — it carries its own copy of the
-generated models — so a shared package reaching for the protocol would serve exactly one of the two
-sides. Plain values in, plain values out; each side unpacks its own models at the call site.
+**It depends on `dartway_core_shared` and nothing else.** Whatever it declares is compiled into the
+server and into the app alike, so it cannot reach for Flutter, a database or IO. A rule that needs the
+database is not a shared rule — it is a handler's.
+
+The three enums are named after the project — `<Project>Channel`, `<Project>Refusal`,
+`<Project>Upload` — so a project's own codes never read as the framework's.
 
 ## `my_app_server` — where the rules live
 
-`lib/src/` here is a closed list too, for the same reason and enforced by the same check.
-
 ```
 my_app_server/
-  bin/main.dart          the server entry point
-  config/                development / staging / production / test + passwords.yaml
-  migrations/            generated schema migrations
-  lib/server.dart        the package's public surface
+  bin/server.dart          starts the server — configured by the environment alone
+  bin/migrate.dart         apply | rollback | status | create <name> | check | rehash
+  bin/seed_dev.dart        development accounts and data; refuses to run twice
+  lib/my_app_server.dart   builds the DwAppServer: protocol, schema, migrations, auth,
+                           handlers, channels, files
+  lib/generated/
+    dw_schema.dart         the schema and the db.<table> getters — generated
   lib/src/
-    models/              your *.spy.yaml model definitions
-    generated/           serverpod generate output — do not edit
-    crud/                one DwCrudConfig per model — the feature's whole behaviour
-    dartway/             DwCore.init and the session role helpers
-    domain/              pure rules over models — no Session, no IO, no DB
-    app/                 session-aware workflows — bootstrap_admin.dart lives here
-    endpoints/           hand-written Serverpod endpoints, for the things CRUD is not — absent
-                         until you need one
-    web/                 server-rendered pages, if you want any
-  test/                  DartWay's auth and password integration suites, against a real DB
+    entities/              row classes (@DwSqlTable) with their generated *.dw.dart tables
+    handlers/              one DwCallHandler per request and command, grouped by area
+    migrations/            migrations.dart and one file per migration — written by
+                           migrate.dart create, then yours
+    auth.dart              DwAuthConfig: code delivery, the profile made with each account
+    call_context.dart      what "the caller" means to this app: ctx.profile, the access rules
+    channels.dart          one DwChannelRule per channel kind
+    files.dart             one DwUploadRule per upload purpose
+    objects.dart           rows → the data objects clients see, related data in batches
+    publications.dart      what a change publishes, and to whom
+    bootstrap.dart         APP_BOOTSTRAP_ADMIN: the first administrator, ensured on every start
+  test/                    acceptance tests on a real server, database and storage
+  docker-compose.yaml      development Postgres and MinIO
+  Dockerfile               the server image the deploy builds
 ```
 
-`domain/` and `app/` are the one boundary worth holding on the server — pure rules against
-session-aware side effects. `domain/` ships empty, because until such code exists the folder is
-nothing; `app/` ships with the one workflow every project needs before it has a domain at all —
-`bootstrap_admin.dart`, which brings the identifier declared in `bootstrapAdminIdentifier` to the
-state "the profile exists and it is an admin" on every boot. The admin role is granted by an admin,
-so the first one is declared per environment; that is also the answer for staging and production,
-where the alternative is an `UPDATE` typed by hand that nobody can read back or repeat. Both folders
-are declared, so creating one is not an invention; anything *else* under `lib/src/` is.
+**The top of `lib/` is fixed; `lib/src/` is yours.** The checker allows exactly the package's library,
+`generated/` and `src/` there, and requires `src/migrations/migrations.dart` — `bin/migrate.dart`
+writes and reads migrations by that path. Everything else under `src/` is arranged as your domain
+asks: the skeleton's files are one reasonable shape, not a law.
 
-`endpoints/` is not there at all, and that is the point rather than an omission: the skeleton
-reaches its whole surface — auth, profiles, roles, settings, an admin panel — through CRUD configs,
-without one hand-written endpoint, and `serverpod generate` is perfectly happy with no endpoints to
-generate. Create the folder for the things CRUD genuinely is not — uploads, webhooks, a third
-party's callback — and treat it as the last resort it is.
+**A row is not a data object.** `UserProfileRow` is a table; `UserProfile` is what a client receives.
+The server builds one from the other in `objects.dart` — the profile's phone and e-mail come from
+the framework's identities, its photo URL from the file store — so a column added for the server's
+own use never reaches a client by accident.
 
-**Models are YAML, not Dart.** `lib/src/models/note/note.spy.yaml` declares a class, its table and
-its fields; `serverpod generate` turns it into Dart in `lib/src/generated/` **and** in the client
-package. You edit the YAML; you never edit the generated Dart.
-
-**A config per model is the API.** `lib/src/crud/` holds one `DwCrudConfig<T>` per exposed model,
-and a model with no config in `DwCore.init(crudConfigurations: [...])` is not reachable at all. The
-skeleton ships two of them — `user_profile_crud_config.dart` and `app_setting_crud_config.dart` —
-which are worth reading before writing your first: between them they show an admin-only access
-filter, a role guard on writes, validation, and a public realtime broadcast.
-
-**`lib/src/dartway/`** is the wiring: `dartway_core.dart` builds `DwCore.init<UserProfile>` with the
-CRUD list, the auth config and the verification-code sender; `dartway_session_extension.dart` holds
-the role helpers (`session.isAdmin`, `adminOnlyAccessFilter`) that the configs read. Both are yours
-to extend — a new role helper goes here, not into each config.
-
-**`lib/src/endpoints/` still exists**, and that is deliberate. CRUD covers data; a report, an import
-or a payment callback is an ordinary Serverpod endpoint you write yourself.
-
-## `my_app_client` — generated, and that is the point
-
-`serverpod generate`, run in the server package, writes this package: the model classes, the
-`Client` the app connects with, and the serialisation. **Nothing here is edited by hand** — the next
-generate would erase it, silently and without breaking the build.
-
-If you find yourself wanting to add a method here, the answer is elsewhere: a rule belongs in a CRUD
-config on the server, an extension over a model belongs in the Flutter package.
+**Accounts are the framework's, profiles are yours.** The framework keeps accounts, sign-in identifiers
+and session keys in its own tables; `UserProfileRow` references the account and is created in the
+same transaction, by `onAccountCreated` in `auth.dart`. A signed-in account without a profile cannot
+exist, and nothing about who a person is to your app lives in the framework.
 
 ## `my_app_flutter` — where the app is
 
 **The top level of `lib/` is a closed list: two files, four zones, four layers.** Nothing else may sit
-there, and each of these means one thing and is spelled one way.
+there, and each name means one thing.
 
 ```
 my_app_flutter/lib/
-  main.dart              development parameters only (backend URL, version label)
-  my_app_app.dart        all the wiring: DwAppRunner, MaterialApp.router, the root subscription
+  main.dart              development parameters only: the server address, the version
+  my_app_app.dart        the wiring: the core, DwAppRunner, MaterialApp.router
 
-  ZONES — features, each with a DwFeatureSpec
+  ZONES — features
   app/                   the app itself — app/home/, app/profile/, ...
   admin/                 the admin panel
   auth/                  the sign-in flow
   common/                features more than one zone draws on (create it when that happens)
 
   LAYERS — everything that is not a feature
-  core/                  app-wide wiring: router/, dw_core.dart, app_settings/, studio/, platform/, dev/
+  core/                  app-wide wiring: dw_core.dart, router/, refusal_text.dart,
+                         update_required_page.dart, profile/, app_settings/, dev/
   shared/                building blocks: widgets and helpers with no story of their own
   ui_kit/                your design system, as source
   l10n/                  ARB files and their generated output
 ```
 
-`main.dart` holds nothing but the concrete environment (the backend URL differs on an Android
-device, which is the one line most people edit first). Everything structural is in the app file.
+`core/dw_core.dart` declares the ambient core — `late DwFlutterCore dw;` — and the function that builds
+it. It is not `final` because a widget test builds its own core against an in-memory server
+(`DwFakeServer`) and disposes it in `tearDown`. `core/refusal_text.dart` is the catalogue that turns
+every refusal code into the user's language; an exhaustive switch, so a code added to the shared enum
+does not compile here until it has a text.
 
-**`web/index.html` is part of the app too.** It sits outside `lib/`, which makes it easy to read as
-scaffolding, and it is not: the shell the skeleton ships carries a scroll lock, and without that block
-focusing a text field on iOS scrolls the document — and with it the Flutter canvas, which is exactly
-one layout viewport tall — off the screen. Nothing fails and nothing is logged, and neither the iOS
-simulator nor a desktop browser reproduces it; a real phone does, which is where a staging build gets
-opened. Anything that regenerates the shell drops the block silently, so `grep -q 'focusin'
-web/index.html` is the check worth running before you hand a web build to someone.
+**There is no `data/` and no `domain/`.** The data layer is `dw.request` and `dw.command` over the
+shared contract, so a `data/` folder is either empty or a second way to do the same thing. The rules
+live in the shared package, where both sides apply them, and in the server's handlers; what is left on
+the Flutter side — extensions on data objects, formatting, predicates — is a helper, and helpers live
+in `shared/`.
 
-**A zone is not a feature and not a folder you invent.** The four are the kinds of thing an app is
-made of, not a list of sections: a fifth navigation zone in the router does *not* earn a folder of
-its own — it is a group inside `app/`, like any other group. The zones are also the only places
-asked for a `DwFeatureSpec`, which is why the admin panel has to be one and cannot live at
-`app/admin/`: nested in a zone it reads as an ordinary group, and the whole panel disappears from
-every question the checker asks about zones.
+**A zone is not a folder you invent.** The four are the kinds of thing an app is made of, not a list of
+sections: a fifth navigation zone does not earn a top-level folder — it is a group inside `app/`. The
+admin panel cannot live at `app/admin/` either: a top-level name nested in a zone reads as an ordinary
+group, and the checker reports it.
 
-`core/studio/` is the [DartWay Studio](../6-studio/studio-bridge.md) bridge binding — the host that talks to
-Studio when the app runs inside its preview frame, plus the screen passports Studio renders beside
-it. It is wiring like the router, inert outside an iframe, and a project that never opens Studio can
-delete the folder.
-
-`core/platform/` is where a conditional-import trio lives — `x.dart` holding
-`export 'x_stub.dart' if (dart.library.js_interop) 'x_web.dart';`, plus the two halves. It is one
-symbol whose implementation the platform picks, which is wiring by any reading; and a feature that
-keeps its own copy has quietly acquired a second answer to the same question. `dartway check` names
-this folder in the `unusedFeatureFile` finding, so the shape does not have to be guessed at.
-
-**There is no `data/` and no `domain/`.** The data layer is `dw.repo`, so a `data/` folder in a
-DartWay app is either empty or a second way to do the same thing; and the rules of a DartWay app
-live in CRUD configs on the server, so what is left on the Flutter side — extensions on models,
-formatting, predicates — is a helper, and helpers live in `shared/`. Both folders were conventional
-once, both stayed empty in every skeleton, and a name that exists only in a document is how a layout
-drifts.
-
-The [conventions checker](../5-tooling/conventions-checker.md) enforces this list rather than
-describing it: an undeclared folder, a stray file at the root of `lib/`, a missing `my_app_app.dart`
-and a top-level name nested inside a zone are all errors.
+The [conventions checker](../5-tooling/conventions-checker.md) enforces the list rather than describing
+it: an undeclared folder, a stray file at the root of `lib/`, a missing `my_app_app.dart` and a
+top-level name inside a zone are all errors.
 
 ### A feature is a folder with one public file
 
 ```
-lib/app/bookings/
-  bookings_page.dart       the entry point — the feature's whole public surface
+lib/app/profile/profile_page/
+  profile_page.dart        the entry point — the feature's whole public surface
   widgets/                 its own widgets
-  logic/                   its own providers, filters, mappers
+  logic/                   its own providers and helpers
 ```
 
 The shape is inferred, not declared: a folder with a root `.dart` file is a **feature**, a folder
-without one is just a **group** that nests features. Only `widgets/` and `logic/` count as a
-feature's internals — any other subfolder is read as a nested feature.
+without one is a **group** that nests features. Only `widgets/` and `logic/` count as a feature's
+internals; any other subfolder is read as a nested feature.
 
-Two rules follow, and the [conventions checker](../5-tooling/conventions-checker.md) enforces both:
-a feature has exactly one root file, and no feature may import another feature's `widgets/` or
-`logic/`. Behaviour two features share is one more feature; a widget with no story of its own is a
-building block and lives in `lib/shared/`, where no spec is expected of it. The entry point also
-declares what it is, in a `DwFeatureSpec` next to its own code rather than in a document that drifts
-— see [features and specs](../3-flutter/features-and-specs.md).
-
-A feature lives in a zone, and only there. The zone it belongs to is the one that owns the
-behaviour, not the one that happens to show it first: a screen the admin panel and the app both
-open belongs in `common/`, and a widget both draw with is not a feature at all — it is a block in
-`shared/`.
+A feature has exactly one root file, and no feature imports another feature's `widgets/` or `logic/`.
+Behaviour two features share is one more feature; a widget with no story of its own is a building
+block in `lib/shared/`. The entry point declares what it is in a `DwFeatureSpec` beside its code —
+see [features and specs](../3-flutter/features-and-specs.md).
 
 ### Why the kit is source in your app, not a dependency
 
-`lib/ui_kit/` is a real design system — `AppText`, `AppButton`, `AppCard`, a theme, formatters — and
-it is **yours**, copied in, not imported. The framework ships no design on purpose: a design system
-is the one thing every serious app ends up owning, and shipping it as a dependency only starts an
-argument about the corner radius of a button. Change any of it without asking anyone, and without
-waiting for a release.
+`lib/ui_kit/` is a design system — `AppText`, `AppButton`, `AppCard`, a theme, formatters — and it is
+**yours**, copied in, not imported. The framework ships no design on purpose: a design system is the
+one thing every serious app ends up owning, and shipping one as a dependency starts an argument about
+the corner radius of a button. Change any of it without waiting for a release.
 
 Inside, files are grouped by how often you reach for them — `1_essentials/`, `2_frequent/`,
-`3_special/` — plus `theme/`, `layout/`, `utils/` and `assets/`. The kit is one library: every file
-is a `part of '../ui_kit.dart'`, and the rest of the app imports the `ui_kit.dart` barrel and
-nothing deeper.
+`3_special/` — plus `theme/`, `layout/`, `utils/` and `assets/`. The kit is one library: every file is
+a `part of` `ui_kit.dart`, and the rest of the app imports that file and nothing deeper.
 
-The boundary is enforced rather than remembered: raw `Color(...)`, `TextStyle(...)`, `BorderRadius`
-and direct `Theme.of(context)` access **outside** `ui_kit/` are a lint (`dartway_lints`, wired into
-`custom_lint`). A style that leaks into a feature is a style nobody can change centrally later.
+The boundary is enforced by `dartway_lints` through `custom_lint`: raw `Color(...)`, `TextStyle(...)`,
+`BorderRadius` and direct theme access **outside** `ui_kit/` are flagged, because a style that leaks
+into a feature is a style nobody can change centrally. The same package limits a relative import to
+two levels up (`deep_relative_import`): past that the path names nothing, and a `package:` import says
+where it goes. See [the UI kit](../3-flutter/ui-kit.md).
 
-The same lint package draws one more line, this time about imports: a relative import may walk at
-most two levels up (`deep_relative_import`). One or two `../` read as "the feature next door";
-past that the path names nothing, and the destination — `core/`, `shared/`,
-`ui_kit/`, another zone — is spelled out with a `package:` import instead. The limit doubles as a
-structure signal: a sibling four levels away is not a sibling.
+### `web/index.html` is part of the app
 
-## `.claude/` — generated, and committed
+It sits outside `lib/`, which makes it easy to read as scaffolding, and it is not: the skeleton's shell
+carries a scroll lock. Without it, focusing a text field on iOS scrolls the document — and with it the
+Flutter canvas — off the screen. Nothing fails and nothing is logged, and neither the iOS simulator
+nor a desktop browser reproduces it; a real phone does. Anything that regenerates the shell drops the
+block silently, so `grep -q 'focusin' web/index.html` is worth running before you hand a web build to
+someone.
 
-The agent toolkit is installed into `.claude/` by `create` (and refreshed by `dartway setup-ai`):
-the project's `CLAUDE.md`, the `dartway-*` skills, and a couple of commands. It is a
-generated-but-committed artifact, like the Serverpod protocol — regenerate it to pick up framework
-changes, but commit the result so the repository is self-contained. See
-[the agent toolkit](../5-tooling/agent-toolkit.md).
+## Generated files, and who writes them
+
+| File | Written by | From |
+|---|---|---|
+| `*_shared/lib/src/**/*.dw.dart` | `dartway generate` | data objects, requests, commands: codecs and equality |
+| `*_shared/lib/generated/dw_protocol.dart` | `dartway generate` | every DTO of the contract: the protocol registry |
+| `*_server/lib/src/entities/*.dw.dart` | `dartway generate` | row classes: the typed table definitions |
+| `*_server/lib/generated/dw_schema.dart` | `dartway generate` | row classes: the schema and the `db.<table>` getters |
+| `*_server/lib/src/migrations/m<timestamp>_<name>.dart` | `dart run bin/migrate.dart create <name>` | the difference between the schema and the migrations — a draft you review, then yours |
+| `*_flutter/lib/l10n/gen/` | Flutter's `gen-l10n` | the ARB files |
+
+**Generated files are never edited by hand, and they are committed.** The next generation would erase
+an edit silently, and `dartway generate --check` — part of `dartway check` — fails on any generated
+file that no longer matches its sources, or whose source is gone. The codecs are the wire: a field a
+stale part does not know compiles, starts, and travels without that field.
+
+A migration is the exception: drafted once, then owned. `create` seals it with a checksum of its
+source; an edit made while reviewing an unapplied draft is re-sealed with `migrate.dart rehash`, and
+`migrate.dart check` fails on a file that no longer matches its seal — an applied migration edited in
+place is a database that no longer agrees with its history.
+
+## `deploy/`
+
+The deployment is configuration, not scripts: `deploy/config.yaml` (from `config.yaml.example`)
+describes the environment — the machine, the `api` and `app` hosts, an optional site, storage,
+required secrets — and `dartway deploy setup`, `check` and `run` do the rest. The server's `Dockerfile`
+and the Flutter package's `Dockerfile` and `nginx.conf` are the images it builds. `deploy/README.md`
+explains the stack; [deploy](../5-tooling/deploy.md) explains the command.
+
+## `.claude/`, `CLAUDE.md` and `docs/dev_notes/`
+
+Three kinds of file, and the difference is who may change them:
+
+- **`.claude/`** is installed by `create` and refreshed by `dartway update` (or `dartway setup-ai`):
+  the toolkit's constitution `.claude/CLAUDE.md`, the `dartway-*` skills, the `/commit` and
+  `/dartway-checkup` commands, and `settings.json`. The managed files are overwritten on every update —
+  commit the result, so the history says which skills the code was written with. Skills and commands
+  of your own, under other names, are never touched; `settings.json` is merged, keeping what you added.
+  See [the agent toolkit](../5-tooling/agent-toolkit.md).
+- **`CLAUDE.md` at the root** is the project's own rules for agents: a DartWay default the project
+  replaces, conventions the framework says nothing about, with the reason beside each. `create` writes
+  it once, nearly empty; `setup-ai` and `update` never touch it.
+- **`docs/dev_notes/`** holds the project's findings, one tracked file per finding. The toolkit seeds its
+  form; the notes are the project's.
+
+A new project gets no other `docs/`, deliberately. What a screen does belongs in its `DwFeatureSpec`,
+a server rule in the doc comment of the handler that holds it, a cross-cutting list — settings keys,
+roles — in code, where the compiler knows the list and a typo is an error. A document apart from the
+code goes stale without anything failing.
 
 ## What `create` changes on the way in
 
-Copying is not all it does. Every occurrence of `dartway_starter` becomes your project name and
-`DartwayStarter` becomes its PascalCase form, in file names and in file contents alike. Each
-package's `dependency_overrides` block — which points at the monorepo checkout and only makes sense
-inside it — is stripped, so the framework dependencies resolve from pub.dev like any other. The
-toolkit lands in `.claude/`, with a default `settings.json` if the project has none, and
-`docs/dev_notes/` — the project's own findings, one tracked file per finding — is created beside it.
+Copying is not all it does. Every occurrence of `dartway_starter` becomes your project name, in file
+names and contents, with its PascalCase, camelCase and dashed forms (the dashed one names the storage
+buckets). The renamed code is formatted once, so the first commit is already the formatter's. Each
+package's `dependency_overrides` block — which points at the monorepo checkout and means nothing
+outside it — is stripped, so the framework resolves from pub.dev; with `--framework-path` it is
+replaced by overrides onto that checkout instead.
 
-Worth knowing if you ever put such a block back — inside the monorepo, or in your own project while
-debugging a framework package. An override does more than redirect one dependency: **for the package
-it names, pub stops checking constraints altogether.** Not "prefers the override" — the caret is
-never evaluated, so a line that no published version could satisfy resolves in silence for as long
-as the block is there. That is the same property [plugins](../3-flutter/plugins.md) warns against
-using as a way to consume the framework, seen from its other side: the override is not only global
-to the resolution, it also hides whether the constraints underneath it still say anything true. The
-first tree to find out is one without the block — a new project, or CI.
-
-So after adding a framework package to a project, resolve it once for real: run
-`dart pub upgrade <the dartway packages>` in each package that gained one, and check that they came
-out on a single commit. `dartway check` reports it when they did not — see
-[the conventions checker](../5-tooling/conventions-checker.md).
+Worth knowing if you ever add such a block yourself: **for the package an override names, pub stops
+checking constraints altogether.** A caret no published version could satisfy resolves in silence for
+as long as the block is there, and the first tree to find out is one without it — a new project, or CI.
 
 ## Where to go next
 
-- [Quick start](quick-start.md) — bring it up, then add a model of your own.
-- [Models](../2-core/models.md) — what goes in a `.spy.yaml` and what generation produces.
-- [CRUD configs](../2-core/crud-configs.md) — the file in `lib/src/crud/`, in full.
-- [How the app reads and writes data](../3-flutter/data-layer.md) — `dw.repo` in full.
-- [The UI kit](../3-flutter/ui-kit.md) — what belongs in it and what does not.
+- [Quick start](quick-start.md) — bring it up, sign in, run the checks.
+- [Data objects and generation](../2-core/data-objects-and-generation.md) — what goes in the shared
+  package and what generation produces.
+- [Handlers and context](../4-server/handlers-and-context.md) — the files in `handlers/`.
+- [Database](../4-server/database.md) and [migrations](../4-server/migrations.md) — rows, queries and
+  the migration CLI.
+- [Flutter core](../3-flutter/flutter-core.md) — what `core/dw_core.dart` builds.
 - [The conventions checker](../5-tooling/conventions-checker.md) — the rules above, as a command.

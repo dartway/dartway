@@ -37,8 +37,8 @@ Without this rule the file becomes the place things go when nobody wants to deci
 reads it.
 
 **Where the mechanism lives is here; where the law lives may be elsewhere.** The web shell being part
-of the application is a structural rule and it stays in the project's `CLAUDE.md`. Why iOS makes it
-necessary is here.
+of the application is a structural rule, and it belongs with the project's rules (`.claude/CLAUDE.md`).
+Why iOS makes it necessary is here.
 
 ---
 

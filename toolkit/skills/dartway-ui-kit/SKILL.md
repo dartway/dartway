@@ -15,9 +15,9 @@ description: >-
 **The kit belongs to the app.** It lives as source in `__FLUTTER_PKG__/lib/ui_kit/`, `dartway create`
 puts it there, and from then on the project edits it freely — it is its code, not a dependency.
 
-**The framework ships no design.** `dartway_flutter` has **no** `DwButton`, `DwText`,
-`DwFlutterTheme`, `DwColorPreset`, and no style presets. Don't look for them and don't import them —
-they do not exist. There is no `dartway_ui_kit` package either, and there won't be: otherwise the app
+**The framework ships no design.** `dartway_core_flutter` has **no** button, no text widget, no theme
+and no style presets. Don't look for them and don't import them — they do not exist. There is no
+`dartway_ui_kit` package either, and there won't be: otherwise the app
 would end up with two kits — ours in dependencies and its own in `lib/` — and every `AppButton` would
 raise the question "whose is this".
 
@@ -32,14 +32,16 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
 ## Core principles
 
 1. **One import.** Components are imported only through the root `ui_kit.dart`. Never import
-   individual buttons/colors/styles directly.
-2. **Everything is declared in `ui_kit.dart`.** Every component file starts with `part of '../ui_kit.dart';`.
-   The root file assembles everything with `part` directives and re-exports `dartway_flutter`.
+   individual buttons/colors/styles directly — `dartway check` fails on it (`forbiddenUiKitImport`).
+2. **Everything is declared in `ui_kit.dart`.** Every component file starts with `part of '../ui_kit.dart';`
+   (a file without it fails `dartway check` as `uiKitPartMissing`). The root file assembles everything
+   with `part` directives and re-exports `dartway_core_flutter`.
 3. **No raw styling in features.** Inside a zone (`app/`, `admin/`, `auth/`, `common/`) and in `shared/`
    the following are **forbidden**: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`, `Theme.of(context)`,
    `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a wish — the
    `forbidden_ui_style_usage` rule from `dartway_lints` (via `custom_lint`) allows them **only inside
-   `ui_kit/`** and recognizes `BuildContext` by type, not by variable name.
+   `ui_kit/`** and recognizes `BuildContext` by type, not by variable name, and `dartway check` fails on
+   the same usages (`forbiddenUiUsage`).
 
    **What to do when Flutter demands a style, not a widget** (`Icon(color:)`,
    `InputDecoration.labelStyle`, `TextSpan`, a third-party widget with `style:`): such a widget
@@ -144,9 +146,11 @@ almost always mean the wrong asset was taken, not a deliberate stretch. Somethin
 area by width with `fit` is **not an icon but a cover**: it has its own widget and its own parameters.
 
 - **a raw path in a feature is forbidden** — `Image.asset('assets/…')` in a screen means the image
-  cannot be found by search and will survive a file rename only by accident;
-- `flutter_gen` is not needed: that a path leads to an existing file is checked by `dartway check` — and
-  the same checker catches raw paths, which the generator never could;
+  cannot be found by search and will survive a file rename only by accident (`dartway check` warns:
+  `forbiddenAssetPath`);
+- `flutter_gen` is not needed: that a path leads to an existing file is checked by `dartway check`
+  (`assetPathMissing`, an error) — and the same checker catches raw paths, which the generator never
+  could;
 - **fonts** never reach the code: they are declared in the pubspec and arrive through text styles. Sounds
   and video are not widgets, their place is in the data layer next to the player, not in the kit.
 
@@ -183,7 +187,7 @@ The kit does not import app models and does not switch on domain enums. If a wid
 on the reason a course is locked, and that enum carries user-facing texts inside — **a widget with two
 constructors moves into the kit**, and the domain `switch` stays in the feature as a single line. Moving
 the enum itself into the kit is not allowed: the texts would come with it, and text constants have no
-place in the kit.
+place in the kit (`dartway check` warns on a string literal under `ui_kit/`: `uiKitContainsText`).
 
 ## Text: a widget with named constructors + a token enum
 
@@ -206,7 +210,7 @@ final l10n = context.l10n;
 AppText.body(l10n.bookSpot)
 ```
 
-A new string = add a key to **every** ARB the project keeps (the skeleton ships `lib/l10n/app_en.arb` and `app_ru.arb`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the generated protocol does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
+A new string = add a key to **every** ARB the project keeps (the skeleton ships `lib/l10n/app_en.arb` and `app_ru.arb`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the output of `dartway generate` does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
 
 ```dart
 // ui_kit/theme/app_text.dart
@@ -234,7 +238,7 @@ class AppText extends StatelessWidget {
 }
 ```
 
-**Why not a "callable enum"** (`AppText.body('x')` as an enum method — that's how it used to be): a
+**Why not a "callable enum"** (`AppText.body('x')` as an enum method): a
 method can never be a `const` expression. One non-const text leaf drags along every enclosing
 `const Padding`, `const Center`, `const Expanded` — and `const` gets washed out of the tree.
 Named constructors give exactly the same call site, but `const` stays legal.
@@ -252,8 +256,8 @@ and hands back a ready `onPressed` (`null` while the action runs) and `busy`.
 AppButton.primary(
   l10n.saveAction,
   onTap: dw.action(
-    (context) => dw.repo.saveModel(model),
-    onSuccessNotification: l10n.saved,
+    (context) => dw.command(PayInvoice(invoiceId: invoice.id)),
+    onSuccessNotification: l10n.invoicePaid,
   ),
 )
 ```
@@ -285,8 +289,9 @@ validate: the action will run, and in debug the framework's `assert` will fire. 
 
 **A label inside a kit widget must be able to shrink.** A row of an icon and text in a `Row` with
 `mainAxisSize.min` overflows as soon as the label doesn't fit the allotted width — and instead of a
-button the user sees a red `RenderFlex overflowed` stripe. Text in such a row is always
-`Flexible` + `maxLines: 1` + `TextOverflow.ellipsis`:
+button the user sees a red `RenderFlex overflowed` stripe. Text in such a row is always `Flexible`;
+then it either wraps (the skeleton's `AppButton` does) or is cut to one line with
+`maxLines: 1` + `TextOverflow.ellipsis`:
 
 ```dart
 Row(
@@ -368,7 +373,8 @@ phone frame.
 
 ```
 lib/ui_kit/
-  ui_kit.dart              // root: imports + part directives + export dartway_flutter
+  ui_kit.dart              // root: imports + part directives + export dartway_core_flutter
+  assets/                  // app_icon.dart (the dictionary), app_icon_view.dart (the renderer)
   1_essentials/            // basics: checkbox, input, multi_link_text
   2_frequent/              // frequent: card, bottom sheet, rating
   3_special/               // narrow, grouped by feature: pin code, chat bubble
@@ -391,4 +397,4 @@ The numbered prefixes keep the kit sorted by usage frequency — the most needed
   not a kit question but a platform one: `dartway-on-device`. The drift check is
   `grep -rn 'viewInsetsOf' lib/ui_kit` — any hit outside the smoother is one.
 - Tempted by a "client-specific hack" inside a framework widget — that's a signal that an extension
-  point is missing. Introduce it in the kit, don't fork `dartway_flutter`.
+  point is missing. Introduce it in the kit, don't fork `dartway_core_flutter`.

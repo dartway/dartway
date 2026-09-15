@@ -33,43 +33,72 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Review the changes in this pull request (diff against `master`).
+            Review the changes in this pull request (diff against its base branch, `${{ github.event.pull_request.base.ref }}`).
 
             This repository is the DartWay framework itself — a Dart monorepo of
-            Flutter + Serverpod packages — not an application built on it. Read
-            `CLAUDE.md` at the repository root for the conventions that apply;
-            `docs/DESIGN.md` is the law for public API design.
+            the framework's server, client and Flutter packages, its CLI, the
+            project template, a reference example, the docs and the agent
+            toolkit — not an application built on it. Read `CLAUDE.md` at the
+            repository root for the conventions that apply; `docs/DESIGN.md` is
+            the law for public API design, and `docs/1.0/DECISIONS.md` records
+            the decisions of the rewrite (the latest entry wins).
 
-            Do not comment on generated or platform files: `**/lib/src/generated/**`,
-            `packages/dartway_serverpod_core/dartway_serverpod_core_client/lib/src/protocol/**`,
-            `**/migrations/**`, `*.g.dart`, `*.freezed.dart`, `*.mocks.dart`;
-            iOS/Android project files (`*.pbxproj`, `*.xcconfig`, `*.xcscheme`,
-            `*.plist`, `*.entitlements`, `Podfile.lock`, `Runner.xcodeproj/**`);
-            lockfiles and assets (`pubspec.lock`, `*.lock`, `*.png`, `*.jpg`,
-            `*.svg`, `*.webp`). Focus on hand-written Dart.
+            Do not comment on generated or platform files: `**/*.dw.dart`,
+            `**/lib/generated/**`, `**/test/goldens/**`, `**/l10n/gen/**`,
+            `*.g.dart`, `*.freezed.dart`, `*.mocks.dart`; iOS/Android project
+            files (`*.pbxproj`, `*.xcconfig`, `*.xcscheme`, `*.plist`,
+            `*.entitlements`, `Podfile.lock`, `Runner.xcodeproj/**`); lockfiles
+            and assets (`pubspec.lock`, `*.lock`, `*.png`, `*.jpg`, `*.svg`,
+            `*.webp`). Migrations under `**/lib/src/migrations/**` are hand-reviewed
+            code: read them. Focus on hand-written Dart.
 
             Look for: bugs and logic errors, null-safety and typing problems, races
             and unintended side effects, security issues. Report only findings you
             are confident about.
 
-            Three checks specific to this repository, in addition to the above:
+            Four checks specific to this repository, in addition to the above:
 
             1. **The synchronisation law.** A change to the public API of any package
-               is incomplete until the same PR updates `example/`, `template/`, the
-               affected skills in `toolkit/skills/`, the affected pages in `docs/`,
-               and the package `CHANGELOG.md`. Flag whichever of those is missing.
+               (what its `lib/<library>.dart` exports) is incomplete until the same
+               PR updates `example/`, `template/`, the affected skills in
+               `toolkit/skills/` and `toolkit/CLAUDE.md`, the affected pages in
+               `docs/`, and the package `CHANGELOG.md`; a version bump brings the
+               carets in `example/` and `template/` along (the core family —
+               `dartway_core_shared`, `dartway_core_server`, `dartway_core_flutter`,
+               `dartway_orm`, `dartway_client`, `dartway_generator` — moves in
+               lockstep; satellites version on their own). Flag whichever is
+               missing.
 
-            2. **The protocol patch.** If the diff touches
-               `dartway_serverpod_core_client/lib/src/protocol/protocol.dart`, verify
-               that `Protocol.deserialize<T>` still contains the manual
-               `DwApiResponse.manualDeserialization<T>(data)` block right after
-               `t ??= T;`. Regenerating the protocol silently drops it, the code still
-               compiles, and every CRUD response then fails to deserialise at runtime.
-               A missing patch is a blocking finding.
+            2. **Generated code is up to date.** A change to a DTO or row class in
+               `example/` or `template/`, or to `packages/dartway_generator`, must
+               come with the regenerated `*.dw.dart` parts and
+               `lib/generated/dw_protocol.dart` / `dw_schema.dart` in the same PR,
+               shared and server together. A hand edit to a generated file is a
+               blocking finding (the next `dartway generate` overwrites it). A row
+               class change that alters the schema without a new migration under
+               `lib/src/migrations/` is a blocking finding, and so is an edit to a
+               migration that already exists on the base branch — migrations are
+               appended, never rewritten (the framework's own included, in
+               `packages/dartway_core_server/lib/src/migrations/`).
 
-            3. **The toolkit invariant.** `toolkit/` must carry no project literals —
-               only `__*__` tokens. Flag any occurrence of a concrete project name
-               (for example `tvolkova`, `tvaity`, `kerla`) introduced under `toolkit/`.
+            3. **A wire change bumps the protocol (D-052).** If the diff changes how
+               anything travels between a server and its clients — `DwHttpContract`
+               paths, headers or query parameters, `DwApiResponse` bodies or HTTP
+               statuses, `DwUpdateTransport` / `DwChannelUpdates`, the live messages
+               or close codes, the JSON of the framework's DTOs, or what the
+               generator writes into `toJson` / `$NameFromJson` — then
+               `dwProtocolVersion` must be bumped and
+               `packages/dartway_core_shared/test/goldens/wire_golden.dart` refreshed
+               in the same PR. A changed golden with an unchanged
+               `dwProtocolVersion` is a blocking finding.
+
+            4. **The toolkit invariant.** `toolkit/` must carry no project
+               literals — only `__*__` tokens (`__SHARED_PKG__`, `__SERVER_PKG__`,
+               `__FLUTTER_PKG__`, …). Flag any concrete project, package or domain
+               name introduced under `toolkit/` — including names from `example/`
+               or `template/` (`dartway_example`, `dartway_starter`) and names of
+               applications built on the framework. Read the diff; no list of names
+               is complete.
 
             Use mcp__github_inline_comment__create_inline_comment (with
             confirmed: true) for line-level remarks. Use `gh pr comment` for the

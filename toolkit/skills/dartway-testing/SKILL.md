@@ -1,305 +1,385 @@
 ---
 name: dartway-testing
 description: >-
-  How a DartWay project tests itself, by layer: an access or save rule from DwCrudConfig
-  is an integration test on the server against a live database (withServerpod +
-  serverpod_test_tools.dart); plain logic is a unit test; a feature is a widget test with the
-  core booted from setUpAll through the app's own idempotent initializer and the server standing
-  in as DwRecordingServerTransport from package:dartway_serverpod_core_flutter/testing.dart —
-  reads prepared with answerGetAll/answerGetOne/answerGetCount, writes read back off
-  transport.saves/transport.deletes, the signed-in user overridden in the test's own ProviderScope.
-  Covers why the core must be up for a feature to even render, why the offline store is not a test
-  seam, the two timing traps (a toast holds a timer past pumpAndSettle, a failed read is retried),
-  what is deliberately not tested, and why there are no coverage thresholds.
-  Use when writing or reviewing tests, when a test cannot see what a feature saved, or when a
-  widget test fails with LateInitializationError, "found 0 widgets" or a pending Timer.
+  How a DartWay project tests itself, by where the behaviour lives: the contract in
+  __SHARED_PKG__ (`dart test` — codecs round-trip through the protocol, `validate()` codes and
+  fields, a request's `onUpdate` and channels); the server as acceptance tests on a real Postgres
+  and MinIO (`dartway test`; `DwTestDatabase` per test file, `DwTestServer.start`, the real client
+  from `connectClient()`, raw wire through `caller()` / `openLive()`, `DwTestStorage`, `wakeJobs`);
+  screens as widget tests on the in-memory server from `package:dartway_client/testing.dart`
+  (`DwFakeServer`, `DwFakeStorage`, `dwFakeTablePage` …) with the app's own `DwFlutterCore` built
+  per test and disposed after it, the localization delegates mounted and the locale pinned. Covers
+  what deserves a test and what does not, the skeleton's harnesses, the timing traps, and why there
+  are no coverage thresholds. Use when writing or reviewing tests, when a widget test fails with
+  "Dw is not initialized" / "Another dw core is alive" / "found 0 widgets" / a pending Timer, or
+  when an acceptance test cannot reach its database.
 ---
 
 # DartWay — how a project tests itself
 
-`dartway-clean-code` Part 3 decides **what** deserves a test (the threshold is behaviour
-complexity, never the fact that a line changed). This skill decides **where** that test goes and
-how to write it, because in a DartWay project the answer is not obvious: a feature reads and writes
-through the ambient `dw`, hands no callbacks out, and has no repository to inject.
+`dartway-clean-code` Part 3 decides **what** deserves a test: the threshold is the complexity of
+the behaviour, never the fact that a line changed. This skill decides **where** the test goes and
+how to write it.
 
-**The level follows where the behaviour lives.** Three layers, three different questions:
+**The level follows where the behaviour lives.** A DartWay project has three places where a rule
+can live, and each has its own kind of test:
 
-| The behaviour | Lives in | Its test |
-|---|---|---|
-| Who may read or save what, and what a save does to the database | `DwCrudConfig` on the server | **Integration test**, against a live database |
-| A calculation, a parse, a state machine, a rule with no I/O | A plain class in the app | **Unit test** |
-| The screen reads, the user acts, something leaves for the server | A feature widget | **Widget test**, with the core up |
+| The behaviour | Lives in | Its test | Runs with |
+|---|---|---|---|
+| What a DTO carries, which field a command refuses, what an arriving object does to a request, which channel a request listens on | The contract, `__SHARED_PKG__` | **Contract test**, pure Dart | `dart test` in `__SHARED_PKG__` |
+| Who may call what, what a command writes and publishes, who may subscribe, what a job does, where a file lands | Handlers, access and channel rules, jobs, upload rules — `__SERVER_PKG__` | **Acceptance test** against a real server on a real database and storage | `dartway test` |
+| What a screen shows, what the user's action sends, how a refusal or a live update looks | A feature — `__FLUTTER_PKG__` | **Widget test** on the in-memory server | `flutter test` in `__FLUTTER_PKG__` |
+| A calculation, a parse, a state machine with no I/O | A plain class or an extension | **Unit test**, in whichever package holds it | `dart test` / `flutter test` |
 
-Choosing the wrong layer is the common failure. A widget test cannot prove that a non-admin is
-refused: the UI hiding a button is not the rule, the server is. And an integration test cannot
-prove that the button sends the right model.
+Choosing the wrong place is the common failure. A widget test cannot prove that a member is refused:
+the button being hidden is not the rule, the server's access rule is. An acceptance test cannot prove
+that the button sends the right command. And a contract rule tested only through the server is
+tested on one of the two sides that apply it.
 
 ---
 
-## 1. Rules — an integration test on the server
+## 1. The contract — `dart test` in `__SHARED_PKG__`
 
-Access and save rules live in `DwCrudConfig`, run inside a real request, and touch the database.
-Nothing below the server can check them, and a mock of the session would only re-state the code.
+The shared package is pure Dart, so its tests need nothing running. The skeleton ships them in
+`__SHARED_PKG__/test/`; extend that file's lists rather than starting a new style.
 
-The skeleton ships one to copy: `test/integration/app_setting_access_test.dart` proves that the
-admin writes a setting, that a signed-in member is refused and nothing reaches the table, and that
-an empty key is rejected even for the admin. The machinery around it — `withServerpod` from the
-generated `test/integration/test_tools/serverpod_test_tools.dart` — stands up a real Serverpod
-against the test database.
+**Every DTO travels and comes back equal.** One test lists a value of every data object, request and
+command — with the optional fields set, and once more without them — and decodes each through the
+project's protocol:
 
 ```dart
-withServerpod('Given the app settings CRUD config', (sessionBuilder, endpoints) {
-  setUp(() async {
-    // withServerpod builds its own Serverpod and never calls run, so DartWay
-    // has to be booted here — the config's session.isAdmin resolves the profile
-    // through the core.
-    initDartwayCore(passwords: const {...});
-    // …seed an admin and a member, and build a session for each with
-    // AuthenticationOverride.authenticationInfo('${profile.id!}', {})
-  });
-
-  test('a signed-in member is refused, and nothing is written', () async {
-    final response = await appSettingCrudConfig.saveConfig!.save(
-      memberSession,
-      AppSetting(settingKey: key, settingValue: 'Not allowed'),
-    );
-
-    expect(response.isOk, isFalse);
-    // …and the table is still empty: a refused save must not reach it
-  });
-});
-```
-
-`DwSaveConfig.save` runs the whole pipeline the endpoint runs — `allowSave` → `validateSave` →
-transaction — so the assertion lands on the project's own rule, not on a re-statement of it.
-
-It needs a live database, and the run makes its own: **`dartway test`** from the project root
-starts one on a port Docker picks, runs `dart test` in the server package against it, and removes
-it at the end. Arguments after `--` go to `dart test` (`dartway test -- --name 'auth'`).
-
-Do not add a test database to `docker compose`, and do not point the suite at a fixed port. That
-is the arrangement this replaced, and it failed in two silent ways: two projects on one machine
-asked for the same port, and the loser read the winner's rows without an error (green, having
-verified nothing); and the database outlived the run, so a row from an earlier one turned up as
-`Expected: <2>, Actual: <3>` in an assertion about rows the test had just created.
-
-**Write one when the rule is the point:** a role boundary, an ownership check, a validation that
-rejects, `beforeSaveTransaction` / `afterSaveTransaction` ordering, a filter that must not leak
-another user's rows. **Not** for CRUD that is configured and does nothing else — that is testing
-the framework, and the framework tests itself.
-
----
-
-## 2. Plain logic — a unit test
-
-Anything with no `dw`, no widget and no server: a parser, a price, a state machine, an extension
-over a list of models. The cheapest layer, and where most of a project's logic should already be —
-`dartway-clean-code` §2.11 takes it out of the widget for reasons that have nothing to do with
-testing.
-
-The skeleton ships one to copy: `test/core/app_settings/app_setting_key_test.dart` pins that
-`AppSettingKey.parse` has **no failure path** — an absent row, a hand-edited value and nonsense all
-resolve to something a screen can render.
-
----
-
-## 3. A feature — a widget test with the core up
-
-This is the layer that needs a technique, so it gets the rest of this skill.
-
-### The seam is the transport, and nothing above it
-
-A DartWay feature saves for itself: no callback is passed in, so there is nothing above it to spy
-on. **Do not keep a callback alive as a test seam** — it buys a weaker screen for a weaker test.
-
-The seam is one level down: the transport the core sends every server operation through. A test
-hands `DwCore` its own instead of a Serverpod client, and then a save is a value in a list.
-
-**The offline store is not this seam, and is documented not to be.** A write always leaves by the
-transport first; `dw.repo.localWrites` is reached only after the connection refuses it. Reaching for
-it to watch a save would force every save to declare itself durably queued, which is a lie about the
-feature's intent.
-
-### The harness, written once per project
-
-The skeleton ships it as `test/support/app_test_core.dart`. Read that file; this is what it holds
-and why.
-
-```dart
-// The project's own generated Protocol — the same object the real client carries.
-// It is the only thing that names the models right: a generated model is an
-// abstract class with a private implementation, so its `runtimeType` reads
-// `_AppSettingImpl`. Import it prefixed — the DartWay core declares a `Protocol` too.
-final testTransport = DwRecordingServerTransport(
-  serializationManager: app.Protocol(),
-);
-
-void bootTestCore() {
-  initExampleDwCore(transport: testTransport);  // the app's own core initializer
-  DefaultModels.initRepository();           // list skeletons need the default models
+for (final object in <DwWireObject>[
+  const ListMyInvoices(),
+  const PayInvoice(invoiceId: 7, note: DwFieldPatch.clear()),
+  invoice(paidAt: null),
+]) {
+  expect(
+    appProtocol.decodeNamed(object.dwTypeName, object.toJson()),
+    object,
+    reason: object.dwTypeName,
+  );
 }
 ```
 
-**Boot through the app's own initializer, not a second core built in the test.** A core assembled
-in a test drifts from the one the app ships, and the drift is invisible until it matters. Give the
-initializer an optional `transport` and build **no Serverpod client** when it is set: a client
-brings a connectivity monitor and an auth key manager, both of which reach for platform channels a
-widget test has no business answering.
+It catches a type missing from the registry, a field that does not survive the trip, and equality
+that ignores a field (which would make the client treat two different requests as one). A new DTO
+is a new line here.
 
-**Keep the initializer idempotent** (`if (_coreInitialized) return;`). There is one core per
-process and it cannot be replaced, so the second test file in a run would otherwise meet
-`Dw is already initialized` or a `LateInitializationError`.
+**Validation, as codes and fields.** A `DwSelfValidating` command's `validate()` runs on both sides,
+so its test is here, asserted as `code@field` rather than as text:
+
+```dart
+List<String> codes(DwSelfValidating dto) => [
+  for (final refusal in dto.validate()) '${refusal.code}@${refusal.field}',
+];
+expect(codes(const PayInvoice(invoiceId: 0)), ['dw.invalid@invoiceId']);
+```
+
+**Update actions and channels are pure functions — test them as such.** What a list request does
+with an arriving object is `onUpdate`, and a mistake in `matches` shows up in the app as a row that
+does not leave its filter, with nothing failing anywhere:
+
+```dart
+const unpaid = ListMyInvoices(status: InvoiceStatus.unpaid);
+expect(unpaid.onUpdate(invoice(status: InvoiceStatus.unpaid)), DwUpdateAction.upsert);
+expect(unpaid.onUpdate(invoice(status: InvoiceStatus.paid)), DwUpdateAction.remove);
+expect(
+  const ListMyInvoices().channels.single.resolvedFor(42).wireName,
+  'invoices:42',
+);
+```
+
+Write one whenever a request has `matches`, a custom `onUpdate`, a `sort`, or a caller channel.
+
+## 2. The server — acceptance tests with `dartway test`
+
+A handler's access rule, what it writes, what it publishes and to whom run inside a real call against
+a real database. A mock of the context would only restate the code, so the test starts the project's
+real server and talks to it the way an app does.
+
+### Running them
+
+```bash
+dartway test                          # from the project root
+dartway test -- --name 'refund'       # arguments after -- go to dart test
+dartway test --keep                   # leave the database container up to inspect a failure
+dartway test --no-storage             # a server without uploads
+```
+
+`dartway test` starts a Postgres and a MinIO for the run on ports Docker picks, passes their
+coordinates as `DW_DATABASE_*` (the maintenance database `postgres`) and `DW_STORAGE_ENDPOINT` /
+`_ACCESS_KEY` / `_SECRET_KEY`, runs `dart test` in `__SERVER_PKG__`, and removes both containers at
+the end — Ctrl-C included.
+
+Do not add a test database to `docker compose` and do not point the suite at a fixed port. A fixed
+port is shared between projects on one machine, and a second container that does not get it starts
+anyway with the port unpublished: the suite then reads the neighbour's database and can pass having
+verified nothing. A database that outlives its run turns up as arithmetic — `Expected: <2>, Actual:
+<3>` — several hypotheses away from the cause.
+
+Running `dart test` by hand works when `DW_DATABASE_*` names a Postgres where the user may create
+databases (the development one does) and, for storage tests, `DW_STORAGE_*` names a MinIO. Without
+them the suite fails at its first `create`, naming the missing variables.
+
+### One database and one server per test file
+
+```dart
+late DwTestDatabase database;
+late DwTestServer server;
+
+setUpAll(() async {
+  database = await DwTestDatabase.create(prefix: 'app_test');
+  server = await DwTestServer.start(
+    buildInvoiceServer(database: database.config), // the project's own server factory
+  );
+});
+tearDownAll(() async {
+  await server.stop(); // stops every client from connectClient first
+  await database.drop();
+});
+```
+
+- **`DwTestDatabase.create`** makes an empty database named `<prefix>_<random>` on the server
+  `DW_DATABASE_*` names; `drop` removes it, disconnecting whatever still holds it. Starting the
+  server migrates it — framework and project migrations — exactly as a deployment does, so an
+  acceptance run also proves the migrations apply to an empty database.
+- **`DwTestServer.start`** starts the server on a free loopback port without signal handling. Build
+  it with the **same factory `bin/server.dart` uses**, overriding only what a test must: the database,
+  the storage, and the auth config's code delivery (capture the codes instead of printing them) and
+  resend delay. A server assembled separately for tests drifts from the one that ships.
+- **Tests in one file share the database**, so each test creates its own members with distinct
+  identifiers and asserts on what it created — never on table-wide counts it did not set up.
+
+**The skeleton's harness does all of this once**, in `__SERVER_PKG__/test/support/`: start and stop,
+a signed-up member by identifier and delivered code, an administrator promoted in the database, a
+watch that waits until it is live, a matcher for a refusal code, a counting HTTP transport, a
+recording live connector. Use it and extend it; a new test file is `setUpAll` → harness start,
+`tearDownAll` → harness stop.
+
+### Three ways to talk to the server
+
+**The real client — for behaviour.** `server.connectClient()` answers a started `DwAppClient` over
+real HTTP and the real live socket, with short test timings (`dwTestClientOptions`):
+
+```dart
+final client = await server.connectClient();
+final session = (await client.command(
+  DwVerifyCode(ticketId: ticket.id, code: code),
+)).valueOrThrow;
+await client.signIn(session);
+
+final invoices = client.watch(const ListMyInvoices()); // live, like a screen
+final paid = (await client.command(const PayInvoice(invoiceId: 7))).valueOrThrow;
+```
+
+A second member's client is how "the other device sees it live" and "someone else is refused" are
+tested. Wait for live state with a small polling helper (the skeleton's harness has one) rather than a
+fixed delay.
+
+**Raw calls — for the wire.** `server.caller(token: …)` sends a call exactly as a client would and
+answers the HTTP status, headers and body; `.response`, `.value(call)`, `.refusal`, `.updates` read
+it:
+
+```dart
+final anonymous = server.caller();
+addTearDown(anonymous.close);
+final answer = await anonymous.call(const ListMyInvoices());
+expect(answer.status, 401);
+```
+
+Use it when the status, a header or the idempotency key is the point. `server.openLive()` opens a raw
+socket (`authenticate`, `subscribe`, `expect<…>()`, `expectSilence()`) for channel rules:
+subscribing to another account's channel must answer `DwSubscriptionRefusedMessage`.
+
+**The database — for what is stored.** `server.db` is the running server's `DwDatabaseHandle`:
+assert the row a command wrote, arrange a state no command can reach yet. Do not assert through the
+database what the client could observe — that ties the test to the schema instead of the behaviour.
+
+### Jobs and storage
+
+- **`server.wakeJobs()`** runs the job executor now instead of at its next poll. Call it after the
+  command that enqueued, then wait for the effect.
+- **`DwTestStorage.create(prefix:)`** provisions a public and a private bucket for the file on the
+  MinIO `dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
+  the server stops. `storage.keys(bucket)` lists what landed where. What to test — `dartway-uploads`.
+
+### What deserves an acceptance test
+
+**Write one when the rule is the point:** a role or ownership boundary, a refusal with its code and
+field, a filter that must not leak another account's rows, what a command publishes and who receives
+it, a channel rule, an idempotent retry, a job's effect, a file landing in the right bucket. A
+bugfix in a handler starts with the failing test.
+
+**Not** for a handler that reads a table and maps it with no rule in between — the framework's
+calls, transport and updates are tested in the DartWay repository.
+
+## 3. Screens — widget tests on the in-memory server
+
+A DartWay feature reads and writes through the ambient `dw` and hands no callback out, so there is
+nothing above it to spy on — and **nothing should be added to make it spyable**: a callback kept "for
+tests" buys a weaker screen for a weaker test. The seam is the server itself, replaced by one in
+memory.
+
+### The in-memory server
+
+`package:dartway_client/testing.dart` (`dartway_client` is a dev dependency of `__FLUTTER_PKG__`):
+
+- **`DwFakeServer(protocol: appProtocol)`** speaks the real HTTP contract and live socket in memory —
+  statuses, idempotent commands, `426` below `minAppBuild`, hello and authentication on the socket,
+  subscriptions — with handlers registered per DTO type:
+
+  ```dart
+  final server = DwFakeServer(protocol: appProtocol)
+    ..registerToken('token-42', 42)
+    ..onRequest<ListMyInvoices>((request, call) => DwCallOk(<Invoice>[...invoices]))
+    ..onCommand<PayInvoice>((command, call) {
+      final paid = invoices.first.copyWith(status: InvoiceStatus.paid);
+      call.publish(DwLiveChannel.forAccount(AppChannel.invoices, 42), [paid]);
+      return DwCallOk(paid);
+    });
+  ```
+
+  A handler answers a `DwCallResult` whose value has the call's result type exactly
+  (`DwCallOk(<Invoice>[])`, not `DwCallOk([])`). `call.accountId` is the caller; `call.publish`
+  publishes as a real command does (in the response, and to other subscribers).
+- **Assert what left**: `server.callsOf<PayInvoice>()` (each with `.call`, headers, status),
+  `server.requestsOf<ListMyInvoices>()`, `server.executions(key)`.
+- **Push from outside**: `server.publish(channel, [object])` is an update someone else caused;
+  `server.closeChannel`, `server.revokeToken`, `server.reachable = false` for the rest.
+- **`server.errors`** collects handler exceptions, calls nobody registered a handler for, and frames
+  that do not decode. **Every test ends asserting it is empty** — a fake that swallowed them would let
+  a broken test pass.
+- Paged reads: answer with `dwFakeTablePage(rows, request)`, `dwFakeOffsetPage(rows, request, call.page)`
+  or `dwFakeWindow(newestFirst, request, call.page)` — they page as the real server does.
+- Uploads: `DwFakeStorage(server)` and its `transport` (`dartway-uploads`).
+
+### The core: built per test, disposed after it
+
+The app builds its `DwFlutterCore` in one factory in `lib/core/`, which takes the transports as
+optional parameters. A widget test calls **that factory** with the fake's `httpTransport` and
+`liveConnector`, a `DwMemoryTokenStore` holding the session to start signed in (or none),
+`clientOptions: dwFakeClientOptions`, and a `DwFakeStorage`'s `transport` when uploads are involved:
+
+```dart
+final core = createInvoiceCore( // the app's own factory, which assigns dw
+  baseUrl: server.baseUrl,
+  appVersion: appVersion,
+  httpTransport: server.httpTransport,
+  liveConnector: server.liveConnector,
+  tokenStore: DwMemoryTokenStore(session),
+  clientOptions: dwFakeClientOptions,
+);
+addTearDown(core.dispose);
+await core.init();
+await tester.pumpWidget(const ProviderScope(child: InvoiceAppRoot()));
+```
+
+- **Through the app's factory, not a second core written in the test.** A core assembled in a test
+  drifts from the one the app ships — its refusal text, its update-required screen, its error
+  reporting — and the drift is invisible until it matters.
+- **With a token store of its own, the core needs no storage plugin** — no platform channel for a
+  widget test to answer.
+- **One core at a time, and it must be disposed.** Building a core while another is alive throws
+  `Another dw core is alive`; the next test in the file fails on it, blaming a test that did nothing
+  wrong. `addTearDown(core.dispose)` right after building covers a test that failed halfway;
+  disposing twice is harmless.
+- **The core is needed to render, not only to tap.** A feature reaches `dw` while building —
+  `dw.action(...)` is constructed in `build` — so a test that never taps still needs one. Without it
+  the subtree throws `Dw is not initialized` and the test dies later at a finder ("found 0 widgets"),
+  with the real cause in an exception block further up the output.
+
+**The skeleton's harness does this once**, in `__FLUTTER_PKG__/test/support/`: a fake app that answers
+the reads every screen makes on its way (the signed-in profile, the settings) the way the real
+handlers do, and a running app that builds the core, pumps the app at phone size, settles, taps,
+waits out notifications, and on stop unmounts, disposes the core and asserts the fake server met no
+surprise. It can also mount the app under `DwAppBootstrapper`, as `DwAppRunner` does, for what covers
+the whole app (the update-required screen). A new widget test starts from it.
+
+The signed-in user is the session in the token store and the profile the fake answers — not a
+provider override. There is no session to fake beyond that.
 
 ### Localization is mounted with a locale, not just with delegates
 
-Every user-visible string in a DartWay app comes from `context.l10n`, so a widget test needs the
-tree to be able to answer that lookup. The harness mounts **three** things, and the third is the one
-that gets left out:
+Every user-visible string comes from the app's localizations, so the tree must be able to answer the
+lookup. The app's root widget already carries the delegates and the supported locales; a test that
+builds its own `MaterialApp` around a widget mounts **three** things:
 
 ```dart
 MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
-  // Explicit, because the default is the locale of the machine running the test.
-  locale: const Locale('en'),
-  home: /* … */,
+  locale: const Locale('en'), // explicit: the default is whatever the platform reports
+  home: subject,
 )
 ```
 
-- **Without the delegates**, the first `context.l10n` fails a null check, and the failure lands where
-  the subject fails to build rather than where the localization is missing. When localization is
-  introduced into a living app this hits every test at once — one app saw 149 of 385 turn red in one
-  step, all with the same error. That is one line in the shared harness, not a line per test file.
-- **Without an explicit `locale:`**, the tree resolves against the platform locale, so
-  `find.text('Save')` asserts on whichever language the machine happened to pick. The suite is green
-  for the person who wrote it and red for the next person to clone the repository, with a diff that
-  says nothing about locales. Pin it to the language the assertions are written in.
+- **Without the delegates** the first lookup fails a null check, and the failure lands where the
+  subject fails to build rather than where localization is missing. When localization reaches a
+  living app this turns every such test red at once — fix it in the shared harness, not per file.
+- **Without an explicit locale** the tree resolves against the locale the test platform reports, so
+  `find.text('Pay')` asserts on whichever language that was. Pin it to the language the assertions
+  are written in — `locale:` on a `MaterialApp` the test builds; for the app's root, which takes its
+  locale from the app's locale provider, set `tester.platformDispatcher.localeTestValue` before
+  pumping (with `addTearDown(tester.platformDispatcher.clearLocaleTestValue)`), or override that
+  provider in the test's `ProviderScope`.
 
-A test that needs another language passes that locale instead — that is the point of it being a
-value in one place rather than an ambient default.
+A test that needs another language passes that locale — the point of it being a value in one place.
 
-### The core is needed to *render*, not only to tap
+### Traps about time
 
-`dw.action(...)` is constructed inside `build`. A feature therefore touches `dw` while building,
-before anything is interacted with — **so a test that never taps anything still needs a booted
-core**. Miss this and the failure does not say so: the subtree fails to build, and the test dies
-later at a finder ("found 0 widgets"), with the real cause in a separate exception block further up
-the output.
+- **Do not `pumpAndSettle` a screen that shows a spinner.** A progress indicator animates for as long
+  as it is on screen, so settling by frames waits out its timeout. Pump a few short frames, then a few
+  hundred milliseconds for Riverpod, the in-memory traffic and a page transition, then a few frames
+  more — the skeleton's harness settles exactly that way.
+- **A notification holds a timer.** A successful `dw.action` shows a notification that removes itself
+  after `DwUiNotification.defaultDuration`; a test that ends with it on screen fails on "A Timer is
+  still pending even after the widget tree was disposed" — an error about a toast in a test about a
+  payment. Pump that duration before unmounting, and before tapping a button the notification covers.
+- **A failed read is retried.** With `dwFakeClientOptions` retries are milliseconds apart, so a read
+  you made fail is attempted several times while the test settles. Assert the shape of what was asked
+  (the request arrived, the error text is on screen), never the number of attempts.
+- **A text field may report a change a frame late** — settle after `enterText` before asserting that a
+  button became enabled.
 
-### Reads are prepared, writes are read back
+### What a widget test asserts
 
-```dart
-testTransport.answerGetAll = (_) async => listResponse([storedAppName('Acme')]);
-
-await tester.pumpFeature(const AdminSettingsForm(), signedInAs: adminProfile());
-await tester.pumpAndSettle();
-
-await tester.tapAndSettle(find.byType(AppCheckbox));
-
-expect(testTransport.saves, hasLength(1));
-final saved = testTransport.saves.single.model as AppSetting;
-expect(saved.settingKey, AppSettingKey.signUpEnabled.key);
-```
-
-- **A read must be prepared.** `answerGetOne` / `answerGetAll` / `answerGetCount`; an unprepared one
-  throws `DwUnpreparedServerCall` naming the call and the field that would answer it. That is
-  deliberate: a test that does not know what its subject fetches is the thing being caught, and an
-  empty list would hide it behind an empty state that looks intentional.
-- **A write needs no setup.** `saveModel` echoes the model back and `delete` succeeds, because the
-  assertion is about what *left*. Set `answerSave` / `answerDelete` only when the response matters —
-  the id assigned on insert, a refusal.
-- **What left is read back** off `transport.saves` and `transport.deletes`: the model, the
-  `apiGroup`, the class name on the wire. `transport.reads` holds the requests, so "this list is
-  unfiltered" stops being a claim in a doc comment.
-- **Reset between tests** (`setUp(resetTestCore)`), because the transport outlives them all.
-
-### The signed-in user is an override, not a session
-
-There is no session in a test — no key manager, nothing to sign into. Stand the user up in the
-test's own `ProviderScope`:
-
-```dart
-ProviderScope(
-  overrides: [
-    dw.userProfileProvider.overrideWithValue(profile),
-    dw.requireUserProfileProvider.overrideWithValue(profile),
-  ],
-  child: /* … */,
-)
-```
-
-This is the sanctioned use of `overrides:` — the app never writes a `ProviderScope` of its own
-(`forbidden_provider_scope`), a test may. Inventing a session instead would test the framework's
-session rather than this feature.
-
-### Two traps about time, not about the transport
-
-- **`pumpAndSettle` does not drain a notification.** A successful
-  `dw.action(onSuccessNotification: ...)` inserts a toast that removes itself on a `Future.delayed`;
-  settling waits for frames, not for timers. The test then fails on "A Timer is still pending even
-  after the widget tree was disposed" — an error about a toast, in a test about a save. Pump
-  `DwUiNotification.defaultDuration` after the tap, once, in a shared `tapAndSettle` helper.
-- **A failed read is retried.** Riverpod retries a failed provider on its own with a growing
-  backoff, so a read you made fail is attempted many times while the test settles. Assert the shape
-  of what was asked — `transport.reads.map((r) => r.operation)` — never the number of attempts; a
-  count pins somebody else's default.
-
-And one that is not about time: **`AppTextFormField` delivers `onChanged` from a post-frame
-callback**, so after `enterText` the form's own state (and whether the Save button is enabled) is a
-frame behind. Use `pumpAndSettle`, not `pump`.
-
----
+That the screen shows what the server answered; that the user's action **sent the right DTO**
+(`callsOf<PayInvoice>().single.call` equals the expected command); that a refusal is rendered as its
+text and nothing else changed; that a published update changes the screen without a re-read
+(`requestsOf` did not grow); that the signed-out and failure states look like themselves.
 
 ## 4. What we deliberately do not test
 
-- **The framework.** That `dw.repo.saveModel` reaches the server, that a list provider refetches on
-  an update, that the session survives a restart — all of it is tested in the DartWay repository,
-  against the framework's own code. Re-testing it in a project buys nothing and breaks on every
-  upgrade.
+- **The framework.** That a command reaches the server, that a list applies an update, that a watch
+  resubscribes after a reconnect, that an upload retries — all tested in the DartWay repository.
+  Re-testing it in a project buys nothing and breaks on every upgrade.
 - **Cosmetics.** A recoloured button, a padding, a rename. A test written for a checkbox contradicts
   KISS and YAGNI, and it will be deleted by the first person who touches the widget.
-- **Generated code.** Models, the protocol, migrations. There is nothing there a human wrote.
-- **A UI rule that mirrors a server rule.** Asserting that the publish button is hidden from a
-  member is fine as *UI*, but it says nothing about access — write the integration test for the
-  rule and let the widget test be about the button.
+- **Generated code.** Codecs, the protocol registry, table definitions, the schema. The contract's
+  round-trip test covers what matters about them; `dartway generate --check` covers the rest.
+- **A UI rule that mirrors a server rule.** Asserting that the pay button is hidden from a viewer is
+  fine as UI, but it says nothing about access — write the acceptance test for the rule and let the
+  widget test be about the button.
 
-## 5. What the checker asks for, and what it will not
+## 5. No coverage thresholds
 
-`dartway check` names three gaps on the server, by model, and nothing about Flutter tests:
+We do not set a percentage and we do not gate anything on one. A threshold is met by writing tests for
+what is easy to cover — getters, mappers, generated wrappers — while the calculation everyone is afraid
+of stays at the one test it had. The number goes up and the suite gets worse.
 
-- **`crudConfigMissing`** (warning) — a table with no `DwCrudConfig`. It answers `notConfigured` to
-  every read and write, so the list is empty forever and nothing says why. If the table really is
-  the server's own, that is what the absence means — write it in a doc comment on the model.
-- **`crudConfigUnregistered`** (error) — the config exists and is not in `crudConfigurations`. There
-  is no second reading of this one.
-- **`crudRuleUntested`** (warning) — a config with hand-written save or delete logic that no test
-  under the server's `test/` names. This is §1 of this skill, made checkable.
-
-A config that only declares a shape — an `accessFilter`, an `include` — is asked for nothing: it has
-no rule to hold.
-
-**It will never ask "does this feature have a test".** That is not a gap with a name, it is a
-percentage, and see below.
-
-## 6. No coverage thresholds
-
-We do not set a percentage and we do not gate anything on one. A threshold is met by writing tests
-for what is easy to cover, which is exactly the code that did not need covering — getters, mappers,
-generated wrappers — while the calculation everyone is afraid of stays at the same one test it had.
-The number goes up and the suite gets worse.
-
-The question at review is not "how much is covered" but "**is the thing that would break covered,
-and at the layer where it lives**". That is what `dartway-finish` asks.
+`dartway check` does not ask whether a feature has a test either: that is not a gap with a name, it is
+a percentage. The question at review is "**is the thing that would break covered, at the place where
+it lives**" — which is what `dartway-finish` asks.
 
 ## Common mistakes
 
-- Testing an access rule through the UI instead of an integration test over `DwCrudConfig`.
-- Building a second `DwCore` inside the test instead of calling the app's initializer.
-- A core initializer without the idempotency guard — green alone, red as soon as a second test file
-  boots it.
-- Reaching for `dw.repo.localWrites` to observe a save.
-- Asserting the number of server calls on a path where a read failed.
-- `pump` instead of `pumpAndSettle` after typing into `AppTextFormField`.
-- A `MaterialApp` in a test with the localization delegates but no `locale:` — green on the
-  author's machine, red on the next one.
+- Testing an access rule through the UI instead of an acceptance test.
+- A server built for tests by hand instead of through the project's server factory.
+- Asserting table-wide counts in a file whose tests share one database.
+- A fixed delay instead of waiting for the condition (a watch going live, a job's effect).
+- A core built in a test and not disposed — the *next* test fails with "Another dw core is alive".
+- A second `DwFlutterCore` written inside the test instead of the app's factory.
+- A widget test that does not assert `server.errors` is empty.
+- `pumpAndSettle` on a screen with a spinner; ending a test with a notification on screen.
+- A `MaterialApp` in a test with the delegates but no locale.
 - Keeping a callback parameter on a widget "so it can be tested".

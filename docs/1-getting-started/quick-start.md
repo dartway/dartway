@@ -1,72 +1,127 @@
 # How do I get a DartWay app running?
 
-> Goal: a running fullstack Dart app in ten minutes, and your first feature — database to live
-> screen — in twenty more. No endpoints are written anywhere in this guide.
+> Goal: from an empty folder to a server answering on `:8080`, the app signed in, and the checks
+> green — by hand, command by command, with the reason each step comes where it does.
 
-This page is the path by hand. Working with an AI assistant instead? Two commands do all of part 1
-and 2 for you — [start with an agent](start-with-an-agent.md).
+Working with an AI assistant instead? It runs this same path for you — see
+[start with an agent](start-with-an-agent.md).
 
-## Prerequisites
-
-- Dart SDK `>=3.11` and Flutter `>=3.41` (FVM works; the template carries a `.fvmrc`)
-- git, with `user.name` and `user.email` set — `create` commits the project it makes for you
-- Network access to pub.dev (or a mirror in `PUB_HOSTED_URL`). `pub get` has no deadline of its
-  own: where the route is filtered or throttled it does not fail, it hangs
-- Docker — the project brings up its own Postgres
-- The Serverpod CLI, **pinned to the version the template depends on**:
-
-  ```bash
-  dart pub global activate serverpod_cli 3.4.11
-  ```
-
-  You need it as soon as you add your own models. Pin it: the CLI generates code for its own
-  version, and a CLI newer than the `serverpod` in your pubspec produces a generated protocol that
-  compiles and then misbehaves at runtime.
-
-`dartway doctor` checks all of these and prints the fix for whatever is missing — run it instead
-of checking by hand.
-
-## 1. Create the project
+## 1. Install the CLI and check the machine
 
 ```bash
 dart pub global activate dartway_cli
-dartway create my_app          # or `dartway create .` to use the current empty folder
+dartway doctor
 ```
 
-You get three packages — `my_app_server`, `my_app_client` (generated), `my_app_flutter` — the agent
-toolkit in `.claude/`, and a git repository with an initial commit.
+`doctor` checks Dart (`>=3.11`), Flutter (`>=3.41`), git with an identity, a reachable pub host, a
+running Docker daemon, and whether globally activated executables are on `PATH`. Each failure prints
+the command that fixes it.
 
-What is inside is a **skeleton, not somebody's product**: passwordless phone auth, a `UserProfile`
-with roles, navigation with zone guards, an admin panel (users + settings), a UI kit as source you
-own, theming, localization, error reporting with app context. Zero domain models — your domain is
-the part you write. What each folder is for: [project layout](project-layout.md).
+Two of these fail in ways worth knowing in advance:
 
-## 2. Run it
+- **Docker.** Postgres and the object storage come from it, for development and for tests alike, and
+  there is no second path.
+- **The pub host.** Every step below begins with `pub get`, and pub sets no deadline on a connection
+  that opens and then goes quiet. Where the route to pub.dev is filtered, you do not get an error —
+  you get a resolve step that hangs. A mirror in `PUB_HOSTED_URL` is checked instead when you set one.
 
-In VS Code this is two launch configurations: **Server**, then **Flutter (web)**. With an assistant
-it is one sentence — [start with an agent](start-with-an-agent.md).
+If `dartway` is not found right after activating it, every command also runs as
+`dart pub global run dartway_cli:dartway <command>`.
 
-By hand it is four commands, and the order matters:
+## 2. Create the project
+
+```bash
+dartway create my_app      # a new folder my_app/
+dartway create .           # or: this empty folder is the project, and names it
+```
+
+The name is `lower_snake_case`: it becomes the package names, the type names and the storage bucket
+names. You get three packages — `my_app_shared`, `my_app_server`, `my_app_flutter` — the agent toolkit
+in `.claude/`, and a git repository with an initial commit (which is why git needs an identity).
+
+What is inside is a skeleton, not somebody's product: sign-in by a one-time code to a phone or an
+e-mail with the terms accepted on sign-up, a profile with a photo, roles, an admin panel (live
+counters, a members table, a card per member, settings), navigation with zone guards, a UI kit as
+source you own, and tests on both sides. No domain models. What each folder is for:
+[project layout](project-layout.md).
+
+Until the framework family is published on pub.dev, build the project against a local DartWay
+checkout: `dartway create my_app --framework-path <path to the checkout>`. Its pubspecs then get
+`dependency_overrides` onto the checkout's packages, and the template and the toolkit come from the
+same checkout.
+
+## 3. Bring the server up
 
 ```bash
 cd my_app/my_app_server
+docker compose up -d
 dart pub get
-docker compose up -d                                       # Postgres on 8090 (+ a test DB, MinIO)
-dart bin/main.dart --apply-migrations --role maintenance    # apply the schema, then exit
-dart bin/main.dart                                          # run the server — this one stays up
 ```
 
-`--role maintenance` is what makes the migration step *finish*. Without it `--apply-migrations`
-applies the schema and then keeps serving, and the terminal never comes back.
+`docker compose up -d` starts Postgres on host port `8090` and MinIO — the object storage for uploads
+— on `8100` (its web console on `8101`). There is no test database among them: `dartway test` starts
+its own for each run. The first run pulls images and can take minutes.
 
-Before that last line, open `config/passwords.yaml` and put your own phone number in
-`bootstrapAdminIdentifier`, under `development`. That is how the project gets its **first
-administrator**: the admin role is granted by an admin, so the first one has to be declared
-somewhere, and it is declared per environment rather than shipped as a default — whoever can
-receive the one-time code on that identifier becomes the admin. The key is empty in a new project;
-the server starts either way and prints on boot what it did, or that the key is unset.
+The server is configured by its environment alone; there is no configuration file. In the shell that
+runs it:
 
-In another terminal:
+```bash
+export DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=8090 DW_DATABASE_NAME=my_app \
+       DW_DATABASE_USER=postgres DW_DATABASE_PASSWORD=dartway_dev_pw DW_DATABASE_SSL=false \
+       DW_STORAGE_ENDPOINT=http://127.0.0.1:8100 \
+       DW_STORAGE_ACCESS_KEY=dartway_dev DW_STORAGE_SECRET_KEY=dartway_dev_storage_pw \
+       DW_STORAGE_PROVISION=true \
+       APP_BOOTSTRAP_ADMIN=you@example.com     # your own phone or e-mail — see step 5
+```
+
+These are the development containers' own values, written in `docker-compose.yaml` beside them. The
+full list the server reads — `PORT`, `DW_MIN_APP_BUILD`, `DW_ALLOWED_ORIGINS` and the rest of
+`DW_STORAGE_*` — is documented at the top of `bin/server.dart`.
+
+Wait until Postgres accepts connections — a container reported as started is not yet a database
+listening:
+
+```bash
+docker compose exec -T postgres pg_isready -U postgres
+```
+
+Then start the server, and leave it running:
+
+```bash
+dart run bin/server.dart
+```
+
+**It migrates the database as it starts** — the framework's own tables and yours — and exits
+non-zero naming the migration when one fails, so there is no separate migration step to forget.
+`DW_STORAGE_PROVISION=true` creates the two buckets on the development MinIO; the server then checks
+that the public one reads anonymously and the private one does not, and refuses to start otherwise.
+Without `DW_STORAGE_ENDPOINT` it starts without uploads and says so.
+
+Once it has logged that it is listening, seed development data — once, in a second shell with the
+same `DW_DATABASE_*`, because it needs the migrated database:
+
+```bash
+dart run bin/seed_dev.dart
+```
+
+It creates an administrator, two members who sign in with a fixed code, and enough members to page
+through the admin table, in one transaction, and refuses to run twice. Never run it against
+production: the fixed code is access to those accounts.
+
+Verify before going further:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/health
+```
+
+`200` means the server is up and reaches its database.
+
+In VS Code the **Server** launch configuration of the project carries the same environment, except
+`APP_BOOTSTRAP_ADMIN`.
+
+## 4. Run the app
+
+On a phone, a simulator or the desktop:
 
 ```bash
 cd my_app/my_app_flutter
@@ -74,213 +129,114 @@ flutter pub get
 flutter run
 ```
 
-> **On an Android device or emulator**, `localhost` is the phone, not your machine. `lib/main.dart`
-> carries a LAN address for that case — set it to your machine's IP. Web, desktop and the iOS
-> simulator need no change.
+The app calls `http://localhost:8080`, or `http://10.0.2.2:8080` on the Android emulator, where
+`localhost` is the emulator itself. `lib/main.dart` picks between them; a deployed build is compiled
+against a fixed address with `--dart-define=DW_BACKEND_URL=…`.
 
-The database starts empty — there is nobody to sign in as until you register. Do that from the app
-with the identifier you put in `bootstrapAdminIdentifier`: the one-time code is printed to the
-server console, because in development nothing is sent over SMS. That account is the admin.
-
-The home screen reads the app name from the database through the generic CRUD, and no app name is
-set yet — an empty setting is a legitimate state, not a missing seed. Open the admin panel, fill it
-in on the settings screen, and watch the home screen update **without a reload**. That is the whole
-path — Postgres → CRUD config → typed live list → widget — proving itself on the first screen, and
-the write end of it as well.
-
-## 3. Declare a model
-
-Models are Serverpod `.spy.yaml` files. Create `my_app_server/lib/src/models/note/note.spy.yaml`:
-
-```yaml
-class: Note
-table: note
-fields:
-  authorProfile: UserProfile?, relation
-  text: String
-  createdAt: DateTime
-```
-
-The relation gives you both `note.authorProfile` (when included) and `note.authorProfileId` — the
-id is what you write, the object is what you read.
-
-Generate the code and the migration:
+**In a browser the app calls its server on its own origin**, as a deployment serves it, so there is no
+CORS to configure — locally either. The development proxy puts Flutter's web server and the API
+behind one origin:
 
 ```bash
-cd my_app/my_app_server
-serverpod generate
-serverpod create-migration
-dart format lib/src/generated ../my_app_client/lib/src/protocol
-dart bin/main.dart --apply-migrations --role maintenance
+cd my_app/my_app_flutter
+dart run dartway_cli:dartway dev web        # open http://localhost:8000
 ```
 
-`serverpod generate` writes Dart into `lib/src/generated/` **and** into `my_app_client`. Neither is
-edited by hand.
+`dev web` starts `flutter run -d web-server` compiled against the proxy's origin and forwards `/dw/*`
+(the live socket included) and `/health` to the server on `8080`. Open `http://localhost:8000`
+exactly: to a browser, `127.0.0.1` is another origin.
 
-The `dart format` line belongs to the sequence, in that position. The generator formats its output
-with its own bundled `dart_style`, which is not the `dart format` of your SDK, so without it every
-generation rewrites files your change never touched — one nullable field can arrive as a 1900-line
-diff. And it comes *after* `create-migration`, because that command regenerates to diff the schema
-and would throw the formatting away. Both paths together, every time; the details are in
-[models.md](../2-core/models.md#the-workflow-and-where-it-usually-goes-wrong).
+The skeleton's Flutter package lists `dartway_cli` as a dev dependency, so `dart run dartway_cli:dartway`
+runs the CLI version the project pinned. A globally activated `dartway dev web` does the same from the
+project root or the Flutter package, with whatever version you activated.
 
-## 4. Configure CRUD — instead of writing endpoints
+For a release build behind the same proxy:
 
-One config per model. It declares the whole behaviour of the feature: who may read it, who may write
-it, what counts as valid, and what happens inside the write transaction.
-
-`my_app_server/lib/src/crud/note_crud_config.dart`:
-
-```dart
-final noteCrudConfig = DwCrudConfig<Note>(
-  table: Note.t,
-  getListConfig: DwGetModelListConfig(
-    // Everyone signed in reads the notes. Returning null means "no filter" —
-    // an explicit decision, not an oversight.
-    accessFilter: (session) async => null,
-    include: Note.include(authorProfile: UserProfile.include()),
-    defaultOrderByList: [Order(column: Note.t.createdAt, orderDescending: true)],
-  ),
-  saveConfig: DwSaveConfig<Note>(
-    // Who may write at all. The relation is declared nullable above, so the
-    // generated `authorProfileId` is `int?` — an unowned note matches nobody.
-    allowSave: (session, ctx) async =>
-        session.isUser(ctx.currentModel.authorProfileId ?? -1),
-
-    // The business rule. Returning a string rejects the write, and the string
-    // reaches the user — the rule lives here and the client cannot forget it.
-    validateSave: (session, ctx) async =>
-        ctx.currentModel.text.trim().isEmpty ? 'The note is empty' : null,
-
-    // Runs inside the same transaction as the write. It can reject too —
-    // return a string — which is where a rule about a shared count belongs:
-    // `validateSave` runs before the transaction opens, so two concurrent
-    // saves can both pass it. Nothing to reject here, hence `null`.
-    beforeSaveTransaction: (session, ctx) async {
-      if (ctx.isInsert) {
-        ctx.currentModel = ctx.currentModel.copyWith(createdAt: DateTime.now());
-      }
-      return null;
-    },
-  ),
-);
+```bash
+flutter build web --dart-define=DW_BACKEND_URL=http://localhost:8000
+dart run dartway_cli:dartway dev proxy --web-dir build/web
 ```
 
-Register it in `lib/src/dartway/dartway_core.dart`, in the `crudConfigurations` list the skeleton
-already has:
+## 5. Sign in
 
-```dart
-dw = DwCore.init<UserProfile>(
-  userProfileTable: UserProfile.t,
-  userProfileInclude: UserProfile.include(),
-  crudConfigurations: [
-    userProfileCrudConfig,
-    appSettingCrudConfig,
-    noteCrudConfig, // <- here
-  ],
-  // ...
-);
+Nothing is sent over SMS or e-mail in development: **the one-time code is printed in the server log**
+as `Sign-in code for <identifier>: <code>`. Read it there. The code is checked, so "any code" does not
+work.
+
+The seeded accounts sign in with the code **`111111`**: the administrator `79990000001`, the members
+`79990000002` and `boris@example.com`.
+
+`APP_BOOTSTRAP_ADMIN` makes the phone or e-mail it names an administrator on every start. The admin
+role is granted by an admin, so the first one has to be declared somewhere, and it is declared per
+environment rather than shipped: whoever receives the codes for that identifier is the admin, and a
+default in a public template would hand every project that forgot to change it to a stranger. Unset,
+the server starts anyway and warns that the admin panel is out of reach; a value that is neither a
+phone nor an e-mail stops it from starting.
+
+A real delivery replaces the log line in `deliverCode`, in `my_app_server/lib/src/auth.dart`.
+
+A good first thing to try: sign in as the administrator in two browser windows, change a member's role
+or an app setting in the admin panel, and watch the other window follow without a reload. That is the
+whole stack — Postgres, a handler, a channel, a widget — the write end included.
+
+## 6. The shape of a feature
+
+1. **Contract**, in `my_app_shared/lib/src/`: a data object, the requests that read it with the
+   channels they live on, the commands that change it.
+2. **Server**, in `my_app_server/lib/src/`: a row class, and one handler per request and command with
+   its access rule, publishing what a command changed.
+3. `dartway generate` — codecs, the protocol registry, tables and the schema.
+4. `dart run bin/migrate.dart create <name>` in the server package, with `DW_DATABASE_*` set — a
+   migration drafted from the row classes. Review it: it is yours.
+5. **App**: a widget reading `ref.watch(dw.request(MyRequest()))` and a button running
+   `dw.action((_) => dw.command(MyCommand()))`, the texts in `lib/l10n/`.
+
+A request or command without a handler stops the server from starting, deliberately. The steps in
+full: [data objects and generation](../2-core/data-objects-and-generation.md),
+[handlers and context](../4-server/handlers-and-context.md), [migrations](../4-server/migrations.md),
+[the data layer](../3-flutter/data-layer.md).
+
+## 7. The checks
+
+From the project root:
+
+```bash
+dartway generate --check                                  # generated code matches its sources
+(cd my_app_server && dart run bin/migrate.dart check)     # migrations produce the schema (DW_DATABASE_*)
+dartway test                                              # server tests on a real Postgres and MinIO
+(cd my_app_shared && dart test)                           # the contract
+(cd my_app_flutter && flutter test)                       # the app, on an in-memory server
+dartway check                                             # the conventions
 ```
 
-That is the backend. `getOne`, `getList`, `save`, `delete`, filters, ordering and pagination are now
-served for `Note` by the generic endpoint.
+- **`generate --check`** writes nothing and fails when a generated file is out of date. It runs the
+  `dartway_generator` the server package resolved as a dev dependency, so the generator always
+  matches the framework the project builds against.
+- **`migrate.dart check`** replays the migrations into throwaway databases next to the one in
+  `DW_DATABASE_*`, compares the result with the schema the row classes declare, and rolls them down
+  and up again.
+- **`dartway test`** starts a Postgres and a MinIO for the run, on ports Docker picks, passes them to
+  the suite as `DW_DATABASE_*` and `DW_STORAGE_*`, and removes them when the run ends. Each test file
+  creates its own database and buckets. Nothing is shared with the development containers or with
+  another project — a fixed test port is how a suite ends up green against a neighbour's database.
+  `--keep` leaves the containers up to inspect a failing run; arguments after `--` go to `dart test`.
+- **`dartway check`** fails on error-level findings — the layout, features, the UI kit, stale
+  generated code and, with `DW_DATABASE_*` set, the migrations check above. Warnings do not fail it.
 
-> **Secure by default:** a model with no config in this list is not reachable at all. You grant
-> access; you never forget to take it away.
+## When it goes sideways
 
-## 5. Show it
-
-First register a default `Note` in `my_app_flutter/lib/core/default_models.dart`, next to the two
-the skeleton already registers:
-
-```dart
-dw.repo.setupRepository(
-  defaultModel: Note(id: dw.repo.mockModelId, text: 'Note text', createdAt: DateTime.now()),
-);
-```
-
-That instance is not decoration: the loading skeleton is drawn from **your own widget** built
-against it, which is why it resembles the content about to arrive. Skip it and the first build of
-a `Note` list throws at runtime.
-
-```dart
-class NotesList extends ConsumerWidget {
-  const NotesList({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watch(dw.repo.modelList<Note>()).dwBuildListAsync(
-          loadingItemsCount: 5,
-          childBuilder: (notes) => ListView(
-            children: [for (final note in notes) NoteCard(note: note)],
-          ),
-        );
-  }
-}
-```
-
-No repository, no service, no provider, no API client. The list is typed, and it refreshes itself
-for the person who writes to it — a save returns the updated rows to whoever saved them.
-
-One thing is missing from that snippet on purpose, and it is the first thing to add once the list is
-real: an `errorBuilder`. `dwBuildListAsync` defaults its error branch to `SizedBox.shrink()`, so a
-failed read reports to your alerts and shows the reader nothing — indistinguishable from a note list
-with no notes in it. See [the error branch](../3-flutter/data-layer.md#the-error-branch-is-the-callers-decision).
-
-Writing goes through `dw.repo`, guarded by the action:
-
-```dart
-AppButton.primary(
-  'Save',
-  onTap: dw.action(
-    (context) => dw.repo.saveModel(
-      Note(authorProfileId: profile.id!, text: text, createdAt: DateTime.now()),
-    ),
-    onSuccessNotification: 'Saved',
-  ),
-)
-```
-
-A double tap does not create two notes; if `validateSave` rejects the write, its message reaches the
-user as a notification. See [actions](../3-flutter/actions.md).
-
-## 6. Make it live for everyone else
-
-The list above updates for the author. For *other* users' screens to change, the config says so —
-one line, on the server:
-
-```dart
-saveConfig: DwSaveConfig<Note>(
-  // ...
-  broadcastTo: (session, ctx) => [DwCoreConst.publicUpdatesChannel],
-),
-```
-
-Nothing is added on the Flutter side: an app created by `dartway create` subscribes to that channel
-at its root, and every model arriving on it is routed **by type** into any `dw.repo.modelList<T>()`
-on screen. Open the app in two windows and watch.
-
-Broadcasting is opt-in per model on purpose — a channel is an audience, and `accessFilter` has no
-say over what travels on one. Public here is right because this config lets every signed-in user
-read every note; a model scoped to its owner must narrow the channel instead. That decision, and
-deleting alongside saving, is [realtime](../2-core/realtime.md).
+- **`pub get` prints one line and hangs.** The pub host is not answering; run `dartway doctor`.
+- **The server exits at startup.** Read the output: it names the cause — a call without a handler
+  (every such problem of the declaration is listed at once), a migration that failed, a bucket with
+  the wrong access.
+- **An empty list after sign-in.** Usually a correct access rule or channel rule, not a bug to loosen.
+- **A local schema drifted beyond repair.** `docker compose down -v` recreates the database and
+  destroys its data — a fair fix, and never one to run without deciding to lose the data.
 
 ## Where to go next
 
-- **[What DartWay is](what-is-dartway.md)** — the idea the CRUD config comes from, and the honest
-  limits.
-- **[Project layout](project-layout.md)** — the three packages and every folder in them.
-- **[Models](../2-core/models.md)** and **[CRUD configs](../2-core/crud-configs.md)** — steps 3 and
-  4 above, in full.
-- **[Access and roles](../2-core/access-and-roles.md)** — `accessFilter`, `allowSave`,
-  `allowDelete`, and why there is no fourth place.
-- **[The data layer](../3-flutter/data-layer.md)** — `dw.repo` in full: filters, single models,
-  pagination, list skeletons.
-- **[`example/`](https://github.com/dartway/dartway/tree/master/example)** — a complete application
-  built exactly this way: a fitness club with a schedule, bookings with capacity rules, a staff-only
-  chat invisible to clients, news, OTP auth, roles and an admin panel. It is the reference to read —
-  not a project to inherit.
-- **[Error reporting](../2-core/error-reporting.md)** — every error carries the route, the mounted
-  features, the action and the user.
-- **[The agent toolkit](../5-tooling/agent-toolkit.md)** — the conventions, the lints and the skills
-  that let an agent add a feature without tearing the project apart.
+- [What DartWay is](what-is-dartway.md) — the ideas behind the steps above.
+- [Project layout](project-layout.md) — the three packages and every folder in them.
+- [The CLI](../5-tooling/cli.md) — every command and its options.
+- [Testing](../5-tooling/testing.md) — the test tiers and what each proves.
+- [Deploy](../5-tooling/deploy.md) — from `deploy/config.yaml` to a running stack.

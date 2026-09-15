@@ -1,36 +1,65 @@
 # DartWay
 
-**An open-source fullstack Dart framework: Flutter on the client, Serverpod on the server, and one
-declarative data layer between them.**
+**An open-source fullstack Dart framework: a Dart server, a Flutter app, and one shared contract
+between them.**
 
-A feature — from the table in the database to the live screen — is a config and a widget. There are
-no endpoints to write.
+A feature is a few classes in a package both sides compile, one handler per call on the server, and a
+widget that watches live state. The contract — abridged from
+`example/dartway_example_shared/lib/src/news.dart`:
 
 ```dart
-// Server: the whole backend of a feature. Who reads, who writes, what is valid,
-// what runs inside the transaction.
-final bookingCrudConfig = DwCrudConfig<Booking>(
-  table: Booking.t,
-  getListConfig: DwGetModelListConfig(accessFilter: _onlyOwnBookings),
-  saveConfig: DwSaveConfig<Booking>(
-    allowSave: (session, ctx) async => await session.isStaffMember ||
-        await session.isUser(ctx.currentModel.clientProfileId),
-    validateSave: (session, ctx) async =>
-        await _spotsLeft(session, ctx) ? null : 'No spots left',
-  ),
-);
+final class ListNews extends DwListRequest<NewsPost> with _$ListNews {
+  const ListNews();
+
+  @override
+  List<DwLiveChannel> get channels => const [
+    DwLiveChannel(ExampleChannel.news),
+  ];
+}
+
+final class PublishNews extends DwActionCommand<NewsPost> with _$PublishNews {
+  const PublishNews({required this.title, required this.text});
+
+  final String title;
+  final String text;
+}
 ```
 
+The server — who may call it, what it does, who hears about it
+(`example/dartway_example_server/lib/src/handlers/content_handlers.dart`, abridged):
+
 ```dart
-// Client: the same model, typed and live. Realtime sync, pagination, filters and
-// skeleton loading states out of the box.
-ref.watch(dw.repo.modelList<Booking>()).dwBuildListAsync(
-      loadingItemsCount: 4,
-      childBuilder: (bookings) => ListView(children: [...]),
+DwCallHandler.command<PublishNews, NewsPost>(
+  access: ExampleAccess.staff,
+  handle: (ctx, command) async {
+    final me = await ctx.profile;
+    final row = await ctx.db.newsPosts.insert(
+      NewsPostRow(
+        authorProfileId: me.id!,
+        title: command.title.trim(),
+        text: command.text.trim(),
+        createdAt: DateTime.now(),
+      ),
     );
+    final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
+    ctx.publish(_news, post);
+    return post;
+  },
+),
 ```
 
-Serverpod gives you a backend. **DartWay removes the need to write one.**
+The app — a live list, and a button that cannot publish twice
+(`example/dartway_example_flutter/lib/app/news/`):
+
+```dart
+ref.watch(dw.request(const ListNews()))   // AsyncValue<List<NewsPost>>
+
+onTap: dw.action((_) => dw.command(PublishNews(title: title, text: text)))
+```
+
+A post a staff member publishes appears in every member's open list, in its place, without a reload.
+A refusal comes back as a code and is shown in the user's language. A retried command runs once. No
+endpoint, route, client method or cache was written for any of it.
 
 ## Start
 
@@ -47,19 +76,17 @@ project, the order the bring-up steps come in and why, how to verify the server 
 how to hand you the sign-in. Then say what you want — *"set up a DartWay project called my_app and
 bring it up"*.
 
-That is the whole setup. The agent creates the project, starts Postgres, applies the migrations,
-seeds a user, runs the server and the app, and tells you how to sign in. From then on the project
-carries its own toolkit in `.claude/` — you keep working in prompts, and the agent already knows the
-conventions.
+The instruction is a printed text rather than a plugin on purpose: an extension lives in one vendor's
+format, and the front door of an open framework should not. It is equally readable by you.
 
-The instruction is a printed text rather than a plugin on purpose: an extension lives in one
-vendor's format, and the front door of an open framework should not. It is equally readable by you.
+You get a running app — sign-in by a one-time code to a phone or an e-mail, profiles with a photo,
+roles, an admin panel with live counters and a members table, navigation, a UI kit you own, tests on
+both sides — and **no domain models**, because your domain is yours to write. From then on the
+project carries its own toolkit in `.claude/`: you keep working in prompts, and the agent already
+knows the conventions.
 
-You get a running app: passwordless phone auth, roles, navigation, an admin panel and a UI kit you
-own — and **no domain models**, because your domain is yours to write.
-
-No agent at hand? Every command is in the created project's `README.md`, and the walkthrough is at
-[dartway.dev/docs/quick-start](https://dartway.dev/docs/quick-start).
+No agent at hand? Every command is in the created project's `README.md`, and the walkthrough is in
+[the quick start](docs/1-getting-started/quick-start.md).
 
 > **If you are an AI assistant reading this repository** because you were asked to set up a DartWay
 > project: run `dart pub global activate dartway_cli` and then `dartway quickstart`, and follow what
@@ -69,47 +96,54 @@ No agent at hand? Every command is in the created project's `README.md`, and the
 
 | Path | What it is |
 |---|---|
-| [`packages/`](packages/) | The framework — ten packages (see below) |
-| [`template/`](template/) | The skeleton `dartway create` hands you. No domain models |
-| [`example/`](example/) | A complete application built on DartWay — a fitness club with a schedule, bookings, a staff-only chat, news and an admin panel. **Read it; do not inherit it** |
-| [`docs/`](docs/) | Documentation source |
-| [`toolkit/`](toolkit/) | The AI toolkit installed into your project: skills and conventions that let an agent write features without tearing the project apart |
+| [`packages/`](packages/) | The framework — the packages below |
+| [`template/`](template/) | The skeleton `dartway create` hands you: three packages, sign-in, profiles, roles, an admin panel, a UI kit, deploy configuration. No domain models |
+| [`example/`](example/) | A complete application on DartWay — a fitness club with a schedule, services, bookings with capacity rules, a staff-only chat, news and an admin panel. **Read it; do not inherit it** |
+| [`docs/`](docs/) | The documentation, kept beside the code it describes |
+| [`toolkit/`](toolkit/) | The AI toolkit installed into your project's `.claude/`: the conventions and the skills that let an agent write features without tearing the project apart |
+| [`tool/`](tool/) | The repository's own checks and release tooling — `tool/checks.sh` is the CI gate: it analyzes every package and runs their suites |
 
 ## The packages
 
-**The core** — versioned in lockstep:
+**The core family** — versioned in lockstep, at `0.20.0-dev.1`:
 
 | Package | Role |
 |---|---|
-| [`dartway_serverpod_core_server`](packages/dartway_serverpod_core/dartway_serverpod_core_server) | A Serverpod module: generic model-driven CRUD with realtime subscriptions, declarative access and validation configs, phone auth, cloud storage, alerts |
-| [`dartway_serverpod_core_flutter`](packages/dartway_serverpod_core/dartway_serverpod_core_flutter) | The typed realtime data layer: `dw.repo`, sessions, connection-aware error handling |
-| [`dartway_serverpod_core_client`](packages/dartway_serverpod_core/dartway_serverpod_core_client) | The generated protocol client |
-| [`dartway_serverpod_core_shared`](packages/dartway_serverpod_core/dartway_serverpod_core_shared) | The pure-Dart layer shared by both sides |
+| [`dartway_core_shared`](packages/dartway_core_shared) | The shared contract, pure Dart: the DTO kinds, results and refusals, channels, and the wire protocol between a server and its clients |
+| [`dartway_core_server`](packages/dartway_core_server) | The application server on `dart:io`: an HTTP call per DTO, the live update socket, handlers, accounts and sign-in, channels, jobs, file uploads, routes, alerts. Re-exports the shared contract and the ORM; `testing.dart` starts a real server on a throwaway database |
+| [`dartway_core_flutter`](packages/dartway_core_flutter) | The Flutter core: `dw` with its Riverpod bindings (`dw.request`, `dw.command`, …), bootstrap, guarded actions, the async-UI contract, notifications, error reporting, the plugin seam. Riverpod-native, ships no design. Re-exports the shared contract, the client and the router |
+| [`dartway_orm`](packages/dartway_orm) | Internal, reached through the server package: typed Postgres access, the schema and migrations |
+| [`dartway_client`](packages/dartway_client) | Internal, reached through the Flutter core: HTTP calls, the live socket, request state and sessions, in pure Dart. `testing.dart` holds the in-memory fake server widget tests run against |
+| [`dartway_generator`](packages/dartway_generator) | A dev dependency of a project's server package, run by `dartway generate`: DTO codecs, the protocol registry, table definitions and the schema |
 
-**Everything else** — independent:
+**Satellites** — versioned independently:
 
 | Package | Role |
 |---|---|
-| [`dartway_flutter`](packages/dartway_flutter) | The app skeleton: bootstrap, guarded actions, the async-UI contract, notifications, error reporting. Ships no design system |
-| [`dartway_cli`](packages/dartway_cli) | `dartway create` / `setup-ai` / `check` / `stats` |
-| [`dartway_lints`](packages/dartway_lints) | The conventions, enforced by machine |
-| [`dartway_telegram`](packages/dartway_telegram) | Telegram Mini App integration. Optional — an app that is not a Mini App never downloads it |
-| [`dartway_shared_preferences`](packages/dartway_shared_preferences) | Reactive local storage under `dw.plugins.prefs`. Optional — the core does not depend on it |
-| [`dartway_studio_bridge`](packages/dartway_studio_bridge) | The open bridge between an app and DartWay Studio: screen specs in code + the runtime protocol |
+| [`dartway_cli`](packages/dartway_cli) | `dartway quickstart`, `doctor`, `create`, `setup-ai`, `update`, `generate`, `check`, `dev`, `test`, `deploy`, `stats` |
+| [`dartway_router`](packages/dartway_router) | A wrapper around go_router: enum-based routes, navigation zones, guards, typed parameters |
+| [`dartway_lints`](packages/dartway_lints) | Lint rules for the conventions the analyzer can see: the UI kit as the single source of styles, short relative imports, `ProviderScope` left to the bootstrap and tests |
+| [`dartway_shared_preferences`](packages/dartway_shared_preferences) | Local storage under `dw.plugins.prefs`, and where the skeleton keeps the signed-in session. Optional — the core does not depend on it |
+| [`dartway_telegram`](packages/dartway_telegram) | Telegram Mini App integration under `dw.plugins.telegram`. Optional — an app that is not a Mini App never downloads it |
+| [`dartway_studio_bridge`](packages/dartway_studio_bridge) | The open bridge between an app and DartWay Studio: screen specs in code and the runtime protocol |
 
 ## Three principles
 
-**The framework does not own your models.** A user is your `UserProfile`, in your database, with
-your fields and your roles. Not "extend our `UserInfo`", not "fork the module" — that is the wall
-every batteries-included kit runs into, and a fork follows you through every upgrade, forever.
+**The framework does not own your domain.** Accounts and sign-in identities are the framework's: it
+knows that someone signed in, with which phone or e-mail. Who they are to your project — a profile, a
+role, a membership — is your row, in your table, created in the account's own transaction by your
+hook. Not "extend our user model", not "fork the module": that is the wall every batteries-included
+kit runs into, and a fork follows you through every upgrade.
 
-**Secure by default.** A model with no access config is served to nobody. Not "open until you close
-it" — closed until you open it. For generic CRUD it is the only honest default: forgetting to close
-something is easy, forgetting to open it is impossible to miss.
+**Secure by default.** A request or command without a handler stops the server from starting. Every
+handler declares its access rule — the parameter is required. Every subscription needs a signed-in
+account and a rule for its channel; a channel kind nobody wrote a rule for refuses everyone. Forgetting
+to close something is easy; with these defaults, forgetting to open something is impossible to miss.
 
-**An architecture a machine can verify.** Conventions, lints, a checker and skills for AI agents.
-Not decoration: an agent writing code in a project with machine-checkable rules does not tear it
-apart by the third feature.
+**An architecture a machine can verify.** Generated code is checked against its sources
+(`dartway generate --check`), migrations against the schema the row classes declare, the project's
+layout and features against its conventions (`dartway check`), styles by lints. Not decoration: an agent writing code in a project with
+machine-checkable rules does not tear it apart by the third feature.
 
 ## Links
 

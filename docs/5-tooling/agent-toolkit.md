@@ -1,8 +1,9 @@
 # What is the `.claude/` folder in a DartWay project?
 
-Every project created by `dartway create` ships with a `.claude/` directory: the methodology of
-the framework, written for an agent instead of for a reader. `dartway setup-ai` installs the same
-thing into a project you already have.
+The methodology of the framework, written for an agent instead of for a reader. Every project created
+by `dartway create` has it; `dartway setup-ai` installs it into a project you already have, and
+`dartway update` carries it forward. The source is `toolkit/` in the monorepo; the installer is
+`packages/dartway_cli/lib/src/toolkit_installer.dart`.
 
 ```bash
 dartway setup-ai --base-branch develop
@@ -11,210 +12,171 @@ dartway setup-ai --base-branch develop
 ## Why the framework ships this at all
 
 DartWay is **highly opinionated**: less freedom in *how* to do things, more consistency and speed.
-All Flutter ↔ server traffic goes through CRUD configs, not endpoints. A feature is a folder with
-exactly one public file. Styles live in the app's own UI kit and nowhere else. None of that is
-guessable from the API surface — an agent reading only your `pubspec.yaml` will write correct Dart
-in the wrong shape, confidently, at speed, everywhere.
+The contract lives in the shared package and every call has exactly one handler with an access rule.
+A feature is a folder with exactly one public file. Styles live in the app's own UI kit and nowhere
+else. None of that is guessable from the API surface — an agent reading only `pubspec.yaml` writes
+correct Dart in the wrong shape, confidently, at speed, everywhere.
 
-That is the failure mode worth naming. An agent that does not know the conventions does not
-produce compile errors you can fix in a morning; it produces a second architecture living inside
-the first one, and it produces it faster than a person can review. The toolkit exists so the agent
-writes code in the same conventions a person on the project would — and so the
-[conventions checker](conventions-checker.md) agrees with it afterwards.
+That is the failure worth naming. An agent that does not know the conventions does not produce
+compile errors you fix in a morning; it produces a second architecture inside the first one, faster
+than a person can review it. The toolkit exists so the agent writes in the conventions a person on
+the project would — and so the [conventions checker](conventions-checker.md) agrees with it
+afterwards.
 
 Toolkit and code evolve in the same repository and the same pull request: a change to a package's
-public API updates the affected skills alongside it. A skill that has fallen behind the API is
-worse than a missing one — the agent writes non-working code with full confidence.
+public API updates the affected skills with it. A skill that has fallen behind the API is worse than
+a missing one — the agent writes non-working code with full confidence.
 
 ## What gets installed
 
 ```
 .claude/
-  CLAUDE.md                    # the methodology, always in the agent's context
-  skills/dartway-*/SKILL.md    # 15 skills, loaded by relevance to the task
-  commands/commit.md
-  commands/dartway-checkup.md
+  CLAUDE.md                   # the constitution, always in the agent's context
+  skills/dartway-*/SKILL.md   # loaded by relevance to the task
+  commands/commit.md          # /commit
+  commands/dartway-checkup.md # /dartway-checkup
+  settings.json               # merged, not overwritten
+  dartway-toolkit.json        # where this install came from
+docs/dev_notes/
+  README.md                   # the form of a project finding
+  _coverage.md                # what /dartway-checkup has read
 ```
 
-`CLAUDE.md` is the always-loaded brain: the cross-stack laws (CRUD first, domain-first, a feature
-is end-to-end), naming rules, what each package is for, why the project uses no `build_runner`,
-and where a feature's description lives — in `DwFeatureSpec` next to the code, not in a doc beside
-it.
+**`CLAUDE.md` is the constitution**: the laws of the framework, the naming rules, what each package
+of the project is for, and where things go. It is loaded into every session, which is why it stays
+short and points at skills for the how.
 
-The installer detects your package layout by directory suffix (`*_server`, `*_client`,
-`*_flutter`, optional `*_shared`) and substitutes the names into the installed markdown, so the
-skills talk about `my_app_flutter`, not about a placeholder. `--base-branch` is substituted the
-same way, so the commit and PR skills diff against the branch your project actually uses.
-
-Commit `.claude/` to your repository. It is a generated-but-committed artifact, like the Serverpod
-client: a clone comes with the skills already in place, and the history records which version of
-the methodology a piece of code was written under.
-
-## Managed files, and how to customize
-
-Reinstalling overwrites **only what the toolkit manages**: `CLAUDE.md`, every skill directory
-named `dartway-*`, and the `commit` / `dartway-checkup` commands. Anything else in `.claude/` — your
-own skills, your own commands — is never touched.
-
-So do not edit a `dartway-*` skill in place; the next `setup-ai` will drop your changes on the
-floor. To customize, **copy the skill under a different name** and edit the copy. The source of
-truth is the toolkit in the monorepo, and there is no reverse sync.
-
-Updating is a deliberate act with a visible diff: run **`dartway update`**, read what changed, commit.
-It installs the toolkit the way `setup-ai` does and then reports what else has moved — which framework
-packages this project is behind on, and which migration notes it still owes an edit to. What
-was installed is written down beside it, in `.claude/dartway-toolkit.json` — repository, channel,
-commit, CLI version — because the files themselves do not say which channel they follow, and
-`--channel` defaults to `stable`. Update a project that had been moved to `master` with the plain
-command and it would be rolled back, with the diff looking like any other update; instead the
-command refuses and asks for the channel by name.
-
-`.claude/settings.json` sits on neither side of that line, and is the third kind of file here: a
-toolkit default the project **extends**. It pre-approves this stack's build commands — `dart pub
-get`, `docker compose up`, `serverpod generate`, the test runners — so a first run is not a queue of
-permission prompts, and it denies reading `config/passwords.yaml`, which turns a rule the skills
-merely state into one the harness enforces. Nothing destructive is on the allow list: `docker
-compose down`, commits and pushes still ask.
-
-An update **merges** it: entries the toolkit has and the project lacks are added, everything the
-project added stays, and every added entry is printed. It used to be written once and never touched,
-which sounds like the safe choice and is only half of one — a changed default then reached an
-existing project only if somebody deleted the file first, and a new `deny` rule reached none of
-them, which is precisely the half the harness is supposed to enforce rather than state. The one cost
-of merging is an entry a project removed on purpose coming back; that is why every addition is named
-in the output rather than applied quietly.
-
-That is also why a finding about the framework leaves the project entirely. A rule that did not catch
-a mistake, two skills that disagree, an API the app had to work around — none of that can be fixed in
-the installed copy, and all of it is worth keeping: the rules are only ever proven wrong by real code.
-Such a finding is **filed as an issue in the framework's tracker**, and `dartway-finish` writes the
-issue text and offers it at the end of a task. Unless `dartway setup-ai --notes-tracker owner/repo`
-names another repository, that tracker is the framework's own; `--notes-tracker none` keeps
-everything inside the project, and nothing reaches the network.
-
-**The default is deliberate.** A project that never decided where its findings should go was a
-project whose findings stayed put — waiting in a git-ignored file that nothing else in the world
-could see.
-
-There used to be a journal in between, and it is worth saying why it is gone. It kept a status of its
-own beside each entry, which is a second copy of a state that changes elsewhere: one project's
-journal advertised eleven open findings a fortnight after all eleven had shipped, the entry asking
-for this mechanism among them, because the fixes landed in the monorepo and nothing wrote back to the
-laptop. Being git-ignored, it was invisible in every place work is actually reviewed — and a
-`git worktree remove` deleted a copy of it without a word, since `git status` says nothing about
-ignored files.
-Making that decision a precondition would have reproduced the failure in every project that skipped
-it.
-
-The half that does **not** travel is the reason filing is not a copy. An entry earns its keep here by
-naming this codebase — the file and line, the class, the workaround the app wrote, the marker beside
-it — and that is precisely what cannot go into a repository other people read. So `CLAUDE.md` asks
-for four things before an issue exists: the finding restated so it stands without this project's
-code (if nothing survives that, it was never about the framework), English rather than the project's
-language, a search of the tracker first because three projects meeting one API gap is one issue, and
-an explicit yes — creating a public issue is the only step in the journal that cannot be taken back.
-
-One kind of finding needs a second half, in the code. A workaround over a `dartway_*` API is written
-down as an entry *and* marked where it lives — `// TODO(dartway, checked: 518ae6d): …`, naming the
-framework version it was last confirmed against. The reason is that the entry alone answers the
-wrong question: it says the workaround exists, never that it is still needed, and the framework
-moves while the code does not. A real one outlived its fix by weeks on a project already pinned past
-it, and it was not an idle duplicate — it threw where the framework had chosen to degrade softly,
-so the app died on an offline start. `dartway-finish` compares `checked:` against the version
-resolved in `pubspec.lock` and raises the marker **only** when they have diverged, which is the only
-moment the answer can have changed; `/dartway-checkup` runs the same comparison across the whole
-project, for the workarounds no task has touched.
+**The laws are the checker's error set.** A law is a rule a project does not override; everything
+else in the toolkit is a default a project may replace with its own rule. The line is not drawn by
+taste: the published law list is exactly the checks `dartway check` fails on (thirteen today), and
+`packages/dartway_cli/test/toolkit_law_list_test.dart` holds the two together. A check that is only a
+warning is one with a second legitimate reading, and a project cannot be forbidden to decide that for
+itself.
 
 ## The skills
 
-The lifecycle of a task runs left to right: `dartway-requirements` → `dartway-plan` →
-implementation with the layer skills → `dartway-finish`.
+A task runs left to right: `dartway-requirements` → `dartway-plan` → implementation with the layer
+skills → `dartway-finish`.
 
-**`dartway-run`** — bring the project up locally and confirm it is alive: dependencies, Postgres
-in Docker, migrations, the first administrator, server, app. Knows the order that matters, the real ports, where
-the sign-in code is printed, and how to read the failures people actually hit.
+| Skill | For |
+|---|---|
+| `dartway-requirements` | Read-only analysis before a task: what the project already has, the debt in the way, the questions worth asking, options with their trade-offs |
+| `dartway-plan` | Read-only planning once the requirements are agreed: an end-to-end plan and the checks to verify it against |
+| `dartway-run` | Bringing the project up locally — the order of the steps and the real ports — and confirming it is alive |
+| `dartway-feature-scaffold` | A feature end to end: its folder, its entry point and `DwFeatureSpec`, its layers |
+| `dartway-contract` | The shared package: data objects, requests and commands, refusal codes, validation, generation |
+| `dartway-server` | Handlers and the call context, rows and queries, auth hooks, jobs, routes |
+| `dartway-data-layer` | The Flutter side of calls: requests, commands, actions, refusal texts |
+| `dartway-realtime` | Channels, publishing, update actions |
+| `dartway-access` | Access rules, channel rules, roles, identities and keys |
+| `dartway-migrations` | Writing, checking and applying migrations |
+| `dartway-uploads` | Files: upload purposes and their rules, the public and the private bucket, rows that store a file id |
+| `dartway-testing` | Where a test goes and how to write it, tier by tier |
+| `dartway-navigation` | The router: zones, route descriptors, guards |
+| `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
+| `dartway-clean-code` | The cleanliness contract for all Dart and Flutter work |
+| `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
+| `dartway-finish` | The definition of done before a commit or PR: audit the diff, apply only what is confirmed |
+| `dartway-update` | Moving onto a newer framework: `dartway update`, the migration notes, then the versions |
+| `dartway-push-delivery` | Server-side push delivery |
 
-**`dartway-requirements`** — read-only analysis before a task: what the project already has on the
-topic, blocking debt versus adjacent debt, the questions worth asking, and 2–3 implementation
-options along the escalation ladder with tradeoffs, risks and a rough estimate.
+Two commands come with them. **`/commit`** writes one conventional-commit line in English and decides
+nothing local — whether commits carry a ticket belongs to the project's own `CLAUDE.md`. **`/dartway-checkup`**
+reports the state of the whole project and what is worth taking into work next: it runs the
+project's gates first (`dartway check`, `dartway generate --check`, the analyzers, the tests), compares
+them with what CI actually runs, measures how far the project trails the framework, and only then
+spends reading on features.
 
-**`dartway-plan`** — read-only planning once the requirements are agreed: a step-by-step
-end-to-end plan (models → migrations → CRUD configs → server logic → Flutter → tests → docs), the
-subtleties and risks, and a checklist to verify against afterwards.
+## The names in the skills are the project's
 
-**`dartway-clean-code`** — the cleanliness contract for all Dart/Flutter work: self-explanatory
-naming, one responsibility per file, never passing `BuildContext` or `WidgetRef` as parameters, no
-`_buildXxx()` widget methods, `ref.invalidate` only where the user asked for it, a failed read that
-looks like neither an empty list nor a spinner, plus SOLID/KISS/DRY/YAGNI and when tests are
-required.
+The toolkit's markdown carries tokens, and the installer replaces them in every installed `.md` file,
+so the skills talk about `my_app_server`, not about a placeholder:
 
-**`dartway-feature-scaffold`** — building a feature end to end: navigation → entry point → state
-and logic → CRUD configs → models → tests, with the feature structure, its isolation, and the
-`DwFeatureSpec` written in the feature's own file.
+| Token | Becomes |
+|---|---|
+| `__SHARED_PKG__` | The `*_shared` package, or empty when there is none |
+| `__SERVER_PKG__` | The `*_server` package |
+| `__FLUTTER_PKG__` | The `*_flutter` package |
+| `__FLUTTER_APP_FILE__` | The app's wiring file, `<project>_app.dart` |
+| `__BASE_BRANCH__` | `--base-branch` (default `master`) |
+| `__PROJECT_LANGUAGE__` | `--language` (default `English`) |
+| `__NOTES_TRACKER__` | `--notes-tracker` (default `dartway/dartway`), or `none` |
 
-**`dartway-models`** — Serverpod `.spy.yaml` models: base versus event models, nullable
-discipline, bidirectional relations and `onDelete`, indexes, enums, and the edit → generate →
-migrate → config workflow.
+The packages are detected by directory suffix at the project root on every run; exactly one
+`*_server` and one `*_flutter` are required. The three flag settings are recorded in
+`.claude/dartway-toolkit.json` and replayed by the next install unless a flag names another value —
+see [The CLI](cli.md).
 
-**`dartway-crud-config`** — the server playbook: `DwCrudConfig<T>` and its hooks, read configs and
-their mandatory `accessFilter`, `DwModelWrapper`, the pure-domain versus session-aware boundary.
-All server logic goes through configs, not endpoints.
+## Managed files, project files, and the one in between
 
-**`dartway-data-layer`** — the Flutter data layer: reads and writes through `dw.repo`, lists via
-`dwBuildListAsync`, backend filtering versus local filtering, actions through `dw.action`,
-notifications through `dw.notify.*` rather than `SnackBar`, the profile getters.
+**Managed files are the toolkit's**, and every install removes them and copies them again:
+`.claude/CLAUDE.md`, every skill directory named `dartway-*`, and the `commit.md` and
+`dartway-checkup.md` commands (a retired command on the installer's list is removed the same way).
+Anything else in `.claude/` — a project's own skills and commands — is never touched.
 
-**`dartway-navigation`** — the DartWay router: zones as enums, route descriptors, zone guards,
-type-safe enum parameters, and how the router is assembled.
+So do not edit a `dartway-*` skill in place: the next install drops the change. To customize,
+**copy the skill under another name** and edit the copy. The source of truth is `toolkit/` in the
+monorepo, and there is no reverse sync. Rules a project adds of its own belong in its root
+`CLAUDE.md` or its own skills.
 
-**`dartway-ui-kit`** — the kit lives as source inside the app: the framework ships no buttons, no
-text widget and no theme. App widgets with named constructors, `DwActionBuilder`, and the ban on
-raw styles inside features.
+**`.claude/settings.json` is a toolkit default the project extends**, so it is merged rather than
+overwritten or skipped. It pre-approves this stack's build, test and run commands — `dart pub get`,
+the analyzers, the test runners, `dartway`, `docker compose up` — so a first run is not a queue of
+permission prompts, and it denies reading `deploy/secrets.yaml`, turning a rule the skills state into
+one the harness enforces. Nothing destructive is on the allow list. On an install, entries the toolkit
+has and the project lacks are added, a value the project holds is never replaced, and **every added
+entry is printed** — the one cost of merging is an entry a project removed on purpose coming back, and
+printing makes that visible in the same run. A file that is not a JSON object is left as it is and
+reported.
 
-**`dartway-push-delivery`** — server-side push through the optional `dartway_push_server` module:
-the engine, recipient resolution, FCM/RuStore transports, idempotent enqueue, retries, campaign
-progress. Opt-in — an app that does not depend on it has no push tables.
+**`docs/dev_notes/`** is the one place the installer writes outside `.claude/`: the project's own
+findings, one committed file per finding. It is tracked, not git-ignored — a finding travels out in
+the pull request that carries it and survives a `git worktree remove`. `README.md` there is the
+toolkit's and is refreshed on every install; `_coverage.md` is the project's record of what
+`/dartway-checkup` has read, created once and never touched again.
 
-**`dartway-testing`** — where a test goes and how to write it: a rule from a `DwCrudConfig` is an
-integration test on the server against a live database, plain logic is a unit test, and a feature is
-a widget test with the core booted and the server standing in as a recording transport. A DartWay
-feature saves for itself and hands no callback out, so the technique is not guessable — and the
-skeleton ships a worked example of each layer in its `test/` folder. Also what is deliberately not
-tested, and why there are no coverage thresholds.
+`.claude/dartway-toolkit.json` records where the install came from — the repository or local path,
+the channel, the commit, the CLI version — and the settings. It records **provenance, not content**:
+a list of installed files or their hashes would be a second copy of the files, and copies drift.
 
-**`dartway-finish`** — the definition of done before a commit or PR: audits the diff against the
-contract, checks the feature's description for drift and the test coverage, then shows suggestions
-and applies only what you confirm.
+Two things are **reported and never changed**: root journals from an older setup (`dartway_notes.md`,
+`dev_notes.md`), which hold findings nobody else has a copy of, and leftovers of an older shell
+installer in `tools/dw_claude_setup/`, whose removal means editing the git index. The installer names
+them and the commands to clear them.
 
-**`dartway-update`** — moving the project onto a newer framework, which is a job of its own rather
-than part of a task: run `dartway update`, read the framework's migration notes, make the edits they
-ask for, and only then move the package versions. That order is the whole point — moving the
-packages first turns a readable instruction into a screen of compile errors.
+Commit `.claude/` and `docs/dev_notes/` after every install: a clone comes with the skills in place,
+and the history records which version of the methodology a piece of code was written under.
 
-Two commands come with them. `/commit` — one conventional-commit line in English, and nothing local
-decided for you: whether commits carry a ticket, and whether anything checks the message, belongs to
-the project's own `CLAUDE.md`. It used to demand a ticket as a required argument and stop without
-one, which in a project with no tracker stalled the agent mid-task on a question that has no answer.
-And `/dartway-checkup` — the state of the project and what is worth taking into work next.
+## Findings about the framework go back to the framework
 
-The checkup answers two questions for the same person on different days: *how bad is it* and *what
-do I fix first*. It runs the project's own gates before reading anything — the checker, the lints,
-the analyzer, the tests — then compares that against what CI actually executes, because a rule
-declared and never run reads as covered while enforcing nothing. It measures how far the project's
-pin trails the framework, since a workaround here may already be a duplicate of something upstream
-now does. Only then does it spend reading on a handful of features, chosen from a coverage table so
-that successive runs go deeper instead of skimming the same surface.
+A rule that did not catch a mistake, two skills that disagree, an API the app had to work around —
+none of that can be fixed in the installed copy, and all of it is worth keeping: the rules are only
+ever proven wrong by real code. So a finding about the framework is **filed as an issue** in the
+repository `--notes-tracker` names, which defaults to the framework's own tracker, `dartway/dartway`.
+A finding about the project itself goes to `docs/dev_notes/`, or to the `knownIssues` of the feature
+it belongs to.
 
-What it finds gets placed rather than announced, and the test is whether the finding has an address
-in code: one that belongs to a feature becomes a line in its `knownIssues`, one about the framework
-becomes an issue in the tracker, and a cross-cutting risk with no address at all becomes a file under
-`docs/dev_notes/` — tracked and committed, so it travels out in a pull request and is visible in
-review. The defect itself lives in the tracker either way; the entry beside the code only references
-it, which is why neither carries a status of its own.
+**The default is deliberate.** A project that never decided where its findings should go is a project
+whose findings stay on one laptop, and making the decision a precondition would reproduce exactly that
+in every project that skipped it. `--notes-tracker owner/repo` sends them to another repository;
+`--notes-tracker none` files nothing outside the project — the finding is written into
+`docs/dev_notes/` like any other.
+
+## Keeping it current
+
+- **`dartway setup-ai`** — the first install, or a re-install on the same channel.
+- **`dartway update`** — the toolkit from the channel the project is on, plus the report of which
+  framework packages the project is behind on and which migration notes it still owes. The
+  `dartway-update` skill carries that report out.
+- **`--local-repo <checkout>`** (or `DARTWAY_MONOREPO_DIR`) — install from a local monorepo checkout
+  instead of a channel, for working on the framework and a project side by side. It records no
+  channel.
+
+A plain re-run that would move a project to another channel is refused and asks for the channel by
+name. The details of both commands are in [The CLI](cli.md).
 
 ## What the toolkit does not do
 
 It never changes code silently. `dartway-requirements` and `dartway-plan` write nothing at all;
-`dartway-finish` shows what it would change and applies only the confirmed part, leaving anything
-architectural to you with a note. The point is a reviewer that is awake at 2 a.m., not an
-autopilot.
+`dartway-finish` shows what it would change and applies only the confirmed part. The point is a
+reviewer that is awake at 2 a.m., not an autopilot.

@@ -1,179 +1,144 @@
-# DartWay Studio Bridge
+# How does an app talk to DartWay Studio?
 
-Every DartWay app can describe itself for [DartWay Studio](https://dartway.dev)
-— the closed platform that shows a live preview of your running app with a
-screen map, screen passports and a demo-persona switcher.
+Through `dartway_studio_bridge`, an open package with two halves: **spec models** an app declares in
+its own code, and a **versioned `postMessage` protocol** between Studio and the app's web build
+running in an iframe. [DartWay Studio](https://dartway.dev) is the closed platform on the other end:
+a live preview of the running app with its screen map, screen passports, the features on the current
+screen, and a demo-persona switcher.
 
-The open `dartway_studio_bridge` package is the only integration surface:
+The package is a satellite (`packages/dartway_studio_bridge`, version `0.9.0`, versioned on its own):
+it depends on Flutter and nothing of the DartWay core, so it is true of any Flutter web app, and its
+README (`packages/dartway_studio_bridge/README.md`) is the full reference of its API.
 
-- **Spec models** — declare navigation zones and screen passports
-  (`StudioScreenSpec`, plain single-language strings — written in whatever
-  language your team works in) in your app's code. Screens are identified by
-  route path strings, so any router works.
-- **Runtime protocol** — a versioned `postMessage` protocol between Studio and
-  the app's web build running in an iframe: Studio navigates the live app,
-  switches its UI locale (when the manifest declares `supportedLocales`) and
-  asks what is declared at a point on screen; the app reports route, session
-  and locale changes.
-- **Demo personas are configured in Studio, not in the app.** Test users and
-  their verification codes live in the platform's project config; on switch
-  Studio sends them over the bridge and the app runs its **regular** auth flow
-  with them (DartWay server side: per-user rotatable `testVerificationCode`).
-  A public web build therefore ships no test accounts and no special sign-in
-  path. Role-gating of zones stays entirely in the app — guards and server
-  filters, not spec metadata.
-- **`DwStudioBinding`** — the app half, and the thing a Flutter project actually
-  mounts. It ships as its own package, `dartway_studio_binding`: one widget in
-  `MaterialApp.builder` that attaches the host, reports the route, the mounted
-  features, the session and the language, and runs what Studio asks for. The
-  project supplies only what the framework cannot know — the manifest, the
-  screen passports, and which profile field names the signed-in user:
+**The Flutter app binding is not available on DartWay 1.0 yet.** The package that mounts the bridge
+into a DartWay app — reporting the route, the session, the mounted features and the language, and
+running what Studio asks for — is not on this branch until it is ported to the 1.0 core (D-010,
+D-024); in the order of D-033 it follows the template, uploads and deploy. Until then an app on 1.0
+has no ready-made way to open a Studio preview, and nothing on this page is wired into `example/` or
+the skeleton.
 
-  ```dart
-  builder: (context, child) => DwStudioBinding(
-    core: dw,
-    manifest: appStudioManifest,
-    router: ref.watch(appRouterProvider),
-    describeUser: (profile) =>
-        DwStudioUser(identifier: profile.phone, label: profile.firstName),
-    validateAccessToken: studioSignedAccessValidator(
-      const String.fromEnvironment('STUDIO_APP_ORIGIN'),
-    ),
-    child: child ?? const SizedBox.shrink(),
-  ),
-  ```
+## Why the app describes itself, and Studio stores nothing
 
-  It is a package rather than something a project copies because none of it
-  refers to any domain — it is protocol wiring nobody edits, and while it
-  travelled by copy-paste the two copies in this repository had already drifted
-  apart. Build on `StudioBridgeHost.attach` directly when an app needs a report
-  cadence of its own. Either way the host is inert unless the app runs on web
-  embedded in an iframe; the channel pins the origin of the first valid Studio
-  message for its replies.
-- **Access is proved by a signature.** Studio presents a short-lived token,
-  signed with its own Ed25519 key and issued for a single origin — the address
-  your build answers at — and the app accepts the connection only if that token
-  passes its `validateAccessToken`. A token taken off the wire is therefore
-  useless anywhere else, and it expires on its own.
+**The app is the single source of truth for its structure.** Studio receives the manifest — navigation
+zones, screen passports, supported locales — over the runtime channel on every connect, so it cannot
+go stale relative to the build it is showing. Features travel the same way: what a feature says
+about itself is declared next to its code in a `DwFeatureSpec` (see
+[Features and specs](../3-flutter/features-and-specs.md)), and an app reports the ones currently
+mounted — `DwFeature.scanMounted()` — rather than a catalogue kept anywhere else.
 
-  The gate is on **everything**, not on the manifest alone: until a token has
-  been accepted the app runs no command it is sent and reports nothing back, so
-  a page that embedded the build without presenting anything can neither drive
-  it nor read its feature passports.
+**Demo personas are the opposite: a platform concern.** Test users and their codes are configured in
+Studio's project settings and never ship inside the app's public web build. On a switch Studio sends
+the credentials over the bridge and the app runs its **regular** sign-in with them — so a public
+build carries no test accounts and no special sign-in path. Role gating stays entirely in the app:
+guards and server rules, not spec metadata.
 
-  **A refusal is answered, once it is a refusal of something.** If the token
-  presented parses as a signed Studio token and then fails the check — expired,
-  or signed by another key — the app replies `connectRefused`. Anything else (an
-  empty token, a guess, noise) is met with silence as before, so a stranger who
-  guessed the preview's URL does not learn there is a bridge here at all. The
-  distinction is the whole value: "this build carries no bridge" and "your
-  signature is stale" are two different repairs and used to look identical.
+## The spec models
 
-  Your build holds no secret and copies nothing out of Studio: the public half
-  of the pair ships inside the bridge package, and a public key can only check
-  signatures, never make them. The build names one thing — where it answers:
-  `--dart-define=STUDIO_APP_ORIGIN=https://app.example`, wired through the
-  shipped `studioSignedAccessValidator`. Leave the define out and the build
-  accepts any connection, which is what makes running Studio against your local
-  build a zero-config affair.
-- **Features** arrive per screen, as the app navigates: every widget that
-  implements `DwFeature` declares its `DwFeatureSpec` next to itself, and the
-  binding reports the ones currently mounted. What a feature says about itself
-  — `purpose`, `behaviors`, `requirements`, `implementationNotes`,
-  `knownIssues` — travels over the bridge on every connect, so Studio renders
-  it live and stores none of it: there is nothing that can drift away from the
-  code. A feature with a non-empty `knownIssues` is flagged in the catalog, so
-  the open questions of a project are visible without opening every passport.
+| Model | What it declares |
+|---|---|
+| `StudioProjectManifest` | `projectName`, `zones`, `features`, `supportedLocales` — what the app sends on connect |
+| `StudioZoneSpec` | A labelled group of screens with a root path and `StudioZoneAccess` (`signedIn`, `signedOut`, `any`) |
+| `StudioScreenSpec` | A screen passport keyed by its route path: `title`, `purpose`, `parentPath`, `discussionQuestions` |
+| `StudioFeatureInfo` | One feature on the wire: `id`, `title`, `purpose`, `behaviors`, `requirements`, `implementationNotes`, `knownIssues` |
+| `StudioSessionState` | Whether someone is signed in, their identifier and label, and whether a requested sign-in is in progress |
+| `StudioManifestIndex` | Looks a reported address up among the declared screens: exact path, then template (`/profile/:id`), then the deepest non-root prefix |
 
-  `manifest.features` stays in the protocol for the *whole-project* catalog,
-  but a running app cannot fill it: Dart has no reflection, so only mounted
-  widgets are observable. Enumerating every feature of a project is a job for
-  static analysis of the sources, not for the app.
+Screens are identified by plain path strings, so any router works. Passport texts are plain strings
+in whatever language the team writes its specs in; Studio shows them as they are.
 
-- **Tap to inspect.** Studio can point at a spot in the live preview and get
-  the feature declared there (`DwFeature.hitTest` on the app side), so a
-  passport is reachable by pointing rather than by knowing the feature's id.
-  The point crosses the bridge as fractions of the app's viewport, not pixels —
-  Studio may be showing the preview scaled or framed, and only the app knows
-  its own logical size, so the app converts. A feature is matched on the area
-  it actually paints into: something scaled down, scrolled out of its viewport
-  or clipped away does not answer for a point where the user sees nothing.
+`manifest.features` stays in the protocol for a whole-project catalogue, but a running Flutter app
+cannot fill it: Dart has no reflection, so only mounted widgets are observable. Enumerating every
+feature of a project is a job for static analysis of the sources.
 
-## Asking whether an app has a bridge at all
+## The protocol
 
-Studio has a second reason to talk to an app: not to preview it, but to find out
-whether it answers. `probeStudioBridge(appUrl: …)` performs exactly one
-handshake and returns one of three things:
+Every message is a JSON string `{"dartwayStudioBridge": 4, "type": "…", "payload": {…}}`, and both
+sides ignore an envelope of another version. The types are the constants of
+`StudioBridgeProtocol`:
 
-```dart
-switch (await probeStudioBridge(appUrl: url, accessToken: myTokenSupplier)) {
-  StudioHandshakeResult.accepted => 'connected',
-  StudioHandshakeResult.rejected => 'the signature was refused',
-  StudioHandshakeResult.silent   => 'no answer',
-}
+| Direction | Types |
+|---|---|
+| Studio → app | `studioConnect` (with the access token), `navigateRequest`, `signInRequest`, `signOutRequest`, `localeRequest`, `inspectPointRequest` |
+| App → Studio | `appReady`, `manifest`, `connectRefused`, `routeChanged`, `sessionChanged`, `featuresChanged`, `localeChanged`, `inspectPointResult` |
+
+The handshake is initiated from both ends and survives reloads and hot restarts of either side. The
+app pins the origin of the first valid Studio message for its replies.
+
+**Adding a message type does not bump the version; changing the meaning of one does.** The version is
+checked strictly, so a bump silences every build already in the field in both directions the moment it
+ships. A new type costs nothing: an old side drops the envelope it does not recognise and carries on —
+which is how `connectRefused` arrived inside version 4.
+
+**Tap to inspect** crosses the bridge as fractions of the app's viewport, not pixels: Studio may show
+the preview scaled or framed, and only the app knows its own logical size. The app converts the point
+and answers with the feature declared there (`DwFeature.hitTest` in a DartWay app). Each request
+carries an id the app echoes back, so a second tap never receives the first one's answer, and an app
+that does not know the message stays silent until Studio's timeout reports "nothing here".
+
+## Access is proved by a signature
+
+Studio presents a short-lived token, signed with its Ed25519 key and issued for **one origin** — the
+address the build answers at:
+
+```text
+<payload>.<signature>
+payload   = base64url( utf8( {"origin":"https://app.example","exp":1765540000} ) )
+signature = base64url( ed25519_sign( privateKey, ascii(payload) ) )
 ```
 
-The frame is created and removed inside the call — nothing to render, nothing to
-know about. That matters because the preview's own `StudioFrameController` hands
-out a *platform view*: its iframe is not in the document until the embedder lays
-it out, and a detached iframe never fetches its `src`, so no layout means no
-load means no handshake. Asking this question through the preview therefore cost
-a 1×1 frame parked on screen for the lifetime of the app.
+A token lifted off the wire is worthless anywhere else, and it expires on its own. **The build holds
+no secret**: the public half of the key pair ships inside the package as `studioSigningPublicKey`,
+and a public key can only check signatures. The signature has to be asymmetric for exactly this
+reason — an HMAC over a shared secret would put the secret back into a public web bundle.
 
-`silent` covers several causes at once — no bridge in the build, a page that
-never loaded, a deployment that forbids being framed, an older app refusing in
-silence. Cross-origin they are one silence and cannot be separated from here:
-check that the URL serves a page, and that it permits `frame-ancestors`, as
-steps of their own before the probe.
+A build names one thing, where it answers — `--dart-define=STUDIO_APP_ORIGIN=https://app.example` —
+through `studioSignedAccessValidator(const String.fromEnvironment('STUDIO_APP_ORIGIN'))`. **A build
+that names no origin accepts any connection**, which is what makes previewing a local build
+zero-config.
+
+**The gate is on everything.** Until a token is accepted the app runs no command it is sent and
+reports nothing, so a page that embedded the build without presenting a token can neither drive it
+nor read its passports. **A refusal is answered only when it refuses something**: a token that parses
+as a signed Studio token (`looksLikeStudioBridgeToken`) and then fails — expired, or signed by another
+key — gets `connectRefused`; an empty or garbled one gets silence, so a stranger who guessed the
+preview's address learns nothing, while Studio is told its signature is stale instead of wondering
+whether the app has a bridge at all.
+
+## The two sides in the package
+
+**App side.** `StudioBridgeHost.attach(manifest:, delegate:, currentPath:, currentSession:, …)`
+connects a Flutter web app to the embedding window; a `StudioBridgeHostDelegate` executes navigation,
+sign-in with credentials, sign-out and locale switches, and the host's `report…` methods send changes
+back. It returns null when the app is not running on web inside an iframe, so the app stays fully
+functional and the bridge dormant. This is the low-level surface a binding is built on.
+
+**Studio side.** `createStudioFrameController` hosts the app in an iframe and `StudioBridgeClient`
+drives it. `probeStudioBridge(appUrl:, accessToken:)` asks one question — does this URL answer — with a
+single handshake in a frame it creates and removes itself, and returns a `StudioHandshakeResult`:
+`accepted`, `rejected` (the app refused the token), or `silent`. Silent covers several causes at
+once — no bridge in the build, a page that never loaded, a deployment that forbids framing — which
+cross-origin cannot be told apart, so check that the URL serves a page and permits `frame-ancestors`
+as steps of their own.
 
 ## When a connection is silent
 
-Every step of the bridge's filtering ends the same way — the message is dropped
-and nothing is said. That is correct for the ordinary case (a page's `window` is
-a shared bus and most of what crosses it belongs to somebody else) and useless
-for the one case that is a real fault: **an app and a Studio on different
-protocol versions.** Both are speaking the bridge, neither will hear the other
-until one is rebuilt, and it looks exactly like a stranger's message. That is
-what `silent` above hides, and what once cost a day.
+A channel drops what is not for it and says nothing, which is right for a page's `window` — a shared
+bus — and useless for the one real fault: **an app and a Studio on different protocol versions**, quiet
+at each other and looking exactly like a stranger's message.
 
-`StudioBridgeProtocol.envelopeVersionOf(data)` reads the envelope version out of
-raw postMessage data — null when there is no envelope, so "not ours" and "ours,
-wrong version" stop being the same answer. Decoding cannot tell them apart:
-`tryDecode` returns null for both.
-
-For the steps that happen before decoding — the origin, the sending window, the
-data's type — pass `onMessageDropped` to `createStudioFrameController`,
-`openStudioProbeFrame`, `probeStudioBridge` or, on the app side,
-`StudioBridgeHost.attach`. Each refused message arrives as a `StudioMessageDrop`
-naming the step it died at. Nothing else changes: without an observer the bridge
-is as quiet as it always was.
-
-The observer exists rather than an exposed frame handle because the Studio-side
-source check compares against the window of *its own* frame — an embedder
-watching `window` from outside can only ask "is this some frame of this page",
-which stops distinguishing anything as soon as the page carries two.
-
-See the package [README](../packages/dartway_studio_bridge/README.md) for the
-full API of the wire, `dartway_studio_binding` for the app half, and
-`example/dartway_example_flutter/lib/core/studio/` for what a project is left
-holding: its manifest and its screen passports, and nothing else.
+- `StudioBridgeProtocol.envelopeVersionOf(data)` reads the envelope version out of raw postMessage
+  data: null for a foreign message, the version for ours. Decoding cannot tell those apart.
+- `onMessageDropped`, taken by `createStudioFrameController`, `openStudioProbeFrame`,
+  `probeStudioBridge` and `StudioBridgeHost.attach`, receives a `StudioMessageDrop` for every refused
+  message, naming the step (`StudioMessageDropReason`: `notAMessageEvent`, `foreignOrigin`,
+  `foreignSource`, `nonStringData`, `notAnEnvelope`, `versionMismatch`, `unknownType`). The last one
+  means the other side is newer, which is not a fault. Without an observer nothing changes.
 
 ## Apps that are not Flutter
 
-Studio previews a web build in an iframe, and nothing in the protocol is
-Flutter-specific — so an app written in React or Vue connects to the same
-Studio, unmodified. The app half of the bridge exists a second time as
-`js/studio-bridge` (`@dartway/studio-bridge` on npm): one core plus two thin
-bindings (`/react`, `/vue`), speaking the same protocol version, checking the
-same signature against the same shipped public key.
-
-One thing differs, and not on the wire: a JS app **can** enumerate its features,
-because a declaration is a component and components are what a framework already
-tracks — where a Flutter app reports what is mounted, a React or Vue app
-declares `<StudioFeature>` and the registry does the rest.
-
-The two implementations are kept honest by golden wire strings in the JS
-package's tests: the Dart encoder's exact output, key order included. Change the
-protocol on one side and those tests fail — which is the point, since the two
-packages version independently and a pilot team's preview is a poor place to
-discover a rename.
+Nothing in the protocol is Flutter-specific. `js/studio-bridge` (`@dartway/studio-bridge` on npm) is
+the app side for JavaScript apps — one core and two thin bindings, `/react` and `/vue` — speaking the
+same protocol version and checking the same signature against the same public key. A JS app **can**
+enumerate its features, because a declaration is a component and a framework already tracks
+components. The two implementations are versioned independently and kept in step by wire tests on the
+JS side that hold its encodings to the Dart encoder's exact output.

@@ -1,7 +1,7 @@
 # Why does DartWay ship no design?
 
-`dartway_flutter` contains no `DwButton`, no `DwText`, no theme, no color presets. There is no
-`dartway_ui_kit` package, and there will not be one. Do not look for them — they do not exist.
+`dartway_core_flutter` contains no button widget, no text widget, no theme, no color presets. There
+is no `dartway_ui_kit` package, and there will not be one. Do not look for them — they do not exist.
 
 This is the one deliberate hole in the framework, and it is worth understanding before you try to
 fill it.
@@ -21,7 +21,7 @@ it. Nothing updates it from under you.
 Exactly the mechanisms a kit should not have to reinvent, and nothing that has a look:
 
 - **`DwActionBuilder`** — the action guard: the in-flight flag, the suppressed second tap, optional
-  `Form` validation, focus handling. See [actions](actions.md).
+  `Form` validation, focus handling. See [actions](actions-and-refusal-texts.md).
 - **`dwBuildAsync` / `dwBuildListAsync`** — one rendering of loading / error / data, with skeletons
   built from your own widget. See [the data layer](data-layer.md).
 
@@ -32,20 +32,32 @@ looks like, and it is not supposed to.
 The app's button is then an ordinary app widget wrapping the guard:
 
 ```dart
-class AppButton extends StatelessWidget {
-  const AppButton.primary(this.label, {required this.onTap, ...})
-      : _variant = _AppButtonVariant.primary;
+// example/dartway_example_flutter/lib/ui_kit/theme/app_button.dart (excerpt)
+@override
+Widget build(BuildContext context) => DwActionBuilder(
+  action: onTap,
+  requireValidation: requireValidation,
+  unfocusOnTap: unfocusOnTap,
+  builder: (context, onPressed, busy) {
+    final style = _style(context);
+    final child = showProgress && busy
+        ? const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : Text(label);
 
-  @override
-  Widget build(BuildContext context) => DwActionBuilder(
-    action: onTap,
-    requireValidation: requireValidation,
-    builder: (context, onPressed, busy) => switch (_variant) {
-      _AppButtonVariant.primary => ElevatedButton(style: ..., onPressed: onPressed, child: child),
-      _AppButtonVariant.secondary => OutlinedButton(style: ..., onPressed: onPressed, child: child),
-      _AppButtonVariant.text => TextButton(style: ..., onPressed: onPressed, child: child),
-    },
-  );
+    return switch (_variant) {
+      _AppButtonVariant.primary =>
+        ElevatedButton(style: style, onPressed: onPressed, child: child),
+      _AppButtonVariant.secondary =>
+        OutlinedButton(style: style, onPressed: onPressed, child: child),
+      _AppButtonVariant.text =>
+        TextButton(style: style, onPressed: onPressed, child: child),
+    };
+  },
+);
 ```
 
 Note the variant picking a real Material widget rather than repainting one: an outlined style is
@@ -62,7 +74,7 @@ app code and carries no `Dw` prefix: `App*` where a bare name would collide with
 ## One import, one place for styles
 
 The kit is assembled through a single root file. Every component is `part of '../ui_kit.dart';`, and
-the root file gathers them with `part` directives and re-exports `dartway_flutter`. Features import
+the root file gathers them with `part` directives and re-exports `dartway_core_flutter`. Features import
 `ui_kit.dart` and nothing else from the kit — importing a component file directly is an error
 (`forbiddenUiKitImport`), because it is how a kit stops being one surface.
 
@@ -236,16 +248,15 @@ AppText.body('Issues')                   // ❌ — content, nailed into a widge
 Every DartWay project is localized. That is a requirement on the project, and a project created by
 `dartway create` arrives satisfying it: `flutter_localizations` and `generate: true` in the pubspec,
 `l10n.yaml`, `lib/l10n/*.arb` with the generated `lib/l10n/gen/` committed beside them,
-`appLocaleProvider` (the system locale by default, switchable at runtime — and by DartWay Studio over
-the bridge), `context.l10n` inside widgets, `appL10n` for the code that runs outside the tree, such as
+`appLocaleProvider` (the system language when the app supports it, English
+otherwise), `context.l10n` inside widgets, `appL10n` for the code that runs outside the tree, such as
 an error toast or a dialog raised from a handler.
 
-The law reaches as far as the app does. Text composed on the **server** — a push body, a
-transactional email — is outside it: the queue stores a finished title and body and the module sends
-them as they are, so there is no `appL10n` to reach for. That text is its own subject and does not
-have a rule yet. Saying so is the point: this paragraph used to name notification bodies among the
-examples, which promised a coverage that did not exist and left anyone reading it honestly with a
-case named and no way to satisfy it.
+The law reaches as far as the app does. Text composed on the **server** — a message body, a
+transactional e-mail — is outside it: the server has no `appL10n` to reach for. That text is its own
+subject and does not have a rule yet. Saying so is the point: a rule that seemed to cover it would name
+a case and give no way to satisfy it. (A refusal is not such text: the server sends a code, and the app
+renders it — see [refusal texts](actions-and-refusal-texts.md#refusal-texts-the-projects-catalogue).)
 
 If your app does not have that wiring, putting it in is the first thing to fix rather than something
 to live with — and nothing else will tell you: the compiler is happy and the tests pass. `dartway
@@ -257,17 +268,17 @@ and moving every string, which is why it is not decided per project.
 
 **Adding a string means running a generator.** A new key goes into every `.arb`, then `flutter
 gen-l10n` regenerates the typed `AppLocalizations`. It is the project's second and last generator —
-`serverpod generate` is the other — and like that one it is a separate CLI rather than `build_runner`,
-it runs when the `.arb` files change rather than on every save, and **its output is committed**, for
-the same reason the generated protocol is: a tree that only compiles after somebody remembers to run
+`dartway generate` is the other — and like that one it is a separate command rather than
+`build_runner`, it runs when the `.arb` files change rather than on every save, and **its output is
+committed**, for the same reason the generated protocol is: a tree that only compiles after somebody remembers to run
 a generator is broken for whoever cloned it.
 
 **A widget test carries a requirement on its environment.** A tree that renders localized text needs
 `localizationsDelegates`, `supportedLocales` **and an explicit `locale:`** — without the delegates the
 first `context.l10n` fails a null check, and without the locale the test resolves against the machine
 it runs on, so an assertion on the app's text passes for its author and fails for the next person to
-clone the repository. The skeleton puts all three in its `test/support/` harness, once, rather than in
-every test file.
+clone the repository. The skeleton's widget tests pump the app's own root widget from `test/support/`,
+which carries all three, rather than setting them in every test file.
 
 **Yes, this costs you `const`.** A widget that displays a localized string cannot be `const` — the
 value is resolved from the context at runtime. The boundary simply moves one level down: `const Icon`,
@@ -289,4 +300,4 @@ is on those two argument positions rather than on the whole line — a label sha
 font family is still a label that leaked into the kit, and is still reported.
 
 Finally: tempted to add a client-specific hack inside a framework widget? That is the signal an
-extension point is missing. Add it to your kit — do not fork `dartway_flutter`.
+extension point is missing. Add it to your kit — do not fork `dartway_core_flutter`.

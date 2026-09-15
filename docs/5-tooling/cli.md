@@ -1,156 +1,137 @@
 # What does the `dartway` command do?
 
-It is the front door and the toolbox: one command prints the whole setup instruction, one checks
-whether the machine can run any of it, one creates a project, one installs the agent toolkit into
-an existing one, one carries a project onto a newer framework, two read your code back to you, and
-one deploys the server.
+It is the front door and the toolbox of a project: one command prints the whole setup instruction,
+one checks the machine, one creates a project, two install and update the agent toolkit, one runs
+the generator, one checks the conventions, one serves the web app and the server on one origin, one
+runs the server tests on a database of their own, one deploys, and one counts lines.
 
 ```bash
 dart pub global activate dartway_cli
 ```
 
-**The complete, current option list of any command is `dartway help <command>`** — and for the nested
-ones, `dartway help deploy secret push`. That output is generated from the parser, so it cannot drift
-from the code; `dartway --help` on its own lists commands only, which is what sends people looking for
-a reference that does not need to exist. This page therefore does not restate every flag. It names the
-ones whose *meaning* is not obvious from a one-line help string — what they protect, and what happens
-if you reach for them without knowing.
+**The complete, current option list of any command is `dartway help <command>`** — and for the
+nested ones, `dartway help deploy secret push`. That output is generated from the parser, so it
+cannot drift from the code. This page does not restate every flag. It names the ones whose
+*meaning* is not obvious from a one-line help string, and states the defaults a reader has to know
+before relying on them.
 
-Or straight from the monorepo, pinned to the verified channel:
+The commands, as `packages/dartway_cli/bin/dartway.dart` registers them: `quickstart`, `doctor`,
+`create`, `setup-ai`, `update`, `generate`, `check`, `dev`, `deploy`, `stats`, `test`. A usage error
+exits `64`; a refusal the command explains exits `1`.
 
-```bash
-dart pub global activate --source git https://github.com/dartway/dartway.git \
-  --git-path packages/dartway_cli --git-ref stable
-```
+**There is no `migrate` command.** Migrations belong to the project: `dart run bin/migrate.dart
+<apply | rollback | status | create <name> | check | rehash>` in the server package, against the
+database named by `DW_DATABASE_*`. The server also applies them as it starts. See
+[Migrations](../4-server/migrations.md).
 
-The CLI does not carry the framework inside itself. `create` and `setup-ai` read the DartWay
-monorepo — a shallow clone cached in `~/.dartway/monorepo`, on the `stable` branch by default.
-`stable` is the last state that was verified end to end; `master` is the development trunk and may
-be mid-refactor. That is why the version of the CLI you installed does not decide what your
-project gets — the channel does.
+## Where the CLI takes the framework from
 
-**The harness channel follows the framework channel, and the default is only right for a project on
-the default.** A project that takes the `dartway_*` packages from `master` and installs its harness
-from `stable` gets an agent instructed in the rules of a framework it is not running — and the
-mismatch is silent, because both halves are internally consistent. It happened: a project on
-`master` carried a `stable` harness five commits behind and was told to put code in `data/` and
-`domain/`, the two folders the current layout check rejects. Take the harness from wherever the
-packages come from:
+The CLI does not carry the framework inside itself. `create`, `setup-ai` and `update` read the
+DartWay monorepo — `template/` and `toolkit/` — from one of two places:
 
-```bash
-dartway setup-ai --channel master   # a project whose pubspec points at master
-```
+- a local checkout, named by `--local-repo` or `DARTWAY_MONOREPO_DIR`;
+- otherwise a shallow clone of a branch, cached in `~/.dartway/monorepo` and refreshed with a
+  shallow fetch on every run. The branch is the **channel**: `--channel`, else `DARTWAY_BRANCH`,
+  else `stable`.
+
+That is why the version of the CLI you installed does not decide what a project gets — the channel
+does.
+
+| Variable | Meaning |
+|---|---|
+| `DARTWAY_BRANCH` | Default channel for `create`, `setup-ai` and `update` |
+| `DARTWAY_MONOREPO_DIR` | A local monorepo checkout to use instead of cloning |
+| `DARTWAY_REPO_URL` | Another monorepo git URL (default `https://github.com/dartway/dartway.git`) |
 
 ## `dartway quickstart` — the instruction, printed
 
-```bash
-dartway quickstart
-```
-
 Prints the full setup brief to stdout: what the machine needs, how to create a project, the order
-the bring-up steps come in and why, how to verify the server is actually answering, and how to hand
-over the sign-in. It writes nothing and asks nothing.
+of the bring-up steps and why, how to verify the server answers, how to hand over the sign-in, and
+the checks to run before calling a change done. It writes nothing and asks nothing.
 
-This is the framework's entry point, and the reason it is a printed text rather than an extension
-for one assistant: **whatever agent you use, its way in is two commands** —
-
-```bash
-dart pub global activate dartway_cli
-dartway quickstart
-```
-
-— after which the instruction is in that agent's context and it proceeds on its own. A plugin for
-one vendor would have made the front door of an open framework depend on a format we do not
-control, and would have left everyone else with prose to copy. The brief is deliberately shell-
-neutral: it states the step and the reason, and lets the agent phrase the command the way its own
-platform wants.
-
-It is equally readable by a human, and it is the same text an agent gets — there is no second,
-friendlier version to drift from it.
+It is a printed text rather than an extension for one assistant on purpose: **whatever agent you
+use, its way in is two commands** — `dart pub global activate dartway_cli` and `dartway
+quickstart` — after which the instruction is in that agent's context. A plugin for one vendor would
+make the front door of an open framework depend on a format nobody here controls. A human reads the
+same text; there is no second, friendlier version to drift from it. The source is
+`packages/dartway_cli/lib/src/quickstart_brief.dart`.
 
 ## `dartway doctor` — is this machine ready?
 
-```bash
-dartway doctor
-```
-
-Checks the seven things that break a first run, and prints the exact fix for each:
+Six checks, each with the exact fix when it fails:
 
 | Check | Why it is here |
 |---|---|
-| Dart `>=3.11` | The SDK running the CLI is the one that will run the project |
-| Flutter `>=3.41` | |
-| git, and a configured `user.name`/`user.email` | `create` clones the template with git and then commits the result. A missing binary is a failure; an unset identity is a warning — the project is complete either way, but its repository has no initial commit, and git says so in its own text in the machine's locale, in the middle of successful output |
-| A pub host that answers | `pub get` sets no deadline on a connection that opens and then goes quiet, so a filtered or throttled route to pub.dev surfaces as a resolve step that prints one line and hangs with no error and no exit. The probe asks for bytes rather than for a socket — a TCP connect succeeds even when the handshake after it is filtered — and honours `PUB_HOSTED_URL`, so it tests whatever pub itself would talk to |
-| A responding Docker daemon | Postgres comes from it, and there is no second path. Installed-but-stopped is reported separately from missing |
-| `serverpod_cli` matching the project's pin | The generator writes code for its own version; a drifted CLI produces a protocol that compiles and then misbehaves at runtime. Inside a project the expected version is read from the server package rather than assumed |
-| The pub global bin directory on PATH | The cause of `dartway: command not found` right after a successful install. A warning, not a failure — the fallback is `dart pub global run dartway_cli:dartway` |
+| Dart `>=3.11.0` | The SDK running the CLI is the one that runs the project |
+| Flutter `>=3.41.0` | |
+| git, with `user.name` and `user.email` | `create` commits the new project. A missing binary fails; a missing identity warns — the project is complete, but has no initial commit |
+| A pub host that answers | `pub get` sets no deadline on a connection that opens and goes quiet, so a filtered route surfaces as a resolve step that hangs without a word. The probe asks for bytes rather than a socket (a TCP connect succeeds even when the TLS handshake after it is filtered), waits 10 seconds, and honours `PUB_HOSTED_URL` |
+| A responding Docker daemon | Postgres and MinIO come from it, for development and for `dartway test`. Not installed and not running are reported apart |
+| The pub global bin directory on `PATH` | The cause of `dartway: command not found` right after a successful install. A warning: `dart pub global run dartway_cli:dartway` works regardless |
 
-Exit code 1 if anything is blocking, 0 otherwise, so an agent or a CI step can branch on it. Run it
-before `create` and again inside a project — the Serverpod check gets sharper once there is a pin
-to read.
+Exit code `1` when anything fails, `0` otherwise (warnings included), so an agent or a CI step can
+branch on it.
 
-## `dartway create <project_name>` — a project that already runs
+## `dartway create <name>` — a project that already runs
 
 ```bash
 dartway create my_app
+dartway create .          # the current, empty folder becomes the project
 ```
 
-You get three packages — `my_app_server`, `my_app_client` (generated), `my_app_flutter` — plus the
-agent toolkit in `.claude/`, and a git repository with an initial commit.
+The source is `template/` in the monorepo: a **skeleton, not somebody's product** — sign-in by a
+one-time code, profiles and roles, navigation with zone guards, an admin panel, a UI kit as source,
+tests on both sides, and no domain models. The full application on the same framework lives in
+`example/` and is a reference to read, not a project to inherit.
 
-The source is `template/` in the monorepo: a **skeleton, not somebody's product**. Phone auth with
-one-time codes, a `UserProfile` with roles, navigation with zone guards, an admin panel, a UI kit
-as source you own — and zero domain models, because the domain is the part you write. The full
-application built on the same framework lives in `example/`, and is a reference to read, not a
-project to inherit. `create` has never handed you `example/`, and deliberately so: inheriting
-somebody's fitness club means deleting their domain before writing yours.
+You get `my_app_shared`, `my_app_server` and `my_app_flutter`, the agent toolkit in `.claude/`
+and `docs/dev_notes/`, and a git repository with an initial commit.
 
 What the copy does beyond copying:
 
-- renames `dartway_starter` → your name and `DartwayStarter` → `MyApp` in every path and every
-  text file (binaries are copied verbatim);
-- skips build residue — `.dart_tool`, `build`, `.git`, `.idea`, `.fvm`, `ephemeral`,
-  `node_modules`, `pubspec.lock`;
-- strips the monorepo-only `dependency_overrides` block from every package pubspec — those
-  overrides point at sibling folders that do not exist in your project, and what is left resolves
-  from pub.dev like any other dependency.
+- renames `dartway_starter` → `my_app`, `DartwayStarter` → `MyApp`, `dartwayStarter` → `myApp` and
+  `dartway-starter` → `my-app` (the storage bucket names) in every path and every text file;
+  binary files are copied verbatim;
+- skips `.dart_tool`, `build`, `.git`, `.idea`, `.fvm`, `ephemeral`, `node_modules` and
+  `pubspec.lock`;
+- runs `dart format` over `bin/`, `lib/` and `test/` of every package — a rename changes the length
+  of names, and without this the first commit would not be formatted and `dartway generate
+  --check` would depend on where lines happened to break;
+- strips the monorepo-only `dependency_overrides` block (with the comments above it) from every
+  package pubspec. Those overrides point at sibling folders of the monorepo; in a project they lead
+  nowhere, and what is left resolves from pub.dev;
+- installs the toolkit with base branch `master` and the given `--language` and `--notes-tracker`
+  (see `setup-ai` below);
+- unless `--no-git`: `git init` (skipped when the folder is already a repository), `git add -A`,
+  and an initial commit.
 
-Stripping that block is also the moment the framework constraints are read for the first time,
-because **an overridden package has its constraints skipped entirely** — see
-[what `create` changes](../1-getting-started/project-layout.md#what-create-changes-on-the-way-in).
-Your project is where they finally have to hold, so if a `dartway create` fails to resolve, the
-version line it names is the answer rather than a mystery.
+The name must be a lower_snake_case Dart identifier without leading, trailing or doubled
+underscores, at most 55 characters — it becomes package names, and `<name>-private` has to fit the
+63 characters S3 allows a bucket. `dartway_starter` itself is refused. The target directory must not
+exist; `create` refuses rather than merging into it.
 
-The project name must be a lower_snake_case Dart identifier — it becomes three package names. The
-target directory must not exist yet; `create` refuses rather than merging into it.
+With `.` the folder names the project, the way `flutter create .` does: `dartway-demo/` becomes
+`dartway_demo`. The folder has to be empty; a `.git` in it is allowed, and the initial commit then
+lands in that repository.
 
-```bash
-dartway create .
-```
+| Option | Default | Meaning |
+|---|---|---|
+| `--channel` | `DARTWAY_BRANCH`, else `stable` | Monorepo branch to take the template and the toolkit from |
+| `--local-repo` | `DARTWAY_MONOREPO_DIR` | A local monorepo checkout instead of a clone |
+| `--framework-path` | — | Resolve the framework packages from a local monorepo checkout by path: each pubspec gets `dependency_overrides` onto `<monorepo>/packages` for exactly the `dartway_*` packages it reaches. The template and the toolkit come from the same checkout unless `--local-repo` names another |
+| `--language` | `English` | The language the project writes its own texts in — feature specs, doc comments, `docs/dev_notes/` |
+| `--notes-tracker` | `dartway/dartway` | GitHub repository where findings about the framework are filed; `none` files nothing outside the project |
+| `--[no-]git` | on | Initialize a repository with an initial commit |
 
-A dot covers the shape people actually start in — an empty folder already opened in an editor or an
-agent — and uses that folder as the project root instead of nesting one inside it. The folder then
-names the project, the way `flutter create .` does: `dartway-demo/` becomes `dartway_demo`, since a
-folder may carry dashes and a Dart package may not. A name that cannot be converted is refused with
-the reason rather than mangled.
+**`--framework-path` is how a project is built against a framework that is not published.** The
+rewrite's package family (`^0.20.0-dev.1`) is not on pub.dev yet, so a project created from this
+tree cannot resolve on its own; `--framework-path` resolves the same pubspecs against the same
+checkout the template was written against. The block it writes says to remove it once the versions
+are published.
 
-The folder has to be empty; an initialized-but-empty git repository is allowed through, since that is
-how such a folder often arrives, and the initial commit then lands in it rather than in a new one.
-
-| Option | Meaning |
-|---|---|
-| `--channel` | Monorepo branch to create from. Default `stable`, or `DARTWAY_BRANCH` |
-| `--local-repo` | Use a local monorepo checkout instead of cloning (framework development) |
-| `--language` | The language the project writes its own texts in. Default English |
-| `--notes-tracker` | `owner/repo` where framework findings are filed as issues. Defaults to the framework's own tracker; `none` files nothing outside the project |
-| `--no-git` | Skip `git init` and the initial commit |
-
-The last thing `create` prints is not a wall of commands: it points at `dartway doctor` and
-`dartway quickstart`, and says to ask whatever assistant you use to bring the project up. Every new
-project ships a toolkit that knows this stack — telling people to type `docker compose up -d` by
-hand while installing that toolkit was a contradiction. The manual sequence still exists, in the
-project's `README.md`, for anyone who wants to see what actually happens.
+The last thing `create` prints points at `dartway doctor` and `dartway quickstart` and says to ask
+whatever assistant you use to bring the project up. The manual sequence is in the project's
+`README.md`.
 
 ## `dartway setup-ai` — the toolkit in a project you already have
 
@@ -158,123 +139,93 @@ project's `README.md`, for anyone who wants to see what actually happens.
 dartway setup-ai --base-branch develop
 ```
 
-Installs or updates `.claude/` in the current project: the methodology `CLAUDE.md`, the
-`dartway-*` skills and the `commit` / `dartway-checkup` commands. It replaced the old
-`setup-claude.sh` / `.ps1` scripts, which are gone.
+Installs the agent toolkit into the project: `.claude/CLAUDE.md`, the `dartway-*` skills, the
+`/commit` and `/dartway-checkup` commands, a merged `.claude/settings.json`, and
+`docs/dev_notes/`. What each of those is, and which files the installer owns, is
+[The agent toolkit](agent-toolkit.md).
 
-It finds the project root through `git rev-parse --show-toplevel` (falling back to the current
-directory), then detects the package layout by directory suffix: `*_server`, `*_client`,
-`*_flutter` are required, `*_shared` is optional — the skeleton ships one, and a project that
-deletes it is still a valid layout. Two packages with the same suffix, or none, and
-the command stops with a layout error rather than guessing. The detected names are substituted
-into the installed markdown, so the skills speak your package names, not placeholders.
+The project root is `git rev-parse --show-toplevel`, or the current directory outside a
+repository. The layout is detected by directory suffix: exactly one `*_server` and one `*_flutter`
+are required, `*_shared` is optional; none or two of a kind stops the command with a layout error
+rather than a guess.
 
-`--language` records what the project writes its own texts in — feature specs, doc comments, its
-journal — straight into the installed `CLAUDE.md`. It defaults to English and does not touch what
-ships to other people: package APIs and error strings stay English either way.
+| Option | Default | Meaning |
+|---|---|---|
+| `--base-branch` | `master` | Base branch of **this** project, used by the commit and PR instructions |
+| `--language` | `English` | The language the project writes its own texts in. Package APIs and error strings stay English |
+| `--notes-tracker` | `dartway/dartway` | Where framework findings are filed; `none` keeps them in the project |
+| `--channel` | `DARTWAY_BRANCH`, else `stable` | Monorepo branch to take the toolkit from |
+| `--local-repo` | `DARTWAY_MONOREPO_DIR` | A local checkout instead of a clone |
 
-The install records where it came from, in `.claude/dartway-toolkit.json`: the repository, the
-channel, the commit and the CLI version, committed with the rest. The installed files themselves say
-none of that — they are the toolkit's files, so comparing them against the current toolkit answers
-*"is this behind"* and nothing about *which channel it follows*.
+**An explicit flag wins, what the project recorded comes next, the default comes last.** The install
+records its provenance and settings in `.claude/dartway-toolkit.json` — source, channel, commit, CLI
+version, and the three settings above — and a re-run without `--base-branch`, `--language` or
+`--notes-tracker` replays the recorded ones. Without that, a plain re-run would reset a project's
+language and tracker, and the diff would look like any update.
 
-That distinction has teeth, because **`--channel` defaults to `stable`**. A project deliberately
-moved to `master` is rolled back by the next plain `dartway setup-ai`, and the diff of that rollback
-is indistinguishable from the diff of an ordinary update. So when the recorded channel differs from
-the one about to be installed and `--channel` was not given, the command **refuses** and says which
-two channels are involved. Naming either one proceeds — the point is that moving between them stops
-being something a default decides, and ends up written in the command that ran.
+**A channel switch nobody asked for is refused.** When the project recorded one channel, `--channel`
+was not given, and the default is another, the command stops before fetching anything and names both
+channels. Naming either one proceeds: moving between channels is a decision, and it ends up written
+in the command that ran. A local checkout ignores the channel and records none, so it is never
+refused.
 
-It records provenance rather than content on purpose: a list of installed files or their hashes
-would be a second copy of the files, and copies drift. Where they came from is written nowhere else.
-A project installed before this existed has no manifest, and is left alone rather than blocked.
-
-`.claude/settings.json` is **merged** rather than overwritten or skipped: it pre-approves this
-stack's build commands so a first run is not a queue of permission prompts, and denies reading
-`config/passwords.yaml`. A project extends it and keeps everything it added; what the toolkit has
-gained since is added and printed, entry by entry. Written once and never touched again — what it
-used to do — meant a new `deny` rule reached no existing project at all.
-
-One thing lands outside `.claude/`: **`docs/dev_notes/`**, where this project's own findings live —
-a risk, a pin that trails, a config written down twice, one file per finding. It is **tracked, not
-git-ignored**, which is the whole design: a finding travels out in the pull request that carries it,
-it is visible in review, and it survives a `git worktree remove`. Two files are created there.
-`README.md` states the form and is refreshed on every install, since it holds nothing of the
-project's to lose; `_coverage.md` is the table `/dartway-checkup` keeps of which features it has read
-properly, and is written once and never touched again. Entries themselves are never touched at all.
-
-Two other things are **reported and not changed**. The journals this replaced (`dartway_notes.md` and
-`dev_notes.md` at the project root) are named with a pointer to the migration, because they hold
-findings nobody else has a copy of and an installer that deletes such a file is a different kind of
-tool. So are leftovers of the old shell installer (`tools/dw_claude_setup/`), with the commands to
-remove them: that folder is usually a gitlink, and taking it out means editing the git index.
-
-A finding about the **framework** gets no file anywhere — it is filed straight as an issue, and
-`--notes-tracker` names the repository it goes to. **It defaults to the framework's own tracker, and
-that default is the point.** Opting in would have meant every project deciding a question it has no
-particular reason to think about, and the projects that never got around to deciding are exactly the
-ones whose findings never left the laptop — which is the failure this mechanism exists to end.
-`--notes-tracker owner/repo` sends them somewhere else instead, for an installation that wants its
-developers' findings triaged internally first. `--notes-tracker none` files nothing outside the
-project — the finding is written into `docs/dev_notes/` like any other, without an issue line, and no
-command reaches the network.
-
-Because the default now points at a public repository, the guard rails are not optional. What the
-installed `CLAUDE.md` requires before an issue is created — the finding restated without this codebase
-in it, English, a duplicate search, and an explicit yes from a human — is in
-[The agent toolkit](agent-toolkit.md). Nothing files on its own.
-
-Only managed files are overwritten — see [The agent toolkit](agent-toolkit.md) for what that means
-and how to customize without losing your changes. Commit `.claude/` afterwards: it is a
-generated-but-committed artifact, like the Serverpod client.
-
-| Option | Meaning |
-|---|---|
-| `--base-branch` | Base branch of **this** project, used by the PR/commit skills. Default `master` |
-| `--language` | The language the project writes its own texts in. Default English |
-| `--notes-tracker` | `owner/repo` where framework findings are filed as issues. Defaults to the framework's own tracker; `none` files nothing outside the project |
-| `--channel` | Monorepo branch to take the toolkit from. Default `stable`, or `DARTWAY_BRANCH` |
-| `--local-repo` | Use a local monorepo checkout instead of cloning |
+Commit `.claude/` and `docs/dev_notes/` afterwards.
 
 ## `dartway update` — carry the project onto a newer framework
 
+`setup-ai` installs the toolkit. `update` does that and then answers the question nothing else in a
+project answers: **what else has moved.** It takes the same options, with one difference: the
+channel defaults to the one the project recorded, because "update" means moving forward on the
+channel the project is on.
+
+It reports three things and changes only the first:
+
+- **the toolkit**, installed as `setup-ai` installs it;
+- **the framework packages the project is behind on** — the version each `dartway_*` package
+  resolves in the project's `pubspec.lock` files against the version in the channel's
+  `packages/*/pubspec.yaml`. Only packages the project depends on are listed. When a project holds
+  several copies of a package (a Flutter lock and a server lock), the **lowest** is the answer: the
+  oldest half is the one still owing the migrations. A hosted package moves by raising its caret
+  (under a `0.x` major a minor behaves like a major, so `^0.4.0` does not admit `0.8.0`); a git one
+  moves by `dart pub upgrade <names>` in the directories the report names;
+- **the migration notes still to apply** — the files of `docs/migrations/` in the channel whose
+  `affects:` names a package the project is below, oldest first, each with its path. A note that
+  cannot be parsed is reported as a framework defect rather than skipped. See
+  [Migration notes](../migrations/README.md).
+
+If the CLI itself is older than the `dartway_cli` in the channel, the run says so first: an old CLI
+installs an old idea of what a project needs, and it cannot replace itself mid-run.
+
+**It edits nothing but the toolkit, deliberately.** A caret is one line, a changed API is not, and a
+command that half-applied the rest would leave a tree nobody can tell from a finished one. The
+`dartway-update` skill carries the list out: read the notes, make the edits, then move the versions,
+in that order.
+
+## `dartway generate` — the generated code
+
 ```bash
-dartway update
+dartway generate            # write
+dartway generate --check    # write nothing; exit 1 when a generated file is out of date or stale
+dartway generate -v         # list every file written or removed
 ```
 
-`setup-ai` installs the toolkit. `update` does that and then answers the question nothing else in a
-project ever answers: **what else has moved.**
+Runs `dartway_generator` over the project: DTO codecs (`*.dw.dart` parts) and the protocol registry
+(`lib/generated/dw_protocol.dart`) in `*_shared`, table definitions and the schema
+(`lib/generated/dw_schema.dart`) in `*_server`. What is generated from what is
+[Data objects and generation](../2-core/data-objects-and-generation.md).
 
-It reports three things, and changes only the first:
+**The CLI does not link the generator in; it runs the one the project resolved.** The generator
+pins an `analyzer`, and a globally activated CLI carrying it would force one analyzer on every
+project it touches — while the generator has to match the `dartway_core_shared` and `dartway_orm`
+the project builds against. So the command walks up to the directory holding the `*_server` and
+`*_shared` packages, looks for `dartway_generator` in their package config (the server package
+first, where the skeleton declares it as a dev dependency), and runs `dart run dartway_generator`
+there. Only when no package resolves it does it fall back to a globally activated
+`dartway_generator`; without either it stops and says how to add one. Run `dart pub get` first: an
+unresolved package has no package config to find the generator in.
 
-- **the toolkit**, installed — from the channel the project is already on. Unlike `setup-ai`, the
-  default here is the recorded channel rather than `stable`: "update" means move forward on my own
-  channel, and a project deliberately put on `master` must not be carried backwards by a command
-  run without arguments. The recorded `--language`, `--base-branch` and `--notes-tracker` are
-  replayed the same way; an explicit flag still wins over both.
-- **the framework packages** the project is behind on — the version it resolves against the version
-  the channel has, per `pubspec.lock`, with the instruction split by source. A hosted package moves
-  by raising a caret (under a `0.x` major a minor behaves like a major, so `^0.4.0` does not admit
-  `0.8.0`); a git one moves by `dart pub upgrade` naming it, because a git dependency is pinned when
-  it is added and shows no version anywhere a person reads.
-- **the migration notes still to apply** — the framework changes that ask this project to edit its
-  own code, read out of `docs/migrations/` in the channel and filtered by the versions this project
-  is actually on. See the synchronisation law, point 7.
-
-**It edits nothing but `.claude/`, deliberately.** The toolkit is a generated artifact whose whole
-update is a copy; a caret is one line but a changed API is not, and a command that half-applied the
-rest would leave a tree nobody can tell apart from a finished one. The `dartway-update` skill in the
-toolkit is what carries the list out — read the notes, make the edits, then move the versions, in
-that order.
-
-The versions come from the lock files rather than the pubspecs, which is what makes a project on git
-dependencies answerable at all: pub writes the pinned commit's own `version:` into the lock, so a
-project showing no version anywhere still states which release it is standing on. Where a project
-holds several copies of one package — a Flutter lock and a server lock — the **oldest** is the
-answer, because it is the oldest half that still owes the migrations.
-
-If the CLI itself is behind what the channel has, the run says so first: an old CLI installs an old
-idea of what a project needs, and it cannot replace itself mid-run.
+The exit code is the generator's. `--check` is what CI runs, and what `dartway check` reports as
+`generatedCodeStale`.
 
 ## `dartway check` — the conventions, enforced
 
@@ -282,358 +233,117 @@ idea of what a project needs, and it cannot replace itself mid-run.
 dartway check
 dartway check --type forbiddenUiUsage
 dartway check --level error
-dartway check --dir lib/app/booking
+dartway check --dir lib/app/invoices
 ```
 
-Runs the built-in convention checks over the Flutter package and prints a per-feature report with
-a grade for every feature. Errors fail the run (exit 1); warnings and infos are advisory. Run it
-from the project root or from inside the `*_flutter` package — both work.
+Runs the convention checks from the project root or from inside the `*_flutter` package: the
+Flutter package, the declared top level of both packages, localization wiring, generated code,
+migrations and framework locks. Exit `1` when any error-severity finding is reported, `0` otherwise.
 
-What it checks, and why those checks exist, is a page of its own:
-[The conventions checker](conventions-checker.md).
+| Option | Meaning |
+|---|---|
+| `--type` | One check by name (case-insensitive); an unknown name is a usage error |
+| `--level` | Only checks of one severity: `info`, `warning` or `error` |
+| `--dir` | Only one folder of the Flutter package (relative to it); skips every project-wide pass |
 
-## `dartway test` — the server tests, on a database that belongs to the run
-
-```bash
-dartway test                        # from the project root
-dartway test -- --name 'auth'       # everything after -- goes to `dart test`
-dartway test --keep                 # leave the container up to look inside it
-```
-
-Starts a Postgres container for this run, waits until it accepts connections, runs the server
-package's tests against it, and removes it afterwards — including when you interrupt the run.
-The coordinates reach the suite as `SERVERPOD_DATABASE_HOST/PORT/NAME/USER/PASSWORD`, which
-Serverpod applies over `config/test.yaml`. The image is the one the project's own compose file
-uses for development, so the tests do not run on a different Postgres major than the code is
-written against; `--image` overrides it.
-
-**No host port is named**, which is the point. A test database declared as a compose service is
-shared, named, long-lived and on a fixed port, and all four are wrong for it:
-
-- **Fixed** meant every project created from the template asked for the same port. The second
-  container up does not get it and *does not fail either* — Docker starts it with the port
-  unpublished — so the suite connects to the neighbouring project's database. Where the schemas
-  are close enough for migrations to apply, the run is green having verified nothing.
-- **Long-lived** meant rows outlived the run that wrote them. The service declared no volume, on
-  the stated grounds that a surviving test database is a liability — but the `postgres` image
-  declares an anonymous one and Compose keeps it. The symptom arrives as arithmetic
-  (`Expected: <2>, Actual: <3>`), several hypotheses away from its cause.
-
-Both stop existing when the database is created per run: there is no port to lose and nothing to
-survive. `docker compose up -d` still brings up the development database and object storage; it
-no longer has anything to do with tests.
-
-Widget tests in the `*_flutter` package need no database and are not this command's business —
-`flutter test` runs them.
+What each check means, which ones fail, and why is [The conventions checker](conventions-checker.md).
 
 ## `dartway dev` — the web app and the server on one origin
 
 ```bash
-dartway dev web                                   # from the project root: flutter run + the proxy
+dartway dev web                                  # flutter run -d web-server + the proxy
 dartway dev web --api http://localhost:8080 -- --profile   # after -- goes to `flutter run`
 
-dartway dev proxy                                 # the origin alone, in front of servers you run
-dartway dev proxy --web http://localhost:5000     # a `flutter run -d web-server --web-port 5000`
-dartway dev proxy --web-dir my_app_flutter/build/web   # a built app instead
+dartway dev proxy                                # the origin alone, in front of servers you run
+dartway dev proxy --web http://localhost:5000    # `flutter run -d web-server --web-port 5000`
+dartway dev proxy --web-dir build/web            # a built app instead
 ```
 
-The server answers no CORS, on purpose: a deployed web app reaches `/dw/*` and `/health` on its own
-origin, because the front Nginx serves the app and proxies those paths beside it. `flutter run -d
-chrome` breaks that on a laptop — the app is served from a port of its own and every call is
-cross-origin. `dartway dev` restores the deployed shape locally: **one origin,
-`http://localhost:8000` by default**, where `/dw/*` (the `/dw/live` socket included) and `/health`
-go to the server and everything else goes to the web app.
+**The server answers no CORS, in development too** (D-039). A deployed web app reaches `/dw/*` and
+`/health` on its own origin, because the front proxy serves the app and proxies those paths beside
+it — see [Deploying the server](deploy.md). `flutter run -d chrome` breaks that on a laptop: the app
+is served from a port of its own and every call is cross-origin. `dartway dev` restores the deployed
+shape: **one origin, `http://localhost:8000` by default**, where `/dw/*` (the `/dw/live` socket
+included) and `/health` go to the server and everything else to the web app.
 
-`dev web` runs `flutter run -d web-server` in the `*_flutter` package on a free port, compiled with
-`--dart-define=DW_BACKEND_URL=http://localhost:8000`, starts the proxy in front of it, and prints the
-address to open once Flutter's server is up. **Open that address, not the one Flutter prints.** Hot
-reload works through the proxy — Flutter's own socket is forwarded like any other. Ctrl+C (or `q`)
-stops Flutter and the proxy together. The Flutter command is the project's FVM SDK when one is
-linked (`.fvm/flutter_sdk`), `fvm flutter` when `.fvmrc` pins a version, `flutter` otherwise;
-`--flutter` names another.
+Both subcommands take:
 
-`dev proxy` is the same origin without Flutter: point `--web` at a web dev server you run yourself,
-or `--web-dir` at a build. A build is served the way the web image serves it — `index.html` for any
-path that is not a file, and the `Cache-Control` of the project's own `nginx.conf` (the template's
-rules when there is none), with an `ETag` — so what the browser keeps locally is what it keeps after
-a deploy.
+| Option | Default | Meaning |
+|---|---|---|
+| `--port`, `-p` | `8000` | Port of the origin to open in the browser |
+| `--api` | `http://localhost:8080` | The running server |
+| `--api-path` | — | A project door (a `DwRoute` path such as `/mcp`) that goes to the server too. Repeatable. In production such doors live on the API host, which proxies everything; locally they share the one origin, so the proxy has to be told |
 
-**Why no `DW_ALLOWED_ORIGINS` is needed.** The server lets a browser open the live socket when the
-page's `Origin` is the host the request was sent to. Through the proxy the page's origin is
-`http://localhost:8000`, and the proxy passes the browser's `Host: localhost:8000` on unchanged —
-what the deployed Nginx does with `proxy_set_header Host $http_host` — so the two match. A proxy that
-rewrote `Host` to the server's own address would make every browser socket cross-origin.
-`X-Forwarded-For`, `X-Real-IP` and `X-Forwarded-Proto` are added as Nginx adds them. Sockets pass
-through as bytes, so frames and close codes arrive as the server sent them.
+**`dev web`** runs `flutter run -d web-server --web-port <free port> --web-hostname localhost
+--dart-define=DW_BACKEND_URL=<the proxy origin>` in the `*_flutter` package, starts the proxy in
+front of it, and prints the address once Flutter's server is up. **Open that address, not the one
+Flutter prints.** Hot reload works through the proxy. Ctrl+C stops Flutter and the proxy together.
+The Flutter command is `--flutter` when given, otherwise the project's FVM SDK
+(`.fvm/flutter_sdk`), `fvm flutter` when `.fvmrc` pins a version, and `flutter` from `PATH`.
+
+**`dev proxy`** is the same origin without Flutter. `--web` (default `http://localhost:5000`) points
+at a web dev server you run; `--web-dir` at a build, served the way the web image serves it —
+`index.html` for any path that is not a file, the `Cache-Control` of the project's own web image
+configuration (the skeleton's rules when there is none), and an `ETag`. The two options exclude each
+other.
+
+**Why no allowed-origins setting is needed.** The server lets a browser open the live socket when
+the page's `Origin` names the host the request was sent to. The proxy passes the browser's `Host`
+through unchanged — as the deployed Nginx does with `proxy_set_header Host $http_host` — so the page
+origin `http://localhost:8000` and the host `localhost:8000` match. `X-Forwarded-For`, `X-Real-IP`
+and `X-Forwarded-Proto` are added as Nginx adds them; upgraded sockets are tunnelled as bytes.
 
 Two things to know:
 
 - **`localhost` and `127.0.0.1` are different origins** to a browser. The app is built against the
   origin the command prints; opened under the other name, its calls are cross-origin again.
-- **The server is started separately**, as usual. Until it listens, the proxy answers `/dw/*` with
-  `502` and says once in the terminal that nothing answers; calls go through as soon as it is up.
+- **The server is started separately.** Until it listens, the proxy answers its paths with `502` and
+  says so once in the terminal; calls go through as soon as it is up.
 
+## `dartway test` — the server tests, on a database of their own
 
-Project doors (`DwRoute` paths such as `/mcp` or `/github`) are not app routes, so the proxy is told about them: `--api-path /mcp --api-path /github` (repeatable) sends those prefixes to the server too — in production they live on the API host, which proxies everything.
+```bash
+dartway test                        # from the project root
+dartway test -- --name 'sign-in'    # everything after -- goes to `dart test`
+dartway test --keep                 # leave the containers up to look inside them
+```
+
+Starts a Postgres and a MinIO for this run on ports Docker picks, waits until both accept
+connections, runs `dart test` in the server package with `DW_DATABASE_*` and `DW_STORAGE_*` in its
+environment, and removes both containers afterwards — Ctrl+C included. Each test file then creates
+a database and buckets of its own.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--keep` | off | Leave the containers running and print how to reach and remove them |
+| `--image` | `postgres:17-alpine` | Postgres image — the one a deployment runs |
+| `--[no-]storage` | on | Start MinIO beside Postgres; `--no-storage` for a server without uploads |
+| `--storage-image` | `minio/minio:RELEASE.2025-09-07T16-13-09Z` | MinIO image — the one a deployment runs |
+
+Why a database per run rather than a compose service, and how a suite uses it, is
+[Testing](testing.md).
 
 ## `dartway deploy` — the server, without a folder of shell scripts
 
 ```bash
-dartway deploy setup --env staging          # once per server, and again for a template change
+dartway deploy setup --env staging
 dartway deploy check --env staging
-dartway deploy run --env staging
-dartway deploy secret push --env production
+dartway deploy run   --env staging
+dartway deploy secret set SMS_API_TOKEN --env staging
 ```
 
-Deployment is described by two files, and they do not overlap. `<project>_server/config/<env>.yaml`
-is the Serverpod configuration you already maintain — domains, ports, database. `deploy/config.yaml`
-adds only what Serverpod has no concept of: the host, the login, the repository and branch, the
-certificate contact, and the domain serving the Flutter build. The CLI **reads** the Serverpod file;
-it never rewrites it. That is the whole reason the pair stays honest — there is no second copy of a
-domain to drift.
+`setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys,
+`check` asserts that a deployment would work without changing anything, and `secret` manages the
+secret store on the server (`init`, `set`, `list`, `put-file`, `push`, `pull`). Everything is
+described by `deploy/config.yaml`. The whole story is [Deploying the server](deploy.md).
 
-`setup` is what turns a bare server into one this project can be deployed to, and it is the only
-subcommand that writes infrastructure: base packages and Docker, the unprivileged deployment user, the
-secret store with the random-string credentials generated in place, the repository checkout, the
-rendered `docker-compose.yml` and `nginx.conf`, the `.env` Compose reads, the firewall, and a
-one-day self-signed certificate so Nginx can start at all — the real one cannot be issued until Nginx
-is answering the challenge, and the first `run` replaces it.
-
-**Idempotent throughout, and that is a feature rather than a disclaimer:** every step either finds
-what it needs or creates it, and none replaces a value that already exists, so re-running it against a
-live server is the supported way to pick up a change to the rendered templates. Two things stop it
-rather than proceeding. A private repository over SSH needs a key the server owns — generated *on* the
-server, so the private half never exists anywhere else — and setup halts with the public half printed,
-asking for it to be registered as a **read-only** deploy key: the server only ever fetches, and a
-writable key turns access to the box into access to the repository. And if the server already carries a
-data volume under a different name than the rendered configuration would use, it refuses outright
-instead of starting the stack — Compose would otherwise create an empty database beside the real one
-and serve it, which looks like a successful deploy of an application that has lost everything.
-
-`check` changes nothing and answers whether a deployment would work. One set of assertions runs over
-the working copy and another over the network — including that every `publicHost` resolves to the
-deployment host, which is the mistake that otherwise burns a Let's Encrypt rate limit before anyone
-notices. With the server unreachable it degrades: the SSH check fails, the rest report as skipped.
-
-**The current list is what the command prints**, each with its stable id, and it is not counted here
-on purpose: a number maintained by hand is a second copy of something the code already knows, and
-this one had already fallen a check behind before anybody noticed.
-
-Three of the local assertions are about whether the images build at all. The rendered compose file builds both of them
-from the project root — `<project>_server/Dockerfile` and `<project>_flutter/Dockerfile`, named by
-convention rather than configured — so a project that never wrote one fails on the server, after the
-checkout has already moved.
-
-The second reads the package graph, because the images copy package directories **by name** and the
-name has to be written down in two more places than the pubspec: the `COPY` lines, and the
-allow-list of a `.dockerignore` that denies by default. A package missing from the first fails inside
-the image as `pub get` exit code 66, three layers from the cause; missing from the second, the `COPY`
-fails outright. Neither is visible in a checkout — there the path resolves — so the two facts meet
-the first time somebody deploys, by which point the change is several merges back. `COPY . .` is
-read as taking everything and passes; `COPY --from=<stage>` is not a context read and does not count
-as one.
-
-The third is the shape of the server image's `ENTRYPOINT`: migrations
-run as `docker compose run backend … --apply-migrations`, and shell form ignores appended arguments,
-so an unnoticed shell form turns every migration into an ordinary server start that reports success.
-The template ships the canonical pair; `server_entrypoint` remains the escape for an image you did
-not write.
-
-The web image gets one build argument, `DW_BACKEND_URL`, and it comes from `publicHost` in the
-Serverpod configuration. A web build compiles the API address into itself, so something has to
-supply it — having the deploy do it is what keeps the domain written down once. The template's
-`main.dart` reads it through `String.fromEnvironment` and falls back to localhost for a local run.
-
-**What the web image is allowed to let a browser keep is the other half of that image, and it fails
-silently.** A Flutter web build hashes nothing: `index.html`, `flutter_bootstrap.js`, `flutter.js`,
-`main.dart.js`, `main.dart.wasm` and everything under `assets/` are named identically in every
-build. The rule everyone reaches for — "fingerprinted assets are immutable, cache them for a year"
-— is correct for a bundler that puts a content hash in the name, and lands here on precisely the
-files that change on every deploy. A browser that took one under a long `max-age` does not ask
-again: it keeps running the previous build while the server serves the new one, with nothing to
-see on either side. It is the shape of failure a deploy cannot report, because from the deploy's
-point of view everything worked.
-
-So the template ships the serving configuration rather than leaving each project to invent one —
-`<project>_flutter/nginx.conf`, copied into the image by the Dockerfile beside it. It serves
-everything a build emits with `Cache-Control: no-cache` (the copy is kept and merely has to be
-confirmed, which with an ETag is a 304 rather than a download) and reserves the long-lived,
-immutable rule for names that genuinely carry a content hash.
-
-Two assertions guard it, and they ask different questions. `web-cache-policy` reads the
-configuration the web image is built with — the file it copies, or a heredoc written straight into
-the Dockerfile — resolves each Flutter entry point through Nginx's own `location` precedence, and
-warns when one of them would be served for reuse without revalidation. It warns rather than
-blocks: reading configuration text can miss an include outside the build context or a header some
-front proxy adds. `web-cache-headers` asks the deployed site itself, over HTTPS, exactly as a
-browser would, and errors on what it actually receives — there is nothing left to interpret in a
-response header. A path that answers 404 is not part of that build and says nothing about caching.
-
-**Fixing the configuration does not reach a browser that already holds a copy.** A response taken
-under `max-age=2592000` stays fresh there for the rest of the thirty days and the browser will not
-ask; no server-side change is capable of reaching it. Tell whoever you can reach to hard-reload or
-clear site data, and for the rest either wait the window out or move the app to a URL that was
-never poisoned. That asymmetry — cheap to prevent, impossible to revoke — is why these two
-assertions exist at all.
-
-`deploy/compose.override.yml` is where a project adds what a standard deployment does not have, and
-a third local assertion guards the one thing that does not belong in it: a `build` block for the
-`web` service. Overriding `web` for a label or a limit is fine, but building it there means naming
-the API address a second time, and nothing compares the two copies — the image keeps building
-successfully against yesterday's API, which is the failure mode with no error message. A warning
-rather than an error, because only the build block reintroduces the duplicate.
-
-The override is **never copied to the server**. Every Compose call the CLI issues names it explicitly
-— `docker compose -f docker-compose.yml -f deploy/compose.override.yml …` — so the file being merged
-is the one in the checkout, which `git reset --hard` refreshes on every deploy. It used to be copied
-to `docker-compose.override.yml` beside the rendered file, and the price was a second copy that a
-deploy silently preferred over the committed one for as long as `setup` was not re-run.
-
-**A two-line bridge is written under that name instead.** Naming the override on every call is
-airtight inside the CLI and nowhere else: `docker compose up -d` — the command in every runbook and
-every habit — applies a strictly smaller stack in a directory that holds only the rendered file, and
-exits 0, because from Compose's point of view nothing is missing. A staging stand lost its `minio`
-that way and stayed down for eleven hours. So the deploy writes
-
-```yaml
-# dartway-bridge: written by dartway deploy. Do not edit.
-include:
-  - deploy/compose.override.yml
-```
-
-which Compose loads on its own and which holds no content to go stale. The CLI's own calls are
-untouched: explicit `-f` flags replace the default file selection outright, so this file is read
-only by the command a person types.
-
-A file already sitting under that name and **not** carrying the marker — a stale copy, or a hand
-edit made while debugging — is moved to `docker-compose.override.yml.retired` rather than deleted.
-And where `deploy/compose.override.yml` is absent from the checkout there is nothing to bridge to:
-the deploy **refuses**, because that file may be the only place its services are declared and
-removing it would be pure subtraction. A bridge left pointing at an override the project has since
-deleted holds nothing and is removed.
-
-**An upstream no service answers to stops the deploy before the restart does.** A snippet under
-`deploy/nginx.d/` names Compose services as backends — `proxy_pass http://minio:9000` — and nothing
-used to check that those services are in the stack. Nginx resolves an upstream **once, when it
-starts**, so the mismatch is not felt at the deploy that introduced it: the proxy keeps running on
-addresses resolved long ago, and the configuration it has not read yet sits there as deferred
-failure. What cashes it in is `restart-proxy`, the deploy's own last step, at the moment an operator
-is looking at an unrelated change. On the u90 stand the nginx container had been up for ten days and
-had never once parsed the snippet written on day five.
-
-The invariant is checked in two places, because they answer different questions. `deploy check`
-reads the working copy — the rendered stack plus `deploy/compose.override.yml` — and fails on a
-snippet naming anything else; that is cheap and catches it before anyone travels. The `check-upstreams`
-step then asks the **server**, between `up` and `restart-proxy`, using `docker compose config
---services` on the stack that was really applied: the checkout can be right while the invocation was
-not, which is exactly what happened. Nothing is restarted when they disagree, and the message names
-the service.
-
-Addresses, fully qualified names, `localhost`, nginx variables and aliases the file defines through
-its own `upstream` block are not services and are not reported — a check that flagged them would be
-switched off within a week.
-
-`run` updates the checkout, writes the bridge, rebuilds, applies migrations, checks the upstreams,
-issues the TLS certificate and restarts, then polls every public URL. The bridge is written **after** the checkout update: it judges the revision this
-deploy is applying, and a deploy that itself introduces the override must not be refused on a tree
-that does not have it yet. It does not render `docker-compose.yml` or `nginx.conf` — a deploy that re-renders
-infrastructure on every push turns a routine change into an infrastructure one.
-
-**The certificate is issued by the deploy, and it is the only place that can.** `setup` writes a
-one-day self-signed file so that Nginx starts, and the compose stack runs `certbot renew` — which
-renews lineages certbot already manages and knows nothing about a file openssl wrote. For a long
-time that left nobody issuing anything: a stand built exactly by the book served an expired
-self-signed certificate, and the smoke test failed on every endpoint while pointing at container
-logs that had nothing to say. The step sits after `up`, because the ACME challenge is answered by
-the Nginx this deploy has just started, and before the restart, which is what makes Nginx read what
-arrived. It asks one question — does certbot manage this lineage — and does nothing when the answer
-is yes, so a routine deploy does not spend a rate-limited issuance every time. One certificate
-covers every served name, because the rendered Nginx names a single certificate in all four of its
-`server` blocks.
-
-**The migration step prints what the container said, and fails on it.** It used to print its title
-and nothing else, because a step's output was shown only when its exit code was non-zero — and this
-particular exit code cannot be asked. Serverpod wraps the whole apply in a `try`/`catch`: a failure
-sets `verified = false`, and `verified` aborts the process **only in development**. Outside it the
-failure is swallowed, the maintenance role ends with the exit code it started with, and a container
-that applied nothing exits 0 exactly like one that applied everything. So "we deployed" stopped
-implying "the schema caught up": the application went on running new code against an old schema, the
-deploy log said nothing, and re-running it produced the same green step and the same broken schema.
-
-The outcome is only ever stated in the text, so the text is now read and shown. `Applied database
-migration:` with the versions, or `Latest database migration already applied.`, passes. Any of
-`Failed to apply migration <version>.`, `Failed to apply database migrations.` or Serverpod's own
-`The database does not match the target database:` fails the step — the last of those being the case
-where nothing threw and the schema still did not catch up. So does silence: a container that exits 0
-without mentioning the schema never reached the migration code, which usually means an `ENTRYPOINT`
-in shell form (see `server_entrypoint`). A failed step stops the deploy before `up`, so the previous
-version keeps serving while you read the reason, which is quoted in the log along with what to run
-next.
-
-There is deliberately no separate schema assertion in `deploy check`. The authoritative comparison
-already runs inside the migration container — Serverpod checks the live schema against the target
-definition table by table on every maintenance start — and the fix was to stop discarding its
-verdict, not to add a second one. A `check` that compared `migration_registry.txt` against the
-`serverpod_migrations` table would compare two version strings rather than a schema, go green on a
-database whose row says the right version while a table is missing, and answer before the deploy has
-run at all: green exactly where the deploy is red.
-
-`secret` moves credentials between the maintainer's `passwords.yaml` and a server, one environment
-at a time: `push` sends `shared` plus that environment, `pull` brings back what the server has and
-the file lacks, `list` shows names only. `set` stores one value, `put-file` uploads a whole file — a
-service-account JSON and the like, which reaches the container only once it is also named under
-`requires.files` — and `init` creates the store and fills in the keys that are just
-random strings, which `setup` has already done by the time you would think to run it. Values travel on
-stdin, never as arguments, so they appear in neither shell history nor a remote process list. Two
-guards refuse a push that would lose information — one for keys the server has and the file does not,
-one for values the file would blank. Both are overridable by the flags below, neither is silent.
-
-Every subcommand takes `--env <environment>` and refuses to guess when it is missing — it answers with
-the environments `deploy/config.yaml` actually declares. All of them also accept `--as <login>` and
-`--identity <key>` for the SSH connection, defaulting to `ssh_user` from the config and to your agent.
-The rest are the flags worth knowing before you need them:
-
-| Subcommand | Flag | What it is for |
-|---|---|---|
-| `setup` | `--dry-run` | Print the rendered `docker-compose.yml` and `nginx.conf`, and what would be uploaded beside them, without touching the server. The way to review a template change |
-| `check` | `--local` | Skip DNS and the server; assert over the working copy only. The form that needs no SSH key and no host yet — every working-copy assertion still runs, the network ones report as skipped |
-| `run` | `--dry-run` | Print the plan and change nothing |
-| `run` | `--skip-git-update` | Deploy what is already checked out on the server, without fetching. For a rebuild of the same commit — and the flag to suspect when a deploy "did not pick up" a push |
-| `secret push` | `--dry-run` | Report what would be sent, send nothing |
-| `secret push` | `--prune` | Allow dropping keys the server has and `passwords.yaml` does not. Off by default: the usual cause of that difference is a local file that is behind, not a server holding junk |
-| `secret push` | `--allow-emptying` | Allow replacing a value the server has with an empty one. Off by default, for the same reason from the other direction |
-| `secret pull` | `--dry-run` | Report what would change locally, write nothing |
-| `secret set` | `--section` | Which `passwords.yaml` section to write to. Defaults to the environment; `shared` is for values common to every run mode |
-| `secret put-file` | `--name` | Name to store the file under, if not its basename |
-
-| Key in `deploy/config.yaml` | When you need it |
-|---|---|
-| `host`, `ssh_user`, `deploy_user`, `os` | always |
-| `repo`, `branch` | always |
-| `ssl_email`, `web_app_domain` | always |
-| `requires.secrets` | to have `check` catch a credential nobody delivered. Short values only — a token, an identifier, a password |
-| `requires.files` | a credential that is a whole document — a service-account JSON, an `.env` for an integration. It belongs here rather than in `passwords.yaml` whatever its length: that file is the master copy of every environment's secrets, and an unquoted value starting with `{` is read by YAML as a mapping rather than as text. Each entry is delivered with `secret put-file` and **mounted read-only at `/app/config/<name>`** in the server container, beside `passwords.yaml` — the application reads it as `config/<name>`, the same path it reads locally. `check` asserts the mount, not the delivery: it asks the server for the configuration Compose will actually run and looks for the file in it, because "the file is on the machine" is green exactly where the deploy is red. An entry is a file name, not a pattern or a path — a mount names one path on each side |
-| `registry_mirror` | pulling base images through a mirror |
-| `firewall_ports` | a port beyond SSH, 80 and 443 |
-| `server_entrypoint` | only when the Dockerfile declares `ENTRYPOINT` in shell form — that form ignores the arguments `docker compose run` appends, so migrations would silently start an ordinary server instead. Setting it is also what tells `check` the shell form is deliberate |
-
-## `dartway stats` — what actually grew this week
+## `dartway stats` — what actually grew
 
 ```bash
 dartway stats
 ```
 
-Files, total lines, average, max and min per top-level area of the Flutter package (`app*`,
-`auth*`, `common*`, `admin*`), plus a total. No grades, no opinions — it is the counter you check
-before and after a refactor, or on Friday, to see where the code went.
-
-## Environment variables
-
-| Variable | Meaning |
-|---|---|
-| `DARTWAY_BRANCH` | Default channel for `create` / `setup-ai` / `update` (for `update`, only where the project has no recorded channel) |
-| `DARTWAY_MONOREPO_DIR` | Local monorepo checkout to use instead of cloning |
-| `DARTWAY_REPO_URL` | Override the monorepo git URL |
-
-The clone is cached in `~/.dartway/monorepo` and refreshed with a shallow fetch on every run, so
-the second `create` on a machine costs a fetch rather than a clone.
+Files, total lines, average, maximum and minimum per top-level folder of the Flutter package's
+`lib/` whose name starts with `app`, `auth`, `common` or `admin`, plus a total. No grades and no
+opinions: the counter you read before and after a refactor. Run it from the project root or inside
+the `*_flutter` package.

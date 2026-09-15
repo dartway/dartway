@@ -2,7 +2,8 @@
 
 `dartway check` looks at the things the analyzer and the lints cannot see. The analyzer reads a
 file; the checker reads the **project**: which folder is a feature, who imports whose internals,
-whether a screen styles itself, whether an asset path leads anywhere. All of that compiles. Some
+whether a screen styles itself, whether an asset path leads anywhere, whether the generated code
+still matches its sources and the migrations still produce the schema. All of that compiles. Some
 of it fails at runtime, some of it never fails and just rots.
 
 Three examples of what nothing else catches:
@@ -10,11 +11,12 @@ Three examples of what nothing else catches:
 - a file spelling out `assets/icons/lock.png` when no such file exists — the code compiles and the
   screen renders a blank where the image was;
 - one feature importing another's `widgets/` — perfectly valid Dart, and the boundary is gone;
-- `Theme.of(context).textTheme.bodySmall` in a screen — ordinary Flutter, and the reason your app
-  has two greys.
+- a data object with a field its generated codec does not know — it compiles, starts and travels
+  without that field.
 
 The checker is not a second analyzer. It exists because DartWay's structural conventions are the
-part of the framework that a compiler has no opinion about.
+part of the framework a compiler has no opinion about. The code is
+`packages/dartway_cli/lib/src/checker/` and `packages/dartway_cli/lib/src/commands/check_command.dart`.
 
 ## Where a rule belongs: the deciding question
 
@@ -26,27 +28,22 @@ is decidable without understanding what the code means**.
 |---|---|---|
 | decidable from the shape of an expression | `dartway_lints` (a `custom_lint` rule, live in the IDE) | is this a raw `Color` outside `ui_kit/`? |
 | decidable from the shape of the project | `dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
-| **only decidable by reading the meaning** | `/dartway-checkup` | is this string something a *user* reads, or is it an identifier, a key, a date pattern? |
+| **only decidable by reading the meaning** | `/dartway-checkup` | is this string something a *user* reads, or an identifier, a key, a date pattern? |
 
 The third row is the one worth defending. `'Issues'`, `'issues/board'` and `'dd.MM'` are the same
 shape and different things, so a mechanical rule about hardcoded text can only guess — and a guessing
-rule grows an exception list with every complaint until somebody turns it off. That is not
-hypothetical: `uiKitContainsText` carries nine hand-grown exceptions today — the ninth being the
-`fontFamily` / `fontFamilyFallback` argument positions, where the string is a typeface the platform's
-font matcher reads and nobody else does, with nowhere to be moved to since the kit is exactly where
-fonts belong — and it survives only because its scope is narrow enough for the guess to be safe (a
-kit file has no content to speak of). Widened to features, the same rule would be noise.
+rule grows an exception list with every complaint until somebody turns it off. `uiKitContainsText`
+carries such a list (paths, interpolations, date patterns, typeface names in the `fontFamily` and
+`fontFamilyFallback` positions) and survives only because its scope is narrow enough for the guess to
+be safe: a kit file has no content to speak of. Widened to features, the same rule would be noise.
 
-That last exception is positional rather than per line, and deliberately so: the literal in the
-`fontFamily` argument is stepped over and the reading continues, so a real label sharing the line is
-still found. An exemption that swallows the whole line is how a rule stops firing without anyone
-noticing.
+The typeface exemption is positional rather than per line, deliberately: the literal in that argument
+is stepped over and the reading continues, so a real label sharing the line is still found. An
+exemption that swallows the whole line is how a rule stops firing without anyone noticing.
 
 A rule that needs understanding is not a weaker rule. It is a rule for a reader.
 
 ## Three commands, and none of them implies the others
-
-A DartWay project has three separate gates, and each has to be run by name:
 
 ```bash
 flutter analyze            # the analyzer and the lint set
@@ -54,326 +51,271 @@ dart run custom_lint       # DartWay's own rules
 dartway check              # the structural conventions
 ```
 
-**`flutter analyze` does not execute `custom_lint` plugins.** This trips everyone once: `dartway_lints`
-is declared in `pubspec.yaml`, `custom_lint` is listed under `analyzer: plugins:`, the IDE underlines
-violations — and a CI running only `flutter analyze` reports a clean build while enforcing none of it.
-A real project shipped that way for months; the code turned out to be clean, but nothing had been
-guarding it.
+**`flutter analyze` does not execute `custom_lint` plugins.** The skeleton declares `dartway_lints`
+and lists `custom_lint` under `analyzer: plugins:`, the IDE underlines violations — and a CI running
+only `flutter analyze` reports a clean build while enforcing none of it.
 
-**A project's CI runs all three, plus its tests.** Not because CI is a virtue, but because these are
-the checks the project has already declared: a rule configured and not executed is worse than a rule
-absent, since it reads as covered. Two consequences worth stating outright:
+The skeleton ships no CI workflow of its own. **A project that adds one runs all three, plus its
+tests** — not because CI is a virtue, but because these are the checks the project has already
+declared, and a rule configured and not executed reads as covered. If a package has a `test/` folder,
+CI runs it: a suite excluded from CI stops compiling, and nobody learns that from the exclusion.
 
-- **if a package has a `test/` folder, CI runs it.** A suite excluded from CI stops compiling, and
-  nobody learns that from the exclusion comment. One project's server tests — including the suite
-  proving one tenant cannot read another's data — had never run; the first CI run that saw them
-  found a test that only passed on the author's operating system;
-- **"it does not compile against the new API" is a red CI, not a note in a workflow file.**
+## What `dartway check` runs
 
-## What the report looks like
+From the project root or from inside the `*_flutter` package, in this order:
 
-The report is organised **per feature**, not as a flat list of lines. A large project should read
-as a list of features to fix, not as a wall to scroll past.
+1. **the declared top level** of the Flutter package and the server package (`invalidTopLevelLayout`);
+2. **localization wiring** (`l10nNotWired`);
+3. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
+   (`generatedCodeStale`);
+4. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
+5. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
+6. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
+   in the zones and `shared/` — the other sixteen checks.
+
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 6 and skips
+steps 1–5 and the UI kit pass: each of those judges a whole package or the whole project, and has
+nothing to say about one folder. `--type <check>` runs one check by name; `--level
+info|warning|error` runs the checks of one severity.
+
+**Exit codes.** `1` when any error-severity finding is reported (a Flutter package with no `lib/`
+counts as one), `0` otherwise — warnings and infos print and pass. An unknown `--type` is a usage
+error, `64`. Run outside a DartWay project, the command says so and exits `1`.
+
+**A check that could not run says so, and does not pass or fail.** When the generator does not run to
+a verdict — an unresolved package, a declaration it refuses — `dartway check` prints its first lines
+under "Not checked". When `DW_DATABASE_HOST` is not set, the migrations are not replayed and the run
+says what to set. A finding invented from a probe that could not run is how a check earns a
+reputation for lying; a silent pass is worse.
+
+## Error is law
+
+**Only errors fail the run**, and that set carries a second meaning outside this command. The harness
+installed by `dartway setup-ai` draws its law/default line on it: the checks that fail are the
+framework's **law**, which a project does not override; everything else is a **default** a project
+may replace with its own rule. A warning is a warning precisely because the check cannot tell one
+legitimate state from another, and that is not something a project can be forbidden to decide. So
+moving a check across the boundary in `dw_check_type.dart` moves it in or out of the law, and
+`packages/dartway_cli/test/toolkit_law_list_test.dart` holds the published law list to the checker's
+error set. See [The agent toolkit](agent-toolkit.md).
+
+## The checks
+
+Thirteen errors, seven warnings, one info — `DwCheckType` and its `severity` in
+`packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
+
+| Check | Level | What it means |
+|---|---|---|
+| `uiKitPartMissing` | error | A kit file without `part of '../ui_kit.dart'` (generated files exempt) |
+| `l10nNotWired` | error | The app has no localization wiring: `flutter_localizations`, `generate: true`, `l10n.yaml`, a `.arb` in `lib/l10n`. Names the missing pieces |
+| `forbiddenUiUsage` | error | Raw styles outside `ui_kit/` — the screen is styling itself |
+| `forbiddenUiKitImport` | error | Importing a file inside `ui_kit/` instead of the `ui_kit.dart` barrel |
+| `invalidFeatureStructure` | error | A feature folder with more than one root file |
+| `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
+| `notAFeature` | error | A folder in a zone whose entry point declares no widget |
+| `assetPathMissing` | error | An `assets/...` string that names no file |
+| `barrelFile` | error | A file that only re-exports |
+| `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
+| `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone |
+| `generatedCodeStale` | error | A generated file that `dartway generate` would write differently, or whose source is gone |
+| `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
+| `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
+| `fileTooLong` | warning | Over 350 lines |
+| `featureSpecMissing` | warning | A feature widget that declares no `DwFeatureSpec` |
+| `forbiddenAssetPath` | warning | A raw `assets/...` path outside `ui_kit/` |
+| `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
+| `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
+| `fileLong` | info | Over 200 lines |
+
+"Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,
+`context.theme`, `context.textTheme`, `context.colorScheme`. The long spelling is on the list on
+purpose: `Theme.of(context).textTheme.bodySmall` reads as ordinary Flutter and means exactly what
+`context.textTheme` means — a screen deciding how it looks.
+
+## The declared top level
+
+`packages/dartway_cli/lib/src/checker/dw_layout.dart` declares the top level of both packages as a
+closed list:
+
+| Package | May hold | Must hold |
+|---|---|---|
+| `<project>_flutter/lib` | zones `admin/ app/ auth/ common/` · layers `core/ l10n/ shared/ ui_kit/` · `main.dart` · `<project>_app.dart` | `main.dart`, `<project>_app.dart` |
+| `<project>_server/lib` | `<project>_server.dart` · `generated/` · `src/` | `<project>_server.dart`, `src/`, and `src/migrations/migrations.dart` |
+
+Dot entries and the folders `generated/`, `gen/`, `l10n/`, `zarchive/`, `zarchiv/` and `.dart_tool/`
+are passed over. Inside `src/` the server is the project's to arrange, except `migrations/`, which
+`bin/migrate.dart` writes and reads by that path.
+
+A zone name or a layer name one level down — `app/admin/` — is an error too, and it is the reason the
+check exists at all: a folder inside a zone is an ordinary group to every other rule, so a misplaced
+admin panel compiles, runs and looks deliberate. There is deliberately no `data/` (the data layer is
+`dw.request` and `dw.command` over the shared contract) and no `domain/` (the rules live in the shared
+package, where both sides apply them, and in the server's handlers). What each folder is for is
+[Project layout](../1-getting-started/project-layout.md).
+
+## The feature tree, and the grade
+
+`packages/dartway_cli/lib/src/checker/dw_feature_tree.dart` builds the tree of each zone from the
+folders themselves — nothing is declared:
+
+- a folder with a root `.dart` file is a **feature**, and that one file is its whole public surface;
+- a folder with no root `.dart` file is a **group**: it only groups features and encapsulates nothing,
+  so feature rules do not apply to it;
+- `widgets/` and `logic/` are a feature's internals, not children. Any other subfolder is a nested
+  feature or group, judged on its own.
+
+Generated files (`.g.dart`, `.gen.dart`, `.freezed.dart`) are nobody's code and are left out.
+
+Scope is two scopes rather than one. The **feature-shaped** areas are the four zones, which must be
+built of features and are asked for a `DwFeatureSpec`. The **checked** areas add `shared/`: its files
+are read for the cleanliness and kit rules, but no spec is expected, because a building block has no
+product behaviour to describe. `ui_kit/` has its own pass. `core/` is skipped entirely — a known gap,
+left open as a decision rather than an oversight.
+
+The report is organised **per feature**, so a large project reads as a list of features to fix rather
+than a wall to scroll past:
 
 ```
 📁 Features (grade · files · findings)
 
 app/
   ✅ profile                          A  4 files
-  🟠 booking                          C  9 files · 2 errors, 1 warning
-    ✅ slot_card                      A  2 files
-  learning/ — group
-    🟡 lesson                         B  6 files · 1 warning
+  🟠 invoices                         C  9 files · 2 errors, 1 warning
+    ✅ invoice_card                   A  2 files
+  billing/ — group
+    🟡 payment                        B  6 files · 1 warning
 ```
-
-The tree is built from the folders themselves — nothing is declared. A folder with exactly one
-root `.dart` file is a **feature**, and that file is its whole public surface; a folder with no
-root `.dart` file is a **group** that only groups features and encapsulates nothing. `widgets/`
-and `logic/` are a feature's internals, not children.
-
-The grade of a feature comes only from what belongs to it:
 
 | Grade | Meaning |
 |---|---|
-| ✅ A | No errors, no warnings (infos are allowed) |
+| ✅ A | No errors, no warnings (infos allowed) |
 | 🟡 B | No errors, some warnings |
 | 🟠 C | One or two errors |
 | 🔴 D | Three or more errors |
 
-Then findings by feature (the first six of each), then a count per check, then the total number of
-errors. **Only errors fail the run.** Warnings and infos print and pass — a check that blocks a
-commit over a 210-line file is a check people disable.
+Then the findings by feature (the first six of each), a count per check, and one verdict line counted
+over every pass.
 
-**That set carries a second meaning outside this command.** The harness installed by
-`dartway setup-ai` draws its law/default line on it: the checks that fail are the framework's law,
-which a project does not override, and everything else — warnings included — is a default it may
-replace with its own rule. A warning is a warning precisely because the check cannot tell one
-legitimate state from another (`crudConfigMissing`, `generatedCodeUnformatted` below), and that is
-not something a project can be forbidden to decide for itself. So changing a check's level here
-moves it in or out of the law; `toolkit_law_list_test.dart` fails when the two stop agreeing.
+## Generated code and migrations: what the server owes its sources
 
-## The checks
+**`generatedCodeStale`** runs the generator the server package resolved in check mode. The codecs are
+the wire, so this has no second reading: a request missing from the registry is refused as unknown by
+a server that has its handler, and a field missing from a codec simply does not travel. The fix it
+prints is `dartway generate`, and generated files are never edited by hand. See
+[Data objects and generation](../2-core/data-objects-and-generation.md).
 
-| Check | Level | What it means |
-|---|---|---|
-| `forbiddenUiUsage` | error | Raw styles outside `ui_kit/` — the screen is styling itself |
-| `forbiddenUiKitImport` | error | Importing inside `ui_kit/` instead of the `ui_kit.dart` barrel |
-| `uiKitPartMissing` | error | A kit file without `part of '../ui_kit.dart'` |
-| `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
-| `uiKitConstStyle` | warning | A `static const Color`/`TextStyle` in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
-| `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, or a fixed name that is missing |
-| `l10nNotWired` | error | The app has no localization wiring — `flutter_localizations`, `generate: true`, `l10n.yaml`, a `.arb` catalogue. Names the missing pieces, not the diagnosis |
-| `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
-| `invalidFeatureStructure` | error | A feature folder with more than one root file |
-| `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
-| `featureSpecMissing` | warning | A feature widget that declares no `DwFeatureSpec` |
-| `notAFeature` | error | A folder in a zone whose entry point declares no widget |
-| `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
-| `barrelFile` | error | A file that only re-exports |
-| `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
-| `assetPathMissing` | error | An `assets/...` string that names no file |
-| `forbiddenAssetPath` | warning | A raw `assets/...` path outside `ui_kit/` |
-| `fileLong` | info | Over 200 lines |
-| `fileTooLong` | warning | Over 350 lines |
-| `generatedCodeUnformatted` | warning | The server's `lib/src/generated/` or the client's `lib/src/protocol/` differs from `dart format` |
-| `crudConfigMissing` | warning | A model with a table and no `DwCrudConfig` — the app cannot reach it |
-| `crudConfigUnregistered` | error | A config that exists and is not in `crudConfigurations` |
-| `crudRuleUntested` | warning | A config carrying save or delete logic that no server test names |
+**`migrationsDrift`** runs the project's `bin/migrate.dart check`, which replays the migrations on
+throwaway databases next to the one `DW_DATABASE_*` names — so it needs a Postgres where databases can
+be created; the development one will do. It fails on migrations that do not produce the schema the
+row classes declare, a migration edited after its checksum was sealed or left unregistered, and a down
+that does not undo its up. The fixes it prints: a schema change the migrations miss is
+`dart run bin/migrate.dart create <name>`; an edited migration applied nowhere yet is
+`dart run bin/migrate.dart rehash <id>`. An error, because a schema the migrations do not produce is a
+server that refuses to start in the next environment. See [Migrations](../4-server/migrations.md).
 
-"Raw styles" means `Color(`, `TextStyle(`, `BorderRadius`, `Theme.of(context)`, `context.theme`,
-`context.textTheme`, `context.colorScheme`. The long spelling is in the list on purpose: the rule
-used to catch `context.textTheme` but not `Theme.of(context).textTheme.bodySmall`, which reads as
-ordinary Flutter and means exactly the same thing — a screen deciding how it looks.
+## Why `notAFeature` and `featureSpecMissing` are one rule
 
-"More than one root file" is a structural claim, not a style one. A feature has exactly one public
-file; behaviour a sibling also needs belongs in a feature of its own. A widget with no story of its
-own is not a feature at all — it is a building block, it lives in `lib/shared/`, and the checker
-never asks it for a spec.
-**`notAFeature` and `featureSpecMissing` are one rule read from both ends**, and neither works
-alone. A zone holds features: a folder in one whose entry point declares no widget is not a feature
-at all (`notAFeature`), and one that does declare a widget owes a passport (`featureSpecMissing`).
-While only the second existed, a provider-only folder passed *because* it was not a widget — a real
-project accumulated ten of them, every one graded A.
+They read one rule from both ends, and neither works alone. A zone holds features: a folder in one
+whose entry point declares no widget is not a feature at all (`notAFeature`, an error), and one that
+does declare a widget owes a passport (`featureSpecMissing`). While only the second existed, a
+provider-only folder passed *because* it was not a widget — a real project accumulated ten of them,
+every one graded A.
 
 Where they go instead: state that several features watch is wiring, so `lib/core/`; a helper with no
 story of its own is a building block, so `lib/shared/`.
 
 The widget test asks whether a **public class extends anything named `*Widget`**, not whether it
-matches a list of base classes. The list used to be
-`(Stateless|Stateful|Consumer|HookConsumer|Hook)Widget` and silently missed `ConsumerStatefulWidget`
-— what every form and dialog extends, which is to say the features with the most behaviour to
-describe. A list of remembered names goes stale in silence; a shape does not.
+matches a list of base classes. A list of remembered names once missed `ConsumerStatefulWidget` —
+what every form and dialog extends, which is to say the features with the most behaviour to describe.
+A list goes stale in silence; a shape does not.
 
 The spec matters because error reports, Studio and the agent all read it: without one the feature
-exists in the code and says nothing about itself.
+exists in the code and says nothing about itself. See [Features and specs](../3-flutter/features-and-specs.md).
 
-**`unusedFeatureFile`** (warning) is the one check the analyzer structurally cannot replace. A public
-class is always "possibly used from somewhere else" — unless the somewhere else is a finite place,
-which Law 3 makes it: nobody outside a feature may import its `widgets/`/`logic/`, so a file in there
-that its own feature never mentions is unreachable. It compiles, it survives refactors, and it is
-found in one folder-deep pass.
+## Why `unusedFeatureFile` is possible at all
 
-Four things it does *not* get wrong, because every one of them cost a real false positive before it
-was fixed:
+A public class is always "possibly used from somewhere else" — unless the somewhere else is a finite
+place, and the feature boundary makes it one: nobody outside a feature may import its
+`widgets/`/`logic/`, so a file in there that its own feature never mentions is unreachable. It
+compiles, it survives refactors, and it is found in a pass one folder deep.
+
+Four things it does *not* get wrong, because each once cost a real false positive:
 
 - **a type is not how it is called** — an extension is reached by member name, a notifier through its
   provider variable, so every public name a file declares counts;
-- **a function is a declaration too** — the index read classes, enums and top-level variables and, for
-  want of an anchor, every `final blob = …` inside a function body as well, while missing functions
-  and getters themselves. A file whose only public member was a top-level function was therefore
-  judged on the names of its own locals, which appear nowhere else by definition;
+- **a function is a declaration too** — a file whose only public member is a top-level function is
+  judged on that function's name, not on the locals inside it;
 - **a conditional import is one symbol in several files** — `foo.dart` forwarding to `foo_stub.dart` /
-  `foo_web.dart` has no file that carries the name alone: the forwarder declares nothing, and each
-  half is a platform the other build never compiles. The trio answers as one unit, alive together and
-  reported together;
-- **dead code keeps dead code alive** — a handler nobody calls still calls its own settings, so the
-  sweep repeats until a pass buries nobody.
+  `foo_web.dart` answers as one unit, alive or reported together;
+- **dead code keeps dead code alive** — the sweep repeats until a pass buries nothing.
 
-What it cannot see: a reference made through a string, and a file whose own halves only reference
-each other.
+What it cannot see: a reference made through a string, and a file whose halves only reference each
+other. The finding names where the file should go instead — `lib/shared/`, `lib/core/`, or
+`lib/core/platform/` for a platform trio — because "dead code" is half an answer: a file its own
+feature stopped using is often a file somebody else needs.
 
-The finding names where the file should go instead — `lib/shared/` for a building block with no story
-of its own, `lib/core/` for wiring several features share, `lib/core/platform/` for a platform trio.
-"Dead code" is half an answer: a file its own feature stopped using is often a file somebody else
-needs, and a message that names no destination leaves the author to find the intended shape by moving
-the file until the rule stops firing.
+## Why `frameworkRefsDiverged` is a warning
 
-**`frameworkRefsDiverged`** (warning) is the one check that reads no Dart at all. A project that
-consumes DartWay by git writes `ref: master` on every framework package, which reads as "all of it
-from master" and is not what the lock does: a git dependency is pinned to a commit the moment it is
-*added*, and stays there until something upgrades it by name. Add the core in March and the push
-module in May and the app runs two framework releases against each other — and a git dependency
-carries no version number, so nothing in the project says so. The check groups the `dartway_*` git
-entries of every `pubspec.lock` under the project root by repository, and reports a repository that
-came out on more than one commit, naming the packages, the commits and the directories to run
-`dart pub upgrade` in. Different repositories are never compared, and hosted packages are left out
-because semver already answers the question for them.
+It is the one check that reads no Dart. A project consuming DartWay by git writes `ref: master` on
+every framework package, which reads as "all of it from master" and is not what the lock does: a git
+dependency is pinned to a commit the moment it is *added*, and stays there until something upgrades it
+by name — and a git dependency carries no version number, so nothing makes the gap visible. The check
+reads the `pubspec.lock` at the project root and in each package beside it, groups the `dartway_*` git
+entries by repository, and reports a repository locked to more than one commit, naming the packages,
+the commits and the directories to run `dart pub upgrade` in. Hosted packages are left out: semver
+already answers for them.
 
-It is a warning because the state is wrong while the code is not, and because what fixes it is a
-command rather than an edit. The related trap on the framework side — a `dependency_overrides` block
-switching off constraint checking for the packages it names — is described in
-[what `create` changes](../1-getting-started/project-layout.md#what-create-changes-on-the-way-in).
-
-Filter with `--type <name>` or `--level error|warning|info`, or narrow the run to a single folder
-with `--dir lib/app/booking`. Note that `--dir` skips the `ui_kit/` pass — the kit is checked as a
-whole or not at all, and for the same reason it skips the layout, generated-format and
-framework-lock passes, which judge the project rather than any one folder.
-
-Scope, and it is two scopes rather than one. The **feature-shaped** areas are the four zones —
-`app/`, `admin/`, `auth/`, `common/` — which must be built out of features and are asked for a
-`DwFeatureSpec`. The **checked** areas add `shared/` and `ui_kit/`: their content is read for the
-cleanliness and UI-Kit rules, but no spec is expected, because a building block has no product
-behaviour to describe. Keeping the two apart is what makes `lib/shared/` safe to recommend —
-before, a widget moved out of a zone left every check behind, not just the passport one. `core/`
-holds infrastructure with a shape of its own and is skipped entirely. Generated files (`.g.dart`,
-`.gen.dart`, `.freezed.dart`) and the folders `generated/`, `gen/`, `l10n/`, `zarchive/` are
-nobody's code and are skipped everywhere.
-
-The zone names are matched exactly, and that is the point of
-[`invalidTopLevelLayout`](../1-getting-started/project-layout.md): the top level of both packages is
-a closed list, so an undeclared folder, a stray file at the root of `lib/`, a missing
-`my_app_app.dart` and a zone name nested inside a zone are all errors. The last one is the reason
-the check exists at all — `app/admin/` is a perfectly ordinary group as far as every other rule is
-concerned, which is how the admin panel spent a release outside the checks that were written for
-it. The pass covers the server package too (`lib/src/`), and `--dir` skips it, the same way it
-skips `ui_kit/`.
-
-## The three server checks: what fails closed, nobody sees fail
-
-The Flutter checks above catch code that is wrong in a way you can point at. The server ones catch
-something else — a project that is missing a piece, where every symptom is an absence.
-
-Generic CRUD is **secure by default**: a model nobody configured refuses every read and write with
-`notConfigured`. That is the right default, and it is silent. The table migrates, the server starts,
-the app compiles, and a list is empty forever. `crudConfigMissing` names the model, and it is a
-warning rather than an error because the absence has a second, legitimate reading — a table the
-server owns alone and no client should ever see. The check cannot tell the two apart; you can, and
-saying which it is costs one doc comment.
-
-`crudConfigUnregistered` is the same failure with no second reading, and it is the one worth the
-error. The config was written. It sits in `lib/src/crud/`, it reviews as finished, it has the access
-rules and the validation in it — and it was never added to the `crudConfigurations` list, so the API
-answers exactly as if the file did not exist. Nothing else in the toolchain has any opinion about
-this: it compiles, and the config is a value nobody is required to use.
-
-`crudRuleUntested` is the one that came out of writing the [testing skill](agent-toolkit.md). A CRUD
-config that only declares a shape — an `accessFilter`, an `include` — has no rule to hold and is not
-asked for anything. One that carries hand-written save or delete logic does, and that logic runs
-inside a request and reads the database to decide: no widget test can reach it, and a widget test
-proving the admin-only button is hidden proves only that the button is hidden. So the check looks
-for the model's name anywhere under the server's `test/`, and says so when it finds nothing. A
-mention is a loose signal on purpose — it is enough to raise the question and not enough to fail a
-build on, which is why this one is a warning too.
-
-**None of the three counts anything.** There is no percentage here and no threshold: each finding
-names one model and one thing to do about it. That is also why two things the checker could have
-guessed at are deliberately absent. A Flutter feature's tests are not countable without becoming the
-coverage number this exists instead of. And an *Event model* — a change written on top of a base — is
-a domain reading with no marker in the YAML: a rule keying off an `*Event` suffix would miss the one
-called `BalanceEntry` and fire on the one that is a plain lookup table.
+A warning, because the state is wrong while the code is not, and what fixes it is a command rather
+than an edit.
 
 ## Why `l10nNotWired` is an error, and the only one you cannot cause
 
-Every other rule here catches something written. This one catches something **never done** — and it
-is the difference that makes it an error rather than a warning.
+Every other rule here catches something written. This one catches something **never done**. An app
+with no localization wiring has broken no convention: its widgets hold their text because there was
+nowhere else to put it, the compiler is happy, and every other check is silent. It is reachable one
+way — a project adopting the methodology from somewhere else, since `dartway create` ships all four
+pieces. In the case that produced this rule it was around 450 strings in some 150 files, surfaced by
+a person noticing one menu item in the wrong language.
 
-An app with no localization wiring has broken no convention. Its widgets hold their text because
-there was nowhere else to put it; the compiler is happy, the tests pass, and every other check is
-silent. The state is reachable only one way: by a project adopting this methodology from somewhere
-else, since `dartway create` ships all four pieces. In the case that produced this rule it was around
-450 strings across some 150 files, and what surfaced it was a person noticing one item of an
-otherwise English menu in another language — because with no single place for text, the language of a
-string is decided by whoever typed it.
-
-The law's own wording settles the severity: localization is *"the first thing fixed, not something to
-live with"*. A warning would say the opposite.
-
-The finding names **which** of the four is missing rather than reporting "not wired", because the
-half-wired states are the ones that produce strange errors — an `.arb` with no `generate: true`
-generates nothing, and the failure reads as a missing key.
-
-## Why `generatedCodeUnformatted` is a warning that names a command
-
-Two programs write the generated code and they disagree about how it should look. `serverpod
-generate` formats its output with the `dart_style` bundled with the Serverpod CLI; the code already
-in the repository was formatted by the `dart format` of the project's SDK. Nothing reconciles them,
-so the difference shows up as a generation run that rewrites files the change never went near.
-Making one field nullable is two lines of schema and, without a format pass, a diff of 29 files and
-about 1900 lines — on review that reads as a rewritten protocol, and the two lines that matter
-cannot be found inside it.
-
-The fix is a `dart format` over both generated trees, and it has to be the **last** of the three
-steps: `create-migration` regenerates in order to diff the schema, so a pass placed between it and
-`generate` is silently thrown away. That is what turns a forgotten step into a loop — generate,
-format, generate, format again — and it is why the sequence is written down as a sequence in
-[models.md](../2-core/models.md#the-workflow-and-where-it-usually-goes-wrong).
-
-The check insists on both trees, including the one that came back clean. Formatting only the half
-you were looking at does not avoid the diff; it defers it to whoever next runs `dart format`
-honestly. One project kept its server tree formatted and left the client raw, and the next person to
-format both added 33 unrelated files to an unrelated pull request.
-
-**Warning, not error, and deliberately.** This is the one check whose verdict depends on the tool
-running it: the comparison is against the `dart_style` of the SDK in use, so a red result can mean
-"your SDK is newer than the one that formatted this" rather than "you skipped a step". Failing a
-build on that would be the fastest way to teach a team to filter this check out — the same argument
-as `SizedBox(width: double.infinity)` below, arrived at from the other direction. What earns the
-check its place instead is the message: it names the files, the exact command with both paths
-written out, and the Dart version it judged against, so that someone who did not write the code and
-does not know why it went red can still fix it or recognise the version skew.
-
-Like the layout pass, it judges the server and client packages, so `--dir` skips it.
+Every project is localized; that is a requirement, not a report on how the project began. The finding
+names **which** of the four pieces is missing, because the half-wired states produce the strangest
+errors — an `.arb` with no `generate: true` generates nothing, and the failure reads as a missing key.
 
 ## Why 200 and 350
 
-Length is the **weakest signal the checker has**, and a tight limit makes it lie. The thresholds
-started at 120 (info) and 200 (warning) and were deliberately relaxed, because the checker began
-flagging files that were long for a good reason: a feature's `DwFeatureSpec` now lives in the file
-of the feature it describes, and a good description costs twenty lines.
-
-A rule that goes off when someone documents their feature properly teaches them to document less.
-That is the whole argument. So nothing is said below 200 lines, above it is a nudge that never
-fails anything, and above 350 a warning that says "worth restructuring" — because at that size a
-file has usually collected more than one responsibility. Split by responsibility, not by line
-count: a meaningful 300-line file beats a pointless chop into three.
+Length is the **weakest signal the checker has**, and a tight limit makes it lie. A feature's
+`DwFeatureSpec` lives in the file of the feature it describes, and a good description costs twenty
+lines; a rule that goes off when someone documents a feature properly teaches them to document less.
+So nothing is said below 200 lines, above it is a nudge that never fails anything, and above 350 a
+warning — at that size a file has usually collected more than one responsibility. Split by
+responsibility, not by line count.
 
 ## Why `SizedBox(width: double.infinity)` is not in `widgetSizesItself`
 
-`widgetSizesItself` fires on exactly two things, and only when they are what `build` returns:
-`Expanded` and `SizedBox.expand`. Both mean the widget has decided how much room it gets. It works
-until someone drops it into a bottom sheet or a scroll view, and then it throws at runtime while
-the analyzer stays silent. Space is the parent's call — let the caller wrap it.
+`widgetSizesItself` fires on exactly two things, and only when `build` returns them: `Expanded` and
+`SizedBox.expand`. Both mean the widget decided how much room it gets; it works until someone puts it
+in a bottom sheet or a scroll view, and then it throws at runtime while the analyzer stays silent.
+Space is the parent's call.
 
-`SizedBox(width: double.infinity)` was tried in this check and taken back out. Inside a bounded
-parent it only means "as wide as allowed" — legitimate, common, and harmless. Every hit was
-arguable.
-
-**A check whose findings are arguable teaches people to skip the checker.** Once a rule has cried
-wolf twice, its next finding — a real one — gets the same shrug, and so does every other rule in
-the tool. Precision is not a nicety here; it is the only thing keeping the checker worth running.
-The two remaining patterns are not arguable: both throw in the first parent that does not offer
-unbounded space.
-
-The same principle shows up elsewhere in the checker. A string inside a doc comment in the kit is
-not flagged as a text constant — usage examples are the most useful thing a kit widget can carry,
-and flagging them taught authors to write worse documentation. A `part of` directive is not
-demanded from generated files — it survives exactly until the next generator run.
+`SizedBox(width: double.infinity)` was tried and taken back out: inside a bounded parent it only means
+"as wide as allowed", so every hit was arguable. **A check whose findings are arguable teaches people
+to skip the checker** — and then its real findings get the same shrug. The same principle runs
+through the rest: a string in a kit doc comment is not a text constant, and a generated file is not
+asked for a `part of` directive that the next generator run would remove.
 
 ## Why `barrelFile` is an error
 
-A file whose whole body is `export` directives reads as convenience and acts as a hole in the
-feature boundary. Importers name the barrel, so reaching into another feature's guts through it
-looks legitimate — and the import checks see a barrel, not the internals behind it. One such file
-laundered three features' internals until it was deleted. A single-line re-export counts too: same
-hole, smaller.
+A file whose whole body is `export` directives reads as convenience and acts as a hole in the feature
+boundary: importers name the barrel, so reaching into another feature's internals through it looks
+legitimate, and the import checks see a barrel rather than the internals behind it. One such file
+laundered three features' internals until it was deleted. A single-line re-export counts too: the
+same hole, smaller.
 
 ## Why asset paths are checked against the file system
 
-DartWay projects do not run `build_runner` in the edit loop — it costs minutes per change and
-punishes whoever forgets to run it with errors about code that is perfectly fine. So asset
-constants are written by hand. A generated constant could not name a missing file; a hand-written
-one can.
-
-`assetPathMissing` restores that guarantee, and `forbiddenAssetPath` keeps the paths in one place:
-a path spelled out in a screen survives a renamed file only by accident, and cannot be found by
-search. The screen should receive a widget, not a file name.
+DartWay projects run no asset code generator, so asset paths are written by hand — and a hand-written
+path, unlike a generated constant, can name a file that does not exist. `assetPathMissing` restores
+that guarantee, and `forbiddenAssetPath` keeps the paths in one place: a path spelled out in a screen
+survives a renamed file only by accident and cannot be found by search. The screen should receive a
+widget, not a file name.

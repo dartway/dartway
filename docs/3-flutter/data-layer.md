@@ -1,487 +1,311 @@
-# How does the app read and write data?
+# How does a screen read and change server data?
 
-Through one object: `dw.repo`. There are no repositories to write, no client calls to make, no
-cache to keep in sync. A DartWay app declares a model, gives it a `DwCrudConfig` on the server, and
-reads it in a widget.
+A screen names what it wants as a **request** — a DTO from the project's shared package — and
+watches it. It changes something by sending a **command**. Everything between the two — caching,
+sharing one fetch between widgets, applying updates, retries, the signed-in account — is the client
+behind `dw`, and a screen writes none of it.
 
-The split inside `dw.repo` is deliberate and worth learning first:
+What requests and commands *are* on the wire is [requests and updates](../2-core/requests-and-updates.md)
+and [commands and idempotency](../2-core/commands-and-idempotency.md). This page is the Flutter side.
 
-- **reads are Riverpod providers** — you consume them with the *native* `ref.watch` / `ref.read` /
-  `ref.refresh`;
-- **writes are plain methods** — `saveModel`, `deleteModel`, awaited like any `Future`.
+| You want | You write | You get |
+|---|---|---|
+| one object, an optional one, a list | `ref.watch(dw.request(request))` | `AsyncValue<T>`, `AsyncValue<T?>`, `AsyncValue<List<T>>` |
+| a feed that grows as it scrolls | `ref.watch(dw.pages(request))` | `AsyncValue<DwPagedData<T>>` |
+| numbered pages with a total | `ref.watch(dw.table(request))` | `AsyncValue<DwTablePage<T>>` |
+| a chat-like window around a point | `ref.watch(dw.window(request, anchor: ...))` | `AsyncValue<DwWindowData<T>>` |
+| to change something | `await dw.command(command)` | `DwCallResult<R>` |
+| a value once, outside any widget | `await dw.client.fetch(request)` | `DwCallResult<R>` |
 
-Nothing in the API asks you for a `ref`, and no provider type name ever appears in app code: the
-entire Riverpod surface an app touches is `ref.watch(dw.repo.<x>(...))`. The reads are kept in their
-own methods because they are the only state-management-coupled part — they can move to a
-`dartway_riverpod` package later without the imperative half following.
-
-## Reading
-
-Three providers, one per shape of answer:
+## Reading: `dw.request`
 
 ```dart
-// AsyncValue<List<T>> — reactive list
-ref.watch(dw.repo.modelList<ClubService>())
-
-// AsyncValue<T?> — reactive single model, absence is a legal answer
-ref.watch(dw.repo.maybeModel<SessionReview>(filter: reviewOfBooking(id)))
-
-// AsyncValue<T> — reactive single model that must exist
-ref.watch(dw.repo.model<ClubSession>(id: sessionId))
+final bookings = ref.watch(dw.request(const ListMyBookings()));
 ```
 
-`model` and `maybeModel` take **either** `id` **or** `filter` — passing neither trips an assert in
-`DwSingleModelStateConfig`. An `id` is sugar: it is turned into an `equals` filter on the `id`
-field.
+The request kind decides the value: a `DwSingleRequest<T>` gives `T` (an absent object is a
+`dw.notFound` refusal), a `DwMaybeRequest<T>` gives `T?`, a `DwListRequest<T>` gives `List<T>`.
+`dw.request` does not take a paginated request — those have their own bindings below.
 
-### `model` vs `maybeModel`
+**A request is its own cache key.** Widgets watching equal requests share one provider, one fetch and
+one set of channel subscriptions; `dw.request(...)` returns the same provider for an equal request, so
+calling it inside `build` is the intended use. The flip side: a field that changes on every build —
+`DateTime.now()` in a request — is a new request every frame. The example's schedule reads "from the
+start of today" out of a provider that changes once a day for exactly that reason
+(`example/dartway_example_flutter/lib/app/schedule/logic/today_provider.dart`).
 
-They run the same fetch and receive the same live updates. The only difference is what happens when
-the row is not there:
-
-- `maybeModel` resolves to `null` — the data branch of the `AsyncValue`;
-- `model` resolves to a `StateError` — the *error* branch, message
-  `dw.repo.model<ClubSession>: model not found (...)`.
-
-Pick by whether absence is a normal state of your screen. A profile screen opened by id: `model`,
-because a missing profile is a bug you want reported. "Has this booking been reviewed yet?":
-`maybeModel`, because `null` is the answer, not a failure.
-
-**`null` is an answer about now, not a promise that the row will never exist.** A `maybeModel` that
-resolved to `null` takes the first row that later arrives and passes its filter (or has its `id`) —
-so "save, then read the provider" works for a model you just created, exactly as it does for a
-list. Until #242 it did not: an empty single-model read stopped listening the moment it answered,
-the screen stayed on a legitimate-looking empty state, and a `if (model == null) return;` behind it
-skipped its work with nothing anywhere saying so.
-
-One consequence catches people out. `model` is a **derived** provider — a throwing view over
-`maybeModel`, not its own fetch. So `ref.refresh(dw.repo.model<T>(...).future)` only recomputes the
-wrapper and returns the same cached value; to force a fresh fetch, refresh the provider that
-actually fetches: `ref.refresh(dw.repo.maybeModel<ClubSession>(id: id).future)`.
-
-### Which `ref` verb
-
-`ref.watch(provider)` subscribes reactively; `ref.read(provider.future)` reads once inside a
-callback or an action; `ref.refresh(provider.future)` discards and refetches. There is also
-`dwGlobalRefreshStateProvider` — every read watches it, so
-`ref.read(dwGlobalRefreshStateProvider.notifier).refresh()` rebuilds all of them at once. That is a
-last resort, not an everyday tool.
-
-### The signed-in profile is not one of these reads
-
-The current user is a special source, not a row you fetch by id. It arrives with the session and is
-kept up to date by it, so it has its own pair of providers on `dw` — never
-`dw.repo.model<UserProfile>(...)`:
+**The value stays live on its own.** When a command's answer or another user's change carries an
+object the request is interested in, it is applied to what is on screen — inserted, replaced, removed
+or re-fetched, as the request declares. How a request declares it is
+[requests and updates](../2-core/requests-and-updates.md) and
+[channels and realtime](../2-core/channels-and-realtime.md). The screen contains no refresh code:
 
 ```dart
-// UserProfile? — signed out is a legal answer: splash, router guards, the auth zone
-ref.watch(dw.userProfileProvider)
-
-// UserProfile — non-nullable, for anything drawn under DwUserAsyncScope
-ref.watch(dw.requireUserProfileProvider)
-ref.watch(dw.requireUserProfileProvider.select((p) => p.firstName))
-```
-
-The split is the same one as `maybeModel` vs `model`, for the same reason: `require` throws a
-`StateError` when nobody is signed in, because on an authenticated screen that is a wiring mistake
-and not a state to render.
-
-Both are typed by the profile model you gave `DwCore<Client, UserProfile>`, so your own model comes
-out of them without a provider of your own. `dartway create` still scaffolds
-`lib/core/user_profile_provider.dart` on top — `ref.watchUserProfile` / `ref.readUserProfile`, two
-getters over `requireUserProfileProvider`, because Dart has no generic getters and the framework
-cannot name your model in an extension on `Ref`. They are shorthand, not the source: delete the file
-and the providers still work.
-
-When the id is all you need — a filter, a channel key, an ownership check — there is a third provider
-beside them, and no reason to pull the whole profile out to reach `.id`:
-
-```dart
-// int? — null while signed out, and null in an app running without a DartWay session
-ref.watch(dw.signedInUserIdProvider)
-```
-
-## Rendering a list
-
-An `AsyncValue` has three branches, and writing `when(loading:, error:, data:)` in every feature is
-how a codebase ends up with twelve different spinners. `dwBuildListAsync` renders all three:
-
-```dart
-ref
-    .watch(dw.repo.modelList<ChatMessage>(
-      backendFilter: AppBackendFilters.channelMessages(channel.id!),
-    ))
-    .dwBuildListAsync(
-      loadingItemsCount: 5,
-      childBuilder: (messages) => ListView.builder(...),
-    );
-```
-
-The loading branch is **not** a shimmer rectangle. It calls your own `childBuilder` with
-`loadingItemsCount` placeholder models and wraps the result in a `Skeletonizer` — so the skeleton
-has the shape of the content that is coming. `dwBuildAsync` (the single-value form) does the same
-with one placeholder, and switches to `SliverSkeletonizer` when your builder returned a sliver,
-because a box skeleton is an invalid child of a `CustomScrollView`.
-
-### The error branch is the caller's decision
-
-Errors go into the framework error pipeline (`DwErrorSource.asyncBuild`) and are replaced on screen
-by `errorWidget`, which defaults to `SizedBox.shrink()`. A failing list is therefore *silent on
-screen and loud in your alerts*.
-
-That default stays, and it is not an oversight: the builders are extensions on `AsyncValue`, which
-knows it holds a `List<ChatMessage>` and nothing about whether those messages are the screen or a
-badge in its corner. **A section that is the reason its screen exists renders its failure; a
-decoration need not.** Only the caller can tell which one it is looking at, so the caller passes
-`errorBuilder` — and blank is not a neutral choice, because an empty list already has copy of its
-own ("No news yet") and empty space reads as a third thing again.
-
-The failure state also needs a way out of it, and that is the one place `ref.invalidate` is right:
-the user asked for the state to be thrown away and fetched again.
-
-```dart
-// the provider is named once and used twice — watched, and thrown away by the retry
-final chatMessages = dw.repo.modelList<ChatMessage>(
-  backendFilter: AppBackendFilters.channelMessages(channel.id!),
-);
-
-ref
-    .watch(chatMessages)
-    .dwBuildListAsync(
-      loadingItemsCount: 5,
-      childBuilder: (messages) => ListView.builder(...),
-      errorBuilder: (_, _) => LoadFailedMessage(
-        onRetry: dw.action((_) => ref.invalidate(chatMessages)),
-      ),
-    );
-```
-
-`LoadFailedMessage` is the app's widget, not the framework's: the copy a person reads comes from
-`context.l10n`, so a package cannot own it. `example/` and `template/` each carry one in
-`lib/shared/widgets/load_failed_message.dart` — a message and a retry button — and it takes the
-retry as a `DwUiAction`, because only the caller knows which read failed.
-
-**Combining several `AsyncValue`s has one trap and it is worth naming.** `asData?.value` answers
-`null` while loading *and* on failure, so the shortest thing that compiles —
-
-```dart
-final profile = ref.watch(profileProvider).asData?.value;
-if (profile == null) return const Spinner();   // a 500 is now a spinner that never stops
-```
-
-— shows a wait for a request that answered long ago. `.value ?? const []` is the same trap wearing a
-fallback. Nest the builders instead, so each read answers for its own failure.
-
-### Placeholder models must be registered
-
-The placeholder comes from a per-type registry the app fills once, at startup:
-
-```dart
-dw.repo.setupRepository(
-  defaultModel: ClubSession(
-    id: dw.repo.mockModelId,
-    serviceId: dw.repo.mockModelId,
-    startsAt: DateTime.now(),
-    capacity: 10,
+// example/dartway_example_flutter/lib/app/schedule/widgets/session_card.dart
+AppButton.primary(
+  l10n.book,
+  onTap: dw.action(
+    (_) => dw.command(BookSession(sessionId: session.id)),
+    onSuccessNotification: l10n.youAreBooked,
   ),
+)
+```
+
+The answer carries the booking and the session; both lists on screen take them before the command
+completes, and other devices get them on their channels.
+
+A watched request is released `DwClientOptions.releaseDelay` (one second by default) after its last
+watcher leaves, keeping its subscriptions meanwhile — so a rebuilt screen, or one left and re-entered
+quickly, finds current data instead of refetching.
+
+### Errors are typed
+
+Every way a read ends short of data is an `AsyncError` whose error is one of four types:
+
+| Error | Means |
+|---|---|
+| `DwRefusalException` | The server refused; `.refusal` is the `DwCallRefusal` to render. Also a request whose `validate()` failed (nothing was sent), and every request once the build is incompatible. |
+| `DwFailedException` | The server failed. `.incidentId` is what the operator finds it by; `.call` names the request. |
+| `DwNotAuthenticatedException` | The request needs a signed-in user, and there is none. |
+| `DwTimeoutException` | No answer for `callTimeout` and no data to show. **The client keeps retrying**; the value becomes data when the server answers. |
+
+An error branch sorts by type, never by message.
+
+### Refreshing stays data
+
+A request that is running again — a pull to refresh, an update that asked for a refetch, a
+reconnected socket — **keeps its last value as `AsyncData`**. The screen does not flash back to a
+skeleton, and a list does not lose its scroll position because the socket blinked.
+
+Pull to refresh is the notifier's `refetch()`, which completes when answered:
+
+```dart
+onRetry: () => ref.read(dw.request(const ListNews()).notifier).refetch(),
+```
+
+Use `refetch()`, not `ref.invalidate`: the client keeps a request alive for the release delay after
+its provider is thrown away, so a rebuilt provider reattaches to the same failed state instead of
+asking again.
+
+## Feeds: `dw.pages`
+
+A `DwPageRequest<T>` is an offset feed. `dw.pages` accumulates its pages into one list. From
+`packages/dartway_core_flutter/test/dw_flutter_core_test.dart`:
+
+```dart
+final pages = ref.watch(dw.pages(const FeedRooms()));
+return Column(
+  children: [
+    if (pages case AsyncData(:final value)) ...[
+      for (final room in value.items) Text(room.name),
+      if (value.hasMore)
+        TextButton(
+          onPressed: () =>
+              ref.read(dw.pages(const FeedRooms()).notifier).loadMore(),
+          child: const Text('more'),
+        ),
+    ],
+  ],
 );
 ```
 
-This is the one place an app builds a model field by field with an id in hand, and it is not a
-rebuild: `mockModelId` is a sentinel, the instance is invented from nothing, and there is no stored
-row to copy from. `model_rebuild_by_constructor` reads the sentinel and stays silent, so
-`core/default_models.dart` needs no `// ignore_for_file:` — see
-[models](../2-core/models.md#an-existing-row-is-rebuilt-with-copywith-never-field-by-field).
+`DwPagedData<T>` carries `items` (every loaded object, updates applied), `hasMore`, `loadingMore` and
+`loadMoreError` — why the last `loadMore` did not load. A failed next page is **not** an error of the
+`AsyncValue`: the loaded items stay, and the error sits beside them for the footer to show.
 
-Skip it for a model and the failure is immediate and total, because this registration is not only
-about skeletons: `setupRepository` also maps the Dart type to the class name the CRUD endpoints
-speak. So:
+`loadMore()` is safe to call from every scroll event: one request while one is in flight, none when
+there is no more. `refetch()` reloads from the top, as many rows as are loaded.
 
-- the **read itself** fails with `Exception: Dw Repository was not initialized for type X`, thrown
-  by the provider before the request is even built;
-- the **loading branch** throws `UnimplementedError: Default Objects Repository doesn't contain a
-  model of type X` while building the skeleton — during `build`, so it is a red screen, not an
-  error state.
+## Tables: `dw.table`
 
-`dwBuildListAsync` asserts that a placeholder is obtainable, but the assert only checks that
-`DwConfig.defaultModelGetter` is wired at all (the app passes `dwGetDefault`), not that your
-particular model is registered. A new model means a new `setupRepository` call, always.
-
-Both the assert and the placeholder itself belong to the loading branch and run nowhere else — a
-widget test that hands the builder a ready `AsyncData` never touches the registry, and so does not
-have to stand it up. A list test that *does* fail on a missing placeholder is a test of the loading
-state, whether or not it was written as one.
-
-## Narrowing the list: `backendFilter`
-
-`backendFilter` becomes part of the query the server runs. Filters are declared once, as an enum
-carrying the field name and the value type:
+A `DwTableRequest<T>` has `page` and `pageSize` fields. **Each page is its own request**, so paging is
+watching another request, and the previous page is released like any other. From
+`example/dartway_example_flutter/lib/admin/users/widgets/admin_users_table.dart`:
 
 ```dart
-enum AppBackendFilters<T> with DwBackendFiltersMixin<T> {
-  clientProfileId<int>(),
-  startsAt<DateTime>();
+final table = dw.table(request);
 
-  static DwBackendFilter clientBookings(int userProfileId) =>
-      AppBackendFilters.clientProfileId.equals(userProfileId);
+return ref
+    .watch(table)
+    .section(
+      loadingValue: DwTablePage(
+        PlaceholderObjects.listOf(PlaceholderObjects.profile, 4),
+        total: 4,
+        page: 1,
+        pageSize: request.pageSize,
+      ),
+      onRetry: () => ref.read(table.notifier).refetch(),
+      builder: (page) => UsersPage(page), // rows, and a pager over page.page / page.pageCount
+    );
+```
 
-  static DwBackendFilter upcomingSessions() =>
-      AppBackendFilters.startsAt.greaterThan(DateTime.now().dayStart);
+`DwTablePage<T>` carries `items`, `total`, `page`, `pageSize` and `pageCount`. A row on the page is
+updated in place when it changes. Nothing is inserted into a table page: an object that is not on it,
+or a deletion, reads the page again, because its rows and its total may have moved. A page below 1 is
+refused locally, without a round trip.
+
+## Windows: `dw.window`
+
+A `DwWindowRequest<T, S, I>` is a newest-first sequence read around a point — a chat, an activity
+log. `dw.window(request, anchor: cursor)` opens it around the row of `cursor` (a string from
+`request.cursorOf(item)` or `DwWindowCursor.encode(sortValue, id)`), or at the newest rows when
+`anchor` is `null`. Windows of one request opened at different anchors are different entries.
+
+```dart
+final provider = dw.window(request, anchor: request.cursorOf(lastRead));
+ref.watch(provider);                     // AsyncValue<DwWindowData<T>>
+ref.read(provider.notifier).loadOlder();
+ref.read(provider.notifier).loadNewer();
+```
+
+`DwWindowData<T>` carries `items` (newest first), `hasOlder`, `hasNewer`, `loadingOlder`,
+`loadingNewer`, `loadError`, and two counters a list needs:
+
+- `unseenNewerCount` — rows that arrived live past the newest loaded one while the window does not
+  reach the newest rows; zero once it does;
+- `prependedCount` — how many rows the last change put before the previous first row.
+
+A screen rarely reads these by hand: [`DwWindowListView`](window-list-view.md) is the list built on
+them.
+
+## Changing: `dw.command`
+
+```dart
+final result = await dw.command(BookSession(sessionId: session.id));
+```
+
+The answer is a `DwCallResult<R>`, sealed:
+
+| Result | Means |
+|---|---|
+| `DwCallOk(:value)` | Done. Its updates are already applied to every watched request. |
+| `DwCallRefused(:refusal)` | The server said no — an answer for the user. |
+| `DwNotAuthenticated()` | It needs a signed-in user; the session is already dropped. |
+| `DwCallFailed(:incidentId)` | The server failed. |
+
+**Inside `dw.action` there is nothing to unwrap:** a result that is not `DwCallOk` is handled — a
+refusal shown through `DwConfig.refusalText`, a not-authenticated answer signing out, a failure
+reported. That is the usual way to send a command; see
+[actions and refusal texts](actions-and-refusal-texts.md). Outside an action, switch over the result,
+or read `result.valueOrThrow` to meet it as the typed exceptions above.
+
+Three things happen without code:
+
+- **validation first.** A command that is `DwSelfValidating` and does not validate answers its first
+  refusal at once, and nothing is sent;
+- **retries are safe.** A command carries an idempotency key kept across its retries, so a retry
+  after a lost answer is answered with the stored outcome instead of running twice. Network failures
+  are retried until `callTimeout` (30 seconds by default); any answer is final;
+- **a timeout is an unknown outcome.** When no answer came in time, the future completes with a
+  `DwTimeoutException` — the command may have run. Repeating the intent is a new command, which is
+  why the timeout is generous.
+
+## The signed-in account
+
+```dart
+ref.watch(dw.accountId); // int?, null when signed out
+```
+
+`dw.accountId` is known from the stored session right after start, before the server has answered —
+the example's router and profile gate decide by it
+(`example/dartway_example_flutter/lib/core/router/app_router_state.dart`). The server corrects it: a
+rejected token makes it `null`.
+
+**Every watched request belongs to an account.** State is kept per signed-in account, and a request
+that follows "my" channel (`DwLiveChannel.ofCaller`) resolves it for the account signed in. So:
+
+- `dw.signIn(session)` adopts a session — the answer of `DwVerifyCode` — and stores it. When the
+  account changes, every watched request is released and asked again for the new account; the value
+  goes through loading and **never shows the previous account's data**;
+- `dw.signOut()` ends the local session at once — every watched request is asked again anonymously —
+  and asks the server to revoke the key. A revocation that did not happen is reported to the error
+  pipeline as `DwSignOutException`; the session on the device is over either way.
+
+```dart
+// example/dartway_example_flutter/lib/auth/logic/auth_state.dart
+if (result case DwCallOk(value: final session)) {
+  await dw.signIn(session);
 }
 ```
 
-The mixin gives `equals`, `greaterThan(OrEquals)`, `lessThan(OrEquals)`, `like`, `ilike`, each with
-a `negate` flag. The comparison operators throw `UnsupportedError` at runtime for any `T` other than
-`int`, `double` or `DateTime` — the type parameter on the enum value is what makes that a mistake
-you make once.
+A screen resets nothing on sign-in or sign-out. The requests it watches follow the account.
 
-The filter also applies to **live updates**: a model arriving over the socket is only inserted into
-a list whose `backendFilter` accepts it. Narrowing is a property of the list, not of one fetch.
-
-**A `backendFilter` is not security.** It is what *this screen* wants to see. What a user is
-*allowed* to see is the `accessFilter` on the server's CRUD config, and it applies whether the
-client narrows or not.
-
-## Filtering locally
-
-The framework deliberately gives you nothing for this. Filtering an already-loaded list is a
-`.where` (or a collection-`if`) inside your `childBuilder`, and a wrapper around `.where` would only
-be a second thing to learn. Keep the search string in an ordinary provider and read it with
-`ref.watch`. The moment you find yourself hunting for "the DartWay way" here, you have found a place
-where there is none, on purpose.
-
-## Providers live at the root
-
-Your app writes no `ProviderScope`. `DwAppRunner` creates the only one, around everything; tests
-build their own and are welcome to.
-
-The temptation it forbids is a nested scope that overrides a provider for one subtree — a screen
-showing the same widgets "as an admin", a route fixing a mode, a panel with its own copy of some
-state. It reads as a clean way to inject a value without threading it through the tree, and for
-widgets it genuinely works: a `WidgetRef` resolves from the nearest scope above its widget and sees
-the override.
-
-A provider does not. Reading through its own `Ref`, it resolves from the container hosting *it* —
-the root, for anything that declares no `dependencies` — and gets the base value. Nothing throws,
-nothing warns, and the screen shows something other than what you overrode. The failure appears
-later, when someone adds a provider that reads a value two other widgets were reading happily.
-
-So a value that differs per subtree is passed, not scoped: a family key, or a constructor argument
-to a notifier.
+## Live status and reconnects
 
 ```dart
-// ❌ the override is invisible to any provider that reads workspaceModeProvider
-ProviderScope(
-  overrides: [workspaceModeProvider.overrideWith(() => IssuesMode())],
-  child: const WorkspacePage(),
-)
+final status = ref.watch(dw.liveStatus); // DwConnectionStatus
+```
 
-// ✅ the mode is an argument — visible in the call, and the same value for everyone
-final workspaceStateProvider =
-    NotifierProvider.family<WorkspaceState, WorkspaceData, WorkspaceMode>(
-  WorkspaceState.new,
+Calls are HTTP and work whatever this says. The status tells whether **the data on screen follows the
+server**:
+
+| `DwConnectionStatus` | Means |
+|---|---|
+| `idle` | No socket: nothing watched is live, nobody is signed in (every subscription requires an account), or the client is not started. Nothing is being missed. |
+| `connecting` | Opening or authenticating the socket. |
+| `connected` | Subscriptions are made as they are needed. |
+| `disconnected` | The socket is down and the client waits before the next attempt. Data on screen is not live. |
+| `incompatible` | This build cannot talk to this server. Terminal — see [update required](update-required.md). |
+
+`example/dartway_example_flutter/lib/ui_kit/3_special/common/connection_status_indicator.dart`
+renders it as a coloured dot, treating `idle` and `connected` alike.
+
+When the socket comes back:
+
+- calls waiting out a retry backoff go at once;
+- subscriptions are made again for every watched request;
+- a request whose data was fetched before its subscription became active — and may have missed an
+  update meanwhile — is read again, with the old value still on screen as data.
+
+A subscription the server refused is tried again after a reconnect; one the server **closed** (access
+revoked) stays closed for that account.
+
+## Rendering an `AsyncValue`
+
+`dwBuildAsync` (on `AsyncValue<T>`) and `dwBuildListAsync` (on `AsyncValue<List<T>>`) render the
+three branches uniformly:
+
+```dart
+ref.watch(dw.request(const ListNews())).dwBuildListAsync(
+  loadingItem: placeholderPost,
+  loadingItemsCount: 5,
+  childBuilder: (posts) => NewsList(posts),
+  errorBuilder: (_, _) => AppText.body(context.l10n.loadFailed),
 );
 ```
 
-`dartway_lints` enforces this as `forbidden_provider_scope`. Riverpod ships a rule for the same trap
-(`scoped_providers_should_specify_dependencies`) which cannot help you here: it only reasons about
-providers written with code generation, and DartWay writes them by hand.
+- **loading** is a skeleton of your real widget, built over placeholder data — `loadingValue` /
+  `loadingItem`, or `DwConfig.defaultModelGetter` when neither is passed — and wrapped in
+  `Skeletonizer` (`SliverSkeletonizer` when the builder returned a sliver). `loadingWidget` replaces
+  the skeleton where a skeleton over stand-in data would itself mislead;
+- **error** goes to the error pipeline with `DwErrorSource.asyncBuild`, and is replaced by
+  `errorBuilder`'s widget, or by `errorWidget` (default `SizedBox.shrink()`);
+- **data** is `childBuilder`. `skipLoadingOnRefresh` is on by default.
 
-## State that is not server data
+**The error default is blank, and the caller decides.** A decoration may fail silently; the section a
+screen exists for may not — an empty page reads as "nothing here yet", not "the read failed". The
+example and the skeleton wrap this in one app extension, `section(...)`, which always renders a
+message with a retry and skips the not-authenticated case, where the sign-in screen is already the
+message (`lib/shared/widgets/load_failed_message.dart` in both).
 
-"How this list is sorted", "is this panel collapsed", "which tab was open" is state too, and it never
-goes near `dw.repo`. Two questions place it, in this order.
+A refusal or a not-authenticated answer rendered this way still reaches `DwConfig.onErrorReport`; the
+app's policy is what keeps it out of the incident log — see [error reporting](error-reporting.md).
 
-**Does it survive a restart?** No — an ordinary `Notifier`, in memory like anything else. Yes — the
-[`dartway_shared_preferences`](plugins.md) plugin, `dw.plugins.prefs`. It hands back a riverpod
-provider, so persisting a value costs no reactivity: the same `ref.watch`, and every reader on the
-screen sees one value.
+## One-off reads: `dw.client`
 
-**Does it belong to an entity?** No, it is one setting for the whole app — a constant key:
-
-```dart
-final darkModeProvider =
-    dw.plugins.prefs.provider<bool>(key: 'darkMode', defaultValue: false);
-```
-
-Yes, there is one per project, per chat, per section — the family form, where `keyFor` builds the key
-from the argument:
+For a value needed once, outside any widget, the client itself is `dw.client`:
 
 ```dart
-final projectSortProvider = dw.plugins.prefs.providerFamily<String, int>(
-  keyFor: (projectId) => 'project.$projectId.sort',
-  defaultValue: 'name',
-);
-
-final sort = ref.watch(projectSortProvider(project.id));
-ref.read(projectSortProvider(project.id).notifier).update('createdAt');
+final result = await dw.client.fetch(const GetInvoice(invoiceId: 7)); // DwCallResult<Invoice>
 ```
 
-The family is what makes this safe, not just short. `provider` takes a constant key and must be
-declared once, like any riverpod provider: call it per id and each call builds a *new* provider, so
-two of them over one key never see each other's writes. A family is declared once and riverpod keeps
-one provider per argument value, which is exactly the guarantee the loop cannot give.
+A `fetch` is not watched: no state is kept and no update reaches the value. It validates first,
+retries and times out like a command. `dw.files.getLink(fileId)` is a fetch of this kind — see
+[uploads on the client](uploads-client.md).
 
-`mappedProvider`/`mappedProviderFamily` are the same pair for enums and custom types, stored as a
-`String`. `dw.plugins.prefs.raw` is the underlying store, for a genuine one-off imperative read — a
-store class of your own built on it has no subscribers, and the state ends up trapped in one widget's
-`State`.
+## Related
 
-## Writing
-
-```dart
-await dw.repo.saveModel(booking.copyWith(status: BookingStatus.cancelled));
-await dw.repo.deleteModel(post);
-```
-
-`saveModel` is **create and update in one call** — a model with no id is inserted, one with an id is
-updated, and the server's `saveConfig` is the single place both are configured. It returns the
-persisted model, so post-processing (computed fields, timestamps) comes back to you. `deleteModel`
-returns `true` when nothing is left on the server; a model that was never persisted returns `true`
-without a round trip.
-
-The `copyWith` above is not a style choice. Rebuilding an existing row by naming its fields —
-`SessionBooking(id: booking.id, …)` — is how a field added later gets silently reset to its default
-on every save, and `model_rebuild_by_constructor` (`dartway_lints`) warns about it. The reasoning,
-and why clearing a nullable field is `copyWith`'s job too, is in
-[models](../2-core/models.md#an-existing-row-is-rebuilt-with-copywith-never-field-by-field).
-
-Both dispatch the server's `updatedModels` into every open watcher of that type, which is why a
-booking cancelled from a card updates the list behind it with no refresh code anywhere. That
-reactivity covers **your own writes**. Another user's write reaching your screen is a server-side
-decision — see [realtime](../2-core/realtime.md).
-
-## When the network is gone
-
-Everything above assumes a connection: `dw.repo` is network-only, a read that cannot reach the
-backend fails, and so does a write. An app that needs otherwise declares a **local store** on the
-core, and then a read may be served from the device and a write may be queued and replayed.
-
-Feature code does not change — the same `ref.watch(dw.repo.modelList<X>())`, the same
-`dw.repo.saveModel(...)`. What changes is one line of bootstrap and, per query, one flag:
-
-```dart
-ref.watch(
-  dw.repo.modelList<Lesson>(
-    customConfig: DwModelListStateConfig<Lesson>(
-      readStrategy: DwRepoReadStrategy.networkFirstWithSnapshot,
-    ),
-  ),
-);
-```
-
-The default stays `DwRepoReadStrategy.networkOnly`, so declaring a store does not quietly turn the
-app into a cache. Writes work the other way round — which ones are queued is decided inside the
-store, not at the call site. See [offline](offline.md).
-
-## Pagination
-
-By default a list is `DwNoPagination`: one request, everything. For long lists pass a strategy
-through `customConfig`:
-
-```dart
-dw.repo.modelList<ChatMessage>(
-  customConfig: DwModelListStateConfig<ChatMessage>(
-    backendFilter: AppBackendFilters.channelMessages(channelId),
-    paginationStrategy: DwCursorPagination(limit: 30),
-  ),
-)
-```
-
-`DwOffsetPagination(pageSize)` walks by offset; `DwCursorPagination(limit:)` walks backwards by id,
-which is what a chat wants — an offset shifts under you when rows are inserted while you scroll.
-`InfiniteListView(listViewConfig: config, listTileBuilder: ...)` drives `loadNextPage` from the
-scroll position and renders the same skeletons.
-
-`DwModelListStateConfig` is also the Riverpod family key, so it defines `==`. Two watches with an
-equal config share one state; a config rebuilt with a fresh closure (`customUpdatesListener`,
-`updatesSortingMethod`) does not, and silently gets its own. Keep such configs out of `build`.
-
-## Testing a feature that reads and writes for itself
-
-A feature built the way this page describes hands nothing out: it watches its own provider and calls
-`dw.repo.saveModel` in its own action. There is no callback for a test to assert on, and **you should
-not keep one alive as a test seam** — that buys a weaker screen for a weaker test.
-
-The seam is one level down, and it is the same one the framework uses on itself: **the transport the
-core sends everything through**. A test hands `DwCore` its own instead of a Serverpod client:
-
-```dart
-import 'package:dartway_serverpod_core_flutter/testing.dart';
-
-// Your own generated Protocol — the same object the real client carries, and
-// the only thing that names your models correctly. A generated model is an
-// abstract class with a private implementation, so its `runtimeType` reads
-// `_LessonImpl`. Import it prefixed: the DartWay core declares a `Protocol` too.
-final transport = DwRecordingServerTransport(
-  serializationManager: app.Protocol(),
-);
-
-// Booted through the app's own initializer — the real bootstrap with one thing
-// swapped — so a test never stands a second, subtly different core beside the
-// one the app ships. Give the initializer an optional `transport` and build no
-// Serverpod client when it is set: a client brings a connectivity monitor and an
-// auth key manager, both of which reach for platform channels.
-setUpAll(() => initAppDwCore(transport: transport));
-
-testWidgets('the button saves the lesson', (tester) async {
-  transport.answerGetAll = (_) async => lessonsResponse([draft]);
-
-  await tester.pumpWidget(const App());
-  await tester.pumpAndSettle();
-  await tester.tap(find.byIcon(Icons.check));
-  await tester.pumpAndSettle();
-
-  expect(transport.saves, hasLength(1));
-  expect((transport.saves.single.model as Lesson).isPublished, isTrue);
-});
-```
-
-The worked version of all of this is
-[`example/dartway_example_flutter/test/`](https://github.com/dartway/dartway/tree/master/example/dartway_example_flutter/test) —
-the news feature, its read states and its write, with the shared harness in `test/support/`.
-
-Reads must be prepared; writes need not be. A read nobody answered throws `DwUnpreparedServerCall`
-naming the call and the field that would answer it — a test that does not know what its subject
-fetches is the thing being caught. A save answers by echoing the model back, because the assertion
-is about what *left*; set `answerSave` when the response itself matters, such as the id assigned on
-insert.
-
-Two things to know before writing the test at all:
-
-- **The core has to be up for the widget to render**, not only for the tap. `dw.action(...)` is
-  constructed in `build`, so a feature reaches `dw` while building — without a core the subtree does
-  not build and the test fails later at a finder ("found 0 widgets"), with the real cause in a
-  separate exception block above. Boot it from `setUpAll` through the app's own initializer, and keep
-  that initializer idempotent so no test file has to know whether another one got there first.
-- **The offline store is not this seam**, and is documented not to be. A write always leaves by the
-  transport first; `dw.repo.localWrites` is reached only after the connection refuses it. Reaching
-  for it to watch a save would force every save to declare itself queued, which is a lie about
-  intent.
-
-And two things that surprise every test that meets them, both of which are about time rather than
-about the transport:
-
-- **`pumpAndSettle` does not drain a notification.** A successful
-  `dw.action(onSuccessNotification: ...)` inserts a toast that removes itself on a `Future.delayed`,
-  and settling waits for frames, not for timers. The test then fails on "A Timer is still pending
-  even after the widget tree was disposed" — an error about the toast, in a test about a save. Pump
-  `DwUiNotification.defaultDuration` after the tap, once, in a shared helper.
-- **A failed read is retried.** Riverpod retries a failed provider on its own with a growing
-  backoff, so a read you made fail is attempted many times while the test settles. Assert the shape
-  of what was asked (`transport.reads.map((r) => r.operation)`), not the count — a count pins
-  somebody else's default.
-
-What this covers is "the button reached `saveModel` with this model". What covers the **rule** —
-who may save what — is an integration test over the CRUD config on the server, where the rule lives.
-
-## Escape hatches
-
-Reach for these only when a provider genuinely does not fit — an imperative flow that owns its own
-state, or a bespoke endpoint of your own:
-
-- `dw.repo.fetchList<T>(filter:, orderByList:, limit:, offset:)` — one-shot `List<T>`;
-- `dw.repo.count<T>(filter:)` — server-side count;
-- `dw.repo.processApiResponse(response)` — unwraps a `DwApiResponse` from a **custom** endpoint and
-  dispatches its `updatedModels` so open watchers stay in sync;
-- `dw.repo.addUpdatesListener<T>` / `removeUpdatesListener<T>` — raw live updates of a type.
+- [Flutter core](flutter-core.md) — building `dw`.
+- [Window list view](window-list-view.md) — the list over `dw.window`.
+- [Actions and refusal texts](actions-and-refusal-texts.md) — sending commands from a tap.
+- The `dartway-data-layer` skill — what to do, step by step, inside a project.

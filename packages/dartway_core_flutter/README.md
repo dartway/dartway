@@ -32,7 +32,7 @@ Around the data layer it is the app's skeleton:
 
 ## Riverpod-native by design
 
-DartWay is opinionated: Serverpod on the server, **Riverpod on the client**.
+DartWay is opinionated: its own server on `dart:io`, **Riverpod on the client**.
 `DwAppRunner` mounts the `ProviderScope`, the data layer exposes providers, and
 `AsyncValue` is the type the whole async-UI contract is built on. This is not an
 implementation detail you can swap — it is the framework.
@@ -55,8 +55,8 @@ AppButton.primary(
   'Save',
   onTap: dw.action(
     // any Future — with the DartWay data layer this is
-    // `DwRepository.saveModel(model)`, but the guard works over any call
-    (context) => saveProfile(model),
+    // `dw.command(SaveProfile(...))`, but the guard works over any call
+    (context) => saveProfile(profile),
     onSuccessNotification: 'Saved',
   ),
 )

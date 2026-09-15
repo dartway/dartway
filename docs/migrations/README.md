@@ -26,36 +26,53 @@ whether an application on the framework, doing nothing wrong, would have to touc
 capability a project may adopt whenever it likes. A note that asks for nothing teaches people to
 skim the ones that do.
 
-`framework-finish` asks for this by name — it is step 5 of that skill, and the reason it is a step
-rather than a habit is that the author of a change is the last person who can see it as a stranger
-would, and the only one who still knows what they broke.
+The `framework-finish` skill asks for this by name, and the reason it is a step rather than a habit
+is that the author of a change is the last person who can see it as a stranger would, and the only
+one who still knows what they broke.
+
+## Not before the rewrite has a release
+
+The DartWay 1.0 rewrite (`dartway_core_*` and the packages around it on this branch) has not been
+released, and until it is, **nothing is preserved and nothing is owed**: versions stay `0.x`, the
+projects moving onto it are recreated on it rather than migrated, databases included (D-031). A note
+is a promise to a project that stands on a released version, so notes for the rewrite are written
+once releases of it exist — from the first one on, every change that asks a project to edit its own
+code carries one, in the same pull request.
+
+A note already in this folder is filtered like any other: a project that does not depend on the
+packages it names, or already has the version it lands in, is never shown it.
 
 ## The form
 
 ```markdown
 ---
-title: DwCore.init takes its plugins as a list
+title: The web image takes the app's origin as a build argument
 affects:
-  dartway_flutter: "0.8.0"
+  dartway_cli: "0.11.0"
 ---
 
 ## Who is affected
 
-A project that calls `DwCore.init` with named plugin arguments — every project created before
-0.8.0, whether or not it declares plugins of its own.
+A project whose `<project>_flutter/Dockerfile` declares no `ARG DW_BACKEND_URL` — every project
+created before `dartway_cli` 0.11.0. `dartway deploy` passes the app its own origin under that name,
+and Docker drops a build argument the Dockerfile does not declare, without a word.
 
 ## What to change
 
-`dartway_flutter/lib/src/dw_core.dart`, in the app file (`<project>_app.dart`):
+`<project>_flutter/Dockerfile`, before `flutter build web`:
 
-    - DwCore.init(prefs: prefsPlugin, push: pushPlugin);
-    + DwCore.init(plugins: [prefsPlugin, pushPlugin]);
+    + ARG DW_BACKEND_URL
+    + RUN test -n "$DW_BACKEND_URL"
+    - RUN flutter build web --release
+    + RUN flutter build web --release \
+    +     --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
 
 ## How to check
 
-`dart analyze` in the Flutter package: the old form no longer compiles, so a missed call site is
-an error rather than something that surfaces at runtime.
+`dartway deploy check --env <environment> --local`: `web-backend-url` passes.
 ```
+
+(An illustration of the form, not a real note: the version is made up.)
 
 **`affects` is the whole mechanism, so it is checked rather than trusted.** Each key is a package
 name; each value is the version the change lands in, **quoted** — unquoted `0.8` is a YAML number
@@ -69,8 +86,8 @@ no history to diff — and because a version is what a project actually moves.
 
 **A change to `template/` alone is keyed to `dartway_cli`.** The skeleton has no version of its
 own, and a project keeps its copy of what it was created from — so a fix to `template/` reaches
-nobody, and the note is the whole delivery. `dartway_cli` is the right key because the template
-declares it as a dev dependency, which puts it in the lock of every project `dartway create`
+nobody, and the note is the whole delivery. `dartway_cli` is the right key because the skeleton's Flutter
+package declares it as a dev dependency, which puts it in the lock of every project `dartway create`
 produces; name the version being released with the fix.
 
 **File name: `YYYY-MM-DD-slug.md`.** The notes are listed in file-name order, which is the order

@@ -7,14 +7,13 @@
       "Bash(dart format:*)",
       "Bash(dart test:*)",
       "Bash(dart run:*)",
-      "Bash(dart bin/main.dart:*)",
+      "Bash(dart pub global run dartway_cli:*)",
       "Bash(flutter pub get:*)",
       "Bash(flutter analyze:*)",
       "Bash(flutter test:*)",
       "Bash(flutter run:*)",
       "Bash(flutter build:*)",
-      "Bash(serverpod generate:*)",
-      "Bash(serverpod create-migration:*)",
+      "Bash(flutter gen-l10n:*)",
       "Bash(dartway:*)",
       "Bash(docker ps:*)",
       "Bash(docker compose up:*)",
@@ -27,7 +26,7 @@
       "Bash(git log:*)"
     ],
     "deny": [
-      "Read(./**/config/passwords.yaml)"
+      "Read(./deploy/secrets.yaml)"
     ]
   }
 }

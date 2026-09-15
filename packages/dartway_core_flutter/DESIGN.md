@@ -7,8 +7,8 @@ is what is specific to *this* package: what it is for, and where its edges are.
 
 The Flutter skeleton of a DartWay app — everything an app needs *before and around* its data layer:
 app bootstrap, the async-UI contract, guarded actions, notifications, error reporting, feature
-declarations, the plugin seam. It knows nothing about a server; the data layer
-(`dartway_serverpod_core_flutter`) is built on top of it and re-exports it.
+declarations, the plugin seam. That skeleton (`DwFlutter`) knows nothing about a server; the data
+layer (`DwFlutterCore`, over `dartway_client`) is built on top of it in the same package.
 
 ## Package principles
 
@@ -24,7 +24,7 @@ contract.
 
 **It collects, it does not deliver.** The error pipeline gathers an error and its context snapshot
 and routes it (`dw.handleError` → `dw.dispatchReport` → the configured hook). It does not deliver:
-Telegram/alert delivery is plugged in by the data layer (`DwFlutterCore` overrides `dispatchReport`). The
+where a report goes is the app's `DwConfig.onErrorReport`, and without one it is only printed. The
 package has no business knowing the channels an error is sent to.
 
 **The core is minimal; optional things are plugins.** This package does not depend on
