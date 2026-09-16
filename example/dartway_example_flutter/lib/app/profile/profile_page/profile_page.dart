@@ -9,7 +9,7 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 
-class ProfilePage extends StatelessWidget implements DwFeature {
+class ProfilePage extends StatelessWidget implements DwFeatureWidget {
   const ProfilePage({super.key});
 
   @override

@@ -17,17 +17,17 @@ Around the data layer it is the app's skeleton:
   from anywhere (`dw.notify.success(...)`), render it with your own handler.
 - 🧯 **Error reporting** — every error carries an app-state snapshot: route,
   mounted features, action label, platform, version.
-- 🏷️ **Feature declarations** — `DwFeature` / `DwFeatureSpec`: a widget states
+- 🏷️ **Feature declarations** — `DwFeatureWidget` / `DwFeatureSpec`: a widget states
   what it is next to its own code — `purpose`, `behaviors` (one checkable
   statement per entry), `requirements`, `implementationNotes`, `knownIssues`.
   Not prose kept
-  somewhere else that drifts: `DwFeature.scanMounted()` reads it off the running
+  somewhere else that drifts: `DwFeatureWidget.scanMounted()` reads it off the running
   app, for error reports, analytics and
   [DartWay Studio](https://dartway.dev) passports.
-- 🔌 **Plugins** — `DwPlugin`: the seam for integrations the framework must not know about. Declare one at startup (`DwFlutter(plugins: [...])`, or `DwFlutterCore` when you use the data layer) and reach it as `dw.plugins.<name>` — kept apart from the core's own services. Telegram lives in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) (`dw.plugins.telegram`), local storage in [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) (`dw.plugins.prefs`) — an app that needs neither never downloads them.
+- 🔌 **Plugins** — `DwFlutterPlugin`: the seam for integrations the framework must not know about. Declare one at startup (`DwFlutterToolbox(plugins: [...])`, or `DwFlutterCore` when you use the data layer) and reach it as `dw.plugins.<name>` — kept apart from the core's own services. Telegram lives in [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) (`dw.plugins.telegram`), local storage in [`dartway_shared_preferences`](https://pub.dev/packages/dartway_shared_preferences) (`dw.plugins.prefs`) — an app that needs neither never downloads them.
 
 > **About `dw`.** It is not a global this package hands you — the app declares it once
-> (`late final DwFlutterCore dw;` with the DartWay data layer, or `DwFlutter`
+> (`late final DwFlutterCore dw;` with the DartWay data layer, or `DwFlutterToolbox`
 > when this package is used standalone) and reaches it from anywhere afterwards.
 
 ## Riverpod-native by design
@@ -76,12 +76,12 @@ DwActionBuilder(
 ## Quick start
 
 ```dart
-// The app declares the ambient core once (DwFlutter standalone, or DwFlutterCore with
+// The app declares the ambient core once (DwFlutterToolbox standalone, or DwFlutterCore with
 // the data layer) and reaches it as `dw` anywhere afterwards.
-late final DwFlutter dw;
+late final DwFlutterToolbox dw;
 
 void main() {
-  dw = DwFlutter(config: const DwConfig(appVersion: '1.0.0'));
+  dw = DwFlutterToolbox(config: const DwFlutterConfig(appVersion: '1.0.0'));
 
   DwAppRunner(
     appInitializers: [myInit],

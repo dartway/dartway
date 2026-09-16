@@ -11,7 +11,7 @@ import 'package:gap/gap.dart';
 import 'widgets/avatar_picker.dart';
 import 'widgets/profile_settings_widget.dart';
 
-class ProfilePage extends StatelessWidget implements DwFeature {
+class ProfilePage extends StatelessWidget implements DwFeatureWidget {
   const ProfilePage({super.key});
 
   @override

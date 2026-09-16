@@ -15,7 +15,7 @@ import 'package:gap/gap.dart';
 /// nothing. So the question is not asked by the sign-in flow but by
 /// `SignedInGate`, of every profile that lacks a name: it covers the login
 /// step, an app closed half-way, and any other road to an unnamed account.
-class ProfileNamePage extends HookWidget implements DwFeature {
+class ProfileNamePage extends HookWidget implements DwFeatureWidget {
   const ProfileNamePage({super.key});
 
   @override

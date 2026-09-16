@@ -230,7 +230,7 @@ class DwFlutterInspector {
       return;
     }
 
-    if (!content.contains('DwFeature')) {
+    if (!content.contains('DwFeatureWidget')) {
       _add(
         DwCheckType.featureSpecMissing,
         '$rel declares no DwFeatureSpec — the feature exists in the code but '

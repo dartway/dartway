@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../dw_feature/dw_feature.dart';
+import '../../dw_feature/dw_feature_widget.dart';
 
 /// Immutable snapshot of the app state captured at the moment an error is
 /// reported. On web builds the stack trace is minified noise — this snapshot
@@ -22,7 +22,7 @@ class DwErrorContextSnapshot {
   /// Current route path, when a route source is registered.
   final String? route;
 
-  /// Ids of the `DwFeature` widgets mounted on the current screen.
+  /// Ids of the `DwFeatureWidget` widgets mounted on the current screen.
   final List<String> featureIds;
 
   /// App-defined entries (user, tenant, ...), insertion-ordered.
@@ -95,7 +95,7 @@ class DwErrorContext {
 
   static List<String> _capturedFeatureIds() {
     try {
-      return [for (final feature in DwFeature.scanMounted()) feature.id];
+      return [for (final feature in DwFeatureWidget.scanMounted()) feature.id];
     } catch (_) {
       return const [];
     }

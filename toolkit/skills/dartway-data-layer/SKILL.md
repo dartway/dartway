@@ -7,7 +7,7 @@ description: >-
   value itself; errors as typed AsyncValue errors (DwRefusalException, DwFailedException,
   DwNotAuthenticatedException, DwTimeoutException) rendered with an explicit error branch; refreshing
   with the notifier's refetch (never ref.invalidate); commands through dw.action((_) =>
-  dw.command(...)) with refusals shown by DwConfig.refusalText; form validation with DwSelfValidating;
+  dw.command(...)) with refusals shown by DwFlutterConfig.refusalText; form validation with DwSelfValidating;
   the session (dw.accountId, dw.signIn, dw.signOut), dw.liveStatus and dw.incompatibility;
   hand-written providers (no riverpod_generator) that answer one question each; notifications via
   dw.notify; local screen state via dw.plugins.prefs. No data/ layer, no repository classes. Use when
@@ -23,7 +23,7 @@ is **no `lib/data/`, no repository class, no service wrapper, no hand-made cache
 can only drift from it.
 
 `dw` is the app's `DwFlutterCore`, built once in `lib/core/` (the skeleton's core file: `late
-DwFlutterCore dw;` and the function that builds it with the protocol, the base URL, `DwConfig` and
+DwFlutterCore dw;` and the function that builds it with the protocol, the base URL, `DwFlutterConfig` and
 the plugins). Everything below reaches it as `dw`.
 
 Related skills: `dartway-contract` (the DTOs), `dartway-realtime` (why screens update by themselves),
@@ -130,7 +130,7 @@ AppButton.primary(
 What `dw.action` does with the `DwCallResult` the callback returns:
 
 - `DwCallOk` → success notification, `followUpIfMountedAction`;
-- **refused** → shows `DwConfig.refusalText(refusal)` as an error notification. Write nothing for it:
+- **refused** → shows `DwFlutterConfig.refusalText(refusal)` as an error notification. Write nothing for it:
   no `try`, no `switch` over the result, no `onErrorNotification` for the refusal case;
 - **not authenticated** → signs out, shows nothing;
 - **failed / timed out** → `onErrorNotification` if given, and the app's error report.
@@ -152,7 +152,7 @@ result thrown there is handled the same way.
 
 ## 5. Refusal texts
 
-`DwConfig.refusalText` is required: a refusal is a code with parameters, and the app turns it into
+`DwFlutterConfig.refusalText` is required: a refusal is a code with parameters, and the app turns it into
 words. The skeleton's `lib/core/` holds the function — a map from every known wire code to its enum
 value, and an **exhaustive `switch`** per enum: the project's `<Project>Refusal`, `DwCoreRefusal`,
 `DwAuthRefusal`, `DwUploadRefusal`, and a generic sentence for a code none of them knows (a newer
@@ -165,7 +165,7 @@ Adding a refusal code to the contract therefore means, in the same change:
 3. parameters rendered from `refusal.params` (strings), and `refusal.field` where one code means
    different things per field (`dw.invalid` on `identifier` vs `code`).
 
-In the app's `DwConfig.onErrorReport`, step over `DwRefusalException` and
+In the app's `DwFlutterConfig.onErrorReport`, step over `DwRefusalException` and
 `DwNotAuthenticatedException` **by type** — a refusal is an answer, not an incident. Never match
 message text.
 
@@ -203,7 +203,7 @@ Send only what changed: an edit command's `DwFieldPatch` fields are `keep()` for
   `connected`, `disconnected`, `incompatible`). Calls work whatever it says; it only tells whether data
   on screen still follows the server — an "offline" hint, never a reason to block a button.
 - **Incompatibility:** a build below the server's `minAppBuild` (or a protocol mismatch) sets
-  `dw.incompatibility`, and `DwAppRunner` shows `DwConfig.updateRequiredScreen` over the whole app.
+  `dw.incompatibility`, and `DwAppRunner` shows `DwFlutterConfig.updateRequiredScreen` over the whole app.
 
 ## 8. Chats and logs — `DwWindowListView`
 

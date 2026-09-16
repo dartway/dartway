@@ -4,13 +4,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  // One DwFlutter per test process — the singleton forbids re-creation. It is
+  // One DwFlutterToolbox per test process — the singleton forbids re-creation. It is
   // built up here because `init` takes a core now, so even the group that only
   // checks the stub is inert needs one to hand over.
   final pluggedIn = DwTelegramWebApp.create(
     config: const DwTelegramWebAppConfig(requestFullScreen: true),
   );
-  final dwInstance = DwFlutter(config: const DwConfig(), plugins: [pluggedIn]);
+  final dwInstance = DwFlutterToolbox(config: const DwFlutterConfig(), plugins: [pluggedIn]);
 
   group('DwTelegramPlatform.fromRaw', () {
     test('maps the clients Telegram reports today', () {

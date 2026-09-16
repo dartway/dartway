@@ -25,7 +25,7 @@ The rewrite (see docs/1.0).
     `Dw-App-Version · User-Agent` (sanitised, 200 characters).
   - **`ctx.sessionKey`** (`DwSessionKeyInfo?`): the key that authenticated
     the call — its id, kind and label — on calls, channel subscription checks
-    and routes. **`DwRoute.get/post/any(..., auth: DwRouteAuth.optional |
+    and routes. **`DwHttpRoute.get/post/any(..., auth: DwRouteAuth.optional |
     required)`** reads `Authorization: Bearer` (401 for an unknown, revoked or
     required-but-missing token; 400 for a malformed header); the default
     `none` reads nothing, as before.

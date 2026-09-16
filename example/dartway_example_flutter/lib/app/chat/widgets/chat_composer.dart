@@ -75,7 +75,7 @@ final class ChatComposerFile {
 ///
 /// The sent message is not added here: it arrives in the command's answer and
 /// on the channel. After sending, the list goes to the newest message.
-class ChatComposer extends HookConsumerWidget implements DwFeature {
+class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
   const ChatComposer({required this.session, super.key});
 
   final ChatSession session;

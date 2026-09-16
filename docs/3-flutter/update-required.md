@@ -22,7 +22,7 @@ two codes rather than one because the cause differs, and so do the words on the 
 Every call carries two headers the client sets itself:
 
 - `Dw-Protocol` — the framework's protocol version (`dwProtocolVersion`);
-- `Dw-App-Version` — `DwConfig.appVersion`, `<semver>+<build>` (`1.4.2+57`). Only the number after `+`
+- `Dw-App-Version` — `DwFlutterConfig.appVersion`, `<semver>+<build>` (`1.4.2+57`). Only the number after `+`
   is compared.
 
 The server answers `426` with status `incompatible` when the protocol differs, or when the build is
@@ -49,12 +49,12 @@ The first incompatible answer makes the client **incompatible for good**:
 
 Nothing under the app can reach the server any more, and nothing is retried: only another build can.
 
-## `DwConfig.updateRequiredScreen`
+## `DwFlutterConfig.updateRequiredScreen`
 
 The project supplies the page:
 
 ```dart
-DwConfig(
+DwFlutterConfig(
   // ...
   updateRequiredScreen: (context, refusal) => UpdateRequiredPage(refusal: refusal),
 )
@@ -141,5 +141,5 @@ page is already the message.
 
 ## Related
 
-- [Flutter core](flutter-core.md) — `DwConfig` and the bootstrap.
+- [Flutter core](flutter-core.md) — `DwFlutterConfig` and the bootstrap.
 - [Refusals and statuses](../2-core/refusals-and-statuses.md) — `incompatible` among the statuses.

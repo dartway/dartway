@@ -3,8 +3,8 @@
 Declare the plugin once:
 
 ```dart
-DwFlutter(
-  config: DwConfig(/* ... */),
+DwFlutterToolbox(
+  config: DwFlutterConfig(/* ... */),
   plugins: [DwSharedPreferences()],
 );
 ```

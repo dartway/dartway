@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/dw_core.dart';
 
-class NewsPage extends StatelessWidget implements DwFeature {
+class NewsPage extends StatelessWidget implements DwFeatureWidget {
   const NewsPage({super.key});
 
   @override

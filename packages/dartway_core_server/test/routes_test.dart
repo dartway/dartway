@@ -13,49 +13,49 @@ void main() {
     build: (app, config) => app.server(
       config,
       routes: [
-        DwRoute.get(
+        DwHttpRoute.get(
           '/hello',
           (ctx, request) => DwHttpResponse.json({
             'hello': request.query['name'] ?? 'world',
             'agent': request.headers['x-agent'],
           }),
         ),
-        DwRoute.post('/echo', (ctx, request) async {
+        DwHttpRoute.post('/echo', (ctx, request) async {
           final body = await request.json() as Map<String, Object?>;
           await ctx.jobs.enqueue('record', {'tag': body['tag']});
           return DwHttpResponse.json(body, status: 201);
         }),
-        DwRoute.post('/limited', (ctx, request) async {
+        DwHttpRoute.post('/limited', (ctx, request) async {
           final bytes = await request.bytes(maxBytes: 8);
           return DwHttpResponse.text('${bytes.length}');
         }),
-        DwRoute.any(
+        DwHttpRoute.any(
           '/any',
           (ctx, request) => DwHttpResponse.text(request.method),
         ),
-        DwRoute.post('/any', (ctx, request) => DwHttpResponse.text('specific')),
-        DwRoute.get('/unread', (ctx, request) => DwHttpResponse.empty()),
-        DwRoute.get('/unusual', (ctx, request) => DwHttpResponse(299)),
-        DwRoute.post('/publish', (ctx, request) async {
+        DwHttpRoute.post('/any', (ctx, request) => DwHttpResponse.text('specific')),
+        DwHttpRoute.get('/unread', (ctx, request) => DwHttpResponse.empty()),
+        DwHttpRoute.get('/unusual', (ctx, request) => DwHttpResponse(299)),
+        DwHttpRoute.post('/publish', (ctx, request) async {
           final note = await TestApp.insertNote(ctx.db, 'from a route');
           ctx.publish(const DwLiveChannel(TestChannel.public), note);
           return DwHttpResponse.empty(status: 202);
         }),
-        DwRoute.get(
+        DwHttpRoute.get(
           '/refuse',
           (ctx, request) => ctx.refuse(DwCoreRefusal.forbidden),
         ),
-        DwRoute.get(
+        DwHttpRoute.get(
           '/slow-down',
           (ctx, request) => throw DwRefusalException(
             DwCallRefusal.tooManyRequests(const Duration(seconds: 7)),
           ),
         ),
-        DwRoute.get(
+        DwHttpRoute.get(
           '/account',
           (ctx, request) => DwHttpResponse.text('${ctx.requireAccountId}'),
         ),
-        DwRoute.get(
+        DwHttpRoute.get(
           '/explode',
           (ctx, request) => throw StateError('route secret s3cr3t'),
         ),

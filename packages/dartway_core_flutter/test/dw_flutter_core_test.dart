@@ -21,7 +21,7 @@ class _MemoryStore extends DwKeyValueStorePlugin {
   final Map<String, Object> values;
 
   @override
-  Future<void> init(DwFlutter core) async {}
+  Future<void> init(DwFlutterToolbox core) async {}
 
   @override
   Future<String?> getString(String key) async => values[key] as String?;
@@ -91,7 +91,7 @@ final class World {
     String appVersion = '1.0.0+5',
     Widget Function(BuildContext, DwCallRefusal)? updateRequiredScreen,
   }) => DwFlutterCore(
-    config: DwConfig(
+    config: DwFlutterConfig(
       appVersion: appVersion,
       onErrorReport: reports.add,
       refusalText: (refusal) => refusal.isCode(RoomRefusal.nameTaken)
@@ -625,7 +625,7 @@ void main() {
     final world = World();
     expect(
       () => DwFlutterCore(
-        config: const DwConfig(appVersion: '1.0.0+1'),
+        config: const DwFlutterConfig(appVersion: '1.0.0+1'),
         protocol: roomsProtocol,
         baseUrl: world.server.baseUrl,
       ),
@@ -633,7 +633,7 @@ void main() {
     );
     expect(
       () => DwFlutterCore(
-        config: DwConfig(refusalText: (refusal) => refusal.code),
+        config: DwFlutterConfig(refusalText: (refusal) => refusal.code),
         protocol: roomsProtocol,
         baseUrl: world.server.baseUrl,
       ),
@@ -641,7 +641,7 @@ void main() {
     );
     expect(
       () => DwFlutterCore(
-        config: DwConfig(
+        config: DwFlutterConfig(
           appVersion: 'one',
           refusalText: (refusal) => refusal.code,
         ),
@@ -657,7 +657,7 @@ void main() {
   test('without a key-value store plugin init fails, naming the fix', () async {
     final world = World();
     final dw = DwFlutterCore(
-      config: DwConfig(
+      config: DwFlutterConfig(
         appVersion: '1.0.0+1',
         refusalText: (refusal) => refusal.code,
       ),

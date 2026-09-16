@@ -110,7 +110,7 @@ about a call — an incompatible client learns that first, whatever else it got 
 `426` with `dw.protocolUnsupported`, and the socket closes with 4026. It means a framework version skew
 between app and server, which the operator resolves.
 
-**`Dw-App-Version`** is the app's own build, from `DwConfig.appVersion`. The server compares its build
+**`Dw-App-Version`** is the app's own build, from `DwFlutterConfig.appVersion`. The server compares its build
 number with `DwServerSettings.minAppBuild` (default 0); a lower build — or no header while the minimum
 is above 0 — is answered `426` with `dw.updateRequired`. `minAppBuild` is read at startup, so raising
 it takes a restart and no release. That is the lever for a project's own incompatible change: a
@@ -119,7 +119,7 @@ minimum.
 
 **On the client an incompatibility is terminal.** The first `426` (or close 4026) sets
 `dw.incompatibility`; from then on every call is answered locally with that refusal, the socket stays
-closed, and `DwConfig.updateRequiredScreen` replaces the app — see
+closed, and `DwFlutterConfig.updateRequiredScreen` replaces the app — see
 [../3-flutter/update-required.md](../3-flutter/update-required.md).
 
 ## Origins

@@ -18,7 +18,7 @@ The server half — queue, eligibility, retries — is [Push delivery](../4-serv
 
 ```dart
 dw = DwFlutterCore(
-  config: DwConfig(...),
+  config: DwFlutterConfig(...),
   protocol: appProtocol, // DwWireProtocol(dwPushProtocolEntries, include: appGeneratedProtocol)
   baseUrl: baseUrl,
   plugins: [

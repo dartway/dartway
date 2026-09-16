@@ -18,7 +18,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// Staff-only chat. The UI hides the tab for clients; the real protection is
 /// the server: the requests refuse a client, and so do the channels and the
 /// file links.
-class StaffChatPage extends HookConsumerWidget implements DwFeature {
+class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
   const StaffChatPage({super.key});
 
   @override

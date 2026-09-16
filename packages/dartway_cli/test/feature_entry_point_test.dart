@@ -41,7 +41,7 @@ void main() {
   group('a feature declares a widget, and the widget declares a spec', () {
     test('a widget with a spec is what the rule wants', () async {
       final findings = await checkZoneFeature('''
-class ThingPage extends StatelessWidget implements DwFeature {
+class ThingPage extends StatelessWidget implements DwFeatureWidget {
   DwFeatureSpec get dwFeature => const DwFeatureSpec(id: 'thing');
 }
 ''');

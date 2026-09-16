@@ -130,7 +130,7 @@ exception squeezed past the rule:
 
 ```dart
 // ✅ the feature's own widget owns how it is shown
-class UserFormSheet extends StatelessWidget implements DwFeature {
+class UserFormSheet extends StatelessWidget implements DwFeatureWidget {
   static Future<void> showCreate(BuildContext context) =>
       context.showAppBottomSheet(child: const UserFormSheet());
   static Future<void> showEdit(BuildContext context, UserProfile userProfile) => ...;

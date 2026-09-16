@@ -12,7 +12,7 @@ DartWay splits the problem in two, and adds one project file:
 - **`DwActionBuilder` — what the UI does while it runs.** The in-flight flag, the dropped second tap,
   form validation, focus.
 - **`lib/core/refusal_text.dart` — what a refusal says.** The project's mapping from refusal codes to
-  localized sentences, handed to `DwConfig.refusalText`.
+  localized sentences, handed to `DwFlutterConfig.refusalText`.
 
 The framework ships no button. It ships the mechanisms a button would otherwise have to contain.
 
@@ -63,7 +63,7 @@ on what went wrong:
 
 | What went wrong | What the user sees | What else |
 |---|---|---|
-| A refusal — `DwCallRefused`, or a `DwRefusalException` thrown by your own code | `DwConfig.refusalText(refusal)` as an error notification. It wins over `onErrorNotification`, which was written once for every way the action could fail. | — |
+| A refusal — `DwCallRefused`, or a `DwRefusalException` thrown by your own code | `DwFlutterConfig.refusalText(refusal)` as an error notification. It wins over `onErrorNotification`, which was written once for every way the action could fail. | — |
 | A refusal that is an incompatibility (`dw.updateRequired`, `dw.protocolUnsupported`) while `updateRequiredScreen` is set | nothing: the update page over the app is already the message | — |
 | Not authenticated — `DwNotAuthenticated`, or `DwNotAuthenticatedException` | nothing: the sign-in screen is the message | `dw.signOut()` |
 | Anything else — `DwCallFailed`, a `DwTimeoutException`, a bug | `onErrorNotification`, when set | — |
@@ -95,7 +95,7 @@ dw.action(
 `DwUiConfirmation` is declarative: `message`, optional `title`, `confirmLabel` / `cancelLabel`
 (defaulting to Material's localized OK and Cancel) and `isDestructive`, which paints the confirm button
 in the theme's error colour. The built-in dialog is `DwConfirmDialog`; replace it app-wide with
-`DwConfig.confirmDialogBuilder`.
+`DwFlutterConfig.confirmDialogBuilder`.
 
 Note the `(context)` at the end: this action is built and run on the spot inside a
 `DropdownButton.onChanged`, because there is no tappable widget to hand it to. Legitimate — but nothing

@@ -5,17 +5,17 @@ import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 ///
 /// It is the one process-wide pointer the package keeps, and it is bound to a
 /// core's lifetime rather than to the process: a core claims it when built and
-/// releases it in [DwFlutter.dispose], so a test can build, dispose and build
+/// releases it in [DwFlutterToolbox.dispose], so a test can build, dispose and build
 /// again as often as it likes. Two cores alive at once is still refused — the
 /// framework code above could not tell which one it means.
-DwFlutter? _instance;
+DwFlutterToolbox? _instance;
 
-DwFlutter get dw {
+DwFlutterToolbox get dw {
   final instance = _instance;
   if (instance == null) {
     throw StateError(
       'Dw is not initialized.\n'
-      'Make sure the app built its core — DwFlutter(config: ...), or DwFlutterCore '
+      'Make sure the app built its core — DwFlutterToolbox(config: ...), or DwFlutterCore '
       'with the data layer — before anything reached dw. A widget test has to '
       'build one too (and dispose it in tearDown): a feature reaches dw while '
       'building, not on the tap, so the subtree does not render without it.',
@@ -26,9 +26,9 @@ DwFlutter get dw {
 
 /// The instance when it exists — for framework code that may run before the
 /// app core is built or after it was disposed (the global error pipeline).
-DwFlutter? get dwOrNull => _instance;
+DwFlutterToolbox? get dwOrNull => _instance;
 
-void attachDwInstance(DwFlutter instance) {
+void attachDwInstance(DwFlutterToolbox instance) {
   final current = _instance;
   if (current != null && !identical(current, instance)) {
     throw StateError(
@@ -40,6 +40,6 @@ void attachDwInstance(DwFlutter instance) {
   _instance = instance;
 }
 
-void detachDwInstance(DwFlutter instance) {
+void detachDwInstance(DwFlutterToolbox instance) {
   if (identical(_instance, instance)) _instance = null;
 }

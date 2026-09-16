@@ -98,7 +98,7 @@ final class LogWorld {
   ];
 
   DwFlutterCore core() => DwFlutterCore(
-    config: DwConfig(
+    config: DwFlutterConfig(
       appVersion: '1.0.0+1',
       refusalText: (refusal) => refusal.code,
     ),

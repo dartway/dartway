@@ -284,7 +284,7 @@ class MyFeature {
       File(p.join(package.path, 'lib', 'app', 'thing', 'thing.dart'))
         ..createSync(recursive: true)
         ..writeAsStringSync('''
-class ThingPage extends StatelessWidget implements DwFeature {
+class ThingPage extends StatelessWidget implements DwFeatureWidget {
   DwFeatureSpec get dwFeature => const DwFeatureSpec(id: 'thing');
 }
 ''');

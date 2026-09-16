@@ -9,7 +9,7 @@ description: >-
   commands; mapping rows to data objects in batch; one DwCallHandler per request and command
   (single/maybe/list/page/table/window/command) with its access rule; the DwCallContext (memo for
   the caller's profile and role, ctx.refuse, ctx.publish after commit, ctx.transaction, jobs,
-  accounts, files); background jobs (DwJobDefinition, DwRecurringJob); DwRoute for external doors
+  accounts, files); background jobs (DwJobDefinition, DwRecurringJob); DwHttpRoute for external doors
   only; auth hooks in DwAuthConfig (onAccountCreated creates the profile in the same transaction,
   onIdentifierChanged); DwAccountService instead of SQL on dw_* tables; the fixed lib/ layout.
   Use when writing or changing a handler, a row class, a query, a job, a route or sign-in hooks.
@@ -382,11 +382,11 @@ publish. Names starting with `dw.` are the framework's.
 
 ## 8. Routes — external doors only
 
-The app never calls a route: it calls DTOs. A `DwRoute` exists for callers that cannot speak the
+The app never calls a route: it calls DTOs. A `DwHttpRoute` exists for callers that cannot speak the
 contract — a payment webhook, a file download link, a health probe of a partner:
 
 ```dart
-DwRoute.post('/webhooks/payments', (ctx, request) async {
+DwHttpRoute.post('/webhooks/payments', (ctx, request) async {
   final body = await request.json();
   // verify the sender's signature, then write, publish, enqueue
   return DwHttpResponse.empty();

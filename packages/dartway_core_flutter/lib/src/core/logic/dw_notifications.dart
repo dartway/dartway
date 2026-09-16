@@ -1,4 +1,4 @@
-part of '../dw_flutter.dart';
+part of '../dw_flutter_toolbox.dart';
 
 class _DwNotifications {
   _DwNotifications._();

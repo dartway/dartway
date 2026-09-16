@@ -10,7 +10,7 @@ import 'widgets/code_entry_block.dart';
 import 'widgets/consents_block.dart';
 import 'widgets/identifier_entry_block.dart';
 
-class AuthPage extends ConsumerWidget implements DwFeature {
+class AuthPage extends ConsumerWidget implements DwFeatureWidget {
   const AuthPage({super.key});
 
   @override

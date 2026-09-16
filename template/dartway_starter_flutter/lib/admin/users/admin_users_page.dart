@@ -11,7 +11,7 @@ import 'widgets/admin_users_table.dart';
 /// Member management: search, role filter, numbered pages, inline role
 /// editing, and a card per member. Listing profiles and changing a role are
 /// both admin-only on the server.
-class AdminUsersPage extends HookWidget implements DwFeature {
+class AdminUsersPage extends HookWidget implements DwFeatureWidget {
   const AdminUsersPage({super.key});
 
   @override

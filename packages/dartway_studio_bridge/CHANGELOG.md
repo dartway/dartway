@@ -208,7 +208,7 @@ token works at one address, for minutes.
 `InspectPointRequestMessage` / `InspectPointResultMessage` — carries the "pencil" tap-to-inspect
 flow: Studio names a spot in the live preview, the app answers with the feature declared there, or
 with nothing. `StudioBridgeClient.inspectPoint()` is the Studio side; `StudioBridgeHost.attach`
-takes an `inspectPoint` callback for the app side (a DartWay app hands it `DwFeature.hitTest`).
+takes an `inspectPoint` callback for the app side (a DartWay app hands it `DwFeatureWidget.hitTest`).
 
 **The point travels as fractions of the app's viewport, not pixels.** Studio shows the preview
 scaled, framed, letterboxed — whatever the panel needs — and only the app knows its own logical

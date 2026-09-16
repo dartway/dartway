@@ -24,7 +24,7 @@ import '../live/dw_live_endpoint.dart';
 import '../live/dw_live_hub.dart';
 import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
-import '../routes/dw_route.dart';
+import '../routes/dw_http_route.dart';
 import 'dw_runtime.dart';
 import 'dw_server_module.dart';
 import 'dw_server_settings.dart';
@@ -100,7 +100,7 @@ final class DwAppServer {
   final List<DwCallHandler> handlers;
   final List<DwChannelRule> channels;
   final List<DwJobDefinition> jobs;
-  final List<DwRoute> routes;
+  final List<DwHttpRoute> routes;
 
   /// File uploads: storage, a rule per purpose, who reads private files.
   /// Without it the framework's file calls fail as incidents and `ctx.files`

@@ -11,7 +11,7 @@ export 'logic/mapped_pref_notifier.dart';
 export 'logic/pref_notifier.dart';
 
 /// Reaches the plugin as `dw.plugins.prefs` — same shape as `dw.plugins.telegram`.
-extension DwPrefsAccess on DwPlugins {
+extension DwPrefsAccess on DwPluginRegistry {
   DwSharedPreferences get prefs => of<DwSharedPreferences>();
 }
 
@@ -22,7 +22,7 @@ extension DwPrefsAccess on DwPlugins {
 /// riverpod can write down — and a file that just wants to remember a setting
 /// has no other reason to. Worse, when riverpod is absent the analyzer does not
 /// say so: it reports *"the getter 'prefs' isn't defined for the type
-/// DwPlugins"*, pointing at a getter that is perfectly fine, while
+/// DwPluginRegistry"*, pointing at a getter that is perfectly fine, while
 /// `unused_import` simultaneously suggests removing the import that fixes it.
 typedef DwPrefProvider<T> = NotifierProvider<PrefNotifier<T>, T>;
 
@@ -44,8 +44,8 @@ typedef DwMappedPrefProviderFamily<T, Arg> =
 /// Declare it at startup, then reach it as `dw.plugins.prefs`:
 ///
 /// ```dart
-/// DwFlutter(
-///   config: DwConfig(/* ... */),
+/// DwFlutterToolbox(
+///   config: DwFlutterConfig(/* ... */),
 ///   plugins: [DwSharedPreferences()],
 /// );
 /// ```
@@ -85,7 +85,7 @@ enum DwPrefsUnavailable {
   /// and the failure is reported once.
   useMemory,
 
-  /// Let the failure out. With [DwPlugin.blocksStartup] left at its default
+  /// Let the failure out. With [DwFlutterPlugin.blocksStartup] left at its default
   /// this stops the app from starting — the right answer where running without
   /// persistence is worse than not running.
   fail,
@@ -119,7 +119,7 @@ class DwSharedPreferences extends DwKeyValueStorePlugin {
   bool get isPersistent => _persistent;
 
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     try {
       raw = await SharedPreferences.getInstance();
     } catch (error, stackTrace) {

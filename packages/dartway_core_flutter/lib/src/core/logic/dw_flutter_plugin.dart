@@ -1,21 +1,21 @@
-import '../dw_flutter.dart';
+import '../dw_flutter_toolbox.dart';
 
 /// An integration plugged into the app core at bootstrap.
 ///
 /// The framework knows what a plugin *is* — never what any particular one
-/// *does*. That is the whole point: `DwConfig` must not grow a field named
+/// *does*. That is the whole point: `DwFlutterConfig` must not grow a field named
 /// after a vendor, and an app that does not use an integration must not carry
 /// its dependency.
 ///
-/// A plugin is declared once (`DwFlutter(plugins: [...])`), initialized with the
-/// app, and reached through [DwPlugins] (`dw.plugins`). Integration packages
+/// A plugin is declared once (`DwFlutterToolbox(plugins: [...])`), initialized with the
+/// app, and reached through [DwPluginRegistry] (`dw.plugins`). Integration packages
 /// build their own accessor on top, so the app writes `dw.plugins.telegram`
 /// rather than a lookup — the ergonomics of an ambient service, with none of
 /// the coupling:
 ///
 /// ```dart
 /// // in the integration package, not in the framework
-/// extension DwTelegramAccess on DwPlugins {
+/// extension DwTelegramAccess on DwPluginRegistry {
 ///   DwTelegramWebApp get telegram => of<DwTelegramWebApp>();
 /// }
 /// ```
@@ -26,18 +26,18 @@ import '../dw_flutter.dart';
 /// constructor that assigns it. Reading `dw` from inside a `plugins: [...]`
 /// list compiles and throws `LateInitializationError` at startup.
 ///
-/// The argument is a [DwFlutter]. An app built on the data layer passes a
+/// The argument is a [DwFlutterToolbox]. An app built on the data layer passes a
 /// `DwFlutterCore`, which is one — a plugin that needs the data layer names it and
 /// casts, and thereby says out loud that it does not work on the plain
 /// toolbox.
-abstract class DwPlugin {
-  const DwPlugin();
+abstract class DwFlutterPlugin {
+  const DwFlutterPlugin();
 
   /// Runs once during `dw.init()`, in declaration order, with the core this
   /// plugin was plugged into. A plugin is built *before* `dw` exists — that is
   /// what `plugins:` being a constructor argument means — so this is the first
   /// moment it may look at anything.
-  Future<void> init(DwFlutter core);
+  Future<void> init(DwFlutterToolbox core);
 
   /// Whether a failure in [init] must stop the application from starting.
   ///
@@ -68,7 +68,7 @@ abstract class DwPlugin {
 class DwPluginInitException implements Exception {
   const DwPluginInitException(this.plugin, this.cause);
 
-  /// The plugin whose [DwPlugin.init] threw.
+  /// The plugin whose [DwFlutterPlugin.init] threw.
   final Type plugin;
 
   /// What it threw.
@@ -84,19 +84,19 @@ class DwPluginInitException implements Exception {
 /// services (`dw.notify`, `dw.action`, `dw.confirm`). `dw.` is the closed,
 /// known core; `dw.plugins.` is the open set a project plugs in. An integration
 /// package adds a named accessor here (`dw.plugins.telegram`, `dw.plugins.prefs`)
-/// via `extension on DwPlugins`.
-class DwPlugins {
-  DwPlugins(this._plugins);
+/// via `extension on DwPluginRegistry`.
+class DwPluginRegistry {
+  DwPluginRegistry(this._plugins);
 
-  final List<DwPlugin> _plugins;
+  final List<DwFlutterPlugin> _plugins;
 
-  /// Plugins whose [DwPlugin.init] threw, by identity, with what it threw.
+  /// Plugins whose [DwFlutterPlugin.init] threw, by identity, with what it threw.
   ///
   /// Kept because a failed plugin is not an absent one, and its `late final`
   /// fields are unset: reaching for it must say what happened, not die on a
   /// `LateInitializationError` from inside it — further from the cause than
   /// the crash it replaced.
-  final Map<DwPlugin, Object> _failures = {};
+  final Map<DwFlutterPlugin, Object> _failures = {};
 
   /// The registered plugin of type [T], or `null` when the app connected none.
   ///
@@ -110,9 +110,9 @@ class DwPlugins {
   /// A plugin that failed to start is **not** a claimant here. It was declared,
   /// it did not survive, and its failure was already reported at init — so the
   /// framework gets the honest answer that nobody holds the role, and the app
-  /// that allowed the failure ([DwPlugin.blocksStartup] false) gets the
+  /// that allowed the failure ([DwFlutterPlugin.blocksStartup] false) gets the
   /// degradation it asked for rather than a second crash later.
-  T? maybeOf<T extends DwPlugin>() {
+  T? maybeOf<T extends DwFlutterPlugin>() {
     T? claimant;
     for (final plugin in _plugins) {
       if (plugin is! T) continue;
@@ -135,7 +135,7 @@ class DwPlugins {
   /// wiring mistake and a corpse is worse, because its fields are unset and
   /// the first touch would raise a `LateInitializationError` from inside the
   /// package, with nothing naming startup.
-  T of<T extends DwPlugin>() {
+  T of<T extends DwFlutterPlugin>() {
     for (final plugin in _plugins) {
       if (plugin is! T) continue;
       final failure = _failures[plugin];
@@ -150,7 +150,7 @@ class DwPlugins {
     }
     throw StateError(
       'No $T is registered. Declare it at startup: '
-      'DwFlutter(plugins: [...]) — or DwFlutterCore with the data layer.',
+      'DwFlutterToolbox(plugins: [...]) — or DwFlutterCore with the data layer.',
     );
   }
 
@@ -164,11 +164,11 @@ class DwPlugins {
   /// something an app author weighs while writing `plugins: [...]`.
   ///
   /// What a failure costs is now the plugin's own answer
-  /// ([DwPlugin.blocksStartup]), and either way the report names it: a blocking
+  /// ([DwFlutterPlugin.blocksStartup]), and either way the report names it: a blocking
   /// failure travels on as [DwPluginInitException] and is reported once, by
   /// whoever catches an uncaught error; a non-blocking one goes through the
   /// error pipeline here and the loop carries on.
-  Future<void> initAll(DwFlutter core) async {
+  Future<void> initAll(DwFlutterToolbox core) async {
     for (final plugin in _plugins) {
       try {
         await plugin.init(core);

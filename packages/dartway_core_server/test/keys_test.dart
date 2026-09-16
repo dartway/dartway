@@ -23,7 +23,7 @@ void main() {
           ('/key/optional', DwRouteAuth.optional),
           ('/key/required', DwRouteAuth.required),
         ])
-          DwRoute.get(
+          DwHttpRoute.get(
             path,
             (ctx, request) => DwHttpResponse.json({
               'account': ctx.accountId,

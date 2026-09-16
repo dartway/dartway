@@ -17,7 +17,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// One channel of the staff chat: its history, the pinned bar, the floating
 /// date, the "↓" button, and the composer — or, while searching, the way
 /// through the matches.
-class ChatChannelView extends HookConsumerWidget implements DwFeature {
+class ChatChannelView extends HookConsumerWidget implements DwFeatureWidget {
   const ChatChannelView({
     required this.channel,
     required this.searchQuery,

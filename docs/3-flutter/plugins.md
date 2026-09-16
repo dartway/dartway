@@ -2,17 +2,17 @@
 
 Every app eventually needs an integration the framework has no business knowing: local storage,
 Telegram, a vendor SDK someone signed a contract for. The usual answer is a field on the framework's
-config — `DwConfig(telegram: ...)` — and from that moment every app carries the vendor's dependency,
+config — `DwFlutterConfig(telegram: ...)` — and from that moment every app carries the vendor's dependency,
 including the ones that will never open Telegram.
 
 DartWay does not do that. The framework knows what a **plugin** is; it never knows what any
 particular one *does*. `dartway_core_flutter` contains no mention of Telegram or of
-`shared_preferences` — only `DwPlugin`, an abstract class with a single `init(core)`
-(`packages/dartway_core_flutter/lib/src/core/logic/dw_plugin.dart`).
+`shared_preferences` — only `DwFlutterPlugin`, an abstract class with a single `init(core)`
+(`packages/dartway_core_flutter/lib/src/core/logic/dw_flutter_plugin.dart`).
 
 The consequences are the whole point:
 
-- `DwConfig` never grows a field named after a vendor;
+- `DwFlutterConfig` never grows a field named after a vendor;
 - an app that does not use an integration does not download it;
 - an integration is released, versioned and broken on its own schedule, without a framework release.
 
@@ -28,15 +28,15 @@ flutter pub add dartway_shared_preferences
 
 ```dart
 dw = DwFlutterCore(
-  config: DwConfig(/* ... */),
+  config: DwFlutterConfig(/* ... */),
   protocol: appProtocol,
   baseUrl: baseUrl,
   plugins: [DwSharedPreferences()],
 );
 ```
 
-`plugins` is declared on `DwFlutter` and passed through by `DwFlutterCore`, so an app on the plain
-toolbox writes `DwFlutter(config: ..., plugins: [...])` and nothing else changes.
+`plugins` is declared on `DwFlutterToolbox` and passed through by `DwFlutterCore`, so an app on the plain
+toolbox writes `DwFlutterToolbox(config: ..., plugins: [...])` and nothing else changes.
 
 **3. Reach it as `dw.plugins.<name>`:**
 
@@ -51,7 +51,7 @@ That accessor is **not** in the framework. It is an extension declared in the pl
 
 ```dart
 // packages/dartway_shared_preferences/lib/src/dw_shared_preferences.dart
-extension DwPrefsAccess on DwPlugins {
+extension DwPrefsAccess on DwPluginRegistry {
   DwSharedPreferences get prefs => of<DwSharedPreferences>();
 }
 ```
@@ -70,7 +70,7 @@ export 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 ```
 
 The failure is worth recognising in advance, because the analyzer does not describe it: with the
-import missing you are told *"the getter `prefs` isn't defined for the type `DwPlugins`"* — about a
+import missing you are told *"the getter `prefs` isn't defined for the type `DwPluginRegistry`"* — about a
 getter that is perfectly fine.
 
 ## When a plugin is initialized
@@ -91,7 +91,7 @@ So plugins are ready before the data layer starts, and both are ready before the
 
 ### What a failing plugin costs — `blocksStartup`
 
-**By default, everything: the app does not start.** `DwPlugin.blocksStartup` is `true` unless a plugin
+**By default, everything: the app does not start.** `DwFlutterPlugin.blocksStartup` is `true` unless a plugin
 says otherwise, because a plugin an app declared is one it expects to have, and an app running without
 it is an app whose features fail one by one, later and further from the cause. The failure lands on
 `DwAppRunner`'s error screen, which prints it.
@@ -99,13 +99,13 @@ it is an app whose features fail one by one, later and further from the cause. T
 Starting anyway is a decision, made by the plugin that knows whether it is load-bearing:
 
 ```dart
-class MyAnalytics extends DwPlugin {
+class MyAnalytics extends DwFlutterPlugin {
   // Its absence costs analytics and nothing else.
   @override
   bool get blocksStartup => false;
 
   @override
-  Future<void> init(DwFlutter core) async {/* ... */}
+  Future<void> init(DwFlutterToolbox core) async {/* ... */}
 }
 ```
 
@@ -147,11 +147,11 @@ Hence the argument. `init` is the first moment the core exists, and it arrives r
 up:
 
 ```dart
-class MyPlugin extends DwPlugin {
+class MyPlugin extends DwFlutterPlugin {
   DwValueProvider<int?>? _accountId;
 
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     // A plugin that needs the data layer names DwFlutterCore and casts. The cast
     // says out loud that this plugin does not work on the plain toolbox, and
     // fails at startup rather than at the first read.
@@ -160,8 +160,8 @@ class MyPlugin extends DwPlugin {
 }
 ```
 
-The parameter is a `DwFlutter` because that is what declares `plugins:`. An app on the data layer
-passes a `DwFlutterCore`, which *is* a `DwFlutter` — so a plugin that needs nothing from the core (most
+The parameter is a `DwFlutterToolbox` because that is what declares `plugins:`. An app on the data layer
+passes a `DwFlutterCore`, which *is* a `DwFlutterToolbox` — so a plugin that needs nothing from the core (most
 of them) ignores the argument and works on both.
 
 What a plugin must **not** do is read, during `init`, a value the app has not set up yet. The session is
@@ -229,9 +229,9 @@ Push on the device is a page of its own: [push notifications](push-notifications
 A plugin is one class and one extension, in your own package:
 
 ```dart
-class MyAnalytics extends DwPlugin {
+class MyAnalytics extends DwFlutterPlugin {
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     // runs during dw.init(), before the first frame, with the core it was
     // plugged into — ignore the argument if you have no use for it
   }
@@ -239,14 +239,14 @@ class MyAnalytics extends DwPlugin {
   void track(String event) {/* ... */}
 }
 
-extension MyAnalyticsAccess on DwPlugins {
+extension MyAnalyticsAccess on DwPluginRegistry {
   MyAnalytics get analytics => of<MyAnalytics>();
 }
 ```
 
 Two rules keep it a plugin rather than a fork:
 
-- **the accessor lives in your package.** A getter on `DwPlugins` inside the framework would put your
+- **the accessor lives in your package.** A getter on `DwPluginRegistry` inside the framework would put your
   vendor's name in everybody's core — the thing this mechanism exists to prevent;
 - **name it for the capability, not the vendor**, when a second implementation is plausible.
   `dw.plugins.prefs` reads as storage; `dw.plugins.telegram` is honest about being one product, and that

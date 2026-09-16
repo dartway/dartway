@@ -8,7 +8,7 @@ import 'widgets/admin_settings_form.dart';
 
 /// Application settings, one row per key the app declares — write access is
 /// admin-only on the server. A key added to `AppSettingKey` appears here.
-class AdminSettingsPage extends StatelessWidget implements DwFeature {
+class AdminSettingsPage extends StatelessWidget implements DwFeatureWidget {
   const AdminSettingsPage({super.key});
 
   @override

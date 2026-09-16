@@ -7,7 +7,7 @@ import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 /// Shell of the admin zone. Deliberately not wrapped in the device frame:
 /// the admin panel is a working surface, so it uses the full viewport and
 /// adapts — a navigation rail on wide screens, a bottom bar on narrow ones.
-class AdminScaffold extends StatelessWidget implements DwFeature {
+class AdminScaffold extends StatelessWidget implements DwFeatureWidget {
   const AdminScaffold({super.key, required this.title, required this.body});
 
   @override

@@ -150,14 +150,14 @@ class LabeledPage extends StatelessWidget {
 /// Builds the real router over [ParameterizedRoutes], opens [location] and
 /// returns the context of the page labelled [leafLabel].
 ///
-/// The router is built by [DwRouter] on purpose: the paths under test are the
+/// The router is built by [DwAppRouter] on purpose: the paths under test are the
 /// ones the framework itself generates from the descriptors.
 Future<BuildContext> pumpRouterAt(
   WidgetTester tester,
   String location,
   String leafLabel,
 ) async {
-  final router = DwRouter<TestRouterState>(
+  final router = DwAppRouter<TestRouterState>(
     navigationZones: [ParameterizedRoutes.values],
     pageBuilder: DwPageBuilder.material,
     options: DwGoRouterOptions(initialLocation: location),

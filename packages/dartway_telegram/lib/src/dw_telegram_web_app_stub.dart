@@ -14,7 +14,7 @@ class DwTelegramWebAppImpl extends DwTelegramWebApp {
   final DwTelegramWebAppConfig config;
 
   @override
-  Future<void> init(DwFlutter core) async {}
+  Future<void> init(DwFlutterToolbox core) async {}
 
   @override
   bool get isRunningInTelegram => false;

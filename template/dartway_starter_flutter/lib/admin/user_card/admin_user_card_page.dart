@@ -12,7 +12,7 @@ import 'widgets/user_card_view.dart';
 
 /// One member's card: everything the app knows about the person, and the
 /// actions on their account.
-class AdminUserCardPage extends ConsumerWidget implements DwFeature {
+class AdminUserCardPage extends ConsumerWidget implements DwFeatureWidget {
   const AdminUserCardPage({super.key, this.profileId});
 
   /// Whose card to show. Usually `null`: the id comes from the address, as on

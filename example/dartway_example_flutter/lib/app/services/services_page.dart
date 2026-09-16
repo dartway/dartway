@@ -9,7 +9,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class ServicesPage extends ConsumerWidget implements DwFeature {
+class ServicesPage extends ConsumerWidget implements DwFeatureWidget {
   const ServicesPage({super.key});
 
   @override

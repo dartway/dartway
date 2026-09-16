@@ -14,7 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // The ambient core. An app declares `dw` itself — the package hands you no
 // global. Declared here, reachable from anywhere as `dw` after this line runs.
 // ---------------------------------------------------------------------------
-late final DwFlutter dw;
+late final DwFlutterToolbox dw;
 
 // ---------------------------------------------------------------------------
 // 1. Bootstrap. `DwAppRunner` owns what every app sets up and none enjoys
@@ -22,8 +22,8 @@ late final DwFlutter dw;
 //    zone that routes uncaught errors into the error pipeline.
 // ---------------------------------------------------------------------------
 void main() {
-  dw = DwFlutter(
-    config: DwConfig(
+  dw = DwFlutterToolbox(
+    config: DwFlutterConfig(
       appVersion: '1.0.0',
       // One error hook, rich by default: it receives the app-state snapshot,
       // not a bare stack trace. Here we just print it.
@@ -50,13 +50,13 @@ void main() {
 }
 
 /// A toy plugin, so the plugins section has something real to resolve. A real
-/// plugin (Telegram, prefs) is the same shape: implement DwPlugin, get
+/// plugin (Telegram, prefs) is the same shape: implement DwFlutterPlugin, get
 /// initialized with the app, be reached through dw.plugins.
-class _ClockPlugin extends DwPlugin {
+class _ClockPlugin extends DwFlutterPlugin {
   late final DateTime startedAt;
 
   @override
-  Future<void> init(DwFlutter core) async => startedAt = DateTime.now();
+  Future<void> init(DwFlutterToolbox core) async => startedAt = DateTime.now();
 }
 
 class _ExampleApp extends StatelessWidget {
@@ -171,7 +171,7 @@ class _TourScreen extends ConsumerWidget {
           // -------------------------------------------------------------------
           //    A list variant: `dwBuildListAsync` renders skeleton rows while
           //    loading. Standalone we pass an explicit `loadingItem`; with the
-          //    data layer, `DwConfig.defaultModelGetter` supplies it and the
+          //    data layer, `DwFlutterConfig.defaultModelGetter` supplies it and the
           //    skeleton is built from your real row widget.
           // -------------------------------------------------------------------
           _Section('Async list', [
@@ -222,11 +222,11 @@ class _TourScreen extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// 7. Feature declarations. Wrap a widget in a DwFeature so the mounted features
+// 7. Feature declarations. Wrap a widget in a DwFeatureWidget so the mounted features
 //    can be discovered at runtime (feature catalogs, error context, Studio
 //    passports). Each section here is one declared feature.
 // ---------------------------------------------------------------------------
-class _Section extends StatelessWidget implements DwFeature {
+class _Section extends StatelessWidget implements DwFeatureWidget {
   const _Section(this.title, this.children);
 
   final String title;

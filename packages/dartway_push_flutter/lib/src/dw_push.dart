@@ -35,7 +35,7 @@ import 'dw_push_transport_client.dart';
 /// Everything it needs comes from the core it is initialized with; it never
 /// reads the app's `dw`, which does not exist yet while its constructor runs
 /// (#54).
-class DwPush extends DwPlugin {
+class DwPush extends DwFlutterPlugin {
   DwPush({
     required List<DwPushTransportClient> transports,
     this.platform,
@@ -87,11 +87,11 @@ class DwPush extends DwPlugin {
   Stream<DwPushReceived> get received => _received.stream;
 
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     if (core is! DwFlutterCore) {
       throw StateError(
         'DwPush registers tokens through the data layer: declare it on a '
-        'DwFlutterCore, not a plain DwFlutter.',
+        'DwFlutterCore, not a plain DwFlutterToolbox.',
       );
     }
     _core = core;
@@ -299,6 +299,6 @@ class DwPush extends DwPlugin {
 }
 
 /// `dw.plugins.push`.
-extension DwPushAccess on DwPlugins {
+extension DwPushAccess on DwPluginRegistry {
   DwPush get push => of<DwPush>();
 }

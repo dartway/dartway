@@ -49,7 +49,7 @@ enum ExampleRefusal with DwRefusalCodes {
 
 **No text crosses the wire.** The server does not know the user's language, and a sentence built on
 the server cannot be fixed without a server release. The app renders every code — its own and the
-framework's — through `DwConfig.refusalText`: see
+framework's — through `DwFlutterConfig.refusalText`: see
 [../3-flutter/actions-and-refusal-texts.md](../3-flutter/actions-and-refusal-texts.md).
 
 ## The framework's codes

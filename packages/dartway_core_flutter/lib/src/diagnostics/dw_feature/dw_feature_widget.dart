@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 /// A product feature present on a screen, discovered at runtime from the widgets
-/// that declare it (see [DwFeature]). The semantic layer of the app: feature
+/// that declare it (see [DwFeatureWidget]). The semantic layer of the app: feature
 /// catalogs, error-report context, analytics, docs — and DartWay Studio
 /// passports (delivered over the bridge by the app's binding).
 class DwFeatureSpec {
@@ -83,10 +83,10 @@ class DwFeatureSpec {
 
 /// Implemented by a widget that *is* a product feature on a screen. A contract,
 /// not behavior: the widget only declares its descriptor. Discover the mounted
-/// features of the current screen with [DwFeature.scanMounted].
+/// features of the current screen with [DwFeatureWidget.scanMounted].
 ///
 /// ```dart
-/// class ScheduleSessionList extends ConsumerWidget implements DwFeature {
+/// class ScheduleSessionList extends ConsumerWidget implements DwFeatureWidget {
 ///   @override
 ///   DwFeatureSpec get dwFeature => const DwFeatureSpec(
 ///         id: 'schedule/session_list',
@@ -95,10 +95,10 @@ class DwFeatureSpec {
 ///       );
 /// }
 /// ```
-abstract interface class DwFeature {
+abstract interface class DwFeatureWidget {
   DwFeatureSpec get dwFeature;
 
-  /// The [DwFeatureSpec]s of every [DwFeature] widget currently *on screen*,
+  /// The [DwFeatureSpec]s of every [DwFeatureWidget] widget currently *on screen*,
   /// keyed by id (a feature declared by several instances appears once).
   ///
   /// Deduplication is per id and never prunes a subtree: the walk continues
@@ -129,7 +129,7 @@ abstract interface class DwFeature {
     final found = <String, DwFeatureSpec>{};
     void visit(Element element) {
       if (_isParkedOffscreen(element.widget)) return;
-      if (element.widget case DwFeature feature) {
+      if (element.widget case DwFeatureWidget feature) {
         found[feature.dwFeature.id] = feature.dwFeature;
       }
       element.visitChildren(visit);
@@ -160,7 +160,7 @@ abstract interface class DwFeature {
     DwFeatureSpec? found;
     void visit(Element element) {
       if (_isParkedOffscreen(element.widget)) return;
-      if (element.widget case DwFeature feature) {
+      if (element.widget case DwFeatureWidget feature) {
         final rect = _paintedGlobalRect(element.renderObject);
         if (rect != null && rect.contains(globalPosition)) {
           found = feature.dwFeature;

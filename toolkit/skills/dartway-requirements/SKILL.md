@@ -114,7 +114,7 @@ cannot express the requirement:
    object, a rule in a handler, a channel added to a request, a screen.
 2. **Extend the contract** — a new data object, request or command with its handler, access rule and
    publications. The normal shape of a new feature.
-3. **Outside a call** — a background job, a `DwRoute` door for an external caller — only with
+3. **Outside a call** — a background job, a `DwHttpRoute` door for an external caller — only with
    the reason a request or a command cannot carry it.
 
 For each option:

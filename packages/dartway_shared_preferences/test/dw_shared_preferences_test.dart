@@ -13,9 +13,9 @@ void main() {
   late ProviderContainer container;
 
   // `init` takes the core the plugin was plugged into, so a test that inits the
-  // plugin by hand needs one to hand over. Built once — one DwFlutter per test
+  // plugin by hand needs one to hand over. Built once — one DwFlutterToolbox per test
   // process — and reused: local storage reads nothing out of it.
-  final dwInstance = DwFlutter(config: const DwConfig());
+  final dwInstance = DwFlutterToolbox(config: const DwFlutterConfig());
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});

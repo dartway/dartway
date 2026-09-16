@@ -259,9 +259,9 @@ enum OverviewZone implements DwNavigationRoute<TestRouterState> {
 }
 
 void main() {
-  group('DwRouter', () {
+  group('DwAppRouter', () {
     test('should create router with valid configuration', () {
-      final router = DwRouter<TestRouterState>(
+      final router = DwAppRouter<TestRouterState>(
         navigationZones: [
           TestRoutes.values,
         ],
@@ -274,7 +274,7 @@ void main() {
 
     test('should throw ArgumentError when navigationZones is empty', () {
       expect(
-        () => DwRouter<TestRouterState>(
+        () => DwAppRouter<TestRouterState>(
           navigationZones: [],
           pageBuilder: DwPageBuilder.material,
         ),
@@ -288,7 +288,7 @@ void main() {
 
     test('should throw ArgumentError when zone is empty', () {
       expect(
-        () => DwRouter<TestRouterState>(
+        () => DwAppRouter<TestRouterState>(
           navigationZones: [[]],
           pageBuilder: DwPageBuilder.material,
         ),
@@ -303,7 +303,7 @@ void main() {
     test('should throw ArgumentError when guards are used without routerState',
         () {
       expect(
-        () => DwRouter<TestRouterState>(
+        () => DwAppRouter<TestRouterState>(
           navigationZones: [
             RoutesWithGuards.values,
           ],
@@ -320,7 +320,7 @@ void main() {
 
     test('should work with guards when routerState is provided', () {
       final routerState = TestRouterState();
-      final router = DwRouter<TestRouterState>(
+      final router = DwAppRouter<TestRouterState>(
         navigationZones: [
           RoutesWithGuards.values,
         ],
@@ -333,7 +333,7 @@ void main() {
 
     group('topRouteFromState', () {
       testWidgets('should return route from state', (tester) async {
-        final router = DwRouter<TestRouterState>(
+        final router = DwAppRouter<TestRouterState>(
           navigationZones: [
             TestRoutes.values,
           ],
@@ -355,7 +355,7 @@ void main() {
       });
 
       test('should return null when route name is not found', () {
-        final router = DwRouter<TestRouterState>(
+        final router = DwAppRouter<TestRouterState>(
           navigationZones: [
             TestRoutes.values,
           ],
@@ -370,7 +370,7 @@ void main() {
 
     group('rootRouteFromState', () {
       testWidgets('should return root route from nested route', (tester) async {
-        final router = DwRouter<TestRouterState>(
+        final router = DwAppRouter<TestRouterState>(
           navigationZones: [
             NestedRoutes.values,
           ],
@@ -396,7 +396,7 @@ void main() {
       testWidgets(
           'pushing the same route twice does not trip the Navigator '
           'duplicate page key assertion', (tester) async {
-        final router = DwRouter<TestRouterState>(
+        final router = DwAppRouter<TestRouterState>(
           navigationZones: [
             TestRoutes.values,
           ],
@@ -425,7 +425,7 @@ void main() {
           'two zones declaring the same name fail when the router is '
           'assembled, naming the value and both zones', () {
         expect(
-          () => DwRouter<TestRouterState>(
+          () => DwAppRouter<TestRouterState>(
             navigationZones: [
               ProjectsZone.values,
               AdminProjectsZone.values,
@@ -449,7 +449,7 @@ void main() {
 
       test('the same name in one zone and a different one in another is fine',
           () {
-        final router = DwRouter<TestRouterState>(
+        final router = DwAppRouter<TestRouterState>(
           navigationZones: [
             ProjectsZone.values,
             ReportsZone.values,
@@ -465,7 +465,7 @@ void main() {
         // Both zones sit at the site root, so `projects` collides on the path
         // as well. The path is the symptom; the message must name the cause.
         expect(
-          () => DwRouter<TestRouterState>(
+          () => DwAppRouter<TestRouterState>(
             navigationZones: [
               ProjectsZone.values,
               SecondProjectsZone.values,
@@ -487,7 +487,7 @@ void main() {
 
       test('a duplicate path names its routes and their zones too', () {
         expect(
-          () => DwRouter<TestRouterState>(
+          () => DwAppRouter<TestRouterState>(
             navigationZones: [
               ReportsZone.values,
               OverviewZone.values,
@@ -511,7 +511,7 @@ void main() {
 
     group('multiple zones', () {
       test('should handle multiple navigation zones', () {
-        final router = DwRouter<TestRouterState>(
+        final router = DwAppRouter<TestRouterState>(
           navigationZones: [
             TestRoutes.values,
             AuthRoutes.values,

@@ -150,7 +150,7 @@ the other following without a reload — Postgres, a handler, a live channel and
   ```
 
   Open `http://localhost:8000` exactly — to a browser `127.0.0.1` is another origin. A project door
-  (`DwRoute`) the browser must reach goes through with `--api-path /that-path`.
+  (`DwHttpRoute`) the browser must reach goes through with `--api-path /that-path`.
 
 ## Typical failures and what they mean
 

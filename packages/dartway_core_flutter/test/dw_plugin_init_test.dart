@@ -2,7 +2,7 @@ import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// A plugin whose `init` throws. [blocksStartup] is the whole variable.
-class _FailingPlugin extends DwPlugin {
+class _FailingPlugin extends DwFlutterPlugin {
   _FailingPlugin({bool? blocking}) : _blocking = blocking;
 
   final bool? _blocking;
@@ -12,17 +12,17 @@ class _FailingPlugin extends DwPlugin {
   bool get blocksStartup => _blocking ?? super.blocksStartup;
 
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     throw StateError('no localStorage');
   }
 }
 
 /// Declared after the failing one. Whether it ran is the blast radius.
-class _LaterPlugin extends DwPlugin {
+class _LaterPlugin extends DwFlutterPlugin {
   bool initialized = false;
 
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     initialized = true;
   }
 }
@@ -31,8 +31,8 @@ void main() {
   final reports = <DwErrorReport>[];
 
   // One core per process; the registries under test are built separately.
-  final core = DwFlutter(
-    config: DwConfig(onErrorReport: reports.add),
+  final core = DwFlutterToolbox(
+    config: DwFlutterConfig(onErrorReport: reports.add),
     plugins: const [],
   );
 
@@ -47,7 +47,7 @@ void main() {
       final later = _LaterPlugin();
 
       await expectLater(
-        DwPlugins([_FailingPlugin(), later]).initAll(core),
+        DwPluginRegistry([_FailingPlugin(), later]).initAll(core),
         throwsA(
           isA<DwPluginInitException>()
               .having((e) => e.plugin, 'plugin', _FailingPlugin)
@@ -63,7 +63,7 @@ void main() {
     test(
       'is reported once, by whoever catches it — not here as well',
       () async {
-        await DwPlugins([
+        await DwPluginRegistry([
           _FailingPlugin(),
         ]).initAll(core).catchError((Object _) {});
 
@@ -76,13 +76,13 @@ void main() {
     test('costs its own feature and nothing else', () async {
       final later = _LaterPlugin();
 
-      await DwPlugins([_FailingPlugin(blocking: false), later]).initAll(core);
+      await DwPluginRegistry([_FailingPlugin(blocking: false), later]).initAll(core);
 
       expect(later.initialized, isTrue);
     });
 
     test('is reported through the pipeline, naming the plugin', () async {
-      await DwPlugins([_FailingPlugin(blocking: false)]).initAll(core);
+      await DwPluginRegistry([_FailingPlugin(blocking: false)]).initAll(core);
 
       expect(reports, hasLength(1));
       expect('${reports.single.error}', contains('_FailingPlugin'));
@@ -94,7 +94,7 @@ void main() {
       // fields unset, and the app dies at the first touch on a
       // LateInitializationError from inside the package — further from the
       // cause than the crash it replaced.
-      final plugins = DwPlugins([_FailingPlugin(blocking: false)]);
+      final plugins = DwPluginRegistry([_FailingPlugin(blocking: false)]);
       await plugins.initAll(core);
 
       expect(
@@ -119,7 +119,7 @@ void main() {
         // The framework asking whether anybody took a job gets the honest
         // answer. The failure was already reported at init, so this is not a
         // silence — it is the degradation the app asked for.
-        final plugins = DwPlugins([_FailingPlugin(blocking: false)]);
+        final plugins = DwPluginRegistry([_FailingPlugin(blocking: false)]);
         await plugins.initAll(core);
 
         expect(plugins.maybeOf<_FailingPlugin>(), isNull);

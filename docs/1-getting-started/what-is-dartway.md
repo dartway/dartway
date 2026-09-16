@@ -172,7 +172,7 @@ When a rule says no, the server answers with a code — a value of the project's
 (`with DwRefusalCodes`) or of the framework's (`DwCoreRefusal`, `DwAuthRefusal`, `DwUploadRefusal`) —
 with an optional field and parameters. It never answers with text.
 
-The text is the app's: `DwConfig.refusalText` turns a code into the user's language, and `dw.action`
+The text is the app's: `DwFlutterConfig.refusalText` turns a code into the user's language, and `dw.action`
 shows it with no further code. A server that writes messages writes them in one language for one
 screen, and an app that receives a sentence cannot react to "no spots left" differently from "the
 session has started".
@@ -196,7 +196,7 @@ framework's forbidden, not-found, conflict and too-many-requests; `401`; `500` f
 for a malformed call; `426` when this build of the app is too old for this server. A failure carries
 an incident id and no detail. A refusal never raises an alert; a server failure does.
 
-`426` is how an old app learns it has to update: the Flutter core shows `DwConfig.updateRequiredScreen`
+`426` is how an old app learns it has to update: the Flutter core shows `DwFlutterConfig.updateRequiredScreen`
 instead of failing to decode an answer it does not understand.
 
 ## The framework knows no domain

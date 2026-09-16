@@ -108,7 +108,7 @@ Run the detectors **over the changed files only** (not over the whole repo). For
 - Server data copied into widget `State` or a hand-written notifier — it stops following updates.
   Reads are `ref.watch(dw.request(...))`, `dw.pages`, `dw.table`, `dw.window` (`dartway-data-layer`).
 - A raw `onPressed: () async { await dw.command(...) }` instead of `dw.action`; a refusal turned into
-  words anywhere but the app's refusal text (the function `DwConfig.refusalText` is given).
+  words anywhere but the app's refusal text (the function `DwFlutterConfig.refusalText` is given).
 - `GlobalKey().currentState/currentContext` used to look things up in the tree.
 - Outer `padding`/`margin` at the top level of a widget's `build`; a widget that sizes itself.
 - A private widget class inside a feature's public file that **has a `State` or takes a callback** — a
@@ -128,7 +128,7 @@ Run the detectors **over the changed files only** (not over the whole repo). For
   (`dartway-navigation`); a `ProviderScope` written by the app; a user-visible string not from the
   app's localizations.
 - Feature isolation: importing a non-entry-point file of another feature.
-- A feature's entry-point widget without `implements DwFeature` / `DwFeatureSpec` — the feature exists
+- A feature's entry-point widget without `implements DwFeatureWidget` / `DwFeatureSpec` — the feature exists
   in the code but says nothing about itself.
 - **Ran into a "this is wrong here" during the audit — that is a line in that feature's `knownIssues`,
   not in the report and not in your head.** A setting nobody reads; a screen on placeholder data; a

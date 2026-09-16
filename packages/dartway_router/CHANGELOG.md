@@ -21,7 +21,7 @@ address only.
 
 A duplicate route name now says which zones declare it.
 
-Route names are global: `DwRouter` keeps one registry for the whole app and
+Route names are global: `DwAppRouter` keeps one registry for the whole app and
 resolves every route by name. An enum, though, gives its values a namespace of
 their own, so two zones each declaring `projects` compile without a word — and
 the failure surfaced far from the declaration, in the first screen that touched
@@ -39,7 +39,7 @@ Declared by:
   - AppNavigationZone.projects (navigationZones[0])
   - AdminNavigationZone.projects (navigationZones[1])
 
-Route names are global across navigation zones. DwRouter keeps a single
+Route names are global across navigation zones. DwAppRouter keeps a single
 registry for the whole app and resolves routes by name, so a name may be
 declared once and only once. ...
 ```
@@ -93,7 +93,7 @@ DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
   `zoneGuards`. Wraps the `OnEnter` API introduced in go_router v14.
 
 - **`DwGoRouterOptions.caseSensitive`** (`bool`, default `true`) — controls
-  case-sensitivity for all route paths built by `DwRouter`. Set to `false`
+  case-sensitivity for all route paths built by `DwAppRouter`. Set to `false`
   if you need `/Profile` and `/profile` to resolve to the same route.
   Wraps the per-route `caseSensitive` flag introduced in go_router v15.
 

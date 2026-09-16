@@ -1,40 +1,40 @@
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _RecordingPlugin extends DwPlugin {
+class _RecordingPlugin extends DwFlutterPlugin {
   bool initialized = false;
-  DwFlutter? core;
+  DwFlutterToolbox? core;
 
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     this.core = core;
     initialized = true;
   }
 }
 
-class _UndeclaredPlugin extends DwPlugin {
+class _UndeclaredPlugin extends DwFlutterPlugin {
   @override
-  Future<void> init(DwFlutter core) async {}
+  Future<void> init(DwFlutterToolbox core) async {}
 }
 
 /// A plugin the app declares through its interface while the object it actually
 /// gets is a private implementation — exactly the shape of
 /// `DwTelegramWebApp.create()`, which returns a web or stub impl. The registry
 /// has to answer by the type the app asks for, not by the concrete class.
-abstract class _Bridge extends DwPlugin {}
+abstract class _Bridge extends DwFlutterPlugin {}
 
 class _BridgeWebImpl extends _Bridge {
   @override
-  Future<void> init(DwFlutter core) async {}
+  Future<void> init(DwFlutterToolbox core) async {}
 }
 
 void main() {
   final recording = _RecordingPlugin();
   final bridge = _BridgeWebImpl();
 
-  // One DwFlutter per test process — the singleton forbids re-creation.
-  final dwInstance = DwFlutter(
-    config: const DwConfig(),
+  // One DwFlutterToolbox per test process — the singleton forbids re-creation.
+  final dwInstance = DwFlutterToolbox(
+    config: const DwFlutterConfig(),
     plugins: [recording, bridge],
   );
 

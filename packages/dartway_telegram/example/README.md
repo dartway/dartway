@@ -3,8 +3,8 @@
 Declare the plugin once, at startup:
 
 ```dart
-DwFlutter(
-  config: DwConfig(/* ... */),
+DwFlutterToolbox(
+  config: DwFlutterConfig(/* ... */),
   plugins: [
     DwTelegramWebApp.create(
       config: const DwTelegramWebAppConfig(requestFullScreen: true),

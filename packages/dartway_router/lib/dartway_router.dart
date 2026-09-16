@@ -41,7 +41,7 @@
 /// }
 ///
 /// // 3. Create the router
-/// final router = DwRouter<AppSession>(
+/// final router = DwAppRouter<AppSession>(
 ///   routerState: AppSession.instance,
 ///   navigationZones: [AppRoutes.values],
 ///   pageBuilder: DwPageBuilder.material,
@@ -62,5 +62,5 @@ export 'src/navigation_zones/dw_navigation_route_descriptor.dart';
 export 'src/navigation_zones/dw_navigation_route_extension.dart';
 export 'src/navigation_zones/dw_navigation_types.dart';
 export 'src/router/dw_go_router_options.dart';
-export 'src/router/dw_router.dart';
+export 'src/router/dw_app_router.dart';
 export 'src/ui/dw_page_builder.dart';

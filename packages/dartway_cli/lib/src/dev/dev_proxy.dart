@@ -61,7 +61,7 @@ final class DwDevProxy {
     ..userAgent = null
     ..connectionTimeout = const Duration(seconds: 5);
 
-  /// The project's external doors (`DwRoute` paths such as `/mcp` or
+  /// The project's external doors (`DwHttpRoute` paths such as `/mcp` or
   /// `/github`) that go to the API as well. In production they live on the
   /// API host, which proxies everything; locally they share the one origin, so
   /// the proxy has to be told which paths are doors rather than app routes.

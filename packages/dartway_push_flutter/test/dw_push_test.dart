@@ -64,7 +64,7 @@ final class World {
     DwWireProtocol? appProtocol,
   }) async {
     final core = DwFlutterCore(
-      config: DwConfig(
+      config: DwFlutterConfig(
         appVersion: '1.0.0+1',
         refusalText: (refusal) => refusal.code,
         onErrorReport: reports.add,

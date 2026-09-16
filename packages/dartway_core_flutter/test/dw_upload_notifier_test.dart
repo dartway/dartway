@@ -66,7 +66,7 @@ void main() {
   late List<DwErrorReport> reports;
 
   DwFlutterCore core() => DwFlutterCore(
-    config: DwConfig(
+    config: DwFlutterConfig(
       appVersion: '1.0.0+1',
       onErrorReport: reports.add,
       refusalText: (refusal) => refusal.code,

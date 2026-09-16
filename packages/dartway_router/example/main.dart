@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
 // Router (defined after route enums)
 // -----------------------------------------------------------------------------
 
-final appRouter = DwRouter<AppSession>(
+final appRouter = DwAppRouter<AppSession>(
   routerState: AppSession(),
   navigationZones: [
     AppRoutes.values,

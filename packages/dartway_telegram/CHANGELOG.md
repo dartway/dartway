@@ -2,8 +2,8 @@
 
 ## 0.2.0
 
-Follows `dartway_flutter` 0.5.0, where `DwPlugin.init()` gained the core as an argument:
-`DwTelegramWebApp.init(DwFlutter core)`. The bridge asks Telegram for everything it knows and needs
+Follows `dartway_flutter` 0.5.0, where `DwFlutterPlugin.init()` gained the core as an argument:
+`DwTelegramWebApp.init(DwFlutterToolbox core)`. The bridge asks Telegram for everything it knows and needs
 nothing from the core — the parameter is the plugin contract, and behaviour is unchanged. Breaking
 only for a consumer that implements `DwTelegramWebApp` itself.
 
@@ -21,7 +21,7 @@ First public release — Telegram Mini App integration for DartWay apps.
 
 **A plugin, not a framework feature.** The framework's config has no business knowing a vendor's
 name, and an app that is not a Mini App should not download a Telegram SDK to get a bootstrap
-runner. You declare `DwFlutter(config: ..., plugins: [DwTelegramWebApp.create(...)])` and reach the bridge as
+runner. You declare `DwFlutterToolbox(config: ..., plugins: [DwTelegramWebApp.create(...)])` and reach the bridge as
 `dw.plugins.telegram` — an extension declared *in this package*, so the ambient accessor exists only for the
 apps that chose Telegram.
 

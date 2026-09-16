@@ -684,7 +684,7 @@ final class TestApp {
     List<DwCallHandler>? handlers,
     List<DwChannelRule>? channels,
     List<DwJobDefinition>? jobs,
-    List<DwRoute> routes = const [],
+    List<DwHttpRoute> routes = const [],
     List<DwDatabaseMigration>? migrations,
     DwWireProtocol? protocol,
     DwDatabaseSchema? schema,

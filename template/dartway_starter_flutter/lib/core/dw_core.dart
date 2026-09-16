@@ -34,7 +34,7 @@ DwFlutterCore createAppDwCore({
   DwTokenStore? tokenStore,
   DwClientOptions clientOptions = const DwClientOptions(),
 }) => dw = DwFlutterCore(
-  config: DwConfig(
+  config: DwFlutterConfig(
     appVersion: appVersion,
     refusalText: (refusal) => refusalText(appL10n, refusal),
     updateRequiredScreen: (context, refusal) =>

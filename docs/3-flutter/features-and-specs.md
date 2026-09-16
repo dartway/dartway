@@ -51,7 +51,7 @@ The feature's public widget declares what it is:
 
 ```dart
 // example/dartway_example_flutter/lib/app/bookings/my_bookings_page.dart
-class MyBookingsPage extends ConsumerWidget implements DwFeature {
+class MyBookingsPage extends ConsumerWidget implements DwFeatureWidget {
   const MyBookingsPage({super.key});
 
   @override
@@ -82,7 +82,7 @@ class MyBookingsPage extends ConsumerWidget implements DwFeature {
   );
 ```
 
-`DwFeature` is an interface with a single getter and no behavior — the widget declares a
+`DwFeatureWidget` is an interface with a single getter and no behavior — the widget declares a
 descriptor, nothing else changes. The point of putting it *here* rather than in a registry or a
 markdown file: a description that lives away from the code drifts on the first edit, silently. The
 compiler does not check it, the checker cannot see it, and the reader — increasingly an agent —
@@ -171,8 +171,8 @@ That is the only way such things survive long enough to be dealt with.
 
 `DwFeatureSpec` is not documentation for humans only. It is read at runtime.
 
-`DwFeature.scanMounted()` walks the element tree from the app root and returns the specs of every
-`DwFeature` widget currently **on screen**, deduplicated by id. It scans from the root rather than
+`DwFeatureWidget.scanMounted()` walks the element tree from the app root and returns the specs of every
+`DwFeatureWidget` widget currently **on screen**, deduplicated by id. It scans from the root rather than
 from a `BuildContext` because the interesting question is "what is on this screen", not "what is
 above this widget".
 

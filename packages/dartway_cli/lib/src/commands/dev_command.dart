@@ -47,7 +47,7 @@ void _addProxyOptions(ArgParser parser) {
     ..addMultiOption(
       'api-path',
       help:
-          'A project door (DwRoute) that goes to the server too, e.g. '
+          'A project door (DwHttpRoute) that goes to the server too, e.g. '
           '--api-path /mcp --api-path /github. Repeatable.',
     );
 }

@@ -32,10 +32,10 @@ Widget _host(Widget child) => ProviderScope(
 );
 
 void main() {
-  // One DwFlutter per test process — the singleton forbids re-creation.
+  // One DwFlutterToolbox per test process — the singleton forbids re-creation.
   final errorReports = <DwErrorReport>[];
-  DwFlutter(
-    config: DwConfig(
+  DwFlutterToolbox(
+    config: DwFlutterConfig(
       defaultModelGetter: _defaultModelGetter,
       onErrorReport: errorReports.add,
     ),

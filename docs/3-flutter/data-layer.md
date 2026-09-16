@@ -184,7 +184,7 @@ The answer is a `DwCallResult<R>`, sealed:
 | `DwCallFailed(:incidentId)` | The server failed. |
 
 **Inside `dw.action` there is nothing to unwrap:** a result that is not `DwCallOk` is handled — a
-refusal shown through `DwConfig.refusalText`, a not-authenticated answer signing out, a failure
+refusal shown through `DwFlutterConfig.refusalText`, a not-authenticated answer signing out, a failure
 reported. That is the usual way to send a command; see
 [actions and refusal texts](actions-and-refusal-texts.md). Outside an action, switch over the result,
 or read `result.valueOrThrow` to meet it as the typed exceptions above.
@@ -275,7 +275,7 @@ ref.watch(dw.request(const ListNews())).dwBuildListAsync(
 ```
 
 - **loading** is a skeleton of your real widget, built over placeholder data — `loadingValue` /
-  `loadingItem`, or `DwConfig.defaultModelGetter` when neither is passed — and wrapped in
+  `loadingItem`, or `DwFlutterConfig.defaultModelGetter` when neither is passed — and wrapped in
   `Skeletonizer` (`SliverSkeletonizer` when the builder returned a sliver). `loadingWidget` replaces
   the skeleton where a skeleton over stand-in data would itself mislead;
 - **error** goes to the error pipeline with `DwErrorSource.asyncBuild`, and is replaced by
@@ -288,7 +288,7 @@ example and the skeleton wrap this in one app extension, `section(...)`, which a
 message with a retry and skips the not-authenticated case, where the sign-in screen is already the
 message (`lib/shared/widgets/load_failed_message.dart` in both).
 
-A refusal or a not-authenticated answer rendered this way still reaches `DwConfig.onErrorReport`; the
+A refusal or a not-authenticated answer rendered this way still reaches `DwFlutterConfig.onErrorReport`; the
 app's policy is what keeps it out of the incident log — see [error reporting](error-reporting.md).
 
 ## One-off reads: `dw.client`

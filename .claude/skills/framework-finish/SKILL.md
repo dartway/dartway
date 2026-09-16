@@ -21,7 +21,7 @@ A package's public API is what it exports: the files reachable through `lib/<lib
 
 - a new, removed or renamed public class, method, parameter or extension;
 - a changed signature, or changed behaviour, of a public method;
-- a changed default in a config (`DwServerSettings`, `DwAuthConfig`, `DwConfig`, `DwClientOptions`, …);
+- a changed default in a config (`DwServerSettings`, `DwAuthConfig`, `DwFlutterConfig`, `DwClientOptions`, …);
 - a new mandatory wiring step (a required `DwAppServer` or `DwFlutterCore` parameter, a startup check a project has to satisfy);
 - a change to what the generator writes, or to the framework's own migrations.
 

@@ -67,7 +67,7 @@ files.example.com →  MinIO                                  (with storage: min
 sends `/dw/`, `/dw/live` and `/health` to the server, so a browser makes same-origin calls: no CORS,
 no preflight, and the server answers none. The web build is given that origin as
 `DW_BACKEND_URL`. The api host proxies everything to the server — calls, the live socket, and the
-project's own doors (`DwRoute`) such as a webhook. The server serves no static files. Local
+project's own doors (`DwHttpRoute`) such as a webhook. The server serves no static files. Local
 development has the same shape through `dartway dev` ([The CLI](cli.md)).
 
 **Storage has a host of its own because a presigned URL signs its host.** Browsers upload to MinIO

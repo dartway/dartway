@@ -6,7 +6,7 @@ export 'logic/dw_error_source.dart';
 
 /// Everything known about a reported error: the error itself plus the app-state
 /// snapshot and the interception metadata. This is what a
-/// `DwConfig.onErrorReport` hook receives.
+/// `DwFlutterConfig.onErrorReport` hook receives.
 class DwErrorReport {
   const DwErrorReport({
     required this.error,

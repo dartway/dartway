@@ -280,7 +280,7 @@ Both subcommands take:
 |---|---|---|
 | `--port`, `-p` | `8000` | Port of the origin to open in the browser |
 | `--api` | `http://localhost:8080` | The running server |
-| `--api-path` | — | A project door (a `DwRoute` path such as `/mcp`) that goes to the server too. Repeatable. In production such doors live on the API host, which proxies everything; locally they share the one origin, so the proxy has to be told |
+| `--api-path` | — | A project door (a `DwHttpRoute` path such as `/mcp`) that goes to the server too. Repeatable. In production such doors live on the API host, which proxies everything; locally they share the one origin, so the proxy has to be told |
 
 **`dev web`** runs `flutter run -d web-server --web-port <free port> --web-hostname localhost
 --dart-define=DW_BACKEND_URL=<the proxy origin>` in the `*_flutter` package, starts the proxy in

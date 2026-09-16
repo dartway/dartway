@@ -28,9 +28,9 @@ final appRouterStateProvider = Provider<AppRouterState>((ref) {
 /// The app router: three zones (app, admin, auth) with cross-redirect guards.
 /// Signed-out users are redirected to the auth zone; signed-in users are kept
 /// out of it, and non-admins out of the admin zone.
-final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
+final appRouterProvider = Provider<DwAppRouter<AppRouterState>>((ref) {
   final routerState = ref.watch(appRouterStateProvider);
-  final router = DwRouter<AppRouterState>(
+  final router = DwAppRouter<AppRouterState>(
     routerState: routerState,
     navigationZones: [
       AppNavigationZone.values,

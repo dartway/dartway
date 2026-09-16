@@ -15,7 +15,7 @@ typedef _Schedule = ({List<ClubSession> sessions, List<SessionBooking> mine});
 /// place on it. Both reads are live: a place someone else takes changes the
 /// spots left on every screen, and your own booking or cancellation flips the
 /// card — with no refresh code here.
-class ScheduleSessionList extends ConsumerWidget implements DwFeature {
+class ScheduleSessionList extends ConsumerWidget implements DwFeatureWidget {
   const ScheduleSessionList({super.key});
 
   @override

@@ -54,6 +54,18 @@ ORM renames: `DwEntity` → `DwRow` (base class of table rows); the raw SQL resu
 | `DwHttp` | `DwHttpContract` |
 | `DwDeleted` | `DwDeletedObject` |
 
+Closed on 2026-09-16, the seven the first pass left behind:
+
+| Was | Is |
+|---|---|
+| `DwConfig` | `DwFlutterConfig` |
+| `DwFlutter` | `DwFlutterToolbox` |
+| `DwPlugin` | `DwFlutterPlugin` |
+| `DwPlugins` | `DwPluginRegistry` |
+| `DwFeature` | `DwFeatureWidget` |
+| `DwRoute` (server) | `DwHttpRoute` |
+| `DwRouter` (router) | `DwAppRouter` |
+
 Any other one-word public name found during the renames follows the same rule (`Dw` + two or more words) and is listed in the stage's report.
 
 ## R2.2 Transport: HTTP per DTO, WebSocket only for live updates

@@ -2,7 +2,7 @@
 /// reports it over the bridge.
 ///
 /// The bridge does not know *how* the app discovers its features — DartWay
-/// apps typically map `DwFeatureSpec`s collected by `DwFeature.scanMounted()`
+/// apps typically map `DwFeatureSpec`s collected by `DwFeatureWidget.scanMounted()`
 /// (package `dartway_core_flutter`) onto this model in their bridge binding, but
 /// any source works.
 ///

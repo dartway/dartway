@@ -16,8 +16,8 @@ import 'dw_telegram_web_app_stub.dart'
 /// Declare it at startup and reach it anywhere as `dw.plugins.telegram`:
 ///
 /// ```dart
-/// DwFlutter(
-///   config: DwConfig(/* ... */),
+/// DwFlutterToolbox(
+///   config: DwFlutterConfig(/* ... */),
 ///   plugins: [
 ///     DwTelegramWebApp.create(
 ///       config: const DwTelegramWebAppConfig(requestFullScreen: true),
@@ -29,10 +29,10 @@ import 'dw_telegram_web_app_stub.dart'
 /// final insets = dw.plugins.telegram.safeAreaInset;
 /// ```
 ///
-/// `dartway_core_flutter` knows nothing of Telegram: it knows only what a [DwPlugin]
+/// `dartway_core_flutter` knows nothing of Telegram: it knows only what a [DwFlutterPlugin]
 /// is. The `dw.plugins.telegram` accessor is an extension declared *here*, so it
 /// exists only for apps that chose this package.
-abstract class DwTelegramWebApp extends DwPlugin {
+abstract class DwTelegramWebApp extends DwFlutterPlugin {
   const DwTelegramWebApp();
 
   /// The platform implementation: the real bridge on web, an inert stub on
@@ -51,7 +51,7 @@ abstract class DwTelegramWebApp extends DwPlugin {
   /// The bridge asks Telegram for everything it knows and needs nothing from
   /// [core] — the argument is the plugin contract, not a hint that it does.
   @override
-  Future<void> init(DwFlutter core);
+  Future<void> init(DwFlutterToolbox core);
 
   /// Whether the app really is running inside a Telegram Mini App — `false` on
   /// mobile, on desktop, and on plain web opened in a browser.
@@ -77,8 +77,8 @@ abstract class DwTelegramWebApp extends DwPlugin {
 /// Reaches the bridge from anywhere: `dw.plugins.telegram.safeAreaInset`.
 ///
 /// Declared in this package rather than in the framework — that is what keeps
-/// `DwConfig` free of vendor names while the app still gets an ambient
+/// `DwFlutterConfig` free of vendor names while the app still gets an ambient
 /// accessor.
-extension DwTelegramAccess on DwPlugins {
+extension DwTelegramAccess on DwPluginRegistry {
   DwTelegramWebApp get telegram => of<DwTelegramWebApp>();
 }

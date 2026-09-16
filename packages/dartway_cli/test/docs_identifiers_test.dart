@@ -19,7 +19,7 @@ import 'package:test/test.dart';
 ///   the monorepo — `packages/<package>/lib/<library>.dart` and what it
 ///   exports, honouring `show` and `hide`, without `@internal` declarations —
 ///   or among the CLI's checks, which are the CLI's public surface;
-/// - every `dw.<member>` is a member of the app core (`DwFlutter`,
+/// - every `dw.<member>` is a member of the app core (`DwFlutterToolbox`,
 ///   `DwFlutterCore` and their extensions) or a `dw.` code the framework
 ///   sends on the wire;
 /// - every relative link in `docs/` resolves.
@@ -31,11 +31,19 @@ void main() {
   final surface = _PublicSurface(root);
   final docs = Directory(p.join(root.path, 'docs'));
 
-  final prose = [
+  final excluded = [
     // `docs/1.0/` is the rewrite's own history: its decisions quote the names
     // they replaced.
+    p.join(docs.path, '1.0'),
+    // A migration note is addressed to a project that is *behind*, and its
+    // whole subject is the name that no longer exists. Checking it against
+    // today's surface would make every rename note fail the day it is written.
+    p.join(docs.path, 'migrations'),
+  ];
+
+  final prose = [
     for (final file in _markdownUnder(docs))
-      if (!p.isWithin(p.join(docs.path, '1.0'), file.path)) file,
+      if (!excluded.any((dir) => p.isWithin(dir, file.path))) file,
     ..._markdownUnder(Directory(p.join(root.path, 'toolkit'))),
     File(p.join(root.path, 'README.md')),
     File(p.join(root.path, 'CLAUDE.md')),
@@ -98,7 +106,7 @@ void main() {
       [for (final findings in checked) ...findings.members],
       isEmpty,
       reason:
-          'neither a member of DwFlutter / DwFlutterCore nor a dw. code the '
+          'neither a member of DwFlutterToolbox / DwFlutterCore nor a dw. code the '
           'framework sends',
     );
   });
@@ -205,7 +213,7 @@ final class _PublicSurface {
 
     final core = p.join(packages.path, 'dartway_core_flutter', 'lib', 'src');
     for (final (path, owner) in [
-      (p.join(core, 'core', 'dw_flutter.dart'), 'DwFlutter'),
+      (p.join(core, 'core', 'dw_flutter_toolbox.dart'), 'DwFlutterToolbox'),
       (p.join(core, 'data', 'dw_flutter_core.dart'), 'DwFlutterCore'),
     ]) {
       dwMembers.addAll(_membersOf(File(path).readAsStringSync(), owner));
@@ -252,7 +260,7 @@ final class _PublicSurface {
   final Set<String> wireCodes = {};
 
   static final _extensionOnCore = RegExp(
-    r'^extension (\w+) on DwFlutter(?:Core)?\b',
+    r'^extension (\w+) on DwFlutterToolbox(?:Core)?\b',
     multiLine: true,
   );
   static final _wireCodeLiteral = RegExp(r'''['"]dw\.([a-zA-Z]\w*)''');

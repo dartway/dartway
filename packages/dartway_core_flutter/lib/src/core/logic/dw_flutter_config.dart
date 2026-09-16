@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import '../../diagnostics/error_reporting/dw_error_report.dart';
 import '../../ui/confirmation/dw_ui_confirmation.dart';
 
-class DwConfig {
-  const DwConfig({
+class DwFlutterConfig {
+  const DwFlutterConfig({
     this.onErrorReport,
     this.appVersion,
     this.confirmDialogBuilder,

@@ -20,7 +20,7 @@ import 'widgets/dw_app_bootstrapper.dart';
 /// - Provide a global error pipeline (FlutterError + PlatformDispatcher)
 /// - Render loading/error screens during initialization
 ///
-/// This class is intentionally decoupled from the DartWay core (`DwFlutter` /
+/// This class is intentionally decoupled from the DartWay core (`DwFlutterToolbox` /
 /// its data-layer subclass `DwFlutterCore`). If you use the core, include its
 /// `init()` inside `appInitializers`.
 class DwAppRunner {

@@ -5,8 +5,8 @@ import '../navigation_zones/dw_navigation_route.dart';
 import '../navigation_zones/dw_navigation_route_extension.dart';
 import 'dw_go_router_options.dart';
 
-class DwRouter<RouterState extends Listenable> {
-  DwRouter({
+class DwAppRouter<RouterState extends Listenable> {
+  DwAppRouter({
     required this.navigationZones,
     required this.pageBuilder,
     this.routerState,
@@ -344,7 +344,7 @@ class DwRouter<RouterState extends Listenable> {
       key: (zoned) => zoned.route.name,
       summary: (name) => 'Duplicate route name "$name".',
       explanation:
-          'Route names are global across navigation zones. DwRouter keeps a '
+          'Route names are global across navigation zones. DwAppRouter keeps a '
           'single registry for the whole app and resolves routes by name, so a '
           'name may be declared once and only once. An enum gives its values a '
           'namespace of their own; the router does not. Rename one of the '
@@ -421,7 +421,7 @@ class DwRouter<RouterState extends Listenable> {
 
 /// A route paired with the index of the zone that declares it.
 ///
-/// [DwRouter.navigationZones] is a list of lists; flattening it loses the one
+/// [DwAppRouter.navigationZones] is a list of lists; flattening it loses the one
 /// fact a duplicate-route message has to carry — which zones the colliding
 /// declarations came from.
 class _ZonedRoute<RouterState extends Listenable> {
@@ -429,7 +429,7 @@ class _ZonedRoute<RouterState extends Listenable> {
 
   final DwNavigationRoute<RouterState> route;
 
-  /// Position of the route's zone in [DwRouter.navigationZones].
+  /// Position of the route's zone in [DwAppRouter.navigationZones].
   final int zoneIndex;
 
   /// `AdminRoutes.projects (navigationZones[1])` — the enum that declares

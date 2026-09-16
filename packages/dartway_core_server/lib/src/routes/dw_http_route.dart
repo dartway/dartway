@@ -30,29 +30,29 @@ typedef DwRouteHandler =
 /// refusal on a call (422, or 403/404/409/429), a
 /// `DwNotAuthenticatedException` with 401, and anything else with 500 and
 /// the incident id only — and an alert.
-final class DwRoute {
-  const DwRoute._(this.method, this.path, this.handle, this.auth);
+final class DwHttpRoute {
+  const DwHttpRoute._(this.method, this.path, this.handle, this.auth);
 
-  DwRoute.get(
+  DwHttpRoute.get(
     String path,
     DwRouteHandler handle, {
     DwRouteAuth auth = DwRouteAuth.none,
   }) : this._('GET', path, handle, auth);
 
-  DwRoute.post(
+  DwHttpRoute.post(
     String path,
     DwRouteHandler handle, {
     DwRouteAuth auth = DwRouteAuth.none,
   }) : this._('POST', path, handle, auth);
 
   /// Every method; a route of the same path with a specific method wins.
-  DwRoute.any(
+  DwHttpRoute.any(
     String path,
     DwRouteHandler handle, {
     DwRouteAuth auth = DwRouteAuth.none,
   }) : this._(null, path, handle, auth);
 
-  /// Upper case, or `null` for [DwRoute.any].
+  /// Upper case, or `null` for [DwHttpRoute.any].
   final String? method;
   final String path;
   final DwRouteHandler handle;

@@ -5,7 +5,7 @@
 // `final` was `NotifierProvider<PrefNotifier<T>, T>` — nameable only where
 // riverpod is imported, which a file that just wants to remember a setting has
 // no other reason to do. And the failure did not say so: the analyzer reported
-// *"the getter 'prefs' isn't defined for the type DwPlugins"*, pointing at a
+// *"the getter 'prefs' isn't defined for the type DwPluginRegistry"*, pointing at a
 // getter that is perfectly fine, while `unused_import` suggested removing the
 // import that fixed it.
 //

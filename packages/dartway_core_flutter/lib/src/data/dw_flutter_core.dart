@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:dartway_client/dartway_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/dw_flutter.dart';
-import '../core/logic/dw_config.dart';
+import '../core/dw_flutter_toolbox.dart';
+import '../core/logic/dw_flutter_config.dart';
 import '../core/logic/dw_key_value_store.dart';
 import '../diagnostics/error_reporting/logic/dw_error_source.dart';
 import '../private/dw_singleton.dart';
@@ -12,14 +12,14 @@ import 'dw_key_value_token_store.dart';
 import 'dw_request_notifiers.dart';
 import 'dw_upload_notifier.dart';
 
-/// The app core with the data layer: the toolbox of [DwFlutter] plus one
+/// The app core with the data layer: the toolbox of [DwFlutterToolbox] plus one
 /// [DwAppClient] and the Riverpod bindings over it.
 ///
 /// ```dart
 /// late final DwFlutterCore dw;
 ///
 /// dw = DwFlutterCore(
-///   config: DwConfig(
+///   config: DwFlutterConfig(
 ///     appVersion: '1.4.2+57',
 ///     refusalText: (refusal) => t.refusal(refusal),
 ///     updateRequiredScreen: (context, refusal) => const UpdateTheAppPage(),
@@ -41,7 +41,7 @@ import 'dw_upload_notifier.dart';
 /// Two phases: the constructor builds and connects nothing; [init] starts the
 /// plugins, then the client. [dispose] stops the client and releases the
 /// core, after which another can be built — nothing here is static.
-class DwFlutterCore extends DwFlutter {
+class DwFlutterCore extends DwFlutterToolbox {
   /// Throws [ArgumentError] for a config without `refusalText` or
   /// `appVersion`, and whatever [DwAppClient] throws for a malformed app
   /// version or base URL — in every case before the core holds the live slot.
@@ -189,7 +189,7 @@ class DwFlutterCore extends DwFlutter {
 
   /// Runs [command], retried with the same idempotency key after network
   /// failures. Inside `dw.action`, a refused result is shown through
-  /// [DwConfig.refusalText] without further code:
+  /// [DwFlutterConfig.refusalText] without further code:
   /// `dw.action((context) => dw.command(BookSession(sessionId: 3)))`.
   Future<DwCallResult<R>> command<R>(DwActionCommand<R> command) =>
       client.command(command);
@@ -232,7 +232,7 @@ class DwFlutterCore extends DwFlutter {
       );
 
   /// Why this build can no longer talk to its server, or `null`. The
-  /// bootstrapper shows [DwConfig.updateRequiredScreen] when it is set.
+  /// bootstrapper shows [DwFlutterConfig.updateRequiredScreen] when it is set.
   late final DwValueProvider<DwCallRefusal?> incompatibility =
       NotifierProvider<Notifier<DwCallRefusal?>, DwCallRefusal?>(
         () => DwStreamValueNotifier<DwCallRefusal?>(
@@ -269,16 +269,16 @@ class DwFlutterCore extends DwFlutter {
 
   /// Checked in the initializer list, so a core that cannot show refusals or
   /// name its build is refused before it claims the live slot.
-  static bool _checkConfig(DwConfig config, {required bool ownStore}) {
+  static bool _checkConfig(DwFlutterConfig config, {required bool ownStore}) {
     if (config.refusalText == null) {
       throw ArgumentError(
-        'DwConfig.refusalText is required by DwFlutterCore: every refusal the '
+        'DwFlutterConfig.refusalText is required by DwFlutterCore: every refusal the '
         'server sends is a code, and the app is what turns it into words.',
       );
     }
     if (config.appVersion == null) {
       throw ArgumentError(
-        'DwConfig.appVersion is required by DwFlutterCore: every call names '
+        'DwFlutterConfig.appVersion is required by DwFlutterCore: every call names '
         'the build (`1.4.2+57`), and the server refuses one it no longer '
         'supports.',
       );

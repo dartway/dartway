@@ -44,10 +44,10 @@ export 'src/data/dw_upload_notifier.dart';
 
 // core: the ambient app root, its config, and the plugin registry
 // (`dw.plugins.<name>`).
-export 'src/core/dw_flutter.dart';
-export 'src/core/logic/dw_config.dart';
+export 'src/core/dw_flutter_toolbox.dart';
+export 'src/core/logic/dw_flutter_config.dart';
 export 'src/core/logic/dw_key_value_store.dart';
-export 'src/core/logic/dw_plugin.dart';
+export 'src/core/logic/dw_flutter_plugin.dart';
 
 // bootstrap: ProviderScope, native splash, ordered initializers, the global
 // error pipeline.
@@ -80,7 +80,7 @@ export 'src/ui/notifications/widgets/dw_notifications_listener.dart';
 export 'src/ui/notifications/widgets/dw_ui_notification_handler.dart';
 
 // ui/confirmation: the declarative request, plus the built-in dialog used when
-// the app has not supplied `DwConfig.confirmDialogBuilder`.
+// the app has not supplied `DwFlutterConfig.confirmDialogBuilder`.
 export 'src/ui/confirmation/dw_ui_confirmation.dart';
 
 // diagnostics/error_reporting: app-state context captured into every report.
@@ -89,4 +89,4 @@ export 'src/diagnostics/error_reporting/dw_error_report.dart';
 
 // diagnostics/dw_feature: mark a widget as a product feature and discover the
 // mounted ones at runtime — feature catalogs, error context, Studio passports.
-export 'src/diagnostics/dw_feature/dw_feature.dart';
+export 'src/diagnostics/dw_feature/dw_feature_widget.dart';

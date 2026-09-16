@@ -47,7 +47,7 @@ So, when you put a symbol on `dw.`:
 
 ## 2. `dw.` is the core; `dw.plugins.<name>` is the extensions
 
-`dw.` is a **closed, known set** — what the core always provides. The toolbox (`DwFlutter`) gives
+`dw.` is a **closed, known set** — what the core always provides. The toolbox (`DwFlutterToolbox`) gives
 `dw.notify`, `dw.action`, `dw.confirm`, `dw.handleError`; the data layer on top of it
 (`DwFlutterCore`) adds `dw.request`, `dw.pages`, `dw.table`, `dw.window`, `dw.command`, `dw.files`,
 `dw.uploader()`, `dw.signIn` / `dw.signOut`, `dw.accountId`, `dw.liveStatus` and
@@ -57,7 +57,7 @@ So, when you put a symbol on `dw.`:
 Keep them apart in the namespace. Merging plugins into the root drowns the stable core in a stream of
 optional add-ons and invites name collisions. The boundary "what is always there" vs "what this
 project connected" should be visible where you type it. A plugin package declares
-`extension on DwPlugins`; the core exports the public `DwPlugins` holder with `of<T>()` for an app
+`extension on DwPluginRegistry`; the core exports the public `DwPluginRegistry` holder with `of<T>()` for an app
 reaching for its own integration and `maybeOf<T>()` for the framework asking whether any plugin took
 a role.
 
@@ -95,14 +95,14 @@ shared-preferences is a plugin — `DwSharedPreferences`, reached as `dw.plugins
 genuinely needs a capability, it asks for a **role**, not a package: `DwFlutterCore` keeps the session
 through whichever plugin claims `DwKeyValueStorePlugin`, or through a token store the app passes
 itself, and says at `init` when neither is there. This is the same seam as a vendor SDK (Telegram):
-`DwPlugin` is the one mechanism for everything optional, not a special case for one integration.
+`DwFlutterPlugin` is the one mechanism for everything optional, not a special case for one integration.
 
 ## 6. Context by default
 
 An error carries a snapshot of the app state at the moment it broke — the route, the mounted
 features, the action, the platform, the app version, the signed-in account — not a bare stack trace.
 The framework collects and routes the error (`DwErrorReport`); *delivery* — a log, an alert channel,
-a message to the user — is the app's, plugged in through `DwConfig.onErrorReport`. A package
+a message to the user — is the app's, plugged in through `DwFlutterConfig.onErrorReport`. A package
 collects; it does not decide where reports are sent.
 
 ## 7. Every public symbol is justified — checked against battle, and against its origin
@@ -126,7 +126,7 @@ and the second meaning then arrives with a worse name than the first. The owner'
 too: `<Entity>Row` for table rows, data objects as nouns of two or more words, reads as `Get…` /
 `List…`, changes as a verb and its object, `<Project>Channel` and `<Project>Refusal`.
 
-The rule is not yet true everywhere: `DwConfig`, `DwFlutter`, `DwPlugin`, `DwPlugins` and `DwFeature`
-in the Flutter core, `DwRoute` in the server and `DwRouter` in the router still have one word. They
-are the rule's open debt — renamed under principle 4 with a migration note — and a new name does not
-add to the list.
+The rule holds everywhere as of 2026-09-16. The last seven names that predated it — five in the
+Flutter core, one in the server, one in the router — were renamed under principle 4, and the
+migration note `docs/migrations/2026-09-16-two-word-names-the-last-seven.md` says which became
+what. A one-word name is now a defect rather than a debt: there is no list left to add it to.

@@ -90,7 +90,7 @@ mounted ones:
 
 ```dart
 List<StudioFeatureInfo> mountedFeatureInfos() => [
-      for (final feature in DwFeature.scanMounted())
+      for (final feature in DwFeatureWidget.scanMounted())
         StudioFeatureInfo(
           id: feature.id,                 // 'schedule/session-list' — a contract; never renamed in place
           title: feature.title,
@@ -131,7 +131,7 @@ on its side:
 StudioFeatureInfo? featureAtPoint(double horizontal, double vertical) {
   final view = WidgetsBinding.instance.platformDispatcher.views.first;
   final size = view.physicalSize / view.devicePixelRatio;
-  final feature = DwFeature.hitTest(
+  final feature = DwFeatureWidget.hitTest(
     Offset(horizontal * size.width, vertical * size.height),
   );
   return feature == null ? null : toWireModel(feature);

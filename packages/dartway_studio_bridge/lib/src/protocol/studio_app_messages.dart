@@ -108,7 +108,7 @@ class RouteChangedMessage extends StudioBridgeMessage {
 }
 
 /// App → Studio: the features mounted on the current screen changed
-/// (discovered from `DwFeature` widgets after the route settles).
+/// (discovered from `DwFeatureWidget` widgets after the route settles).
 class FeaturesChangedMessage extends StudioBridgeMessage {
   const FeaturesChangedMessage({required this.path, required this.features});
 

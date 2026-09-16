@@ -82,7 +82,7 @@ For each chosen feature apply the **whole** clean-code contract, not a skim of i
 - DRY: copy-pasted widgets, mappings, logic;
 - the Law of Demeter, tell-don't-ask, a single source of truth;
 - **feature isolation** — importing another feature's `widgets/`/`logic/`, or a helper in `logic/` that everyone else has started reaching for;
-- **hacks**: workarounds, `TODO`/`HACK`/`FIXME`, temporary patches, commented-out code, a second way across the contract (a `DwRoute` or a raw HTTP call doing what a request or a command should). A `TODO(dartway, checked: <ref>)` is the exception and is **not** a finding on its own: it is the required marker on a workaround over a framework API, and it is judged in Phase 0 by whether its `checked:` still matches — a marker without one, on such a workaround, is the finding;
+- **hacks**: workarounds, `TODO`/`HACK`/`FIXME`, temporary patches, commented-out code, a second way across the contract (a `DwHttpRoute` or a raw HTTP call doing what a request or a command should). A `TODO(dartway, checked: <ref>)` is the exception and is **not** a finding on its own: it is the required marker on a workaround over a framework API, and it is judged in Phase 0 by whether its `checked:` still matches — a marker without one, on such a workaround, is the finding;
 - **hardcoded user-visible text** — a string a person reads, written into a widget instead of coming from `context.l10n`. Judge by meaning; do not report identifiers, keys, paths, format patterns or test data. Nothing mechanical catches this, which is why it is here;
 - **a spec that has drifted** — `behaviors` that no longer match what the widget does;
 - non-trivial logic without tests; a bugfix without a regression test.

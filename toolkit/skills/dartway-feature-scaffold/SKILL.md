@@ -150,7 +150,7 @@ provider in one file — provider first.
 ### Build it
 
 1. **Navigation** — the entry and exit points; a route if needed (`dartway-navigation`).
-2. **The public widget**, `implements DwFeature` with its `DwFeatureSpec` (below). Without it
+2. **The public widget**, `implements DwFeatureWidget` with its `DwFeatureSpec` (below). Without it
    `dartway check` warns `featureSpecMissing`.
 3. **Reads:** `ref.watch(dw.request(...))` (or `dw.pages` / `dw.table` / `dw.window`), with the section
    it exists for rendering its error — the skeleton's shared section extension (`dartway-data-layer`).
@@ -163,7 +163,7 @@ provider in one file — provider first.
    on its own widget, taking `BuildContext` first:
 
 ```dart
-class InvoiceEditSheet extends ConsumerWidget implements DwFeature {
+class InvoiceEditSheet extends ConsumerWidget implements DwFeatureWidget {
   const InvoiceEditSheet({super.key, required this.invoiceId});
 
   static Future<void> show(BuildContext context, {required int invoiceId}) =>
@@ -194,7 +194,7 @@ list the parent had to compute is.
 
 ```dart
 // lib/app/invoices/my_invoices/my_invoices_page.dart
-class MyInvoicesPage extends ConsumerWidget implements DwFeature {
+class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
   const MyInvoicesPage({super.key});
 
   @override

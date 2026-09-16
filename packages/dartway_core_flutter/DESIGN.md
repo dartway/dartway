@@ -7,7 +7,7 @@ is what is specific to *this* package: what it is for, and where its edges are.
 
 The Flutter skeleton of a DartWay app — everything an app needs *before and around* its data layer:
 app bootstrap, the async-UI contract, guarded actions, notifications, error reporting, feature
-declarations, the plugin seam. That skeleton (`DwFlutter`) knows nothing about a server; the data
+declarations, the plugin seam. That skeleton (`DwFlutterToolbox`) knows nothing about a server; the data
 layer (`DwFlutterCore`, over `dartway_client`) is built on top of it in the same package.
 
 ## Package principles
@@ -24,12 +24,12 @@ contract.
 
 **It collects, it does not deliver.** The error pipeline gathers an error and its context snapshot
 and routes it (`dw.handleError` → `dw.dispatchReport` → the configured hook). It does not deliver:
-where a report goes is the app's `DwConfig.onErrorReport`, and without one it is only printed. The
+where a report goes is the app's `DwFlutterConfig.onErrorReport`, and without one it is only printed. The
 package has no business knowing the channels an error is sent to.
 
 **The core is minimal; optional things are plugins.** This package does not depend on
 `shared_preferences`, Telegram, or any other thing an app might not need. Those are plugins, reached
-through `dw.plugins.<name>`. `DwPlugin` / `DwPlugins` is the seam.
+through `dw.plugins.<name>`. `DwFlutterPlugin` / `DwPluginRegistry` is the seam.
 
 ## Known debt
 

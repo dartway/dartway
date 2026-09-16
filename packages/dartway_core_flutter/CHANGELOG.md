@@ -63,7 +63,7 @@ The rewrite (see docs/1.0).
 - **One plugin's failed `init` no longer takes the whole app start with it, and the report says
   which plugin it was.**
 
-  `DwPlugins.initAll` ran the list bare: a single `init` that threw aborted `dw.init()`, so every
+  `DwPluginRegistry.initAll` ran the list bare: a single `init` that threw aborted `dw.init()`, so every
   plugin declared after it never ran and the application did not start at all. Declaration order
   silently decided the blast radius — not something an app author weighs while writing
   `plugins: [...]`. In production this cost a whole app start: the first plugin in the list met a
@@ -71,7 +71,7 @@ The rewrite (see docs/1.0).
   never got their turn. The report was as unhelpful as the outcome — a raw exception out of a
   third-party package, naming neither the plugin nor initialization.
 
-  What a failure costs is now the plugin's own answer. **`DwPlugin.blocksStartup` defaults to
+  What a failure costs is now the plugin's own answer. **`DwFlutterPlugin.blocksStartup` defaults to
   `true`**, so nothing changes for an app that says nothing: a plugin it declared is one it expects
   to have. An integration that is genuinely optional sets it to `false`, and its failure is
   reported once through the error pipeline while the app starts without it.
@@ -79,7 +79,7 @@ The rewrite (see docs/1.0).
   Either way the failure now travels as `DwPluginInitException`, which names the plugin and carries
   the cause, so the message says what happened wherever it is caught.
 
-  **Breaking for a class that `implements DwPlugin`** rather than extending it: the new member has a
+  **Breaking for a class that `implements DwFlutterPlugin`** rather than extending it: the new member has a
   default body, so `extends` inherits it and `implements` must declare it. `DwTelegramWebApp` was
   such a class and now extends instead — which is what a plugin base wants anyway, so the next
   member with a default does not break it either.
@@ -97,7 +97,7 @@ an incident:
 
 - `dw.action` shows that message instead of the action's `onErrorNotification`. The rule's text was
   written for this case; the action's was written for every case.
-- it still travels through `dw.handleError`, so an app's `DwConfig.onErrorReport` sees it and sorts
+- it still travels through `dw.handleError`, so an app's `DwFlutterConfig.onErrorReport` sees it and sorts
   it out with one type check. The core's built-in alerting does not raise it — see
   `dartway_serverpod_core_flutter` 0.11.0, where a server response marked `isRefusal` becomes one.
 - an app can throw one from its own code for a local rule ("this file is larger than 10 MB") and get
@@ -138,8 +138,8 @@ registry unless it is genuinely testing the loading state.
 
 ## 0.5.0
 
-**A plugin is handed the core it was plugged into.** `DwPlugin.init()` now takes one:
-`Future<void> init(DwFlutter core)`. Until now it took nothing, and a plugin had no legal way to
+**A plugin is handed the core it was plugged into.** `DwFlutterPlugin.init()` now takes one:
+`Future<void> init(DwFlutterToolbox core)`. Until now it took nothing, and a plugin had no legal way to
 reach the framework it was part of.
 
 The gap was not theoretical. A plugin is constructed *as an argument* to the constructor that
@@ -160,16 +160,16 @@ singleton out — so there was no version of that line that worked, only version
 might. `dartway_push_flutter`'s own README shipped one.
 
 `init` is the first moment the core exists, so that is where it arrives. The argument is a
-`DwFlutter`; an app on the data layer passes a `DwCore`, which is one — a plugin that needs the data
+`DwFlutterToolbox`; an app on the data layer passes a `DwCore`, which is one — a plugin that needs the data
 layer names it and casts, and thereby says out loud that it does not work on the plain toolbox.
 
-**Breaking, mechanically.** Every `DwPlugin` implementation adds the parameter; nothing else about a
-plugin changes, and a plugin with no use for the core ignores it. `DwPlugins.initAll()` takes the core
+**Breaking, mechanically.** Every `DwFlutterPlugin` implementation adds the parameter; nothing else about a
+plugin changes, and a plugin with no use for the core ignores it. `DwPluginRegistry.initAll()` takes the core
 too, and `dw.init()` passes itself.
 
 ## 0.4.0
 
-**A feature can be found by pointing at it.** `DwFeature.hitTest(globalPosition)` answers what is
+**A feature can be found by pointing at it.** `DwFeatureWidget.hitTest(globalPosition)` answers what is
 declared at a point on screen — the other half of `scanMounted`, which answers what is declared on
 the screen at all. Studio's tap-to-inspect is the first caller: pick a spot in the live preview, get
 that feature's passport, with no id to look up and no map to keep in your head.
@@ -225,7 +225,7 @@ say, and that is exactly what made feature descriptions shallow.
 The registry enum is gone with it. A spec belongs in the file of the feature it describes — a
 central catalog of every feature in the app is a file nobody reads that lives far from the code it
 claims to describe. What the enum did give was enumerability, and a running app cannot replace it:
-Dart has no reflection, so `DwFeature.scanMounted()` sees only what is on screen. A whole-project
+Dart has no reflection, so `DwFeatureWidget.scanMounted()` sees only what is on screen. A whole-project
 catalog is a job for static analysis of the sources.
 
 ## 0.1.0
@@ -250,15 +250,15 @@ welded to a button, so a list tile or an icon gets it too.
 (`dw.notify.success(...)`), render it with your own handler.
 
 **Error reporting with context.** Every error carries an app-state snapshot — route, mounted
-features, the action label, platform, version — through a single `DwConfig.onErrorReport` hook (and
+features, the action label, platform, version — through a single `DwFlutterConfig.onErrorReport` hook (and
 an overridable `dispatchReport`). A minified web stack trace tells you nothing; this tells you what the
 user was doing.
 
-**Feature declarations.** `DwFeature` / `DwFeature.scanMounted`: mark widgets as product features and
+**Feature declarations.** `DwFeatureWidget` / `DwFeatureWidget.scanMounted`: mark widgets as product features and
 discover the mounted ones at runtime — for feature catalogs, analytics, error context and
 [DartWay Studio](https://dartway.dev) passports.
 
-**Plugins.** `DwPlugin` is the seam for integrations the framework must not know about: declare one
+**Plugins.** `DwFlutterPlugin` is the seam for integrations the framework must not know about: declare one
 at startup and reach it as `dw.plugins.<name>` — the open namespace for what a project plugs in, kept
 apart from the core's own services. Telegram lives in
 [`dartway_telegram`](https://pub.dev/packages/dartway_telegram) (`dw.plugins.telegram`), local

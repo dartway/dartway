@@ -4,7 +4,7 @@ import 'package:dartway_example_flutter/app/schedule/widgets/schedule_session_li
 import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-class SchedulePage extends StatelessWidget implements DwFeature {
+class SchedulePage extends StatelessWidget implements DwFeatureWidget {
   const SchedulePage({super.key});
 
   @override

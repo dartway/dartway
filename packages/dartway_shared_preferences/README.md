@@ -10,8 +10,8 @@ doesn't never downloads `shared_preferences`.
 ## Use
 
 ```dart
-DwFlutter(
-  config: DwConfig(/* ... */),
+DwFlutterToolbox(
+  config: DwFlutterConfig(/* ... */),
   plugins: [DwSharedPreferences()],
 );
 ```
@@ -42,7 +42,7 @@ final token = dw.plugins.prefs.raw.getString('token');
 the file needs no other import — that is what they are for. Leave the type to inference and the
 declaration only compiles where riverpod happens to be imported, which a file that just wants to
 remember a setting has no reason to do. And it does not fail helpfully: the analyzer says *"the
-getter `prefs` isn't defined for the type `DwPlugins`"*, pointing at a getter that is perfectly fine,
+getter `prefs` isn't defined for the type `DwPluginRegistry`"*, pointing at a getter that is perfectly fine,
 while `unused_import` suggests removing the very import that fixes it.
 
 **The extension has to be in scope.** `dw.plugins.prefs` is declared here, so every file reading it

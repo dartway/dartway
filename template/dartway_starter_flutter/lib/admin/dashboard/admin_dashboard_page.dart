@@ -9,7 +9,7 @@ import 'widgets/admin_counter_tiles.dart';
 /// Admin home: headline counters the server counts and keeps live. Event
 /// analytics (visits, conversion, retention) arrives with the analytics
 /// milestone — this screen is its future home.
-class AdminDashboardPage extends StatelessWidget implements DwFeature {
+class AdminDashboardPage extends StatelessWidget implements DwFeatureWidget {
   const AdminDashboardPage({super.key});
 
   @override

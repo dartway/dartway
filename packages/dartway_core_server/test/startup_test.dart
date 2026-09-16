@@ -93,11 +93,11 @@ void main() {
           ],
           routes: [
             for (final path in ['/dw', '/dw/live', '/dw/ListNotes', '/health'])
-              DwRoute.get(path, (ctx, request) => DwHttpResponse.empty()),
-            DwRoute.post('hook', (ctx, request) => DwHttpResponse.empty()),
-            DwRoute.post('/hook', (ctx, request) => DwHttpResponse.empty()),
-            DwRoute.post('/hook', (ctx, request) => DwHttpResponse.empty()),
-            DwRoute.any('/hook', (ctx, request) => DwHttpResponse.empty()),
+              DwHttpRoute.get(path, (ctx, request) => DwHttpResponse.empty()),
+            DwHttpRoute.post('hook', (ctx, request) => DwHttpResponse.empty()),
+            DwHttpRoute.post('/hook', (ctx, request) => DwHttpResponse.empty()),
+            DwHttpRoute.post('/hook', (ctx, request) => DwHttpResponse.empty()),
+            DwHttpRoute.any('/hook', (ctx, request) => DwHttpResponse.empty()),
           ],
           settings: const DwServerSettings(
             allowedOrigins: {

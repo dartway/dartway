@@ -23,7 +23,7 @@ The plan follows the DartWay order: **contract → server → app.** The contrac
 sides compile against it — a data object, the requests that read it and the commands that change it are
 the agreement the handler and the screen are then written to. The domain comes before the screen: data
 objects and rows reflect the domain, not the momentary needs of one widget. Maximum reuse of what exists;
-a door outside the call mechanism (a `DwRoute`) only for an external caller, as a documented exception.
+a door outside the call mechanism (a `DwHttpRoute`) only for an external caller, as a documented exception.
 Do not plan work "just in case" — YAGNI.
 
 ## Phase A — Context
@@ -75,7 +75,7 @@ layers that are not relevant.
    read-modify-write. Doc comments above handlers and rules state the rule. A request or command without
    a handler stops the server from starting. `dartway-server`, `dartway-access`, `dartway-realtime`.
 5. **Background and doors, only if the option needs them** — jobs (`DwJobDefinition`, `DwRecurringJob`)
-   for work outside a call, a `DwRoute` for an external caller (a webhook), upload rules and `canRead`
+   for work outside a call, a `DwHttpRoute` for an external caller (a webhook), upload rules and `canRead`
    for files. `dartway-server`, `dartway-uploads`.
 6. **App** (`__FLUTTER_PKG__`) — the route (`dartway-navigation`) → the feature's entry point and its
    `DwFeatureSpec` (`dartway-feature-scaffold`) → the data layer: `ref.watch(dw.request(...))` /

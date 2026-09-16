@@ -40,9 +40,9 @@ Widget _button(DwUiAction<void> action, {bool requireValidation = true}) =>
     );
 
 void main() {
-  // One DwFlutter per test process — the singleton forbids re-creation.
+  // One DwFlutterToolbox per test process — the singleton forbids re-creation.
   // Registers itself as the ambient `dw`, so `testDw.action(...)` works.
-  final testDw = DwFlutter(config: const DwConfig());
+  final testDw = DwFlutterToolbox(config: const DwFlutterConfig());
 
   group('DwActionBuilder with requireValidation', () {
     testWidgets('shouts at build time when there is no Form', (tester) async {

@@ -137,7 +137,7 @@ Pass both zones and `routerState` (required for guards). Start at login; the gua
 ```dart
 final appSession = AppSession();
 
-final router = DwRouter<AppSession>(
+final router = DwAppRouter<AppSession>(
   routerState: appSession,
   navigationZones: [
     AuthRoutes.values,   // Auth zone (login)
@@ -222,7 +222,7 @@ Navigation zones allow you to group related routes together. Each zone can have:
 Example with multiple zones (e.g. auth zone + protected app zone, as in Quick Start):
 
 ```dart
-final router = DwRouter<AppSession>(
+final router = DwAppRouter<AppSession>(
   routerState: appSession,
   navigationZones: [
     AuthRoutes.values,   // Public/auth zone (login)
@@ -310,10 +310,10 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 }
 ```
 
-**Important**: When using guards, you must provide `routerState` to `DwRouter`:
+**Important**: When using guards, you must provide `routerState` to `DwAppRouter`:
 
 ```dart
-final router = DwRouter<AppSession>(
+final router = DwAppRouter<AppSession>(
   routerState: appSession, // Required when using guards
   navigationZones: [AppRoutes.values],
   pageBuilder: DwPageBuilder.material,
@@ -489,7 +489,7 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
   // ... implementation ...
 }
 
-final router = DwRouter<AppSession>(
+final router = DwAppRouter<AppSession>(
   routerState: appSession,
   navigationZones: [
     AppRoutes.values,   // Authenticated zone
@@ -564,7 +564,7 @@ if (AppRoutes.profile.isActive(context)) {
 Configure GoRouter behavior:
 
 ```dart
-final router = DwRouter<AppSession>(
+final router = DwAppRouter<AppSession>(
   routerState: appSession,
   navigationZones: [AppRoutes.values],
   pageBuilder: DwPageBuilder.material,
@@ -596,7 +596,7 @@ final router = DwRouter<AppSession>(
 
 ### Core Classes
 
-#### `DwRouter<RouterState>`
+#### `DwAppRouter<RouterState>`
 
 Main router class that wraps GoRouter.
 
@@ -724,7 +724,7 @@ lib/
 
 ### Guards not working
 
-- Ensure `routerState` is provided to `DwRouter`
+- Ensure `routerState` is provided to `DwAppRouter`
 - Check that guards return `null` to allow navigation
 - Verify guard logic is correct
 

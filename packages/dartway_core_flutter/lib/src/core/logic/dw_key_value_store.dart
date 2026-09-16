@@ -1,4 +1,4 @@
-import 'dw_plugin.dart';
+import 'dw_flutter_plugin.dart';
 
 /// The plugin that gives the framework somewhere to keep a few small values.
 ///
@@ -6,7 +6,7 @@ import 'dw_plugin.dart';
 /// reload and has no opinion about what stores it. Declared here so both sides
 /// can name it without either depending on the other — the same shape as
 /// `DwRepoLocalStorePlugin`, which the data layer asks for through
-/// [DwPlugins.maybeOf].
+/// [DwPluginRegistry.maybeOf].
 ///
 /// ```dart
 /// dw = DwFlutterCore(
@@ -24,8 +24,8 @@ import 'dw_plugin.dart';
 /// point of the change.
 ///
 /// Only one plugin may claim the role. Two is a wiring mistake, and
-/// [DwPlugins.maybeOf] reports it rather than picking one.
-abstract class DwKeyValueStorePlugin extends DwPlugin {
+/// [DwPluginRegistry.maybeOf] reports it rather than picking one.
+abstract class DwKeyValueStorePlugin extends DwFlutterPlugin {
   const DwKeyValueStorePlugin();
 
   Future<String?> getString(String key);

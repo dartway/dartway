@@ -25,7 +25,7 @@ context snapshot and dispatches a `DwErrorReport`. `DwErrorSource` names where i
 | `manual` | an explicit `dw.handleError(...)` from app code — and a plugin whose `init` failed with `blocksStartup` false. |
 | `failedCall` | declared, and not used by the framework's own interception points today. |
 
-A report is dispatched to **`DwConfig.onErrorReport`** when it is set. Without it, the report is printed
+A report is dispatched to **`DwFlutterConfig.onErrorReport`** when it is set. Without it, the report is printed
 with `debugPrint` and goes nowhere else — an app that ships without a policy has no error reporting.
 
 ## What a report carries
@@ -43,9 +43,9 @@ with `debugPrint` and goes nowhere else — an app that ships without a policy h
 | Field | Filled from |
 |---|---|
 | `platform` | Flutter: `android`, `ios`, `macos`, …; `web/android`, `web/ios`, … on the web. |
-| `appVersion` | `DwConfig.appVersion`. |
+| `appVersion` | `DwFlutterConfig.appVersion`. |
 | `route` | the route source the app registered (below); `null` without one. |
-| `featureIds` | the ids of the `DwFeature` widgets mounted on screen at that moment — see [features and specs](features-and-specs.md#where-the-spec-goes). |
+| `featureIds` | the ids of the `DwFeatureWidget` widgets mounted on screen at that moment — see [features and specs](features-and-specs.md#where-the-spec-goes). |
 | `entries` | app-defined entries. `DwFlutterCore` registers `account` — the signed-in account id — itself. |
 
 ## Making the context rich
@@ -102,5 +102,5 @@ type, never by message. An app that wants to count refusals can.
 ## Related
 
 - [Actions and refusal texts](actions-and-refusal-texts.md) — what an action shows before it reports.
-- [Flutter core](flutter-core.md) — `DwConfig` and `DwAppRunner`.
+- [Flutter core](flutter-core.md) — `DwFlutterConfig` and `DwAppRunner`.
 - [Alerts](../4-server/alerts.md) — the server's side of failures.

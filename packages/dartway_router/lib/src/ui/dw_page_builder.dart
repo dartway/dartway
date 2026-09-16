@@ -5,14 +5,14 @@ import 'package:go_router/go_router.dart';
 ///
 /// Provides common page transition animations (material, fade, slide, scale)
 /// with customizable parameters. These builders can be used as the [pageBuilder]
-/// parameter when creating a [DwRouter].
+/// parameter when creating a [DwAppRouter].
 ///
 /// All transition builders accept optional [curve] and [duration] parameters
 /// for customization. The default transition duration is 300 milliseconds.
 ///
 /// Example:
 /// ```dart
-/// final router = DwRouter(
+/// final router = DwAppRouter(
 ///   navigationZones: [routes],
 ///   pageBuilder: DwPageBuilder.fade,
 /// );

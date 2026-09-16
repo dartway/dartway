@@ -12,7 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// The pinned messages of the channel over its list, newest first: a tap
 /// scrolls to the one shown — reopening the history around it when it is
 /// far back — and turns the bar to the next. Live: a pin anywhere joins it.
-class ChatPinnedSection extends HookConsumerWidget implements DwFeature {
+class ChatPinnedSection extends HookConsumerWidget implements DwFeatureWidget {
   const ChatPinnedSection({required this.session, super.key});
 
   final ChatSession session;

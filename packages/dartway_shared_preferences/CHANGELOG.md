@@ -57,8 +57,8 @@
 
 ## 0.3.0
 
-Follows `dartway_flutter` 0.5.0, where `DwPlugin.init()` gained the core as an argument:
-`DwSharedPreferences.init(DwFlutter core)`. Local storage needs nothing from the core — the parameter
+Follows `dartway_flutter` 0.5.0, where `DwFlutterPlugin.init()` gained the core as an argument:
+`DwSharedPreferences.init(DwFlutterToolbox core)`. Local storage needs nothing from the core — the parameter
 is the plugin contract, and behaviour is unchanged. An app that declares the plugin and reads
 `dw.plugins.prefs` never sees the difference.
 
@@ -71,7 +71,7 @@ is the plugin contract, and behaviour is unchanged. An app that declares the plu
   not compile in the file it told you to put it in.
 
   The failure was the expensive part, not the fix. Leaving the type to inference in a library without
-  riverpod makes the analyzer report *"the getter `prefs` isn't defined for the type `DwPlugins`"* —
+  riverpod makes the analyzer report *"the getter `prefs` isn't defined for the type `DwPluginRegistry`"* —
   a getter that is perfectly fine — while `unused_import` simultaneously suggests removing the import
   that fixes it. Found on a real project, and it cost three analyzer runs to stop believing the error
   message.

@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 /// Runtime configuration options for the underlying [GoRouter].
 ///
-/// These options are passed through to [GoRouter] when [DwRouter] builds
+/// These options are passed through to [GoRouter] when [DwAppRouter] builds
 /// its router. See [GoRouter] and [GoRouterDelegate] for semantics of
 /// each option.
 class DwGoRouterOptions {
@@ -108,7 +108,7 @@ class DwGoRouterOptions {
   /// Whether route paths are matched case-sensitively (default `true`).
   ///
   /// When `false`, `/Profile` and `/profile` resolve to the same route.
-  /// Applies to all routes built by [DwRouter].
+  /// Applies to all routes built by [DwAppRouter].
   final bool caseSensitive;
 
   /// Whether shell routes notify the root navigator observer on inner

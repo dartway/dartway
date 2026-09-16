@@ -22,7 +22,7 @@ There is no client package: the shared package *is* the client contract, and bot
 
 ## Cross-stack laws (they hold everywhere)
 
-1. **The contract is the only way across.** Everything the app and the server exchange is a DTO declared in `__SHARED_PKG__`: a **data object** the server returns and publishes, a **request** that reads, a **command** that changes. No hand-written HTTP for the app, no JSON maps, no second API. A `DwRoute` is a door for callers that are not the app — a webhook, a tool — and nothing else.
+1. **The contract is the only way across.** Everything the app and the server exchange is a DTO declared in `__SHARED_PKG__`: a **data object** the server returns and publishes, a **request** that reads, a **command** that changes. No hand-written HTTP for the app, no JSON maps, no second API. A `DwHttpRoute` is a door for callers that are not the app — a webhook, a tool — and nothing else.
 2. **Rows never leave the server.** A row class (`<Entity>Row`) is the server's shape of a table; a data object is what a reader may see. The server maps one to the other explicitly, in batch. A data object is designed for its readers — not a copy of the table, and never carrying what they may not see.
 3. **A feature is end-to-end.** A feature is a flow running through the contract (its DTOs), the server (their handlers) and Flutter (entry point + widgets + logic). From outside the feature, **only** its entry point is imported — at any nesting depth.
 
@@ -73,7 +73,7 @@ Two kinds of rule live in this file and read alike: the same prose, the same voi
 
 Seven further checks are warnings and one is a nudge; those are defaults, however firmly the prose around them is written. **Anything this table and the types do not hold is a default by construction** — no rule in this file or in the skills becomes law by being phrased definitely, and promoting one costs a failing check rather than a sentence.
 
-**The gap this leaves is named rather than smoothed over.** The naming law has no check at all; the contract law is held against JSON maps and stray DTOs by the types, but nothing fails on a `DwRoute` the app calls instead of a request; "done" has only a warning (`featureSpecMissing`). `migrationsDrift` needs a Postgres (`DW_DATABASE_*`) and says it did not run rather than passing without one.
+**The gap this leaves is named rather than smoothed over.** The naming law has no check at all; the contract law is held against JSON maps and stray DTOs by the types, but nothing fails on a `DwHttpRoute` the app calls instead of a request; "done" has only a warning (`featureSpecMissing`). `migrationsDrift` needs a Postgres (`DW_DATABASE_*`) and says it did not run rather than passing without one.
 
 ## Code generation: two generators, and no `build_runner`
 
@@ -115,7 +115,7 @@ A project is free to decide otherwise (a large asset library, union types where 
 |---|---|
 | A cross-cutting registry — analytics events, settings keys, roles | Code: an enum in `__SHARED_PKG__` when both sides use it, in `lib/core/` of the app otherwise, with doc comments. The compiler knows the list, and a typo is an error rather than a discrepancy |
 | The roles and access matrix | The doc comments above the handlers and rules — the rule sits where it is enforced |
-| An external integration's payload | Doc comments on the route (`DwRoute`) that receives it |
+| An external integration's payload | Doc comments on the route (`DwHttpRoute`) that receives it |
 | "How this app is put together" | The skills. The methodology ships from the framework and is updated with it; a copy inside the project would only fall behind |
 | A checkup report | The chat. `/dartway-checkup` writes no report file on purpose: what belongs to a feature becomes a line in its `knownIssues`, what belongs to the project goes to `docs/dev_notes/`, and the rest was worth saying once |
 
@@ -307,13 +307,13 @@ PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commi
 
 Nothing else may sit at the top level, and nothing may carry one of those names lower down: `app/admin/` is not the admin panel, it is a group that has quietly left every check written for zones. There is **no `data/`** (the data layer is `dw.request` and `dw.command` over the contract) and **no `domain/`** (the rules live in the shared package, where both sides apply them, and in the server's handlers). A fifth navigation zone in the router does not earn a folder — it is a group inside `app/`. `dartway check` enforces all of this as `invalidTopLevelLayout`.
 
-- **Features:** a feature = an entry point (one public file) + `widgets/` + `logic/`. From outside, import **only the entry point**. The entry-point widget declares the feature spec (`implements DwFeature` with a `DwFeatureSpec`) right in its own file. Skill — `dartway-feature-scaffold`.
+- **Features:** a feature = an entry point (one public file) + `widgets/` + `logic/`. From outside, import **only the entry point**. The entry-point widget declares the feature spec (`implements DwFeatureWidget` with a `DwFeatureSpec`) right in its own file. Skill — `dartway-feature-scaffold`.
 - **Data:** reads are `ref.watch(dw.request(request))` (`dw.pages`, `dw.table`, `dw.window` for the paginated kinds), live by their channels; changes are `dw.command(command)` inside `dw.action`, which shows a refusal through the project's refusal texts. No repository classes, no hand-written HTTP, no copies of server state in a notifier. A read the screen exists for renders its error state — a failed read must not look like an empty one. The contract — `dartway-data-layer`.
 - **`ProviderScope` is not written by the app.** The only one belongs to `DwAppRunner`; tests may create their own with `overrides:`. A nested scope looks like it works — widgets under it do read the override — but a provider reaching the same provider through `Ref` starts from the root container and silently gets the base value. **A value that must differ per subtree travels as a family key or a constructor argument.** Enforced by `forbidden_provider_scope` (`dartway_lints`).
 - **The UI Kit is the only source of styles:** in the zones and in `shared/`, direct `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme` are forbidden; the only import is `ui_kit.dart`. Skill — `dartway-ui-kit`.
 - **Every project is localized, and user-visible text is never written in code.** This is a requirement on the project, not a report on how it began. What has to be present: `flutter_localizations` and `generate: true` in the Flutter pubspec, `l10n.yaml` and `lib/l10n/*.arb` with its generated output committed beside them, `appLocaleProvider` (the system locale when supported, the first supported one otherwise), `context.l10n` in widgets and `appL10n` for code outside the tree — an error toast, a refusal text. `dartway check` reports a missing piece as `l10nNotWired`, an error.
 
-  **Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Project>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
+  **Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Project>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwFlutterConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
 
   **The law reaches as far as the app does, and no further.** Text composed on the *server* — a sign-in code message, an e-mail — is outside it: there is no `appL10n` there. That text has no rule yet, which is a gap named rather than covered; a project sending server-composed text in more than one language decides for itself how, and says so where its next reader will look.
 
@@ -323,5 +323,5 @@ Nothing else may sit at the top level, and nothing may carry one of those names 
 
   **A string the user reads is content, not decoration** — so `ui_kit` may not hold it and a feature may not hardcode it. `AppText.body(context.l10n.issuesTitle)`, never `AppText.body('Issues')`. Outside the kit this is not mechanically enforced (telling `'Issues'` from `'issues/board'` takes reading the meaning); `/dartway-checkup` looks for it. Inside `ui_kit/` `dartway check` reports it as `uiKitContainsText`; strings in the `fontFamily` and `fontFamilyFallback` positions are exempt.
 - **Navigation:** the DartWay Router — enum routes, enum parameters, guards centralized. One exception, and it is a fact rather than a preference: a transition nobody started from the tree — a tapped notification, a deep link — has no context to go through, and takes the navigation function from the router in one seam per application, in `core/`. Skill — `dartway-navigation`.
-- **Specials:** notifications — `dw.notify.*` (not `SnackBar`); actions from the UI — `dw.action`; sign-out — `dw.signOut()`; the signed-in account — `dw.accountId`; "update the app" — `DwConfig.updateRequiredScreen`, shown by the core when the server refuses this build.
+- **Specials:** notifications — `dw.notify.*` (not `SnackBar`); actions from the UI — `dw.action`; sign-out — `dw.signOut()`; the signed-in account — `dw.accountId`; "update the app" — `DwFlutterConfig.updateRequiredScreen`, shown by the core when the server refuses this build.
 - **The web shell (`web/index.html`) is part of the app, not scaffolding.** It is outside `lib/`, which is the only reason it reads as something the build generates. The skeleton ships it with a scroll lock the app depends on: without that block, focusing a text field on iOS takes the app off the screen, silently and only on a real phone. Anything that regenerates the shell drops it — `grep -q 'focusin' web/index.html` is the check, and `dartway-on-device` has the mechanism.

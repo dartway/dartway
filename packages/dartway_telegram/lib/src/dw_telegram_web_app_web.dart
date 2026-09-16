@@ -37,7 +37,7 @@ class DwTelegramWebAppImpl extends DwTelegramWebApp {
   }
 
   @override
-  Future<void> init(DwFlutter core) async {
+  Future<void> init(DwFlutterToolbox core) async {
     if (!isRunningInTelegram) return;
 
     // The WebApp object can exist before Telegram has handed over the viewport,

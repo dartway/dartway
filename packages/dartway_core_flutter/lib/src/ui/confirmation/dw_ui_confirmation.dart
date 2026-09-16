@@ -25,7 +25,7 @@ class DwUiConfirmation {
 }
 
 /// The built-in confirmation dialog; used when the app has not supplied
-/// `DwConfig.confirmDialogBuilder`.
+/// `DwFlutterConfig.confirmDialogBuilder`.
 abstract final class DwConfirmDialog {
   static Future<bool?> show(
     BuildContext context,

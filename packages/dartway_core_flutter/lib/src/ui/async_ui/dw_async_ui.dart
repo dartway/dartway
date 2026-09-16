@@ -59,7 +59,7 @@ extension DwAsyncValueListX<T> on AsyncValue<List<T>> {
         assert(
           loadingItem != null || dw.isDefaultModelsGetterSetUp,
           'Cannot build a loading value for dwBuildListAsync: either pass '
-          'loadingItem, or set DwConfig.defaultModelGetter.',
+          'loadingItem, or set DwFlutterConfig.defaultModelGetter.',
         );
 
         return List.generate(

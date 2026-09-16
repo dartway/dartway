@@ -5,7 +5,7 @@ description: >-
   implementing DwNavigationRoute<AppRouterState>; descriptors
   DwNavigationRouteDescriptor.zoneRoot/.simple/.parameterized; zone guards in
   zoneGuards; type-safe parameters via an enum with DwNavigationParamsMixin
-  (set/fromPath/fromQuery); the router is assembled with DwRouter<T>(routerState:,
+  (set/fromPath/fromQuery); the router is assembled with DwAppRouter<T>(routerState:,
   navigationZones:, pageBuilder:, options:). Use when creating or editing routes,
   screens, redirects and navigation between zones.
 ---
@@ -137,9 +137,9 @@ class AppRouterState extends ChangeNotifier {
 ## Assembling the router
 
 ```dart
-final appRouterProvider = Provider<DwRouter<AppRouterState>>((ref) {
+final appRouterProvider = Provider<DwAppRouter<AppRouterState>>((ref) {
   final routerState = ref.watch(appRouterStateProvider);
-  return DwRouter<AppRouterState>(
+  return DwAppRouter<AppRouterState>(
     routerState: routerState,
     navigationZones: [
       AppNavigationZone.values,
@@ -168,7 +168,7 @@ without a word of complaint. The router works the other way round: it keeps a
 Two zones owning a concept called `projects` is the natural thing to write, and
 it is an error.
 
-`DwRouter` refuses to assemble in that case and names both declarations:
+`DwAppRouter` refuses to assemble in that case and names both declarations:
 
 ```
 Duplicate route name "projects".

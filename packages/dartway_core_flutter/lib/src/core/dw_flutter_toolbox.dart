@@ -7,23 +7,23 @@ import 'package:flutter/material.dart';
 
 part 'logic/dw_notifications.dart';
 
-class DwFlutter {
+class DwFlutterToolbox {
   /// Builds the core and makes it the live one. Nothing runs yet: [init] does
   /// that, and [dispose] ends it.
-  DwFlutter({required this.config, List<DwPlugin> plugins = const []})
-    : plugins = DwPlugins(plugins) {
+  DwFlutterToolbox({required this.config, List<DwFlutterPlugin> plugins = const []})
+    : plugins = DwPluginRegistry(plugins) {
     attachDwInstance(this);
   }
 
   /// What the app configured.
-  final DwConfig config;
+  final DwFlutterConfig config;
 
-  DwConfig get _config => config;
+  DwFlutterConfig get _config => config;
 
   /// The integrations the app connected, reached as `dw.plugins.<name>` — kept
   /// apart from the core's own services. An integration package adds its named
-  /// accessor via `extension on DwPlugins`.
-  final DwPlugins plugins;
+  /// accessor via `extension on DwPluginRegistry`.
+  final DwPluginRegistry plugins;
 
   final notify = _DwNotifications._();
 
@@ -64,7 +64,7 @@ class DwFlutter {
   );
 
   /// Dispatch point for every reported error. The base implementation runs the
-  /// configured [DwConfig.onErrorReport] hook, or logs via `debugPrint` when
+  /// configured [DwFlutterConfig.onErrorReport] hook, or logs via `debugPrint` when
   /// none is set; `DwFlutterCore` overrides it to alert out of the box when the app
   /// has not installed its own policy.
   void dispatchReport(DwErrorReport report) {
@@ -73,12 +73,12 @@ class DwFlutter {
     debugPrint('${report.error}\n${report.stackTrace}');
   }
 
-  /// True when the app supplied its own error handling in [DwConfig] — the
+  /// True when the app supplied its own error handling in [DwFlutterConfig] — the
   /// out-of-the-box alerting then steps aside.
   bool get hasCustomErrorHandling => _config.onErrorReport != null;
 
   /// Shows a confirmation for [confirmation]: the app-supplied
-  /// [DwConfig.confirmDialogBuilder] when set, the built-in [DwConfirmDialog]
+  /// [DwFlutterConfig.confirmDialogBuilder] when set, the built-in [DwConfirmDialog]
   /// otherwise. Used by `DwUiAction(confirmation: ...)`.
   Future<bool?> confirm(BuildContext context, DwUiConfirmation confirmation) =>
       (_config.confirmDialogBuilder ?? DwConfirmDialog.show)(
@@ -86,19 +86,19 @@ class DwFlutter {
         confirmation,
       );
 
-  /// Whether [DwConfig.defaultModelGetter] is configured — drives whether
+  /// Whether [DwFlutterConfig.defaultModelGetter] is configured — drives whether
   /// skeleton loading states use a real placeholder model or a generic shimmer.
   bool get isDefaultModelsGetterSetUp => _config.defaultModelGetter != null;
 
   /// Returns a placeholder instance of model [T] for skeleton loading, via
-  /// [DwConfig.defaultModelGetter]. Throws if the getter is not configured.
+  /// [DwFlutterConfig.defaultModelGetter]. Throws if the getter is not configured.
   T getDefaultModel<T>() {
     final getter = _config.defaultModelGetter;
 
     if (getter == null) {
       throw StateError(
-        'DwConfig.defaultModelGetter is not set. '
-        'Provide it in the DwConfig passed to DwFlutter/DwFlutterCore.',
+        'DwFlutterConfig.defaultModelGetter is not set. '
+        'Provide it in the DwFlutterConfig passed to DwFlutterToolbox/DwFlutterCore.',
       );
     }
 

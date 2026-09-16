@@ -13,7 +13,7 @@ import 'package:gap/gap.dart';
 /// the admin bootstrap and other tools create accounts nobody named. So the
 /// question is also asked by `SignedInGate`, of every profile that lacks a
 /// name, whichever road led to it.
-class ProfileNamePage extends HookWidget implements DwFeature {
+class ProfileNamePage extends HookWidget implements DwFeatureWidget {
   const ProfileNamePage({super.key});
 
   @override

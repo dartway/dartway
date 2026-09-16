@@ -11,7 +11,7 @@ class _CapturingHandler implements DwNotificationHandler<DwUiNotification> {
   void show(BuildContext context, DwUiNotification event) => shown.add(event);
 }
 
-class _FeatureBox extends StatelessWidget implements DwFeature {
+class _FeatureBox extends StatelessWidget implements DwFeatureWidget {
   const _FeatureBox(this.id);
 
   final String id;
@@ -27,8 +27,8 @@ void main() {
   final reports = <DwErrorReport>[];
 
   // One core for the whole file: nothing here disposes it.
-  final dwInstance = DwFlutter(
-    config: DwConfig(
+  final dwInstance = DwFlutterToolbox(
+    config: DwFlutterConfig(
       appVersion: '1.2.3',
       onErrorReport: reports.add,
       refusalText: (refusal) => switch (refusal.code) {

@@ -24,7 +24,7 @@ zones, screen passports, supported locales — over the runtime channel on every
 go stale relative to the build it is showing. Features travel the same way: what a feature says
 about itself is declared next to its code in a `DwFeatureSpec` (see
 [Features and specs](../3-flutter/features-and-specs.md)), and an app reports the ones currently
-mounted — `DwFeature.scanMounted()` — rather than a catalogue kept anywhere else.
+mounted — `DwFeatureWidget.scanMounted()` — rather than a catalogue kept anywhere else.
 
 **Demo personas are the opposite: a platform concern.** Test users and their codes are configured in
 Studio's project settings and never ship inside the app's public web build. On a switch Studio sends
@@ -71,7 +71,7 @@ which is how `connectRefused` arrived inside version 4.
 
 **Tap to inspect** crosses the bridge as fractions of the app's viewport, not pixels: Studio may show
 the preview scaled or framed, and only the app knows its own logical size. The app converts the point
-and answers with the feature declared there (`DwFeature.hitTest` in a DartWay app). Each request
+and answers with the feature declared there (`DwFeatureWidget.hitTest` in a DartWay app). Each request
 carries an id the app echoes back, so a second tap never receives the first one's answer, and an app
 that does not know the message stays silent until Studio's timeout reports "nothing here".
 

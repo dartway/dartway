@@ -18,7 +18,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// from the server, live, so the very first screen proves the whole path —
 /// Postgres → handler → live request → widget. Change the name in the admin
 /// panel and every open copy of this screen follows without a reload.
-class HomePage extends ConsumerWidget implements DwFeature {
+class HomePage extends ConsumerWidget implements DwFeatureWidget {
   const HomePage({super.key});
 
   @override

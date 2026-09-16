@@ -8,11 +8,11 @@ what it needs to exist, and the two moments of its life — being built and bein
 
 | Class | What it is |
 |---|---|
-| `DwFlutter` | The toolbox with no server: `DwConfig`, plugins (`dw.plugins`), notifications (`dw.notify`), actions (`dw.action`), confirmations, the error pipeline (`dw.handleError`, `dw.errorContext`). |
-| `DwFlutterCore` | `DwFlutter` plus the data layer: one `DwAppClient` (`dw.client`) and the Riverpod bindings over it — `dw.request`, `dw.pages`, `dw.table`, `dw.window`, `dw.command`, `dw.files`, `dw.uploader()`, `dw.accountId`, `dw.liveStatus`, `dw.incompatibility`, `dw.signIn`, `dw.signOut`. |
+| `DwFlutterToolbox` | The toolbox with no server: `DwFlutterConfig`, plugins (`dw.plugins`), notifications (`dw.notify`), actions (`dw.action`), confirmations, the error pipeline (`dw.handleError`, `dw.errorContext`). |
+| `DwFlutterCore` | `DwFlutterToolbox` plus the data layer: one `DwAppClient` (`dw.client`) and the Riverpod bindings over it — `dw.request`, `dw.pages`, `dw.table`, `dw.window`, `dw.command`, `dw.files`, `dw.uploader()`, `dw.accountId`, `dw.liveStatus`, `dw.incompatibility`, `dw.signIn`, `dw.signOut`. |
 
-An app that talks to a DartWay server builds a `DwFlutterCore`. `DwFlutter` exists on its own for
-the parts that have no server — a plugin receives a `DwFlutter` in `init`, because that is the class
+An app that talks to a DartWay server builds a `DwFlutterCore`. `DwFlutterToolbox` exists on its own for
+the parts that have no server — a plugin receives a `DwFlutterToolbox` in `init`, because that is the class
 that declares `plugins:` (see [plugins](plugins.md)).
 
 `dw` is **the app's own variable**, declared in `lib/core/dw_core.dart`:
@@ -30,7 +30,7 @@ and for each widget test:
 
 ```dart
 dw = DwFlutterCore(
-  config: DwConfig(
+  config: DwFlutterConfig(
     appVersion: appVersion,
     refusalText: (refusal) => refusalText(appL10n, refusal),
     updateRequiredScreen: (context, refusal) =>
@@ -56,7 +56,7 @@ dw = DwFlutterCore(
   `package:dartway_client/testing.dart`).
 - **`tokenStore`** — where the session is kept; see below.
 
-### `DwConfig`
+### `DwFlutterConfig`
 
 | Field | Required by `DwFlutterCore` | What it is for |
 |---|---|---|
@@ -118,7 +118,7 @@ void run() {
 
 `DwAppBootstrapper` runs the initializers in order and shows, in this priority:
 
-1. `DwConfig.updateRequiredScreen`, when the client reports the build incompatible — over the loading
+1. `DwFlutterConfig.updateRequiredScreen`, when the client reports the build incompatible — over the loading
    and error screens too;
 2. the error screen, when an initializer threw — built from the error itself
    (`DwAppLoadingOptions.defaultErrorScreen` prints it, because the person looking at a failed start

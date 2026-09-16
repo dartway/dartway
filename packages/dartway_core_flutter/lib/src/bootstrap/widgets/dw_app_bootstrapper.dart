@@ -11,7 +11,7 @@ import '../dw_app_runner.dart';
 
 /// The widget [DwAppRunner] mounts under its `ProviderScope`: runs the app's
 /// initializers in order, shows [loadingScreen] meanwhile and the error screen
-/// when one throws, then [child] — and puts `DwConfig.updateRequiredScreen`
+/// when one throws, then [child] — and puts `DwFlutterConfig.updateRequiredScreen`
 /// over all of it once the core's client says this build can no longer talk
 /// to its server.
 ///

@@ -12,14 +12,14 @@ import 'package:flutter/material.dart';
 /// caller never has to unwrap a result to get the refusal shown.
 ///
 /// A refusal — a [DwCallRefused] result, or a [DwRefusalException] thrown by the
-/// app's own code — is shown to the user through [DwConfig.refusalText], the
+/// app's own code — is shown to the user through [DwFlutterConfig.refusalText], the
 /// project's catalogue, rather than as the action's generic error text. A
 /// not-authenticated answer shows nothing and signs out: the session is over,
 /// and the sign-in screen is the message. Both still travel through
 /// `dw.handleError`, so an app's error policy sees everything and sorts them
 /// out by type.
 ///
-/// Create one through [DwFlutter.action] — `dw.action(...)` — never directly:
+/// Create one through [DwFlutterToolbox.action] — `dw.action(...)` — never directly:
 /// the action's work is woven into the ambient `dw` services (it calls
 /// `dw.confirm`, `dw.notify`, `dw.handleError`), so its factory lives on `dw`.
 /// The type itself is public — a `DwUiAction` is a value you store, pass around
@@ -34,7 +34,7 @@ class DwUiAction<T> {
 }
 
 /// The single public entry point for building a [DwUiAction] — `dw.action(...)`.
-extension DwActionExtension on DwFlutter {
+extension DwActionExtension on DwFlutterToolbox {
   DwUiAction<T> action<T>(
     FutureOr<T> Function(BuildContext context) action, {
     String? label,

@@ -5,15 +5,15 @@ webhook, a partner's callback, a tool that downloads a file, an MCP client. For 
 declares **routes** — plain HTTP doors on the same port, over the framework's own small HTTP types.
 
 ```dart
-final routes = <DwRoute>[
-  DwRoute.get(
+final routes = <DwHttpRoute>[
+  DwHttpRoute.get(
     '/hello',
     (ctx, request) => DwHttpResponse.json({
       'hello': request.query['name'] ?? 'world',
       'agent': request.headers['x-agent'],
     }),
   ),
-  DwRoute.post('/echo', (ctx, request) async {
+  DwHttpRoute.post('/echo', (ctx, request) async {
     final body = await request.json() as Map<String, Object?>;
     await ctx.jobs.enqueue('record', {'tag': body['tag']});
     return DwHttpResponse.json(body, status: 201);
@@ -26,7 +26,7 @@ Passed as `DwAppServer(routes: routes)`; both are from
 
 ## Declaring a route
 
-`DwRoute.get(path, handle, {auth})`, `DwRoute.post(…)` and `DwRoute.any(…)` — every method; a
+`DwHttpRoute.get(path, handle, {auth})`, `DwHttpRoute.post(…)` and `DwHttpRoute.any(…)` — every method; a
 route of the same path with a specific method wins over it. The handler is a `DwRouteHandler`:
 
 ```dart

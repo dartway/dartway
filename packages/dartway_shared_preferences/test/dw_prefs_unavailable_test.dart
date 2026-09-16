@@ -37,8 +37,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   final reports = <DwErrorReport>[];
-  final core = DwFlutter(
-    config: DwConfig(onErrorReport: reports.add),
+  final core = DwFlutterToolbox(
+    config: DwFlutterConfig(onErrorReport: reports.add),
     plugins: const [],
   );
 

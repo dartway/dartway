@@ -36,7 +36,7 @@ DwFlutterCore createExampleDwCore({
   DwClientOptions clientOptions = const DwClientOptions(),
   List<DwPushTransportClient> pushTransports = const [],
 }) => dw = DwFlutterCore(
-  config: DwConfig(
+  config: DwFlutterConfig(
     appVersion: appVersion,
     refusalText: (refusal) => refusalText(appL10n, refusal),
     updateRequiredScreen: (context, refusal) =>

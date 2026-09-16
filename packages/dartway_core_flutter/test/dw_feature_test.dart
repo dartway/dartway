@@ -2,7 +2,7 @@ import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _FeatureBox extends StatelessWidget implements DwFeature {
+class _FeatureBox extends StatelessWidget implements DwFeatureWidget {
   const _FeatureBox(this.spec);
 
   final DwFeatureSpec spec;
@@ -16,7 +16,7 @@ class _FeatureBox extends StatelessWidget implements DwFeature {
 
 /// A feature that hosts a subtree — the shape of a card that may or may not
 /// build a nested feature of its own.
-class _FeatureGroup extends StatelessWidget implements DwFeature {
+class _FeatureGroup extends StatelessWidget implements DwFeatureWidget {
   const _FeatureGroup(this.spec, {this.child});
 
   final DwFeatureSpec spec;
@@ -29,11 +29,11 @@ class _FeatureGroup extends StatelessWidget implements DwFeature {
   Widget build(BuildContext context) => child ?? const SizedBox.shrink();
 }
 
-/// A [DwFeature] widget with a concrete, hit-testable size — [_FeatureBox]
+/// A [DwFeatureWidget] widget with a concrete, hit-testable size — [_FeatureBox]
 /// renders a zero-size box, which never intersects a hit-test point. A
 /// [child] gets the same size as its parent (`SizedBox` imposes tight
 /// constraints), which is exactly what a card's nested row does.
-class _SizedFeature extends StatelessWidget implements DwFeature {
+class _SizedFeature extends StatelessWidget implements DwFeatureWidget {
   const _SizedFeature(this.spec, {this.child});
 
   final DwFeatureSpec spec;
@@ -52,7 +52,7 @@ DwFeatureSpec _spec(String id) =>
 
 void main() {
   testWidgets(
-    'DwFeature.scanMounted collects mounted features, deduped by id',
+    'DwFeatureWidget.scanMounted collects mounted features, deduped by id',
     (tester) async {
       await tester.pumpWidget(
         Column(
@@ -64,7 +64,7 @@ void main() {
         ),
       );
 
-      final ids = DwFeature.scanMounted().map((f) => f.id).toList();
+      final ids = DwFeatureWidget.scanMounted().map((f) => f.id).toList();
       expect(ids.toSet(), {'a', 'b'});
       expect(ids.length, 2);
     },
@@ -74,7 +74,7 @@ void main() {
   // feature it has already seen. It matters for a list of near-identical cards:
   // collapsing to the first card's subtree would lose a nested feature only
   // some cards build — a "more actions" row on the one card that has extras.
-  testWidgets('DwFeature.scanMounted keeps a nested feature only one instance '
+  testWidgets('DwFeatureWidget.scanMounted keeps a nested feature only one instance '
       'of a repeated card builds', (tester) async {
     await tester.pumpWidget(
       Column(
@@ -89,23 +89,23 @@ void main() {
       ),
     );
 
-    final ids = DwFeature.scanMounted().map((feature) => feature.id).toList();
+    final ids = DwFeatureWidget.scanMounted().map((feature) => feature.id).toList();
     expect(ids.toSet(), {'ad/card', 'ad/card/more-actions'});
     expect(ids.length, 2);
   });
 
-  testWidgets('DwFeature.scanMounted is empty with no DwFeature widgets', (
+  testWidgets('DwFeatureWidget.scanMounted is empty with no DwFeatureWidget widgets', (
     tester,
   ) async {
     await tester.pumpWidget(const SizedBox.shrink());
-    expect(DwFeature.scanMounted(), isEmpty);
+    expect(DwFeatureWidget.scanMounted(), isEmpty);
   });
 
   // Mounted is not the same as on screen. An app that keeps a bottom-nav tab
   // alive behind an IndexedStack, or a route under a pushed one, leaves those
   // subtrees mounted — and reporting them would claim every screen hosts the
   // whole app.
-  testWidgets('DwFeature.scanMounted skips unselected IndexedStack children', (
+  testWidgets('DwFeatureWidget.scanMounted skips unselected IndexedStack children', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -118,10 +118,10 @@ void main() {
       ),
     );
 
-    expect(DwFeature.scanMounted().map((f) => f.id), ['shown']);
+    expect(DwFeatureWidget.scanMounted().map((f) => f.id), ['shown']);
   });
 
-  testWidgets('DwFeature.scanMounted skips an offstage subtree', (
+  testWidgets('DwFeatureWidget.scanMounted skips an offstage subtree', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -133,10 +133,10 @@ void main() {
       ),
     );
 
-    expect(DwFeature.scanMounted().map((f) => f.id), ['shown']);
+    expect(DwFeatureWidget.scanMounted().map((f) => f.id), ['shown']);
   });
 
-  testWidgets('DwFeature.scanMounted skips a disabled TickerMode subtree', (
+  testWidgets('DwFeatureWidget.scanMounted skips a disabled TickerMode subtree', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -149,10 +149,10 @@ void main() {
       ),
     );
 
-    expect(DwFeature.scanMounted().map((f) => f.id), ['shown']);
+    expect(DwFeatureWidget.scanMounted().map((f) => f.id), ['shown']);
   });
 
-  group('DwFeature.hitTest', () {
+  group('DwFeatureWidget.hitTest', () {
     testWidgets('returns the feature under the point', (tester) async {
       await tester.pumpWidget(
         Directionality(
@@ -173,8 +173,8 @@ void main() {
         ),
       );
 
-      expect(DwFeature.hitTest(centerOf('left'))?.id, 'left');
-      expect(DwFeature.hitTest(centerOf('right'))?.id, 'right');
+      expect(DwFeatureWidget.hitTest(centerOf('left'))?.id, 'left');
+      expect(DwFeatureWidget.hitTest(centerOf('right'))?.id, 'right');
     });
 
     testWidgets('is null over a point nothing declared covers', (tester) async {
@@ -185,7 +185,7 @@ void main() {
         ),
       );
 
-      expect(DwFeature.hitTest(const Offset(9999, 9999)), isNull);
+      expect(DwFeatureWidget.hitTest(const Offset(9999, 9999)), isNull);
     });
 
     // A card and a "more actions" row it may or may not build can both cover
@@ -209,7 +209,7 @@ void main() {
           (widget) => widget is _SizedFeature && widget.spec.id == 'ad/card',
         ),
       );
-      expect(DwFeature.hitTest(center)?.id, 'ad/card/more-actions');
+      expect(DwFeatureWidget.hitTest(center)?.id, 'ad/card/more-actions');
     });
 
     // hitTest bypasses Flutter's own hit-testing (it checks render bounds
@@ -223,7 +223,7 @@ void main() {
         ),
       );
 
-      expect(DwFeature.hitTest(const Offset(50, 50)), isNull);
+      expect(DwFeatureWidget.hitTest(const Offset(50, 50)), isNull);
     });
 
     // A scaled subtree draws smaller than it lays out. Matching on the
@@ -247,8 +247,8 @@ void main() {
       );
 
       // Laid out 100x100, drawn 50x50 at the top-left corner.
-      expect(DwFeature.hitTest(const Offset(20, 20))?.id, 'scaled');
-      expect(DwFeature.hitTest(const Offset(70, 70)), isNull);
+      expect(DwFeatureWidget.hitTest(const Offset(20, 20))?.id, 'scaled');
+      expect(DwFeatureWidget.hitTest(const Offset(70, 70)), isNull);
     });
 
     // A list item scrolled past the edge of its viewport keeps its layout
@@ -278,10 +278,10 @@ void main() {
         ),
       );
 
-      expect(DwFeature.hitTest(const Offset(50, 50))?.id, 'in-view');
+      expect(DwFeatureWidget.hitTest(const Offset(50, 50))?.id, 'in-view');
       // 'below-the-fold' lays out at y 100..200 — outside the viewport, drawn
       // nowhere.
-      expect(DwFeature.hitTest(const Offset(50, 150)), isNull);
+      expect(DwFeatureWidget.hitTest(const Offset(50, 150)), isNull);
     });
   });
 }

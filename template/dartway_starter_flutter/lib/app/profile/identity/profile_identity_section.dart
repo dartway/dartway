@@ -9,7 +9,7 @@ import 'widgets/identity_change_sheet.dart';
 
 /// How the member signs in: their phone and e-mail, each added or changed by a
 /// code sent to the new one — without signing in again.
-class ProfileIdentitySection extends StatelessWidget implements DwFeature {
+class ProfileIdentitySection extends StatelessWidget implements DwFeatureWidget {
   const ProfileIdentitySection({super.key});
 
   @override

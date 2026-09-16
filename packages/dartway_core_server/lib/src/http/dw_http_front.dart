@@ -9,7 +9,7 @@ import '../alerts/dw_server_logger.dart';
 import '../calls/dw_call_endpoint.dart';
 import '../context/dw_call_context.dart';
 import '../live/dw_live_endpoint.dart';
-import '../routes/dw_route.dart';
+import '../routes/dw_http_route.dart';
 import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
 import 'dw_http_request.dart';
@@ -26,7 +26,7 @@ final class DwHttpFront {
     required this.settings,
     required this.calls,
     required this.live,
-    required List<DwRoute> routes,
+    required List<DwHttpRoute> routes,
   }) : _routes = _indexRoutes(routes);
 
   final DwRuntime runtime;
@@ -35,7 +35,7 @@ final class DwHttpFront {
   final DwLiveEndpoint live;
 
   /// Path → method (`null` for any) → route.
-  final Map<String, Map<String?, DwRoute>> _routes;
+  final Map<String, Map<String?, DwHttpRoute>> _routes;
 
   HttpServer? _server;
   bool _stopping = false;
@@ -53,8 +53,8 @@ final class DwHttpFront {
 
   static final JsonUtf8Encoder _jsonUtf8 = JsonUtf8Encoder();
 
-  static Map<String, Map<String?, DwRoute>> _indexRoutes(List<DwRoute> routes) {
-    final index = <String, Map<String?, DwRoute>>{};
+  static Map<String, Map<String?, DwHttpRoute>> _indexRoutes(List<DwHttpRoute> routes) {
+    final index = <String, Map<String?, DwHttpRoute>>{};
     for (final route in routes) {
       (index[route.path] ??= {})[route.method] = route;
     }
@@ -270,7 +270,7 @@ final class DwHttpFront {
   /// none, when the route requires one), 500 when resolving fails.
   Future<(DwSessionKeyInfo?, DwHttpResponse?)> _routeSession(
     HttpRequest request,
-    DwRoute route,
+    DwHttpRoute route,
     String where,
   ) async {
     if (route.auth == DwRouteAuth.none) return (null, null);
