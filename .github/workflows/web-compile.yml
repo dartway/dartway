@@ -3,8 +3,8 @@ name: Web compile
 # dart2js rejects things the VM accepts — an integer literal that a JavaScript
 # double cannot hold exactly is the standing example. Unit tests run on the VM
 # and cannot see that class of error at all, so the only guard is compiling for
-# the web. `dartway_offline_flutter` reached a consumer's release build with two
-# such literals in it precisely because nothing here ever compiled it.
+# the web. A package that nothing here ever compiled reached a consumer's
+# release build with two such literals in it; that is what this job prevents.
 
 on:
   pull_request:
@@ -18,20 +18,9 @@ concurrency:
 
 jobs:
   build:
+    name: example
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # The offline package is depended on by no example and no template,
-          # so it carries its own harness — see the app's `lib/main.dart`.
-          - name: dartway_offline_flutter
-            path: packages/dartway_offline/dartway_offline_flutter/example
-          # The example covers the core, dartway_flutter and the router.
-          - name: example
-            path: example/dartway_example_flutter
-    name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,11 +29,12 @@ jobs:
           flutter-version: 3.44.0
           channel: stable
 
-      # The workspace resolves from the repository root; the two web targets
-      # sit outside it and resolve on their own.
+      # The example covers the core, dartway_core_flutter and the router. The
+      # workspace resolves from the repository root; the example sits outside it
+      # and resolves on its own.
       - run: flutter pub get
       - run: flutter pub get
-        working-directory: ${{ matrix.path }}
+        working-directory: example/dartway_example_flutter
 
       - run: flutter build web --release
-        working-directory: ${{ matrix.path }}
+        working-directory: example/dartway_example_flutter
