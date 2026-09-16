@@ -182,6 +182,17 @@ Delivered after commit, like publications. Without it the demoted member keeps r
 published to the channel until they reconnect. Signing out and revoking a session key close the
 key's subscriptions by themselves.
 
+**Every path that takes the right away needs its own `ctx.revoke`** — removing a member, deleting
+the group, moving it to another owner, turning a public project private. The rule was asked once,
+at subscription, and nothing asks it again; the server has no reason to notice that the answer has
+changed.
+
+**A test proves this only if it watches a channel that can be revoked.** A caller channel
+(`ofCaller`) is never revoked — its key *is* the subscriber — so a test that removes someone and
+then asserts their "my teams" list stays quiet passes whether or not the command revokes anything.
+Watch the group's own channel instead, and prove the test can fail: delete the `ctx.revoke` and
+see it go red.
+
 ## 5. What an update does to a request
 
 When an object arrives on a channel a request declares (and is of the request's item type), the
@@ -278,7 +289,9 @@ What to cover for a new channel or a new publishing command:
 - [ ] the other client's request hears the change (and the author's from the response);
 - [ ] someone not entitled is refused at subscription (one refused subscribe per rule);
 - [ ] "my" data published for account A never reaches account B's "my" request;
-- [ ] a revoked right closes the channel (the client receives its `closed` frame);
+- [ ] a revoked right closes the channel (the client receives its `closed` frame) — on the group's
+      own channel, not a caller channel, and verified by deleting the `ctx.revoke` and watching the
+      test fail;
 - [ ] a deletion leaves the other client's list;
 - [ ] in `__SHARED_PKG__/test/`: `onUpdate` answers `upsert`/`remove` as intended for matching and
       non-matching objects.

@@ -212,6 +212,22 @@ void main() {
     expect('${onChannel.stderr}', contains('nowhere.git'));
   });
 
+  test('the language and the tracker chosen at creation are recorded, because '
+      'update runs with no arguments and reads them back', () async {
+    final project = await create([
+      'shop',
+      '--language',
+      'ru',
+      '--notes-tracker',
+      'github',
+    ]);
+    final manifest = read(project, '.claude/dartway-toolkit.json');
+
+    expect(manifest, contains('"language": "ru"'));
+    expect(manifest, contains('"notesTracker": "github"'));
+    expect(manifest, contains('"baseBranch": "master"'));
+  });
+
   test('a name that cannot become a bucket name is refused', () async {
     for (final name in ['shop__floor', 'shop_', 'a' * 56]) {
       final result = await dartway(['create', name, '--no-git']);

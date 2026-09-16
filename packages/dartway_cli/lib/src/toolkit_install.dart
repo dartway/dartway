@@ -126,11 +126,11 @@ class ToolkitInstallChoice {
   /// runs from.
   final bool channelChosen;
 
-  Map<String, String> get settings => {
-    ToolkitProvenance.baseBranchSetting: baseBranch,
-    ToolkitProvenance.languageSetting: language,
-    ToolkitProvenance.notesTrackerSetting: notesTracker,
-  };
+  Map<String, String> get settings => ToolkitProvenance.settingsOf(
+    baseBranch: baseBranch,
+    language: language,
+    notesTracker: notesTracker,
+  );
 
   void describe(StringSink out) {
     out.writeln('Base branch: $baseBranch');

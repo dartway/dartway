@@ -43,6 +43,20 @@ class ToolkitProvenance {
   static const languageSetting = 'language';
   static const notesTrackerSetting = 'notesTracker';
 
+  /// The three settings as the manifest holds them.
+  ///
+  /// Every writer goes through here, so a command that records them cannot
+  /// record two of the three: the caller names the values, never the keys.
+  static Map<String, String> settingsOf({
+    required String baseBranch,
+    required String language,
+    required String notesTracker,
+  }) => {
+    baseBranchSetting: baseBranch,
+    languageSetting: language,
+    notesTrackerSetting: notesTracker,
+  };
+
   /// Reads the manifest a previous install left, or null when there is none —
   /// which is every project installed before this existed.
   static ToolkitProvenance? read(Directory projectRoot) {

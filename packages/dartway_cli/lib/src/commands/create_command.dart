@@ -7,6 +7,7 @@ import '../framework_overrides.dart';
 import '../monorepo_source.dart';
 import '../project_layout.dart';
 import '../toolkit_installer.dart';
+import '../toolkit_manifest.dart';
 
 /// Creates a new DartWay project from the `template/` skeleton of the monorepo:
 /// copies it, names everything after the project — packages, types, the
@@ -152,15 +153,25 @@ class CreateCommand extends Command<int> {
     }
 
     final layout = ProjectLayout.detect(targetDir);
+    // The three settings are recorded as well as substituted: `dartway update`
+    // runs without arguments and takes them from the manifest, so a project
+    // created `--language ru` with a tracker would otherwise be rewritten in
+    // the defaults by its first update — silently, since a missing setting and
+    // a defaulted one look alike.
+    final settings = ToolkitProvenance.settingsOf(
+      baseBranch: 'master',
+      language: argResults!['language'] as String,
+      notesTracker: argResults!['notes-tracker'] as String,
+    );
     await ToolkitInstaller.install(
       toolkitDir: Directory(p.join(monorepoDir.path, 'toolkit')),
       projectRoot: targetDir,
       tokens: layout.toolkitTokens(
-        baseBranch: 'master',
-        language: argResults!['language'] as String,
-        notesTracker: argResults!['notes-tracker'] as String,
+        baseBranch: settings[ToolkitProvenance.baseBranchSetting]!,
+        language: settings[ToolkitProvenance.languageSetting]!,
+        notesTracker: settings[ToolkitProvenance.notesTrackerSetting]!,
       ),
-      provenance: await source.provenance(monorepoDir),
+      provenance: await source.provenance(monorepoDir, settings: settings),
     );
 
     if (argResults!['git'] as bool) {
