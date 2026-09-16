@@ -4,6 +4,13 @@
 
 The rewrite (see docs/1.0).
 
+- **The server reads and writes its own files**: `ctx.files.read(fileId)` answers the bytes of a
+  confirmed file, public or private; `ctx.files.readLink(fileId)` a short link another service can
+  fetch; `ctx.files.store(purpose, accountId:, bytes:, contentType:, fileName:)` a new confirmed
+  file the server made, by the purpose's rule. None asks `canRead` or `canUpload`. A stored file
+  is confirmed in the caller's transaction; rolled back, it is removed with its object as an
+  unfinished upload (D-062).
+
 - **Failed jobs are no longer kept forever.** `dw.cleanup` removes a job that ran out of attempts
   once `DwServerSettings.failedJobRetention` (30 days by default) has passed since it failed.
   Such rows stay for the operator to read and re-enqueue, but nothing did either on its own, so a

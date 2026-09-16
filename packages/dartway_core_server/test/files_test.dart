@@ -621,6 +621,108 @@ void main() {
       });
     }
 
+    group('the server\'s own files', () {
+      int sumOf(List<int> bytes) => bytes.fold<int>(0, (a, b) => a + b);
+
+      test('read and readLink reach a private file without canRead', () async {
+        // Alice's private document: Bob may not read it as a client, and the
+        // server reads it anyway — that is the point.
+        final body = bytesOf(40, 3);
+        final file = await upload(
+          alice,
+          TestUpload.document,
+          bytes: body,
+          type: 'text/plain',
+        );
+        final asClient = await bob.call(DwGetFileLink(fileId: file.id));
+        expect(asClient.status, 403);
+
+        final command = ReadAsServer(file.id);
+        final answer = (await bob.call(command)).value(command).urls;
+        expect(answer['length'], '${body.length}');
+        expect(answer['sum'], '${sumOf(body)}');
+        final fetched = await getUrl(answer['link']!);
+        expect(fetched.status, 200);
+        expect(fetched.bytes, body);
+      });
+
+      test(
+        'read and readLink know nothing of an unfinished or absent file',
+        () async {
+          final unfinished = await ticketFor(
+            alice,
+            start(TestUpload.document, type: 'text/plain', name: 'a.txt'),
+          );
+          for (final id in [unfinished.id, 1 << 40]) {
+            final command = ReadAsServer(id);
+            expect((await alice.call(command)).value(command).urls, isEmpty);
+          }
+        },
+      );
+
+      test('store writes a confirmed private file the server made', () async {
+        const command = StoreMade(purpose: 'document', size: 30);
+        final stored = (await alice.call(command)).value(command);
+        expect(stored.url, isNull, reason: 'private');
+        expect(stored.byteSize, 30);
+        final row = await rowOf(stored.id);
+        expect(row['confirmed_at'], isNotNull);
+        expect(row.get<String>('bucket'), storage.privateBucket);
+        expect(
+          await storage.keys(storage.privateBucket),
+          contains(row.get<String>('object_key')),
+        );
+
+        final read = ReadAsServer(stored.id);
+        final answer = (await alice.call(read)).value(read).urls;
+        expect(answer['sum'], '${sumOf(bytesOf(30))}');
+      });
+
+      test(
+        'store rolled back leaves an unconfirmed file for the cleanup',
+        () async {
+          final before = await harness().db.query(
+            'SELECT max(id) AS id FROM dw_stored_file',
+          );
+          final last = before.single['id'] as int? ?? 0;
+          const command = StoreMade(
+            purpose: 'document',
+            size: 12,
+            refuse: true,
+          );
+          expect((await alice.call(command)).status, 409);
+          final rows = await harness().db.query(
+            'SELECT confirmed_at, bucket, object_key FROM dw_stored_file '
+            'WHERE id > @last',
+            params: {'last': last},
+          );
+          expect(rows, hasLength(1));
+          expect(rows.single['confirmed_at'], isNull);
+          final read = ReadAsServer(
+            (await harness().db.query(
+              'SELECT id FROM dw_stored_file WHERE id > @last',
+              params: {'last': last},
+            )).single.get<int>('id'),
+          );
+          expect((await alice.call(read)).value(read).urls, isEmpty);
+        },
+      );
+
+      test(
+        'store holds the purpose\'s rule, as mistakes in server code',
+        () async {
+          for (final command in const [
+            StoreMade(purpose: 'document', size: 2 << 20),
+            StoreMade(purpose: 'document', size: 8, type: 'image/png'),
+            StoreMade(purpose: 'unruled', size: 8),
+          ]) {
+            expect((await alice.call(command)).status, 500, reason: '$command');
+          }
+          harness().app.alerts.incidents.clear();
+        },
+      );
+    });
+
     test('delete from a read is an error, and deletes nothing', () async {
       final file = await upload(alice, TestUpload.avatar);
       final answer = await alice.call(DropFromRead(file.id));

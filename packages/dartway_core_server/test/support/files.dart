@@ -327,6 +327,60 @@ final class DropFromRead extends DwListRequest<NoteView> {
       DropFromRead(json['fileId']! as int);
 }
 
+/// Stores a file the server made through `ctx.files.store`: [size] bytes of
+/// `bytesOf`, as [purpose] with [type], owned by the caller.
+final class StoreMade extends DwActionCommand<DwStoredFile> {
+  const StoreMade({
+    required this.purpose,
+    required this.size,
+    this.type = 'text/plain',
+    this.refuse = false,
+  });
+
+  final String purpose;
+  final int size;
+  final String type;
+
+  /// Refuse after storing: the transaction rolls back.
+  final bool refuse;
+
+  @override
+  String get dwTypeName => 'StoreMade';
+
+  @override
+  Map<String, Object?> toJson() => {
+    'purpose': purpose,
+    'size': size,
+    'type': type,
+    if (refuse) 'refuse': true,
+  };
+
+  static StoreMade fromJson(Map<String, Object?> json) => StoreMade(
+    purpose: json['purpose']! as String,
+    size: json['size']! as int,
+    type: json['type']! as String,
+    refuse: json['refuse'] == true,
+  );
+}
+
+/// Reads a file as the server: its length and a digest of its bytes through
+/// `ctx.files.read`, and a link through `ctx.files.readLink`. Answers the
+/// caller nothing about files it does not own — the test reads the answer.
+final class ReadAsServer extends DwActionCommand<FileUrls> {
+  const ReadAsServer(this.fileId);
+
+  final int fileId;
+
+  @override
+  String get dwTypeName => 'ReadAsServer';
+
+  @override
+  Map<String, Object?> toJson() => {'fileId': fileId};
+
+  static ReadAsServer fromJson(Map<String, Object?> json) =>
+      ReadAsServer(json['fileId']! as int);
+}
+
 final class FileUrls extends DwWireObject {
   const FileUrls(this.urls);
 
@@ -348,6 +402,8 @@ final DwWireProtocol filesProtocol = DwWireProtocol([
   const DwProtocolEntry<ResolveUrls>('ResolveUrls', ResolveUrls.fromJson),
   const DwProtocolEntry<DropFromRead>('DropFromRead', DropFromRead.fromJson),
   const DwProtocolEntry<FileUrls>('FileUrls', FileUrls.fromJson),
+  const DwProtocolEntry<StoreMade>('StoreMade', StoreMade.fromJson),
+  const DwProtocolEntry<ReadAsServer>('ReadAsServer', ReadAsServer.fromJson),
 ], include: testProtocol);
 
 List<DwCallHandler> fileHandlers() => [
@@ -375,6 +431,32 @@ List<DwCallHandler> fileHandlers() => [
       )).entries)
         '$key': value,
     }),
+  ),
+  DwCallHandler.command<StoreMade, DwStoredFile>(
+    access: DwAccessRule.signedIn,
+    handle: (ctx, command) async {
+      final stored = await ctx.files.store(
+        TestUpload.values.byName(command.purpose),
+        accountId: ctx.requireAccountId,
+        bytes: bytesOf(command.size),
+        contentType: command.type,
+        fileName: 'made.txt',
+      );
+      if (command.refuse) ctx.refuse(DwCoreRefusal.conflict);
+      return stored;
+    },
+  ),
+  DwCallHandler.command<ReadAsServer, FileUrls>(
+    access: DwAccessRule.signedIn,
+    handle: (ctx, command) async {
+      final bytes = await ctx.files.read(command.fileId);
+      final link = await ctx.files.readLink(command.fileId);
+      return FileUrls({
+        if (bytes != null) 'length': '${bytes.length}',
+        if (bytes != null) 'sum': '${bytes.fold<int>(0, (a, b) => a + b)}',
+        if (link != null) 'link': link.url,
+      });
+    },
   ),
   DwCallHandler.list<DropFromRead, NoteView>(
     access: DwAccessRule.anonymous,

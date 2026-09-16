@@ -231,6 +231,13 @@ request (reads have no side effects), and answers whether the file existed.
 **Delete the file a command replaces or clears**; otherwise it stays in the bucket for ever, owned
 by nobody. The foreign key's `onDelete` decides what happens to rows still pointing at it.
 
+**The server works on a file itself with `ctx.files.read(fileId)`, `ctx.files.readLink(fileId)` and
+`ctx.files.store(purpose, accountId:, bytes:, contentType:, fileName:)`** — a model reading a private
+photo, a generated image kept for its owner. They ask no `canRead`/`canUpload`: the server is the
+reader and the writer. **Never make a file public so that server code can reach it** — health data,
+documents and photos stay private and are read this way. Never pass what `read` or `readLink` answers
+to a caller who may not read the file.
+
 **Unfinished uploads clean themselves up**: a ticket never finished is removed with its object by a
 framework job after `ticketLifetime` + `uploadGrace` (fifteen minutes each by default). An account
 holding `maxPendingUploads` (ten) unfinished uploads is refused `dw.tooManyRequests` until one expires.

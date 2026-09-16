@@ -33,7 +33,10 @@ void main() {
           '/any',
           (ctx, request) => DwHttpResponse.text(request.method),
         ),
-        DwHttpRoute.post('/any', (ctx, request) => DwHttpResponse.text('specific')),
+        DwHttpRoute.post(
+          '/any',
+          (ctx, request) => DwHttpResponse.text('specific'),
+        ),
         DwHttpRoute.get('/unread', (ctx, request) => DwHttpResponse.empty()),
         DwHttpRoute.get('/unusual', (ctx, request) => DwHttpResponse(299)),
         DwHttpRoute.post('/publish', (ctx, request) async {

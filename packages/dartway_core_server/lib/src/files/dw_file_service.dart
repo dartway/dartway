@@ -43,6 +43,48 @@ abstract interface class DwFileService {
   ///
   /// Throws [StateError] in a request: reads have no side effects.
   Future<bool> delete(int fileId);
+
+  /// The bytes of the confirmed file [fileId], public or private; `null` when
+  /// there is none.
+  ///
+  /// The server's own read, for server code that works on a file — a model
+  /// looking at a photo, a document being parsed. No `canRead` is asked: the
+  /// reader is the server, and what it does with the bytes is the handler's
+  /// decision. Never return them to a caller without checking the caller may
+  /// read the file.
+  Future<List<int>?> read(int fileId);
+
+  /// A link to the confirmed file [fileId] that anyone holding it can read
+  /// until [expires] passes (the storage's link lifetime by default); `null`
+  /// when there is none.
+  ///
+  /// For server code handing a private file to another service that fetches
+  /// by URL. Like [read], it asks no `canRead`: it is the server's access,
+  /// not the caller's — a client asks for a link with `DwGetFileLink`.
+  Future<DwFileLink?> readLink(int fileId, {Duration? expires});
+
+  /// Stores [bytes] as a new confirmed file of [purpose] owned by
+  /// [accountId] — a file the server made, not one a client uploaded: a
+  /// generated image, a rendered report.
+  ///
+  /// The purpose's rule applies as to an upload — its visibility picks the
+  /// bucket, and a size over `maxBytes` or a content type it does not list
+  /// is an [ArgumentError], a mistake in server code rather than a refusal.
+  /// `canUpload` is not asked: the writer is the server.
+  ///
+  /// The object is written at once and the file confirmed in the caller's
+  /// transaction. If that transaction rolls back, the file is left
+  /// unconfirmed and removed with its object by the cleanup of unfinished
+  /// uploads, as an abandoned upload is.
+  ///
+  /// Throws [StateError] in a request: reads have no side effects.
+  Future<DwStoredFile> store(
+    DwUploadPurpose purpose, {
+    required int accountId,
+    required List<int> bytes,
+    required String contentType,
+    required String fileName,
+  });
 }
 
 /// The file storage of a running server: the object store, the built-in
@@ -522,6 +564,22 @@ final class DwUnconfiguredFiles implements DwFileService {
 
   @override
   Future<bool> delete(int fileId) async => _fail();
+
+  @override
+  Future<List<int>?> read(int fileId) async => _fail();
+
+  @override
+  Future<DwFileLink?> readLink(int fileId, {Duration? expires}) async =>
+      _fail();
+
+  @override
+  Future<DwStoredFile> store(
+    DwUploadPurpose purpose, {
+    required int accountId,
+    required List<int> bytes,
+    required String contentType,
+    required String fileName,
+  }) async => _fail();
 }
 
 final class _DwContextFiles implements DwFileService {
@@ -589,5 +647,132 @@ final class _DwContextFiles implements DwFileService {
       });
       return true;
     });
+  }
+
+  /// The confirmed file's record and where its object is, or `null`.
+  Future<({DwFileRecord record, String bucket, String key})?> _confirmed(
+    int fileId,
+  ) async {
+    final rows = await _ctx.db.query(
+      'SELECT ${DwFileStore._columns}, bucket, object_key FROM dw_stored_file '
+      'WHERE id = @id AND confirmed_at IS NOT NULL',
+      params: {'id': fileId},
+    );
+    if (rows.isEmpty) return null;
+    final row = rows.single;
+    return (
+      record: DwFileStore._record(row),
+      bucket: row.get<String>('bucket'),
+      key: row.get<String>('object_key'),
+    );
+  }
+
+  @override
+  Future<List<int>?> read(int fileId) async {
+    final file = await _confirmed(fileId);
+    if (file == null) return null;
+    return _store.objects.get(
+      file.bucket,
+      file.key,
+      maxBytes: file.record.byteSize,
+    );
+  }
+
+  @override
+  Future<DwFileLink?> readLink(int fileId, {Duration? expires}) async {
+    final file = await _confirmed(fileId);
+    if (file == null) return null;
+    final lifetime = expires ?? _store.storage.linkLifetime;
+    if (lifetime <= Duration.zero ||
+        lifetime > DwFileStorage.maxPresignedLifetime) {
+      throw ArgumentError.value(
+        expires,
+        'expires',
+        'must be positive and at most ${DwFileStorage.maxPresignedLifetime}',
+      );
+    }
+    final now = DateTime.now().toUtc();
+    return DwFileLink(
+      id: file.record.id,
+      url:
+          '${_store.objects.presignGet(bucket: file.bucket, key: file.key, expires: lifetime, time: now, fileName: file.record.fileName)}',
+      expiresAt: DateTime.fromMillisecondsSinceEpoch(
+        now.millisecondsSinceEpoch ~/ 1000 * 1000,
+        isUtc: true,
+      ).add(lifetime),
+    );
+  }
+
+  @override
+  Future<DwStoredFile> store(
+    DwUploadPurpose purpose, {
+    required int accountId,
+    required List<int> bytes,
+    required String contentType,
+    required String fileName,
+  }) async {
+    _ctx.requireSideEffects('files.store');
+    final rule =
+        _store.rules[purpose.purposeName] ??
+        (throw ArgumentError.value(
+          purpose.purposeName,
+          'purpose',
+          'has no upload rule',
+        ));
+    if (bytes.length > rule.maxBytes) {
+      throw ArgumentError.value(
+        bytes.length,
+        'bytes',
+        'is over the ${rule.maxBytes} bytes ${purpose.purposeName} allows',
+      );
+    }
+    if (!rule.contentTypes.contains(contentType)) {
+      throw ArgumentError.value(
+        contentType,
+        'contentType',
+        'is not one ${purpose.purposeName} allows',
+      );
+    }
+    final database =
+        _store._database ??
+        (throw StateError('the file store is not attached to a database'));
+    // Present: startup refuses a rule whose visibility has no bucket.
+    final bucket = _store.storage.config.bucketFor(rule.visibility)!;
+    final key =
+        '${rule.purpose.purposeName}/$accountId/${DwFileStore._randomName()}.'
+        '${DwFileStore.extensions[contentType] ?? 'bin'}';
+    // Recorded unconfirmed on the pool, committed before the object exists:
+    // whatever happens after — the write failing, the caller's transaction
+    // rolling back — the row is there for the cleanup of unfinished uploads
+    // to remove the object by.
+    final row = (await database.query(
+      'INSERT INTO dw_stored_file (account_id, purpose, bucket, object_key, '
+      'visibility, file_name, content_type, byte_size) '
+      'VALUES (@account, @purpose, @bucket, @key, @visibility, @name, @type, '
+      '@size) RETURNING ${DwFileStore._columns}, bucket, object_key',
+      params: {
+        'account': accountId,
+        'purpose': rule.purpose.purposeName,
+        'bucket': bucket,
+        'key': key,
+        'visibility': rule.visibility.name,
+        'name': fileName,
+        'type': contentType,
+        'size': bytes.length,
+      },
+    )).single;
+    await _store.objects.put(
+      bucket,
+      key,
+      bytes: bytes,
+      contentType: contentType,
+    );
+    // In the caller's transaction: the file exists exactly when the work that
+    // made it commits.
+    await _ctx.db.execute(
+      'UPDATE dw_stored_file SET confirmed_at = now() WHERE id = @id',
+      params: {'id': row.get<int>('id')},
+    );
+    return _store.storedFile(DwFileStore._record(row), row);
   }
 }

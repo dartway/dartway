@@ -165,6 +165,58 @@ final class DwObjectStore {
     );
   }
 
+  /// The object's bytes, or `null` when there is none. Reads at most
+  /// [maxBytes]: more than that is a storage that no longer holds what the
+  /// row describes, and it throws rather than buffering it.
+  Future<List<int>?> get(
+    String bucket,
+    String key, {
+    required int maxBytes,
+  }) async {
+    final response = await send('GET', bucket: bucket, key: key);
+    if (response.statusCode == HttpStatus.notFound) {
+      await response.drain<void>();
+      return null;
+    }
+    if (response.statusCode != HttpStatus.ok) {
+      throw DwStorageException(
+        'GET',
+        response.statusCode,
+        await errorCodeOf(response),
+      );
+    }
+    final bytes = <int>[];
+    await for (final chunk in response) {
+      bytes.addAll(chunk);
+      if (bytes.length > maxBytes) {
+        throw DwStorageException('GET', response.statusCode, 'TooLarge');
+      }
+    }
+    return bytes;
+  }
+
+  /// Stores [bytes] under [key], on the condition that the key is free: the
+  /// same `if-none-match: *` a client's upload ticket carries, so a server
+  /// write cannot overwrite an object either.
+  Future<void> put(
+    String bucket,
+    String key, {
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final response = await send(
+      'PUT',
+      bucket: bucket,
+      key: key,
+      body: bytes,
+      headers: {'content-type': contentType, 'if-none-match': '*'},
+    );
+    final code = await errorCodeOf(response);
+    if (response.statusCode != HttpStatus.ok) {
+      throw DwStorageException('PUT', response.statusCode, code);
+    }
+  }
+
   /// Deletes the object; an absent one is not an error (S3 answers `204`
   /// either way, and a `404` from a stricter storage means the same).
   Future<void> delete(String bucket, String key) async {

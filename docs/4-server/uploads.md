@@ -244,6 +244,33 @@ Turn ids into URLs when rows become data objects, for the whole list at once
 (`template/dartway_starter_server/lib/src/objects.dart`) — never store a URL on a row: the storage
 configuration decides it, and a private file has none.
 
+### The server's own access — `read`, `readLink`, `store`
+
+A handler or a job sometimes works on a file itself rather than handing it to a client: a model
+looks at a private photo, a report is rendered and kept. Three calls do that, on the server's
+authority rather than the caller's — **no `canRead` or `canUpload` is asked**:
+
+```dart
+final bytes = await ctx.files.read(fileId);               // null: no confirmed file
+final link = await ctx.files.readLink(fileId);            // a short link another service can fetch
+final made = await ctx.files.store(
+  AppUpload.progressCard,
+  accountId: profile.accountId,
+  bytes: png,
+  contentType: 'image/png',
+  fileName: 'progress.png',
+);
+```
+
+- `read` and `readLink` reach a confirmed file, public or private. What the handler then gives a
+  caller is its decision: never return the bytes or the link to someone who may not read the file.
+- `store` applies the purpose's rule as an upload does — the visibility picks the bucket; a size
+  over `maxBytes` or a content type the rule does not list is an `ArgumentError`, a mistake in
+  server code. The file's row is committed unconfirmed before the object is written and confirmed
+  in the caller's transaction, so a rolled-back command leaves an unfinished file that the cleanup
+  below removes with its object, exactly like an abandoned upload.
+- `store` throws in a request, like `delete`.
+
 ## Refusals
 
 | Code | When |
