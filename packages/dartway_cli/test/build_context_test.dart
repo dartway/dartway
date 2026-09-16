@@ -192,4 +192,107 @@ COPY --from=build /server /app/server
       );
     });
   });
+  group('outsideContextProblems', () {
+    /// The shape Studio's image failed on, 16.09.2026: the framework taken
+    /// from a checkout beside the project.
+    const outside = '../../framework/packages/dartway_core_server';
+
+    test('names a dependency taken by path from outside the project', () {
+      write(
+        'server/pubspec.yaml',
+        'name: server\ndependencies:\n  dartway_core_server:\n'
+            '    path: $outside\n',
+      );
+      expect(outsideContextProblems(projectRoot: root, packages: ['server']), [
+        'server/pubspec.yaml takes dartway_core_server from $outside, '
+            'outside the build context',
+      ]);
+    });
+
+    test(
+      'reads overrides and dev dependencies, which the image resolves too',
+      () {
+        write(
+          'server/pubspec.yaml',
+          'name: server\n'
+              'dev_dependencies:\n  tool:\n    path: ../../tool\n'
+              'dependency_overrides:\n  dartway_orm:\n    path: ../../orm\n',
+        );
+        expect(
+          outsideContextProblems(projectRoot: root, packages: ['server']),
+          hasLength(2),
+        );
+      },
+    );
+
+    test('follows a sibling package to its own outside dependency', () {
+      package('server', dependencies: ['shared']);
+      write(
+        'shared/pubspec.yaml',
+        'name: shared\ndependencies:\n  dartway_core_shared:\n'
+            '    path: ../../core_shared\n',
+      );
+      expect(outsideContextProblems(projectRoot: root, packages: ['server']), [
+        'shared/pubspec.yaml takes dartway_core_shared from ../../core_shared, '
+            'outside the build context',
+      ]);
+    });
+
+    test('a sibling package inside the project is not its business', () {
+      package('server', dependencies: ['shared']);
+      package('shared');
+      expect(
+        outsideContextProblems(projectRoot: root, packages: ['server']),
+        isEmpty,
+      );
+    });
+
+    test(
+      'reads pubspec_overrides.yaml, which pub applies inside the image',
+      () {
+        package('server');
+        write(
+          'server/pubspec_overrides.yaml',
+          'dependency_overrides:\n  dartway_orm:\n    path: ../../orm\n',
+        );
+        expect(
+          outsideContextProblems(projectRoot: root, packages: ['server']),
+          [
+            'server/pubspec_overrides.yaml takes dartway_orm from ../../orm, '
+                'outside the build context',
+          ],
+        );
+      },
+    );
+
+    test('but not once .dockerignore keeps that file out of the image', () {
+      package('server');
+      write(
+        'server/pubspec_overrides.yaml',
+        'dependency_overrides:\n  dartway_orm:\n    path: ../../orm\n',
+      );
+      write(
+        '.dockerignore',
+        '**\n!server/\n!server/**\n'
+            '**/pubspec_overrides.yaml\n',
+      );
+      expect(
+        outsideContextProblems(projectRoot: root, packages: ['server']),
+        isEmpty,
+      );
+    });
+
+    test('the COPY check does not also ask to copy what cannot be copied', () {
+      write(
+        'server/pubspec.yaml',
+        'name: server\ndependencies:\n  dartway_core_server:\n'
+            '    path: $outside\n',
+      );
+      write('server/Dockerfile', 'FROM alpine\nCOPY server/ server/\n');
+      expect(
+        buildContextProblems(projectRoot: root, packages: ['server']),
+        isEmpty,
+      );
+    });
+  });
 }

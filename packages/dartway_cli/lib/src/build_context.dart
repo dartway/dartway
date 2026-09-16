@@ -114,15 +114,26 @@ bool admits(Set<String> patterns, String directory) {
 }
 
 /// Sibling packages [pubspec] depends on by path, by directory name.
+///
+/// Only paths that stay inside the project — the directory above the package.
+/// One that leaves it is not a package to copy, since no `COPY` can reach it;
+/// [outsideContextProblems] names it, and counting it here as well would
+/// answer the same cause with advice that cannot work.
 Set<String> pathDependenciesOf(File pubspec) {
   if (!pubspec.existsSync()) return const {};
   final document = loadYaml(pubspec.readAsStringSync());
   final dependencies = document is YamlMap ? document['dependencies'] : null;
   if (dependencies is! YamlMap) return const {};
+  final packageDirectory = p.normalize(pubspec.absolute.parent.path);
+  final projectRoot = p.dirname(packageDirectory);
   return {
-    for (final entry in dependencies.entries)
-      if (entry.value is YamlMap && (entry.value as YamlMap)['path'] != null)
-        entry.key.toString(),
+    for (final MapEntry(:key, :value) in dependencies.entries)
+      if (value is YamlMap && value['path'] is String)
+        if (p.isWithin(
+          projectRoot,
+          p.normalize(p.join(packageDirectory, value['path'] as String)),
+        ))
+          key.toString(),
   };
 }
 
@@ -194,5 +205,92 @@ List<String> buildContextProblems({
     }
   }
 
+  return problems;
+}
+
+/// The pubspec sections `dart pub get` inside an image resolves.
+///
+/// `dev_dependencies` included: the template's Dockerfiles run a plain
+/// `dart pub get`, which resolves them too, so a dev tool taken by path from
+/// outside fails the build the same way a runtime dependency does.
+const _resolvedSections = [
+  'dependencies',
+  'dev_dependencies',
+  'dependency_overrides',
+];
+
+/// Whether [ignoreFile] keeps [package]'s `pubspec_overrides.yaml` out of the
+/// context — by the name pub gives the file, on its own line.
+bool _ignoresOverridesFile(File ignoreFile, String package) {
+  if (!ignoreFile.existsSync()) return false;
+  const name = 'pubspec_overrides.yaml';
+  return ignoreFile
+      .readAsLinesSync()
+      .map((line) => line.trim())
+      .any(
+        (line) =>
+            line == '**/$name' || line == '*/$name' || line == '$package/$name',
+      );
+}
+
+/// Path dependencies of [packages] that point outside [projectRoot], as
+/// sentences.
+///
+/// The build context is the project root and nothing above it, so such a
+/// dependency cannot reach the image: `dart pub get` fails inside the build as
+/// exit code 66 on a package it cannot find, while every checkout on the
+/// author's machine resolves. It is the natural state of a project built
+/// against an unpublished framework — a local checkout beside the project —
+/// and `deploy run` is the wrong moment to learn it.
+///
+/// `pubspec_overrides.yaml` is read as well, unless `.dockerignore` keeps it
+/// out: pub applies it wherever it finds it, the role-suffix allow-list admits
+/// it with the rest of the package, and it is exactly where a local checkout is
+/// meant to live.
+List<String> outsideContextProblems({
+  required Directory projectRoot,
+  required Iterable<String> packages,
+}) {
+  final root = p.normalize(projectRoot.absolute.path);
+  final ignoreFile = File(p.join(root, '.dockerignore'));
+  final all = <String>{
+    for (final package in packages) ...{
+      package,
+      ...packagesNeededBy(projectRoot, package),
+    },
+  }.toList()..sort();
+
+  final problems = <String>[];
+  for (final package in all) {
+    final directory = p.join(root, package);
+    final files = [
+      (File(p.join(directory, 'pubspec.yaml')), _resolvedSections),
+      if (!_ignoresOverridesFile(ignoreFile, package))
+        (
+          File(p.join(directory, 'pubspec_overrides.yaml')),
+          const ['dependency_overrides'],
+        ),
+    ];
+    for (final (file, sections) in files) {
+      if (!file.existsSync()) continue;
+      final document = loadYaml(file.readAsStringSync());
+      if (document is! YamlMap) continue;
+      for (final section in sections) {
+        final entries = document[section];
+        if (entries is! YamlMap) continue;
+        for (final MapEntry(:key, :value) in entries.entries) {
+          if (value is! YamlMap || value['path'] is! String) continue;
+          final resolved = p.normalize(
+            p.join(directory, value['path'] as String),
+          );
+          if (resolved == root || p.isWithin(root, resolved)) continue;
+          problems.add(
+            '$package/${p.basename(file.path)} takes $key from '
+            '${value['path']}, outside the build context',
+          );
+        }
+      }
+    }
+  }
   return problems;
 }

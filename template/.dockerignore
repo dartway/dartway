@@ -22,5 +22,9 @@
 **/ephemeral/
 # custom_lint.log alone reaches hundreds of megabytes when the analyzer trips.
 **/*.log
+# `dart pub get` applies a package's pubspec_overrides.yaml wherever it finds
+# it, and that file is where a local checkout of an unpublished framework lives
+# — a path outside the project, which no image can reach.
+**/pubspec_overrides.yaml
 # The rendered server environment holds secrets; it never enters an image.
 **/.env

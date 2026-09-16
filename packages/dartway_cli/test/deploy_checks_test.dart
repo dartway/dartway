@@ -4,6 +4,7 @@ import 'package:dartway_cli/src/checker/dw_check_type.dart';
 import 'package:dartway_cli/src/deploy/deploy_check.dart';
 import 'package:dartway_cli/src/deploy/remote_checks.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
+import 'package:dartway_cli/src/vendor_framework.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -252,7 +253,15 @@ dependencies:
     test(
       'the example passes every local check a deployment runs',
       () async {
-        final root = Directory(p.join(repository!.path, 'example'));
+        // On a vendored copy, as the local stack proof deploys it: in this
+        // repository the example takes the framework by path from
+        // `../../packages`, which no image can reach — exactly what
+        // `dependencies-inside-context` refuses in a project.
+        final sandbox = Directory.systemTemp.createTempSync('dw_example_');
+        addTearDown(() => sandbox.deleteSync(recursive: true));
+        final root = Directory(p.join(sandbox.path, 'example'));
+        copyProject(Directory(p.join(repository!.path, 'example')), root);
+        vendorFramework(project: root, monorepo: repository);
         final context = DwDeployContext(
           projectRoot: root,
           stack: DwStack(

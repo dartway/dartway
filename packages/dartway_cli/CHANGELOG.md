@@ -17,6 +17,18 @@
   the packages each pubspec reaches — instead of pub.dev, and takes the template from the same
   checkout. For building the framework, and for versions not yet published.
 
+- **`dartway deploy check` refuses a path dependency that leaves the project**
+  (`dependencies-inside-context`, error). Images build from the project root, so a package taken
+  by path from above it — a local framework checkout, the overrides `--framework-path` writes —
+  resolves in every working copy and fails inside the image as `pub get` exit code 66. Read from
+  `dependencies`, `dev_dependencies` and `dependency_overrides`, through sibling packages, and from
+  `pubspec_overrides.yaml` unless `.dockerignore` keeps it out. `docker-context-packages` no longer
+  also asks to `COPY` such a package. The template's and the example's `.dockerignore` keep
+  `**/pubspec_overrides.yaml` out of images.
+
+- **`dartway create` records the language and the notes tracker it was given**, so the first
+  `dartway update` keeps them instead of reinstalling the toolkit in the defaults.
+
 - **BREAKING: a CLI with the framework beside it hands out its own revision.** `create`,
   `setup-ai` and `update` without a named checkout or a chosen channel (`--channel`,
   `DARTWAY_BRANCH`, or the channel a project recorded for `update`) take the template and the

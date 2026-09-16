@@ -127,7 +127,7 @@ void main() {
   setUpAll(() async {
     root = Directory.systemTemp.createTempSync('dw_stack_proof_');
     project = Directory(p.join(root.path, 'project'));
-    _copy(Directory(p.join(monorepo.path, 'example')), project);
+    copyProject(Directory(p.join(monorepo.path, 'example')), project);
     // The example has no site; the proof gives it one, committed-shaped.
     File(p.join(project.path, 'app_site', 'build', 'index.html'))
       ..createSync(recursive: true)
@@ -562,17 +562,3 @@ void main() {
 }
 
 /// Copies a project without what a checkout would not carry either.
-void _copy(Directory source, Directory destination) {
-  const skipped = {'.dart_tool', 'build', '.fvm', 'ephemeral', 'node_modules'};
-  destination.createSync(recursive: true);
-  for (final entity in source.listSync(followLinks: false)) {
-    final name = p.basename(entity.path);
-    if (skipped.contains(name)) continue;
-    final target = p.join(destination.path, name);
-    if (entity is Directory) {
-      _copy(entity, Directory(target));
-    } else if (entity is File) {
-      entity.copySync(target);
-    }
-  }
-}

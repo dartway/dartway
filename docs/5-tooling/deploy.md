@@ -234,6 +234,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `docker-context` | warning | A `.dockerignore` exists at the build context root |
 | `dockerfiles-present` | error | Both `<project>_server/Dockerfile` and `<project>_flutter/Dockerfile` exist |
 | `docker-context-packages` | error | Each image copies every package it depends on, and `.dockerignore` admits it — a missing one fails as `pub get` exit code 66, three layers from the cause |
+| `dependencies-inside-context` | error | No image resolves a package by a path outside the project — the context is the project root, so `pub get` in the image cannot find it though every checkout resolves. `pubspec_overrides.yaml` counts unless `.dockerignore` keeps it out. The usual cause is an unpublished framework taken from a local checkout: depend on it by git with a pinned ref instead |
 | `server-signals` | error | The server image's `ENTRYPOINT` (or `CMD`) is in exec form, so the binary is PID 1 and receives the SIGTERM a deploy sends; under `/bin/sh -c` it is killed mid-call when the grace period runs out |
 | `web-backend-url` | error | The web Dockerfile declares `ARG DW_BACKEND_URL` — Docker silently drops an undeclared build argument |
 | `web-cache-policy` | warning | The web image's Nginx configuration revalidates every Flutter entry point |

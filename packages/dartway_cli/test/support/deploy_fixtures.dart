@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dartway_cli/src/deploy/deploy_target.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
+import 'package:path/path.dart' as p;
 
 /// A complete environment, as `deploy/config.yaml` would state it.
 String configYaml({String extra = '', String environment = 'staging'}) =>
@@ -128,5 +129,22 @@ class LocalShell extends DwSshRunner {
       stdout: await out,
       stderr: await err,
     );
+  }
+}
+
+/// Copies a project tree without what a build leaves behind — the shape a
+/// deployment's checkout has.
+void copyProject(Directory source, Directory destination) {
+  const skipped = {'.dart_tool', 'build', '.fvm', 'ephemeral', 'node_modules'};
+  destination.createSync(recursive: true);
+  for (final entity in source.listSync(followLinks: false)) {
+    final name = p.basename(entity.path);
+    if (skipped.contains(name)) continue;
+    final target = p.join(destination.path, name);
+    if (entity is Directory) {
+      copyProject(entity, Directory(target));
+    } else if (entity is File) {
+      entity.copySync(target);
+    }
   }
 }

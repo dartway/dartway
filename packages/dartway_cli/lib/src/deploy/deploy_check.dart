@@ -156,6 +156,13 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     evaluate: _checkBuildContextPackages,
   ),
   DwDeployCheck(
+    id: 'dependencies-inside-context',
+    title: 'No image resolves a package from a path outside the project',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkDependenciesInsideContext,
+  ),
+  DwDeployCheck(
     id: 'server-signals',
     title: 'The server image receives SIGTERM itself',
     stage: DwDeployCheckStage.local,
@@ -353,6 +360,34 @@ Future<DwDeployVerdict> _checkBuildContextPackages(
     fix:
         'Add a `COPY <package>/ <package>/` line for each package the image '
         'needs, and make sure `.dockerignore` admits it.',
+  );
+}
+
+/// A path dependency that leaves the project cannot enter the build context,
+/// which is the project root. The checkout resolves it and the image does not.
+Future<DwDeployVerdict> _checkDependenciesInsideContext(
+  DwDeployContext context,
+) async {
+  final problems = outsideContextProblems(
+    projectRoot: context.projectRoot,
+    packages: [context.serverPackage, context.flutterPackage],
+  );
+  if (problems.isEmpty) {
+    return const DwDeployVerdict.pass(
+      'every path dependency is inside the project',
+    );
+  }
+  return DwDeployVerdict.fail(
+    problems.join('; '),
+    fix:
+        'Images build from the project root and see nothing above it, so '
+        '`dart pub get` in the image cannot find these packages — the '
+        'overrides `dartway create --framework-path` writes are exactly '
+        'this. Depend on '
+        'them by version, or — for a framework that is not published yet — '
+        'by git with a pinned ref (`git: {url, ref, path}`, the ref in '
+        'quotes), and keep a local checkout in `pubspec_overrides.yaml` with '
+        '`**/pubspec_overrides.yaml` in `.dockerignore`.',
   );
 }
 
