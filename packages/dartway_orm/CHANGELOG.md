@@ -4,6 +4,12 @@
 
 The rewrite (see docs/1.0).
 
+- **BREAKING: pending migrations apply namespace by namespace** — in the order the runner is given
+  them (the framework's, the modules', the project's), then by id — after `dependsOn`. They used to
+  sort by id across namespaces, so a project migration older than a framework migration ran first,
+  though module docs and the startup test's name already promised the other order. Only what is
+  pending is reordered; applied migrations stay as recorded (D-060).
+
 - **A pending migration edited after its checksum was sealed is refused before it is applied**
   (`DwUnsealedMigration`), where its source is on disk: `DwMigrationRunner(sources:)` maps a
   namespace to its directory, and `migrate apply` passes it. Applying it used to run the new text

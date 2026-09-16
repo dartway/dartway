@@ -190,13 +190,13 @@ void main() {
         'SELECT namespace, id, batch FROM dw_migrations ORDER BY seq',
       );
       expect(ledger.map((r) => '${r['namespace']}/${r['id']}'), [
+        // Every framework migration first, whatever the ids: the app's is
+        // older than three of them and follows all of them (D-060).
         'dw/20260913_000000_dw_initial',
-        'app/20260913_120000_test_app',
-        // Framework and app migrations interleave by id: a later framework
-        // migration runs after an earlier app one.
         'dw/20260914_000000_dw_stored_file',
         'dw/20260914_180000_dw_stored_file_bucket',
         'dw/20260914_220000_dw_keys_and_identities',
+        'app/20260913_120000_test_app',
       ]);
       await server.stop();
 
@@ -307,7 +307,10 @@ void main() {
         final ledger = await opened.db.query(
           'SELECT namespace FROM dw_migrations',
         );
-        expect(ledger.map((r) => r['namespace']), ['dw']);
+        // The framework's migrations, all applied before the app's failed;
+        // nothing of the app's is recorded.
+        expect(ledger.map((r) => r['namespace']).toSet(), {'dw'});
+        expect(ledger, hasLength(DwAppServer.frameworkMigrations.length));
         await opened.close();
       },
     );

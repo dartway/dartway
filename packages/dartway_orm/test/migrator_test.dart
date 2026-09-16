@@ -85,7 +85,55 @@ void main() {
       ]);
     });
 
-    test('orders by dependsOn first, then by id, across namespaces', () async {
+    test('applies namespaces in the order given, before ids', () async {
+      // The shape of a project created from a template older than a framework
+      // migration: the project's initial migration has the earlier id and
+      // references a framework table and a module table, declaring nothing.
+      final run = await DwMigrationRunner(
+        db(),
+        migrations: {
+          'dw': [createTable('20300101_000000_account', 'dw_account')],
+          'push': [
+            createTable(
+              '20300102_000000_device',
+              'dw_push_device',
+              extra: [
+                DwColumnSchema(
+                  'account_id',
+                  'bigint',
+                  references: const DwForeignKey('dw_account'),
+                ),
+              ],
+            ),
+          ],
+          'app': [
+            createTable(
+              '20200101_000000_initial',
+              'profile',
+              extra: [
+                DwColumnSchema(
+                  'account_id',
+                  'bigint',
+                  references: const DwForeignKey('dw_account'),
+                ),
+                DwColumnSchema(
+                  'device_id',
+                  'bigint',
+                  references: const DwForeignKey('dw_push_device'),
+                ),
+              ],
+            ),
+          ],
+        },
+      ).apply();
+      expect(run.migrations.map((ref) => ref.toString()), [
+        'dw/20300101_000000_account',
+        'push/20300102_000000_device',
+        'app/20200101_000000_initial',
+      ]);
+    });
+
+    test('dependsOn still wins over the namespace order', () async {
       final run = await DwMigrationRunner(
         db(),
         migrations: {
@@ -174,8 +222,8 @@ void main() {
       ).apply();
       expect(run.migrations.single, const DwMigrationRef('app', '1_framework'));
       expect(await ledger(), [
-        'app/1_app:1:applied',
         'dw/1_framework:1:applied',
+        'app/1_app:1:applied',
         'app/1_framework:2:applied',
       ]);
     });

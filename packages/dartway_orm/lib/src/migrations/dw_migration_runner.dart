@@ -376,7 +376,24 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
     required Set<DwMigrationRef> satisfied,
   }) {
     final done = {...satisfied};
-    final remaining = pending.sorted(_byId);
+    // Namespaces in the order they were given — the framework's, then its
+    // modules', then the project's — and by id within one. The framework never
+    // references a project's tables and a project references the framework's
+    // all the time, so that order holds by construction; ordering by id across
+    // namespaces held only while every project migration happened to be newer
+    // than the framework migration it relied on.
+    final rank = {
+      for (final (index, namespace) in _migrations.keys.indexed)
+        namespace: index,
+    };
+    final remaining = pending.sorted(
+      (a, b) => switch (rank[a.ref.namespace]!.compareTo(
+        rank[b.ref.namespace]!,
+      )) {
+        0 => _byId(a, b),
+        final byNamespace => byNamespace,
+      },
+    );
     final ordered = <_Registered>[];
     while (remaining.isNotEmpty) {
       final next = remaining.firstWhere(

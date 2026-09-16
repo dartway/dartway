@@ -94,14 +94,16 @@ Before applying anything, the runner compares the ledger with the code and **ref
 - a `dependsOn` names an unregistered migration, the dependencies form a cycle, or one id is
   registered twice.
 
-Otherwise the pending migrations run as one **batch**, ordered by `dependsOn` first, then by id,
-then by namespace. Each transactional migration runs in its own transaction together with its
+Otherwise the pending migrations run as one **batch**, ordered by `dependsOn` first, then by
+namespace — the framework's `dw`, then the modules' in the order they are given, then the
+project's — then by id. Each transactional migration runs in its own transaction together with its
 ledger row. A migration that throws stops the run with `DwMigrationFailed`; the ones before it stay
 applied. Every refusal and failure exits non-zero, in the CLI and in the server.
 
-Since order is by id across namespaces, a project migration created today follows the framework
-migrations its tables reference. Declare `dependsOn` when a migration must follow one with a later
-id.
+So a project migration follows every framework and module migration, whatever their ids: a
+project created from an older template has an initial migration older than framework migrations
+it relies on, and it still runs after them. Within the project, declare `dependsOn` when a
+migration must follow one with a later id.
 
 ## Namespaces
 
