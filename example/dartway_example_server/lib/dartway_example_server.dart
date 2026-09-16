@@ -45,6 +45,7 @@ DwAppServer buildExampleServer({
   protocol: exampleProtocol,
   schema: dartwayExampleSchema,
   migrations: appMigrations,
+  migrationsDirectory: 'lib/src/migrations',
   database: database,
   auth: auth ?? exampleAuth,
   handlers: [

@@ -61,6 +61,7 @@ final class DwAppServer {
     required this.protocol,
     this.schema,
     required this.migrations,
+    this.migrationsDirectory,
     required this.database,
     required this.auth,
     required this.handlers,
@@ -95,6 +96,16 @@ final class DwAppServer {
   /// index an operator added by hand.
   final DwDatabaseSchema? schema;
   final List<DwDatabaseMigration> migrations;
+
+  /// Where the source files of [migrations] are, relative to the working
+  /// directory — `lib/src/migrations` in a project laid out by the template.
+  ///
+  /// When the directory is there — a server run from its sources — a pending
+  /// migration edited after its checksum was sealed stops the start with
+  /// "run `rehash`", instead of being applied under a checksum that describes
+  /// its previous text. A compiled server has no sources beside it and checks
+  /// nothing.
+  final String? migrationsDirectory;
   final DwDatabaseConfig database;
   final DwAuthConfig auth;
   final List<DwCallHandler> handlers;
@@ -178,6 +189,10 @@ final class DwAppServer {
           dwFrameworkNamespace: dwFrameworkMigrations,
           for (final module in modules) module.namespace: module.migrations,
           'app': migrations,
+        },
+        sources: {
+          if (migrationsDirectory case final directory?)
+            if (Directory(directory).existsSync()) 'app': directory,
         },
       ).apply();
       if (schema case final declared?) {

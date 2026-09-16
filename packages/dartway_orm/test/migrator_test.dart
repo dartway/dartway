@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dartway_orm/dartway_orm.dart';
+import 'package:dartway_orm/src/migrations/dw_migration_checksum.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import 'support/test_database.dart';
@@ -374,6 +377,88 @@ void main() {
                 .having((p) => p.current, 'current', 'v3'),
           ),
         ),
+      );
+    });
+
+    group('a pending migration edited after sealing', () {
+      const id = '20260916_120000_add_a';
+      late Directory sources;
+
+      setUp(() => sources = Directory.systemTemp.createTempSync('dw_sources_'));
+      tearDown(() => sources.deleteSync(recursive: true));
+
+      /// Writes the migration's source as `create` would, sealed, and answers
+      /// the checksum it declares.
+      String writeSealed() {
+        final sealed = DwMigrationChecksum.seal('''
+class M$id extends DwDatabaseMigration {
+  @override
+  String get id => '$id';
+  @override
+  String get checksum => '';
+  @override
+  Future<void> up(DwMigrationContext m) async {}
+}
+''');
+        File(p.join(sources.path, 'm$id.dart')).writeAsStringSync(sealed);
+        return DwMigrationChecksum.declared(sealed)!;
+      }
+
+      DwMigrationRunner runner(String checksum) => DwMigrationRunner(
+        db(),
+        migrations: {
+          'app': [createTable(id, 'a', checksum: checksum)],
+        },
+        sources: {'app': sources.path},
+      );
+
+      test('applies while the file still matches its seal', () async {
+        final checksum = writeSealed();
+        final run = await runner(checksum).apply();
+        expect(run.migrations, [const DwMigrationRef('app', id)]);
+      });
+
+      test('is refused, and nothing is applied or recorded', () async {
+        // The failure this prevents: the edited code runs, the stale checksum
+        // is recorded, and after the `rehash` every start refuses the
+        // migration as edited after it was applied.
+        final checksum = writeSealed();
+        final file = File(p.join(sources.path, 'm$id.dart'));
+        file.writeAsStringSync(
+          file.readAsStringSync().replaceFirst(
+            'async {}',
+            "async { await m.execute('SELECT 1'); }",
+          ),
+        );
+
+        await expectLater(
+          runner(checksum).apply(),
+          throwsA(
+            isA<DwMigrationRefused>().having(
+              (e) => e.problems.single,
+              'problem',
+              isA<DwUnsealedMigration>(),
+            ),
+          ),
+        );
+        expect(await tables(), isNot(contains('a')));
+      });
+
+      test('formatting alone does not count as an edit', () async {
+        final checksum = writeSealed();
+        final file = File(p.join(sources.path, 'm$id.dart'));
+        file.writeAsStringSync(
+          file.readAsStringSync().replaceAll('  ', '    '),
+        );
+        expect((await runner(checksum).apply()).migrations, hasLength(1));
+      });
+
+      test(
+        'with no source on disk, as in a compiled server, it applies',
+        () async {
+          final run = await runner('whatever-was-compiled').apply();
+          expect(run.migrations, hasLength(1));
+        },
       );
     });
 

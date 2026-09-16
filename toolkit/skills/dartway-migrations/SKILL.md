@@ -160,7 +160,9 @@ dart run bin/migrate.dart rehash 20260915_101500_add_invoice_due_date
 **Rehash before the migration is applied anywhere — including your own development database.** The
 ledger stores the checksum the migration declares at the moment it is applied. Apply with a stale
 checksum, rehash afterwards, and the next start of that database refuses: the migration "was
-edited after it was applied". `rehash` refuses nothing, so the order is yours to keep.
+edited after it was applied". `migrate apply` and a server started from its sources refuse an
+unsealed pending migration first ("changed after its checksum was sealed … run `rehash`") — do what
+it says; do not work around it by editing the ledger.
 
 ### 6. Apply, look, roll back while it is still local
 

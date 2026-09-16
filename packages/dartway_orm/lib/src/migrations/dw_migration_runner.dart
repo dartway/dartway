@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:collection/collection.dart';
+import 'package:path/path.dart' as p;
 import 'package:postgres/postgres.dart' as pg;
 
 import '../db/dw_database_handle.dart';
 import 'dw_database_migration.dart';
+import 'dw_draft_writer.dart';
+import 'dw_migration_checksum.dart';
 import 'dw_migration_errors.dart';
 
 /// Applies and rolls back migrations of several namespaces against one
@@ -16,10 +21,16 @@ final class DwMigrationRunner {
   DwMigrationRunner(
     this._db, {
     required Map<String, List<DwDatabaseMigration>> migrations,
+    Map<String, String> sources = const {},
   }) : _migrations = {
          for (final MapEntry(key: namespace, value: list) in migrations.entries)
            namespace: List.unmodifiable(list),
-       };
+       },
+       _sources = Map.unmodifiable(sources);
+
+  /// Where the source files of a namespace's migrations are, by namespace —
+  /// for the check that a pending migration is still sealed.
+  final Map<String, String> _sources;
 
   static const ledgerTable = 'dw_migrations';
 
@@ -49,6 +60,7 @@ final class DwMigrationRunner {
         if (!ledger.containsKey(migration.ref)) migration,
     ], satisfied: ledger.keys.toSet());
     if (pending.isEmpty) return const DwMigrationRun(null, []);
+    _refuseOn(_checkSealed(pending));
 
     final batch = (ledger.values.map((row) => row.batch).maxOrNull ?? 0) + 1;
     for (final migration in pending) {
@@ -58,6 +70,19 @@ final class DwMigrationRunner {
       for (final migration in pending) migration.ref,
     ]);
   });
+
+  /// Pending migrations whose source file, where it is on disk, no longer
+  /// matches the checksum it declares.
+  List<DwMigrationProblem> _checkSealed(Iterable<_Registered> pending) => [
+    for (final entry in pending)
+      if (_sources[entry.ref.namespace] case final directory?)
+        if (File(p.join(directory, DwDraftWriter.fileName(entry.ref.id)))
+            case final file when file.existsSync())
+          if (DwMigrationChecksum.declared(file.readAsStringSync())
+              case final declared?
+              when declared != DwMigrationChecksum.of(file.readAsStringSync()))
+            DwUnsealedMigration(entry.ref, path: file.path),
+  ];
 
   /// Rolls back a batch (the last one by default) or a single migration, in
   /// reverse order of application.

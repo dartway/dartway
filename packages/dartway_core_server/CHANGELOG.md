@@ -4,6 +4,11 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwAppServer(migrationsDirectory:)`**: a server run from its sources refuses to start on a
+  pending migration edited after its checksum was sealed, and says to `rehash`. The template and
+  the example pass `lib/src/migrations`; a compiled server has no such directory and checks
+  nothing.
+
 - **Server modules.** `DwAppServer(modules: [...])` takes `DwServerModule`s —
   framework satellites such as push — each bringing migrations under its own
   namespace (applied after `dw`, before `app`), handlers for calls the project

@@ -165,7 +165,11 @@ usage: migrate <command>
   }
 
   Future<int> _apply() => _withDatabase((db) async {
-    final run = await DwMigrationRunner(db, migrations: _allMigrations).apply();
+    final run = await DwMigrationRunner(
+      db,
+      migrations: _allMigrations,
+      sources: {namespace: directory},
+    ).apply();
     if (run.isEmpty) {
       _out.writeln('nothing to apply');
     } else {

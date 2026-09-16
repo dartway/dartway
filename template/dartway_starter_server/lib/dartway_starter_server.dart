@@ -40,6 +40,7 @@ DwAppServer buildDartwayStarterServer({
   protocol: dartwayStarterProtocol,
   schema: dartwayStarterSchema,
   migrations: appMigrations,
+  migrationsDirectory: 'lib/src/migrations',
   database: database,
   auth: auth ?? appAuth(),
   handlers: [...profileHandlers, ...adminHandlers, ...settingsHandlers],

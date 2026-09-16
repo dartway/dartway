@@ -56,6 +56,24 @@ final class DwChangedMigration extends DwMigrationProblem {
       '$ref was edited after it was applied (checksum $applied in the ledger, $current in the code)';
 }
 
+/// Pending, and its source changed after its checksum was sealed.
+///
+/// Applying it would run the edited code and record the stale checksum in the
+/// ledger: the database then holds what the file says, the ledger a hash of
+/// what it said before, and the `rehash` that follows makes every later start
+/// refuse it as "edited after it was applied". Caught only where the sources
+/// are on disk — a compiled server has none, and checks nothing here.
+final class DwUnsealedMigration extends DwMigrationProblem {
+  const DwUnsealedMigration(super.ref, {required this.path});
+
+  final String path;
+
+  @override
+  String toString() =>
+      '$ref ($path) changed after its checksum was sealed; it is not applied '
+      'yet, so run `rehash ${ref.id}` and start again';
+}
+
 /// A non-transactional migration that started and never finished.
 final class DwDirtyMigration extends DwMigrationProblem {
   const DwDirtyMigration(super.ref);

@@ -4,6 +4,12 @@
 
 The rewrite (see docs/1.0).
 
+- **A pending migration edited after its checksum was sealed is refused before it is applied**
+  (`DwUnsealedMigration`), where its source is on disk: `DwMigrationRunner(sources:)` maps a
+  namespace to its directory, and `migrate apply` passes it. Applying it used to run the new text
+  under the old checksum, and the `rehash` that followed made every later start refuse the
+  migration as edited after it was applied (D-059).
+
 - **`DwDatabaseMigration.supersededChecksums` (D-056):** checksums of earlier
   texts of a migration that the ledger accepts in place of `checksum` — for
   correcting a migration that could not apply on some databases while others

@@ -187,6 +187,13 @@ Once written, the draft is an ordinary migration and the author's. Editing it be
 anywhere is expected; then run `rehash <id>`, or `check` reports the file as changed since sealing.
 Editing it after it is applied somewhere is what the checksum refuses.
 
+A pending migration edited and not yet rehashed is also refused where it would be applied, as long
+as its source is on disk: `migrate apply`, and a server run from its sources with
+`DwAppServer(migrationsDirectory: 'lib/src/migrations')`. Applying it would run the new text and
+record the old checksum, and the `rehash` after that would make every later start refuse the
+migration as edited after it was applied. A compiled server has no sources beside it and does not
+check.
+
 ## `check`
 
 `check` is what CI runs, and what `dartway check` runs as `migrationsDrift`:
