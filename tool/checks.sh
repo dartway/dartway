@@ -52,6 +52,32 @@ case "$MODE" in
     ;;
 esac
 
+# The SDK this repository is written against, from `.fvmrc` — the one file that
+# already says so, read rather than repeated.
+#
+# Checked because the gate is worthless when it runs on another SDK: a Flutter
+# on `PATH` seven months old failed `dartway_core_flutter`, the example and the
+# template on a widget parameter that only exists in 3.44, and the failures
+# named the parameter rather than the SDK. The opposite is worse and silent:
+# code written against an older SDK passes here and fails in CI, which pins the
+# version. Neither answer is about the change under test.
+#
+# It stops rather than re-executing itself under fvm: this script also runs in
+# CI, where fvm is not installed and the version is pinned by the workflow.
+PINNED="$(sed -n 's/.*"flutter"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .fvmrc)"
+RUNNING="$(flutter --version 2>/dev/null | sed -n '1s/^Flutter \([^ ]*\).*/\1/p')"
+
+if [ -z "$PINNED" ]; then
+  echo "cannot read the pinned Flutter version out of .fvmrc" >&2
+  exit 1
+fi
+
+if [ "$RUNNING" != "$PINNED" ]; then
+  echo "Flutter ${RUNNING:-not found} is on PATH; this repository is written against $PINNED" >&2
+  echo "run it under the pinned SDK:  fvm exec tool/checks.sh ${1:-}" >&2
+  exit 1
+fi
+
 # Suites this script deliberately does not run, each with its reason. A package
 # is skipped only by being named here — anything new with a `test/` directory is
 # picked up and run, which is the direction that fails loudly rather than
