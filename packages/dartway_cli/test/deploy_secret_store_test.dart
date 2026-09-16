@@ -274,4 +274,38 @@ production:
       expect(local.read, throwsStateError);
     });
   });
+  group('directoriesToOwn', () {
+    // Studio's first deploy on 1.0: `~/.config` survived from an earlier tool
+    // as root's, and creating the store under it failed as "cannot change
+    // permissions … No such file or directory".
+    test('names what lies between the home and the store', () {
+      expect(
+        DwSecretStore.directoriesToOwn(
+          home: '/home/deployer',
+          directory: '/home/deployer/.config/shop',
+        ),
+        ['/home/deployer/.config'],
+      );
+    });
+
+    test('nearest the home first, never the home or the store itself', () {
+      expect(
+        DwSecretStore.directoriesToOwn(
+          home: '/home/deployer',
+          directory: '/home/deployer/a/b/store',
+        ),
+        ['/home/deployer/a', '/home/deployer/a/b'],
+      );
+    });
+
+    test('a store outside the home changes nothing', () {
+      expect(
+        DwSecretStore.directoriesToOwn(
+          home: '/home/deployer',
+          directory: '/tmp/proof/store',
+        ),
+        isEmpty,
+      );
+    });
+  });
 }

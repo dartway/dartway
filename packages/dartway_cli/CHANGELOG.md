@@ -26,6 +26,12 @@
   also asks to `COPY` such a package. The template's and the example's `.dockerignore` keep
   `**/pubspec_overrides.yaml` out of images.
 
+- **`dartway deploy setup` takes back a directory on the way to the secret store that the deploy
+  user cannot write** — `~/.config` left as root's by an earlier tool — non-recursively and only
+  inside the user's own home, and says so. It used to fail as "cannot change permissions … No such
+  file or directory", naming neither the directory nor its owner; when the ownership cannot be
+  changed, the failure now names both and the `chown` that fixes it.
+
 - **`dartway create` records the language and the notes tracker it was given**, so the first
   `dartway update` keeps them instead of reinstalling the toolkit in the defaults.
 

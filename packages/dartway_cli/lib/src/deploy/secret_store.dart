@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'deploy_target.dart';
 import 'ssh_runner.dart';
 import 'stack.dart';
@@ -94,9 +96,73 @@ class DwSecretStore {
     return values;
   }
 
+  /// The directories between the deploy user's home and [directory], which
+  /// the user has to be able to write for the store to be created — nearest
+  /// the home first.
+  ///
+  /// Empty when [directory] is not under that home: a store kept elsewhere
+  /// (the local proof) is its caller's business.
+  static List<String> directoriesToOwn({
+    required String home,
+    required String directory,
+  }) {
+    final path = p.posix;
+    if (!path.isWithin(home, directory)) return const [];
+    final chain = <String>[];
+    for (var d = path.dirname(directory); d != home; d = path.dirname(d)) {
+      chain.insert(0, d);
+    }
+    return chain;
+  }
+
   /// Creates the store directory if absent. Idempotent.
-  Future<DwSshResult> ensureDirectory() =>
-      _run("install -d -m 0700 '$directory'");
+  ///
+  /// A directory on the way that the deploy user cannot write — in practice
+  /// `~/.config` left behind by an earlier tool that ran as root — is taken
+  /// back first, non-recursively. Without that, `install -d` reports
+  /// "cannot change permissions … No such file or directory", which names
+  /// neither the directory nor its owner. Only a directory inside the user's
+  /// own home is ever changed; if it cannot be, the failure says which one,
+  /// whose it is, and the command that fixes it.
+  Future<DwSshResult> ensureDirectory() async {
+    final chain = directoriesToOwn(
+      home: '/home/${target.deployUser}',
+      directory: directory,
+    );
+    final notes = <String>[];
+    if (chain.isNotEmpty) {
+      final list = chain.map((d) => "'$d'").join(' ');
+      final blocked = await _run(
+        'for d in $list; do '
+        '[ -e "\$d" ] && [ ! -w "\$d" ] && echo "\$d \$(stat -c %U "\$d")"; '
+        'done; true',
+      );
+      for (final line in blocked.stdout.split('\n')) {
+        final parts = line.trim().split(' ');
+        if (parts.length != 2) continue;
+        final (dir, owner) = (parts[0], parts[1]);
+        final user = target.deployUser;
+        final taken = await ssh.runPrivileged("chown '$user:$user' '$dir'");
+        if (!taken.ok) {
+          return DwSshResult(
+            exitCode: taken.exitCode,
+            stdout: '',
+            stderr:
+                '$dir belongs to $owner, so $user cannot create the secret '
+                "store inside it; as root: chown '$user:$user' '$dir'",
+          );
+        }
+        notes.add('took $dir back from $owner');
+      }
+    }
+    final created = await _run("install -d -m 0700 '$directory'");
+    if (notes.isEmpty || !created.ok) return created;
+    return DwSshResult(
+      exitCode: created.exitCode,
+      stdout: [...notes, created.stdout].where((l) => l.isNotEmpty).join('\n'),
+      stderr: created.stderr,
+    );
+  }
 
   /// Key names in the store. Values never leave the server.
   Future<DwSecretKeyNames> readKeyNames() =>
