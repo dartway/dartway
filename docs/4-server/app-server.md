@@ -142,6 +142,7 @@ app on one server process.
 | `jobWorkers` | 2 | Concurrent job executions in this process; `0` runs none. |
 | `jobPollInterval` | 30 s | The slowest a due job waits when its notification was lost. |
 | `commandOutcomeRetention` | 7 days | How long command outcomes are kept for idempotency (D-013); see [commands](../2-core/commands-and-idempotency.md). |
+| `failedJobRetention` | 30 days | How long a job out of attempts stays in `dw_job` for the operator, from when it failed; `dw.cleanup` removes it after. |
 | `alertsPerSignature` | 5 | Alerts of one failure signature per `alertWindow` ([alerts](alerts.md)). |
 | `alertWindow` | 1 h | The window of that ceiling. |
 

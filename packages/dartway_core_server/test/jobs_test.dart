@@ -202,27 +202,40 @@ void main() {
     caller = harness().caller();
   });
 
-  test(
-    'the framework cleanup removes old outcomes, tickets and revoked keys',
-    () async {
-      final db = harness().db;
-      await db.execute(
-        "INSERT INTO dw_command_outcome (key, type, status, created_at) VALUES "
-        "('old', 'Ping', 'ok', now() - interval '8 days'), "
-        "('new', 'Ping', 'ok', now())",
-      );
-      await db.execute(
-        "UPDATE dw_recurring_job SET next_run_at = now() WHERE name = 'dw.cleanup'",
-      );
-      harness().server.wakeJobs();
-      await eventually(() async {
-        final rows = await db.query('SELECT key FROM dw_command_outcome');
-        return !rows.any((r) => r['key'] == 'old');
-      });
-      final rows = await db.query(
-        "SELECT key FROM dw_command_outcome WHERE key = 'new'",
-      );
-      expect(rows, hasLength(1));
-    },
-  );
+  test('the framework cleanup removes old outcomes, tickets, revoked keys and '
+      'long-failed jobs', () async {
+    final db = harness().db;
+    await db.execute(
+      "INSERT INTO dw_command_outcome (key, type, status, created_at) VALUES "
+      "('old', 'Ping', 'ok', now() - interval '8 days'), "
+      "('new', 'Ping', 'ok', now())",
+    );
+    // Failed jobs are kept for the operator, but not forever: one failed
+    // past the retention goes, one failed recently and one still pending
+    // stay.
+    await db.execute(
+      "INSERT INTO dw_job (name, payload, key, run_at, failed_at, last_error) "
+      "VALUES "
+      "('gone', '{}', 'failed-old', now(), now() - interval '31 days', 'boom'), "
+      "('gone', '{}', 'failed-new', now(), now() - interval '1 day', 'boom'), "
+      // Not due, so no worker claims a job nobody declares.
+      "('gone', '{}', 'pending', now() + interval '1 day', NULL, NULL)",
+    );
+    await db.execute(
+      "UPDATE dw_recurring_job SET next_run_at = now() WHERE name = 'dw.cleanup'",
+    );
+    harness().server.wakeJobs();
+    await eventually(() async {
+      final rows = await db.query('SELECT key FROM dw_command_outcome');
+      return !rows.any((r) => r['key'] == 'old');
+    });
+    final rows = await db.query(
+      "SELECT key FROM dw_command_outcome WHERE key = 'new'",
+    );
+    expect(rows, hasLength(1));
+    final jobs = await db.query(
+      "SELECT key FROM dw_job WHERE name = 'gone' ORDER BY key",
+    );
+    expect(jobs.map((r) => r['key']), ['failed-new', 'pending']);
+  });
 }

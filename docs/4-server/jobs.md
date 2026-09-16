@@ -90,7 +90,8 @@ everything back and leaves the job pending, as if it never started.
 On a throw, the savepoint rolls back, and the attempt, the error's text (`last_error`) and the next
 run time — `backoff(attempt)` from now — are written under the same row lock. Intermediate failures
 are logged as warnings. The last attempt sets `failed_at` and **alerts** ([alerts](alerts.md)). A
-failed row stays in `dw_job` for the operator; nothing removes or retries it.
+failed row stays in `dw_job` for the operator — nothing retries it — until `dw.cleanup` removes it
+`DwServerSettings.failedJobRetention` (30 days) after it failed.
 
 ### Non-transactional jobs
 
@@ -117,7 +118,7 @@ and waits for the next slot: a recurring job has no retries — its next run is 
 
 | Job | Kind | What it does |
 |---|---|---|
-| `dw.cleanup` | recurring, hourly | deletes command outcomes older than `DwServerSettings.commandOutcomeRetention`, code tickets past their use, and session keys revoked more than a day ago |
+| `dw.cleanup` | recurring, hourly | deletes command outcomes older than `DwServerSettings.commandOutcomeRetention`, code tickets past their use, session keys revoked more than a day ago, and jobs that failed longer ago than `DwServerSettings.failedJobRetention` |
 | `dw.files.cleanup` | recurring, every `DwFileStorage.cleanupInterval` | removes unfinished uploads past their ticket and grace, object first ([uploads](uploads.md#cleanup)) |
 | `dw.files.deleteObject` | queued, non-transactional, 10 attempts | deletes a file's object after `ctx.files.delete` commits |
 

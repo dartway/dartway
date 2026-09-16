@@ -53,7 +53,9 @@ final class DwHttpFront {
 
   static final JsonUtf8Encoder _jsonUtf8 = JsonUtf8Encoder();
 
-  static Map<String, Map<String?, DwHttpRoute>> _indexRoutes(List<DwHttpRoute> routes) {
+  static Map<String, Map<String?, DwHttpRoute>> _indexRoutes(
+    List<DwHttpRoute> routes,
+  ) {
     final index = <String, Map<String?, DwHttpRoute>>{};
     for (final route in routes) {
       (index[route.path] ??= {})[route.method] = route;

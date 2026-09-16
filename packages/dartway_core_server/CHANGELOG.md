@@ -4,6 +4,11 @@
 
 The rewrite (see docs/1.0).
 
+- **Failed jobs are no longer kept forever.** `dw.cleanup` removes a job that ran out of attempts
+  once `DwServerSettings.failedJobRetention` (30 days by default) has passed since it failed.
+  Such rows stay for the operator to read and re-enqueue, but nothing did either on its own, so a
+  job failing on every run of a schedule added a row an hour for as long as the server lived.
+
 - **`DwAppServer(migrationsDirectory:)`**: a server run from its sources refuses to start on a
   pending migration edited after its checksum was sealed, and says to `rehash`. The template and
   the example pass `lib/src/migrations`; a compiled server has no such directory and checks

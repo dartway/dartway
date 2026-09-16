@@ -530,6 +530,11 @@ final class DwAppServer {
           'WHERE created_at < now() - @age::int8 * interval \'1 microsecond\'',
           params: {'age': ticketRetention.inMicroseconds},
         );
+        await ctx.db.execute(
+          'DELETE FROM dw_job '
+          'WHERE failed_at < now() - @age::int8 * interval \'1 microsecond\'',
+          params: {'age': settings.failedJobRetention.inMicroseconds},
+        );
         // A revoked key has no use once its revocation has been delivered and
         // every cache has forgotten it.
         await ctx.db.execute(

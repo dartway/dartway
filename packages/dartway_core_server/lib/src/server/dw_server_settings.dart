@@ -17,6 +17,7 @@ final class DwServerSettings {
     this.jobWorkers = 2,
     this.jobPollInterval = const Duration(seconds: 30),
     this.commandOutcomeRetention = const Duration(days: 7),
+    this.failedJobRetention = const Duration(days: 30),
     this.alertsPerSignature = 5,
     this.alertWindow = const Duration(hours: 1),
   }) : assert(minAppBuild >= 0),
@@ -96,6 +97,16 @@ final class DwServerSettings {
 
   /// How long command outcomes are kept for idempotency (D-013).
   final Duration commandOutcomeRetention;
+
+  /// How long a job that ran out of attempts stays in `dw_job` for the
+  /// operator, counted from when it failed.
+  ///
+  /// A failed job is kept on purpose: its payload and `last_error` are what an
+  /// operator reads to decide whether to re-enqueue it, and each failure was
+  /// already alerted. But nothing re-enqueues on its own, so without a bound the
+  /// rows only accumulate — a job failing on every run of a recurring schedule
+  /// adds one an hour for as long as the server lives.
+  final Duration failedJobRetention;
 
   /// Alerts of one failure signature per [alertWindow]; failures are logged
   /// regardless.
