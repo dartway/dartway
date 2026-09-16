@@ -312,7 +312,11 @@ final class DwPushWorker {
               token: device.token,
               title: message.title,
               body: message.body,
-              imageUrl: message.imageUrl,
+              // Stored as queued; an image no provider shows is left out
+              // rather than failing the delivery (see DwPushMessage.imageUrl).
+              imageUrl: DwPushMessage.showsImage(message.imageUrl)
+                  ? message.imageUrl
+                  : null,
               data: message.data,
               link: message.data[DwPushData.linkKey],
               ttl: message.expiresAt.difference(now),

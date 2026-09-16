@@ -24,9 +24,21 @@ final class DwPushMessage {
   /// the browser goes when the app is closed.
   final String? link;
 
-  /// An HTTPS image shown in the notification where the platform supports
-  /// one.
+  /// An image shown in the notification where the platform supports one.
+  ///
+  /// Providers show only an `https` image. One that is `http` — a development
+  /// storage's public URL, typically — is accepted, and the notification goes
+  /// without it: the picture is decoration, and the command that queued the
+  /// message must not fail over it. `DwPushService.send` logs a warning
+  /// naming the URL.
   final String? imageUrl;
+
+  /// Whether a provider can show [imageUrl].
+  bool get imageIsShowable => showsImage(imageUrl);
+
+  /// Whether a provider can show an image at [url]: an `https` one.
+  static bool showsImage(String? url) =>
+      url != null && Uri.tryParse(url)?.scheme == 'https';
 
   static const int maxTitleLength = 200;
   static const int maxBodyLength = 2000;
@@ -53,8 +65,9 @@ final class DwPushMessage {
     if (link case final link? when !link.startsWith('/')) {
       return 'the link "$link" is not an in-app path starting with "/"';
     }
-    if (imageUrl case final url? when Uri.tryParse(url)?.scheme != 'https') {
-      return 'the image URL is not https';
+    if (imageUrl case final url?
+        when !const {'http', 'https'}.contains(Uri.tryParse(url)?.scheme)) {
+      return 'the image URL "$url" is not an http or https URL';
     }
     final size = wireData.entries.fold<int>(
       0,

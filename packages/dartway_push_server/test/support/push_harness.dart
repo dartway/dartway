@@ -49,6 +49,7 @@ final class QueueAlert extends DwActionCommand<int> {
     this.lifetimeMillis,
     this.refuse = false,
     this.category = 'news',
+    this.image,
   });
 
   final List<int> recipients;
@@ -58,6 +59,7 @@ final class QueueAlert extends DwActionCommand<int> {
   final int? lifetimeMillis;
   final bool refuse;
   final String category;
+  final String? image;
 
   @override
   String get dwTypeName => 'QueueAlert';
@@ -71,6 +73,7 @@ final class QueueAlert extends DwActionCommand<int> {
     'lifetimeMillis': ?lifetimeMillis,
     'refuse': refuse,
     'category': category,
+    'image': ?image,
   };
 
   static QueueAlert fromJson(Map<String, Object?> json) => QueueAlert(
@@ -81,6 +84,7 @@ final class QueueAlert extends DwActionCommand<int> {
     lifetimeMillis: json['lifetimeMillis'] as int?,
     refuse: json['refuse']! as bool,
     category: json['category']! as String,
+    image: json['image'] as String?,
   );
 }
 
@@ -100,6 +104,7 @@ final DwCallHandler queueAlertHandler = DwCallHandler.command<QueueAlert, int>(
         body: 'Maintenance day.',
         data: const NewsAlert(id: 12, title: 'Pool closed'),
         link: '/news/12',
+        imageUrl: command.image,
       ),
       category: TestCategory.values.byName(command.category),
       dedupKey: command.dedupKey,

@@ -70,6 +70,51 @@ void main() {
     },
   );
 
+  test('an https image goes to FCM; an http one is left out and the command '
+      'still commits', () async {
+    // An http image is what a development storage's public URL is: the
+    // notification is decoration-free there, not a failed command.
+    final h = harness();
+    for (final (token, image, shown) in [
+      ('fcm-token-https-image', 'https://cdn.example.com/a.png', true),
+      ('fcm-token-http-image', 'http://127.0.0.1:9000/public/a.png', false),
+    ]) {
+      final member = await h.member(token);
+      final command = QueueAlert(recipients: [member.id], image: image);
+      expect((await h.queue(command)).value(command), 1);
+      await finished(member.id);
+      expect((await deliveryOf(member.id))['outcome'], 'sent');
+      final notification =
+          h.fcm.sends
+                  .singleWhere((s) => s.token == token)
+                  .message['notification']!
+              as Map;
+      expect(notification.containsKey('image'), shown, reason: image);
+      if (shown) expect(notification['image'], image);
+      expect(
+        h.logs.any((line) => line.contains('push image $image is not https')),
+        !shown,
+        reason: 'an image left out is said, not silent',
+      );
+    }
+  });
+
+  test('an image that is not an http URL at all is a mistake, and queues '
+      'nothing', () async {
+    final h = harness();
+    final member = await h.member('fcm-token-bad-image');
+    final command = QueueAlert(recipients: [member.id], image: 'ftp://x/a.png');
+    expect((await h.queue(command)).status, 500);
+    expect(
+      await h.db.query(
+        'SELECT 1 FROM dw_push_delivery WHERE account_id = @a',
+        params: {'a': member.id},
+      ),
+      isEmpty,
+    );
+    h.alerts.incidents.clear();
+  });
+
   test('a push queued in a rolled-back command does not exist', () async {
     final h = harness();
     final member = await h.member('fcm-token-rollback');

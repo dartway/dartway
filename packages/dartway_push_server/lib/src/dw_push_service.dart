@@ -52,6 +52,11 @@ final class DwPushService {
     if (message.problemIn(_ctx.protocol) case final problem?) {
       throw ArgumentError.value(message, 'message', problem);
     }
+    if (message.imageUrl case final url? when !message.imageIsShowable) {
+      _ctx.log.warning(
+        'push image $url is not https: the notification is sent without it',
+      );
+    }
     if (dedupKey != null &&
         (dedupKey.isEmpty || dedupKey.length > maxDedupKeyLength)) {
       throw ArgumentError.value(

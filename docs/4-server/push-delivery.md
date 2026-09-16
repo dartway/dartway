@@ -90,8 +90,12 @@ when there is none.
   `retention` (7 days): a retried command, a job that runs twice, two events about one thing send
   once. Without it every call sends.
 - A message that cannot be sent — an empty title, a payload the protocol does not register, a link
-  that is not a path, a non-https image, data too large for a provider — throws `ArgumentError` at
-  the call site.
+  that is not a path, an image that is not an http or https URL, data too large for a provider —
+  throws `ArgumentError` at the call site.
+- **An `http` image is sent without the image**, with a warning naming the URL logged when the
+  message is queued. Providers show only `https` images; `http` is what a development storage's
+  public URL is, and a picture — decoration — must not fail the command that queued the
+  notification, nor every acceptance test that runs on a local MinIO.
 
 ## Who receives it, and when: eligibility
 
