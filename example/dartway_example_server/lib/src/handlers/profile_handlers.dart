@@ -29,7 +29,7 @@ final profileHandlers = <DwCallHandler>[
       );
       final profile = ClubObjects.profile(updated);
       ctx
-        ..publish(profileOf(updated.accountId), profile)
+        ..publish(ExampleChannels.profileOf(updated.accountId), profile)
         ..publish(adminChannel, profile);
       return profile;
     },

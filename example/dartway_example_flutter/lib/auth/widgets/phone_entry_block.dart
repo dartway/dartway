@@ -61,17 +61,17 @@ class PhoneEntryBlock extends ConsumerWidget {
                   MultiLinkTextPart(
                     l10n.agreeTermsPrefix,
                     l10n.offerLink,
-                    wipProgressNotificationCallback,
+                    dw.notImplementedYet,
                   ),
                   MultiLinkTextPart(
                     null,
                     l10n.userAgreementLink,
-                    wipProgressNotificationCallback,
+                    dw.notImplementedYet,
                   ),
                   MultiLinkTextPart(
                     l10n.acceptTermsPrefix,
                     l10n.dataPolicyLinkComma,
-                    wipProgressNotificationCallback,
+                    dw.notImplementedYet,
                   ),
                 ],
               ),
@@ -91,17 +91,17 @@ class PhoneEntryBlock extends ConsumerWidget {
                   MultiLinkTextPart(
                     l10n.iGive,
                     l10n.consentLink,
-                    wipProgressNotificationCallback,
+                    dw.notImplementedYet,
                   ),
                   MultiLinkTextPart(
                     l10n.marketingConsentText,
                     l10n.consentLink,
-                    wipProgressNotificationCallback,
+                    dw.notImplementedYet,
                   ),
                   MultiLinkTextPart(
                     l10n.dataProcessingConsentText,
                     l10n.dataPolicyLink,
-                    wipProgressNotificationCallback,
+                    dw.notImplementedYet,
                   ),
                 ],
               ),

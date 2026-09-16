@@ -11,7 +11,7 @@ import '../publications.dart';
 final adminHandlers = <DwCallHandler>[
   DwCallHandler.single<GetAdminCounters, AdminCounters>(
     access: AppAccess.admin,
-    handle: (ctx, request) => countAdminCounters(ctx.db),
+    handle: (ctx, request) => AppPublications.countAdminCounters(ctx.db),
   ),
 
   DwCallHandler.table<ListUserProfiles, UserProfile>(
@@ -19,14 +19,14 @@ final adminHandlers = <DwCallHandler>[
     rows: (ctx, request, table) async => AppObjects.profiles(
       ctx,
       await ctx.db.userProfiles.find(
-        where: await _membersFilter(ctx, request),
+        where: await request.membersFilter(ctx),
         orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
         limit: table.fetchLimit,
         offset: table.offset,
       ),
     ),
     count: (ctx, request) async =>
-        ctx.db.userProfiles.count(where: await _membersFilter(ctx, request)),
+        ctx.db.userProfiles.count(where: await request.membersFilter(ctx)),
   ),
 
   DwCallHandler.single<GetUserCard, UserCard>(
@@ -56,38 +56,39 @@ final adminHandlers = <DwCallHandler>[
       // Access is checked once, at subscription: a role taken away closes
       // what it opened.
       if (row.role == UserRole.admin) {
-        ctx.revoke(adminChannel, updated.accountId);
+        ctx.revoke(AppChannels.admin, updated.accountId);
       }
-      await publishAdminCounters(ctx);
-      return publishProfile(ctx, updated);
+      await AppPublications.adminCounters(ctx);
+      return AppPublications.profile(ctx, updated);
     },
   ),
 ];
 
-/// The filter of a [ListUserProfiles] page — by name, phone or e-mail, and by
-/// role — or `null` for every member.
-Future<DwWhereCondition Function(UserProfileTable t)?> _membersFilter(
-  DwCallContext ctx,
-  ListUserProfiles request,
-) async {
-  final search = request.search.trim();
-  final role = request.role;
-  if (search.isEmpty && role == null) return null;
-  // Identifiers live in the framework's table and the ORM has no joins: the
-  // matching accounts are read first, in one query.
-  final byIdentifier = search.isEmpty
-      ? const <int>{}
-      : await ctx.accounts.accountsMatching(search);
-  // LIKE's own characters in what was typed are matched literally.
-  final pattern =
-      '%${search.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
-  return (UserProfileTable t) {
-    final byRole = role == null ? null : t.role.equals(role);
-    if (search.isEmpty) return byRole!;
-    var bySearch = t.firstName.ilike(pattern) | t.lastName.ilike(pattern);
-    if (byIdentifier.isNotEmpty) {
-      bySearch = bySearch | t.accountId.inList(byIdentifier);
-    }
-    return byRole == null ? bySearch : bySearch & byRole;
-  };
+extension on ListUserProfiles {
+  /// The filter of a [ListUserProfiles] page — by name, phone or e-mail, and by
+  /// role — or `null` for every member.
+  Future<DwWhereCondition Function(UserProfileTable t)?> membersFilter(
+    DwCallContext ctx,
+  ) async {
+    final text = search.trim();
+    final role = this.role;
+    if (text.isEmpty && role == null) return null;
+    // Identifiers live in the framework's table and the ORM has no joins: the
+    // matching accounts are read first, in one query.
+    final byIdentifier = text.isEmpty
+        ? const <int>{}
+        : await ctx.accounts.accountsMatching(text);
+    // LIKE's own characters in what was typed are matched literally.
+    final pattern =
+        '%${text.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
+    return (UserProfileTable t) {
+      final byRole = role == null ? null : t.role.equals(role);
+      if (text.isEmpty) return byRole!;
+      var bySearch = t.firstName.ilike(pattern) | t.lastName.ilike(pattern);
+      if (byIdentifier.isNotEmpty) {
+        bySearch = bySearch | t.accountId.inList(byIdentifier);
+      }
+      return byRole == null ? bySearch : bySearch & byRole;
+    };
+  }
 }

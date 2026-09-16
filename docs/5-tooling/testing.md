@@ -85,11 +85,11 @@ static Future<AppHarness> start({DwFileStorageConfig? storage}) async {
   final database = await DwTestDatabase.create(prefix: 'app_test');
   late final AppHarness harness;
   final server = await DwTestServer.start(
-    buildDartwayStarterServer(
+    DartwayStarterServer.build(
       database: database.config,
       storage: storage,
       port: 0,
-      auth: appAuth(
+      auth: AppAuth.config(
         // Tests ask one identifier for several codes within a minute.
         resendDelay: Duration.zero,
         deliverCode: (ctx, kind, identifier, code) async =>
@@ -139,7 +139,7 @@ testWidgets('the app name comes from the server settings, and a name saved '
   final app = await TestApp.start(tester, fake);
   expect(find.text('You are in DartwayStarter'), findsOneWidget);
 
-  app.server.publish(settingsChannel, [
+  app.server.publish(AppChannels.settings, [
     const AppSetting(id: AppSettingKeys.appName, value: 'Acme'),
   ]);
   await app.settle(tester);

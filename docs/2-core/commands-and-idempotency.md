@@ -117,7 +117,7 @@ DwCallHandler.command<PublishNews, NewsPost>(
     );
     final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
     ctx.publish(_news, post);
-    await publishAdminCounters(ctx);
+    await ctx.publishAdminCounters();
     return post;
   },
 ),

@@ -104,7 +104,7 @@ class _FileLinkTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => ChatFileTile(
     name: file.fileName,
-    sizeLabel: chatFileSizeLabel(file.byteSize),
+    sizeLabel: file.byteSize.fileSizeLabel,
     onTap: () async {
       // No browser or viewer plugin in the example: the link is handed over.
       final link = await dw.files.getLink(file.id);

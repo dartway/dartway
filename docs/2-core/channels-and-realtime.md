@@ -41,7 +41,8 @@ The server declares one rule per kind and passes the list to `DwAppServer(channe
 (`example/dartway_example_server/lib/src/example_channels.dart`):
 
 ```dart
-final exampleChannels = <DwChannelRule>[
+// ExampleChannels
+static final rules = <DwChannelRule>[
   DwChannelRule.single(ExampleChannel.schedule, canSubscribe: _anyMember),
   DwChannelRule.keyed<int>(
     ExampleChannel.staffChat,
@@ -88,7 +89,7 @@ ctx.publish(
 );
 for (final booking in affected) {
   ctx.publish(
-    bookingsOf(clients[booking.clientProfileId]!),
+    ExampleChannels.bookingsOf(clients[booking.clientProfileId]!),
     DwDeletedObject.of<SessionBooking>(booking.id!, ctx.protocol),
   );
 }

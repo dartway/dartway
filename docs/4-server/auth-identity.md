@@ -74,13 +74,13 @@ How long a resolved token is trusted without a query is a server setting, not an
 - `DwToolOrigin()` — `DwAccountService.ensure`: a seed, an admin bootstrap, an import. It has
   accepted nothing on anyone's behalf.
 
-The skeleton's `createProfile` (`template/dartway_starter_server/lib/src/auth.dart`) shows why the
+The skeleton's `AppAuth.createProfile` (`template/dartway_starter_server/lib/src/auth.dart`) shows why the
 difference matters:
 
 ```dart
 switch (origin) {
   case DwSignInOrigin(:final registration):
-    if (!await isSignUpEnabled(ctx.db)) {
+    if (!await AppAuth.isSignUpEnabled(ctx.db)) {
       ctx.refuse(DartwayStarterRefusal.signUpClosed, field: 'identifier');
     }
     if (registration[RegistrationKeys.terms] != 'true') {

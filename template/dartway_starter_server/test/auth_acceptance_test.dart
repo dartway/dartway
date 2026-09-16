@@ -180,11 +180,14 @@ void main() {
       'promoted on a later start, quiet when nothing changed', () async {
     final server = app.server.server;
     expect(
-      () => parseAdminIdentifier('not an identifier'),
+      () => AppBootstrap.parseAdminIdentifier('not an identifier'),
       throwsArgumentError,
     );
 
-    expect(await ensureAdministrator(server, 'Admin@Example.com'), isTrue);
+    expect(
+      await AppBootstrap.ensureAdministrator(server, 'Admin@Example.com'),
+      isTrue,
+    );
     final created = (await app.db.userProfiles.findFirst(
       where: (t) => t.role.equals(UserRole.admin) & t.firstName.equals('Admin'),
     ))!;
@@ -193,11 +196,17 @@ void main() {
       isNull,
       reason: "a tool accepts nothing on anyone's behalf",
     );
-    expect(await ensureAdministrator(server, 'admin@example.com'), isFalse);
+    expect(
+      await AppBootstrap.ensureAdministrator(server, 'admin@example.com'),
+      isFalse,
+    );
 
     // Demoted in the panel, back on the next start.
     await app.db.userProfiles.update(created.copyWith(role: UserRole.user));
-    expect(await ensureAdministrator(server, 'admin@example.com'), isTrue);
+    expect(
+      await AppBootstrap.ensureAdministrator(server, 'admin@example.com'),
+      isTrue,
+    );
 
     final device = await app.client();
     final (:ticket, :code) = await app.requestCode(

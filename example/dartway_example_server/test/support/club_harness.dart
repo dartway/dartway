@@ -29,16 +29,16 @@ final class ClubHarness {
     final database = await DwTestDatabase.create(prefix: 'dw_example_test');
     late final ClubHarness harness;
     final server = await DwTestServer.start(
-      buildExampleServer(
+      ExampleServer.build(
         database: database.config,
         storage: storage,
         port: 0,
         settings: settings,
         push: push,
         auth: DwAuthConfig(
-          normalize: exampleAuth.normalize,
-          onAccountCreated: exampleAuth.onAccountCreated,
-          onIdentifierChanged: exampleAuth.onIdentifierChanged,
+          normalize: ExampleAuth.config.normalize,
+          onAccountCreated: ExampleAuth.config.onAccountCreated,
+          onIdentifierChanged: ExampleAuth.config.onIdentifierChanged,
           deliverCode: (ctx, kind, identifier, code) async =>
               harness.delivered[identifier] = code,
         ),
@@ -74,7 +74,7 @@ final class ClubHarness {
     final session = await client.command(
       DwVerifyCode(
         ticketId: ticket.valueOrThrow.id,
-        code: delivered[normalizePhone(phone)]!,
+        code: delivered[ExampleAuth.normalizePhone(phone)]!,
         registration: {'firstName': name, 'marketing': '$marketing'},
       ),
     );

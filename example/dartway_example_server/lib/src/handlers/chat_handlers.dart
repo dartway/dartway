@@ -5,10 +5,8 @@ import '../../generated/dw_schema.dart';
 import '../chat/chat_objects.dart';
 import '../chat/chat_reads.dart';
 import '../entities/chat.dart';
+import '../example_channels.dart';
 import '../example_context.dart';
-
-DwLiveChannel _chatOf(int channelId) =>
-    DwLiveChannel(ExampleChannel.staffChat, channelId);
 
 /// Advisory lock namespace of reactions: the first key of the two-key lock,
 /// the message id the second.
@@ -69,7 +67,7 @@ final chatHandlers = <DwCallHandler>[
       // Only an empty read asks whether the channel exists: a channel with
       // messages plainly does, and the question costs a query per read.
       if (rows.isEmpty && position == null) {
-        await _requireChannel(ctx, request.channelId);
+        await ctx._requireChannel(request.channelId);
       }
       return ChatObjects.messages(ctx.db, rows);
     },
@@ -85,7 +83,7 @@ final chatHandlers = <DwCallHandler>[
             t.deletedAt.isNull(),
         orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
       );
-      if (rows.isEmpty) await _requireChannel(ctx, request.channelId);
+      if (rows.isEmpty) await ctx._requireChannel(request.channelId);
       return ChatObjects.messages(ctx.db, rows);
     },
   ),
@@ -124,7 +122,7 @@ final chatHandlers = <DwCallHandler>[
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      await _requireChannel(ctx, command.channelId);
+      await ctx._requireChannel(command.channelId);
       if (command.replyToMessageId case final quotedId?) {
         final quoted = await ctx.db.chatMessages.findById(quotedId);
         if (quoted == null ||
@@ -184,7 +182,7 @@ final chatHandlers = <DwCallHandler>[
       final message = (await ChatObjects.messages(ctx.db, [
         row,
       ], author: me)).single;
-      ctx.publish(_chatOf(row.channelId), message);
+      ctx.publish(ExampleChannels.chatOf(row.channelId), message);
       await ChatReads.publishChannel(ctx, row.channelId);
       return message;
     },
@@ -194,7 +192,7 @@ final chatHandlers = <DwCallHandler>[
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      final row = await _requireMessage(ctx, command.messageId, lock: true);
+      final row = await ctx._requireMessage(command.messageId, lock: true);
       if (row.authorProfileId != me.id) ctx.refuse(DwCoreRefusal.forbidden);
       if (DateTime.now().isAfter(row.sentAt.add(ChatMessage.editWindow))) {
         ctx.refuse(ExampleRefusal.editWindowClosed);
@@ -212,8 +210,8 @@ final chatHandlers = <DwCallHandler>[
       final message = (await ChatObjects.messages(ctx.db, [
         edited,
       ], author: me)).single;
-      ctx.publish(_chatOf(edited.channelId), message);
-      await _publishQuoting(ctx, edited);
+      ctx.publish(ExampleChannels.chatOf(edited.channelId), message);
+      await ctx._publishQuoting(edited);
       return message;
     },
   ),
@@ -222,7 +220,7 @@ final chatHandlers = <DwCallHandler>[
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      final row = await _requireMessage(ctx, command.messageId, lock: true);
+      final row = await ctx._requireMessage(command.messageId, lock: true);
       if (row.authorProfileId != me.id && !await ctx.isAdmin) {
         ctx.refuse(DwCoreRefusal.forbidden);
       }
@@ -230,10 +228,10 @@ final chatHandlers = <DwCallHandler>[
         row.copyWith(deletedAt: DwFieldPatch.set(DateTime.now())),
       );
       ctx.publish(
-        _chatOf(deleted.channelId),
+        ExampleChannels.chatOf(deleted.channelId),
         DwDeletedObject.of<ChatMessage>(deleted.id!, ctx.protocol),
       );
-      await _publishQuoting(ctx, deleted);
+      await ctx._publishQuoting(deleted);
       // Someone who had not read it counts one message fewer.
       await ChatReads.publishChannel(ctx, deleted.channelId);
     },
@@ -243,7 +241,7 @@ final chatHandlers = <DwCallHandler>[
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      final row = await _requireMessage(ctx, command.messageId, lock: true);
+      final row = await ctx._requireMessage(command.messageId, lock: true);
       // Pinning a pinned message keeps when it was pinned, and by whom.
       final saved = command.pinned == (row.pinnedAt != null)
           ? row
@@ -259,7 +257,7 @@ final chatHandlers = <DwCallHandler>[
                     ),
             );
       final message = (await ChatObjects.messages(ctx.db, [saved])).single;
-      ctx.publish(_chatOf(saved.channelId), message);
+      ctx.publish(ExampleChannels.chatOf(saved.channelId), message);
       return message;
     },
   ),
@@ -268,7 +266,7 @@ final chatHandlers = <DwCallHandler>[
     access: ExampleAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      final row = await _requireMessage(ctx, command.messageId);
+      final row = await ctx._requireMessage(command.messageId);
       // A double tap sends two commands at once: without the lock both
       // delete nothing and both insert, and the unique pair refuses one of
       // them as a database error. Under it the second sees the first's
@@ -287,7 +285,7 @@ final chatHandlers = <DwCallHandler>[
         );
       }
       final message = (await ChatObjects.messages(ctx.db, [row])).single;
-      ctx.publish(_chatOf(row.channelId), message);
+      ctx.publish(ExampleChannels.chatOf(row.channelId), message);
       return message;
     },
   ),
@@ -316,35 +314,36 @@ final chatHandlers = <DwCallHandler>[
   ),
 ];
 
-Future<void> _requireChannel(DwCallContext ctx, int channelId) async {
-  if (!await ctx.db.chatChannels.exists(where: (t) => t.id.equals(channelId))) {
-    ctx.refuse(DwCoreRefusal.notFound);
+extension on DwCallContext {
+  Future<void> _requireChannel(int channelId) async {
+    if (!await db.chatChannels.exists(where: (t) => t.id.equals(channelId))) {
+      refuse(DwCoreRefusal.notFound);
+    }
   }
-}
 
-/// The message [messageId] unless it is deleted; otherwise `dw.notFound`.
-/// With [lock], held until the command commits: edits, deletions and pins of
-/// one message queue instead of overwriting each other's row.
-Future<ChatMessageRow> _requireMessage(
-  DwCallContext ctx,
-  int messageId, {
-  bool lock = false,
-}) async {
-  final row = await ctx.db.chatMessages.findById(
-    messageId,
-    lock: lock ? DwRowLock.forUpdate : null,
-  );
-  if (row == null || row.isDeleted) ctx.refuse(DwCoreRefusal.notFound);
-  return row;
-}
+  /// The message [messageId] unless it is deleted; otherwise `dw.notFound`.
+  /// With [lock], held until the command commits: edits, deletions and pins of
+  /// one message queue instead of overwriting each other's row.
+  Future<ChatMessageRow> _requireMessage(
+    int messageId, {
+    bool lock = false,
+  }) async {
+    final row = await db.chatMessages.findById(
+      messageId,
+      lock: lock ? DwRowLock.forUpdate : null,
+    );
+    if (row == null || row.isDeleted) refuse(DwCoreRefusal.notFound);
+    return row;
+  }
 
-/// Republishes the live messages that quote [quoted]: their quote changed
-/// with it — its text, or that it is deleted.
-Future<void> _publishQuoting(DwCallContext ctx, ChatMessageRow quoted) async {
-  final replies = await ctx.db.chatMessages.find(
-    where: (t) => t.replyToMessageId.equals(quoted.id) & t.deletedAt.isNull(),
-  );
-  for (final reply in await ChatObjects.messages(ctx.db, replies)) {
-    ctx.publish(_chatOf(reply.channelId), reply);
+  /// Republishes the live messages that quote [quoted]: their quote changed
+  /// with it — its text, or that it is deleted.
+  Future<void> _publishQuoting(ChatMessageRow quoted) async {
+    final replies = await db.chatMessages.find(
+      where: (t) => t.replyToMessageId.equals(quoted.id) & t.deletedAt.isNull(),
+    );
+    for (final reply in await ChatObjects.messages(db, replies)) {
+      publish(ExampleChannels.chatOf(reply.channelId), reply);
+    }
   }
 }

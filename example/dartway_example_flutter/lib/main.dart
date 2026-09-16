@@ -7,6 +7,28 @@ import 'app_version.dart';
 import 'dartway_example_app.dart';
 
 Future<void> main() async {
+  // Firebase, when the build names a project: `--dart-define=FIREBASE_API_KEY=…`
+  // with `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID` and
+  // `FIREBASE_PROJECT_ID` (and the web push key, `FIREBASE_WEB_VAPID_KEY`). The
+  // example ships no Firebase project, so by default push is inert.
+  Future<bool> firebaseConfigured() async {
+    const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
+    if (apiKey.isEmpty) return false;
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: apiKey,
+        appId: String.fromEnvironment('FIREBASE_APP_ID'),
+        messagingSenderId: String.fromEnvironment(
+          'FIREBASE_MESSAGING_SENDER_ID',
+        ),
+        projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
+      ),
+    );
+    DwFirebasePush.registerBackgroundHandler();
+    return true;
+  }
+
   // Concrete development parameters live here; the app itself stays
   // environment agnostic.
   //
@@ -31,30 +53,10 @@ Future<void> main() async {
     baseUrl: Uri.parse(backendUrl),
     appVersion: exampleAppVersion,
     pushTransports: [
-      if (await _firebaseConfigured())
+      if (await firebaseConfigured())
         DwFirebasePush(
           webVapidKey: const String.fromEnvironment('FIREBASE_WEB_VAPID_KEY'),
         ),
     ],
   ).run();
-}
-
-/// Firebase, when the build names a project: `--dart-define=FIREBASE_API_KEY=…`
-/// with `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID` and
-/// `FIREBASE_PROJECT_ID` (and the web push key, `FIREBASE_WEB_VAPID_KEY`). The
-/// example ships no Firebase project, so by default push is inert.
-Future<bool> _firebaseConfigured() async {
-  const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
-  if (apiKey.isEmpty) return false;
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: apiKey,
-      appId: String.fromEnvironment('FIREBASE_APP_ID'),
-      messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
-      projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
-    ),
-  );
-  DwFirebasePush.registerBackgroundHandler();
-  return true;
 }

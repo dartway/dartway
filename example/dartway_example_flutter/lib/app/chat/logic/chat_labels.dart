@@ -37,11 +37,13 @@ extension ChatDayLabel on DateTime {
   }
 }
 
-/// "12 KB", "3.4 MB".
-String chatFileSizeLabel(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).round()} KB';
-  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+extension ChatFileSize on int {
+  /// This many bytes as a person reads them: "12 KB", "3.4 MB".
+  String get fileSizeLabel {
+    if (this < 1024) return '$this B';
+    if (this < 1024 * 1024) return '${(this / 1024).round()} KB';
+    return '${(this / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
 }
 
 extension ChatMessageFacts on ChatMessage {

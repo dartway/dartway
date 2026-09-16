@@ -197,10 +197,16 @@ extension UserCourseAccess on UserCourse {
 
 **Where things go:** creates a value of its own type → **factory constructor**; answers a question about an existing value → **method or getter**; the type is someone else's (a data object from `__SHARED_PKG__`, a framework type) → **extension**; you need a shared utility with no type of its own → a static method on an owner class, not a free function.
 
-**Exactly two exceptions, both forced:**
+**Exactly three exceptions:**
 
 - **codegen provider entry points** — if the project does use `riverpod_generator` after all (by default a DartWay project writes its providers by hand): a `@riverpod` function must be top-level, the generator requires it;
-- **`main()`** and similar runtime entry points.
+- **`main()`** and similar runtime entry points — a helper only `main` uses is a local function inside it, not a top-level one;
+- **test helpers** — in a test file or under `test/support/` (`eventually`, a fixture builder): a test suite is not a library anyone navigates by type, and the framework's own suites are written this way.
+
+The template and the example follow this rule and are the pattern to copy: a server's pieces are static
+members of a class named for what they are (`AppChannels.profileOf`, `AppPublications.profile`,
+`AppAuth.config`, `AppFiles.storageConfig`, `DartwayStarterServer.build`), and helpers that take the call
+context are an extension on it (`ctx.publishAdminCounters()`).
 
 ## 1.3c A private widget method that computes data is an extension in `logic/`
 

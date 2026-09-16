@@ -9,54 +9,56 @@ import '../example_context.dart';
 
 const adminChannel = DwLiveChannel(ExampleChannel.admin);
 
-/// The dashboard numbers, counted now.
-Future<AdminCounters> countAdminCounters(DwCallContext ctx) async =>
-    AdminCounters(
-      members: await ctx.db.userProfiles.count(),
-      upcomingSessions: await ctx.db.clubSessions.count(
-        where: (t) => t.startsAt.gte(DateTime.now()),
-      ),
-      newsPosts: await ctx.db.newsPosts.count(),
-    );
+/// The admin dashboard's numbers, as a handler counts and publishes them.
+extension AdminCounting on DwCallContext {
+  /// The dashboard numbers, counted now.
+  Future<AdminCounters> countAdminCounters() async => AdminCounters(
+    members: await db.userProfiles.count(),
+    upcomingSessions: await db.clubSessions.count(
+      where: (t) => t.startsAt.gte(DateTime.now()),
+    ),
+    newsPosts: await db.newsPosts.count(),
+  );
 
-/// Publishes fresh counters to the admin dashboard. Called by the commands that
-/// change what they count, so a dashboard never reads again on its own.
-Future<void> publishAdminCounters(DwCallContext ctx) async =>
-    ctx.publish(adminChannel, await countAdminCounters(ctx));
+  /// Publishes fresh counters to the admin dashboard. Called by the commands
+  /// that change what they count, so a dashboard never reads again on its own.
+  Future<void> publishAdminCounters() async =>
+      publish(adminChannel, await countAdminCounters());
+}
 
-/// The filter of a [ListUserProfiles] page — by name or phone, and by role —
-/// or `null` for every member.
-DwWhereCondition Function(UserProfileTable t)? _membersFilter(
-  ListUserProfiles request,
-) {
-  final search = request.search.trim();
-  final role = request.role;
-  if (search.isEmpty && role == null) return null;
-  // LIKE's own characters in what was typed are matched literally.
-  final pattern =
-      '%${search.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
-  return (t) {
-    final byRole = role == null ? null : t.role.equals(role);
-    if (search.isEmpty) return byRole!;
-    final bySearch =
-        t.firstName.ilike(pattern) |
-        t.lastName.ilike(pattern) |
-        t.phone.like(pattern);
-    return byRole == null ? bySearch : bySearch & byRole;
-  };
+extension on ListUserProfiles {
+  /// The filter of a [ListUserProfiles] page — by name or phone, and by role —
+  /// or `null` for every member.
+  DwWhereCondition Function(UserProfileTable t)? get membersFilter {
+    final text = search.trim();
+    final role = this.role;
+    if (text.isEmpty && role == null) return null;
+    // LIKE's own characters in what was typed are matched literally.
+    final pattern =
+        '%${text.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
+    return (t) {
+      final byRole = role == null ? null : t.role.equals(role);
+      if (text.isEmpty) return byRole!;
+      final bySearch =
+          t.firstName.ilike(pattern) |
+          t.lastName.ilike(pattern) |
+          t.phone.like(pattern);
+      return byRole == null ? bySearch : bySearch & byRole;
+    };
+  }
 }
 
 final adminHandlers = <DwCallHandler>[
   DwCallHandler.single<GetAdminCounters, AdminCounters>(
     access: ExampleAccess.admin,
-    handle: (ctx, request) => countAdminCounters(ctx),
+    handle: (ctx, request) => ctx.countAdminCounters(),
   ),
 
   DwCallHandler.table<ListUserProfiles, UserProfile>(
     access: ExampleAccess.admin,
     rows: (ctx, request, table) async => [
       for (final row in await ctx.db.userProfiles.find(
-        where: _membersFilter(request),
+        where: request.membersFilter,
         orderBy: (t) => [t.firstName.asc(), t.id.asc()],
         limit: table.fetchLimit,
         offset: table.offset,
@@ -64,7 +66,7 @@ final adminHandlers = <DwCallHandler>[
         ClubObjects.profile(row),
     ],
     count: (ctx, request) =>
-        ctx.db.userProfiles.count(where: _membersFilter(request)),
+        ctx.db.userProfiles.count(where: request.membersFilter),
   ),
 
   DwCallHandler.command<ChangeRole, UserProfile>(
@@ -83,7 +85,7 @@ final adminHandlers = <DwCallHandler>[
         ..publish(adminChannel, profile)
         // To the admins' table, and to the member's own profile — not to the
         // admin's, whose "my profile" does not declare that channel.
-        ..publish(profileOf(updated.accountId), profile);
+        ..publish(ExampleChannels.profileOf(updated.accountId), profile);
       // Access is checked once, at subscription: a role taken away closes
       // what it opened.
       final account = updated.accountId;

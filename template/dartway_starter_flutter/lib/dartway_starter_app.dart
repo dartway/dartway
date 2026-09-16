@@ -23,7 +23,7 @@ class DartwayStarterApp {
     // Built here, started by the runner: `dw.init()` starts the plugins and
     // reads the stored session, without waiting for the server — a start
     // offline is a start.
-    createAppDwCore(baseUrl: baseUrl, appVersion: appVersion);
+    AppDwCore.create(baseUrl: baseUrl, appVersion: appVersion);
 
     DwAppRunner(
       // No onError: uncaught errors flow into the dw pipeline, where the app's

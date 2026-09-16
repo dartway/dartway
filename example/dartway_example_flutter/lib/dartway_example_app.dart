@@ -33,7 +33,7 @@ class DartwayExampleApp {
     // Built here, started by the runner: `dw.init()` starts the plugins and
     // reads the stored session, without waiting for the server — a start
     // offline is a start.
-    createExampleDwCore(
+    ExampleDwCore.create(
       baseUrl: baseUrl,
       appVersion: appVersion,
       pushTransports: pushTransports,

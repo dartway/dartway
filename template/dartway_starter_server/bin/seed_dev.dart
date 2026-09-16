@@ -38,7 +38,7 @@ Future<void> main() async {
           normalize: AuthIdentifier.normalize,
           deliverCode: (ctx, kind, identifier, code) async {},
           onAccountCreated: (ctx, accountId, kind, identifier, origin) =>
-              createProfile(ctx, accountId, origin),
+              AppAuth.createProfile(ctx, accountId, origin),
         ),
       );
 

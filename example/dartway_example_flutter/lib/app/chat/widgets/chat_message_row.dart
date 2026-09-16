@@ -128,13 +128,13 @@ class ChatMessageRow extends StatelessWidget {
               Flexible(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onLongPress: () => showChatMessageMenu(
+                  onLongPress: () => ChatMessageMenu.show(
                     context,
                     message: message,
                     session: session,
                     me: me,
                   ),
-                  onSecondaryTap: () => showChatMessageMenu(
+                  onSecondaryTap: () => ChatMessageMenu.show(
                     context,
                     message: message,
                     session: session,

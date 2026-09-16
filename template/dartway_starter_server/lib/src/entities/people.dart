@@ -7,7 +7,7 @@ part 'people.dw.dart';
 ///
 /// The framework owns the account and its sign-in identifiers; this row is
 /// what the app knows about the person, and it exists from the moment the
-/// account does — created in the same transaction (`appAuth`'s
+/// account does — created in the same transaction (`AppAuth.config`'s
 /// `onAccountCreated`).
 @DwSqlTable(
   'user_profile',

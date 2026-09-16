@@ -17,7 +17,7 @@ void main() {
       ];
       for (final code in codes) {
         expect(
-          refusalText(l10n, DwCallRefusal(code)),
+          l10n.refusalText(DwCallRefusal(code)),
           isNot(l10n.refusalGeneric),
           reason: code.code,
         );
@@ -29,15 +29,14 @@ void main() {
 
   test('a code the app does not know still reads as a sentence', () {
     expect(
-      refusalText(en, const DwCallRefusal.raw('fromANewerServer')),
+      en.refusalText(const DwCallRefusal.raw('fromANewerServer')),
       en.refusalGeneric,
     );
   });
 
   test('refusals use their parameters', () {
     expect(
-      refusalText(
-        en,
+      en.refusalText(
         DwCallRefusal(
           DwCoreRefusal.invalid,
           field: 'code',
@@ -47,22 +46,17 @@ void main() {
       'Wrong code. Attempts left: 2',
     );
     expect(
-      refusalText(
-        en,
-        DwCallRefusal(DwCoreRefusal.invalid, field: 'identifier'),
-      ),
+      en.refusalText(DwCallRefusal(DwCoreRefusal.invalid, field: 'identifier')),
       'Enter a valid phone number or e-mail.',
     );
     expect(
-      refusalText(
-        en,
+      en.refusalText(
         DwCallRefusal.tooManyRequests(const Duration(seconds: 30)),
       ),
       'Too many attempts. Try again in 30 s.',
     );
     expect(
-      refusalText(
-        en,
+      en.refusalText(
         DwCallRefusal(
           DwUploadRefusal.tooLarge,
           field: 'byteSize',

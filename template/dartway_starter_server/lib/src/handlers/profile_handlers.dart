@@ -50,7 +50,7 @@ final profileHandlers = <DwCallHandler>[
       if (previousAvatar != null && previousAvatar != updated.avatarFileId) {
         await ctx.files.delete(previousAvatar);
       }
-      return publishProfile(ctx, updated);
+      return AppPublications.profile(ctx, updated);
     },
   ),
 ];

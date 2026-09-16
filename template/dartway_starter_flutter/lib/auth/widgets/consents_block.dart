@@ -46,12 +46,12 @@ class ConsentsBlock extends ConsumerWidget {
                 MultiLinkTextPart(
                   l10n.termsConsentPrefix,
                   l10n.termsLink,
-                  wipProgressNotificationCallback,
+                  dw.notImplementedYet,
                 ),
                 MultiLinkTextPart(
                   l10n.termsConsentMiddle,
                   l10n.privacyLink,
-                  wipProgressNotificationCallback,
+                  dw.notImplementedYet,
                 ),
               ],
             ),

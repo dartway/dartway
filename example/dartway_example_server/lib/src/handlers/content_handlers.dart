@@ -35,7 +35,7 @@ final contentHandlers = <DwCallHandler>[
       );
       final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
       ctx.publish(_news, post);
-      await publishAdminCounters(ctx);
+      await ctx.publishAdminCounters();
       // Queued in this transaction: a refused or failed publication notifies
       // nobody. Who of the members receives it is the push eligibility rule's
       // decision (marketing consent), taken when the delivery is due.
@@ -69,7 +69,7 @@ final contentHandlers = <DwCallHandler>[
         _news,
         DwDeletedObject.of<NewsPost>(command.postId, ctx.protocol),
       );
-      await publishAdminCounters(ctx);
+      await ctx.publishAdminCounters();
     },
   ),
 

@@ -129,7 +129,7 @@ final class TestApp {
     final printed = debugPrint;
     debugPrint = (message, {wrapWidth}) => logs.add(message ?? '');
 
-    final core = createAppDwCore(
+    final core = AppDwCore.create(
       baseUrl: fake.server.baseUrl,
       appVersion: appBuildVersion,
       httpTransport: fake.server.httpTransport,

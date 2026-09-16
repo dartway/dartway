@@ -218,7 +218,7 @@ and RuStore's send API, records what it was sent and answers what the test says.
 
 ```dart
 final fcm = await DwFakePushService.start();
-final server = await DwTestServer.start(buildServer(push: examplePush(providers: [fcm.fcmProvider()])));
+final server = await DwTestServer.start(buildServer(push: ExamplePush.module(providers: [fcm.fcmProvider()])));
 // ...
 fcm.answer = (send) => DwFakePushAnswer.fcmError(404, 'NOT_FOUND', 'Requested entity was not found.', fcmCode: 'UNREGISTERED');
 ```

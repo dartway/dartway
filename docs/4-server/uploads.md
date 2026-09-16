@@ -55,7 +55,8 @@ The server declares one `DwUploadRule` per purpose. From
 `template/dartway_starter_server/lib/src/files.dart`:
 
 ```dart
-List<DwUploadRule> get appUploadRules => [
+// AppFiles
+static List<DwUploadRule> get uploadRules => [
   DwUploadRule(
     DartwayStarterUpload.avatar,
     // Shown to anyone who sees the member, by URL: a photo is not private.
@@ -100,8 +101,9 @@ may be allowed after signing in. The example lets chat members read chat attachm
 (`example/dartway_example_server/lib/src/example_files.dart`):
 
 ```dart
-Future<bool> exampleCanRead(DwCallContext ctx, DwFileRecord file) async =>
-    await canReadChatAttachment(ctx, file) ?? file.accountId == ctx.accountId;
+// ExampleFiles
+static Future<bool> canRead(DwCallContext ctx, DwFileRecord file) async =>
+    await ChatAttachments.canRead(ctx, file) ?? file.accountId == ctx.accountId;
 ```
 
 `DwFileRecord` carries `id`, `accountId`, `purpose`, `visibility`, `fileName`, `contentType`,
@@ -139,8 +141,9 @@ probe say whether it is right. The skeleton's `bin/server.dart` provisions when
 ## Configuration
 
 ```dart
-DwFileStorage appFileStorage(DwFileStorageConfig config) =>
-    DwFileStorage(config, rules: appUploadRules);
+// AppFiles
+static DwFileStorage storage(DwFileStorageConfig config) =>
+    DwFileStorage(config, rules: uploadRules);
 ```
 
 passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/src/files.dart`).
@@ -160,7 +163,7 @@ passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/src/fi
 
 `DwFileStorageConfig.fromEnvironment(env, {prefix: 'DW_STORAGE_'})` reports every missing or
 malformed key at once. Which buckets are needed is the rules' business, so neither is required
-there; the server names the missing one at startup. The skeleton's `appStorageConfig` fills in
+there; the server names the missing one at startup. The skeleton's `AppFiles.storageConfig` fills in
 development defaults — bucket names after the project, the public base URL on the endpoint — and
 answers `null` without `DW_STORAGE_ENDPOINT`, so the server runs without uploads.
 
@@ -232,7 +235,7 @@ DwCallHandler.command<UpdateMyProfile, UserProfile>(
     if (previousAvatar != null && previousAvatar != updated.avatarFileId) {
       await ctx.files.delete(previousAvatar);
     }
-    return publishProfile(ctx, updated);
+    return AppPublications.profile(ctx, updated);
   },
 ),
 ```

@@ -299,7 +299,7 @@ handler that answers one object and a handler that answers a hundred build it th
 
 **Publishing is mapping too.** A changed row often goes to several channels, as several objects;
 the skeleton keeps that in one function per change
-(`template/dartway_starter_server/lib/src/publications.dart`, `publishProfile`), so every command
+(`template/dartway_starter_server/lib/src/publications.dart`, `AppPublications.profile`), so every command
 that changes a profile publishes the same set.
 
 ## Related

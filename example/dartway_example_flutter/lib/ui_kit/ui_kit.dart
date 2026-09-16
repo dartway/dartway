@@ -46,8 +46,10 @@ part 'utils/conditional_parent.dart';
 part 'utils/date_labels.dart';
 part 'utils/formatters.dart';
 
-/// For links whose destination does not exist yet. A getter, not a stored
-/// action: an action is bound to the core it was built on, and a test builds
-/// a new core per test.
-DwUiAction<void> get wipProgressNotificationCallback =>
-    dw.action((context) => dw.notify.success('Not implemented yet'));
+/// For links whose destination does not exist yet.
+extension ExampleWipAction on DwFlutterCore {
+  /// A getter, not a stored action: an action is bound to the core it was
+  /// built on, and a test builds a new core per test.
+  DwUiAction<void> get notImplementedYet =>
+      action((context) => notify.success('Not implemented yet'));
+}

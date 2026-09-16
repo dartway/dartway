@@ -16,7 +16,7 @@ run it, seed it and test it: `../README.md`.
 Uploads go from the app straight to an S3-compatible storage in two buckets:
 a **public** one, whose objects anyone reads by URL (the avatar), and a
 **private** one, read only through short presigned links after the read rule
-(`exampleCanRead`). A rule's visibility picks the bucket; a new purpose is a
+(`ExampleFiles.canRead`). A rule's visibility picks the bucket; a new purpose is a
 new rule in `lib/src/example_files.dart` and nothing else.
 
 Without `DW_STORAGE_ENDPOINT` the server runs without uploads. For development,

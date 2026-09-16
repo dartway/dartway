@@ -78,7 +78,7 @@ class AvatarPicker extends HookWidget {
         ),
         const Gap(8),
         AppText.caption(switch (upload) {
-          DwUploadError(:final refusal?) => refusalText(l10n, refusal),
+          DwUploadError(:final refusal?) => l10n.refusalText(refusal),
           DwUploadError() => l10n.refusalUploadFailed,
           _ => l10n.profilePhotoHint,
         }, textAlign: TextAlign.center),

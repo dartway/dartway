@@ -62,7 +62,7 @@ final bookingHandlers = <DwCallHandler>[
       final updated = await ctx.db.clubSessions.update(
         session.copyWith(bookedCount: session.bookedCount + 1),
       );
-      return _publishBookingChange(ctx, booking, updated, me);
+      return ctx._publishBookingChange(booking, updated, me);
     },
   ),
 
@@ -91,7 +91,7 @@ final bookingHandlers = <DwCallHandler>[
       final updated = await ctx.db.clubSessions.update(
         session.copyWith(bookedCount: session.bookedCount - 1),
       );
-      return _publishBookingChange(ctx, cancelled, updated, me);
+      return ctx._publishBookingChange(cancelled, updated, me);
     },
   ),
 
@@ -110,7 +110,7 @@ final bookingHandlers = <DwCallHandler>[
         booking.copyWith(status: BookingStatus.attended),
       );
       final object = (await ClubObjects.bookings(ctx.db, [attended])).single;
-      ctx.publish(bookingsOf(object.accountId), object);
+      ctx.publish(ExampleChannels.bookingsOf(object.accountId), object);
       return object;
     },
   ),
@@ -139,29 +139,30 @@ final bookingHandlers = <DwCallHandler>[
       final object = (await ClubObjects.bookings(ctx.db, [
         booking,
       ], client: me)).single;
-      ctx.publish(bookingsOf(me.accountId), object);
+      ctx.publish(ExampleChannels.bookingsOf(me.accountId), object);
       return object;
     },
   ),
 ];
 
-/// The session's new spots go to everyone on the schedule, the booking to its
-/// member's devices.
-Future<SessionBooking> _publishBookingChange(
-  DwCallContext ctx,
-  SessionBookingRow booking,
-  ClubSessionRow session,
-  UserProfileRow client,
-) async {
-  final sessionObject = (await ClubObjects.sessions(ctx.db, [session])).single;
-  final object = (await ClubObjects.bookings(
-    ctx.db,
-    [booking],
-    client: client,
-    session: sessionObject,
-  )).single;
-  ctx
-    ..publish(scheduleChannel, sessionObject)
-    ..publish(bookingsOf(client.accountId), object);
-  return object;
+extension on DwCallContext {
+  /// The session's new spots go to everyone on the schedule, the booking to its
+  /// member's devices.
+  Future<SessionBooking> _publishBookingChange(
+    SessionBookingRow booking,
+    ClubSessionRow session,
+    UserProfileRow client,
+  ) async {
+    final sessionObject = (await ClubObjects.sessions(db, [session])).single;
+    final object = (await ClubObjects.bookings(
+      db,
+      [booking],
+      client: client,
+      session: sessionObject,
+    )).single;
+    this
+      ..publish(scheduleChannel, sessionObject)
+      ..publish(ExampleChannels.bookingsOf(client.accountId), object);
+    return object;
+  }
 }

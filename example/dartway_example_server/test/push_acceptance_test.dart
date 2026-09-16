@@ -13,7 +13,7 @@ void main() {
   setUpAll(() async {
     fcm = await DwFakePushService.start();
     club = await ClubHarness.start(
-      push: examplePush(
+      push: ExamplePush.module(
         providers: [
           fcm.fcmProvider(webLinkBase: Uri.parse('https://app.example.com')),
         ],

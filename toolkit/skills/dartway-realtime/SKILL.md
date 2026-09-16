@@ -89,7 +89,8 @@ A keyed channel built from a field is not `const`:
 One rule per kind, in `DwAppServer(channels: [...])`:
 
 ```dart
-final appChannels = <DwChannelRule>[
+// AppChannels — lib/src/channels.dart
+static final rules = <DwChannelRule>[
   // "My" channel: a member subscribes to their own account's key only.
   DwChannelRule.ofCaller(AppChannel.invoices),
   DwChannelRule.single(

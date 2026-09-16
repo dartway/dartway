@@ -29,11 +29,11 @@ final class AppHarness {
     final database = await DwTestDatabase.create(prefix: 'app_test');
     late final AppHarness harness;
     final server = await DwTestServer.start(
-      buildDartwayStarterServer(
+      DartwayStarterServer.build(
         database: database.config,
         storage: storage,
         port: 0,
-        auth: appAuth(
+        auth: AppAuth.config(
           // Tests ask one identifier for several codes within a minute.
           resendDelay: Duration.zero,
           deliverCode: (ctx, kind, identifier, code) async =>

@@ -288,7 +288,7 @@ class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
                     ChatFileTile(
                       key: ValueKey('composer-file-${file.key}'),
                       name: file.name,
-                      sizeLabel: chatFileSizeLabel(file.byteSize),
+                      sizeLabel: file.byteSize.fileSizeLabel,
                       progress: file.isUploading ? file.progress : null,
                       removeTooltip: l10n.cancel,
                       thumbnail: file.width != null && file.bytes != null

@@ -19,46 +19,48 @@ import 'src/handlers/schedule_handlers.dart';
 import 'src/migrations/migrations.dart';
 
 export 'generated/dw_schema.dart';
-export 'src/example_auth.dart' show createProfile, exampleAuth, normalizePhone;
-export 'src/example_files.dart'
-    show exampleFileStorage, exampleStorageConfig, exampleUploadRules;
-export 'src/example_push.dart' show examplePush, examplePushProviders;
+export 'src/example_auth.dart' show ExampleAuth;
+export 'src/example_files.dart' show ExampleFiles;
+export 'src/example_push.dart' show ExamplePush;
 export 'src/migrations/migrations.dart' show appMigrations;
 
-/// Builds the example server. `bin/server.dart` starts it; tests start it on a
-/// free port against their own database.
-///
-/// With [storage] the server takes uploads by [exampleUploadRules] — public
-/// purposes into its public bucket, private ones into its private bucket —
-/// and checks both buckets as it starts; without it, it has no files.
-///
-/// [push] sends notifications (`examplePush`); by default it has no providers
-/// and records deliveries it has nobody to send through.
-DwAppServer buildExampleServer({
-  required DwDatabaseConfig database,
-  DwFileStorageConfig? storage,
-  int port = 8080,
-  DwAuthConfig? auth,
-  DwServerSettings settings = const DwServerSettings(),
-  DwPushModule? push,
-}) => DwAppServer(
-  protocol: exampleProtocol,
-  schema: dartwayExampleSchema,
-  migrations: appMigrations,
-  migrationsDirectory: 'lib/src/migrations',
-  database: database,
-  auth: auth ?? exampleAuth,
-  handlers: [
-    ...profileHandlers,
-    ...scheduleHandlers,
-    ...bookingHandlers,
-    ...contentHandlers,
-    ...chatHandlers,
-    ...adminHandlers,
-  ],
-  channels: exampleChannels,
-  files: storage == null ? null : exampleFileStorage(storage),
-  modules: [push ?? examplePush()],
-  port: port,
-  settings: settings,
-);
+/// The club's server, as `bin/server.dart` and the tests build it.
+abstract final class ExampleServer {
+  /// Builds the example server. `bin/server.dart` starts it; tests start it on a
+  /// free port against their own database.
+  ///
+  /// With [storage] the server takes uploads by [ExampleFiles.uploadRules] — public
+  /// purposes into its public bucket, private ones into its private bucket —
+  /// and checks both buckets as it starts; without it, it has no files.
+  ///
+  /// [push] sends notifications (`ExamplePush.module`); by default it has no providers
+  /// and records deliveries it has nobody to send through.
+  static DwAppServer build({
+    required DwDatabaseConfig database,
+    DwFileStorageConfig? storage,
+    int port = 8080,
+    DwAuthConfig? auth,
+    DwServerSettings settings = const DwServerSettings(),
+    DwPushModule? push,
+  }) => DwAppServer(
+    protocol: exampleProtocol,
+    schema: dartwayExampleSchema,
+    migrations: appMigrations,
+    migrationsDirectory: 'lib/src/migrations',
+    database: database,
+    auth: auth ?? ExampleAuth.config,
+    handlers: [
+      ...profileHandlers,
+      ...scheduleHandlers,
+      ...bookingHandlers,
+      ...contentHandlers,
+      ...chatHandlers,
+      ...adminHandlers,
+    ],
+    channels: ExampleChannels.rules,
+    files: storage == null ? null : ExampleFiles.storage(storage),
+    modules: [push ?? ExamplePush.module()],
+    port: port,
+    settings: settings,
+  );
+}

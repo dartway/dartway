@@ -32,7 +32,7 @@ final settingsHandlers = <DwCallHandler>[
               existing.copyWith(value: command.value),
             );
       final setting = AppSetting(id: saved.key, value: saved.value);
-      ctx.publish(settingsChannel, setting);
+      ctx.publish(AppChannels.settings, setting);
       return setting;
     },
   ),

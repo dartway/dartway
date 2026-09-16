@@ -75,7 +75,7 @@ final scheduleHandlers = <DwCallHandler>[
       }
       final session = (await ClubObjects.sessions(ctx.db, [row])).single;
       ctx.publish(scheduleChannel, session);
-      await publishAdminCounters(ctx);
+      await ctx.publishAdminCounters();
       return session;
     },
   ),
@@ -105,11 +105,11 @@ final scheduleHandlers = <DwCallHandler>[
       );
       for (final booking in affected) {
         ctx.publish(
-          bookingsOf(clients[booking.clientProfileId]!),
+          ExampleChannels.bookingsOf(clients[booking.clientProfileId]!),
           DwDeletedObject.of<SessionBooking>(booking.id!, ctx.protocol),
         );
       }
-      await publishAdminCounters(ctx);
+      await ctx.publishAdminCounters();
     },
   ),
 ];

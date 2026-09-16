@@ -12,7 +12,7 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 ///   one fails;
 /// - `PORT` — the port to listen on, 8080 by default;
 /// - `DW_STORAGE_*` — the S3-compatible storage for uploads
-///   (`appStorageConfig`): `ENDPOINT`, `ACCESS_KEY` and `SECRET_KEY` together;
+///   (`AppFiles.storageConfig`): `ENDPOINT`, `ACCESS_KEY` and `SECRET_KEY` together;
 ///   `PUBLIC_BUCKET` and `PRIVATE_BUCKET` (named after the project),
 ///   `PUBLIC_BASE_URL` (the public bucket on the endpoint), `REGION`,
 ///   `PATH_STYLE`, `VERIFY_BUCKETS`. Without `DW_STORAGE_ENDPOINT` the server
@@ -32,15 +32,17 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 ///   made one on every start; unset for none.
 Future<void> main() async {
   final env = Platform.environment;
-  final adminIdentifier = env[bootstrapAdminVariable]?.trim() ?? '';
+  final adminIdentifier = env[AppBootstrap.adminVariable]?.trim() ?? '';
   // Checked before anything starts: a mistyped admin is a startup error.
-  if (adminIdentifier.isNotEmpty) parseAdminIdentifier(adminIdentifier);
+  if (adminIdentifier.isNotEmpty) {
+    AppBootstrap.parseAdminIdentifier(adminIdentifier);
+  }
 
-  final storage = appStorageConfig(env);
+  final storage = AppFiles.storageConfig(env);
   if (storage != null && env['DW_STORAGE_PROVISION'] == 'true') {
     await DwFileStorageSetup.provision(storage);
   }
-  final server = buildDartwayStarterServer(
+  final server = DartwayStarterServer.build(
     database: DwDatabaseConfig.fromEnvironment(env),
     storage: storage,
     port: int.parse(env['PORT'] ?? '8080'),
@@ -61,10 +63,10 @@ Future<void> main() async {
   }
   if (adminIdentifier.isEmpty) {
     server.logger.warning(
-      'No administrator is declared: set $bootstrapAdminVariable to reach the '
+      'No administrator is declared: set ${AppBootstrap.adminVariable} to reach the '
       'admin panel.',
     );
-  } else if (await ensureAdministrator(server, adminIdentifier)) {
+  } else if (await AppBootstrap.ensureAdministrator(server, adminIdentifier)) {
     server.logger.info('Administrator ensured: $adminIdentifier');
   } else {
     server.logger.info('Administrator already in place: $adminIdentifier');

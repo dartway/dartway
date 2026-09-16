@@ -10,7 +10,7 @@ the rule of every upload purpose.
 ```dart
 DwCallHandler.single<GetAdminCounters, AdminCounters>(
   access: ExampleAccess.admin,
-  handle: (ctx, request) => countAdminCounters(ctx),
+  handle: (ctx, request) => ctx.countAdminCounters(),
 ),
 ```
 

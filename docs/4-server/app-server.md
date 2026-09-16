@@ -8,35 +8,40 @@ who presses the button.
 ## The constructor
 
 ```dart
-DwAppServer buildExampleServer({
-  required DwDatabaseConfig database,
-  DwFileStorageConfig? storage,
-  int port = 8080,
-  DwAuthConfig? auth,
-  DwServerSettings settings = const DwServerSettings(),
-}) => DwAppServer(
-  protocol: dartwayExampleProtocol,
-  schema: dartwayExampleSchema,
-  migrations: appMigrations,
-  database: database,
-  auth: auth ?? exampleAuth,
-  handlers: [
-    ...profileHandlers,
-    ...scheduleHandlers,
-    ...bookingHandlers,
-    ...contentHandlers,
-    ...chatHandlers,
-    ...adminHandlers,
-  ],
-  channels: exampleChannels,
-  files: storage == null ? null : exampleFileStorage(storage),
-  port: port,
-  settings: settings,
-);
+abstract final class ExampleServer {
+  static DwAppServer build({
+    required DwDatabaseConfig database,
+    DwFileStorageConfig? storage,
+    int port = 8080,
+    DwAuthConfig? auth,
+    DwServerSettings settings = const DwServerSettings(),
+    DwPushModule? push,
+  }) => DwAppServer(
+    protocol: exampleProtocol,
+    schema: dartwayExampleSchema,
+    migrations: appMigrations,
+    migrationsDirectory: 'lib/src/migrations',
+    database: database,
+    auth: auth ?? ExampleAuth.config,
+    handlers: [
+      ...profileHandlers,
+      ...scheduleHandlers,
+      ...bookingHandlers,
+      ...contentHandlers,
+      ...chatHandlers,
+      ...adminHandlers,
+    ],
+    channels: ExampleChannels.rules,
+    files: storage == null ? null : ExampleFiles.storage(storage),
+    modules: [push ?? ExamplePush.module()],
+    port: port,
+    settings: settings,
+  );
+}
 ```
 
 That is `example/dartway_example_server/lib/dartway_example_server.dart`. The skeleton has the same
-shape in `buildDartwayStarterServer`; `bin/server.dart` builds it from the environment, and tests
+shape in `DartwayStarterServer.build`; `bin/server.dart` builds it from the environment, and tests
 build it on a free port against their own database.
 
 | Parameter | Required | What it is |
@@ -211,7 +216,8 @@ leaves the first one nowhere to come from; `APP_BOOTSTRAP_ADMIN` names it per en
 error), starts the server, then calls:
 
 ```dart
-Future<bool> ensureAdministrator(
+// AppBootstrap
+static Future<bool> ensureAdministrator(
   DwAppServer server,
   String rawIdentifier,
 ) async {

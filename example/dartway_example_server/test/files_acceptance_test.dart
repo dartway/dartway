@@ -21,15 +21,18 @@ void main() {
     };
 
     test('without an endpoint there is no storage', () {
-      expect(exampleStorageConfig(const {}), isNull);
+      expect(ExampleFiles.storageConfig(const {}), isNull);
       expect(
-        exampleStorageConfig(const {'DW_STORAGE_ENDPOINT': '', ...credentials}),
+        ExampleFiles.storageConfig(const {
+          'DW_STORAGE_ENDPOINT': '',
+          ...credentials,
+        }),
         isNull,
       );
     });
 
     test('a development MinIO needs only its endpoint and keys', () {
-      final config = exampleStorageConfig(const {
+      final config = ExampleFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:9000',
         ...credentials,
       })!;
@@ -43,7 +46,7 @@ void main() {
     });
 
     test('what the environment names wins over every default', () {
-      final config = exampleStorageConfig(const {
+      final config = ExampleFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'https://storage.yandexcloud.net',
         'DW_STORAGE_PUBLIC_BUCKET': 'club-files',
         'DW_STORAGE_PUBLIC_BASE_URL': 'https://cdn.club.example',
@@ -108,13 +111,13 @@ void main() {
           protocol: DwWireProtocol(const []),
           migrations: appMigrations,
           database: club.database.config,
-          auth: exampleAuth,
+          auth: ExampleAuth.config,
           handlers: const [],
           files: DwFileStorage(
             storage.config,
             // The club's own rules hold a private purpose (chat
             // attachments), and nothing else is needed for it.
-            rules: exampleUploadRules,
+            rules: ExampleFiles.uploadRules,
           ),
         ),
       );

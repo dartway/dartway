@@ -21,29 +21,32 @@ void main() {
     };
 
     test('without an endpoint there is no storage', () {
-      expect(appStorageConfig(const {}), isNull);
+      expect(AppFiles.storageConfig(const {}), isNull);
       expect(
-        appStorageConfig(const {'DW_STORAGE_ENDPOINT': '', ...credentials}),
+        AppFiles.storageConfig(const {
+          'DW_STORAGE_ENDPOINT': '',
+          ...credentials,
+        }),
         isNull,
       );
     });
 
     test('a development MinIO needs only its endpoint and keys', () {
-      final config = appStorageConfig(const {
+      final config = AppFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:8100/',
         ...credentials,
       })!;
-      expect(config.publicBucket, defaultPublicBucket);
-      expect(config.privateBucket, defaultPrivateBucket);
+      expect(config.publicBucket, AppFiles.defaultPublicBucket);
+      expect(config.privateBucket, AppFiles.defaultPrivateBucket);
       expect(
         config.publicBaseUrl,
-        Uri.parse('http://127.0.0.1:8100/$defaultPublicBucket'),
+        Uri.parse('http://127.0.0.1:8100/${AppFiles.defaultPublicBucket}'),
       );
       expect(config.verifyBuckets, isTrue);
     });
 
     test('what the environment names wins over every default', () {
-      final config = appStorageConfig(const {
+      final config = AppFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'https://storage.example.net',
         'DW_STORAGE_PUBLIC_BUCKET': 'files',
         'DW_STORAGE_PUBLIC_BASE_URL': 'https://cdn.example.net',

@@ -120,7 +120,7 @@ final class ExampleTestApp {
     final printed = debugPrint;
     debugPrint = (message, {wrapWidth}) => logs.add(message ?? '');
 
-    final core = createExampleDwCore(
+    final core = ExampleDwCore.create(
       baseUrl: club.server.baseUrl,
       appVersion: exampleAppVersion,
       httpTransport: club.server.httpTransport,

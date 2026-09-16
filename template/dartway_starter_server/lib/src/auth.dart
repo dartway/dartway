@@ -18,112 +18,119 @@ typedef CodeDelivery =
       String code,
     );
 
-/// Sign-in by a one-time code to a phone number or an e-mail address.
-///
-/// [deliverCode] sends the code. By default it is written to the server log:
-/// the template sends no SMS and no e-mail, which is enough to sign in locally.
-/// **A deployed project delivers it here** — an SMS gateway for phones, a mail
-/// service for e-mail — and the log line goes.
-///
-/// [resendDelay] is the pause before another code may be asked for the same
-/// identifier; the app counts it down from the ticket's `resendAfter`.
-DwAuthConfig appAuth({
-  CodeDelivery? deliverCode,
-  Duration resendDelay = const Duration(seconds: 60),
-}) => DwAuthConfig(
-  // One rule on both sides: the app normalizes what it sends with the same
-  // function.
-  normalize: AuthIdentifier.normalize,
-  deliverCode: deliverCode ?? _logCode,
+/// Signing in: the auth configuration, and the profile an account is created
+/// with.
+abstract final class AppAuth {
+  /// Sign-in by a one-time code to a phone number or an e-mail address.
+  ///
+  /// [deliverCode] sends the code. By default it is written to the server log:
+  /// the template sends no SMS and no e-mail, which is enough to sign in locally.
+  /// **A deployed project delivers it here** — an SMS gateway for phones, a mail
+  /// service for e-mail — and the log line goes.
+  ///
+  /// [resendDelay] is the pause before another code may be asked for the same
+  /// identifier; the app counts it down from the ticket's `resendAfter`.
+  static DwAuthConfig config({
+    CodeDelivery? deliverCode,
+    Duration resendDelay = const Duration(seconds: 60),
+  }) => DwAuthConfig(
+    // One rule on both sides: the app normalizes what it sends with the same
+    // function.
+    normalize: AuthIdentifier.normalize,
+    deliverCode: deliverCode ?? _logCode,
 
-  // Store reviewers, demo personas and end-to-end tests sign in with a fixed
-  // code set on their profile; nobody else has one.
-  fixedCode: (ctx, kind, identifier, accountId) async {
-    if (accountId == null) return null;
-    final profile = await ctx.db.userProfiles.findFirst(
-      where: (t) => t.accountId.equals(accountId),
-    );
-    return profile?.testVerificationCode;
-  },
-
-  // The profile is created with the account, in the same transaction: a
-  // signed-in account without a profile cannot exist. A refusal here rolls the
-  // account back and leaves the code usable.
-  onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
-    final profile = await createProfile(ctx, accountId, origin);
-    // The newcomer goes to the admins: the dashboard counts them, and a
-    // members table page reads itself again — a new row moves the paging and
-    // the total, which only the server can compute.
-    ctx
-      ..publish(adminChannel, await countAdminCounters(ctx.db))
-      ..publish(adminChannel, await AppObjects.profile(ctx, profile));
-  },
-
-  // The profile shows the phone and the e-mail an account signs in with, read
-  // from the framework's identities rather than copied into the profile row —
-  // so there is nothing to write here, only to tell: every change the
-  // framework makes (a member attaching or replacing one by code) republishes
-  // the profile to its owner and the admins, in the changing transaction.
-  onIdentifierChanged: (ctx, change) async {
-    final profile = await ctx.db.userProfiles.findFirst(
-      where: (t) => t.accountId.equals(change.accountId),
-    );
-    if (profile != null) await publishProfile(ctx, profile);
-  },
-  resendDelay: resendDelay,
-);
-
-Future<void> _logCode(
-  DwCallContext ctx,
-  DwIdentifierKind kind,
-  String identifier,
-  String code,
-) async => stdout.writeln('Sign-in code for $identifier: $code');
-
-/// The profile a new account starts with, in the account's transaction.
-///
-/// A sign-up is refused, and nothing is created, while sign-up is switched off
-/// in the settings ([DartwayStarterRefusal.signUpClosed]) or without the terms
-/// accepted ([DartwayStarterRefusal.consentsRequired]) — the app then asks for
-/// them and verifies the same code again. An account made by a tool
-/// ([DwToolOrigin]: the admin bootstrap, the dev seed) accepts nothing on
-/// anyone's behalf: its `termsAcceptedAt` stays empty.
-Future<UserProfileRow> createProfile(
-  DwCallContext ctx,
-  int accountId,
-  DwAccountOrigin origin,
-) async {
-  final now = DateTime.now().toUtc();
-  switch (origin) {
-    case DwSignInOrigin(:final registration):
-      if (!await isSignUpEnabled(ctx.db)) {
-        ctx.refuse(DartwayStarterRefusal.signUpClosed, field: 'identifier');
-      }
-      if (registration[RegistrationKeys.terms] != 'true') {
-        ctx.refuse(DartwayStarterRefusal.consentsRequired, field: 'consents');
-      }
-      return ctx.db.userProfiles.insert(
-        UserProfileRow(
-          accountId: accountId,
-          firstName: registration[RegistrationKeys.firstName]?.trim() ?? '',
-          agreedForMarketing:
-              registration[RegistrationKeys.marketing] == 'true',
-          termsAcceptedAt: now,
-          createdAt: now,
-        ),
+    // Store reviewers, demo personas and end-to-end tests sign in with a fixed
+    // code set on their profile; nobody else has one.
+    fixedCode: (ctx, kind, identifier, accountId) async {
+      if (accountId == null) return null;
+      final profile = await ctx.db.userProfiles.findFirst(
+        where: (t) => t.accountId.equals(accountId),
       );
-    case DwToolOrigin():
-      return ctx.db.userProfiles.insert(
-        UserProfileRow(accountId: accountId, createdAt: now),
-      );
-  }
-}
+      return profile?.testVerificationCode;
+    },
 
-/// Whether a new visitor may create an account: the `signUpEnabled` setting,
-/// on while nobody has stored it.
-Future<bool> isSignUpEnabled(DwDatabaseHandle db) async {
-  final row = await db.appSettings.findFirst(
-    where: (t) => t.key.equals(AppSettingKeys.signUpEnabled),
+    // The profile is created with the account, in the same transaction: a
+    // signed-in account without a profile cannot exist. A refusal here rolls the
+    // account back and leaves the code usable.
+    onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
+      final profile = await AppAuth.createProfile(ctx, accountId, origin);
+      // The newcomer goes to the admins: the dashboard counts them, and a
+      // members table page reads itself again — a new row moves the paging and
+      // the total, which only the server can compute.
+      ctx
+        ..publish(
+          AppChannels.admin,
+          await AppPublications.countAdminCounters(ctx.db),
+        )
+        ..publish(AppChannels.admin, await AppObjects.profile(ctx, profile));
+    },
+
+    // The profile shows the phone and the e-mail an account signs in with, read
+    // from the framework's identities rather than copied into the profile row —
+    // so there is nothing to write here, only to tell: every change the
+    // framework makes (a member attaching or replacing one by code) republishes
+    // the profile to its owner and the admins, in the changing transaction.
+    onIdentifierChanged: (ctx, change) async {
+      final profile = await ctx.db.userProfiles.findFirst(
+        where: (t) => t.accountId.equals(change.accountId),
+      );
+      if (profile != null) await AppPublications.profile(ctx, profile);
+    },
+    resendDelay: resendDelay,
   );
-  return row?.value.trim().toLowerCase() != 'false';
+
+  static Future<void> _logCode(
+    DwCallContext ctx,
+    DwIdentifierKind kind,
+    String identifier,
+    String code,
+  ) async => stdout.writeln('Sign-in code for $identifier: $code');
+
+  /// The profile a new account starts with, in the account's transaction.
+  ///
+  /// A sign-up is refused, and nothing is created, while sign-up is switched off
+  /// in the settings ([DartwayStarterRefusal.signUpClosed]) or without the terms
+  /// accepted ([DartwayStarterRefusal.consentsRequired]) — the app then asks for
+  /// them and verifies the same code again. An account made by a tool
+  /// ([DwToolOrigin]: the admin bootstrap, the dev seed) accepts nothing on
+  /// anyone's behalf: its `termsAcceptedAt` stays empty.
+  static Future<UserProfileRow> createProfile(
+    DwCallContext ctx,
+    int accountId,
+    DwAccountOrigin origin,
+  ) async {
+    final now = DateTime.now().toUtc();
+    switch (origin) {
+      case DwSignInOrigin(:final registration):
+        if (!await AppAuth.isSignUpEnabled(ctx.db)) {
+          ctx.refuse(DartwayStarterRefusal.signUpClosed, field: 'identifier');
+        }
+        if (registration[RegistrationKeys.terms] != 'true') {
+          ctx.refuse(DartwayStarterRefusal.consentsRequired, field: 'consents');
+        }
+        return ctx.db.userProfiles.insert(
+          UserProfileRow(
+            accountId: accountId,
+            firstName: registration[RegistrationKeys.firstName]?.trim() ?? '',
+            agreedForMarketing:
+                registration[RegistrationKeys.marketing] == 'true',
+            termsAcceptedAt: now,
+            createdAt: now,
+          ),
+        );
+      case DwToolOrigin():
+        return ctx.db.userProfiles.insert(
+          UserProfileRow(accountId: accountId, createdAt: now),
+        );
+    }
+  }
+
+  /// Whether a new visitor may create an account: the `signUpEnabled` setting,
+  /// on while nobody has stored it.
+  static Future<bool> isSignUpEnabled(DwDatabaseHandle db) async {
+    final row = await db.appSettings.findFirst(
+      where: (t) => t.key.equals(AppSettingKeys.signUpEnabled),
+    );
+    return row?.value.trim().toLowerCase() != 'false';
+  }
 }
