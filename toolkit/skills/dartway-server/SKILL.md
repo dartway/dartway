@@ -101,7 +101,7 @@ The generator holds you to:
 - `@DwSqlTable('<snake_case>')`, and `static const tableDef = <Entity>Table();`;
 - `@override final int? id;` with `this.id` — a `bigserial` key, `null` until inserted;
 - column types: `int`, `double`, `String`, `bool`, `DateTime`, `Duration`, `Uint8List`, an enum
-  (stored as its name in `text`), `List<T>`/`Map<String, T>` of scalars (`jsonb`), or nullable ones.
+  (stored as its name in `text`), `List<T>`/`Map<String, T>` of scalars (`jsonb`), `List<E>` of an enum (`jsonb` of names — not a `List<String>` with a typed getter), or nullable ones.
   A DTO is not a column: store its fields, or the id of another row.
 
 Annotations: `@DwForeignKey('table', onDelete: DwOnDelete.cascade | setNull | restrict | noAction)`

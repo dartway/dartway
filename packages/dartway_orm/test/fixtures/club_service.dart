@@ -10,7 +10,7 @@ enum ClubServiceKind { group, personal }
 /// contract with generated code is exercised without the generator.
 ///
 /// Covers every column type: enum, nullable double, `Duration`, a `jsonb`
-/// list, a `now()` default, a nullable `DateTime`, nullable bytes, and a
+/// list, a `jsonb` list of an enum, a `now()` default, a nullable `DateTime`, nullable bytes, and a
 /// boolean with an SQL default.
 @DwSqlTable('club_service')
 final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
@@ -21,6 +21,7 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
     this.price,
     required this.duration,
     this.tags = const [],
+    this.offeredAs = const [],
     required this.createdAt,
     this.archivedAt,
     this.cover,
@@ -35,6 +36,10 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   final double? price;
   final Duration duration;
   final List<String> tags;
+
+  /// The kinds this service is also sold as: a list of an enum, stored as
+  /// its names.
+  final List<ClubServiceKind> offeredAs;
 
   @DwDefaultValue.now()
   final DateTime createdAt;

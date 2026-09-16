@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwEnumListType<E>`**: a `List<E>` of an enum stored as a `jsonb` array of the values' names — the list form of `DwEnumType`. A name no value has fails the read (D-064).
+
 - **BREAKING: pending migrations apply namespace by namespace** — in the order the runner is given
   them (the framework's, the modules', the project's), then by id — after `dependsOn`. They used to
   sort by id across namespaces, so a project migration older than a framework migration ran first,

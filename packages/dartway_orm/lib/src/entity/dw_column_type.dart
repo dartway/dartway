@@ -249,6 +249,36 @@ final class DwJsonListType<E> extends _DwJsonType<List<E>> {
   }
 }
 
+/// A `List<E>` of an enum stored as a `jsonb` array of the values' names —
+/// the list form of [DwEnumType] (D-008): adding a value needs no migration,
+/// and a name no value has any more fails the read rather than guessing.
+final class DwEnumListType<E extends Enum> extends _DwJsonType<List<E>> {
+  const DwEnumListType(this.values);
+
+  final List<E> values;
+
+  @override
+  Object encode(List<E> value) => [for (final item in value) item.name];
+
+  @override
+  Object encodeArrayElement(List<E> value) => jsonEncode(encode(value));
+
+  @override
+  List<E> decode(Object raw) {
+    if (raw is! List) {
+      throw DwDecodeException('expected a jsonb array, got ${raw.runtimeType}');
+    }
+    return List<E>.unmodifiable([
+      for (final name in raw)
+        values.firstWhere(
+          (value) => value.name == name,
+          orElse: () =>
+              throw DwDecodeException('"$name" is not a value of $E'),
+        ),
+    ]);
+  }
+}
+
 /// A `Map<String, V>` stored as a `jsonb` object.
 final class DwJsonMapType<V> extends _DwJsonType<Map<String, V>> {
   const DwJsonMapType();

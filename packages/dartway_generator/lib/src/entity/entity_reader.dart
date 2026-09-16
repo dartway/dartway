@@ -352,6 +352,8 @@ final class EntityReader {
     DurationWire() => 'DwColumnType.duration',
     BytesWire() => 'DwColumnType.bytea',
     EnumWire(:final spelling) => 'DwEnumType($spelling.values)',
+    ListWire(element: EnumWire(:final spelling)) =>
+      'DwEnumListType($spelling.values)',
     ListWire(:final element) => 'DwJsonListType<${_jsonSpelling(element)}>()',
     MapWire(:final value) => 'DwJsonMapType<${_jsonSpelling(value)}>()',
     DtoWire() || PatchWire() => throw StateError('not a column type: $type'),

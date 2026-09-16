@@ -105,7 +105,7 @@ final class WireTypeReader {
   String get supportedList => forEntity
       ? 'int, double, String, bool, DateTime, Duration, Uint8List, an enum, '
             'List<T> or Map<String, T> of int, double, String or bool (jsonb), '
-            'or a nullable one of these'
+            'List<E> of an enum (jsonb of names), or a nullable one of these'
       : 'int, double, String, bool, DateTime, Duration, Uint8List, an enum, '
             'a DTO class, List<T>, Map<String, T>, DwFieldPatch<T>, or a nullable '
             'one of these';
@@ -129,11 +129,15 @@ final class WireTypeReader {
         throw UnsupportedType(
           '`$display` is a command input, not a stored value',
         );
+      // A list of an enum is stored as its names (DwEnumListType).
+      case ListWire(element: EnumWire(nullable: false)):
+        return;
       case ListWire(element: final inner) || MapWire(value: final inner)
           when inner is! ScalarWire && inner is! DoubleWire:
         throw UnsupportedType(
           '`$display` is stored as jsonb, whose elements are read back as '
-          'plain JSON: they must be int, double, String or bool',
+          'plain JSON: they must be int, double, String or bool — or, in a '
+          'list, a non-null enum',
         );
       default:
         return;

@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **A row field may be a `List<E>` of an enum** (non-null elements), generated as `DwEnumListType(E.values)`. It used to be refused as a `jsonb` list whose elements are not plain JSON, and projects stored `List<String>` names behind a typed getter (D-064).
+
 - **Row fields `name`, `columns`, `schema`, `table`, `row` (D-040):** generated
   tables override `tableColumns`, schemas and repositories name
   `<Row>.tableDef`, and `fromRow` reaches a column called `row` through `this`.

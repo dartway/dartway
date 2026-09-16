@@ -83,6 +83,7 @@ value a new row gets in Dart comes from the constructor's default (`this.bookedC
 | `Uint8List` | `bytea` | |
 | an enum | `text` | its `name` (D-008): adding a value needs no migration |
 | `List<E>` | `jsonb` | `E` is `int`, `double`, `String` or `bool`, nullable or not |
+| `List<E>` of an enum | `jsonb` | an array of the values' names; `E` not nullable. A name no value has any more fails the read (`DwDecodeException`) |
 | `Map<String, V>` | `jsonb` | the same element types |
 
 A data object is not a column type: a row holds ids, and the handler builds the object.

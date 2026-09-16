@@ -19,6 +19,7 @@ void main() {
     double? price,
     Duration duration = const Duration(hours: 1),
     List<String> tags = const [],
+    List<ClubServiceKind> offeredAs = const [],
     DateTime? createdAt,
     DateTime? archivedAt,
     Uint8List? cover,
@@ -29,6 +30,7 @@ void main() {
     price: price,
     duration: duration,
     tags: tags,
+    offeredAs: offeredAs,
     createdAt: createdAt ?? DateTime.utc(2026, 9, 1, 10),
     archivedAt: archivedAt,
     cover: cover,
@@ -122,12 +124,50 @@ void main() {
       expect(found, setting);
     });
 
+    test('a list of an enum is stored as its names and read back', () async {
+      final one = await db().clubServices.insert(
+        service(offeredAs: [ClubServiceKind.personal, ClubServiceKind.group]),
+      );
+      final many = await db().clubServices.insertAll([
+        service(title: 'Empty'),
+        service(title: 'One', offeredAs: [ClubServiceKind.personal]),
+      ]);
+      expect(await db().clubServices.findById(one.id!), one);
+      expect(one.offeredAs, [ClubServiceKind.personal, ClubServiceKind.group]);
+      expect(
+        [
+          for (final row in many)
+            (await db().clubServices.findById(row.id!))!.offeredAs,
+        ],
+        [
+          const <ClubServiceKind>[],
+          [ClubServiceKind.personal],
+        ],
+      );
+      final stored = (await db().query(
+        "SELECT offered_as::text AS names FROM club_service WHERE id = @id",
+        params: {'id': one.id},
+      )).single;
+      expect(stored['names'], '["personal", "group"]');
+    });
+
+    test(
+      'a list of an enum holding a name no value has fails loudly',
+      () async {
+        await db().execute(
+          "INSERT INTO club_service (title, kind, duration, tags, offered_as, "
+          "created_at) VALUES ('x', 'group', 1, '[]', '[\"retired\"]', now())",
+        );
+        expect(db().clubServices.find(), throwsA(isA<DwDecodeException>()));
+      },
+    );
+
     test(
       'a decoded row that does not fit the row class fails loudly',
       () async {
         await db().execute(
-          "INSERT INTO club_service (title, kind, duration, tags, created_at) "
-          "VALUES ('x', 'unknown', 1, '[]', now())",
+          "INSERT INTO club_service (title, kind, duration, tags, offered_as, "
+          "created_at) VALUES ('x', 'unknown', 1, '[]', '[]', now())",
         );
         expect(db().clubServices.find(), throwsA(isA<DwDecodeException>()));
       },
@@ -659,8 +699,8 @@ void main() {
 
     test('execute runs a script without parameters and counts rows', () async {
       final count = await db().execute('''
-        INSERT INTO club_service (title, kind, duration, tags, created_at) VALUES ('a', 'group', 1, '[]', now());
-        INSERT INTO club_service (title, kind, duration, tags, created_at) VALUES ('b', 'group', 1, '[]', now());
+        INSERT INTO club_service (title, kind, duration, tags, offered_as, created_at) VALUES ('a', 'group', 1, '[]', '[]', now());
+        INSERT INTO club_service (title, kind, duration, tags, offered_as, created_at) VALUES ('b', 'group', 1, '[]', '[]', now());
       ''');
       expect(count, 2);
       expect(

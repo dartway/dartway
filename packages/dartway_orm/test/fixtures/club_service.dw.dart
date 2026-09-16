@@ -14,6 +14,7 @@ mixin _$ClubServiceRow on DwTableRow {
           other.price == _self.price &&
           other.duration == _self.duration &&
           dwListEquals(other.tags, _self.tags) &&
+          dwListEquals(other.offeredAs, _self.offeredAs) &&
           other.createdAt == _self.createdAt &&
           other.archivedAt == _self.archivedAt &&
           dwListEquals(other.cover, _self.cover) &&
@@ -27,6 +28,7 @@ mixin _$ClubServiceRow on DwTableRow {
     _self.price,
     _self.duration,
     Object.hashAll(_self.tags),
+    Object.hashAll(_self.offeredAs),
     _self.createdAt,
     _self.archivedAt,
     _self.cover == null ? null : Object.hashAll(_self.cover!),
@@ -35,7 +37,7 @@ mixin _$ClubServiceRow on DwTableRow {
 
   @override
   String toString() =>
-      'ClubServiceRow(id: ${_self.id}, title: ${_self.title}, kind: ${_self.kind}, price: ${_self.price}, duration: ${_self.duration}, tags: ${_self.tags}, createdAt: ${_self.createdAt}, archivedAt: ${_self.archivedAt}, cover: ${_self.cover}, active: ${_self.active})';
+      'ClubServiceRow(id: ${_self.id}, title: ${_self.title}, kind: ${_self.kind}, price: ${_self.price}, duration: ${_self.duration}, tags: ${_self.tags}, offeredAs: ${_self.offeredAs}, createdAt: ${_self.createdAt}, archivedAt: ${_self.archivedAt}, cover: ${_self.cover}, active: ${_self.active})';
 }
 
 extension ClubServiceRowCopyWith on ClubServiceRow {
@@ -46,6 +48,7 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
     DwFieldPatch<double> price = const DwFieldPatch.keep(),
     Duration? duration,
     List<String>? tags,
+    List<ClubServiceKind>? offeredAs,
     DateTime? createdAt,
     DwFieldPatch<DateTime> archivedAt = const DwFieldPatch.keep(),
     DwFieldPatch<Uint8List> cover = const DwFieldPatch.keep(),
@@ -57,6 +60,7 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
     price: price.apply(this.price),
     duration: duration ?? this.duration,
     tags: tags ?? this.tags,
+    offeredAs: offeredAs ?? this.offeredAs,
     createdAt: createdAt ?? this.createdAt,
     archivedAt: archivedAt.apply(this.archivedAt),
     cover: cover.apply(this.cover),
@@ -81,6 +85,9 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
 
   DwTableColumn<List<String>> get tags =>
       const DwTableColumn('tags', DwJsonListType<String>());
+
+  DwTableColumn<List<ClubServiceKind>> get offeredAs =>
+      const DwTableColumn('offered_as', DwEnumListType(ClubServiceKind.values));
 
   DwTableColumn<DateTime> get createdAt => const DwTableColumn(
     'created_at',
@@ -108,6 +115,7 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     price,
     duration,
     tags,
+    offeredAs,
     createdAt,
     archivedAt,
     cover,
@@ -122,6 +130,7 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     price: row.decode(price),
     duration: row.decode(duration),
     tags: row.decode(tags),
+    offeredAs: row.decode(offeredAs),
     createdAt: row.decode(createdAt),
     archivedAt: row.decode(archivedAt),
     cover: row.decode(cover),
@@ -136,6 +145,7 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     'price': row.price,
     'duration': row.duration,
     'tags': row.tags,
+    'offered_as': row.offeredAs,
     'created_at': row.createdAt,
     'archived_at': row.archivedAt,
     'cover': row.cover,

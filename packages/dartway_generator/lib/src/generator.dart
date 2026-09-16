@@ -464,6 +464,7 @@ final class _Run {
     'DwTableColumn': 'dartway_orm',
     'DwColumnType': 'dartway_orm',
     'DwEnumType': 'dartway_orm',
+    'DwEnumListType': 'dartway_orm',
     'DwJsonListType': 'dartway_orm',
     'DwJsonMapType': 'dartway_orm',
     'DwTableDef': 'dartway_orm',

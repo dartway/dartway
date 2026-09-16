@@ -1,8 +1,8 @@
 app_server/lib/src/columns.dart:15:13: an index of row class `ColumnsRow` names `missing`, which is not a column field of `ColumnsRow` (indexes name Dart fields, not SQL columns)
 app_server/lib/src/columns.dart:15:13: row class `ColumnsRow` declares index `columns_title_idx` twice
 app_server/lib/src/columns.dart:30:19: field `view` of row class `ColumnsRow` cannot be a column: `ValueView` is a DTO, which is not stored; store its fields as columns (or ids of other rows) and map it in the handler
-app_server/lib/src/columns.dart:31:24: field `dates` of row class `ColumnsRow` cannot be a column: `List<DateTime>` is stored as jsonb, whose elements are read back as plain JSON: they must be int, double, String or bool
-app_server/lib/src/columns.dart:32:18: field `set` of row class `ColumnsRow` cannot be a column: `Set<int>` cannot be stored; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, List<T> or Map<String, T> of int, double, String or bool (jsonb), or a nullable one of these
+app_server/lib/src/columns.dart:31:24: field `dates` of row class `ColumnsRow` cannot be a column: `List<DateTime>` is stored as jsonb, whose elements are read back as plain JSON: they must be int, double, String or bool — or, in a list, a non-null enum
+app_server/lib/src/columns.dart:32:18: field `set` of row class `ColumnsRow` cannot be a column: `Set<int>` cannot be stored; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, List<T> or Map<String, T> of int, double, String or bool (jsonb), List<E> of an enum (jsonb of names), or a nullable one of these
 app_server/lib/src/columns.dart:35:16: field `ownerName` of row class `ColumnsRow` references another table, so it holds that row's id and must be `int` or `int?`
 app_server/lib/src/columns.dart:40:13: fields `same` and `alsoSame` of row class `ColumnsRow` both map to column `same`
 app_server/lib/src/columns.dart:46:13: table name `shared_name` of row class `SameTableARow` is also used at columns.dart:56:13
