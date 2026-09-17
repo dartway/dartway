@@ -113,6 +113,13 @@ class DeployRunCommand extends Command<int> {
             'Finish the deployment the server remembers: pass over its done '
             'steps, wait for a step still running, run the rest.',
       )
+      ..addFlag(
+        'retry-failed',
+        negatable: false,
+        help:
+            'With --resume: run the step that failed again, instead of '
+            'stopping with its reason.',
+      )
       ..addOption(
         'progress',
         allowed: ['text', 'json'],

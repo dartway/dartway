@@ -231,8 +231,12 @@ steps after the interruption still need someone to run them: **`dartway deploy r
 plan, passes over the steps that finished, waits for a step still running instead of starting it a
 second time, judges again from its output a finished step whose success is checked beyond its exit
 code (the upstream check), and runs everything from the first step that actually runs — then the
-services and the probes, as always. A failed step runs again, against the checkout that deployment
-updated to; after fixing code, deploy anew rather than resume.
+services and the probes, as always. A step that ended badly in the deployment being resumed is **not** run again: the resume stops with
+that step's reason and the output the server kept, because a self-deploy resumes after every
+interruption and a failing step would otherwise be repeated until the attempts ran out — each time
+stopping the server it had just started again. `--retry-failed` with `--resume` runs it once more
+(against the checkout that deployment updated to); after fixing code, deploy anew rather than
+resume.
 
 A new `run` starts a new record, says where the previous deployment stopped if it did not finish,
 and refuses while a step of it is still running — two deployments never interleave on one server.
@@ -251,7 +255,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_skipped` | `index`, `count`, `id` — done by the deployment being resumed |
 | `step_started` | `index`, `count`, `id`, `title`, `picked_up` — waiting for a step already on the server |
 | `step_finished` | `index`, `count`, `id`, `exit_code`; `stdout`, `stderr` for a step whose output is its result |
-| `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message` |
+| `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
 | `probe` | `title`, `passed`, `detail` |
 | `run_finished` | `ok`, `exit_code`; `failed_step`, or `reason` (`checks`, `nothing-to-resume`, `unreachable`, `verification`) |

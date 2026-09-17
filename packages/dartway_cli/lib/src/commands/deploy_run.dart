@@ -152,6 +152,7 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     steps,
     remote: remote,
     resumeFrom: record,
+    retryFailed: results.flag('retry-failed'),
     progress: progress,
     onUpdated: reportRevision,
   );
@@ -188,12 +189,14 @@ List<Map<String, String>> _stepList(List<DwDeployStep> steps) => [
 /// a new record there. With [resumeFrom] — that record, read back — the steps
 /// it shows done are passed over, a step still running or finished unjudged is
 /// waited for instead of started again, and from the first step that actually
-/// runs everything after it runs too.
+/// runs everything after it runs too. A step that ended badly stops the
+/// resume with its own reason unless [retryFailed] says to run it again.
 Future<String?> executeDeploySteps(
   List<DwDeployStep> steps, {
   Future<void> Function()? onUpdated,
   DwRemoteSteps? remote,
   Map<String, DwRemoteStepRecord>? resumeFrom,
+  bool retryFailed = false,
   DwDeployProgress? progress,
 }) async {
   final report = progress ?? DwDeployProgress.text();
@@ -215,6 +218,42 @@ Future<String?> executeDeploySteps(
       continue;
     }
     passingOver = false;
+    // A step the run being resumed ended badly is not tried again by itself:
+    // a self-deploy resumes after every interruption, and a failing step
+    // would be repeated until the attempts ran out, each time stopping the
+    // server it just started again. The reason is read from the server and
+    // reported; `--retry-failed` is how a person says to run it once more.
+    final failedBefore =
+        remote != null &&
+        previous != null &&
+        !retryFailed &&
+        (previous.state == DwRemoteStepState.rejected ||
+            (previous.state == DwRemoteStepState.exited &&
+                !previous.succeeded));
+    if (failedBefore) {
+      final recorded = await remote.collect(step.id);
+      out.writeln(
+        '\n[${index + 1}/${steps.length}] ${step.title} — failed in the run '
+        'being resumed',
+      );
+      report.problems.writeln(
+        'Step "${step.id}" failed before this resume '
+        '(${previous.state == DwRemoteStepState.rejected ? 'its work was refused' : 'exit ${previous.exitCode}'}); '
+        'fix what it reports, or run again with --retry-failed to repeat it.',
+      );
+      _indent(report.problems, '${recorded.stdout}\n${recorded.stderr}');
+      report.event('step_failed', {
+        ...position,
+        'reason': previous.state == DwRemoteStepState.rejected
+            ? 'verdict'
+            : 'exit',
+        'exit_code': ?previous.exitCode,
+        'resumed': true,
+        'stdout': recorded.stdout,
+        'stderr': recorded.stderr,
+      });
+      return step.id;
+    }
     // Finished but not judged yet, or still going: its result is on the
     // server already, and running it again would do the work twice.
     final pickUp =

@@ -54,10 +54,12 @@ void main() {
   Future<String?> execute(
     List<DwDeployStep> steps, {
     bool resume = false,
+    bool retryFailed = false,
   }) async => executeDeploySteps(
     steps,
     remote: remote,
     resumeFrom: resume ? await remote.read() : null,
+    retryFailed: retryFailed,
     progress: progress,
   );
 
@@ -73,7 +75,7 @@ void main() {
       expect(await execute(plan()), 'b');
       failing = false;
 
-      expect(await execute(plan(), resume: true), isNull);
+      expect(await execute(plan(), resume: true, retryFailed: true), isNull);
       expect(ran(), ['a', 'b', 'b', 'c']);
     },
   );
@@ -112,7 +114,7 @@ void main() {
         verdict: (r) => r.stdout.contains('whole') ? null : 'half',
       ),
     ];
-    expect(await execute(judged, resume: true), isNull);
+    expect(await execute(judged, resume: true, retryFailed: true), isNull);
     expect(ran(), ['a', 'a']);
   });
 
@@ -123,7 +125,11 @@ void main() {
     await step('c').run();
 
     expect(
-      await execute([step('a'), step('b'), step('c')], resume: true),
+      await execute(
+        [step('a'), step('b'), step('c')],
+        resume: true,
+        retryFailed: true,
+      ),
       isNull,
     );
     expect(ran(), ['a', 'b', 'c', 'b', 'c']);
