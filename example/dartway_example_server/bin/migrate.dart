@@ -14,6 +14,5 @@ Future<void> main(List<String> args) async {
       'dw': DwAppServer.frameworkMigrations,
       dwPushNamespace: dwPushMigrations,
     },
-    database: DwDatabaseConfig.fromEnvironment(Platform.environment),
   ).run(args);
 }

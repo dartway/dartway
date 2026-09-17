@@ -132,10 +132,12 @@ Future<void> main(List<String> args) async {
     migrations: appMigrations,
     directory: 'lib/src/migrations',
     modules: {'dw': DwAppServer.frameworkMigrations},
-    database: DwDatabaseConfig.fromEnvironment(Platform.environment),
   ).run(args);
 }
 ```
+
+Without `database:` the CLI reads `DW_DATABASE_*` only for the commands that use a database, so
+`rehash` runs with none set. Pass `database:` to point it somewhere else.
 
 `schema` is the generated `DwDatabaseSchema` of the row classes, `modules` the migrations of other
 namespaces run before the project's replay (their tables are not part of `schema`), and `namespace`
