@@ -102,7 +102,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Thirteen errors, eight warnings, one info — `DwCheckType` and its `severity` in
+Fourteen errors, eight warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -119,6 +119,7 @@ Thirteen errors, eight warnings, one info — `DwCheckType` and its `severity` i
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone |
 | `generatedCodeStale` | error | A generated file that `dartway generate` would write differently, or whose source is gone |
+| `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |

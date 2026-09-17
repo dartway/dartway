@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'dw_check_type.dart';
 import 'dw_feature_tree.dart';
 import 'dw_layout.dart';
+import 'dw_route_names.dart';
 import 'dw_unused_feature_files.dart';
 
 /// Line-length model: nothing is said below 200 lines, >200 is a nudge
@@ -143,6 +144,7 @@ class DwFlutterInspector {
     }
 
     await _checkFiles(libDir, scope);
+    if (scope == null) await _checkRouteNames(libDir);
 
     return _report(trees, scope);
   }
@@ -268,6 +270,26 @@ class DwFlutterInspector {
   }
 
   // -------------------------------------------------------------------- files
+
+  Future<void> _checkRouteNames(Directory libDir) async {
+    final routes = <DwZoneRoute>[];
+    for (final file in libDir.listSync(recursive: true).whereType<File>()) {
+      if (!file.path.endsWith('.dart')) continue;
+      final content = await file.readAsString();
+      if (!content.contains('DwNavigationRoute')) continue;
+      routes.addAll(DwRouteNames.routesIn(_libRelative(file.path), content));
+    }
+    for (final MapEntry(key: name, value: declarations)
+        in DwRouteNames.duplicates(routes).entries) {
+      _add(
+        DwCheckType.routeNameDuplicated,
+        'route name "$name" is declared by '
+            '${declarations.map((d) => '${d.zone}.${d.route} (${d.file})').join(' and ')}; '
+            'names are global across zones — rename one',
+        'router',
+      );
+    }
+  }
 
   Future<void> _checkFiles(Directory libDir, String? scope) async {
     final files = libDir

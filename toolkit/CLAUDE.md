@@ -60,7 +60,7 @@ Two kinds of rule live in this file and read alike: the same prose, the same voi
 
 **How the boundary stays honest: law is what fails.** Much of it fails before any check runs, because it is built into the types and into the server's startup: a row class cannot be registered in the protocol (only DTOs travel), a handler cannot be declared without an access rule, a refusal cannot be built from a string, a registered request or command without a handler stops the server from starting. The rest is held by `dartway check`, which has **three** severities, not two — and several checks are warnings **precisely because they have a second legitimate reading**: `uiKitConstStyle` is fine for a project with one theme, `frameworkRefsDiverged` cannot tell a pin from an oversight. A check that deliberately declines to fail is not a rule a project is forbidden to decide for itself. So the `error` severity is law; a warning is a strong default, and the `info` is a nudge.
 
-**The law list is therefore derived rather than sorted** — it is `DwCheckType.severity` in `dartway_cli`, one `switch` statement, and reading it off is the whole method. Thirteen checks fail today:
+**The law list is therefore derived rather than sorted** — it is `DwCheckType.severity` in `dartway_cli`, one `switch` statement, and reading it off is the whole method. Fourteen checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -68,6 +68,7 @@ Two kinds of rule live in this file and read alike: the same prose, the same voi
 | The UI kit boundary | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport` |
 | The widget's contract with its parent | `widgetSizesItself` |
 | The declared top-level layout | `invalidTopLevelLayout` |
+| What the router refuses on the first frame | `routeNameDuplicated` |
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
 

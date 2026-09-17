@@ -8,6 +8,12 @@ enum DwCheckType {
   /// A file inside `ui_kit/` without the `part of '../ui_kit.dart'` directive.
   uiKitPartMissing,
 
+  /// Two navigation zones declare a route of the same name. Route names are
+  /// global in `DwAppRouter`, which refuses to build — on the first frame, as
+  /// an error over the whole screen. Read from the zone enums, so the build
+  /// fails first (#240).
+  routeNameDuplicated,
+
   /// The app's localization is not wired: `flutter_localizations`,
   /// `generate: true`, `l10n.yaml` and a `.arb` catalogue.
   ///
