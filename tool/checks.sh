@@ -85,7 +85,7 @@ fi
 #
 # The two project servers are tier three: their suites run through `dartway
 # test`, which applies the project's migrations to a Postgres and a MinIO of its
-# own, nightly in `database.yml`. The lints fixture is not a `dart test`
+# own, in `database.yml` (pull requests and nightly). The lints fixture is not a `dart test`
 # suite at all — the files under its `test/` are written to violate the rules and
 # deliberately have no `main`; its own pubspec says `dart run custom_lint` is the
 # suite, and that runs below.

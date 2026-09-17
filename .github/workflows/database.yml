@@ -14,15 +14,14 @@ name: Database
 # Docker picks, applies the migrations, runs the suite and removes the container
 # afterwards. Nothing is shared between runs, so nothing is left to collide.
 #
-# **Not on pull requests yet, on purpose.** Every measurement of these suites so
-# far was taken on one developer's machine — 15 tests in about 4 seconds for the
-# template, 50 in 12 for example, container start included. That is fast, but
-# speed was never the worry: these are the only suites in the repository that
-# test *races* — two activations of one code at once, parallel requests against
-# a rate limit — and a race is what goes intermittently red on a smaller,
-# busier runner. A flaky red teaches people to stop reading the gate, which is
-# the state this whole tier was meant to end, so it runs on a schedule until
-# there is a week of runs to look at, and only then blocks anything.
+# **On pull requests since 2026-09-17.** It ran on a schedule first, on
+# purpose: these are the only suites in the repository that test *races* — two
+# activations of one code at once, parallel requests against a rate limit —
+# and a race is what goes intermittently red on a smaller, busier runner. A
+# flaky red teaches people to stop reading the gate. Fourteen nightly runs in a
+# row were green (2026-09-03 … 09-16), and so was the first run of the 1.0
+# branch, so it now gates the changes that can break what it proves: the
+# framework packages, the template and the example.
 
 on:
   # A workflow woken only by a clock and by hand has no way to prove it is
@@ -48,6 +47,9 @@ on:
     types: [opened, synchronize, ready_for_review, reopened]
     paths:
       - '.github/workflows/database.yml'
+      - 'packages/**'
+      - 'template/**'
+      - 'example/**'
   schedule:
     - cron: '7 5 * * *'
   workflow_dispatch:
