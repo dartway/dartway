@@ -291,18 +291,26 @@ dw_wait_healthy "\$cid" 'the server'
   Future<DwSshResult> testProxyConfiguration() =>
       _compose('exec -T ${DwStack.nginxService} nginx -t');
 
-  /// Asks Let's Encrypt for the real certificate, once.
+  /// Asks Let's Encrypt for the certificate of every served host.
   ///
   /// `deploy setup` writes a one-day self-signed certificate so that nginx can
   /// start at all, and certbot's `renew` loop only renews lineages it manages.
   /// Runs after the proxy answers the ACME challenge and before the restart
-  /// that makes nginx read what was issued; does nothing when certbot already
-  /// manages the lineage, which keeps a routine deploy off the rate limit.
+  /// that makes nginx read what was issued. A lineage certbot already manages
+  /// is left alone when it covers every served host, which keeps a routine
+  /// deploy off the rate limit; a host added to the configuration since — a
+  /// storage domain, a site — extends it.
   Future<DwSshResult> issueCertificate() {
     final certName = target.apiDomain;
-    final domains = target.servedDomains
-        .map((domain) => "-d '$domain'")
-        .join(' ');
+    final served = target.servedDomains;
+    final domains = served.map((domain) => "-d '$domain'").join(' ');
+    final certbot =
+        '${DwComposeFiles.invoke} run --rm -T --entrypoint sh '
+        '${DwStack.certbotService} -c';
+    final request =
+        "certbot certonly --webroot -w /var/www/certbot \\\n"
+        "    --cert-name '$certName' $domains \\\n"
+        "    --email '${target.sslEmail}' --agree-tos --no-eff-email -n";
     return _as('''
 set -e
 cd '$appDir'
@@ -311,21 +319,31 @@ ${DwComposeFiles.selectFiles}
 # self-signed bootstrap certificate has none. `-s` rather than `-f`: a failed
 # attempt leaves that file behind empty, and certbot then issues under
 # `$certName-0001`, a path nginx never names.
-if ${DwComposeFiles.invoke} run --rm -T --entrypoint sh ${DwStack.certbotService} -c \\
-  "test -s /etc/letsencrypt/renewal/$certName.conf" </dev/null; then
-  echo "certbot already manages $certName"
+if managed=\$($certbot \\
+  "test -s /etc/letsencrypt/renewal/$certName.conf && certbot certificates --cert-name '$certName'" </dev/null); then
+  covered=\$(printf '%s\\n' "\$managed" | sed -n 's/^ *Domains: *//p')
+  missing=""
+  for domain in ${served.map((domain) => "'$domain'").join(' ')}; do
+    case " \$covered " in *" \$domain "*) ;; *) missing="\$missing \$domain" ;; esac
+  done
+  if [ -z "\$missing" ]; then
+    echo "certbot already manages $certName for every served host"
+    exit 0
+  fi
+  echo "extending $certName to:\$missing"
+  $certbot "
+  $request --expand
+" </dev/null
   exit 0
 fi
-${DwComposeFiles.invoke} run --rm -T --entrypoint sh ${DwStack.certbotService} -c "
+$certbot "
   set -e
   # certonly refuses to write into an existing live directory, and that
   # directory is exactly what the bootstrap step created.
   rm -rf /etc/letsencrypt/live/$certName \\
          /etc/letsencrypt/archive/$certName \\
          /etc/letsencrypt/renewal/$certName.conf
-  certbot certonly --webroot -w /var/www/certbot \\
-    --cert-name '$certName' $domains \\
-    --email '${target.sslEmail}' --agree-tos --no-eff-email -n
+  $request
 " </dev/null
 ''');
   }

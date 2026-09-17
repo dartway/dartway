@@ -121,6 +121,76 @@ void main() {
       );
     });
 
+    group('a certificate certbot already manages', () {
+      late Directory temp;
+      late File calls;
+
+      setUp(() {
+        temp = Directory.systemTemp.createTempSync('dw_certificate_');
+        calls = File(p.join(temp.path, 'calls'));
+        Directory(p.join(temp.path, 'shop')).createSync();
+      });
+      tearDown(() => temp.deleteSync(recursive: true));
+
+      /// Runs the step against a `docker` that answers as certbot managing a
+      /// lineage for [covered], and answers what it was asked to run.
+      Future<(DwSshResult, List<String>)> issue(String covered) async {
+        final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+        final docker = File(p.join(bin.path, 'docker'))
+          ..writeAsStringSync('''
+#!/bin/sh
+last=""; for arg in "\$@"; do last="\$arg"; done
+printf '%s\\n---\\n' "\$last" >> '${calls.path}'
+case "\$last" in
+  *"certbot certificates"*) printf 'Found the following certs:\\n  Certificate Name: api.example.com\\n    Domains: $covered\\n' ;;
+esac
+''');
+        Process.runSync('chmod', ['+x', docker.path]);
+        final runner = DwDeployRunner(
+          ssh: LocalShell(
+            environment: {
+              'PATH': '${bin.path}:${Platform.environment['PATH']}',
+            },
+          ),
+          stack: stackVariants()['minio and a site']!,
+          appDir: p.join(temp.path, 'shop'),
+        );
+        final result = await runner.issueCertificate();
+        return (
+          result,
+          calls
+              .readAsStringSync()
+              .split('\n---\n')
+              .where((call) => call.trim().isNotEmpty)
+              .toList(),
+        );
+      }
+
+      test('covering every served host is left alone', () async {
+        final (result, calls) = await issue(
+          'api.example.com app.example.com example.com files.example.com',
+        );
+        expect(result.ok, isTrue, reason: result.stderr);
+        expect(result.stdout, contains('already manages api.example.com'));
+        expect(calls, hasLength(1));
+      });
+
+      test('is extended to a host added since, keeping its lineage', () async {
+        final (result, calls) = await issue(
+          'api.example.com app.example.com example.com',
+        );
+        expect(result.ok, isTrue, reason: result.stderr);
+        expect(
+          result.stdout,
+          contains('extending api.example.com to: files.example.com'),
+        );
+        expect(calls, hasLength(2));
+        expect(calls.last, contains('--expand'));
+        expect(calls.last, contains("-d 'files.example.com'"));
+        expect(calls.last, isNot(contains('rm -rf')));
+      });
+    });
+
     test('the environment is rendered with every required secret', () async {
       final ssh = RecordingSsh();
       await DwDeployRunner(

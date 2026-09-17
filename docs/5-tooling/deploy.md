@@ -197,8 +197,10 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
    stops the deploy before that restart;
-9. issues the certificate **once** — only when certbot does not already manage it, so a routine
-   deploy stays off the rate limit — for every served host;
+9. issues the certificate for every served host under one name — only when certbot does not already
+   manage it, or when a host was added to the configuration since (a storage domain, a site): then
+   the lineage is extended with `--expand`. A routine deploy stays off the rate limit. A host added
+   to a live server needs `setup` first, so that nginx answers the ACME challenge for it;
 10. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
     a second later on its configuration.
 
