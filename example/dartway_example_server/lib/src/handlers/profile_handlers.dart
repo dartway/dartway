@@ -18,13 +18,16 @@ final profileHandlers = <DwCallHandler>[
   DwCallHandler.command<UpdateMyProfile, UserProfile>(
     access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
-      final current = await ctx.profile;
+      // Locked: two edits at once would each write the other's fields back.
+      final current = (await ctx.db.userProfiles.findById(
+        (await ctx.profile).id!,
+        lock: DwRowLock.forUpdate,
+      ))!;
       final updated = await ctx.db.userProfiles.update(
         current.copyWith(
           firstName: command.firstName?.trim(),
           lastName: command.lastName,
           gender: command.gender,
-          imageUrl: command.imageUrl,
         ),
       );
       final profile = ClubObjects.profile(updated);

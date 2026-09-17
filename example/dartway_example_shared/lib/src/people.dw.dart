@@ -177,7 +177,6 @@ mixin _$UpdateMyProfile on DwActionCommand<UserProfile> {
     };
     DwJsonCodec.writePatch(json, 'lastName', _self.lastName, (v) => v);
     DwJsonCodec.writePatch(json, 'gender', _self.gender, (v) => v.name);
-    DwJsonCodec.writePatch(json, 'imageUrl', _self.imageUrl, (v) => v);
     return json;
   }
 
@@ -187,8 +186,7 @@ mixin _$UpdateMyProfile on DwActionCommand<UserProfile> {
       other is UpdateMyProfile &&
           other.firstName == _self.firstName &&
           other.lastName == _self.lastName &&
-          other.gender == _self.gender &&
-          other.imageUrl == _self.imageUrl;
+          other.gender == _self.gender;
 
   @override
   int get hashCode => Object.hash(
@@ -196,7 +194,6 @@ mixin _$UpdateMyProfile on DwActionCommand<UserProfile> {
     _self.firstName,
     _self.lastName,
     _self.gender,
-    _self.imageUrl,
   );
 }
 
@@ -209,5 +206,4 @@ UpdateMyProfile $UpdateMyProfileFromJson(Map<String, Object?> json) =>
         'gender',
         (v) => DwJsonCodec.decodeEnum(v, UserGender.values),
       ),
-      imageUrl: DwJsonCodec.readPatch(json, 'imageUrl', (v) => v! as String),
     );

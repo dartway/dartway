@@ -81,14 +81,12 @@ final class UpdateMyProfile extends DwActionCommand<UserProfile>
     this.firstName,
     this.lastName = const DwFieldPatch.keep(),
     this.gender = const DwFieldPatch.keep(),
-    this.imageUrl = const DwFieldPatch.keep(),
   });
 
   /// `null` keeps the name; a name cannot be cleared.
   final String? firstName;
   final DwFieldPatch<String> lastName;
   final DwFieldPatch<UserGender> gender;
-  final DwFieldPatch<String> imageUrl;
 
   @override
   List<DwCallRefusal> validate() => [
