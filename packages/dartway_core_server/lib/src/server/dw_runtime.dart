@@ -154,7 +154,8 @@ final class DwRuntime {
     return DwUpdateTransport([
       for (final MapEntry(key: name, value: items) in byChannel.entries)
         if (readable.contains(name))
-          for (final item in items) (name, item),
+          for (final (:item, :except) in items)
+            if (!except.contains(caller.accountId)) (name, item),
     ]);
   }
 
@@ -167,15 +168,37 @@ final class DwRuntime {
     }
   }
 
-  static Map<String, List<DwWireObject>> _byChannel(
-    List<(DwLiveChannel, DwWireObject)> publications,
+  /// The publications by channel, each object once — at the position of its
+  /// last publication, with that publication's exceptions: an object travels
+  /// as it ended, so a recipient excluded only from an earlier version does not
+  /// receive that stale version instead.
+  static Map<String, List<DwPublished>> _byChannel(
+    List<(DwLiveChannel, DwWireObject, Set<int>)> publications,
   ) {
-    final byChannel = <String, List<DwWireObject>>{};
-    for (final (channel, item) in publications) {
-      (byChannel[channel.wireName] ??= []).add(item);
+    final byChannel = <String, List<DwPublished>>{};
+    for (final (channel, item, except) in publications) {
+      (byChannel[channel.wireName] ??= []).add((item: item, except: except));
+    }
+    for (final MapEntry(:key, :value) in byChannel.entries) {
+      final last = <(String, Object), int>{};
+      for (final (index, published) in value.indexed) {
+        last[_keyOf(published.item)] = index;
+      }
+      if (last.length == value.length) continue;
+      byChannel[key] = [
+        for (final (index, published) in value.indexed)
+          if (last[_keyOf(published.item)] == index) published,
+      ];
     }
     return byChannel;
   }
+
+  static (String, Object) _keyOf(DwWireObject item) => switch (item) {
+    DwDeletedObject(:final typeName, :final id) => (typeName, id),
+    DwDataObject(:final id) => (item.dwTypeName, id),
+    // `ctx.publish` lets only these two through.
+    _ => throw StateError('not publishable: ${item.dwTypeName}'),
+  };
 
   /// A session key was revoked and the revocation has committed: the next
   /// call with its token reads the database again, and live connections

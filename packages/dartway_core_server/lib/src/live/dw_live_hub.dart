@@ -5,6 +5,9 @@ import 'package:meta/meta.dart';
 
 import 'dw_live_connection.dart';
 
+/// One object published to a channel, and the accounts it is kept from.
+typedef DwPublished = ({DwWireObject item, Set<int> except});
+
 /// The in-process registry of live connections, their sessions and
 /// subscriptions, and the place publications fan out. Single isolate by
 /// design (D-014): this state exists once.
@@ -129,7 +132,7 @@ final class DwLiveHub {
   /// the response (D-036): the client applies it only to the requests that
   /// declare that channel.
   void publish(
-    Map<String, List<DwWireObject>> byChannel, {
+    Map<String, List<DwPublished>> byChannel, {
     DwLiveConnection? author,
   }) {
     for (final MapEntry(key: name, value: items) in byChannel.entries) {
@@ -138,16 +141,39 @@ final class DwLiveHub {
           (subscribers.length == 1 && identical(subscribers.first, author))) {
         continue;
       }
-      final frame = jsonEncode(
+      String frameOf(Iterable<DwWireObject> objects) => jsonEncode(
         DwUpdateMessage(
           channel: name,
-          updates: DwChannelUpdates(items),
+          updates: DwChannelUpdates(objects),
         ).toJson(),
       );
-      // Iterated in place: `sendFrame` never changes subscriptions
-      // synchronously — a slow consumer's close leaves the hub on `done`.
+      if (items.every((published) => published.except.isEmpty)) {
+        final frame = frameOf([for (final (:item, except: _) in items) item]);
+        // Iterated in place: `sendFrame` never changes subscriptions
+        // synchronously — a slow consumer's close leaves the hub on `done`.
+        for (final connection in subscribers) {
+          if (!identical(connection, author)) connection.sendFrame(frame);
+        }
+        continue;
+      }
+      // Some items are kept from some accounts: a connection receives what is
+      // not kept from its account, and each distinct selection is encoded
+      // once, however many connections share it.
+      final frames = <String, String?>{};
       for (final connection in subscribers) {
-        if (!identical(connection, author)) connection.sendFrame(frame);
+        if (identical(connection, author)) continue;
+        final account = connection.accountId;
+        final kept = [
+          for (final (index, published) in items.indexed)
+            if (!published.except.contains(account)) index,
+        ];
+        final frame = frames.putIfAbsent(
+          kept.join(','),
+          () => kept.isEmpty
+              ? null
+              : frameOf([for (final index in kept) items[index].item]),
+        );
+        if (frame != null) connection.sendFrame(frame);
       }
     }
   }

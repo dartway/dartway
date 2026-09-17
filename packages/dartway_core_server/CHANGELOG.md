@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`ctx.publish(channel, item, exceptAccounts: {...})`** keeps one publication from those accounts: their live connections do not receive it, nor does a command's response when the caller is one of them. An object published twice in a call travels as its last publication, exceptions included (D-066).
+
 - **`DwAppServer.runInContext(work)`** (and `DwTestServer.runInContext`): server-level work with a
   real `DwCallContext` — background, no caller, one transaction, effects delivered after commit and
   none on a throw. A domain service that needs a context could only be reached through a command or

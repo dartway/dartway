@@ -169,6 +169,13 @@ Future<CustomerInvoice> publishInvoice(DwCallContext ctx, InvoiceRow row) async 
 
 Within one call, one object published twice to a channel travels once, as it ended.
 
+### Keeping an item from some accounts — `exceptAccounts`
+
+When an item on a shared channel must not reach certain members — a blocked author's message in a
+group chat — pass `ctx.publish(channel, item, exceptAccounts: {...})`. Their connections and, if the
+caller is one of them, the response do not carry it. **Never filter such an item on the client**: the
+text has already reached the device. Never open a channel per member to get the same effect.
+
 ### Taking access away — `ctx.revoke`
 
 Access is checked at subscription, so a command that removes someone's right to a channel closes it:

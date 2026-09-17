@@ -747,8 +747,11 @@ final class _DetachedContext extends DwCallContext {
       );
 
   @override
-  void publish(DwLiveChannel channel, DwWireObject item) =>
-      _noServer('publish');
+  void publish(
+    DwLiveChannel channel,
+    DwWireObject item, {
+    Set<int> exceptAccounts = const {},
+  }) => _noServer('publish');
 
   @override
   void revoke(DwLiveChannel channel, int accountId) => _noServer('revoke');

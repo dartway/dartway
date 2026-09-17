@@ -81,7 +81,18 @@ abstract class DwCallContext {
   /// unresolved caller channel throws [ArgumentError]: on a server it could
   /// only mean the caller, and a command changing someone else's data is
   /// exactly where that reading goes wrong.
-  void publish(DwLiveChannel channel, DwWireObject item);
+  ///
+  /// [exceptAccounts] keeps the item from those accounts' connections, and
+  /// from the response when the caller is one of them: a member who blocked
+  /// another does not receive the blocked member's message on a channel they
+  /// share, rather than receiving it and hiding it on the device. Published
+  /// again in the same call, an object travels as it ended, with the
+  /// exceptions of its last publication.
+  void publish(
+    DwLiveChannel channel,
+    DwWireObject item, {
+    Set<int> exceptAccounts = const {},
+  });
 
   /// Closes [accountId]'s subscriptions to [channel], after commit. Throws
   /// [StateError] in a request, as [publish], and [ArgumentError] for an
@@ -140,7 +151,7 @@ enum DwContextKind {
 /// transaction it was made in commits, discarded if it rolls back.
 @internal
 final class DwCallEffects {
-  final List<(DwLiveChannel, DwWireObject)> publications = [];
+  final List<(DwLiveChannel, DwWireObject, Set<int>)> publications = [];
   final List<(DwLiveChannel, int)> revocations = [];
 
   /// Session keys revoked by the call.
@@ -281,7 +292,11 @@ final class DwRuntimeContext extends DwCallContext {
   }
 
   @override
-  void publish(DwLiveChannel channel, DwWireObject item) {
+  void publish(
+    DwLiveChannel channel,
+    DwWireObject item, {
+    Set<int> exceptAccounts = const {},
+  }) {
     requireSideEffects('publish');
     _requireResolved(channel);
     // Checked where the mistake is made: nobody could ever subscribe to such
@@ -314,7 +329,11 @@ final class DwRuntimeContext extends DwCallContext {
         'A deletion names a data object type of the protocol',
       );
     }
-    _current.effects.publications.add((channel, item));
+    _current.effects.publications.add((
+      channel,
+      item,
+      Set.unmodifiable(exceptAccounts),
+    ));
   }
 
   @override

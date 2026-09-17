@@ -400,7 +400,11 @@ final class TestApp {
           command.text,
           ctx.requireAccountId,
         );
-        ctx.publish(const DwLiveChannel(TestChannel.notes), note);
+        ctx.publish(
+          const DwLiveChannel(TestChannel.notes),
+          note,
+          exceptAccounts: {if (command.exceptAuthor) ctx.requireAccountId},
+        );
         for (var i = 0; i < command.extraPublishes; i++) {
           ctx.publish(
             const DwLiveChannel(TestChannel.notes),

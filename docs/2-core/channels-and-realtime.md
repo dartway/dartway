@@ -105,6 +105,25 @@ for (final booking in affected) {
 - The same object may go to several channels; each reaches its own requests
   (`ChangeRole` publishes a profile to the admin table and to the member's own profile channel).
 
+### Keeping an item from some accounts
+
+A channel is shared, but not every item on it is for everyone who hears it: a member who blocked
+another shares a group chat with them. `exceptAccounts` keeps one publication from those accounts —
+their connections do not receive it, and neither does the response when the caller is one of them:
+
+```dart
+ctx.publish(
+  ChatChannels.messagesOf(circleId),
+  message,
+  exceptAccounts: blockedBy, // accounts that blocked the author
+);
+```
+
+Filtering on the device instead would still send the text there. Each distinct selection is encoded
+once per channel, so a publication without exceptions costs what it always did. Published again in
+the same call, an object travels as it ended — its last version, with that publication's exceptions
+— so an account kept from the final version does not receive an earlier one instead.
+
 ## Revoking
 
 Because access is checked once, a command that takes access away closes what it opened

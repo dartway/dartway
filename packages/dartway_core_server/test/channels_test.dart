@@ -158,6 +158,78 @@ void main() {
     },
   );
 
+  group('a publication kept from some accounts', () {
+    const notes = DwLiveChannel(TestChannel.notes);
+
+    test(
+      'does not reach their connections, and reaches everyone else\'s',
+      () async {
+        final (_, blocker, blockerSocket) = await signedSocket(
+          'keep-a@example.com',
+        );
+        final (_, _, otherSocket) = await signedSocket('keep-b@example.com');
+        for (final socket in [blockerSocket, otherSocket]) {
+          expect(await socket.subscribe('notes'), isA<DwSubscribedMessage>());
+        }
+        await harness().server.runInContext((ctx) async {
+          ctx
+            ..publish(
+              notes,
+              const NoteView(id: 911, text: 'from the blocked member'),
+              exceptAccounts: {blocker.id},
+            )
+            ..publish(notes, const NoteView(id: 912, text: 'for everyone'));
+        });
+        final toOther = await otherSocket.expect<DwUpdateMessage>();
+        expect(
+          [for (final o in toOther.updates.objects) (o as NoteView).id],
+          [911, 912],
+        );
+        final toBlocker = await blockerSocket.expect<DwUpdateMessage>();
+        expect(
+          [for (final o in toBlocker.updates.objects) (o as NoteView).id],
+          [912],
+        );
+        await blockerSocket.expectSilence();
+      },
+    );
+
+    test(
+      'travels as it ended: an earlier version is not sent instead',
+      () async {
+        final (_, blocker, blockerSocket) = await signedSocket(
+          'keep-c@example.com',
+        );
+        expect(
+          await blockerSocket.subscribe('notes'),
+          isA<DwSubscribedMessage>(),
+        );
+        await harness().server.runInContext((ctx) async {
+          ctx
+            ..publish(notes, const NoteView(id: 913, text: 'draft'))
+            ..publish(
+              notes,
+              const NoteView(id: 913, text: 'final'),
+              exceptAccounts: {blocker.id},
+            );
+        });
+        await blockerSocket.expectSilence();
+      },
+    );
+
+    test('is not in the response of a caller it is kept from', () async {
+      final (author, _, _) = await signedSocket('keep-author@example.com');
+      final (_, _, listener) = await signedSocket('keep-listener@example.com');
+      expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
+      const command = CreateNote('kept from me', exceptAuthor: true);
+      final answer = await author.call(command);
+      expect(answer.value(command).text, 'kept from me');
+      expect(answer.updates.objectsOn('notes'), isEmpty);
+      final update = await listener.expect<DwUpdateMessage>();
+      expect((update.updates.objects.single as NoteView).text, 'kept from me');
+    });
+  });
+
   group('server-level work', () {
     test(
       'publishes after commit, as a job would, and answers its value',

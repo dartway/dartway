@@ -449,12 +449,19 @@ final class EnsureAccount extends DwActionCommand<int> {
 /// `account:<owner>`.
 final class CreateNote extends DwActionCommand<NoteView>
     implements DwSelfValidating {
-  const CreateNote(this.text, {this.extraPublishes = 0});
+  const CreateNote(
+    this.text, {
+    this.extraPublishes = 0,
+    this.exceptAuthor = false,
+  });
 
   final String text;
 
   /// Publishes the same note this many more times (collapse test).
   final int extraPublishes;
+
+  /// Publishes the note to `notes` kept from the author's own account.
+  final bool exceptAuthor;
 
   @override
   List<DwCallRefusal> validate() => [
@@ -470,11 +477,13 @@ final class CreateNote extends DwActionCommand<NoteView>
   Map<String, Object?> toJson() => {
     'text': text,
     if (extraPublishes != 0) 'extraPublishes': extraPublishes,
+    if (exceptAuthor) 'exceptAuthor': true,
   };
 
   static CreateNote fromJson(Map<String, Object?> json) => CreateNote(
     json['text']! as String,
     extraPublishes: (json['extraPublishes'] as int?) ?? 0,
+    exceptAuthor: json['exceptAuthor'] == true,
   );
 }
 
