@@ -580,6 +580,48 @@ void main() {
       );
     });
 
+    test(
+      'increment adds in the database, so concurrent increments all count',
+      () async {
+        final yoga = await db().clubServices.insert(service());
+        final rows = await db().clubSessions.insertAll([
+          for (final capacity in [5, 7])
+            ClubSessionRow(
+              serviceId: yoga.id!,
+              startsAt: DateTime.utc(2026, 1, capacity),
+              capacity: capacity,
+            ),
+        ]);
+        // Twenty transactions at once, each adding one to both rows: a read,
+        // add and write would lose most of them.
+        await Future.wait([
+          for (var i = 0; i < 20; i++)
+            db().transaction(
+              (tx) => tx.clubSessions.updateWhere(
+                where: (t) => t.serviceId.equals(yoga.id!),
+                set: (t) => [t.capacity.increment(1)],
+              ),
+            ),
+        ]);
+        expect(
+          [
+            for (final row in rows)
+              (await db().clubSessions.findById(row.id!))!.capacity,
+          ],
+          [25, 27],
+        );
+        expect(
+          await db().clubSessions.updateWhere(
+            where: (t) => t.id.equals(rows.first.id!),
+            set: (t) => [t.capacity.increment(-5), t.note.set('fewer')],
+          ),
+          1,
+        );
+        final changed = (await db().clubSessions.findById(rows.first.id!))!;
+        expect((changed.capacity, changed.note), (20, 'fewer'));
+      },
+    );
+
     test('delete and deleteWhere return affected counts', () async {
       final rows = await db().clubServices.insertAll([
         service(title: 'a'),

@@ -150,6 +150,7 @@ final alreadyBooked = await ctx.db.sessionBookings.exists(
 | non-null values | `inList(values)`, `notInList(values)` — one array parameter, so one prepared statement for every list length |
 | comparable (`int`, `double`, `String`, `DateTime`, `Duration`) | `gt`, `gte`, `lt`, `lte`, `between(low, high)` (inclusive) |
 | `String` | `like(pattern)`, `ilike(pattern)` |
+| non-null `int` or `double` | `increment(n)` for `updateWhere`: `column = column + n`, a negative `n` decrements |
 
 Conditions combine with `&`, `|` and `.not()`. Expressions that make no sense for a type do not
 compile: no `gt` on a `bool`, no `like` on a `DateTime`. Null follows Dart, not SQL's three-valued
@@ -194,6 +195,19 @@ await db.chatReadPositions.updateWhere(
   set: (t) => [t.messageId.set(message.id!), t.sentAt.set(message.sentAt)],
 );
 ```
+
+A counter moves in the statement, so concurrent changes all count — reading it, adding one and
+writing it back would lose the increments another transaction made in between:
+
+```dart
+await db.chatUnreads.updateWhere(
+  where: (t) => t.channelId.equals(channelId) & t.profileId.notEquals(authorId),
+  set: (t) => [t.count.increment(1)],
+);
+```
+
+`increment` exists only on a non-null number column: on a nullable one `NULL + 1` is `NULL`, and
+treating null as zero is the project's decision to write, not the ORM's to hide.
 
 ## Transactions
 

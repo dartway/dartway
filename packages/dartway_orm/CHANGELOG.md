@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`column.increment(n)` in `updateWhere`**: `SET column = column + n` on a non-null `int` or `double` column, computed by the database so concurrent increments all count. Unread counters needed raw SQL before.
+
 - **SSL required of a server without it fails at once and lets the process exit.** The pool asks the server once, on a socket it closes, whether it speaks SSL before the first connection; a server that does not is refused with `DW_DATABASE_SSL=false` named. The driver alone threw and left its socket open, so a migration CLI printed the error and never exited.
 
 - **`DwEnumListType<E>`**: a `List<E>` of an enum stored as a `jsonb` array of the values' names — the list form of `DwEnumType`. A name no value has fails the read (D-064).

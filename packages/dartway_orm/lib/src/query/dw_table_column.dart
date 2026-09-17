@@ -244,16 +244,44 @@ final class DwOrderTerm {
   String get sql => descending ? '${column.sql} DESC' : column.sql;
 }
 
-/// One `SET column = value` of `updateWhere`.
+/// One `SET` of `updateWhere`: a value ([DwTableColumn.set]) or an amount
+/// added to the column's current value ([DwNumberColumn.increment]).
 final class DwColumnAssignment<T> {
-  const DwColumnAssignment._(this.column, this.value);
+  const DwColumnAssignment._(this.column, this.value) : _adds = false;
+
+  const DwColumnAssignment._adding(this.column, this.value) : _adds = true;
 
   final DwTableColumn<T> column;
+
+  /// The value set, or the amount added.
   final T value;
 
+  /// Whether [value] is added to the current value rather than replacing it.
+  final bool _adds;
+
   @internal
-  void write(DwSqlWriter writer) =>
-      writer.write('${column.sql} = ${column.encodeParameter(writer, value)}');
+  void write(DwSqlWriter writer) {
+    final parameter = column.encodeParameter(writer, value);
+    writer.write(
+      _adds
+          ? '${column.sql} = ${column.sql} + $parameter'
+          : '${column.sql} = $parameter',
+    );
+  }
+}
+
+/// Arithmetic assignments on a non-null number column.
+///
+/// Computed by the database in the `UPDATE` itself, so concurrent increments
+/// all count: reading a counter, adding one and writing it back loses the
+/// increments another transaction made in between, and a raw
+/// `SET n = n + 1` was the only way around that. Not offered on a nullable
+/// column, where `NULL + 1` is `NULL` and "treat null as zero" would be a
+/// decision hidden in the ORM.
+extension DwNumberColumn<N extends num> on DwTableColumn<N> {
+  /// `column = column + amount` — a negative amount decrements.
+  DwColumnAssignment<N> increment(N amount) =>
+      DwColumnAssignment._adding(this, amount);
 }
 
 /// Accumulates a statement's text with its positional parameters and their
