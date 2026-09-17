@@ -216,6 +216,7 @@ final class DwAppServer {
           logger: logger,
           maxPerWindow: settings.alertsPerSignature,
           window: settings.alertWindow,
+          maxPerMinute: settings.alertsPerMinute,
         ),
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),

@@ -145,10 +145,14 @@ final class DwTelegramAlertSink implements DwAlertSink {
   }
 }
 
-/// Logs every incident and forwards it to [sink] under a per-signature
-/// ceiling: at most [maxPerWindow] alerts of one signature per [window]. A
-/// failure repeating a thousand times is one problem, and a channel flooded
-/// with it hides the next one.
+/// Logs every incident and forwards it to [sink] under two ceilings: at most
+/// [maxPerWindow] alerts of one signature per [window] — a failure repeating a
+/// thousand times is one problem, and a channel flooded with it hides the next
+/// one — and at most [maxPerMinute] alerts of any signatures in a minute, so
+/// many different failures at once cannot exhaust the channel's own limit
+/// (Telegram's is 20 a minute per group) and lose the rest to its refusals.
+/// An alert past that ceiling is only logged, and the next one that goes out
+/// says how many were held back.
 @internal
 final class DwAlertGate {
   DwAlertGate({
@@ -156,6 +160,7 @@ final class DwAlertGate {
     required this.logger,
     this.maxPerWindow = 5,
     this.window = const Duration(hours: 1),
+    this.maxPerMinute = 10,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
@@ -163,8 +168,15 @@ final class DwAlertGate {
   final DwServerLogger logger;
   final int maxPerWindow;
   final Duration window;
+  final int maxPerMinute;
   final DateTime Function() _clock;
   final Map<String, _SignatureWindow> _windows = {};
+
+  /// When the alerts of the last minute went out.
+  final List<DateTime> _recent = [];
+
+  /// Alerts held back by [maxPerMinute] since the last one that went out.
+  int _heldBack = 0;
 
   /// Records a failure and returns its incident id.
   String report({
@@ -192,17 +204,30 @@ final class DwAlertGate {
       () => _SignatureWindow(now),
     );
     state.count++;
-    if (state.count <= maxPerWindow) {
-      final note = state.count == maxPerWindow
-          ? 'further alerts like this are muted until '
-                '${state.start.add(window).toUtc().toIso8601String()}'
-          : null;
-      unawaited(
-        sink.send(incident, suppressedNote: note).catchError((Object e) {
-          logger.warning('alert sink failed for ${incident.id}', error: e);
-        }),
-      );
+    if (state.count > maxPerWindow) return incident.id;
+    _recent.removeWhere(
+      (sent) => now.difference(sent) >= const Duration(minutes: 1),
+    );
+    if (_recent.length >= maxPerMinute) {
+      _heldBack++;
+      return incident.id;
     }
+    _recent.add(now);
+    final notes = [
+      if (state.count == maxPerWindow)
+        'further alerts like this are muted until '
+            '${state.start.add(window).toUtc().toIso8601String()}',
+      if (_heldBack > 0)
+        '$_heldBack more alert(s) were held back by the limit of '
+            '$maxPerMinute a minute; they are in the log',
+    ];
+    _heldBack = 0;
+    final note = notes.isEmpty ? null : notes.join('; ');
+    unawaited(
+      sink.send(incident, suppressedNote: note).catchError((Object e) {
+        logger.warning('alert sink failed for ${incident.id}', error: e);
+      }),
+    );
     return incident.id;
   }
 }

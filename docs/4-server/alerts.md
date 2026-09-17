@@ -55,6 +55,12 @@ hour). The last alert before the ceiling carries a note — "further alerts like
 A failure repeating a thousand times is one problem; a channel flooded with it hides the next one.
 The ceiling is in the process's memory, and it resets with a restart.
 
+A second ceiling holds across signatures: at most `DwServerSettings.alertsPerMinute` (10) alerts a
+minute. Many different failures at once — a dependency down under every command — would otherwise
+exhaust the channel's own limit (Telegram's is 20 a minute per group) and lose the rest, including
+the one that mattered, to its refusals. An incident past it is only logged, and the next alert that
+goes out says how many were held back.
+
 A sink that fails to deliver is logged as a warning and does not fail the call, nor create another
 incident: an alert channel that is down must not turn into an incident loop.
 

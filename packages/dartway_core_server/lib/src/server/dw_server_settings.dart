@@ -20,6 +20,7 @@ final class DwServerSettings {
     this.failedJobRetention = const Duration(days: 30),
     this.alertsPerSignature = 5,
     this.alertWindow = const Duration(hours: 1),
+    this.alertsPerMinute = 10,
   }) : assert(minAppBuild >= 0),
        assert(maxBodyBytes > 0),
        assert(outboundLimitBytes > 0),
@@ -112,4 +113,9 @@ final class DwServerSettings {
   /// regardless.
   final int alertsPerSignature;
   final Duration alertWindow;
+
+  /// Alerts of any signatures a minute; past it an incident is only logged,
+  /// and the next alert says how many were held back. Below the channel's own
+  /// limit (Telegram: 20 a minute per group), so its refusals never drop one.
+  final int alertsPerMinute;
 }

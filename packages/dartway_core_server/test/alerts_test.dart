@@ -64,6 +64,39 @@ void main() {
       expect(sink.incidents.where((i) => i.where == 'command B'), hasLength(3));
     });
 
+    test('many signatures at once stay under the per-minute ceiling, and the '
+        'next alert says how many were held back', () async {
+      final minute = DwAlertGate(
+        sink: sink,
+        logger: RecordingLogger(),
+        maxPerMinute: 4,
+        clock: () => now,
+      );
+      for (var i = 0; i < 10; i++) {
+        try {
+          throw StateError('boom');
+        } catch (error, stackTrace) {
+          minute.report(
+            where: 'place $i',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(sink.incidents, hasLength(4));
+
+      now = now.add(const Duration(minutes: 1));
+      minute.report(
+        where: 'later',
+        error: StateError('x'),
+        stackTrace: StackTrace.current,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(sink.incidents, hasLength(5));
+      expect(sink.notes.last, contains('6 more alert(s) were held back'));
+    });
+
     test('a failing sink does not throw into the caller', () async {
       final failing = DwAlertGate(
         sink: _ThrowingAlerts(),
