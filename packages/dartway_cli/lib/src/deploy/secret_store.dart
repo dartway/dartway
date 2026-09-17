@@ -292,10 +292,24 @@ chmod 600 '$file'
     required String appDir,
     required List<String> required,
     required Set<String> reserved,
+  }) => _run(
+    renderEnvironmentScript(
+      appDir: appDir,
+      required: required,
+      reserved: reserved,
+    ),
+  );
+
+  /// The script [renderEnvironment] runs, for a caller that runs it its own
+  /// way — a deployment step detached from the connection.
+  String renderEnvironmentScript({
+    required String appDir,
+    required List<String> required,
+    required Set<String> reserved,
   }) {
     final requiredList = required.join(' ');
     final reservedList = (reserved.toList()..sort()).join(' ');
-    return _run('''
+    return '''
 set -e
 umask 077
 store='$file'
@@ -338,7 +352,7 @@ staged=\$(mktemp "$appDir/.env.XXXXXX")
 chmod 600 "\$staged"
 mv "\$staged" "\$out"
 echo "rendered \$(grep -cE "$linePattern" "\$out") key(s) into \$out"
-''');
+''';
   }
 
   /// Uploads a secret file (service account JSON and similar) into the store.

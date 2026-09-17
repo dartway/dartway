@@ -206,6 +206,48 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
 every push turns a routine change into an infrastructure one. `--dry-run` prints the plan and the
 probes, and executes nothing.
 
+
+### A step outlives the connection that started it
+
+Every step runs on the server **detached from the `ssh` session**: its script is written to
+`~/.config/<project>/deploy-run/` of the deploy user and started in a session of its own
+(`setsid`), streams to files, exit code written last. The call that starts a step waits for it, so a
+routine deploy still makes one connection per step; when that connection breaks, fresh ones wait for
+the same step for up to fifteen minutes, and past that `run` stops waiting and says the step is still
+running. Nothing the invoking machine does — losing its network, or dying because it is a container
+of the stack whose server step 7 replaces — stops a step midway.
+
+That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
+steps after the interruption still need someone to run them: **`dartway deploy run --env <env>
+--resume`**. It reads the record of the last deployment on the server and, in that deployment's
+plan, passes over the steps that finished, waits for a step still running instead of starting it a
+second time, judges again from its output a finished step whose success is checked beyond its exit
+code (the upstream check), and runs everything from the first step that actually runs — then the
+services and the probes, as always. A failed step runs again, against the checkout that deployment
+updated to; after fixing code, deploy anew rather than resume.
+
+A new `run` starts a new record, says where the previous deployment stopped if it did not finish,
+and refuses while a step of it is still running — two deployments never interleave on one server.
+
+### Progress for a program
+
+`--progress json` writes one JSON object per line on stdout and moves the prose to stderr. A program
+reads the events; the prose may change wording at any time, the events may not.
+
+| `event` | Fields |
+|---|---|
+| `notice` | `message` — what the server said about the previous deployment |
+| `plan` | `steps` (`id`, `title`) — `--dry-run` only |
+| `run_started` | `environment`, `resume`, `steps` (`id`, `title`) |
+| `revision` | `commit` (full hash), `subject` — after the checkout update, or before the steps when there is none |
+| `step_skipped` | `index`, `count`, `id` — done by the deployment being resumed |
+| `step_started` | `index`, `count`, `id`, `title`, `picked_up` — waiting for a step already on the server |
+| `step_finished` | `index`, `count`, `id`, `exit_code`; `stdout`, `stderr` for a step whose output is its result |
+| `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message` |
+| `services` | `services` (`name`, `status`) |
+| `probe` | `title`, `passed`, `detail` |
+| `run_finished` | `ok`, `exit_code`; `failed_step`, or `reason` (`checks`, `nothing-to-resume`, `unreachable`, `verification`) |
+
 **Then it verifies from outside**, as a browser and an app would, retrying failed probes up to twelve
 times five seconds apart:
 

@@ -4,6 +4,7 @@ import 'compose_files.dart';
 import 'deploy_target.dart';
 import 'nginx_upstreams.dart';
 import 'outside_probe.dart';
+import 'remote_steps.dart';
 import 'secret_store.dart';
 import 'ssh_runner.dart';
 import 'stack.dart';
@@ -49,6 +50,7 @@ class DwDeployRunner {
     String? appDir,
     String? storeDir,
     DwOutsideProbe? probe,
+    this.remote,
   }) : appDir = appDir ?? stack.target.appDir,
        store = DwSecretStore(
          ssh: ssh,
@@ -66,6 +68,18 @@ class DwDeployRunner {
   final DwSecretStore store;
   final DwOutsideProbe probe;
 
+  /// Runs every step detached from the connection, when set — see
+  /// [DwRemoteSteps]. Without it a step lives as long as its `ssh` call, which
+  /// is what the local proof and the tests want.
+  final DwRemoteSteps? remote;
+
+  /// The step whose script the next [_as] call is, while [steps] runs one.
+  String? _step;
+
+  /// Where [remote] keeps the record of the deployment on the server.
+  static String remoteDirectoryOf(DwDeployTarget target) =>
+      '${target.runtimeConfigDir}/deploy-run';
+
   DwDeployTarget get target => stack.target;
 
   bool get _tls => stack.front is DwTlsFront;
@@ -75,8 +89,15 @@ class DwDeployRunner {
   Future<DwSshResult> _compose(String arguments) =>
       _as(DwComposeFiles.commandIn(appDir, arguments));
 
-  Future<DwSshResult> _as(String script) =>
-      ssh.runAs(target.deployUser, script);
+  /// Every script of a deployment goes through here: detached when it is a
+  /// step and [remote] is set, over the plain connection otherwise.
+  Future<DwSshResult> _as(String script) {
+    final step = _step;
+    _step = null;
+    final detached = remote;
+    if (step != null && detached != null) return detached.run(step, script);
+    return ssh.runAs(target.deployUser, script);
+  }
 
   /// Brings the checkout to the tip of the deployment branch.
   ///
@@ -90,8 +111,10 @@ class DwDeployRunner {
     "git reset --hard 'origin/${target.branch}'",
   );
 
+  /// The commit the checkout is at: the full hash on the first line, the
+  /// short one and the subject on the second.
   Future<DwSshResult> deployedRevision() =>
-      _as("cd '$appDir' && git log -1 --format='%h %s'");
+      _as("cd '$appDir' && git log -1 --format='%H%n%h %s'");
 
   /// Keeps a hand-typed `docker compose` in the checkout equal to the deploy.
   /// See [DwComposeFiles.bridgeIn].
@@ -100,10 +123,12 @@ class DwDeployRunner {
   /// Renders `.env` from the secret store — see
   /// [DwSecretStore.renderEnvironment]. Every deploy, so a secret changed with
   /// `secret set` takes effect on the next one.
-  Future<DwSshResult> renderEnvironment() => store.renderEnvironment(
-    appDir: appDir,
-    required: stack.requiredSecretKeys,
-    reserved: stack.reservedSecretKeys,
+  Future<DwSshResult> renderEnvironment() => _as(
+    store.renderEnvironmentScript(
+      appDir: appDir,
+      required: stack.requiredSecretKeys,
+      reserved: stack.reservedSecretKeys,
+    ),
   );
 
   /// Asks Compose whether the merged stack is one it can run, before anything
@@ -333,6 +358,24 @@ echo "nginx restarted and running"
       _compose("ps --format '{{.Name}}\t{{.Status}}'");
 
   List<DwDeployStep> steps({required bool skipGitUpdate}) => [
+    for (final step in _plannedSteps(skipGitUpdate: skipGitUpdate))
+      DwDeployStep(
+        id: step.id,
+        title: step.title,
+        showOutput: step.showOutput,
+        verdict: step.verdict,
+        run: () {
+          _step = step.id;
+          try {
+            return step.run();
+          } finally {
+            _step = null;
+          }
+        },
+      ),
+  ];
+
+  List<DwDeployStep> _plannedSteps({required bool skipGitUpdate}) => [
     if (!skipGitUpdate)
       DwDeployStep(
         id: 'update-checkout',

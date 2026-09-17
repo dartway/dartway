@@ -107,6 +107,21 @@ class DeployRunCommand extends Command<int> {
         help: 'Deploy what is already checked out on the server.',
       )
       ..addFlag(
+        'resume',
+        negatable: false,
+        help:
+            'Finish the deployment the server remembers: pass over its done '
+            'steps, wait for a step still running, run the rest.',
+      )
+      ..addOption(
+        'progress',
+        allowed: ['text', 'json'],
+        defaultsTo: 'text',
+        help:
+            'json: one event per line on stdout for a program to read; the '
+            'prose goes to stderr.',
+      )
+      ..addFlag(
         'dry-run',
         negatable: false,
         help: 'Print the plan and change nothing.',
@@ -123,7 +138,8 @@ class DeployRunCommand extends Command<int> {
 
   @override
   String get invocation =>
-      'dartway deploy run --env <environment> [--dry-run] [--skip-git-update]';
+      'dartway deploy run --env <environment> [--dry-run] [--skip-git-update] '
+      '[--resume] [--progress json]';
 
   @override
   Future<int> run() => runDeploy(

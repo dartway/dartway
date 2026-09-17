@@ -4,8 +4,10 @@ import 'package:args/args.dart';
 
 import '../checker/dw_check_type.dart';
 import '../deploy/deploy_check.dart';
+import '../deploy/deploy_progress.dart';
 import '../deploy/deploy_runner.dart';
 import '../deploy/outside_probe.dart';
+import '../deploy/remote_steps.dart';
 import '../deploy/ssh_runner.dart';
 import '../deploy/stack.dart';
 
@@ -17,6 +19,21 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
   final projectRoot = Directory.current;
   final target = stack.target;
   final environment = target.environment;
+  final progress = results.option('progress') == 'json'
+      ? DwDeployProgress.json()
+      : DwDeployProgress.text();
+  final out = progress.human;
+  final resume = results.flag('resume');
+
+  int finish(int code, {String? failedStep, String? reason}) {
+    progress.event('run_finished', {
+      'ok': code == 0,
+      'exit_code': code,
+      'failed_step': ?failedStep,
+      'reason': ?reason,
+    });
+    return code;
+  }
 
   final sshUser = results.option('as') ?? target.sshUser;
   final ssh = DwSshRunner(
@@ -24,11 +41,20 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     user: sshUser,
     identityFile: results.option('identity'),
   );
-  final runner = DwDeployRunner(ssh: ssh, stack: stack);
-  final steps = runner.steps(skipGitUpdate: results.flag('skip-git-update'));
+  final remote = DwRemoteSteps(
+    ssh: ssh,
+    deployUser: target.deployUser,
+    directory: DwDeployRunner.remoteDirectoryOf(target),
+    onNotice: (notice) {
+      out.writeln(notice);
+      progress.event('notice', {'message': notice});
+    },
+  );
+  final runner = DwDeployRunner(ssh: ssh, stack: stack, remote: remote);
+  var steps = runner.steps(skipGitUpdate: results.flag('skip-git-update'));
 
-  stdout
-    ..writeln('Deploy [$environment]')
+  out
+    ..writeln('Deploy [$environment]${resume ? ' — resuming' : ''}')
     ..writeln(
       '  server:  $sshUser@${target.host}, runs as ${target.deployUser}',
     )
@@ -50,113 +76,256 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     }
     if (check.severity == DwCheckSeverity.error) {
       blocking++;
-      stderr.writeln('  FAIL  ${check.title} — ${verdict.detail}');
+      progress.problems.writeln('  FAIL  ${check.title} — ${verdict.detail}');
     } else {
-      stdout.writeln('  warn  ${check.title} — ${verdict.detail}');
+      out.writeln('  warn  ${check.title} — ${verdict.detail}');
     }
   }
   if (blocking > 0) {
-    stderr.writeln(
+    progress.problems.writeln(
       'Refusing to deploy: $blocking blocking issue(s). '
       'Run "dartway deploy check --env $environment --local" for the detail.',
     );
-    return 1;
+    return finish(1, reason: 'checks');
   }
 
   if (results.flag('dry-run')) {
-    stdout.writeln('\nPlan:');
+    out.writeln('\nPlan:');
     for (var index = 0; index < steps.length; index++) {
-      stdout.writeln('  ${index + 1}. ${steps[index].title}');
+      out.writeln('  ${index + 1}. ${steps[index].title}');
     }
-    stdout.writeln('  ${steps.length + 1}. Verify from outside:');
+    out.writeln('  ${steps.length + 1}. Verify from outside:');
     for (final probe in _describeProbes(stack)) {
-      stdout.writeln('       $probe');
+      out.writeln('       $probe');
     }
-    stdout.writeln('\nDry run — nothing executed.');
-    return 0;
+    out.writeln('\nDry run — nothing executed.');
+    progress.event('plan', {'steps': _stepList(steps)});
+    return finish(0);
   }
+
+  Map<String, DwRemoteStepRecord>? record;
+  if (resume) {
+    try {
+      record = await remote.read();
+    } on StateError catch (error) {
+      progress.problems.writeln(error.message);
+      return finish(1, reason: 'unreachable');
+    }
+    if (record == null) {
+      progress.problems.writeln(
+        'Nothing to resume: the server keeps no record of a deployment. '
+        'Run without --resume.',
+      );
+      return finish(1, reason: 'nothing-to-resume');
+    }
+    // The plan of the run being resumed, not a new one: a checkout update
+    // slipped in front of steps that already ran would deploy code they
+    // never saw.
+    final planned = record.keys.toList();
+    steps = [for (final id in planned) ...steps.where((step) => step.id == id)];
+  }
+
+  progress.event('run_started', {
+    'environment': environment,
+    'resume': resume,
+    'steps': _stepList(steps),
+  });
+
+  Future<void> reportRevision() async {
+    final revision = await runner.deployedRevision();
+    final lines = revision.stdout.trim().split('\n');
+    if (!revision.ok || lines.length < 2) return;
+    out.writeln('  now at ${lines[1].trim()}');
+    progress.event('revision', {
+      'commit': lines.first.trim(),
+      'subject': lines[1].trim().split(' ').skip(1).join(' '),
+    });
+  }
+
+  final updates = steps.any(
+    (step) =>
+        step.id == 'update-checkout' && !(record?[step.id]?.succeeded ?? false),
+  );
+  if (!updates) await reportRevision();
 
   final failedStep = await executeDeploySteps(
     steps,
-    onUpdated: () async {
-      final revision = await runner.deployedRevision();
-      if (revision.ok) stdout.writeln('  now at ${revision.firstLine}');
-    },
+    remote: remote,
+    resumeFrom: record,
+    progress: progress,
+    onUpdated: reportRevision,
   );
   if (failedStep != null) {
-    return 1;
+    return finish(1, failedStep: failedStep);
   }
 
-  stdout.writeln('\nServices');
+  out.writeln('\nServices');
   final status = await runner.status();
+  final services = <Map<String, String>>[];
   for (final line in status.stdout.split('\n')) {
-    if (line.trim().isNotEmpty) {
-      stdout.writeln('  ${line.trim()}');
-    }
+    if (line.trim().isEmpty) continue;
+    out.writeln('  ${line.trim()}');
+    final [name, ...rest] = line.trim().split('\t');
+    services.add({'name': name, 'status': rest.join(' ')});
   }
+  progress.event('services', {'services': services});
 
-  return reportOutsideVerification(await runner.verifyFromOutside());
+  final code = reportOutsideVerification(
+    await runner.verifyFromOutside(),
+    progress: progress,
+  );
+  return finish(code, reason: code == 0 ? null : 'verification');
 }
+
+List<Map<String, String>> _stepList(List<DwDeployStep> steps) => [
+  for (final step in steps) {'id': step.id, 'title': step.title},
+];
 
 /// Runs [steps] in order and reports each. Answers the id of the step that
 /// failed, or null when all of them did their work.
+///
+/// With [remote], each step runs detached on the server and a new run starts
+/// a new record there. With [resumeFrom] — that record, read back — the steps
+/// it shows done are passed over, a step still running or finished unjudged is
+/// waited for instead of started again, and from the first step that actually
+/// runs everything after it runs too.
 Future<String?> executeDeploySteps(
   List<DwDeployStep> steps, {
   Future<void> Function()? onUpdated,
+  DwRemoteSteps? remote,
+  Map<String, DwRemoteStepRecord>? resumeFrom,
+  DwDeployProgress? progress,
 }) async {
+  final report = progress ?? DwDeployProgress.text();
+  final out = report.human;
+  if (remote != null && resumeFrom == null) {
+    remote.beginFresh([for (final step in steps) step.id]);
+  }
+  var passingOver = resumeFrom != null;
   for (var index = 0; index < steps.length; index++) {
     final step = steps[index];
-    stdout.writeln('\n[${index + 1}/${steps.length}] ${step.title}');
-    final result = await step.run();
+    final position = {'index': index + 1, 'count': steps.length, 'id': step.id};
+    final previous = passingOver ? resumeFrom![step.id] : null;
+    if (previous != null && previous.succeeded && step.verdict == null) {
+      out.writeln(
+        '\n[${index + 1}/${steps.length}] ${step.title} — done by the run '
+        'being resumed',
+      );
+      report.event('step_skipped', position);
+      continue;
+    }
+    passingOver = false;
+    // Finished but not judged yet, or still going: its result is on the
+    // server already, and running it again would do the work twice.
+    final pickUp =
+        remote != null &&
+        previous != null &&
+        (previous.state == DwRemoteStepState.running || previous.succeeded);
+
+    out.writeln(
+      '\n[${index + 1}/${steps.length}] ${step.title}'
+      '${pickUp ? ' — picking up the step already on the server' : ''}',
+    );
+    report.event('step_started', {
+      ...position,
+      'title': step.title,
+      'picked_up': pickUp,
+    });
+
+    final DwSshResult result;
+    try {
+      result = pickUp ? await remote.collect(step.id) : await step.run();
+    } on DwDeployBusy catch (busy) {
+      report.problems.writeln(busy);
+      report.event('step_failed', {
+        ...position,
+        'reason': 'busy',
+        'message': busy.toString(),
+      });
+      return step.id;
+    }
 
     // A step that declares it prints its own output prints it whatever
     // happened: "only on failure" is how a step that reports its outcome in
     // text comes out green and blank.
     if (step.showOutput) {
-      _indent(stdout, '${result.stdout}\n${result.stderr}');
+      _indent(out, '${result.stdout}\n${result.stderr}');
     }
 
     if (!result.ok) {
-      stderr.writeln('Step "${step.id}" failed (exit ${result.exitCode}).');
+      report.problems.writeln(
+        'Step "${step.id}" failed (exit ${result.exitCode}).',
+      );
       if (!step.showOutput) {
-        _indent(stderr, '${result.stdout}\n${result.stderr}');
+        _indent(report.problems, '${result.stdout}\n${result.stderr}');
       }
+      report.event('step_failed', {
+        ...position,
+        'reason': 'exit',
+        'exit_code': result.exitCode,
+        'stdout': result.stdout,
+        'stderr': result.stderr,
+      });
       return step.id;
     }
 
     final verdict = step.verdict?.call(result);
     if (verdict != null) {
-      stderr
+      await remote?.reject(step.id);
+      report.problems
         ..writeln('Step "${step.id}" exited 0 and did not do its work:')
         ..writeln(verdict);
+      report.event('step_failed', {
+        ...position,
+        'reason': 'verdict',
+        'exit_code': 0,
+        'message': verdict,
+      });
       return step.id;
     }
+    report.event('step_finished', {
+      ...position,
+      'exit_code': 0,
+      if (step.showOutput) ...{
+        'stdout': result.stdout,
+        'stderr': result.stderr,
+      },
+    });
     if (step.id == 'update-checkout') {
       await onUpdated?.call();
     }
     // Says nothing on a server whose bridge is already in place.
     if (step.id == 'bridge-override' && result.stdout.trim().isNotEmpty) {
-      stdout.writeln('  ${result.stdout.trim()}');
+      out.writeln('  ${result.stdout.trim()}');
     }
   }
   return null;
 }
 
 /// Prints the outside verification and answers the exit code.
-int reportOutsideVerification(List<DwProbeResult> results) {
-  stdout.writeln('\nVerify from outside');
+int reportOutsideVerification(
+  List<DwProbeResult> results, {
+  DwDeployProgress? progress,
+}) {
+  final report = progress ?? DwDeployProgress.text();
+  report.human.writeln('\nVerify from outside');
   for (final result in results) {
-    stdout.writeln('  $result');
+    report.human.writeln('  $result');
+    report.event('probe', {
+      'title': result.title,
+      'passed': result.passed,
+      'detail': result.detail,
+    });
   }
   final failed = results.where((result) => !result.passed).length;
   if (failed > 0) {
-    stderr.writeln(
+    report.problems.writeln(
       '\nDeployed, but $failed answer(s) are not what a browser or an app '
       'needs. Each line above says what was observed.',
     );
     return 1;
   }
-  stdout.writeln('\nDeployment completed.');
+  report.human.writeln('\nDeployment completed.');
   return 0;
 }
 
