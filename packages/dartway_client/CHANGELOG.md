@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwAppClient.deleteAccount()`**: sends `DwDeleteMyAccount` and ends the session once the server confirms (D-072).
+
 - **A value newer than the build puts the client out of date** (D-071): an enum name the build does not know, in a call result, a watched request or a live update, switches the client to `dw.updateRequired` — the update screen — instead of failing the call or the list.
 
 - **`DwAppClient.listen(channels)`**: a stream of what is published to the channels, without reading anything. Subscribed while listened to, shared with watched requests on the same channel, caller channels following a switch of account; nothing replayed across a disconnect (D-067).

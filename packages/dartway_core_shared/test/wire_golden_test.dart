@@ -590,6 +590,7 @@ List<_WireShape> _wireShapes() {
       const DwAuthSession(id: 7, token: 'token-1', isNewAccount: false),
     ),
     dto('dto.signOut', const DwSignOut()),
+    dto('dto.deleteMyAccount', const DwDeleteMyAccount()),
     dto(
       'dto.requestIdentifierCode',
       const DwRequestIdentifierCode(

@@ -172,5 +172,34 @@ void main() {
         );
       },
     );
+
+    test('deleting the account removes the profile and the photo, and ends the '
+        'session', () async {
+      final nina = await app.signUp('79990004010', firstName: 'Nina');
+      final file = (await nina.client.files.upload(
+        DartwayStarterUpload.avatar,
+        DwUploadSource.bytes(image(512, 5)),
+        fileName: 'nina.png',
+        contentType: 'image/png',
+      )).valueOrThrow;
+      await nina.client.command(
+        UpdateMyProfile(avatarFileId: DwFieldPatch.set(file.id)),
+      );
+
+      expect(await nina.client.deleteAccount(), isA<DwCallOk<void>>());
+      expect(nina.client.accountId, isNull);
+      expect(
+        await app.db.query(
+          'SELECT 1 FROM user_profile WHERE account_id = @id',
+          params: {'id': nina.accountId},
+        ),
+        isEmpty,
+      );
+      app.server.wakeJobs();
+      await eventually(
+        () async => (await getAnonymously(file.url!)).status != 200,
+        reason: 'the photo leaves the storage with the account',
+      );
+    });
   });
 }

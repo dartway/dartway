@@ -13,6 +13,70 @@ void main() {
 
   DwAccountService accounts() => harness().server.server.accounts;
 
+  group('deleting an account', () {
+    Future<int> countOf(String table, int accountId) async =>
+        (await harness().db.query(
+          'SELECT count(*)::int AS n FROM $table WHERE account_id = @id',
+          params: {'id': accountId},
+        )).single.get<int>('n');
+
+    test('DwDeleteMyAccount removes the account, its identities, its keys and '
+        "the project's rows, and ends its sessions", () async {
+      const email = 'leaving@example.com';
+      final session = await harness().app.signIn(harness().caller(), email);
+      final member = harness().caller(token: session.token);
+
+      final answer = await member.call(const DwDeleteMyAccount());
+      expect(answer.status, 200, reason: answer.text);
+
+      expect(await identities(email), 0);
+      expect(await countOf('profile', session.id), 0);
+      expect(await countOf('dw_auth_key', session.id), 0);
+      expect(
+        await harness().db.query(
+          'SELECT 1 FROM dw_account WHERE id = @id',
+          params: {'id': session.id},
+        ),
+        isEmpty,
+      );
+      expect(
+        (await member.call(const DwSignOut())).status,
+        401,
+        reason: 'the session ended with the account',
+      );
+
+      // The identifier is free: it makes a new account.
+      final again = await accounts().ensure(DwIdentifierKind.email, email);
+      expect(again.created, isTrue);
+      expect(again.accountId, isNot(session.id));
+    });
+
+    test(
+      'a refusing onAccountDeleting keeps the account and its session',
+      () async {
+        final session = await harness().app.signIn(
+          harness().caller(),
+          'staying@example.com',
+        );
+        harness().app.undeletable.add(session.id);
+        final member = harness().caller(token: session.token);
+
+        final answer = await member.call(const DwDeleteMyAccount());
+        expect(answer.status, 403, reason: answer.text);
+        expect(await countOf('profile', session.id), 1);
+        expect(await identities('staying@example.com'), 1);
+        expect((await member.call(const DwSignOut())).status, 200);
+      },
+    );
+
+    test('signed out, there is nothing to delete', () async {
+      expect(
+        (await harness().caller().call(const DwDeleteMyAccount())).status,
+        401,
+      );
+    });
+  });
+
   group('server.accounts', () {
     test('ensure creates once, normalizes, runs onAccountCreated in the same '
         'transaction; find sees it', () async {

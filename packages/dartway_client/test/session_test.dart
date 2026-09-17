@@ -178,6 +178,34 @@ void main() {
     });
   });
 
+  group('deleting the account', () {
+    test('ends the session once the server confirms', () async {
+      final h = Harness()..serveRooms();
+      final deleted = <int?>[];
+      h.server.onCommand<DwDeleteMyAccount>((command, call) {
+        deleted.add(call.accountId);
+        return const DwCallOk<void>(null);
+      });
+      await h.start();
+      final result = await h.client.deleteAccount();
+      expect(result, isA<DwCallOk<void>>());
+      expect(deleted, [alice.id]);
+      expect(h.client.accountId, isNull);
+      expect(await h.store.read(), isNull);
+    });
+
+    test('a refusal keeps the session: the account still exists', () async {
+      final h = Harness()..serveRooms();
+      h.server.onCommand<DwDeleteMyAccount>(
+        (command, call) =>
+            DwCallRefused<void>(DwCallRefusal(DwCoreRefusal.forbidden)),
+      );
+      await h.start();
+      expect(await h.client.deleteAccount(), isA<DwCallRefused<void>>());
+      expect(h.client.accountId, alice.id);
+    });
+  });
+
   group('the server ends a session', () {
     test('a not-authenticated answer to the current token ends it', () async {
       final h = Harness()..serveRooms();

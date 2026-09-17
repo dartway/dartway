@@ -49,6 +49,8 @@
   "profileTitle": "Профиль",
   "adminPanel": "Админка",
   "signOutAction": "Выйти",
+  "deleteAccountAction": "Удалить аккаунт",
+  "deleteAccountConfirmation": "Удалить аккаунт и все данные в нём? Отменить это нельзя.",
   "firstNameLabel": "Имя",
   "firstNameHint": "Введите имя",
   "lastNameLabel": "Фамилия",

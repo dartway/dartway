@@ -127,6 +127,7 @@ Registered by the framework in every server; a project may not register handlers
 | `DwRequestCode(kind, identifier)` | anonymous | `DwCodeTicket` | normalizes, applies the limits, creates a ticket and delivers the code |
 | `DwVerifyCode(ticketId, code, registration)` | anonymous | `DwAuthSession` | checks the code; creates the account when the identifier has none; makes an `app` session key |
 | `DwSignOut()` | signed in | none | revokes the caller's session key |
+| `DwDeleteMyAccount()` | signed in | none | deletes the caller's account — see below |
 | `DwRequestIdentifierCode(kind, identifier)` | signed in | `DwCodeTicket` | a code to an identifier the caller wants to attach, or change theirs to |
 | `DwConfirmIdentifier(ticketId, code, replace)` | signed in | `DwIdentityInfo` | attaches the identifier or, with `replace`, puts it in place of the caller's identifiers of that kind |
 
@@ -154,6 +155,17 @@ attempts.
 
 An account may hold several identifiers of one kind. With `replace`, the oldest identity of the
 kind takes the new value (its id stays) and the others of the kind are removed.
+
+**Deleting an account.** App stores require it inside the app from any app that lets people sign
+up (App Store Review Guideline 5.1.1(v)), whatever the sign-in method. `DwDeleteMyAccount` — or
+`ctx.accounts.deleteAccount(accountId)` for an administrator's command — runs in one transaction:
+`DwAuthConfig.onAccountDeleting(ctx, accountId)` first, where the project deletes or anonymises its
+own rows (a row referencing `dw_account` without `ON DELETE CASCADE` must go there, or the deletion
+fails; refusing keeps the account); then the account's stored files (their objects leave the
+storage once it commits), every session key revoked (its live sessions close), and the account
+with its identities, keys, tickets and push devices. Analytics keep their events without the
+account. On the client, `dw.deleteAccount()` sends it and ends the session once the server
+confirms; the skeleton's profile page has the button, with a confirmation.
 
 On the client, the app sends these commands like any other and keeps the answered session with
 `dw.signIn(session)` ([Flutter core](../3-flutter/flutter-core.md)).

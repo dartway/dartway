@@ -124,6 +124,9 @@ final class TestApp {
   /// it has written the profile.
   final Set<String> failingIdentifierChanges = {};
 
+  /// Accounts whose deletion `onAccountDeleting` refuses.
+  final Set<int> undeletable = {};
+
   /// Accounts that may read anyone's notes (`NotesOfOwner`).
   final Set<int> staff = {};
 
@@ -194,6 +197,17 @@ final class TestApp {
           },
           'identifier': identifier,
         },
+      );
+    },
+    // The profile references the account without a cascade, as a project's
+    // own row may: the hook has to remove it, or the deletion fails.
+    onAccountDeleting: (ctx, accountId) async {
+      if (undeletable.contains(accountId)) {
+        ctx.refuse(DwCoreRefusal.forbidden);
+      }
+      await ctx.db.execute(
+        'DELETE FROM profile WHERE account_id = @id',
+        params: {'id': accountId},
       );
     },
     // Mirrors the latest identifier into the profile, as a project showing it

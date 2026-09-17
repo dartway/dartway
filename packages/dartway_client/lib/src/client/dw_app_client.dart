@@ -362,6 +362,15 @@ final class DwAppClient {
     }
   }
 
+  /// Deletes the signed-in account (`DwDeleteMyAccount`) and, once the server
+  /// confirms, ends the session here as a sign-out does. A refusal or a
+  /// failure keeps the session: the account still exists.
+  Future<DwCallResult<void>> deleteAccount() async {
+    final result = await command(const DwDeleteMyAccount());
+    if (result is DwCallOk<void>) _endSession();
+    return result;
+  }
+
   /// Runs [request] once. [page] selects the rows of a paginated request: a
   /// [DwOffsetQuery] for a [DwPageRequest], a [DwWindowQuery] for a
   /// [DwWindowRequest]; the other kinds take none (a table's page is a field

@@ -186,6 +186,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get signOutAction => 'Sign out';
 
   @override
+  String get deleteAccountAction => 'Delete account';
+
+  @override
+  String get deleteAccountConfirmation =>
+      'Delete your account and everything in it? This cannot be undone.';
+
+  @override
   String get firstNameLabel => 'First name';
 
   @override

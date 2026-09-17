@@ -392,6 +392,18 @@ abstract class AppLocalizations {
   /// **'Sign out'**
   String get signOutAction;
 
+  /// The button that deletes the signed-in account for good.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get deleteAccountAction;
+
+  /// Asked before the account is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete your account and everything in it? This cannot be undone.'**
+  String get deleteAccountConfirmation;
+
   /// No description provided for @firstNameLabel.
   ///
   /// In en, this message translates to:

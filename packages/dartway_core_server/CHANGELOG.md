@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **Deleting an account** (D-072): `DwDeleteMyAccount` and `DwAccountService.deleteAccount` — `DwAuthConfig.onAccountDeleting` for the project's rows, then the account's files, keys (sessions end) and the account with its identities, in one transaction.
+
 - **`DW_MIGRATE_ONLY=true` makes `DwAppServer.start()` a one-off migration** that serves nothing and ends the process (0, or non-zero with the reason); `DwAppServer.migrate()` does the same without ending it. `dartway deploy` migrates this way between stopping the old server and starting the new one (D-070).
 
 - **`DwCallHandler.command(recordsSuccess: false)`** skips storing a successful outcome under the idempotency key, for a command whose own unique keys make a repeat harmless and which is sent often (analytics batches); refusals are still recorded.

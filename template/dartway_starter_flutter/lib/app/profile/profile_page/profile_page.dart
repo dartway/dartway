@@ -70,6 +70,16 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
               // every zone but auth to the sign-in screen.
               onTap: dw.action((_) => dw.signOut()),
             ),
+            // App stores require deleting the account inside the app. The
+            // server removes the account; the session ends with it, and the
+            // guards send the app to the sign-in screen.
+            AppButton.text(
+              l10n.deleteAccountAction,
+              onTap: dw.action(
+                (_) => dw.deleteAccount(),
+                confirmation: DwUiConfirmation(l10n.deleteAccountConfirmation),
+              ),
+            ),
             const Gap(24),
           ],
         ),

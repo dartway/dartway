@@ -422,6 +422,10 @@ it. `DwAuthConfig` in `lib/src/`:
   consents — or `DwToolOrigin()` for `DwAccountService.ensure` (a seed, an admin bootstrap), which
   accepted nothing on anyone's behalf. **Refusing here refuses the sign-in** and creates nothing;
   the code stays usable;
+- **`onAccountDeleting(ctx, accountId)` deletes or anonymises the project's rows** when the account is
+  deleted (`DwDeleteMyAccount`, required by app stores). A row that references `dw_account` without a
+  cascade must go here; what someone else sees (messages in a shared chat) is usually anonymised, not
+  deleted. The framework removes its own part — files, keys, identities — after the hook;
 - `onIdentifierChanged(ctx, change)` runs in the transaction of every identifier change the framework
   makes to an existing account (a confirmed attach or replace, `moveIdentities`, `removeIdentities`)
   — the place to mirror an identifier into a project row, or to republish the profile that shows it.

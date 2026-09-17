@@ -14,6 +14,7 @@ final class DwAuthConfig {
     this.fixedCode,
     this.onAccountCreated,
     this.onIdentifierChanged,
+    this.onAccountDeleting,
     this.codeLength = 6,
     this.codeLifetime = const Duration(minutes: 10),
     this.maxAttempts = 5,
@@ -92,6 +93,15 @@ final class DwAuthConfig {
   /// about identifiers; publishing is the hook's to do.
   final Future<void> Function(DwCallContext ctx, DwIdentifierChange change)?
   onIdentifierChanged;
+
+  /// Runs in the transaction that deletes an account (`DwDeleteMyAccount`,
+  /// `DwAccountService.deleteAccount`), before the framework removes what it
+  /// keeps: the place to delete — or anonymise — the project's rows of
+  /// [accountId]. A row referencing `dw_account` without `ON DELETE CASCADE`
+  /// must go here, or the deletion fails. Throwing (or refusing) keeps the
+  /// account.
+  final Future<void> Function(DwCallContext ctx, int accountId)?
+  onAccountDeleting;
 
   /// Digits in a delivered code.
   final int codeLength;

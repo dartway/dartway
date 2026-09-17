@@ -45,6 +45,7 @@ final class DwAuthService {
     DwRequestCode,
     DwVerifyCode,
     DwSignOut,
+    DwDeleteMyAccount,
     DwRequestIdentifierCode,
     DwConfirmIdentifier,
   };
@@ -71,6 +72,12 @@ final class DwAuthService {
     DwCallHandler.command<DwSignOut, void>(
       access: DwAccessRule.signedIn,
       handle: _signOut,
+    ),
+    DwCallHandler.command<DwDeleteMyAccount, void>(
+      access: DwAccessRule.signedIn,
+      handle: (ctx, command) async {
+        await ctx.accounts.deleteAccount(ctx.requireAccountId);
+      },
     ),
     DwCallHandler.command<DwRequestIdentifierCode, DwCodeTicket>(
       access: DwAccessRule.signedIn,

@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`dw.deleteAccount()`** (D-072).
+
 - **A list with no loading placeholder loads as nothing, not as an error.** `dwBuildListAsync` without `loadingItem` in an app whose `defaultModelGetter` is unset (or does not know the model) failed an assert in debug and threw in release, showing an error block until the data came; it now renders nothing while loading, as `dwBuildAsync` does. A skeleton is still built whenever a placeholder exists.
 
 - **No run-time dependency on `flutter_native_splash`** (#268). The splash is held with the binding's `deferFirstFrame` and released after bootstrap; on the web a shell's `removeSplashFromWeb()` is still called when it defines one. The generator's `image`, `archive`, `xml`, `html` and their dependencies leave every app's graph. An app that runs `dart run flutter_native_splash:create` lists the package in its own `dev_dependencies`, as the template now does.

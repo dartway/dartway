@@ -257,6 +257,10 @@ class DwFlutterCore extends DwFlutterToolbox {
   /// asked again anonymously, and the server revokes the key.
   Future<void> signOut() => client.signOut();
 
+  /// Deletes the signed-in account and ends the session — see
+  /// `DwAppClient.deleteAccount`.
+  Future<DwCallResult<void>> deleteAccount() => client.deleteAccount();
+
   /// One cached provider per [key], forgotten when its notifier is disposed —
   /// only that provider: an equal request may already have a newer one.
   P _provider<P extends Object>(

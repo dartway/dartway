@@ -186,6 +186,32 @@ final class DwSignOut extends DwActionCommand<void> {
   int get hashCode => 0;
 }
 
+/// Deletes the caller's account and everything the framework keeps for it:
+/// identities, session keys (every session of the account ends), stored
+/// files, push devices. The project's own data goes in
+/// `DwAuthConfig.onAccountDeleting`, in the same transaction.
+///
+/// App stores require it: an app that lets people create an account must let
+/// them delete it inside the app (App Store Review Guideline 5.1.1(v)).
+final class DwDeleteMyAccount extends DwActionCommand<void> {
+  const DwDeleteMyAccount();
+
+  @override
+  String get dwTypeName => 'DwDeleteMyAccount';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static DwDeleteMyAccount fromJson(Map<String, Object?> json) =>
+      const DwDeleteMyAccount();
+
+  @override
+  bool operator ==(Object other) => other is DwDeleteMyAccount;
+
+  @override
+  int get hashCode => 1;
+}
+
 /// What a session key is for.
 ///
 /// Every token the server accepts is a session key of an account; the kind
@@ -472,6 +498,10 @@ const List<DwProtocolEntry> dwAuthProtocolEntries = [
   DwProtocolEntry<DwVerifyCode>('DwVerifyCode', DwVerifyCode.fromJson),
   DwProtocolEntry<DwAuthSession>('DwAuthSession', DwAuthSession.fromJson),
   DwProtocolEntry<DwSignOut>('DwSignOut', DwSignOut.fromJson),
+  DwProtocolEntry<DwDeleteMyAccount>(
+    'DwDeleteMyAccount',
+    DwDeleteMyAccount.fromJson,
+  ),
   DwProtocolEntry<DwRequestIdentifierCode>(
     'DwRequestIdentifierCode',
     DwRequestIdentifierCode.fromJson,

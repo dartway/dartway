@@ -524,6 +524,7 @@ const String wireGolden = r'''
       "token": "token-1"
     },
     "dto.signOut": {},
+    "dto.deleteMyAccount": {},
     "dto.requestIdentifierCode": {
       "kind": "email",
       "identifier": "ada@example.com"

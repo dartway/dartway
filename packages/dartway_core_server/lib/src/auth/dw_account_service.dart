@@ -388,6 +388,49 @@ final class DwAccountService {
     });
   }
 
+  /// Deletes [accountId] and everything the framework keeps for it, and
+  /// answers whether it existed.
+  ///
+  /// In one transaction: `DwAuthConfig.onAccountDeleting` (the project's
+  /// rows), the account's stored files (their objects go once it commits),
+  /// every session key revoked (its sessions close once it commits), then the
+  /// account — identities, keys, code tickets and push devices with it;
+  /// analytics keep their events without the account.
+  Future<bool> deleteAccount(int accountId) {
+    _scope.checkRevocation();
+    return _scope.transaction((ctx) async {
+      final db = ctx.db;
+      final found = await db.query(
+        'SELECT id FROM dw_account WHERE id = @id FOR UPDATE',
+        params: {'id': accountId},
+      );
+      if (found.isEmpty) return false;
+      await _auth.onAccountDeleting?.call(ctx, accountId);
+      final files = await db.query(
+        'SELECT id FROM dw_stored_file WHERE account_id = @id',
+        params: {'id': accountId},
+      );
+      for (final file in files) {
+        await ctx.files.delete(file.get<int>('id'));
+      }
+      await _scope.direct((db, revoked) async {
+        final keys = await db.query(
+          'UPDATE dw_auth_key SET revoked_at = now() '
+          'WHERE account_id = @account AND revoked_at IS NULL RETURNING id',
+          params: {'account': accountId},
+        );
+        for (final row in keys) {
+          revoked(row.get<int>('id'));
+        }
+      });
+      await db.execute(
+        'DELETE FROM dw_account WHERE id = @id',
+        params: {'id': accountId},
+      );
+      return true;
+    });
+  }
+
   /// Revokes every session key of [accountId], app and personal alike, with
   /// the effect described in [revokeKey].
   Future<void> revokeKeys(int accountId) {

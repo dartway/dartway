@@ -185,6 +185,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get signOutAction => 'Выйти';
 
   @override
+  String get deleteAccountAction => 'Удалить аккаунт';
+
+  @override
+  String get deleteAccountConfirmation =>
+      'Удалить аккаунт и все данные в нём? Отменить это нельзя.';
+
+  @override
   String get firstNameLabel => 'Имя';
 
   @override
