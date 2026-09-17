@@ -11,14 +11,25 @@ sealed class DwFieldPatch<T> {
   const factory DwFieldPatch.set(T value) = DwSetField<T>;
   const factory DwFieldPatch.clear() = DwClearField<T>;
 
+  bool get isKept => this is DwKeepField;
+}
+
+/// Applying a patch, as an extension rather than a member.
+///
+/// A member `T? apply(T? current)` is checked against the patch's type
+/// argument at run time. `const DwFieldPatch.clear()` and `.keep()` in a
+/// context that cannot supply `T` — a conditional expression in a generic
+/// function — are `DwClearField<Never>`: assignable to any `DwFieldPatch<T>`,
+/// and a member `apply('x')` on them failed with "String is not a subtype of
+/// Null". An extension is resolved by the static type, so the value a caller
+/// passes is checked against the type it declared, not against `Never`.
+extension DwFieldPatchApply<T> on DwFieldPatch<T> {
   /// Applies the patch to the current value.
   T? apply(T? current) => switch (this) {
     DwKeepField() => current,
     DwSetField(:final value) => value,
     DwClearField() => null,
   };
-
-  bool get isKept => this is DwKeepField<T>;
 }
 
 final class DwKeepField<T> extends DwFieldPatch<T> {

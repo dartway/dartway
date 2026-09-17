@@ -8,6 +8,7 @@ export 'package:dartway_core_shared/dartway_core_shared.dart'
         DwClearField,
         DwKeepField,
         DwFieldPatch,
+        DwFieldPatchApply,
         DwSetField,
         dwListEquals,
         dwMapEquals;

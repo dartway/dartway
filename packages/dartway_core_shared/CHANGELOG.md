@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwFieldPatch.apply` is an extension (`DwFieldPatchApply`).** `const DwFieldPatch.clear()` or `.keep()` where `T` cannot be inferred — a conditional in a generic function — is a `DwClearField<Never>`, and the member `apply` failed at run time with "String is not a subtype of Null". Resolved by the static type, it applies to a value of the declared type. A library that re-exports `DwFieldPatch` by a `show` list must show `DwFieldPatchApply` too.
+
 - **Identity and session key DTOs (D-042, D-045).** Built into
   `DwWireProtocol.core`: `DwRequestIdentifierCode(kind, identifier)` →
   `DwCodeTicket` and `DwConfirmIdentifier(ticketId, code, replace)` →
