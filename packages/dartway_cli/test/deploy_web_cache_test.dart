@@ -361,11 +361,24 @@ EXPOSE 80
     });
 
     test('names the entry points an immutable rule would freeze', () async {
-      writeWebImage(_immutableAssetsConfiguration);
+      // With fonts in the immutable rule, as the project in #251 had it.
+      writeWebImage(
+        _immutableAssetsConfiguration.replaceFirst(
+          'woff|woff2)',
+          'woff|woff2|otf)',
+        ),
+      );
       final verdict = await check.evaluate(contextIn(root));
 
       expect(verdict.passed, isFalse);
       expect(verdict.detail, contains('/main.dart.js'));
+      // The icon font is a build artefact, not a picture: reported with the
+      // code, where deferring it reads as deferring a broken app (#251).
+      final [breaking, cosmetic] = verdict.detail.split('; ');
+      expect(breaking, contains('previous build'));
+      expect(breaking, contains('/assets/fonts/MaterialIcons-Regular.otf'));
+      expect(cosmetic, contains('/favicon.png'));
+      expect(cosmetic, isNot(contains('.otf')));
       // The half a fix has to be accompanied by, or the finding is only half
       // reported: the copies already out there.
       expect(verdict.fix, contains('hard-reload'));

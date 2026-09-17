@@ -40,6 +40,17 @@ const List<String> dwFlutterEntryPoints = [
   '/canvaskit/canvaskit.wasm',
 ];
 
+/// Whether a stale copy of [path] breaks the app rather than merely showing an
+/// old picture: the page, the code, the engine, the manifests that point at
+/// assets, and the icon font — which tree shaking rebuilds with new code
+/// points under the same name, so old font and new code draw the wrong glyph
+/// or none (#251).
+bool dwStaleCopyBreaksApp(String path) =>
+    !(path.startsWith('/icons/') ||
+        path == '/favicon.png' ||
+        path == '/manifest.json' ||
+        path.startsWith('/assets/assets/'));
+
 /// The subset worth asking a live server about.
 ///
 /// One request each, and only paths a deployed build almost certainly has. The

@@ -481,8 +481,16 @@ Future<DwDeployVerdict> _checkWebCachePolicy(DwDeployContext context) async {
       .map((entry) => entry.key)
       .toList();
   if (freely.isNotEmpty) {
+    final breaking = freely.where(dwStaleCopyBreaksApp).toList();
+    final cosmetic = freely.where((path) => !dwStaleCopyBreaksApp(path));
     return DwDeployVerdict.fail(
-      'cached without revalidation: ${freely.join(', ')}',
+      [
+        if (breaking.isNotEmpty)
+          'browsers will go on running the previous build — its page, code or '
+              'icon font is reused without asking: ${breaking.join(', ')}',
+        if (cosmetic.isNotEmpty)
+          'images stay stale after a deploy: ${cosmetic.join(', ')}',
+      ].join('; '),
       fix: dwWebCacheFix(context.flutterPackage),
     );
   }
