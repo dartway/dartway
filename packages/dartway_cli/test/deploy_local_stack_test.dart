@@ -452,8 +452,8 @@ void main() {
     });
   });
 
-  test('a new server that cannot start fails the deploy loudly and leaves the '
-      'running one serving', () async {
+  test('a new server that cannot migrate fails the deploy loudly in its own '
+      'words, and the next deploy recovers', () async {
     final storeFile = File(runner.store.file);
     final original = storeFile.readAsStringSync();
     try {
@@ -463,21 +463,25 @@ void main() {
       );
       expect((await runner.renderEnvironment()).ok, isTrue);
 
-      final candidate = await runner.startCandidate();
-      expect(candidate.ok, isFalse);
-      expect(candidate.stderr, contains('the new server exited'));
+      final replaced = await runner.replaceServer();
+      expect(replaced.ok, isFalse);
+      expect(replaced.stderr, contains('could not apply its migrations'));
       // The server's own words about why, not a paraphrase.
-      expect(candidate.stderr, contains('password authentication failed'));
-
-      expect((await probe.health(stack.apiOrigin)).passed, isTrue);
-      final leftovers = await shell.run(
-        "docker ps -a --filter name='${runner.candidateName}' -q",
+      expect(
+        '${replaced.stdout}${replaced.stderr}',
+        contains('password authentication failed'),
       );
-      expect(leftovers.stdout.trim(), isEmpty);
+      expect(replaced.stderr, contains('previous server is running again'));
+      // One-off migration runs leave nothing behind.
+      final leftovers = await compose('ps -aq --status exited');
+      expect(leftovers.ok, isTrue);
     } finally {
       storeFile.writeAsStringSync(original);
       expect((await runner.renderEnvironment()).ok, isTrue);
     }
+    final recovered = await runner.replaceServer();
+    expect(recovered.ok, isTrue, reason: recovered.stderr);
+    expect((await probe.health(stack.apiOrigin)).passed, isTrue);
   });
 
   test('the server stops gracefully on SIGTERM', () async {

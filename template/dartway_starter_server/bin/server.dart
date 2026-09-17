@@ -10,6 +10,9 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 ///   `HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SSL`, `MAX_CONNECTIONS`).
 ///   The server applies its migrations as it starts and exits non-zero when
 ///   one fails;
+/// - `DW_MIGRATE_ONLY=true` — applies the migrations and exits without
+///   serving: how `dartway deploy` migrates between the old server and the
+///   new one;
 /// - `PORT` — the port to listen on, 8080 by default;
 /// - `DW_STORAGE_*` — the S3-compatible storage for uploads
 ///   (`AppFiles.storageConfig`): `ENDPOINT`, `ACCESS_KEY` and `SECRET_KEY` together;

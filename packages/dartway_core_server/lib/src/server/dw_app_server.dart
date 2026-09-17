@@ -146,9 +146,66 @@ final class DwAppServer {
   _DwRunning get _require =>
       _running ?? (throw StateError('The server is not running'));
 
+  /// The environment variable that turns [start] into a one-off migration:
+  /// `DW_MIGRATE_ONLY=true`.
+  static const String migrateOnlyVariable = 'DW_MIGRATE_ONLY';
+
   /// Starts the server; on SIGINT or SIGTERM it stops gracefully.
-  Future<void> start() =>
-      startOn(port: port, address: address, handleSignals: true);
+  ///
+  /// With `DW_MIGRATE_ONLY=true` in the environment it serves nothing: it
+  /// applies the pending migrations ([migrate]) and ends the process — 0 when
+  /// they applied, non-zero with the reason when one failed. `dartway deploy`
+  /// runs the new image this way after the previous server has stopped, so
+  /// no two versions of the server ever run at once and old code never meets
+  /// a new schema. The process ends here rather than returning, because what
+  /// a project's `main` does after `start` (bootstrapping an administrator)
+  /// needs a running server.
+  Future<void> start() async {
+    if (Platform.environment[migrateOnlyVariable] == 'true') {
+      try {
+        await migrate();
+      } catch (error, stackTrace) {
+        logger.error('migrations failed', error: error, stackTrace: stackTrace);
+        exit(1);
+      }
+      exit(0);
+    }
+    await startOn(port: port, address: address, handleSignals: true);
+  }
+
+  /// Applies the pending migrations and checks the declared schema, then
+  /// closes the database: everything [start] does before it serves, and
+  /// nothing after.
+  Future<void> migrate() async {
+    final problems = validate();
+    if (problems.isNotEmpty) throw DwStartupException(problems);
+    final opened = await DwPostgresDatabase.open(database);
+    try {
+      await _applyMigrations(opened);
+      logger.info('migrations applied; not serving (migrate only)');
+    } finally {
+      await opened.close();
+    }
+  }
+
+  Future<void> _applyMigrations(DwPostgresDatabase opened) async {
+    await DwMigrationRunner(
+      opened.db,
+      migrations: {
+        dwFrameworkNamespace: dwFrameworkMigrations,
+        for (final module in modules) module.namespace: module.migrations,
+        'app': migrations,
+      },
+      sources: {
+        if (migrationsDirectory case final directory?)
+          if (Directory(directory).existsSync()) 'app': directory,
+      },
+    ).apply();
+    if (schema case final declared?) {
+      final missing = await _missingFromDatabase(declared, opened.db);
+      if (missing.isNotEmpty) throw DwStartupException(missing);
+    }
+  }
 
   @internal
   Future<void> startOn({
@@ -184,22 +241,7 @@ final class DwAppServer {
       }
       openedDatabase = await DwPostgresDatabase.open(database);
       fileStore?.attach(openedDatabase.db);
-      await DwMigrationRunner(
-        openedDatabase.db,
-        migrations: {
-          dwFrameworkNamespace: dwFrameworkMigrations,
-          for (final module in modules) module.namespace: module.migrations,
-          'app': migrations,
-        },
-        sources: {
-          if (migrationsDirectory case final directory?)
-            if (Directory(directory).existsSync()) 'app': directory,
-        },
-      ).apply();
-      if (schema case final declared?) {
-        final missing = await _missingFromDatabase(declared, openedDatabase.db);
-        if (missing.isNotEmpty) throw DwStartupException(missing);
-      }
+      await _applyMigrations(openedDatabase);
 
       late final DwJobRunner runner;
       final runtime = DwRuntime(

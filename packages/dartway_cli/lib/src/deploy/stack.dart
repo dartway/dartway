@@ -100,6 +100,10 @@ class DwStack {
   static bool mirrorServes(String image) =>
       !image.split(':').first.contains('/');
 
+  /// Turns a server start into a one-off migration that serves nothing — the
+  /// name `DwAppServer.migrateOnlyVariable` reads in `dartway_core_server`.
+  static const String migrateOnlyVariable = 'DW_MIGRATE_ONLY';
+
   /// The mount point of `requires.files` inside the server container.
   static const String secretFilesDir = '/run/secrets';
 

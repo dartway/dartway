@@ -187,12 +187,18 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    file sets, or a required secret is missing or empty;
 4. checks the merged Compose configuration, then builds the images;
 5. with MinIO, starts it and runs `minio-init`, printing what it did; starts Postgres;
-6. **starts the new server beside the running one.** It applies its migrations as it starts and
-   either becomes healthy or exits; on an exit its log is printed and the deploy stops with the
-   previous version still serving. That log *is* the migration outcome, in the server's own words.
-   The candidate has no network alias, so the proxy never routes to it;
-7. replaces the server and waits until it is healthy, replaces the web app, and converges the rest of
-   the stack (`up -d --remove-orphans`);
+6. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
+   flight are answered, live sockets close with "server stopping" — and from then on the proxy
+   answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
+   idempotency key, so a retry never runs it twice). The new image applies the migrations in a
+   one-off run that serves nothing and takes no jobs (`DW_MIGRATE_ONLY=true`), then the new server
+   starts and has to become healthy. The gap is the stop, the migrations and the start: seconds
+   for a routine deploy, as long as a migration takes for a heavy one. **No two versions ever run
+   at once**: old code never writes into a new schema, never claims a job only the new code
+   declares. When the migrations fail (they roll back) or the new server does not become healthy,
+   the image that was serving is started again and the step fails with the server's own log; after
+   a failure past the migrations the previous code runs on the new schema, and the message says so;
+7. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
 8. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
    the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this

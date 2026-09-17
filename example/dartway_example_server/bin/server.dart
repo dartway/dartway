@@ -6,6 +6,9 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 /// Starts the example server. Configured by the environment:
 ///
 /// - `DW_DATABASE_*` — the database (see `DwDatabaseConfig.fromEnvironment`);
+/// - `DW_MIGRATE_ONLY=true` — applies the migrations and exits without
+///   serving: how `dartway deploy` migrates between the old server and the
+///   new one;
 /// - `PORT` — the port to listen on, 8080 by default;
 /// - `DW_MIN_APP_BUILD` — the oldest app build still served; an older one is
 ///   shown the "update the app" screen. Raising it needs a restart, not a

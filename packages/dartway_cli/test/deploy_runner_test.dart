@@ -35,7 +35,6 @@ void main() {
         'build',
         'storage',
         'database',
-        'server-candidate',
         'server',
         'web',
         'stack',
@@ -51,11 +50,11 @@ void main() {
       before('compose-config', 'build');
     });
 
-    // The previous server keeps serving while a candidate that cannot migrate
-    // or start says why.
-    test('the new server proves itself before it replaces the old one', () {
-      before('database', 'server-candidate');
-      before('server-candidate', 'server');
+    // Migrations need the database, and the proxy is pointed at the server
+    // only once it is the new one.
+    test('the server is replaced after the database, before the web app', () {
+      before('database', 'server');
+      before('server', 'web');
     });
 
     test('the proxy is checked, then certified, then restarted', () {
@@ -84,13 +83,12 @@ void main() {
       await runner.checkComposeConfig();
       await runner.build();
       await runner.startDatabase();
-      await runner.startCandidate();
       await runner.replaceServer();
       await runner.startWeb();
       await runner.startStack();
       await runner.restartProxy();
 
-      expect(ssh.issued, hasLength(8));
+      expect(ssh.issued, hasLength(7));
       for (final command in ssh.issued) {
         expect(command, contains("cd '/home/deployer/shop'"));
         expect(command, contains(DwComposeFiles.projectOverride));
@@ -118,6 +116,100 @@ void main() {
       expect(
         command,
         contains('test -s /etc/letsencrypt/renewal/api.example.com.conf'),
+      );
+    });
+
+    group('replacing the server', () {
+      late Directory temp;
+      late File calls;
+
+      setUp(() {
+        temp = Directory.systemTemp.createTempSync('dw_replace_server_');
+        calls = File(p.join(temp.path, 'calls'));
+        Directory(p.join(temp.path, 'shop')).createSync();
+      });
+      tearDown(() => temp.deleteSync(recursive: true));
+
+      /// Runs the step against a `docker` that answers as a server of
+      /// [image] would, and answers the result and the docker calls made.
+      Future<(DwSshResult, List<String>)> replace({
+        bool running = true,
+        bool migrationFails = false,
+        bool healthy = true,
+      }) async {
+        final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+        final docker = File(p.join(bin.path, 'docker'))
+          ..writeAsStringSync('''
+#!/bin/sh
+echo "\$*" | sed 's/-f [^ ]*//g; s/  */ /g' >> '${calls.path}'
+case "\$*" in
+  *" ps -aq server"*) ${running ? 'echo old-container' : 'true'} ;;
+  *" ps -q server"*) echo new-container ;;
+  *"{{.Config.Image}}"*) echo shop-server ;;
+  "inspect -f {{.Image}}"*) echo sha256:previous ;;
+  *" run --rm --no-deps -T -e DW_MIGRATE_ONLY=true server"*) ${migrationFails ? 'echo "migration 42 failed" >&2; exit 1' : 'echo migrated'} ;;
+  *"{{.State.Status}}"*) echo "running ${healthy ? 'healthy' : 'unhealthy'} 0 0" ;;
+esac
+exit 0
+''');
+        Process.runSync('chmod', ['+x', docker.path]);
+        final result = await DwDeployRunner(
+          ssh: LocalShell(
+            environment: {
+              'PATH': '${bin.path}:${Platform.environment['PATH']}',
+            },
+          ),
+          stack: stackFrom(),
+          appDir: p.join(temp.path, 'shop'),
+        ).replaceServer();
+        final issued = calls.existsSync()
+            ? calls.readAsLinesSync().map((line) => line.trim()).toList()
+            : <String>[];
+        return (result, issued);
+      }
+
+      int at(List<String> calls, String fragment) =>
+          calls.indexWhere((call) => call.contains(fragment));
+
+      test('stops the old one, migrates in a one-off run, then starts the new '
+          'one — never two at once', () async {
+        final (result, calls) = await replace();
+        expect(result.ok, isTrue, reason: result.stderr);
+        final stop = at(calls, 'stop -t 45 server');
+        final migrate = at(calls, 'DW_MIGRATE_ONLY=true server');
+        final start = at(calls, 'up -d --no-deps server');
+        expect(stop, isNot(-1));
+        expect(migrate, greaterThan(stop));
+        expect(start, greaterThan(migrate));
+        expect(at(calls, 'image tag'), -1, reason: 'nothing to roll back');
+      });
+
+      test('a failed migration starts the previous image again', () async {
+        final (result, calls) = await replace(migrationFails: true);
+        expect(result.ok, isFalse);
+        expect(result.stderr, contains('migration 42 failed'));
+        expect(result.stderr, contains('previous server is running again'));
+        final tag = at(calls, 'image tag sha256:previous shop-server');
+        expect(tag, greaterThan(at(calls, 'DW_MIGRATE_ONLY=true')));
+        expect(at(calls.sublist(tag), 'up -d --no-deps server'), isNot(-1));
+      });
+
+      test('a new server that does not become healthy is replaced by the '
+          'previous one, and the message names the schema', () async {
+        final (result, calls) = await replace(healthy: false);
+        expect(result.ok, isFalse);
+        expect(result.stderr, contains('previous code runs on the new schema'));
+        expect(at(calls, 'image tag sha256:previous shop-server'), isNot(-1));
+      });
+
+      test(
+        'a first deployment has nothing to stop and nothing to go back to',
+        () async {
+          final (result, calls) = await replace(running: false);
+          expect(result.ok, isTrue, reason: result.stderr);
+          expect(at(calls, 'stop -t 45'), -1);
+          expect(at(calls, 'DW_MIGRATE_ONLY=true server'), isNot(-1));
+        },
       );
     });
 

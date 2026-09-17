@@ -151,18 +151,6 @@ class DwDeployRunner {
   Future<DwSshResult> startDatabase() =>
       _compose('up -d --wait ${DwStack.postgresService}');
 
-  /// The container name of the candidate server.
-  String get candidateName => '${_projectName}_server_candidate';
-
-  /// Compose's project name: the checkout directory's name, as Compose derives
-  /// it — lower case, and only the characters a project name may hold.
-  String get _projectName => appDir
-      .split('/')
-      .where((part) => part.isNotEmpty)
-      .last
-      .toLowerCase()
-      .replaceAll(RegExp('[^a-z0-9_-]'), '');
-
   /// Waits for a container to be healthy; on anything else prints why and the
   /// container's own log, and fails.
   ///
@@ -206,40 +194,67 @@ dw_wait_healthy() {
 }
 ''';
 
-  /// Starts the new server image beside the one that is serving, and waits
-  /// for it to migrate and answer `/health`.
+  /// Replaces the server with the new image, one version at a time: the
+  /// serving server stops gracefully (calls in flight are answered; clients
+  /// retry through the gap), the new image applies the migrations in a
+  /// one-off run that serves nothing (`DW_MIGRATE_ONLY=true`), then the new
+  /// server starts and has to become healthy.
   ///
-  /// Beside, not instead: if the new code cannot start — a migration that
-  /// fails, a configuration the server refuses — the running version is still
-  /// the one answering while the log below says why. The candidate gets no
-  /// network alias, so the proxy never routes to it; it is stopped the moment
-  /// it has proven itself, and the migrations it applied are the ones the
-  /// replacement then finds already done.
-  Future<DwSshResult> startCandidate() => _as('''
-set -e
-cd '$appDir'
-${DwComposeFiles.selectFiles}
-${waitHealthyFunction()}
-docker rm -f '$candidateName' >/dev/null 2>&1 || true
-${DwComposeFiles.invoke} run -d --name '$candidateName' ${DwStack.serverService} </dev/null >/dev/null
-status=0
-dw_wait_healthy '$candidateName' 'the new server' || status=\$?
-docker stop -t 45 '$candidateName' >/dev/null 2>&1 || true
-docker rm -f '$candidateName' >/dev/null 2>&1 || true
-exit \$status
-''');
-
-  /// Replaces the serving server with the new image and waits until it is
-  /// healthy.
+  /// No two versions ever run at once, so old code never writes into a new
+  /// schema and never claims a job it does not know. The price is a short
+  /// gap — the stop, the migrations, the start — which the client's retries
+  /// cover.
+  ///
+  /// When the migrations or the new server fail, the image that was serving
+  /// is started again, and the step fails with the server's own words. A
+  /// migration that failed rolled back; a server that failed after its
+  /// migrations applied leaves the previous code on the new schema, which the
+  /// message says.
   Future<DwSshResult> replaceServer() => _as('''
 set -e
 cd '$appDir'
 ${DwComposeFiles.selectFiles}
 ${waitHealthyFunction()}
+# The image the serving server runs, to start again on a failure. Read from
+# the container: the build has already moved the image name to the new one.
+old=\$(${DwComposeFiles.invoke} ps -aq ${DwStack.serverService} | head -n 1)
+image=""
+previous=""
+if [ -n "\$old" ]; then
+  image=\$(docker inspect -f '{{.Config.Image}}' "\$old")
+  previous=\$(docker inspect -f '{{.Image}}' "\$old")
+fi
+dw_start_previous() {
+  if [ -z "\$previous" ]; then
+    echo "there is no previous server to start again" >&2
+    return 0
+  fi
+  if docker image tag "\$previous" "\$image" && ${DwComposeFiles.invoke} up -d --no-deps ${DwStack.serverService} >/dev/null 2>&1; then
+    echo "the previous server is running again" >&2
+  else
+    echo "ERROR: the previous server could not be started again" >&2
+  fi
+}
+if [ -n "\$old" ]; then
+  ${DwComposeFiles.invoke} stop -t 45 ${DwStack.serverService}
+fi
+if ! ${DwComposeFiles.invoke} run --rm --no-deps -T -e ${DwStack.migrateOnlyVariable}=true ${DwStack.serverService} </dev/null; then
+  echo "ERROR: the new image could not apply its migrations (the log is above); they rolled back" >&2
+  dw_start_previous
+  exit 1
+fi
 ${DwComposeFiles.invoke} up -d --no-deps ${DwStack.serverService}
 cid=\$(${DwComposeFiles.invoke} ps -q ${DwStack.serverService})
-[ -n "\$cid" ] || { echo "ERROR: Compose started no ${DwStack.serverService} container" >&2; exit 1; }
-dw_wait_healthy "\$cid" 'the server'
+if [ -z "\$cid" ]; then
+  echo "ERROR: Compose started no ${DwStack.serverService} container" >&2
+  dw_start_previous
+  exit 1
+fi
+if ! dw_wait_healthy "\$cid" 'the new server'; then
+  echo "ERROR: the new server did not become healthy; its migrations are applied, so the previous code runs on the new schema" >&2
+  dw_start_previous
+  exit 1
+fi
 ''');
 
   Future<DwSshResult> startWeb() =>
@@ -433,14 +448,10 @@ echo "nginx restarted and running"
       run: startDatabase,
     ),
     DwDeployStep(
-      id: 'server-candidate',
-      title: 'Start the new server beside the running one: migrate, /health',
-      run: startCandidate,
-      showOutput: true,
-    ),
-    DwDeployStep(
       id: 'server',
-      title: 'Replace the server and wait until it is healthy',
+      title:
+          'Replace the server: stop it, migrate, start the new one (the '
+          'previous one again on a failure)',
       run: replaceServer,
       showOutput: true,
     ),

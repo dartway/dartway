@@ -208,6 +208,31 @@ void main() {
       await again.stop();
     });
 
+    test('migrate applies what a start would, and serves nothing', () async {
+      final server = app.server(database.config);
+      await server.migrate();
+      final opened = await DwPostgresDatabase.open(database.config);
+      try {
+        final ledger = await opened.db.query(
+          "SELECT id FROM dw_migrations WHERE namespace = 'app'",
+        );
+        expect(ledger.map((r) => r['id']), ['20260913_120000_test_app']);
+        // Nothing stayed open: no listener, no job connection.
+        final others = await opened.db.query(
+          'SELECT count(*)::int AS n FROM pg_stat_activity '
+          'WHERE datname = current_database() AND pid <> pg_backend_pid()',
+        );
+        expect(others.single['n'], 0);
+      } finally {
+        await opened.close();
+      }
+      expect(
+        () => server.stop(),
+        returnsNormally,
+        reason: 'a migrate-only server was never running',
+      );
+    });
+
     test('the framework migration rolls back and applies again', () async {
       final opened = await DwPostgresDatabase.open(database.config);
       try {

@@ -2,6 +2,8 @@
 
 ## Unreleased — DartWay 1.0
 
+- **BREAKING (deploy): the server is replaced one version at a time** (D-070). `deploy run` no longer starts the new server beside the serving one: the serving server stops gracefully, the new image migrates in a one-off run (`DW_MIGRATE_ONLY=true`), the new server starts; on a failure the previous image is started again. The gap is covered by the client's retries. Step `server-candidate` is gone; `server` does all of it.
+
 - **`dartway check` holds the contract's names to the naming law** (`contractNameInvalid`, error — #167): a DTO in the shared package named one word, a read not named `Get…`/`List…`, or a command named like a read. The class name is the wire name, so the check fires before a build carries it. The example's `SearchChatMessages` is `ListChatMessagesMatching`.
 
 - **`dartway create --language` sets the app's language** (#230). The project keeps only that translation (`en` or `ru`), makes it the template ARB and `AppLocaleController.productLocale`, and regenerates `lib/l10n/gen`. The skeleton no longer takes the device's language, and no longer falls back to whichever ARB sorts first.
