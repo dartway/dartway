@@ -189,6 +189,12 @@ constructors moves into the kit**, and the domain `switch` stays in the feature 
 the enum itself into the kit is not allowed: the texts would come with it, and text constants have no
 place in the kit (`dartway check` warns on a string literal under `ui_kit/`: `uiKitContainsText`).
 
+**The kit does not know the language either.** A kit widget takes **every** visible string as a
+parameter and never reads `context.l10n`: the locale belongs to the app, and a label baked into the
+kit is text nobody can translate and a second source of truth beside the `.arb`. The first kit widget
+that needs a label is where this goes wrong — it gets a parameter, not a constant. The one exception is
+a string no person reads: a semantics key, a `debugLabel`.
+
 ## Text: a widget with named constructors + a token enum
 
 Two different entities, and they must not be collapsed into one:

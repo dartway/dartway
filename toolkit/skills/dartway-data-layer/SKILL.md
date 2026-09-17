@@ -142,6 +142,10 @@ result thrown there is handled the same way.
 - **`dw.action(...)` is a `DwUiAction`, not a `VoidCallback`.** Give it to the kit's buttons, or to any
   tappable widget through `DwActionBuilder(action:, builder: (context, onPressed, busy) => …)`, which
   blocks repeated taps and reports `busy`.
+- **`dw.action` wraps work, not waiting for a person.** `busy` lasts exactly as long as the callback's
+  `Future`: awaiting a sheet, a dialog or a picker inside it spins the button for as long as the sheet
+  is open, and makes `pumpAndSettle` never return in a test. Opening a sheet is navigation — do it from
+  a plain handler, and wrap in `dw.action` what happens **after** the choice: the save, the send.
 - **A command is retried after network failures with the same idempotency key**, so a retried send
   never executes twice. A `DwTimeoutException` means the outcome is unknown; the next tap is a new
   intent.

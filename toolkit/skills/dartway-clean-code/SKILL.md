@@ -986,6 +986,13 @@ final displayName = ref.watch(
 - Edge cases and rollback/degradation scenarios ("downgrade": a business profile expired → the badge was removed, a subscription was cancelled, the balance went negative).
 - Any bugfix of non-trivial behavior.
 
+**Assert the outcome, not the firing.** "After the call the value moved in the right direction" proves
+the code ran, not that it does what it was written for. For anything that accumulates — growth, decay,
+streaks, progression — the claim is about the **trajectory**: run N steps and check where the value
+ended up. If "after 30 days the norm reaches X" cannot be written because nobody knows X, the problem is
+the specification, not the test. A constant changed because "the test failed on the old one" is always
+a reason to ask what the test checks.
+
 **What we do NOT test:** cosmetics — recolored a button, fixed a padding, renamed something. A test for the sake of a checkbox contradicts KISS/YAGNI.
 
 **A bugfix is strictly "cause → fix":**

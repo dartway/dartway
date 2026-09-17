@@ -113,7 +113,16 @@ always writes every column.
 
 **Nullable only when the value can really be absent** in the domain, never for a form's convenience.
 Money and other histories are rows of their own (one row per change), not a field overwritten in
-place. Rebuild a stored row with its generated `copyWith`, never by listing fields in the
+place.
+
+**Append-only is a decision about the screen, not about storage.** A table that never updates its rows
+means an edit takes effect only at some event. Before choosing it, answer **what event** applies an
+edit, **how the person triggers it**, and **what they see in between** — without all three the form
+accepts input and nothing visible happens, which is worse than a disabled form. Usually the "fixed
+state" revisions were wanted for already exists as an entity (a cycle, an order, a document version),
+and copying a few fields into it is cheaper than a history nobody reads.
+
+Rebuild a stored row with its generated `copyWith`, never by listing fields in the
 constructor — a field added later silently takes its default in every row that path writes.
 
 After changing a row class: `dartway generate`, then `dart run bin/migrate.dart create <name>` from

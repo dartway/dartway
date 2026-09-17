@@ -355,6 +355,10 @@ For every item give a **concrete proposed edit**, ready to apply. Mark anything 
 - Ask what to apply. Support batches: "apply the descriptions", "apply Minor", "apply everything except
   the architectural items", or item by item by number.
 - Apply **only what was confirmed**. Nothing silently.
+- **Format the files in the diff, not the package.** `dart format lib test` rewrites line breaks in
+  files the task never touched, and the diff stops answering "what did this change":
+  `git diff --name-only origin/__BASE_BRANCH__...HEAD -- '*.dart' | xargs dart format`. A package that
+  really needs formatting is its own commit.
 - After applying, re-run the checks the edits touch (a DTO edit → `dartway generate --check` and the
   contract test; a handler → `dartway test`; a widget → `flutter test` and `dartway check`).
 - Do not touch anything debatable/architectural, even if the author said "all of it" — ask again about
