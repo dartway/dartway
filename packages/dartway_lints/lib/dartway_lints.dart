@@ -1,5 +1,4 @@
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/error/error.dart' hide LintCode;
 import 'package:analyzer/error/listener.dart';
 import 'package:custom_lint_builder/custom_lint_builder.dart';
@@ -12,7 +11,6 @@ class _DartwayLintsPlugin extends PluginBase {
     ForbiddenUiStyleUsageRule(),
     DeepRelativeImportRule(),
     ForbiddenProviderScopeRule(),
-    ModelRebuildByConstructorRule(),
   ];
 }
 
@@ -27,20 +25,6 @@ bool _isGeneratedFile(String path) {
   return normalized.endsWith('.g.dart') ||
       normalized.endsWith('.freezed.dart') ||
       normalized.endsWith('.gen.dart');
-}
-
-/// Where `serverpod generate` writes its models: `lib/src/protocol/` in a
-/// client package, `lib/src/generated/` in a server one. Not covered by
-/// [_isGeneratedFile] — serverpod names its output after the model, not after
-/// the generator, so there is no suffix to recognise.
-///
-/// Recognised by the two-segment tail rather than by `protocol` alone: a
-/// hand-written `lib/protocol/` of one's own is somebody's code, and the point
-/// of this check is that nobody wrote what it skips.
-bool _isServerpodGeneratedFile(String path) {
-  final normalized = path.replaceAll('\\', '/');
-  return normalized.contains('/lib/src/protocol/') ||
-      normalized.contains('/lib/src/generated/');
 }
 
 /// The theme getters the app's `ui_kit/` defines on `BuildContext`. Reaching
@@ -170,148 +154,6 @@ class ForbiddenProviderScopeRule extends DartLintRule {
         reporter.atNode(node.constructorName, code);
       }
     });
-  }
-}
-
-/// DartWay convention: a stored Serverpod model is rebuilt with `copyWith`, and
-/// the generated constructor is for creating a row that does not exist yet.
-///
-/// The mistake it catches is silent by construction. Serverpod makes a field
-/// with `default=` (and any nullable field) an **optional** argument, so a
-/// method that rebuilds a model by naming its fields —
-/// `StudioIssue(id: …, title: …, …)` — keeps compiling when a field is added to
-/// the model, and quietly substitutes the default for it. In a real project a
-/// `priority` field was reset to `medium` on every single edit of the record it
-/// belonged to; nothing in the compiler, the tests or the review could see it.
-///
-/// A doc comment does not close this. The method carried an honest "anything
-/// added here too" note above it, and the field was added by another task that
-/// never opened the file. A rule living in a comment at the far end of the
-/// system is not a rule.
-///
-/// The signal is a real `id:`. A row being created never passes one — the id
-/// comes back from the database — so a call that does pass one is rebuilding
-/// something that already exists, and `copyWith` is what rebuilds it. Nothing
-/// is lost by the ban: `copyWith` can clear a nullable field too, because the
-/// generated one takes `Object? field = _Undefined` and tests
-/// `field is T? ? field : this.field`, which tells "not passed" apart from
-/// "passed null".
-///
-/// Two ids are not real, and neither is a rebuild: `null`, which says out loud
-/// that the row does not exist yet, and `dw.repo.mockModelId`, the sentinel a
-/// skeleton default carries. The second one is why the exemption exists at all
-/// — `setupRepository(defaultModel:)` is the framework's own API, and every
-/// project registers one default per model, so without it the rule reported a
-/// warning per model in the one file where it had nothing to say. A rule that
-/// is guaranteed to be loud where it must be silent teaches people to scroll
-/// past its output.
-///
-/// Matched through `SerializableModel` rather than through `TableRow`: on the
-/// server a model implements both, but the **client** half of the same
-/// generated model implements only `SerializableModel` — and the client half is
-/// the one an application writes its code against, the one package where these
-/// lints actually run. A `TableRow` check would be dead in exactly the place
-/// the rule is for.
-class ModelRebuildByConstructorRule extends DartLintRule {
-  const ModelRebuildByConstructorRule() : super(code: _code);
-
-  static const _code = LintCode(
-    name: 'model_rebuild_by_constructor',
-    problemMessage:
-        'A stored row is a model with a real id, and this rebuilds one by '
-        'listing its fields. A field with default= or a nullable field is an '
-        'optional argument, so the next one added to the model is not a '
-        'compile error here — it is a silent default.',
-    correctionMessage:
-        'Rebuild it with copyWith. Clearing a nullable field works too: pass '
-        'null, and the sentinel tells that apart from not passing it. A '
-        'skeleton default is not a row — build it with '
-        'id: dw.repo.mockModelId.',
-    errorSeverity: DiagnosticSeverity.WARNING,
-  );
-
-  @override
-  void run(
-    CustomLintResolver resolver,
-    DiagnosticReporter reporter,
-    CustomLintContext context,
-  ) {
-    final path = resolver.path;
-
-    if (_isGeneratedFile(path) || _isServerpodGeneratedFile(path)) return;
-
-    context.registry.addInstanceCreationExpression((node) {
-      final idArgument = _idArgument(node.argumentList);
-      if (idArgument == null) return;
-
-      // `id: null` is a row saying out loud that it does not exist yet — the
-      // one shape of a field-by-field call that is not a rebuild.
-      if (idArgument.expression is NullLiteral) return;
-
-      // The skeleton default: an id that is the sentinel is not an id.
-      if (_isMockModelId(idArgument.expression)) return;
-
-      if (!_isSerializableModel(node.staticType)) return;
-
-      reporter.atNode(node.constructorName, code);
-    });
-  }
-
-  /// The sentinel a skeleton default carries in place of an id, spelled
-  /// `dw.repo.mockModelId` in application code (`DwRepository.mockModelId` is
-  /// the static it delegates to, and lives inside the framework).
-  static const _mockModelIdName = 'mockModelId';
-
-  /// Matched by name rather than by resolved element, for the same reason
-  /// `forbidden_provider_scope` matches `ProviderScope` by name: an unresolved
-  /// reference would make the rule fire, and firing is the failure mode being
-  /// fixed here. The trade — a variable of one's own called `mockModelId`
-  /// silences the rule for that one call — costs nothing next to a warning on
-  /// every model of every project that uses `setupRepository`.
-  ///
-  /// Deliberately not widened to "any construction passed as the
-  /// `defaultModel:` argument of `setupRepository`". The sentinel travels with
-  /// the value — through a helper that builds the instance, through a list of
-  /// defaults registered in a loop — while the argument position only catches
-  /// the call written inline; and a *real* id handed to `setupRepository` is a
-  /// stored row pinned as a skeleton, which is worth seeing rather than
-  /// silencing.
-  static bool _isMockModelId(Expression expression) =>
-      _tailName(expression) == _mockModelIdName;
-
-  /// The last identifier of a reference, whatever shape it arrives in:
-  /// `mockModelId`, `DwRepository.mockModelId` (a prefixed identifier),
-  /// `dw.repo.mockModelId` (a property access on a prefixed identifier).
-  static String? _tailName(Expression expression) => switch (expression) {
-    SimpleIdentifier(:final name) => name,
-    PrefixedIdentifier(:final identifier) => identifier.name,
-    PropertyAccess(:final propertyName) => propertyName.name,
-    _ => null,
-  };
-
-  static NamedExpression? _idArgument(ArgumentList argumentList) {
-    for (final argument in argumentList.arguments) {
-      if (argument is NamedExpression && argument.name.label.name == 'id') {
-        return argument;
-      }
-    }
-    return null;
-  }
-
-  /// Asks the type rather than the name: `id:` is a common argument, and only
-  /// on a Serverpod model does it mean a database row.
-  static bool _isSerializableModel(DartType? type) {
-    if (type is! InterfaceType) return false;
-
-    for (final supertype in type.allSupertypes) {
-      final element = supertype.element;
-
-      if (element.name == 'SerializableModel' &&
-          element.library.uri.toString().startsWith('package:serverpod')) {
-        return true;
-      }
-    }
-    return false;
   }
 }
 

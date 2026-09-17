@@ -389,6 +389,11 @@ void main() {
         expect(early.status, 422);
         expect(early.refusal.isCode(DwUploadRefusal.missing), isTrue);
         expect(
+          RecordingLogger.lines,
+          contains(contains('upload ${ticket.id} has no object yet')),
+          reason: 'the only server-side trace of a lost upload',
+        );
+        expect(
           harness().app.alerts.incidents,
           isEmpty,
           reason: 'not a failure',

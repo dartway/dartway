@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **A finished upload with no object is logged** (#224): the refusal `DwUploadRefusal.missing` now leaves a warning with the file id, expected size and type, bucket and key — the only server-side trace when an upload that reported success left nothing in the bucket.
+
 - **Alerts have a ceiling across signatures** (#257): `DwServerSettings.alertsPerMinute` (10). Past it an incident is only logged, and the next alert carries how many were held back — many different failures at once no longer exhaust Telegram's 20-a-minute limit and lose alerts to its refusals.
 
 - **Jobs know their run and announce as they go.** `ctx.job` (`DwJobAttempt`: `attempt`, `maxAttempts`, `isLastAttempt`) in a job's handler, `null` elsewhere. A non-transactional job's publications inside a `ctx.transaction` are delivered when that transaction commits, rather than when the job ends.

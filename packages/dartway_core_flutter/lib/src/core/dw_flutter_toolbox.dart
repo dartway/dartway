@@ -50,14 +50,14 @@ class DwFlutterToolbox {
     Object error,
     StackTrace stackTrace, {
     DwErrorSource source = DwErrorSource.manual,
-    String? actionLabel,
+    String? label,
     String? failedCall,
   }) => dispatchReport(
     DwErrorReport(
       error: error,
       stackTrace: stackTrace,
       source: source,
-      actionLabel: actionLabel,
+      label: label,
       failedCall: failedCall,
       context: errorContext.capture(appVersion: _config.appVersion),
     ),

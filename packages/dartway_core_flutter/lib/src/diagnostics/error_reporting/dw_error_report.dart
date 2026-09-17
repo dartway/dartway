@@ -13,7 +13,7 @@ class DwErrorReport {
     required this.stackTrace,
     required this.source,
     required this.context,
-    this.actionLabel,
+    this.label,
     this.failedCall,
   });
 
@@ -22,8 +22,10 @@ class DwErrorReport {
   final DwErrorSource source;
   final DwErrorContextSnapshot context;
 
-  /// Label of the `DwUiAction` that failed.
-  final String? actionLabel;
+  /// What failed, in words the reader of a report recognises — for a
+  /// `DwUiAction` its label; for any other source what the caller of
+  /// `handleError` named. Every source may carry one.
+  final String? label;
 
   /// The wire name of the request or command that failed.
   final String? failedCall;

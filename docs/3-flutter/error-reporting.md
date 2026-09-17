@@ -33,8 +33,8 @@ with `debugPrint` and goes nowhere else — an app that ships without a policy h
 `DwErrorReport`:
 
 - `error`, `stackTrace`, `source`;
-- `actionLabel` — for `uiAction`: the action's `label`, else its `onErrorNotification`, else its
-  `onSuccessNotification`. Give an action an explicit `label` when its texts are generic: twelve reports
+- `label` — what failed, for any source: for `uiAction` the action's `label`, else its
+  `onErrorNotification`, else its `onSuccessNotification`; for others what `handleError(label:)` named. Give an action an explicit `label` when its texts are generic: twelve reports
   labelled "Saved" say nothing;
 - `failedCall` — the wire name of the request or command that failed, when the error names one
   (`DwFailedException.call`);

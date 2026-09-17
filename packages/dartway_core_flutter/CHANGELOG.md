@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **BREAKING: `DwErrorReport.actionLabel` is `label`**, and `dw.handleError(label:)` takes it for any source (#126). Migration note: `docs/migrations/2026-09-17-error-report-label.md`.
+
 - **`dw.listen(channels)`** forwards `DwAppClient.listen`: hear a channel without reading a page (D-067).
 
 - **`DwAppRunner` survives an error whose stack is not a `StackTrace`.** On the web `FlutterErrorDetails.stack` can hold a raw JavaScript value; the handler read it typed, threw inside itself, and the original error was lost. Any value is now turned into a `StackTrace` (`DwAppRunner.stackOf`).

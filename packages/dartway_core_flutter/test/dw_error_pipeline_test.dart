@@ -74,7 +74,7 @@ void main() {
       expect(reports, hasLength(1));
       final report = reports.single;
       expect(report.source, DwErrorSource.uiAction);
-      expect(report.actionLabel, 'testAction');
+      expect(report.label, 'testAction');
       expect(report.error, isA<StateError>());
       expect(report.context.route, '/test-route');
       expect(report.context.featureIds, contains('feature-a'));
@@ -93,7 +93,7 @@ void main() {
       );
       await action(context);
 
-      expect(reports.single.actionLabel, 'Could not save');
+      expect(reports.single.label, 'Could not save');
     });
 
     test('manual handleError captures context too', () {

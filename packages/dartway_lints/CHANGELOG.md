@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+`model_rebuild_by_constructor` is removed (#103). It matched Serverpod's `SerializableModel`, which DartWay 1.0 apps no longer have, so it could not fire; and the rows it guarded now live only in server packages, where these lints do not run. The fixtures and the `serverpod_client` dependency of the example go with it.
+
 ## 0.3.1
 
 `model_rebuild_by_constructor` no longer reports a skeleton default. A construction whose `id:` is

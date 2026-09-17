@@ -69,7 +69,7 @@ on what went wrong:
 | Anything else — `DwCallFailed`, a `DwTimeoutException`, a bug | `onErrorNotification`, when set | — |
 
 In **every** case `onError(error, stackTrace)` is called when given, and the error goes to
-`dw.handleError` with `DwErrorSource.uiAction` and an `actionLabel` — `label`, else
+`dw.handleError` with `DwErrorSource.uiAction` and a `label` — `label`, else
 `onErrorNotification`, else `onSuccessNotification`. The app's error policy sees everything and sorts
 it by type; see [error reporting](error-reporting.md). The skeleton's policy ignores refusals and
 not-authenticated answers, and shows a generic "it did not work" notification for any other failure of

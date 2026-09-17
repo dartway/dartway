@@ -360,7 +360,17 @@ final class DwFileStore {
       row.get<String>('bucket'),
       row.get<String>('object_key'),
     );
-    if (head == null) ctx.refuse(DwUploadRefusal.missing);
+    if (head == null) {
+      // A refusal the client may meet by finishing too early — and the only
+      // trace on the server when an upload that reported success left
+      // nothing in the bucket.
+      ctx.log.warning(
+        'upload ${record.id} has no object yet: expected '
+        '${record.byteSize} bytes of ${record.contentType} at '
+        '${row.get<String>('bucket')}/${row.get<String>('object_key')}',
+      );
+      ctx.refuse(DwUploadRefusal.missing);
+    }
     if (head.byteSize != record.byteSize ||
         head.contentType != record.contentType) {
       ctx.log.warning(

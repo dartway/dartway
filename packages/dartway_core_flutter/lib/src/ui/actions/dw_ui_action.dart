@@ -114,7 +114,7 @@ extension DwActionExtension on DwFlutterToolbox {
           source: DwErrorSource.uiAction,
           // Actions rarely get explicit labels — the notification texts make
           // a meaningful fallback name in error reports.
-          actionLabel: label ?? onErrorNotification ?? onSuccessNotification,
+          label: label ?? onErrorNotification ?? onSuccessNotification,
           failedCall: switch (error) {
             DwFailedException(:final call) => call,
             _ => null,
