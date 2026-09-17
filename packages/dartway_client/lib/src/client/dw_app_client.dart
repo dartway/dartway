@@ -188,6 +188,9 @@ final class DwAppClient {
   /// switch it is moved to the next account's entry of its request.
   final Set<_Watch<Object?>> _watches = {};
 
+  /// Every open `listen` stream's hold on its channels.
+  final Set<_ChannelListener> _listeners = {};
+
   /// One-shot calls not yet answered, by the function that ends each with an
   /// error — how [stop] ends them.
   final Set<void Function(Object error)> _pendingCalls = {};
@@ -221,6 +224,11 @@ final class DwAppClient {
       watch._closeFromClient();
     }
     _watches.clear();
+    for (final listener in _listeners.toList()) {
+      listener.disposed = true;
+      unawaited(listener.controller.close());
+    }
+    _listeners.clear();
     for (final entry in _entries.values.toList()) {
       entry.dispose();
     }
@@ -263,6 +271,49 @@ final class DwAppClient {
 
   /// [incompatibility]: the current value first, then the change.
   Stream<DwCallRefusal?> get incompatibilityStream => _incompatibility.stream;
+
+  /// Objects published to [channels], without reading anything: a badge that
+  /// counts new posts, a sound on a new message — where the data itself is
+  /// read elsewhere, or not at all.
+  ///
+  /// The channels are subscribed while the stream has a listener and released
+  /// when it cancels, like a watched request's; a caller channel
+  /// (`DwLiveChannel.ofCaller`) is the signed-in account's and follows a
+  /// switch of account. Each object arrives as published: a data object or a
+  /// `DwDeletedObject`, of whatever type the channel carries.
+  ///
+  /// What is published while the socket is down is not replayed: anything
+  /// that must be exact across a reconnect — the count a badge starts from —
+  /// belongs in a request, which is read again after every reconnect.
+  Stream<DwWireObject> listen(List<DwLiveChannel> channels) {
+    _checkNotStopped();
+    late final _ChannelListener listener;
+    final controller = StreamController<DwWireObject>(
+      onListen: () {
+        listener.resolveFor(_session?.id);
+        _listeners.add(listener);
+        if (_sessionReady) {
+          _attachChannels(listener);
+        } else {
+          unawaited(
+            start().then((_) {
+              if (!listener.disposed && _lifecycle == _Lifecycle.started) {
+                listener.resolveFor(_session?.id);
+                _attachChannels(listener);
+              }
+            }),
+          );
+        }
+      },
+      onCancel: () {
+        listener.disposed = true;
+        _listeners.remove(listener);
+        _detachChannels(listener);
+      },
+    );
+    listener = _ChannelListener(List.unmodifiable(channels), controller);
+    return controller.stream;
+  }
 
   /// Adopts [session] — the answer of `DwVerifyCode` — and stores it.
   ///
@@ -510,11 +561,19 @@ final class DwAppClient {
       for (final entry in _entries.values.toList()) {
         _disposeEntry(entry);
       }
+      // A listener's caller channels were the previous account's.
+      for (final listener in _listeners) {
+        _detachChannels(listener);
+      }
     }
     _authenticateLive(next?.token);
     if (accountChanged) {
       for (final watch in _watches.toList()) {
         _bind(watch);
+      }
+      for (final listener in _listeners) {
+        listener.resolveFor(next?.id);
+        _attachChannels(listener);
       }
     }
     // Signing in or out changes whether the socket is wanted at all, even

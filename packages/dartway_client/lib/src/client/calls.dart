@@ -357,9 +357,10 @@ extension on DwAppClient {
   /// An entry on several of the channels absorbs once, each object in it
   /// once: the same object published to two channels is one update.
   void _applyUpdates(Iterable<(String channel, List<DwWireObject>)> updates) {
-    final byEntry = <_Entry, List<DwWireObject>>{};
+    final byEntry = <_ChannelMember, List<DwWireObject>>{};
     for (final (channel, objects) in updates) {
-      for (final entry in _channels[channel]?.entries ?? const <_Entry>{}) {
+      for (final entry
+          in _channels[channel]?.entries ?? const <_ChannelMember>{}) {
         (byEntry[entry] ??= []).addAll(objects);
       }
     }

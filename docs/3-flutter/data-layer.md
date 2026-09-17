@@ -230,6 +230,31 @@ if (result case DwCallOk(value: final session)) {
 
 A screen resets nothing on sign-in or sign-out. The requests it watches follow the account.
 
+## Hearing without reading: `dw.listen`
+
+Some screens need what is published, not what is stored: a badge "3 new posts" has its starting
+count from a request and only has to hear the posts that follow. Reading a page to subscribe would
+send rows nobody shows.
+
+```dart
+// The starting number is a request; the badge watches it as usual.
+final state = ref.watch(dw.request(const GetMyFeedReaderState()));
+
+// The posts that follow are only heard.
+final subscription = dw.listen(const [DwLiveChannel(AppChannel.feed)]).listen((
+  object,
+) {
+  if (object is FeedPost) newPosts.value++;
+});
+// …subscription.cancel() when the badge goes away
+```
+
+The channels are subscribed while the stream is listened to and released when it is cancelled,
+shared with any watched request on the same channel; a caller channel follows a switch of account.
+Objects arrive as published — data objects and `DwDeletedObject`s. What is published while the socket
+is down is not replayed: the exact number belongs to the request, which is read again after every
+reconnect.
+
 ## Live status and reconnects
 
 ```dart

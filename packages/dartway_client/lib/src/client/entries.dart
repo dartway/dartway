@@ -49,7 +49,7 @@ typedef _Accepted = (DwWireObject object, DwUpdateAction action);
 /// answer must never erase an update that arrived before it. Every action is
 /// idempotent (replace by id, remove by id, insert only when absent), so
 /// applying an update the answer already contains changes nothing.
-sealed class _Entry {
+sealed class _Entry implements _ChannelMember {
   _Entry(this.client, this.key) : request = key.$2 {
     DwCallRefusal? refusal;
     try {
@@ -92,10 +92,12 @@ sealed class _Entry {
   /// Wire names of the channels the request declares, without repeats, caller
   /// channels resolved for the entry's account. Updates reach the entry only
   /// on these (D-036).
+  @override
   late final List<String> channels;
 
   final Set<_Watch<Object?>> watches = {};
   Timer? releaseTimer;
+  @override
   bool disposed = false;
 
   /// The operation in flight or waiting to be sent.
@@ -164,6 +166,7 @@ sealed class _Entry {
 
   /// Loads the entry again; completes when a reload that started after this
   /// call has been answered. Coalesced with every other trigger.
+  @override
   Future<void> reload() {
     if (disposed) return Future.value();
     final waiter = Completer<void>();
@@ -390,6 +393,7 @@ sealed class _Entry {
 
   /// Offers objects that arrived on the entry's channels: takes those the
   /// request accepts, asks the request what each does, and applies them.
+  @override
   void absorb(List<DwWireObject> objects) {
     if (disposed) return;
     final protocol = client.protocol;
@@ -434,6 +438,7 @@ sealed class _Entry {
 
   /// A channel of this entry became active with activation [seq]. Data asked
   /// for before may have missed what was published until then.
+  @override
   void onChannelActivated(int seq) {
     final current = op;
     final staleData = dataSeq != null && dataSeq! < seq;
@@ -444,6 +449,7 @@ sealed class _Entry {
 
   /// The socket or a subscription changed: show whether the data is live,
   /// and send an operation that waited for subscriptions once they settled.
+  @override
   void onLiveChanged() {
     if (disposed) return;
     syncLive();

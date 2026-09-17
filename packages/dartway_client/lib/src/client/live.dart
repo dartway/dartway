@@ -17,15 +17,75 @@ enum _SubState {
   closed,
 }
 
-/// One wire channel and the entries that need it. There is exactly one
-/// record per channel name, however many entries declare it: the reference
+/// What holds a channel open: a request's entry, or a listener that only
+/// hears what is published (`DwAppClient.listen`).
+abstract interface class _ChannelMember {
+  /// Wire names of its channels, caller channels resolved.
+  List<String> get channels;
+
+  bool get disposed;
+
+  void absorb(List<DwWireObject> objects);
+
+  void onChannelActivated(int seq);
+
+  void onLiveChanged();
+
+  Future<void> reload();
+}
+
+/// One wire channel and the members that need it. There is exactly one
+/// record per channel name, however many members declare it: the reference
 /// count is the size of [entries].
 final class _ChannelRecord {
   _ChannelRecord(this.name);
 
   final String name;
-  final Set<_Entry> entries = {};
+  final Set<_ChannelMember> entries = {};
   _SubState state = _SubState.idle;
+}
+
+/// A `DwAppClient.listen` stream's hold on its channels. Reads nothing, keeps
+/// nothing: every object published to its channels goes to the stream, and a
+/// reconnect or a reload has nothing to fetch.
+final class _ChannelListener implements _ChannelMember {
+  _ChannelListener(this.declared, this.controller);
+
+  final List<DwLiveChannel> declared;
+  final StreamController<DwWireObject> controller;
+
+  @override
+  List<String> channels = const [];
+
+  @override
+  bool disposed = false;
+
+  /// [declared] as wire names for [account]: a caller channel is that
+  /// account's, and signed out there is none (D-037, D-020).
+  void resolveFor(int? account) {
+    channels = List.unmodifiable({
+      for (final channel in declared)
+        if (!channel.isOfCaller)
+          channel.wireName
+        else if (account != null)
+          channel.resolvedFor(account).wireName,
+    });
+  }
+
+  @override
+  void absorb(List<DwWireObject> objects) {
+    if (disposed) return;
+    objects.forEach(controller.add);
+  }
+
+  @override
+  void onChannelActivated(int seq) {}
+
+  @override
+  void onLiveChanged() {}
+
+  @override
+  Future<void> reload() async {}
 }
 
 /// The live socket's state, kept on the client (a part cannot add fields).
@@ -517,7 +577,7 @@ extension on DwAppClient {
     _sendLive(DwSubscribeMessage(record.name));
   }
 
-  void _attachChannels(_Entry entry) {
+  void _attachChannels(_ChannelMember entry) {
     if (entry.channels.isEmpty) return;
     for (final name in entry.channels) {
       final record = _channels.putIfAbsent(name, () => _ChannelRecord(name));
@@ -529,7 +589,7 @@ extension on DwAppClient {
     _updateLiveDemand();
   }
 
-  void _detachChannels(_Entry entry) {
+  void _detachChannels(_ChannelMember entry) {
     if (entry.channels.isEmpty) return;
     for (final name in entry.channels) {
       final record = _channels[name];

@@ -201,6 +201,13 @@ then asserts their "my teams" list stays quiet passes whether or not the command
 Watch the group's own channel instead, and prove the test can fail: delete the `ctx.revoke` and
 see it go red.
 
+### Hearing a channel without reading — `dw.listen`
+
+When a screen only needs to *hear* publications — a "new posts" badge whose starting count comes from
+a request — use `dw.listen([channels])`, a stream subscribed while listened to. **Never read a page
+(or ask for one row) just to get a subscription**: that sends rows nobody shows. Missed publications
+during a disconnect are not replayed — keep the exact number in a request.
+
 ## 5. What an update does to a request
 
 When an object arrives on a channel a request declares (and is of the request's item type), the

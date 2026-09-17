@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwAppClient.listen(channels)`**: a stream of what is published to the channels, without reading anything. Subscribed while listened to, shared with watched requests on the same channel, caller channels following a switch of account; nothing replayed across a disconnect (D-067).
+
 - **Updates are routed by channel (D-036).** An object from a response or the
   live socket is applied only to entries whose request declares the channel it
   was published to — an entry on several of them absorbs it once. A request

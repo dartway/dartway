@@ -208,6 +208,12 @@ class DwFlutterCore extends DwFlutterToolbox {
         handleError(error, stackTrace, source: DwErrorSource.client),
   );
 
+  /// Objects published to [channels], without reading anything — a badge that
+  /// counts new posts from a request's starting number. The channels stay
+  /// subscribed while the stream is listened to; see `DwAppClient.listen`.
+  Stream<DwWireObject> listen(List<DwLiveChannel> channels) =>
+      client.listen(channels);
+
   /// The signed-in account id, `null` when signed out.
   late final DwValueProvider<int?> accountId =
       NotifierProvider<Notifier<int?>, int?>(
