@@ -634,4 +634,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get serverMismatchBody =>
       'This app and the club\'s server speak different versions. We are on it — please try again later.';
+
+  @override
+  String get refusalIdentifierTaken =>
+      'This is already used by another account.';
+
+  @override
+  String refusalUploadTooLarge(int megabytes) {
+    return 'The file is too large: at most $megabytes MB.';
+  }
+
+  @override
+  String get refusalUploadTypeRejected => 'This type of file is not accepted.';
+
+  @override
+  String get refusalFileNotOwned => 'This file cannot be used here.';
+
+  @override
+  String get refusalUploadFailed =>
+      'The file did not upload. Please try again.';
 }

@@ -12,6 +12,8 @@ void main() {
       final codes = <DwRefusalCode>[
         ...ExampleRefusal.values,
         ...DwCoreRefusal.values,
+        ...DwAuthRefusal.values,
+        ...DwUploadRefusal.values,
       ];
       for (final code in codes) {
         expect(

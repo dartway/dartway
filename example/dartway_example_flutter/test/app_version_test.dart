@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:dartway_example_flutter/app_version.dart';
+import 'package:dartway_example_flutter/core/app_version.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

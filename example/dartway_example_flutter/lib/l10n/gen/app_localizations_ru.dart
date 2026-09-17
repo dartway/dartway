@@ -634,4 +634,22 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get serverMismatchBody =>
       'Приложение и сервер клуба говорят на разных версиях. Мы уже чиним — попробуйте позже.';
+
+  @override
+  String get refusalIdentifierTaken =>
+      'Это уже используется другой учётной записью.';
+
+  @override
+  String refusalUploadTooLarge(int megabytes) {
+    return 'Файл слишком большой: не больше $megabytes МБ.';
+  }
+
+  @override
+  String get refusalUploadTypeRejected => 'Файлы такого типа не принимаются.';
+
+  @override
+  String get refusalFileNotOwned => 'Этот файл здесь использовать нельзя.';
+
+  @override
+  String get refusalUploadFailed => 'Файл не загрузился. Попробуйте ещё раз.';
 }

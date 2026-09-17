@@ -15,7 +15,7 @@ emulator). Another address is compiled in:
 
     flutter run --dart-define=DW_BACKEND_URL=http://localhost:18080
 
-The build it reports (`lib/app_version.dart`) is the `version` of
+The build it reports (`lib/core/app_version.dart`) is the `version` of
 `pubspec.yaml`; a test keeps the two equal.
 
 ## Tests

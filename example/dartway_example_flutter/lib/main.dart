@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import 'app_version.dart';
+import 'core/app_version.dart';
 import 'dartway_example_app.dart';
 
 Future<void> main() async {

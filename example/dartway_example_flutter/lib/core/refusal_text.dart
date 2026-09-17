@@ -9,6 +9,8 @@ extension ExampleRefusalText on AppLocalizations {
     for (final code in <DwRefusalCode>[
       ...ExampleRefusal.values,
       ...DwCoreRefusal.values,
+      ...DwAuthRefusal.values,
+      ...DwUploadRefusal.values,
     ])
       code.code: code,
   };
@@ -16,12 +18,14 @@ extension ExampleRefusalText on AppLocalizations {
   /// The sentence a refusal is shown as. A refusal carries a code and
   /// parameters, never text: this is where the app turns them into words.
   ///
-  /// Both switches below are exhaustive, so a code added to [ExampleRefusal] or
-  /// to the framework's [DwCoreRefusal] does not compile until it has a text.
-  /// A code neither knows — a newer server — still gets a sentence.
+  /// Every switch below is exhaustive, so a code added to [ExampleRefusal] or
+  /// to one of the framework's enums does not compile until it has a text. A
+  /// code none of them knows — a newer server — still gets a sentence.
   String refusalText(DwCallRefusal refusal) => switch (_codes[refusal.code]) {
     final ExampleRefusal code => _exampleText(code, refusal),
     final DwCoreRefusal code => _coreText(code, refusal),
+    final DwAuthRefusal code => _authText(code),
+    final DwUploadRefusal code => _uploadText(code, refusal),
     _ => refusalGeneric,
   };
 
@@ -82,4 +86,25 @@ extension ExampleRefusalText on AppLocalizations {
     DwCoreRefusal.updateRequired => updateRequiredBody,
     DwCoreRefusal.protocolUnsupported => serverMismatchBody,
   };
+
+  String _authText(DwAuthRefusal code) => switch (code) {
+    DwAuthRefusal.identifierTaken => refusalIdentifierTaken,
+  };
+
+  String _uploadText(DwUploadRefusal code, DwCallRefusal refusal) =>
+      switch (code) {
+        DwUploadRefusal.tooLarge => refusalUploadTooLarge(
+          ((int.tryParse(refusal.params['maxBytes'] ?? '') ?? 0) /
+                  (1024 * 1024))
+              .ceil(),
+        ),
+        DwUploadRefusal.typeRejected => refusalUploadTypeRejected,
+        DwUploadRefusal.notOwned => refusalFileNotOwned,
+        // What went wrong between the app and the storage is not the user's
+        // to untangle: the upload is simply tried again.
+        DwUploadRefusal.purposeUnknown ||
+        DwUploadRefusal.missing ||
+        DwUploadRefusal.mismatch ||
+        DwUploadRefusal.expired => refusalUploadFailed,
+      };
 }

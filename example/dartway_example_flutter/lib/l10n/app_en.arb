@@ -269,5 +269,14 @@
   "updateRequiredTitle": "Update the app",
   "updateRequiredBody": "This version of the app is no longer supported. Install the latest one to keep using the club.",
   "serverMismatchTitle": "The app cannot reach its server",
-  "serverMismatchBody": "This app and the club's server speak different versions. We are on it — please try again later."
+  "serverMismatchBody": "This app and the club's server speak different versions. We are on it — please try again later.",
+
+  "refusalIdentifierTaken": "This is already used by another account.",
+  "refusalUploadTooLarge": "The file is too large: at most {megabytes} MB.",
+  "@refusalUploadTooLarge": {
+    "placeholders": {"megabytes": {"type": "int"}}
+  },
+  "refusalUploadTypeRejected": "This type of file is not accepted.",
+  "refusalFileNotOwned": "This file cannot be used here.",
+  "refusalUploadFailed": "The file did not upload. Please try again."
 }

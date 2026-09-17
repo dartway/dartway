@@ -1177,6 +1177,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This app and the club\'s server speak different versions. We are on it — please try again later.'**
   String get serverMismatchBody;
+
+  /// No description provided for @refusalIdentifierTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'This is already used by another account.'**
+  String get refusalIdentifierTaken;
+
+  /// No description provided for @refusalUploadTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is too large: at most {megabytes} MB.'**
+  String refusalUploadTooLarge(int megabytes);
+
+  /// No description provided for @refusalUploadTypeRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'This type of file is not accepted.'**
+  String get refusalUploadTypeRejected;
+
+  /// No description provided for @refusalFileNotOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'This file cannot be used here.'**
+  String get refusalFileNotOwned;
+
+  /// No description provided for @refusalUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file did not upload. Please try again.'**
+  String get refusalUploadFailed;
 }
 
 class _AppLocalizationsDelegate

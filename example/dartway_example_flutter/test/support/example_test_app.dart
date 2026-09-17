@@ -1,6 +1,6 @@
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
-import 'package:dartway_example_flutter/app_version.dart';
+import 'package:dartway_example_flutter/core/app_version.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
