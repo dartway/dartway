@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'splash/dw_native_splash.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import '../diagnostics/error_reporting/dw_error_report.dart';
@@ -73,7 +74,7 @@ class DwAppRunner {
     final binding = WidgetsFlutterBinding.ensureInitialized();
 
     if (appLoadingOptions.useNativeSplash) {
-      FlutterNativeSplash.preserve(widgetsBinding: binding);
+      DwNativeSplash.preserve(binding);
     }
 
     return binding;

@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **No run-time dependency on `flutter_native_splash`** (#268). The splash is held with the binding's `deferFirstFrame` and released after bootstrap; on the web a shell's `removeSplashFromWeb()` is still called when it defines one. The generator's `image`, `archive`, `xml`, `html` and their dependencies leave every app's graph. An app that runs `dart run flutter_native_splash:create` lists the package in its own `dev_dependencies`, as the template now does.
+
 - **BREAKING: `DwErrorReport.actionLabel` is `label`**, and `dw.handleError(label:)` takes it for any source (#126). Migration note: `docs/migrations/2026-09-17-error-report-label.md`.
 
 - **`dw.listen(channels)`** forwards `DwAppClient.listen`: hear a channel without reading a page (D-067).

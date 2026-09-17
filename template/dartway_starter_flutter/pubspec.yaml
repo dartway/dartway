@@ -55,6 +55,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  # The splash generator (`dart run flutter_native_splash:create`): a build
+  # tool, not part of the app — the framework holds the splash at run time.
+  flutter_native_splash: ^2.4.0
+
   # `DwFakeServer` and `DwFakeStorage`: widget tests talk to an in-memory
   # server that speaks the real HTTP contract and live socket.
   dartway_client: ^0.20.0-dev.1

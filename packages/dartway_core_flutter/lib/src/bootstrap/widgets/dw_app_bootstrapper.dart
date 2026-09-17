@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:dartway_client/dartway_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/dw_flutter_core.dart';
 import '../../private/dw_singleton.dart';
 import '../dw_app_runner.dart';
+import '../splash/dw_native_splash.dart';
 
 /// The widget [DwAppRunner] mounts under its `ProviderScope`: runs the app's
 /// initializers in order, shows [loadingScreen] meanwhile and the error screen
@@ -127,7 +127,7 @@ class _DwAppBootstrapperState extends ConsumerState<DwAppBootstrapper> {
       }
     } finally {
       if (widget.useNativeSplash) {
-        FlutterNativeSplash.remove();
+        DwNativeSplash.remove();
       }
     }
   }
