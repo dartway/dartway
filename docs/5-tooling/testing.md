@@ -42,8 +42,8 @@ dartway test --keep                 # leave the containers up after the run
 dartway test --no-storage           # a server without uploads
 ```
 
-The command starts `postgres:17-alpine` and `minio/minio:RELEASE.2025-09-07T16-13-09Z` — the images a
-deployment runs — each published on `127.0.0.1` at a port Docker picks and with its data in `tmpfs`,
+The command starts `postgres:17-alpine` and `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` —
+the images a deployment runs — each published on `127.0.0.1` at a port Docker picks and with its data in `tmpfs`,
 waits until Postgres answers `pg_isready` and MinIO its readiness endpoint (60 seconds at most), runs
 `dart test` in the server package, and removes both containers afterwards, on Ctrl+C too. `--image`
 and `--storage-image` name other images. The suite receives the coordinates in its environment:

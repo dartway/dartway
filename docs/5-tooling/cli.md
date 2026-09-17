@@ -326,7 +326,7 @@ a database and buckets of its own.
 | `--keep` | off | Leave the containers running and print how to reach and remove them |
 | `--image` | `postgres:17-alpine` | Postgres image — the one a deployment runs |
 | `--[no-]storage` | on | Start MinIO beside Postgres; `--no-storage` for a server without uploads |
-| `--storage-image` | `minio/minio:RELEASE.2025-09-07T16-13-09Z` | MinIO image — the one a deployment runs |
+| `--storage-image` | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | MinIO image — the one a deployment runs |
 
 Why a database per run rather than a compose service, and how a suite uses it, is
 [Testing](testing.md).

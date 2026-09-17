@@ -27,7 +27,7 @@
 #     -e POSTGRES_USER=dartway -e POSTGRES_PASSWORD=dartway postgres:17-alpine
 #   docker run -d --name dw10-minio -p 127.0.0.1:55470:9000 \
 #     -e MINIO_ROOT_USER=dartway -e MINIO_ROOT_PASSWORD=dartway-secret \
-#     minio/minio server /data
+#     quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
 #   export DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=55460 \
 #     DW_DATABASE_NAME=postgres DW_DATABASE_USER=dartway \
 #     DW_DATABASE_PASSWORD=dartway DW_DATABASE_SSL=false \

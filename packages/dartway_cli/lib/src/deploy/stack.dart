@@ -81,14 +81,24 @@ class DwStack {
 
   /// MinIO's community edition stopped publishing images after this release,
   /// so an unpinned tag names nothing that will ever change — pinned to say so.
-  static const String minioImage = 'minio/minio:RELEASE.2025-09-07T16-13-09Z';
+  /// From quay.io: MinIO removed its repositories from Docker Hub, and a
+  /// deploy pinned there fails at the pull.
+  static const String minioImage =
+      'quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z';
   static const String minioClientImage =
-      'minio/mc:RELEASE.2025-08-13T08-35-41Z';
+      'quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z';
 
   /// Stateless, and following upstream security fixes is worth more here than
   /// reproducing yesterday's proxy.
   static const String nginxImage = 'nginx:alpine';
   static const String certbotImage = 'certbot/certbot:latest';
+
+  /// Whether `registry_mirror` can serve [image]: an official Docker Hub image
+  /// (`postgres`, `nginx`) — what `mirror.gcr.io` and a Hub library cache
+  /// hold. An image of another registry or of a Hub organisation is pulled
+  /// from where it lives; prefixed with the mirror it would name nothing.
+  static bool mirrorServes(String image) =>
+      !image.split(':').first.contains('/');
 
   /// The mount point of `requires.files` inside the server container.
   static const String secretFilesDir = '/run/secrets';

@@ -38,9 +38,11 @@ class DwStackRenderer {
 
   DwDeployTarget get _target => stack.target;
 
-  String get _mirror => switch (_target.registryMirror) {
-    final mirror? => '$mirror/',
-    null => '',
+  /// [image] as the compose file names it: through `registry_mirror` when
+  /// the mirror can serve it (see [DwStack.mirrorServes]).
+  String _image(String image) => switch (_target.registryMirror) {
+    final mirror? when DwStack.mirrorServes(image) => '$mirror/$image',
+    _ => image,
   };
 
   bool get _tls => stack.front is DwTlsFront;
@@ -84,7 +86,7 @@ class DwStackRenderer {
     // --- postgres
     buffer
       ..writeln('  ${DwStack.postgresService}:')
-      ..writeln('    image: ${_q('$_mirror${DwStack.postgresImage}')}')
+      ..writeln('    image: ${_q(_image(DwStack.postgresImage))}')
       ..writeln('    restart: unless-stopped')
       ..writeln('    environment:')
       ..writeln('      POSTGRES_DB: ${_q(stack.databaseName)}')
@@ -221,7 +223,7 @@ class DwStackRenderer {
     if (minio) {
       buffer
         ..writeln('  ${DwStack.minioService}:')
-        ..writeln('    image: ${_q('$_mirror${DwStack.minioImage}')}')
+        ..writeln('    image: ${_q(_image(DwStack.minioImage))}')
         ..writeln('    restart: unless-stopped')
         ..writeln('    command: ["server", "/data"]')
         ..writeln('    environment:')
@@ -259,7 +261,7 @@ class DwStackRenderer {
         ..writeln('      retries: 30')
         ..writeln()
         ..writeln('  ${DwStack.minioInitService}:')
-        ..writeln('    image: ${_q('$_mirror${DwStack.minioClientImage}')}')
+        ..writeln('    image: ${_q(_image(DwStack.minioClientImage))}')
         ..writeln('    restart: "no"')
         ..writeln('    depends_on:')
         ..writeln('      ${DwStack.minioService}:')
@@ -301,7 +303,7 @@ class DwStackRenderer {
     // --- nginx
     buffer
       ..writeln('  ${DwStack.nginxService}:')
-      ..writeln('    image: ${_q('$_mirror${DwStack.nginxImage}')}')
+      ..writeln('    image: ${_q(_image(DwStack.nginxImage))}')
       ..writeln('    restart: unless-stopped')
       ..writeln('    ports:');
     switch (stack.front) {
@@ -351,7 +353,7 @@ class DwStackRenderer {
     if (_tls) {
       buffer
         ..writeln('  ${DwStack.certbotService}:')
-        ..writeln('    image: ${_q('$_mirror${DwStack.certbotImage}')}')
+        ..writeln('    image: ${_q(_image(DwStack.certbotImage))}')
         ..writeln('    restart: unless-stopped')
         ..writeln('    volumes:')
         ..writeln('      - "certbot_data:/etc/letsencrypt"')

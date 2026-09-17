@@ -97,7 +97,7 @@ jobs:
         run: |
           docker run -d --name minio -p 127.0.0.1:55470:9000 \
             -e MINIO_ROOT_USER=dartway -e MINIO_ROOT_PASSWORD=dartway-secret \
-            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
           for _ in $(seq 60); do
             curl -fsS http://127.0.0.1:55470/minio/health/live >/dev/null && exit 0
             sleep 1

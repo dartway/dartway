@@ -25,7 +25,7 @@ a local MinIO:
 ```bash
 docker run -d --name club-minio -p 127.0.0.1:9000:9000 \
   -e MINIO_ROOT_USER=club -e MINIO_ROOT_PASSWORD=club-secret \
-  minio/minio server /data
+  quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
 
 export DW_STORAGE_ENDPOINT=http://127.0.0.1:9000 \
        DW_STORAGE_ACCESS_KEY=club DW_STORAGE_SECRET_KEY=club-secret \

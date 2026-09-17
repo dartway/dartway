@@ -40,7 +40,7 @@ Nothing writes `config.yaml`; the deploy only reads it.
 | `site` | no | `domain` and `source`: a directory of the repository served as static files, or `none` for a site that lives elsewhere |
 | `storage` | no | `minio` or `external`; absent means no file storage |
 | `storage_domain` | with `minio` | The public host of MinIO; refused without `storage: minio` |
-| `registry_mirror` | no | Pull the stack's base images through a mirror |
+| `registry_mirror` | no | Pull the official Docker Hub images of the stack (`postgres`, `nginx`) through a mirror such as `mirror.gcr.io`; MinIO (quay.io) and certbot come from where they live |
 | `firewall_ports` | no | TCP ports to open beyond SSH, 80 and 443 |
 | `requires.secrets` | no | Secrets nobody can generate, as environment variable names |
 | `requires.files` | no | Secret documents, by file name, mounted into the server |

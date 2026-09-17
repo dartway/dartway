@@ -2,6 +2,8 @@
 
 ## Unreleased — DartWay 1.0
 
+- **MinIO comes from quay.io** (#264): MinIO removed `minio/minio` and `minio/mc` from Docker Hub, so every `storage: minio` deploy failed at the pull. Same releases, `quay.io/minio/…`; `dartway test` and the template's compose file follow. **`registry_mirror` now applies only to official Docker Hub images** (`postgres`, `nginx`): prefixed onto an image of another registry or a Hub organisation it named nothing. A server set up earlier keeps the old image names in its rendered `docker-compose.yml` until `dartway deploy setup` renders it again.
+
 - **`dartway deploy run` survives the machine that started it** (D-068, #266). Every step runs on the server detached from the `ssh` session (`setsid`, streams and exit code in `~/.config/<project>/deploy-run/`); a broken connection is waited through for up to fifteen minutes. `--resume` finishes the deployment the server remembers — passing over done steps, waiting for a running one, running the rest — and a new run refuses while a step of the last one still runs. `--progress json` writes step events as JSON lines on stdout (prose on stderr). `now at` and the `revision` event are also reported with `--skip-git-update`.
 
 - **`dartway check` names an override the framework caught up with** (`frameworkOverrideOutlived`, warning — D-032). A `dependency_overrides` version pin on a `dartway_*` package is reported when a resolved framework package depending on it already allows the locked version, with the file to edit; path and git overrides are left alone.

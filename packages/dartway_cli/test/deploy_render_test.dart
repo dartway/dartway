@@ -237,6 +237,21 @@ void main() {
       );
     });
 
+    test('a registry mirror serves the official images and nothing else', () {
+      final stack = stackFrom(
+        extra:
+            '  storage: minio\n  storage_domain: files.example.com\n'
+            '  registry_mirror: mirror.gcr.io\n',
+      );
+      String image(String service) =>
+          _service(stack, service)['image'] as String;
+      expect(image('postgres'), 'mirror.gcr.io/${DwStack.postgresImage}');
+      expect(image('nginx'), 'mirror.gcr.io/${DwStack.nginxImage}');
+      expect(image('minio'), DwStack.minioImage);
+      expect(image('minio-init'), DwStack.minioClientImage);
+      expect(image('certbot'), DwStack.certbotImage);
+    });
+
     test('a site is mounted from the checkout, read-only', () {
       final nginx = _service(stackVariants()['minio and a site']!, 'nginx');
       expect(nginx['volumes'], contains('./app_site/build:/srv/site:ro'));
