@@ -124,6 +124,9 @@ final class TestApp {
   /// it has written the profile.
   final Set<String> failingIdentifierChanges = {};
 
+  /// Account id → `provider:subject` of an external sign-in.
+  final Map<int, String> externalAccounts = {};
+
   /// Accounts whose deletion `onAccountDeleting` refuses.
   final Set<int> undeletable = {};
 
@@ -201,6 +204,20 @@ final class TestApp {
     },
     // The profile references the account without a cascade, as a project's
     // own row may: the hook has to remove it, or the deletion fails.
+    onExternalAccountCreated:
+        (ctx, accountId, provider, subject, registration) async {
+          createdAccounts.add(accountId);
+          externalAccounts[accountId] = '$provider:$subject';
+          await ctx.db.execute(
+            'INSERT INTO profile (account_id, name, identifier) '
+            'VALUES (@account, @name, @identifier)',
+            params: {
+              'account': accountId,
+              'name': registration['name'] ?? '',
+              'identifier': '$provider:$subject',
+            },
+          );
+        },
     onAccountDeleting: (ctx, accountId) async {
       if (undeletable.contains(accountId)) {
         ctx.refuse(DwCoreRefusal.forbidden);

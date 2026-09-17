@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **The seam for external sign-in** (D-073, in progress): `DwAccountService.signInWithExternalIdentity(provider:, subject:)` signs in — or creates — the account of an identity a provider proved, with `DwAuthConfig.onExternalAccountCreated` for the project's row, and `accountOfExternalIdentity` to look one up. The verification of a provider's token lives in `dartway_auth_providers_server`.
+
 - **Deleting an account** (D-072): `DwDeleteMyAccount` and `DwAccountService.deleteAccount` — `DwAuthConfig.onAccountDeleting` for the project's rows, then the account's files, keys (sessions end) and the account with its identities, in one transaction.
 
 - **`DW_MIGRATE_ONLY=true` makes `DwAppServer.start()` a one-off migration** that serves nothing and ends the process (0, or non-zero with the reason); `DwAppServer.migrate()` does the same without ending it. `dartway deploy` migrates this way between stopping the old server and starting the new one (D-070).

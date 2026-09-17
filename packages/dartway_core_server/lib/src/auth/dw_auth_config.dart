@@ -15,6 +15,7 @@ final class DwAuthConfig {
     this.onAccountCreated,
     this.onIdentifierChanged,
     this.onAccountDeleting,
+    this.onExternalAccountCreated,
     this.codeLength = 6,
     this.codeLifetime = const Duration(minutes: 10),
     this.maxAttempts = 5,
@@ -93,6 +94,24 @@ final class DwAuthConfig {
   /// about identifiers; publishing is the hook's to do.
   final Future<void> Function(DwCallContext ctx, DwIdentifierChange change)?
   onIdentifierChanged;
+
+  /// Runs in the transaction that creates an account for an identity an
+  /// external provider proved (`google`, `apple` —
+  /// `DwAccountService.signInWithExternalIdentity`), where
+  /// [DwAuthConfig.onAccountCreated] runs for an identifier a code reached:
+  /// the place to insert the project's profile from what the provider told
+  /// about the person. [registration] is what the app sent with the sign-in.
+  ///
+  /// Required to sign in externally at all: without it such a sign-in throws,
+  /// rather than leaving an account no project row belongs to.
+  final Future<void> Function(
+    DwCallContext ctx,
+    int accountId,
+    String provider,
+    String subject,
+    Map<String, String> registration,
+  )?
+  onExternalAccountCreated;
 
   /// Runs in the transaction that deletes an account (`DwDeleteMyAccount`,
   /// `DwAccountService.deleteAccount`), before the framework removes what it

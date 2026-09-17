@@ -388,6 +388,65 @@ final class DwAccountService {
     });
   }
 
+  /// Signs in the account of an identity another system proved — the stable
+  /// subject id an external provider gave, checked by whoever calls this —
+  /// creating the account when the identity is new, and answers its session.
+  ///
+  /// [provider] is the provider's name (`google`, `apple`), stored as the
+  /// identity's kind beside the identifiers a code reaches;
+  /// `dartway_auth_providers_server` calls this after verifying the
+  /// provider's token, and nothing else should: the identity counts as
+  /// verified. [registration] reaches `DwAuthConfig.onAccountCreated` as it
+  /// does for a code sign-in, with `DwExternalOrigin` naming the provider.
+  Future<DwAuthSession> signInWithExternalIdentity({
+    required String provider,
+    required String subject,
+    Map<String, String> registration = const {},
+    String? label,
+  }) {
+    if (!_providerName.hasMatch(provider)) {
+      throw ArgumentError.value(provider, 'provider', 'is not a provider name');
+    }
+    if (subject.isEmpty || subject.length > 255) {
+      throw ArgumentError.value(subject, 'subject', 'is not a subject id');
+    }
+    return _scope.transaction((ctx) async {
+      final (:accountId, created: isNew) = await dwEnsureExternalAccount(
+        ctx,
+        _auth,
+        provider,
+        subject,
+        registration,
+      );
+      final issued = (await DwAuthStore.insertKey(
+        ctx.db,
+        accountId: accountId,
+        kind: DwSessionKeyKind.app,
+        label: label ?? _scope.clientLabel ?? '',
+      ))!;
+      _scope.madeSecret();
+      return DwAuthSession(
+        id: accountId,
+        token: issued.token,
+        isNewAccount: isNew,
+      );
+    });
+  }
+
+  /// The account of an external identity, or null.
+  Future<int?> accountOfExternalIdentity({
+    required String provider,
+    required String subject,
+  }) => _scope.direct((db, _) async {
+    final rows = await db.query(
+      'SELECT account_id FROM dw_identity WHERE kind = @kind AND value = @value',
+      params: {'kind': provider, 'value': subject},
+    );
+    return rows.isEmpty ? null : rows.single.get<int>('account_id');
+  });
+
+  static final RegExp _providerName = RegExp(r'^[a-z][a-z0-9_]{1,30}$');
+
   /// Deletes [accountId] and everything the framework keeps for it, and
   /// answers whether it existed.
   ///
@@ -521,6 +580,54 @@ Future<DwEnsuredAccount> dwEnsureAccount(
     params: {'account': accountId, 'kind': kind.name, 'value': identifier},
   );
   await auth.onAccountCreated?.call(ctx, accountId, kind, identifier, origin);
+  return (accountId: accountId, created: true);
+}
+
+/// The account of an external provider's [subject], created when the identity
+/// is new: the external twin of [dwEnsureAccount].
+///
+/// Must run inside a transaction on `ctx.db`.
+@internal
+Future<DwEnsuredAccount> dwEnsureExternalAccount(
+  DwCallContext ctx,
+  DwAuthConfig auth,
+  String provider,
+  String subject,
+  Map<String, String> registration,
+) async {
+  final db = ctx.db;
+  if (!db.inTransaction) {
+    throw StateError('dwEnsureExternalAccount needs a transaction');
+  }
+  final created = auth.onExternalAccountCreated;
+  if (created == null) {
+    throw StateError(
+      'DwAuthConfig.onExternalAccountCreated is not set: an external sign-in '
+      'would leave an account without the project row that belongs to it',
+    );
+  }
+  // Two first sign-ins of one provider identity at once make one account.
+  await db.advisoryLock(
+    DwLockSpace.identifier,
+    dwLockKey('$provider:$subject'),
+  );
+  final existing = await db.query(
+    'UPDATE dw_identity SET verified_at = now() '
+    'WHERE kind = @kind AND value = @value RETURNING account_id',
+    params: {'kind': provider, 'value': subject},
+  );
+  if (existing.isNotEmpty) {
+    return (accountId: existing.single.get<int>('account_id'), created: false);
+  }
+  final accountId = (await db.query(
+    'INSERT INTO dw_account DEFAULT VALUES RETURNING id',
+  )).single.get<int>('id');
+  await db.execute(
+    'INSERT INTO dw_identity (account_id, kind, value, verified_at) '
+    'VALUES (@account, @kind, @value, now())',
+    params: {'account': accountId, 'kind': provider, 'value': subject},
+  );
+  await created(ctx, accountId, provider, subject, registration);
   return (accountId: accountId, created: true);
 }
 
@@ -664,6 +771,10 @@ sealed class _Scope {
   /// A secret — a session key's token — was made, and may travel in the
   /// result of the call this scope belongs to.
   void madeSecret() {}
+
+  /// What a session key made here is labelled with: the caller's app and
+  /// version inside a call, nothing outside one.
+  String? get clientLabel => null;
 }
 
 final class _ContextScope extends _Scope {
@@ -676,6 +787,9 @@ final class _ContextScope extends _Scope {
 
   @override
   void madeSecret() => ctx.markSecret();
+
+  @override
+  String? get clientLabel => ctx.clientLabel;
 
   @override
   Future<T> transaction<T>(Future<T> Function(DwCallContext ctx) body) =>

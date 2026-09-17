@@ -13,6 +13,90 @@ void main() {
 
   DwAccountService accounts() => harness().server.server.accounts;
 
+  group('signing in with an external identity', () {
+    test(
+      'creates the account and its project row once, then signs in to it',
+      () async {
+        const subject = 'google-subject-1';
+        final first = await accounts().signInWithExternalIdentity(
+          provider: 'google',
+          subject: subject,
+          registration: const {'name': 'Ada'},
+        );
+        expect(first.isNewAccount, isTrue);
+        expect(harness().app.externalAccounts[first.id], 'google:$subject');
+        final profile = await harness().db.query(
+          'SELECT name, identifier FROM profile WHERE account_id = @id',
+          params: {'id': first.id},
+        );
+        expect(profile.single['name'], 'Ada');
+
+        final again = await accounts().signInWithExternalIdentity(
+          provider: 'google',
+          subject: subject,
+        );
+        expect(again.id, first.id);
+        expect(again.isNewAccount, isFalse);
+        expect(again.token, isNot(first.token), reason: 'a session of its own');
+        expect(
+          await accounts().accountOfExternalIdentity(
+            provider: 'google',
+            subject: subject,
+          ),
+          first.id,
+        );
+
+        // The same subject at another provider is another person.
+        final apple = await accounts().signInWithExternalIdentity(
+          provider: 'apple',
+          subject: subject,
+        );
+        expect(apple.id, isNot(first.id));
+      },
+    );
+
+    test('the identity is verified, and the account can be deleted like any '
+        'other', () async {
+      final session = await accounts().signInWithExternalIdentity(
+        provider: 'google',
+        subject: 'google-subject-2',
+      );
+      final verified = await harness().db.query(
+        'SELECT kind, verified_at FROM dw_identity WHERE account_id = @id',
+        params: {'id': session.id},
+      );
+      expect(verified.single['kind'], 'google');
+      expect(verified.single['verified_at'], isNotNull);
+
+      expect(await accounts().deleteAccount(session.id), isTrue);
+      expect(
+        await accounts().accountOfExternalIdentity(
+          provider: 'google',
+          subject: 'google-subject-2',
+        ),
+        isNull,
+      );
+    });
+
+    test('a provider name or subject the store cannot take is an argument '
+        'error', () async {
+      expect(
+        () => accounts().signInWithExternalIdentity(
+          provider: 'Google Plus',
+          subject: 'x',
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => accounts().signInWithExternalIdentity(
+          provider: 'google',
+          subject: '',
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('deleting an account', () {
     Future<int> countOf(String table, int accountId) async =>
         (await harness().db.query(
