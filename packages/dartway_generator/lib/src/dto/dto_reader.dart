@@ -62,6 +62,8 @@ final class DtoReader {
       return null;
     }
 
+    if (kind == DtoKind.command && !_hasWireResult(element)) return null;
+
     final constructorFields = readConstructorFields(element, diagnostics);
     if (constructorFields == null) return null;
 
@@ -193,6 +195,41 @@ final class DtoReader {
       );
     }
     return isValid;
+  }
+
+  /// Whether the command's result type is one the wire carries — `void`, a
+  /// JSON primitive or a DTO, each possibly nullable (see `DwActionCommand`).
+  /// Anything else compiles and fails only when the first result is encoded.
+  bool _hasWireResult(ClassElement element) {
+    final command = element.allSupertypes.firstWhere(
+      (type) => DwFrameworkTypes.isCoreClass(type.element, 'DwActionCommand'),
+    );
+    final result = command.typeArguments.single;
+    if (result is VoidType || result.isDartCoreNull) return true;
+    if (result is InterfaceType) {
+      if (result.isDartCoreInt ||
+          result.isDartCoreDouble ||
+          result.isDartCoreNum ||
+          result.isDartCoreString ||
+          result.isDartCoreBool) {
+        return true;
+      }
+      final isDto = [
+        result.element,
+        ...result.element.allSupertypes.map((type) => type.element),
+      ].any((type) => DwFrameworkTypes.isCoreClass(type, 'DwWireObject'));
+      if (isDto && result.element.typeParameters.isEmpty) return true;
+    }
+    diagnostics.add(
+      DwGenerationDiagnostic.at(
+        element,
+        'the result of command `${element.name}` is '
+        '`${result.getDisplayString()}`; a command answers void, a JSON '
+        'primitive (int, double, num, String, bool) or a DTO, each possibly '
+        'nullable — wrap a collection in a DTO',
+      ),
+    );
+    return false;
   }
 
   static bool _reachesKindBySuperclass(ClassElement element) {

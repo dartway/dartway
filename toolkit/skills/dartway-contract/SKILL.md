@@ -210,7 +210,7 @@ context; a field for them is an invitation to forge them.
 
 The answer `R` is **one value** (D-006): a data object, a JSON primitive (`int`, `double`, `num`,
 `String`, `bool`), or nothing (`DwActionCommand<void>`; a nullable `R` may answer `null`). A
-collection is wrapped in a data object. Usually the answer is the object the command changed; the
+collection is wrapped in a data object; `dartway generate` refuses any other `R`. Usually the answer is the object the command changed; the
 other objects it changed reach the screens through publications (`dartway-realtime`), not through
 the answer.
 

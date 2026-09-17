@@ -16,6 +16,9 @@ The result is **one value, untagged**:
 | `void` | nothing |
 | a nullable `R` | may be `null` |
 
+Any other `R` — a `List`, a `Map`, `Object`, an enum — is refused by `dartway generate`, naming the
+command: it would compile and fail when the first result is encoded.
+
 **A collection is wrapped in a DTO (D-006).** The client decodes the result from the command's type
 argument, and a generic `List<T>` cannot be decoded from an erased type; a server handler returning
 one fails. Nothing names the result's type on the wire — it is the command's `R`, known to both

@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **A command whose result the wire cannot carry is refused** (#265): `DwActionCommand<List<…>>`, `Map`, `Object`, an enum — anything but `void`, a JSON primitive or a DTO, each possibly nullable — compiled and failed at runtime when the result was encoded; generation now names the command and says to wrap the collection in a DTO.
+
 - **An app package without `pub get` no longer stops generation.** An unresolved `*_flutter` package is skipped and named in the summary (`not scanned: … — run \`dart pub get\` there`, `DwGenerationReport.skipped`); the shared and server packages still generate. `--check` keeps it an error: it cannot call a package it did not read up to date.
 
 - **A row field may be a `List<E>` of an enum** (non-null elements), generated as `DwEnumListType(E.values)`. It used to be refused as a `jsonb` list whose elements are not plain JSON, and projects stored `List<String>` names behind a typed getter (D-064).

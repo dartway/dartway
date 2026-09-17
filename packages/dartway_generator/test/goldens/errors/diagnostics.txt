@@ -20,6 +20,9 @@ app_shared/lib/src/ids.dart:16:14: the id of data object `NullableId` must be `i
 app_shared/lib/src/ids.dart:19:13: data object `NoId` declares no `id`; add `@override final int id;` (or a String) or an `id` getter
 app_shared/lib/src/inherited.dart:7:13: field `unit` of `Parcel` cannot be serialised: `Unit` is not imported by this library, and the generated part can only use the library's imports
 app_shared/lib/src/no_part.dart:3:13: `no_part.dart` declares generated classes but not their part: add `part 'no_part.dw.dart';` after the imports
+app_shared/lib/src/results.dart:5:13: the result of command `ListResult` is `List<Note>`; a command answers void, a JSON primitive (int, double, num, String, bool) or a DTO, each possibly nullable — wrap a collection in a DTO
+app_shared/lib/src/results.dart:9:13: the result of command `MapResult` is `Map<String, int>`; a command answers void, a JSON primitive (int, double, num, String, bool) or a DTO, each possibly nullable — wrap a collection in a DTO
+app_shared/lib/src/results.dart:14:13: the result of command `ObjectResult` is `Object?`; a command answers void, a JSON primitive (int, double, num, String, bool) or a DTO, each possibly nullable — wrap a collection in a DTO
 app_shared/lib/src/unsupported_types.dart:25:18: field `set` of `Unsupported` cannot be serialised: `Set<int>` cannot be serialised; supported: int, double, String, bool, DateTime, Duration, Uint8List, an enum, a DTO class, List<T>, Map<String, T>, DwFieldPatch<T>, or a nullable one of these
 app_shared/lib/src/unsupported_types.dart:26:25: field `nested` of `Unsupported` cannot be serialised: `List<int>` cannot be a list element or map value: equality would compare the inner collection by identity
 app_shared/lib/src/unsupported_types.dart:27:26: field `intKeys` of `Unsupported` cannot be serialised: `Map<int, String>` has keys of type `int`; JSON object keys are strings, so a map must be Map<String, T>
