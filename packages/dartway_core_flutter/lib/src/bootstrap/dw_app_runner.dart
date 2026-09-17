@@ -79,6 +79,15 @@ class DwAppRunner {
     return binding;
   }
 
+  /// [raw] as a [StackTrace]: itself when it is one, its text when it is
+  /// anything else, empty when there is none.
+  @visibleForTesting
+  static StackTrace stackOf(Object? raw) => switch (raw) {
+    final StackTrace stack => stack,
+    null => StackTrace.empty,
+    _ => StackTrace.fromString('$raw'),
+  };
+
   void run() {
     final binding = _preInit();
 
@@ -91,10 +100,13 @@ class DwAppRunner {
     // catches uncaught async errors that reach the root zone — the modern,
     // zone-safe equivalent of runZonedGuarded.
     FlutterError.onError = (FlutterErrorDetails details) {
-      effectiveOnError(details.exception, details.stack ?? StackTrace.empty);
+      // Read untyped: on the web the field can hold a raw JavaScript value, and
+      // a typed read throws inside the error handler — the error it was called
+      // for is lost.
+      effectiveOnError(details.exception, stackOf((details as dynamic).stack));
     };
-    binding.platformDispatcher.onError = (error, stack) {
-      effectiveOnError(error, stack);
+    binding.platformDispatcher.onError = (error, Object? stack) {
+      effectiveOnError(error, stackOf(stack));
       return true;
     };
 

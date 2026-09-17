@@ -169,6 +169,45 @@ final class ExampleTestApp {
     }
   }
 
+  /// Awaits [future] — a call on the core, `core.signOut()` — pumping frames
+  /// until it completes.
+  ///
+  /// A widget test runs on fake time: the fake server's traffic moves only as
+  /// frames are pumped, so a plain `await` on such a future never returns.
+  /// Fails naming the wait when [future] is still pending after [limit] of
+  /// fake time, instead of hanging the test.
+  Future<T> run<T>(
+    WidgetTester tester,
+    Future<T> future, {
+    Duration limit = const Duration(seconds: 10),
+  }) async {
+    var completed = false;
+    late T value;
+    Object? error;
+    StackTrace? stackTrace;
+    future.then(
+      (result) {
+        value = result;
+        completed = true;
+      },
+      onError: (Object e, StackTrace s) {
+        error = e;
+        stackTrace = s;
+        completed = true;
+      },
+    );
+    const step = Duration(milliseconds: 10);
+    for (var waited = Duration.zero; !completed; waited += step) {
+      if (waited >= limit) {
+        fail('the future is still pending after $limit of pumped time');
+      }
+      await tester.pump(step);
+    }
+    if (error case final e?) Error.throwWithStackTrace(e, stackTrace!);
+    await settle(tester);
+    return value;
+  }
+
   /// Taps [finder] and lets everything it set off finish. A notification it
   /// raised stays on screen until [stop] waits it out.
   Future<void> tap(WidgetTester tester, Finder finder) async {

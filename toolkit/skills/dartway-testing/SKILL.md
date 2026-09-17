@@ -332,6 +332,10 @@ A test that needs another language passes that locale — the point of it being 
 
 ### Traps about time
 
+- **Never `await` a call on the core directly in a widget test** — `core.signOut()`, a `dw.command`
+  outside a tap. The test runs on fake time and the fake server's traffic moves only with pumped
+  frames, so the future never completes. `await app.run(tester, core.signOut())` pumps until it does
+  and fails, naming the wait, after ten seconds of pumped time.
 - **Do not `pumpAndSettle` a screen that shows a spinner.** A progress indicator animates for as long
   as it is on screen, so settling by frames waits out its timeout. Pump a few short frames, then a few
   hundred milliseconds for Riverpod, the in-memory traffic and a page transition, then a few frames
