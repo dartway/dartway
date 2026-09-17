@@ -38,6 +38,35 @@ void main() {
     params: {'name': applicationName},
   );
 
+  test('SSL required of a server without it is refused at once, naming the '
+      'setting', () async {
+    // The suites' Postgres runs without SSL, as a development database does.
+    // The driver alone threw here and left its socket open, so a CLI printed
+    // the error and never exited.
+    final config = testServerConfig(name: database().name);
+    final stopwatch = Stopwatch()..start();
+    await expectLater(
+      DwPostgresDatabase.open(
+        DwDatabaseConfig(
+          host: config.host,
+          port: config.port,
+          name: config.name,
+          user: config.user,
+          password: config.password,
+          ssl: true,
+        ),
+      ),
+      throwsA(
+        isA<DwDatabaseException>().having(
+          (e) => e.message,
+          'message',
+          contains('DW_DATABASE_SSL=false'),
+        ),
+      ),
+    );
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)));
+  });
+
   test('a caller waiting for a free connection times out loudly', () async {
     final pool = await open(connectTimeout: const Duration(milliseconds: 300));
     final release = Completer<void>();

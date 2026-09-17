@@ -160,7 +160,8 @@ only when the project asks it to:
   `_USER`, `_PASSWORD`, `_SSL` (`true` unless `false`) and `_MAX_CONNECTIONS` (10). Every missing or
   malformed key is reported in one `ArgumentError`, so a misconfigured deploy fails with the whole
   list instead of one line per restart. A local Postgres without TLS needs
-  `DW_DATABASE_SSL=false`.
+  `DW_DATABASE_SSL=false`. A server without SSL is refused at once when SSL is required — the pool asks it once before the first
+  connection — with an error naming the setting.
 - `DwFileStorageConfig.fromEnvironment(env)` reads `DW_STORAGE_*` ([uploads](uploads.md#configuration)).
 
 Everything else is the project's `bin/server.dart` reading `Platform.environment` and passing

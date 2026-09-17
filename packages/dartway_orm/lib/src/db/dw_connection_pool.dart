@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 
 import 'package:meta/meta.dart';
 import 'package:postgres/messages.dart' as pgm;
@@ -298,9 +299,16 @@ final class DwConnectionPool {
     }
   }
 
+  /// Whether the server was asked once that it speaks SSL (see [_checkSsl]).
+  bool _sslConfirmed = false;
+
   Future<DwPooledConnection> _connect() async {
     _open++;
     try {
+      if (_config.ssl && !_sslConfirmed) {
+        await _checkSsl();
+        _sslConfirmed = true;
+      }
       return await DwPooledConnection.open(_config, counter: _counter);
     } catch (_) {
       _open--;
@@ -308,6 +316,54 @@ final class DwConnectionPool {
       // must not wait out its timeout for capacity that exists.
       _connectForWaiter();
       rethrow;
+    }
+  }
+
+  /// Asks the server whether it speaks SSL, on a socket of its own that is
+  /// always closed, before the driver is given a connection that requires it.
+  ///
+  /// The driver (postgres 3.5) answers a server without SSL by throwing and
+  /// leaving its socket open, which keeps the process alive: a migration CLI
+  /// printed the error and then never exited, which reads as a hang. Asked
+  /// once per pool — whether a server speaks SSL does not change while a
+  /// process runs.
+  Future<void> _checkSsl() async {
+    final where = '${_config.host}:${_config.port}/${_config.name}';
+    final Socket socket;
+    try {
+      socket = await Socket.connect(
+        _config.host,
+        _config.port,
+        timeout: _config.connectTimeout,
+      );
+    } on Exception catch (error) {
+      throw DwDatabaseException(
+        null,
+        'cannot connect to $where: $error',
+        cause: error,
+      );
+    }
+    try {
+      // SSLRequest: length 8, code 80877103. The server answers one byte.
+      socket.add(const [0, 0, 0, 8, 4, 210, 22, 47]);
+      await socket.flush();
+      final answer = await socket.first.timeout(_config.connectTimeout);
+      if (answer.isEmpty || answer.first != 0x53) {
+        throw DwDatabaseException(
+          null,
+          'cannot connect to $where: the server does not support SSL, which '
+          'is required (DW_DATABASE_SSL is true unless set); for a local '
+          'database set DW_DATABASE_SSL=false',
+        );
+      }
+    } on TimeoutException {
+      throw DwDatabaseException(
+        null,
+        'cannot connect to $where: no answer to the SSL request within '
+        '${_config.connectTimeout}',
+      );
+    } finally {
+      socket.destroy();
     }
   }
 
