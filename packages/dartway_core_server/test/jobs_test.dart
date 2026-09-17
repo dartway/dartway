@@ -168,6 +168,56 @@ void main() {
     },
   );
 
+  test(
+    'jobs a newer version declared wait for it, and stop nothing here',
+    () async {
+      // During a deployment the new server shares the tables: it inserts its
+      // recurring row already due and enqueues kinds this process does not
+      // know. Neither may throw this worker out of its loop or be marked
+      // failed by it.
+      final incidentsBefore = harness().app.alerts.incidents.length;
+      final db = harness().db;
+      await db.execute(
+        'INSERT INTO dw_recurring_job (name, every_micros, next_run_at) '
+        "VALUES ('from_newer', 3600000000, now() - interval '1 second')",
+      );
+      await db.execute(
+        "INSERT INTO dw_job (name, payload, run_at) "
+        "VALUES ('from_newer_queued', '{\"tag\": \"newer\"}'::jsonb, now())",
+      );
+
+      await caller.call(const EnqueueJob('record', 'alongside'));
+      await eventually(
+        () async => (await logged('record')).contains('alongside'),
+      );
+
+      final queued = (await jobRow('newer'))!;
+      expect(queued['failed_at'], isNull);
+      expect(queued['attempts'], 0);
+      final recurring = await db.query(
+        "SELECT next_run_at <= now() AS due FROM dw_recurring_job "
+        "WHERE name = 'from_newer'",
+      );
+      expect(
+        recurring.single['due'],
+        isTrue,
+        reason: 'not run by this process',
+      );
+      // Let a worker that would trip over the foreign row come round again.
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      expect(
+        harness().app.alerts.incidents.skip(incidentsBefore),
+        isEmpty,
+        reason: 'a foreign job must not fail this process',
+      );
+
+      await db.execute(
+        "DELETE FROM dw_recurring_job WHERE name = 'from_newer'",
+      );
+      await db.execute("DELETE FROM dw_job WHERE name = 'from_newer_queued'");
+    },
+  );
+
   test('an unknown job name fails the enqueueing call', () async {
     final result = await caller.call(const EnqueueJob('nope', 'x'));
     expect(result.status, 500);

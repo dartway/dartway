@@ -106,6 +106,16 @@ final class DwJobRunner {
 
   static const _contendedRetry = Duration(milliseconds: 250);
 
+  /// The jobs this process declares. A worker claims only those: during a
+  /// deployment the old and the new server share one table, and a job only
+  /// the new code declares — a recurring row it inserted already due, a job
+  /// it enqueued — must wait for a process that can run it. Claimed by the
+  /// old one it threw out of the worker loop (recurring: every job of that
+  /// process stopped while the row stayed due), or was marked failed for
+  /// good (queued).
+  late final List<String> _queuedNames = queued.keys.toList();
+  late final List<String> _recurringNames = recurring.keys.toList();
+
   final _Signal _signal = _Signal();
   final List<Future<void>> _loops = [];
   bool _running = false;
@@ -168,6 +178,18 @@ final class DwJobRunner {
     for (final row in removed) {
       _log.info('recurring job ${row['name']} is no longer declared; removed');
     }
+    final waiting = await _db.query(
+      'SELECT name, count(*)::int AS jobs FROM dw_job '
+      'WHERE failed_at IS NULL AND NOT (name = ANY(@queued::text[])) '
+      'GROUP BY name ORDER BY name',
+      params: {'queued': _queuedNames},
+    );
+    for (final row in waiting) {
+      _log.warning(
+        '${row['jobs']} queued job(s) named ${row['name']} are declared by no '
+        'job of this process; they wait for one that declares them',
+      );
+    }
   }
 
   Future<void> _work(int worker) async {
@@ -191,9 +213,11 @@ final class DwJobRunner {
     final row = (await _db.query(
       'SELECT EXTRACT(EPOCH FROM (LEAST('
       '(SELECT min(GREATEST(run_at, COALESCE(locked_until, run_at))) '
-      'FROM dw_job WHERE failed_at IS NULL), '
-      '(SELECT min(next_run_at) FROM dw_recurring_job)) - now()))::float8 '
+      'FROM dw_job WHERE failed_at IS NULL AND name = ANY(@queued::text[])), '
+      '(SELECT min(next_run_at) FROM dw_recurring_job '
+      'WHERE name = ANY(@recurring::text[]))) - now()))::float8 '
       'AS seconds',
+      params: {'queued': _queuedNames, 'recurring': _recurringNames},
     )).single;
     final seconds = row['seconds'] as double?;
     if (seconds == null) return pollInterval;
@@ -210,7 +234,9 @@ final class DwJobRunner {
       final rows = await tx.query(
         'SELECT name, every_micros, next_run_at, now() AS now '
         'FROM dw_recurring_job WHERE next_run_at <= now() '
+        'AND name = ANY(@recurring::text[]) '
         'ORDER BY next_run_at LIMIT 1 FOR UPDATE SKIP LOCKED',
+        params: {'recurring': _recurringNames},
       );
       if (rows.isEmpty) return false;
       final row = rows.single;
@@ -262,7 +288,9 @@ final class DwJobRunner {
         'SELECT id, name, payload, attempts FROM dw_job '
         'WHERE failed_at IS NULL AND run_at <= now() '
         'AND (locked_until IS NULL OR locked_until <= now()) '
+        'AND name = ANY(@queued::text[]) '
         'ORDER BY run_at, id LIMIT 1 FOR UPDATE SKIP LOCKED',
+        params: {'queued': _queuedNames},
       );
       if (rows.isEmpty) return false;
       final row = rows.single;

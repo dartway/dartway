@@ -125,6 +125,15 @@ A run executes in the transaction that claimed it. After a long outage the job r
 per missed slot, and its next run is the first slot of its schedule after now. A failure alerts, stores its text in `last_error`,
 and waits for the next slot: a recurring job has no retries — its next run is the retry.
 
+### Two versions at once
+
+During a deployment the new server starts beside the old one on the same tables. **A process claims
+only the jobs it declares**: a recurring job the new version added — inserted already due — and a
+job of a kind only the new code enqueues wait for a process that declares them, instead of stopping
+the old worker or being marked failed by it. If the new version never takes over (its health check
+failed and the deployment stopped), such rows simply wait; the old server logs a warning at start
+for queued jobs no job of it declares.
+
 ## The framework's jobs
 
 | Job | Kind | What it does |
