@@ -21,7 +21,20 @@ rootProject.allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://artifactory-external.vkpartner.ru/artifactory/maven' }
+        maven { url 'https://nexus-external.rustore.ru/repository/maven-rustore-exposed' }
+    }
+}
+
+// RuStore retires its old repository on 01.10.2026, and flutter_rustore_push
+// 7.2.0 — which this plugin depends on — still adds it to every project. A
+// repository host that no longer answers fails the build instead of being
+// skipped, so it is removed once every project has declared its own.
+gradle.projectsEvaluated {
+    rootProject.allprojects {
+        repositories.removeIf { repository ->
+            repository instanceof MavenArtifactRepository &&
+                repository.url.host == 'artifactory-external.vkpartner.ru'
+        }
     }
 }
 

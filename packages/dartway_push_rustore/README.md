@@ -32,6 +32,9 @@ In `android/app/src/main/AndroidManifest.xml`:
 ```
 
 The RuStore SDK is not on Maven Central: this package declares its repository, so an app that pins
-repositories (`FAIL_ON_PROJECT_REPOS`) adds `https://artifactory-external.vkpartner.ru/artifactory/maven`.
+repositories (`FAIL_ON_PROJECT_REPOS`) adds `https://nexus-external.rustore.ru/repository/maven-rustore-exposed`.
+It also removes RuStore's retired repository (`artifactory-external.vkpartner.ru`, off from 01.10.2026),
+which `flutter_rustore_push` 7.2.0 still adds to every project; an app that pins repositories itself
+must not list that host either.
 
 RuStore push runs only on a physical device with RuStore installed and signed in.
