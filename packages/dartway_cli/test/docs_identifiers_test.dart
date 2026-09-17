@@ -237,6 +237,19 @@ final class _PublicSurface {
         wireCodes.addAll(
           _wireCodeLiteral.allMatches(source).map((m) => m.group(1)!),
         );
+        if (p.basename(file.path) == 'dw_analytics_event.dart') {
+          // `DwAppEvent.eventName` is `'dw.$name'`: its values are event names.
+          final body = RegExp(
+            r'enum DwAppEvent[^{]*\{(.*?)\n  static',
+            dotAll: true,
+          ).firstMatch(source)!.group(1)!;
+          wireCodes.addAll(
+            RegExp(
+              r'^  ([a-z]\w*)[,;]',
+              multiLine: true,
+            ).allMatches(body).map((m) => m.group(1)!),
+          );
+        }
         if (p.basename(file.path) == 'dw_call_refusal.dart') {
           // `DwCoreRefusal.code` is `'dw.$name'`: its values are the codes.
           final body = RegExp(

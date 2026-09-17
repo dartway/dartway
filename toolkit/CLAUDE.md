@@ -263,7 +263,7 @@ An entry below answers three things, in this order: **how to tell** the project 
 
 ## Skills and commands
 
-- Skills (`.claude/skills/`): `dartway-requirements`, `dartway-plan`, `dartway-run`, `dartway-feature-scaffold`, `dartway-contract`, `dartway-server`, `dartway-data-layer`, `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads`, `dartway-testing`, `dartway-navigation`, `dartway-ui-kit`, `dartway-clean-code`, `dartway-on-device`, `dartway-push-delivery`, `dartway-finish`, `dartway-update` — loaded by relevance to the task.
+- Skills (`.claude/skills/`): `dartway-requirements`, `dartway-plan`, `dartway-run`, `dartway-feature-scaffold`, `dartway-contract`, `dartway-server`, `dartway-data-layer`, `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads`, `dartway-testing`, `dartway-navigation`, `dartway-ui-kit`, `dartway-clean-code`, `dartway-on-device`, `dartway-push-delivery`, `dartway-analytics`, `dartway-finish`, `dartway-update` — loaded by relevance to the task.
 - Commands (`.claude/commands/`): `/dartway-checkup` — the state of the project and what to take into work next (whole project by default, a path narrows it); `/commit` — a commit in the project's format.
 
 **Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (`dartway-feature-scaffold`, and the layer skills: `dartway-contract` → `dartway-server` → `dartway-data-layer`, with `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads` where the feature reaches them) → `dartway-finish` (checks, audit, descriptions reconciled with the code, tests) before the PR.

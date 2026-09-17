@@ -254,9 +254,17 @@ sealed class DwCallHandler {
   /// check and its idempotency record in one database transaction; set it to
   /// `false` for handlers that call external services, which then open their
   /// own `ctx.transaction` where they write.
+  ///
+  /// [recordsSuccess] `false` skips storing the successful outcome under the
+  /// idempotency key — only for a command whose data already makes a repeat
+  /// harmless (it writes rows under a unique key of its own and answers
+  /// nothing), and that is sent often enough for one outcome row per call to
+  /// matter: analytics batches. A repeat then runs again and changes nothing.
+  /// Refusals are recorded either way.
   static DwCallHandler command<C extends DwActionCommand<R>, R>({
     required DwAccessRule access,
     bool transactional = true,
+    bool recordsSuccess = true,
     int? maxBodyBytes,
     required Future<R> Function(DwCallContext ctx, C command) handle,
   }) => DwCommandHandler<C, R>._(
@@ -264,7 +272,7 @@ sealed class DwCallHandler {
     maxBodyBytes,
     transactional,
     handle,
-    recordsSuccess: true,
+    recordsSuccess: recordsSuccess,
   );
 }
 

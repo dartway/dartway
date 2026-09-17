@@ -182,6 +182,11 @@ The outcome — the result, or a refusal — is stored under the idempotency key
 retry of the same key; a failure is not stored, so it can be retried. See
 [commands and idempotency](../2-core/commands-and-idempotency.md).
 
+**`recordsSuccess: false`** skips storing a successful outcome — only for a command whose own
+unique keys already make a repeat harmless and which is sent often enough for an outcome row per
+call to matter. The analytics batch is the one in the framework: its events are unique by install
+and sequence ([analytics](analytics.md)).
+
 ## `DwCallContext`
 
 One context per call. Everything a handler may touch is on it.

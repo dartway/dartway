@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwCallHandler.command(recordsSuccess: false)`** skips storing a successful outcome under the idempotency key, for a command whose own unique keys make a repeat harmless and which is sent often (analytics batches); refusals are still recorded.
+
 - **A job runner claims only the jobs its process declares.** During a deployment the old server claimed a recurring job the new one had just added — due at once — and threw on the unknown name, stopping every job of that process while the row stayed due; a queued job of a kind only the new code enqueues was marked failed for good. Both now wait for a process that declares them; queued jobs nobody here declares are logged at start.
 
 - **A finished upload with no object is logged** (#224): the refusal `DwUploadRefusal.missing` now leaves a warning with the file id, expected size and type, bucket and key — the only server-side trace when an upload that reported success left nothing in the bucket.

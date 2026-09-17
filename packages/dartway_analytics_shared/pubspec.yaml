@@ -1,0 +1,14 @@
+name: dartway_analytics_shared
+description: The analytics contract of DartWay shared by server and app — events a project declares, and the batch the app sends them in.
+version: 0.1.0-dev.1
+repository: https://github.com/dartway/dartway
+license: Apache-2.0
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.11.0
+dependencies:
+  dartway_core_shared: ^0.20.0-dev.1
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.26.0

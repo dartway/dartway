@@ -79,6 +79,7 @@ skills → `dartway-finish`.
 | `dartway-finish` | The definition of done before a commit or PR: audit the diff, apply only what is confirmed |
 | `dartway-update` | Moving onto a newer framework: `dartway update`, the migration notes, then the versions |
 | `dartway-push-delivery` | Server-side push delivery |
+| `dartway-analytics` | Events tracked in the app and on the server, stored in the project's Postgres |
 
 Two commands come with them. **`/commit`** writes one conventional-commit line in English and decides
 nothing local — whether commits carry a ticket belongs to the project's own `CLAUDE.md`. **`/dartway-checkup`**
