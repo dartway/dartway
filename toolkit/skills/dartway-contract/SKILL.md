@@ -361,8 +361,9 @@ alone** and an unknown one can be shown neutrally or left out without anyone act
 the kind of an entry in an activity feed, the icon of a notification. **Never** when behaviour
 depends on the value: a status that decides what may happen next, a role, a permission, a kind of
 payment. Every reader turns an unknown name into `unknown` (the screen must handle it: hide the
-row, show a neutral label); `unknown` itself can never be written to a row, so nothing is
-overwritten with it. `dartway generate` refuses an open enum without `unknown`.
+row, show a neutral label); `unknown` can never be written to a **row**, so nothing stored is
+overwritten with it, and it does travel on the wire as itself — an older server answering from a
+row it cannot read sends `unknown` instead of failing the answer. `dartway generate` refuses an open enum without `unknown`.
 
 ## 10. Generation
 

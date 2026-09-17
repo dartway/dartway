@@ -19,8 +19,11 @@
 ///
 /// An open enum declares a value named `unknown`: every reader — the app's
 /// codecs, a row read on the server — turns a name it does not know into it.
-/// `unknown` itself is never written: a row holding it, or a DTO carrying it,
-/// fails to encode, so a build that did not know a value cannot overwrite it.
+/// **`unknown` is never stored**: writing it into a row throws, so a build
+/// that did not know a value cannot overwrite it with this one. It does
+/// travel on the wire as itself — a server that read a row it does not know
+/// answers with `unknown` rather than failing the whole answer, and the
+/// reader shows it as it shows any unknown value.
 mixin DwOpenEnum on Enum {
   /// The name of the value unknown names are read as.
   static const String fallbackName = 'unknown';

@@ -53,9 +53,10 @@ abstract final class DwJsonCodec {
     );
   }
 
-  /// The name [value] is written as. Throws [StateError] for the `unknown`
+  /// The name [value] is stored as. Throws [StateError] for the `unknown`
   /// value of an open enum: it stands for a name this build did not know,
-  /// and writing it would replace that name.
+  /// and storing it would replace that name. Used where a value is written
+  /// to keep — a row column; the wire carries `unknown` as itself.
   static String encodeEnum(Enum value) {
     if (value is DwOpenEnum && value.isUnknown) {
       throw StateError(
