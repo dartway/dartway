@@ -126,7 +126,8 @@ List<DwUnusedFeatureFile> findUnusedFeatureFiles(DwFeatureNode feature) {
   ];
 }
 
-/// Groups the files bound together by a conditional `export`/`import`.
+/// Groups the files bound together by a conditional `export`/`import`, or by
+/// `part`: a library and its parts answer as one.
 ///
 /// `export 'foo_stub.dart' if (dart.library.js_interop) 'foo_web.dart';` is one
 /// symbol with two implementations. Read file by file each of the three looks
@@ -164,6 +165,16 @@ Map<String, String> _conditionalGroups(Map<String, String> sources) {
   };
 
   for (final source in sources.entries) {
+    // A library and its parts are one unit: a part's declarations are the
+    // library's, reached by whoever imports the library — for a part of the
+    // entry point, other features.
+    for (final part in _partDirective.allMatches(source.value)) {
+      final target = part.group(1)!;
+      if (target.contains(':')) continue;
+      final resolved =
+          byNormalised[p.normalize(p.join(p.dirname(source.key), target))];
+      if (resolved != null) union(source.key, resolved);
+    }
     for (final directive in _directive.allMatches(source.value)) {
       final statement = directive.group(0)!;
       if (!_conditionalClause.hasMatch(statement)) continue;
@@ -184,6 +195,12 @@ Map<String, String> _conditionalGroups(Map<String, String> sources) {
 /// An `export`/`import` statement, read from the unstripped source — [_strip]
 /// blanks the very uris this has to see.
 final _directive = RegExp(r'^\s*(?:export|import)\s[^;]*;', multiLine: true);
+
+/// `part 'uri';` — not `part of`, which names the library from the other side.
+final _partDirective = RegExp(
+  r'''^\s*part\s+["']([^"'\n]+)["']\s*;''',
+  multiLine: true,
+);
 
 final _conditionalClause = RegExp(r'\bif\s*\(\s*dart\.library\.');
 

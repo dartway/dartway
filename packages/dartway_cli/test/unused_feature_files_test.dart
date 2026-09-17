@@ -62,6 +62,28 @@ class MyFeature extends StatelessWidget {
     expect(unusedNames(feature), ['save_button_bar.dart']);
   });
 
+  test('a part of the entry point is the entry point, whoever uses it', () {
+    final feature = featureWith({
+      'my_feature.dart': '''
+part 'widgets/my_feed.dart';
+part 'logic/feed_days.dart';
+
+class MyFeature extends StatelessWidget {
+  Widget build(BuildContext context) => const SizedBox();
+}
+''',
+      'widgets/my_feed.dart':
+          "part of '../my_feature.dart';\n\nclass MyFeed {}",
+      'logic/feed_days.dart':
+          "part of '../my_feature.dart';\n\nclass FeedDays {}",
+      'widgets/forgotten_panel.dart': 'class ForgottenPanel {}',
+    });
+
+    // MyFeed and FeedDays are built by other features through the library;
+    // the file nobody reaches is still reported.
+    expect(unusedNames(feature), ['forgotten_panel.dart']);
+  });
+
   test('an extension is alive through its member, not its type name', () {
     // The trap: `CommentOptions` appears nowhere, so searching for the declared
     // type reports a file that is called on every build.
