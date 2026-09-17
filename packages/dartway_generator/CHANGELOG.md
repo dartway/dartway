@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **An app package without `pub get` no longer stops generation.** An unresolved `*_flutter` package is skipped and named in the summary (`not scanned: … — run \`dart pub get\` there`, `DwGenerationReport.skipped`); the shared and server packages still generate. `--check` keeps it an error: it cannot call a package it did not read up to date.
+
 - **A row field may be a `List<E>` of an enum** (non-null elements), generated as `DwEnumListType(E.values)`. It used to be refused as a `jsonb` list whose elements are not plain JSON, and projects stored `List<String>` names behind a typed getter (D-064).
 
 - **Row fields `name`, `columns`, `schema`, `table`, `row` (D-040):** generated

@@ -43,10 +43,16 @@ final class DwProjectPackage {
 ///
 /// The role is read from the package name in `pubspec.yaml`, not from the
 /// directory, because the name is what the registry variable is derived from.
+///
+/// An unresolved `*_flutter` package is added to [skipped] instead of being
+/// an error when [skipped] is given: generation of the contract and the
+/// server does not depend on the app, and an app not yet moved to the
+/// framework's current version — mid-port — must not stop it.
 List<DwProjectPackage> detectPackages(
   String root,
-  List<DwGenerationDiagnostic> diagnostics,
-) {
+  List<DwGenerationDiagnostic> diagnostics, {
+  List<String>? skipped,
+}) {
   final candidates = <String>[
     if (File(p.join(root, 'pubspec.yaml')).existsSync())
       root
@@ -81,6 +87,10 @@ List<DwProjectPackage> detectPackages(
         .firstOrNull;
     if (role == null) continue;
     final version = _languageVersion(directory, name);
+    if (version == null && role == DwPackageRole.flutter && skipped != null) {
+      skipped.add(name);
+      continue;
+    }
     if (version == null) {
       diagnostics.add(
         DwGenerationDiagnostic(

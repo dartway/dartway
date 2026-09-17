@@ -58,6 +58,30 @@ void main() {
       );
     });
 
+    test('an app package without pub get does not stop the contract and the '
+        'server, and is named', () async {
+      // Mid-port: the app still resolves against the old framework, or not at
+      // all, while the shared and server packages are being moved.
+      final project = TempProject.create(['app_shared', 'app_flutter']);
+      Directory(
+        project.path('app_flutter/.dart_tool'),
+      ).deleteSync(recursive: true);
+      final report = await project.generate();
+      expect(report.diagnostics, isEmpty);
+      expect(report.skipped, ['app_flutter']);
+      expect(
+        report.summary,
+        endsWith('not scanned: app_flutter — run `dart pub get` there'),
+      );
+
+      // --check cannot say "up to date" about a package it did not read.
+      final check = await project.generate(check: true);
+      expect(
+        check.diagnostics.single.message,
+        startsWith('app_flutter has no resolved package config'),
+      );
+    });
+
     test('two packages of one role', () async {
       final project = TempProject.create(['app_shared', 'other_shared']);
       final report = await project.generate();

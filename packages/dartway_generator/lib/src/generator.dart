@@ -35,9 +35,15 @@ final class DwGenerationReport {
     required this.diagnostics,
     required this.elapsed,
     required this.check,
+    this.skipped = const [],
   });
 
   final String root;
+
+  /// Packages not scanned: a `*_flutter` package without a resolved package
+  /// config, left out so the contract and the server still generate. Their
+  /// generated parts, if any, were neither written nor checked.
+  final List<String> skipped;
 
   /// Files whose content changed (in check mode: would change).
   final List<String> written;
@@ -68,9 +74,12 @@ final class DwGenerationReport {
           '${removed.length} stale, ${unchanged.length} up to date '
           '($seconds s)';
     }
+    final notScanned = skipped.isEmpty
+        ? ''
+        : '; not scanned: ${skipped.join(', ')} — run `dart pub get` there';
     return 'dartway generate: ${written.length} written, '
         '${unchanged.length} unchanged, ${removed.length} removed '
-        '($seconds s)';
+        '($seconds s)$notScanned';
   }
 }
 
@@ -101,6 +110,7 @@ abstract final class DwCodeGenerator {
       root = Directory(root).resolveSymbolicLinksSync();
     }
     final diagnostics = <DwGenerationDiagnostic>[];
+    final skipped = <String>[];
 
     DwGenerationReport finish({OutputPlan? plan}) {
       diagnostics.sort();
@@ -112,10 +122,17 @@ abstract final class DwCodeGenerator {
         diagnostics: List.unmodifiable(diagnostics),
         elapsed: stopwatch.elapsed,
         check: check,
+        skipped: List.unmodifiable(skipped),
       );
     }
 
-    final packages = detectPackages(root, diagnostics);
+    // `--check` answers whether everything is up to date, which it cannot
+    // for a package it did not read: there an unresolved app stays an error.
+    final packages = detectPackages(
+      root,
+      diagnostics,
+      skipped: check ? null : skipped,
+    );
     if (diagnostics.isNotEmpty) return finish();
 
     final collection = AnalysisContextCollection(
