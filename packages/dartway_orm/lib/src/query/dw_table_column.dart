@@ -247,27 +247,42 @@ final class DwOrderTerm {
 /// One `SET` of `updateWhere`: a value ([DwTableColumn.set]) or an amount
 /// added to the column's current value ([DwNumberColumn.increment]).
 final class DwColumnAssignment<T> {
-  const DwColumnAssignment._(this.column, this.value) : _adds = false;
+  const DwColumnAssignment._(this.column, this.value) : _kind = _Assign.set;
 
-  const DwColumnAssignment._adding(this.column, this.value) : _adds = true;
+  const DwColumnAssignment._adding(this.column, this.value)
+    : _kind = _Assign.add;
+
+  const DwColumnAssignment._ifNull(this.column, this.value)
+    : _kind = _Assign.ifNull;
 
   final DwTableColumn<T> column;
 
-  /// The value set, or the amount added.
+  /// The value set, the amount added, or the value a null cell takes.
   final T value;
 
-  /// Whether [value] is added to the current value rather than replacing it.
-  final bool _adds;
+  final _Assign _kind;
 
   @internal
   void write(DwSqlWriter writer) {
     final parameter = column.encodeParameter(writer, value);
-    writer.write(
-      _adds
-          ? '${column.sql} = ${column.sql} + $parameter'
-          : '${column.sql} = $parameter',
-    );
+    final name = column.sql;
+    writer.write(switch (_kind) {
+      _Assign.set => '$name = $parameter',
+      _Assign.add => '$name = $name + $parameter',
+      _Assign.ifNull => '$name = COALESCE($name, $parameter)',
+    });
   }
+}
+
+enum _Assign { set, add, ifNull }
+
+/// Assignments on a nullable column.
+extension DwNullableColumn<V extends Object> on DwTableColumn<V?> {
+  /// `column = COALESCE(column, value)`: sets [value] where the cell is null
+  /// and leaves a value that is there — in the same statement as the rest of
+  /// the update, rather than a second `updateWhere` limited to null cells.
+  DwColumnAssignment<V?> setIfNull(V value) =>
+      DwColumnAssignment._ifNull(this, value);
 }
 
 /// Arithmetic assignments on a non-null number column.

@@ -272,8 +272,7 @@ final class DwEnumListType<E extends Enum> extends _DwJsonType<List<E>> {
       for (final name in raw)
         values.firstWhere(
           (value) => value.name == name,
-          orElse: () =>
-              throw DwDecodeException('"$name" is not a value of $E'),
+          orElse: () => throw DwDecodeException('"$name" is not a value of $E'),
         ),
     ]);
   }

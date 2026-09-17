@@ -387,12 +387,11 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
         namespace: index,
     };
     final remaining = pending.sorted(
-      (a, b) => switch (rank[a.ref.namespace]!.compareTo(
-        rank[b.ref.namespace]!,
-      )) {
-        0 => _byId(a, b),
-        final byNamespace => byNamespace,
-      },
+      (a, b) =>
+          switch (rank[a.ref.namespace]!.compareTo(rank[b.ref.namespace]!)) {
+            0 => _byId(a, b),
+            final byNamespace => byNamespace,
+          },
     );
     final ordered = <_Registered>[];
     while (remaining.isNotEmpty) {

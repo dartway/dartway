@@ -622,6 +622,33 @@ void main() {
       },
     );
 
+    test('setIfNull fills only null cells, in the same statement', () async {
+      final yoga = await db().clubServices.insert(service());
+      final rows = await db().clubSessions.insertAll([
+        for (final note in [null, 'kept'])
+          ClubSessionRow(
+            serviceId: yoga.id!,
+            startsAt: DateTime.utc(2026, 2, note == null ? 1 : 2),
+            capacity: 1,
+            note: note,
+          ),
+      ]);
+      expect(
+        await db().clubSessions.updateWhere(
+          where: (t) => t.serviceId.equals(yoga.id!),
+          set: (t) => [t.note.setIfNull('filled'), t.capacity.increment(1)],
+        ),
+        2,
+      );
+      expect(
+        [
+          for (final row in rows)
+            ((await db().clubSessions.findById(row.id!))!).note,
+        ],
+        ['filled', 'kept'],
+      );
+    });
+
     test('delete and deleteWhere return affected counts', () async {
       final rows = await db().clubServices.insertAll([
         service(title: 'a'),

@@ -151,6 +151,7 @@ final alreadyBooked = await ctx.db.sessionBookings.exists(
 | comparable (`int`, `double`, `String`, `DateTime`, `Duration`) | `gt`, `gte`, `lt`, `lte`, `between(low, high)` (inclusive) |
 | `String` | `like(pattern)`, `ilike(pattern)` |
 | non-null `int` or `double` | `increment(n)` for `updateWhere`: `column = column + n`, a negative `n` decrements |
+| nullable | `setIfNull(v)` for `updateWhere`: `column = COALESCE(column, v)` — fills a null cell, keeps a value |
 
 Conditions combine with `&`, `|` and `.not()`. Expressions that make no sense for a type do not
 compile: no `gt` on a `bool`, no `like` on a `DateTime`. Null follows Dart, not SQL's three-valued
