@@ -13,6 +13,7 @@ import '../auth/dw_auth_service.dart';
 import '../auth/dw_session_cache.dart';
 import '../calls/dw_call_endpoint.dart';
 import '../channels/dw_channel_rule.dart';
+import '../context/dw_call_context.dart';
 import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../files/dw_file_storage.dart';
@@ -325,6 +326,24 @@ final class DwAppServer {
       _running = null;
       _stopping = false;
     }
+  }
+
+  /// Runs [work] as server-level work, the way a job runs: in a background
+  /// context with no caller, in one transaction — its publications and
+  /// revocations delivered once it commits, and nothing of it if it throws.
+  ///
+  /// For code outside any call that needs what a handler has: a script or a
+  /// seed that publishes, a test that calls a domain service directly instead
+  /// of through a command. [scope] names it in the log.
+  Future<T> runInContext<T>(
+    Future<T> Function(DwCallContext ctx) work, {
+    String scope = 'server',
+  }) async {
+    final runtime = _require.runtime;
+    final ctx = runtime.context(scope: scope, kind: DwContextKind.background);
+    final result = await ctx.transaction((_) => work(ctx));
+    runtime.deliver(ctx);
+    return result;
   }
 
   /// Wakes the job executor at once instead of at its next notification or

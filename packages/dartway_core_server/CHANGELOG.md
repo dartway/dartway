@@ -4,6 +4,11 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwAppServer.runInContext(work)`** (and `DwTestServer.runInContext`): server-level work with a
+  real `DwCallContext` — background, no caller, one transaction, effects delivered after commit and
+  none on a throw. A domain service that needs a context could only be reached through a command or
+  a job written for the purpose (D-065).
+
 - **The server reads and writes its own files**: `ctx.files.read(fileId)` answers the bytes of a
   confirmed file, public or private; `ctx.files.readLink(fileId)` a short link another service can
   fetch; `ctx.files.store(purpose, accountId:, bytes:, contentType:, fileName:)` a new confirmed

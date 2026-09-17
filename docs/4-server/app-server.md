@@ -247,6 +247,20 @@ start. There is no default identifier: whoever receives the codes sent to it bec
 A script with no server running (the seed) builds `DwAccountService(db, auth)` over a bare
 database instead — see [auth and identity](auth-identity.md#dwaccountservice).
 
+### `server.runInContext`
+
+Code outside any call sometimes needs what a handler has — `ctx.publish`, `ctx.jobs`, `ctx.files`,
+`ctx.accounts`: a script that publishes, a test that calls a domain service directly rather than
+through a command.
+
+```dart
+final plan = await server.runInContext((ctx) => PlanService.rebuild(ctx, accountId));
+```
+
+It runs the way a job does: a background context with no caller, in one transaction; publications
+and revocations are delivered once it commits, and nothing of it is if `work` throws. The value
+`work` returns is the answer. A test server exposes the same as `DwTestServer.runInContext`.
+
 ## Related
 
 - [Handlers and the call context](handlers-and-context.md) — what runs for each call.

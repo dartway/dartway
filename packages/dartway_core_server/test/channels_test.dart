@@ -158,6 +158,46 @@ void main() {
     },
   );
 
+  group('server-level work', () {
+    test(
+      'publishes after commit, as a job would, and answers its value',
+      () async {
+        final (_, _, listener) = await signedSocket('ctx-listener@example.com');
+        expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
+        final answer = await harness().server.runInContext((ctx) async {
+          ctx.publish(
+            const DwLiveChannel(TestChannel.notes),
+            const NoteView(id: 901, text: 'from a service'),
+          );
+          await listener.expectSilence();
+          return 'done';
+        });
+        expect(answer, 'done');
+        final update = await listener.expect<DwUpdateMessage>();
+        expect(
+          (update.updates.objects.single as NoteView).text,
+          'from a service',
+        );
+      },
+    );
+
+    test('publishes nothing when the work throws', () async {
+      final (_, _, listener) = await signedSocket('ctx-thrown@example.com');
+      expect(await listener.subscribe('notes'), isA<DwSubscribedMessage>());
+      await expectLater(
+        harness().server.runInContext<void>((ctx) async {
+          ctx.publish(
+            const DwLiveChannel(TestChannel.notes),
+            const NoteView(id: 902, text: 'never'),
+          );
+          throw StateError('the service failed');
+        }),
+        throwsStateError,
+      );
+      await listener.expectSilence();
+    });
+  });
+
   test(
     'subscribing twice is idempotent: one subscription, one delivery',
     () async {

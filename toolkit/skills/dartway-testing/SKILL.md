@@ -199,6 +199,10 @@ database what the client could observe — that ties the test to the schema inst
 
 - **`server.wakeJobs()`** runs the job executor now instead of at its next poll. Call it after the
   command that enqueued, then wait for the effect.
+- **`server.runInContext((ctx) async { ... })`** calls a domain service directly with a real
+  context — no command, no scaffolding job: a background context in one transaction, publications
+  delivered after commit, nothing delivered if it throws. Use it for a service that has rules of its
+  own; what a command publishes to whom is still tested through the command.
 - **`DwTestStorage.create(prefix:)`** provisions a public and a private bucket for the file on the
   MinIO `dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
   the server stops. `storage.keys(bucket)` lists what landed where. What to test — `dartway-uploads`.

@@ -8,6 +8,7 @@ import 'package:dartway_client/dartway_client.dart'
     hide DwNotAuthenticatedException;
 import 'package:dartway_orm/dartway_orm.dart';
 
+import '../context/dw_call_context.dart';
 import '../server/dw_app_server.dart';
 
 /// A throwaway database for one test file: created empty, dropped after.
@@ -112,6 +113,12 @@ final class DwTestServer {
 
   /// Wakes the job executor now.
   void wakeJobs() => server.wakeJobs();
+
+  /// Runs [work] in a server-level context — see [DwAppServer.runInContext]:
+  /// a domain service called directly, with its publications delivered after
+  /// commit.
+  Future<T> runInContext<T>(Future<T> Function(DwCallContext ctx) work) =>
+      server.runInContext(work, scope: 'test');
 
   /// A raw HTTP caller of this server, optionally signed in with [token].
   DwTestCaller caller({String? token}) =>
