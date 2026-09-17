@@ -566,7 +566,12 @@ class DwFlutterInspector {
       final openedFallbackList = insideFallbackList;
       insideFallbackList = _fontFallbackListContinues(line, insideFallbackList);
 
-      for (final match in _uiKitTextLiteral.allMatches(line)) {
+      for (final match in _DwStringLiteral.allIn(line)) {
+        if (match.value.length < 3) continue;
+        // A pattern is not a label either: nobody reads `r'\D'`.
+        if (_regExpArgument.hasMatch(line.substring(0, match.start))) {
+          continue;
+        }
         // A typeface is not a label: nobody reads `'monospace'`, it is never
         // translated, and the kit is exactly where a font belongs — so there
         // is nowhere the rule could ask for it to be moved. Only the literals
@@ -576,7 +581,7 @@ class DwFlutterInspector {
           continue;
         }
 
-        final value = match.group(1);
+        final String? value = match.value;
         // Skip paths, translations, interpolations, date formats and the like.
         final isException =
             value == null ||
@@ -630,10 +635,17 @@ class DwFlutterInspector {
   /// inside one is not read as code. Each literal is replaced by as many
   /// characters as it had: the exemption is measured in columns, and a mask
   /// that shortened the line would move them.
-  static String _maskLiterals(String line) => line.replaceAllMapped(
-    _uiKitTextLiteral,
-    (match) => '_' * match.group(0)!.length,
-  );
+  static String _maskLiterals(String line) {
+    final masked = StringBuffer();
+    var at = 0;
+    for (final literal in _DwStringLiteral.allIn(line)) {
+      masked
+        ..write(line.substring(at, literal.start))
+        ..write('_' * (literal.end - literal.start));
+      at = literal.end;
+    }
+    return (masked..write(line.substring(at))).toString();
+  }
 
   /// Whether a `fontFamilyFallback: [...]` list is still open after [line].
   /// `dart format` breaks a long fallback list across lines, so the exemption
@@ -777,9 +789,70 @@ class _DwGrade {
   final String badge;
 }
 
-/// A quoted run of at least three characters — what the kit rule reads as a
-/// candidate text constant.
-final _uiKitTextLiteral = RegExp('''["']([^"']{3,})["']''');
+/// A string literal on one line, as Dart reads it: its quote, `r` for raw,
+/// escapes in a cooked one. A pattern of quote characters could not tell
+/// `r'\D'` from the closing quote of the literal before it, and quoted the
+/// text between two literals as a label no one had written.
+class _DwStringLiteral {
+  const _DwStringLiteral(this.start, this.end, this.value);
+
+  /// Where the literal starts (its `r`, if raw) and ends, past the quote.
+  final int start;
+  final int end;
+
+  /// What is between the quotes, as written.
+  final String value;
+
+  /// Every literal on [line] that closes on it; one left open (a multi-line
+  /// string) ends the scan.
+  static List<_DwStringLiteral> allIn(String line) {
+    final found = <_DwStringLiteral>[];
+    var i = 0;
+    while (i < line.length) {
+      final char = line[i];
+      if (char == '/' && i + 1 < line.length && line[i + 1] == '/') break;
+      final raw =
+          char == 'r' &&
+          i + 1 < line.length &&
+          (line[i + 1] == "'" || line[i + 1] == '"') &&
+          (i == 0 || !RegExp(r'[A-Za-z0-9_$]').hasMatch(line[i - 1]));
+      final quoteAt = raw ? i + 1 : i;
+      final quote = line[quoteAt];
+      if (quote != "'" && quote != '"') {
+        i++;
+        continue;
+      }
+      final triple = line.startsWith(quote * 3, quoteAt);
+      final delimiter = triple ? quote * 3 : quote;
+      var j = quoteAt + delimiter.length;
+      int? close;
+      while (j < line.length) {
+        if (!raw && line[j] == r'\') {
+          j += 2;
+          continue;
+        }
+        if (line.startsWith(delimiter, j)) {
+          close = j;
+          break;
+        }
+        j++;
+      }
+      if (close == null) break;
+      found.add(
+        _DwStringLiteral(
+          i,
+          close + delimiter.length,
+          line.substring(quoteAt + delimiter.length, close),
+        ),
+      );
+      i = close + delimiter.length;
+    }
+    return found;
+  }
+}
+
+/// `RegExp(` directly before a literal: its pattern.
+final _regExpArgument = RegExp(r'\bRegExp\(\s*$');
 
 /// A `static const` declaration that mentions a colour or a text style.
 ///

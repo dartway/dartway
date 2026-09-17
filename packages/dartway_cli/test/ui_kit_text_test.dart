@@ -163,4 +163,50 @@ class AppTextStyles {
       );
     });
   });
+
+  group('a literal is read where Dart reads it', () {
+    test('a raw-string pattern is not taken apart into a label', () async {
+      final inspector = await checkKitFile(r'''
+class AppPhoneField {
+  static String digitsOf(String text) =>
+      text.replaceAll(RegExp(r'\D'), '').replaceAll(RegExp(r'[^0-9+]'), '');
+}
+''');
+
+      expect(
+        inspector.findingTypes,
+        isNot(contains(DwCheckType.uiKitContainsText)),
+        reason: inspector.findingMessages.join('\n'),
+      );
+    });
+
+    test('a label after an escaped quote is named whole', () async {
+      final inspector = await checkKitFile(r'''
+class AppTexts {
+  static const hint = 'Don\'t leave it empty';
+}
+''');
+
+      expect(
+        inspector.findingMessages,
+        contains(
+          contains(
+            '"Don'
+            r"\'"
+            't leave it empty"',
+          ),
+        ),
+      );
+    });
+
+    test('a label beside a pattern is still reported', () async {
+      final inspector = await checkKitFile(r'''
+class AppPhoneField {
+  static final label = (RegExp(r'\D'), 'Phone number');
+}
+''');
+
+      expect(inspector.findingMessages, contains(contains('"Phone number"')));
+    });
+  });
 }
