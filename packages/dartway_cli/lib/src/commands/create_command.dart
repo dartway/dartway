@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../framework_overrides.dart';
 import '../monorepo_source.dart';
 import '../project_layout.dart';
+import '../project_locale.dart';
 import '../toolkit_installer.dart';
 import '../toolkit_manifest.dart';
 
@@ -53,8 +54,9 @@ class CreateCommand extends Command<int> {
         'language',
         defaultsTo: 'English',
         help:
-            "Language the new project writes its own texts in (feature specs, "
-            "doc comments, docs/dev_notes/).",
+            "Language of the new project: the app's one UI language (en, ru, "
+            "or English, Russian), and the language it writes its own texts "
+            "in (feature specs, doc comments, docs/dev_notes/).",
       )
       ..addOption(
         'notes-tracker',
@@ -143,6 +145,12 @@ class CreateCommand extends Command<int> {
 
     stdout.writeln('Creating $projectName from the DartWay template...');
     _copyProject(templateDir, targetDir, projectName);
+    for (final notice in ProjectLocale.apply(
+      ProjectLayout.detect(targetDir).flutterPackageDir,
+      argResults!['language'] as String,
+    )) {
+      stderr.writeln('Note: $notice');
+    }
     _formatRenamedCode(targetDir);
     _rewritePubspecs(targetDir, frameworkPackages);
     if (frameworkPath != null) {

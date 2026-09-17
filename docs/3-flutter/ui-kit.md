@@ -248,8 +248,7 @@ AppText.body('Issues')                   // ❌ — content, nailed into a widge
 Every DartWay project is localized. That is a requirement on the project, and a project created by
 `dartway create` arrives satisfying it: `flutter_localizations` and `generate: true` in the pubspec,
 `l10n.yaml`, `lib/l10n/*.arb` with the generated `lib/l10n/gen/` committed beside them,
-`appLocaleProvider` (the system language when the app supports it, English
-otherwise), `context.l10n` inside widgets, `appL10n` for the code that runs outside the tree, such as
+`appLocaleProvider` (`AppLocaleController.productLocale`: the language the product speaks, stated by `dartway create --language` — never the device's), `context.l10n` inside widgets, `appL10n` for the code that runs outside the tree, such as
 an error toast or a dialog raised from a handler.
 
 The law reaches as far as the app does. Text composed on the **server** — a message body, a

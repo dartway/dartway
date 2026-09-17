@@ -216,7 +216,7 @@ final l10n = context.l10n;
 AppText.body(l10n.bookSpot)
 ```
 
-A new string = add a key to **every** ARB the project keeps (the skeleton ships `lib/l10n/app_en.arb` and `app_ru.arb`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the output of `dartway generate` does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
+A new string = add a key to **every** ARB the project keeps (a new project keeps one — the language it was created in; a second is added deliberately, with a switch that sets `appLocaleProvider`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the output of `dartway generate` does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
 
 ```dart
 // ui_kit/theme/app_text.dart

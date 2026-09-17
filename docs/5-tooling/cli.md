@@ -126,7 +126,7 @@ lands in that repository.
 | `--channel` | `DARTWAY_BRANCH`, else the checkout the CLI runs from, else `stable` | Monorepo branch to take the template and the toolkit from |
 | `--local-repo` | `DARTWAY_MONOREPO_DIR` | A local monorepo checkout instead of a clone |
 | `--framework-path` | — | Resolve the framework packages from a local monorepo checkout by path: each pubspec gets `dependency_overrides` onto `<monorepo>/packages` for exactly the `dartway_*` packages it reaches. The template and the toolkit come from the same checkout unless `--local-repo` names another |
-| `--language` | `English` | The language the project writes its own texts in — feature specs, doc comments, `docs/dev_notes/` |
+| `--language` | `English` | The app's one UI language — `en`, `ru`, or `English`, `Russian`: the project keeps only that `.arb`, makes it the template ARB and `AppLocaleController.productLocale`, and regenerates `lib/l10n/gen` (a language the skeleton has no translation for starts in English, with a note). Also the language the project writes its own texts in — feature specs, doc comments, `docs/dev_notes/` |
 | `--notes-tracker` | `dartway/dartway` | GitHub repository where findings about the framework are filed; `none` files nothing outside the project |
 | `--[no-]git` | on | Initialize a repository with an initial commit |
 

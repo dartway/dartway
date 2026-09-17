@@ -228,6 +228,80 @@ void main() {
     expect(manifest, contains('"baseBranch": "master"'));
   });
 
+  group('the app speaks the language the project was created in', () {
+    List<String> arbs(Directory project) => [
+      for (final file in Directory(
+        p.join(project.path, 'shop_flutter', 'lib', 'l10n'),
+      ).listSync().whereType<File>())
+        if (file.path.endsWith('.arb')) p.basename(file.path),
+    ];
+
+    test(
+      '--language ru keeps one translation, stated, and regenerated',
+      () async {
+        final project = await create(['shop', '--language', 'ru']);
+        expect(arbs(project), ['app_ru.arb']);
+        expect(
+          read(project, 'shop_flutter/l10n.yaml'),
+          contains('template-arb-file: app_ru.arb'),
+        );
+        expect(
+          read(project, 'shop_flutter/lib/core/app_l10n.dart'),
+          contains("static const Locale productLocale = Locale('ru');"),
+        );
+        final generated = read(
+          project,
+          'shop_flutter/lib/l10n/gen/app_localizations.dart',
+        );
+        expect(generated, contains("Locale('ru')"));
+        expect(generated, isNot(contains("Locale('en')")));
+        expect(
+          File(
+            p.join(
+              project.path,
+              'shop_flutter/lib/l10n/gen/app_localizations_en.dart',
+            ),
+          ).existsSync(),
+          isFalse,
+        );
+      },
+    );
+
+    test('by default the app speaks English, and only English', () async {
+      final project = await create(['shop']);
+      expect(arbs(project), ['app_en.arb']);
+      expect(
+        read(project, 'shop_flutter/lib/core/app_l10n.dart'),
+        contains("static const Locale productLocale = Locale('en');"),
+      );
+    });
+
+    test(
+      'a language the skeleton has no translation for is said out loud',
+      () async {
+        final result = await dartway([
+          'create',
+          'shop',
+          '--language',
+          'German',
+          '--no-git',
+        ]);
+        expect(result.exitCode, 0);
+        expect('${result.stderr}', contains('no "German" translation'));
+      },
+    );
+
+    test('the device does not choose the language', () {
+      final controller = File(
+        p.join(
+          repository.path,
+          'template/dartway_starter_flutter/lib/core/app_l10n.dart',
+        ),
+      ).readAsStringSync();
+      expect(controller, isNot(contains('PlatformDispatcher')));
+    });
+  });
+
   test('a name that cannot become a bucket name is refused', () async {
     for (final name in ['shop__floor', 'shop_', 'a' * 56]) {
       final result = await dartway(['create', name, '--no-git']);
