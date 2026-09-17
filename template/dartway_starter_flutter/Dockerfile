@@ -24,7 +24,7 @@ RUN test -n "$DW_BACKEND_URL"
 RUN flutter build web --release \
     --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
 
-FROM nginx:alpine
+FROM nginx:1.30.5-alpine
 
 COPY --from=build /workspace/dartway_starter_flutter/build/web /usr/share/nginx/html
 

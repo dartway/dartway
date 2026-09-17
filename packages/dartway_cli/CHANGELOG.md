@@ -2,6 +2,8 @@
 
 ## Unreleased — DartWay 1.0
 
+- **The proxy and certbot images are pinned** (#269): `nginx:1.30.5-alpine`, `certbot/certbot:v5.8.0`, like Postgres and MinIO. A server set up earlier keeps the old names in its rendered `docker-compose.yml` until `deploy setup` renders it again.
+
 - **BREAKING (deploy): the server is replaced one version at a time** (D-070). `deploy run` no longer starts the new server beside the serving one: the serving server stops gracefully, the new image migrates in a one-off run (`DW_MIGRATE_ONLY=true`), the new server starts; on a failure the previous image is started again. The gap is covered by the client's retries. Step `server-candidate` is gone; `server` does all of it.
 
 - **`dartway check` holds the contract's names to the naming law** (`contractNameInvalid`, error — #167): a DTO in the shared package named one word, a read not named `Get…`/`List…`, or a command named like a read. The class name is the wire name, so the check fires before a build carries it. The example's `SearchChatMessages` is `ListChatMessagesMatching`.

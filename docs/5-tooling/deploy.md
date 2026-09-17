@@ -101,7 +101,7 @@ The rendered Nginx:
 | `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080`, `DW_DATABASE_*` (and, with MinIO, `DW_STORAGE_*`) in the compose file. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
 | `web` | Built from `<project>_flutter/Dockerfile` with the build argument `DW_BACKEND_URL` = the app origin |
 | `minio`, `minio-init` | With `storage: minio`: the storage, and a one-shot job that creates and configures both buckets on every deploy |
-| `nginx` | `nginx:alpine` on 80 and 443 |
+| `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443 |
 | `certbot` | Renews the certificate every 12 hours |
 
 **Data-bearing images are pinned** — Postgres to its major, MinIO to its last community release — so a
@@ -312,7 +312,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   the server fails — and `ENTRYPOINT ["/app/server"]` in exec form.
 - **The web image** builds with Flutter from the project root, takes `ARG DW_BACKEND_URL` (and refuses
   to build without it), runs `flutter build web --release --dart-define=DW_BACKEND_URL=…`, and serves
-  the build with `nginx:alpine` and `<project>_flutter/nginx.conf`. It serves files only.
+  the build with `nginx:1.30.5-alpine` and `<project>_flutter/nginx.conf`. It serves files only.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
   `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build
   output and local secrets never reach the Docker daemon.

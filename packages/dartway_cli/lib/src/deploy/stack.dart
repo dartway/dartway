@@ -88,10 +88,13 @@ class DwStack {
   static const String minioClientImage =
       'quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z';
 
-  /// Stateless, and following upstream security fixes is worth more here than
-  /// reproducing yesterday's proxy.
-  static const String nginxImage = 'nginx:alpine';
-  static const String certbotImage = 'certbot/certbot:latest';
+  /// Pinned too, though stateless: a redeploy weeks later must not pull a
+  /// different proxy and call the regression "the deploy broke", and a
+  /// client's list of third-party software needs a version, not "latest as
+  /// of that day" (#269). nginx on its stable line; both raised deliberately,
+  /// with a framework release that says so.
+  static const String nginxImage = 'nginx:1.30.5-alpine';
+  static const String certbotImage = 'certbot/certbot:v5.8.0';
 
   /// Whether `registry_mirror` can serve [image]: an official Docker Hub image
   /// (`postgres`, `nginx`) — what `mirror.gcr.io` and a Hub library cache
