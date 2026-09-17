@@ -316,6 +316,14 @@ message (`lib/shared/widgets/load_failed_message.dart` in both).
 A refusal or a not-authenticated answer rendered this way still reaches `DwFlutterConfig.onErrorReport`; the
 app's policy is what keeps it out of the incident log — see [error reporting](error-reporting.md).
 
+## Where a rule lives
+
+A business rule — may this invoice be paid, is this slot still bookable — is a function of data, not
+of a `WidgetRef`. Written as `extension on WidgetRef`, it reads its inputs through providers and can be
+tested only by booting the app around it. Put the decision in a factory on the state type, or an
+extension on the data object in `lib/shared/`, with time passed in rather than read; the provider or
+widget only says where the data comes from. Then the rule is a plain unit test (#226).
+
 ## One-off reads: `dw.client`
 
 For a value needed once, outside any widget, the client itself is `dw.client`:
