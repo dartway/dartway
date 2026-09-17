@@ -2,6 +2,8 @@
 
 ## Unreleased — DartWay 1.0
 
+- **`dartway check` names an override the framework caught up with** (`frameworkOverrideOutlived`, warning — D-032). A `dependency_overrides` version pin on a `dartway_*` package is reported when a resolved framework package depending on it already allows the locked version, with the file to edit; path and git overrides are left alone.
+
 - **BREAKING: `dartway create` hands out the 1.0 skeleton.** Three packages — `*_shared` (the
   contract), `*_server` and `*_flutter`, no generated client package — with sign-in by a one-time
   code to a phone or an e-mail, the terms accepted on sign-up, a profile with a photo and its

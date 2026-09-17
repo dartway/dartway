@@ -70,6 +70,7 @@ From the project root or from inside the `*_flutter` package, in this order:
    (`generatedCodeStale`);
 4. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
 5. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
+   and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
 6. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
    in the zones and `shared/` — the other sixteen checks.
 
@@ -101,7 +102,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Thirteen errors, seven warnings, one info — `DwCheckType` and its `severity` in
+Thirteen errors, eight warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -126,6 +127,7 @@ Thirteen errors, seven warnings, one info — `DwCheckType` and its `severity` i
 | `forbiddenAssetPath` | warning | A raw `assets/...` path outside `ui_kit/` |
 | `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
+| `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
 | `fileLong` | info | Over 200 lines |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,

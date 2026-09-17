@@ -138,7 +138,13 @@ enum DwCheckType {
   /// commit of the framework. Nothing else says so: `ref: master` is written
   /// once per package and reads as "from master", while the lock pins each one
   /// at whatever master was when *that* package was added.
-  frameworkRefsDiverged;
+  frameworkRefsDiverged,
+
+  /// A `dependency_overrides` entry pins a `dartway_*` package to a version
+  /// the framework's own packages already allow (D-032): the override was
+  /// how a project took a satellite before the core raised its caret, and
+  /// now it only hides the next raise.
+  frameworkOverrideOutlived;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -158,6 +164,7 @@ enum DwCheckType {
     DwCheckType.forbiddenAssetPath ||
     DwCheckType.unusedFeatureFile ||
     DwCheckType.frameworkRefsDiverged ||
+    DwCheckType.frameworkOverrideOutlived ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

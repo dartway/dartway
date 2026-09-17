@@ -71,7 +71,7 @@ Two kinds of rule live in this file and read alike: the same prose, the same voi
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
 
-Seven further checks are warnings and one is a nudge; those are defaults, however firmly the prose around them is written. **Anything this table and the types do not hold is a default by construction** — no rule in this file or in the skills becomes law by being phrased definitely, and promoting one costs a failing check rather than a sentence.
+Eight further checks are warnings and one is a nudge; those are defaults, however firmly the prose around them is written. **Anything this table and the types do not hold is a default by construction** — no rule in this file or in the skills becomes law by being phrased definitely, and promoting one costs a failing check rather than a sentence.
 
 **The gap this leaves is named rather than smoothed over.** The naming law has no check at all; the contract law is held against JSON maps and stray DTOs by the types, but nothing fails on a `DwHttpRoute` the app calls instead of a request; "done" has only a warning (`featureSpecMissing`). `migrationsDrift` needs a Postgres (`DW_DATABASE_*`) and says it did not run rather than passing without one.
 
