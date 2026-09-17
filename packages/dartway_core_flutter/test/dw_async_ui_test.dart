@@ -114,6 +114,25 @@ void main() {
       expect(find.byType(SkeletonizerScope), findsOneWidget);
     });
 
+    testWidgets('a model the registry does not know loads as nothing, as a '
+        'single value does — never an error block', (tester) async {
+      errorReports.clear();
+      const loading = AsyncValue<List<_Unknown>>.loading();
+
+      await tester.pumpWidget(
+        _host(
+          loading.dwBuildListAsync(
+            childBuilder: (items) => const Text('unreachable'),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('unreachable'), findsNothing);
+      expect(find.byType(SkeletonizerScope), findsNothing);
+      expect(errorReports, isEmpty);
+    });
+
     testWidgets('loadingItem keeps the registry out of it entirely', (
       tester,
     ) async {
@@ -145,6 +164,19 @@ void main() {
       );
 
       expect(find.text('real'), findsOneWidget);
+    });
+
+    testWidgets('a model the registry does not know loads as nothing', (
+      tester,
+    ) async {
+      const loading = AsyncValue<_Unknown>.loading();
+
+      await tester.pumpWidget(
+        _host(loading.dwBuildAsync(childBuilder: (value) => Text(value.title))),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SkeletonizerScope), findsNothing);
     });
 
     testWidgets('loadingWidget wins over the placeholder', (tester) async {

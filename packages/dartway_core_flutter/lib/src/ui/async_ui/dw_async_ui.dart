@@ -26,6 +26,8 @@ extension DwAsyncValueX<T> on AsyncValue<T> {
       errorWidget: errorWidget,
       errorBuilder: errorBuilder,
       loadingValueBuilder: placeholder == null ? null : () => placeholder,
+      registryValueBuilder: () =>
+          null is T ? null as T : dw.getDefaultModel<T>(),
       loadingWidget: loadingWidget,
       skipLoadingOnReload: skipLoadingOnReload,
       skipLoadingOnRefresh: skipLoadingOnRefresh,
@@ -51,23 +53,17 @@ extension DwAsyncValueListX<T> on AsyncValue<List<T>> {
       childBuilder: childBuilder,
       errorWidget: errorWidget,
       errorBuilder: errorBuilder,
-      // A factory, not a value: the placeholder list — and the assert that it
-      // can be built at all — must not run on the data and error branches. A
-      // widget test of a list screen would otherwise need the app's model
-      // registry standing up to render an AsyncData it already holds.
-      loadingValueBuilder: () {
-        assert(
-          loadingItem != null || dw.isDefaultModelsGetterSetUp,
-          'Cannot build a loading value for dwBuildListAsync: either pass '
-          'loadingItem, or set DwFlutterConfig.defaultModelGetter.',
-        );
-
-        return List.generate(
-          loadingItemsCount,
-          (_) =>
-              loadingItem ?? (null is T ? null as T : dw.getDefaultModel<T>()),
-        );
-      },
+      // Factories, not values: the placeholder list — and the registry it may
+      // need — must not be touched on the data and error branches. A widget
+      // test of a list screen would otherwise need the app's model registry
+      // standing up to render an AsyncData it already holds.
+      loadingValueBuilder: loadingItem == null
+          ? null
+          : () => List.filled(loadingItemsCount, loadingItem),
+      registryValueBuilder: () => List.generate(
+        loadingItemsCount,
+        (_) => null is T ? null as T : dw.getDefaultModel<T>(),
+      ),
       loadingWidget: loadingWidget,
       skipLoadingOnReload: skipLoadingOnReload,
       skipLoadingOnRefresh: skipLoadingOnRefresh,
@@ -78,13 +74,19 @@ extension DwAsyncValueListX<T> on AsyncValue<List<T>> {
 /// The single implementation both public builders delegate to. The loading
 /// placeholder arrives as a factory so that nothing it needs — the default-model
 /// registry above all — is touched unless the loading branch actually renders.
-/// A null [loadingValueBuilder] means the caller supplied no placeholder.
+/// A null [loadingValueBuilder] means the caller supplied no placeholder; the
+/// app's registry ([registryValueBuilder]) is asked then. When it has no
+/// placeholder for the type — no getter configured, or a getter that does not
+/// know the model — the loading branch is empty, as it is for a single value:
+/// a skeleton is an improvement on nothing, never a reason for an error block
+/// where a list is about to appear.
 Widget _dwBuildAsync<T>(
   AsyncValue<T> value, {
   required Widget Function(T value) childBuilder,
   required Widget errorWidget,
   required Widget Function(Object error, StackTrace stackTrace)? errorBuilder,
   required T Function()? loadingValueBuilder,
+  required T Function() registryValueBuilder,
   required Widget? loadingWidget,
   required bool skipLoadingOnReload,
   required bool skipLoadingOnRefresh,
@@ -100,13 +102,18 @@ Widget _dwBuildAsync<T>(
     loading: () {
       if (loadingWidget != null) return loadingWidget;
 
-      if (loadingValueBuilder == null && !dw.isDefaultModelsGetterSetUp) {
-        return const SizedBox.shrink();
+      final T fakeData;
+      if (loadingValueBuilder != null) {
+        fakeData = loadingValueBuilder();
+      } else {
+        if (!dw.isDefaultModelsGetterSetUp) return const SizedBox.shrink();
+        try {
+          fakeData = registryValueBuilder();
+        } catch (_) {
+          // The registry does not know this model: no skeleton, not an error.
+          return const SizedBox.shrink();
+        }
       }
-
-      final fakeData = loadingValueBuilder != null
-          ? loadingValueBuilder()
-          : (null is T ? null as T : dw.getDefaultModel<T>());
 
       final built = childBuilder(fakeData);
 
