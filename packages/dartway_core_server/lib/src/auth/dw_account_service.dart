@@ -708,6 +708,9 @@ final class _DetachedContext extends DwCallContext {
   DwDatabaseHandle get db =>
       (Zone.current[_zoneKey] as DwDatabaseHandle?) ?? _root;
 
+  @override
+  DwJobAttempt? get job => null;
+
   static Never _noServer(String what) => throw StateError(
     '$what needs a running server; this context belongs to DwAccountService '
     'over a bare database. Use server.accounts or ctx.accounts instead.',

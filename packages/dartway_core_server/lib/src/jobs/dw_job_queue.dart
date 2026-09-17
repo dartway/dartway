@@ -29,6 +29,30 @@ Duration dwDefaultJobBackoff(int attempt) {
 ///
 /// Enqueued jobs are declared with the unnamed constructor, recurring ones
 /// with [DwRecurringJob]; both go into `DwAppServer(jobs: …)`. Names starting
+/// Which run of a job a context belongs to: `ctx.job` in a job's handler.
+final class DwJobAttempt {
+  const DwJobAttempt({
+    required this.name,
+    required this.attempt,
+    required this.maxAttempts,
+  });
+
+  final String name;
+
+  /// This run's number, from 1. A recurring job runs once per occurrence, so
+  /// it is always 1 of 1.
+  final int attempt;
+
+  final int maxAttempts;
+
+  /// Whether a failure of this run marks the job failed instead of retrying
+  /// it — where a handler records "gave up" for the people waiting on it.
+  bool get isLastAttempt => attempt >= maxAttempts;
+
+  @override
+  String toString() => 'DwJobAttempt($name, $attempt of $maxAttempts)';
+}
+
 /// with `dw.` belong to the framework.
 sealed class DwJobDefinition {
   const DwJobDefinition._(this.name);

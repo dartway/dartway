@@ -104,6 +104,17 @@ So a non-transactional job may run twice, and **a handler running longer than it
 twice at once** — another worker claims the row when the lease expires. Make such handlers
 idempotent, and give them a lease longer than they take.
 
+What such a handler publishes inside a `ctx.transaction` goes out **when that transaction commits**,
+not when the job ends — a status ("analysing") reaches subscribers before the slow call it announces.
+Publications outside any transaction go when the handler returns.
+
+### Which attempt
+
+`ctx.job` is the run a handler belongs to: `attempt` (from 1), `maxAttempts` and `isLastAttempt`. A
+handler that must tell the people waiting on it that it gave up does so when `isLastAttempt` is true
+and it is about to fail. The delay before the next attempt is `DwQueuedJob(backoff: (attempt) =>
+…)`; outside a job, `ctx.job` is `null`.
+
 ### Recurring jobs
 
 A recurring job's next run time lives in `dw_recurring_job`, so a restart neither skips nor repeats

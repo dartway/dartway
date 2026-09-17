@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **Jobs know their run and announce as they go.** `ctx.job` (`DwJobAttempt`: `attempt`, `maxAttempts`, `isLastAttempt`) in a job's handler, `null` elsewhere. A non-transactional job's publications inside a `ctx.transaction` are delivered when that transaction commits, rather than when the job ends.
+
 - **`ctx.publish(channel, item, exceptAccounts: {...})`** keeps one publication from those accounts: their live connections do not receive it, nor does a command's response when the caller is one of them. An object published twice in a call travels as its last publication, exceptions included (D-066).
 
 - **`DwAppServer.runInContext(work)`** (and `DwTestServer.runInContext`): server-level work with a

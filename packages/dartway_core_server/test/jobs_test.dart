@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:test/test.dart';
 
@@ -95,6 +97,31 @@ void main() {
     await eventually(() async => await jobRow('twice') == null);
     // Two failed attempts wrote their log row inside the rolled-back savepoint.
     expect(await logged('flaky-attempt'), ['twice']);
+  });
+
+  test('a handler knows its attempt and whether it is the last', () async {
+    harness().app.jobAttempts.clear();
+    harness().app.jobFailures['flaky:attempts'] = 2;
+    await caller.call(const EnqueueJob('flaky', 'attempts'));
+    await eventually(() async => await jobRow('attempts') == null);
+    expect(harness().app.jobAttempts, ['1/3:false', '2/3:false', '3/3:true']);
+  });
+
+  test('a non-transactional job publishes when its transaction commits, not '
+      'when the job ends', () async {
+    final app = harness().app;
+    app.jobGate = Completer();
+    final (_, session) = await harness().signedIn('job-announce@example.com');
+    final socket = await harness().live(token: session.token);
+    expect(await socket.subscribe('notes'), isA<DwSubscribedMessage>());
+    await caller.call(const EnqueueJob('announced', 'analysing'));
+    // Heard while the job still waits on its long call.
+    final update = await socket.expect<DwUpdateMessage>();
+    expect((update.updates.objects.single as NoteView).text, 'analysing');
+    expect(app.jobGate.isCompleted, isFalse);
+    app.jobGate.complete();
+    await eventually(() async => await jobRow('analysing') == null);
+    await socket.expectSilence();
   });
 
   test('a job out of attempts is kept as failed and alerts', () async {

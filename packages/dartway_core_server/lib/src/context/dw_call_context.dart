@@ -109,6 +109,10 @@ abstract class DwCallContext {
   /// Background jobs; an enqueue joins the enclosing transaction.
   DwJobQueue get jobs;
 
+  /// The run of the job this context belongs to — its attempt and whether it
+  /// is the last — or `null` outside a job.
+  DwJobAttempt? get job;
+
   /// Accounts by identifier, bound to this context: writes join its
   /// transaction, and revoked sessions close after it commits.
   DwAccountService get accounts;
@@ -195,9 +199,12 @@ final class DwRuntimeContext extends DwCallContext {
     Map<Type, DwServerModule> modules = const {},
     required DwChannelRules channelRules,
     this.sessionKey,
+    this.job,
+    void Function(DwRuntimeContext ctx)? deliverOnCommit,
     String? clientAppVersion,
     String? clientUserAgent,
   }) : _root = _Scope(db),
+       _deliverOnCommit = deliverOnCommit,
        _jobs = jobs,
        _accounts = accounts,
        _clientAppVersion = clientAppVersion,
@@ -216,6 +223,16 @@ final class DwRuntimeContext extends DwCallContext {
   final DwChannelRules _channelRules;
 
   final DwContextKind kind;
+
+  @override
+  final DwJobAttempt? job;
+
+  /// Called when a transaction opened directly on this context's pool
+  /// commits: a non-transactional job's publications go out then, rather
+  /// than when the whole job ends — its status reaches subscribers before a
+  /// long call to another service. `null` where the context itself runs in a
+  /// transaction whose commit comes later.
+  final void Function(DwRuntimeContext ctx)? _deliverOnCommit;
 
   @override
   final DwSessionKeyInfo? sessionKey;
@@ -282,6 +299,7 @@ final class DwRuntimeContext extends DwCallContext {
     // Reached only when the transaction (or savepoint) committed: its effects
     // now belong to the parent, and ride on the parent's commit in turn.
     parent.effects.absorb(scope.effects);
+    if (identical(parent, _root)) _deliverOnCommit?.call(this);
     return result;
   }
 

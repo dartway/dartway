@@ -141,6 +141,13 @@ final class TestApp {
 
   /// Job name → how many times it should still fail.
   final Map<String, int> jobFailures = {};
+
+  /// `ctx.job` as each run of `flaky` saw it: `attempt/max:isLast`.
+  final List<String> jobAttempts = [];
+
+  /// Held open by the `announced` job after its transaction commits, until a
+  /// test completes it.
+  Completer<void> jobGate = Completer();
   final List<String> jobRuns = [];
   final StreamController<String> jobEvents = StreamController.broadcast();
 
@@ -643,6 +650,10 @@ final class TestApp {
       maxAttempts: 3,
       backoff: (attempt) => const Duration(milliseconds: 50),
       handle: (ctx, payload) async {
+        final run = ctx.job!;
+        jobAttempts.add(
+          '${run.attempt}/${run.maxAttempts}:${run.isLastAttempt}',
+        );
         await _logJob(ctx, 'flaky-attempt', payload['tag']);
         final left = jobFailures['flaky:${payload['tag']}'] ?? 0;
         if (left > 0) {
@@ -666,6 +677,21 @@ final class TestApp {
         }
         await _logJob(ctx, 'outside', payload['tag']);
         jobEvents.add('outside:${payload['tag']}');
+      },
+    ),
+    DwJobDefinition(
+      'announced',
+      transactional: false,
+      handle: (ctx, payload) async {
+        await ctx.transaction((_) async {
+          ctx.publish(
+            const DwLiveChannel(TestChannel.notes),
+            NoteView(id: 990, text: '${payload['tag']}'),
+          );
+        });
+        // The long call to another service a status is announced before.
+        await jobGate.future;
+        jobEvents.add('announced:${payload['tag']}');
       },
     ),
     if (withTick)

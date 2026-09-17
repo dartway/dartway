@@ -58,6 +58,8 @@ final class DwRuntime {
     required DwContextKind kind,
     DwDatabaseHandle? db,
     DwSessionKeyInfo? sessionKey,
+    DwJobAttempt? job,
+    void Function(DwRuntimeContext ctx)? deliverOnCommit,
     String? clientAppVersion,
     String? clientUserAgent,
   }) => DwRuntimeContext(
@@ -71,6 +73,8 @@ final class DwRuntime {
     modules: modules,
     channelRules: channelRules,
     sessionKey: sessionKey,
+    job: job,
+    deliverOnCommit: deliverOnCommit,
     clientAppVersion: clientAppVersion,
     clientUserAgent: clientUserAgent,
   );

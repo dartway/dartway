@@ -32,6 +32,7 @@ export 'src/http/dw_http_response.dart';
 export 'src/http/dw_request_body.dart' show DwRequestBodyException;
 export 'src/jobs/dw_job_queue.dart'
     show
+        DwJobAttempt,
         DwJobDefinition,
         DwJobQueue,
         DwQueuedJob,

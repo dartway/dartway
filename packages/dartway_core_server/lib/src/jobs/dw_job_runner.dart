@@ -227,6 +227,7 @@ final class DwJobRunner {
         scope: 'job ${job.name}',
         kind: DwContextKind.background,
         db: tx,
+        job: DwJobAttempt(name: job.name, attempt: 1, maxAttempts: 1),
       );
       try {
         await ctx.transaction((_) => job.handle(ctx));
@@ -294,6 +295,11 @@ final class DwJobRunner {
         scope: 'job $name #$id',
         kind: DwContextKind.background,
         db: tx,
+        job: DwJobAttempt(
+          name: name,
+          attempt: attempts + 1,
+          maxAttempts: job.maxAttempts,
+        ),
       );
       try {
         // A savepoint: a failing handler leaves the claim transaction usable
@@ -320,6 +326,14 @@ final class DwJobRunner {
     final ctx = runtime.context(
       scope: 'job ${job.name} #${lease.id}',
       kind: DwContextKind.background,
+      job: DwJobAttempt(
+        name: job.name,
+        attempt: lease.attempt,
+        maxAttempts: job.maxAttempts,
+      ),
+      // No transaction around the handler: what a transaction inside it
+      // publishes goes out when that transaction commits.
+      deliverOnCommit: runtime.deliver,
     );
     try {
       await job.handle(ctx, lease.payload);
