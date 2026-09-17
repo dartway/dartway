@@ -37,7 +37,7 @@ void main() {
         );
         expect(
           await client.fetch(
-            SearchChatMessages(channelId: channel.id!, query: 'shift'),
+            ListChatMessagesMatching(channelId: channel.id!, query: 'shift'),
           ),
           forbidden,
         );
@@ -477,7 +477,7 @@ void main() {
       final channel = await club.chatChannel('Front desk');
       Future<List<String>> search(String query) async => [
         for (final m in (await boris.client.fetch(
-          SearchChatMessages(channelId: channel.id!, query: query),
+          ListChatMessagesMatching(channelId: channel.id!, query: query),
         )).valueOrThrow)
           m.text,
       ];
@@ -501,7 +501,7 @@ void main() {
 
       expect(
         await boris.client.fetch(
-          SearchChatMessages(channelId: channel.id!, query: ' l '),
+          ListChatMessagesMatching(channelId: channel.id!, query: ' l '),
         ),
         refusedWith(ExampleRefusal.searchQueryTooShort),
       );
@@ -509,7 +509,7 @@ void main() {
       final authorId = await club.profileIdOf(boris);
       final base = DateTime.utc(2026, 9, 1);
       await club.db.chatMessages.insertAll([
-        for (var i = 0; i < SearchChatMessages.maxResults + 20; i++)
+        for (var i = 0; i < ListChatMessagesMatching.maxResults + 20; i++)
           ChatMessageRow(
             channelId: channel.id!,
             authorProfileId: authorId,
@@ -518,8 +518,8 @@ void main() {
           ),
       ]);
       final bulk = await search('bulk note');
-      expect(bulk, hasLength(SearchChatMessages.maxResults));
-      expect(bulk.first, 'bulk note ${SearchChatMessages.maxResults + 19}');
+      expect(bulk, hasLength(ListChatMessagesMatching.maxResults));
+      expect(bulk.first, 'bulk note ${ListChatMessagesMatching.maxResults + 19}');
     });
 
     test('one reaction per member: set, replaced, taken back — and a double '

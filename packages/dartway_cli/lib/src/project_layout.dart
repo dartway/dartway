@@ -43,6 +43,8 @@ class ProjectLayout {
   final String flutterPackage;
   final String sharedPackage;
 
+  Directory get sharedPackageDir => Directory(p.join(root.path, sharedPackage));
+
   Directory get flutterPackageDir =>
       Directory(p.join(root.path, flutterPackage));
 

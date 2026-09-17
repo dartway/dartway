@@ -48,7 +48,7 @@ short and points at skills for the how.
 
 **The laws are the checker's error set.** A law is a rule a project does not override; everything
 else in the toolkit is a default a project may replace with its own rule. The line is not drawn by
-taste: the published law list is exactly the checks `dartway check` fails on (fourteen today), and
+taste: the published law list is exactly the checks `dartway check` fails on (fifteen today), and
 `packages/dartway_cli/test/toolkit_law_list_test.dart` holds the two together. A check that is only a
 warning is one with a second legitimate reading, and a project cannot be forbidden to decide that for
 itself.

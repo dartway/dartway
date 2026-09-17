@@ -55,7 +55,7 @@ extension ExampleRefusalText on AppLocalizations {
       ),
       ExampleRefusal.editWindowClosed => refusalEditWindowClosed,
       ExampleRefusal.searchQueryTooShort => refusalSearchQueryTooShort(
-        param('min', SearchChatMessages.minQueryLength),
+        param('min', ListChatMessagesMatching.minQueryLength),
       ),
       ExampleRefusal.settingKeyUnknown => refusalSettingKeyUnknown,
       ExampleRefusal.firstNameRequired => refusalFirstNameRequired,

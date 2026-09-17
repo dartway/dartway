@@ -82,7 +82,7 @@ than its handler keeps a row on the page that has left the filter.
    It reaches the client in that command's response, or over the live socket.
 2. **Only requests that declare that channel hear it.** A request without `channels` hears nothing,
    including the responses of its own app's commands — which is right for a snapshot such as a
-   search (`SearchChatMessages` in `example/dartway_example_shared/lib/src/chat.dart`).
+   search (`ListChatMessagesMatching` in `example/dartway_example_shared/lib/src/chat.dart`).
 3. Only objects of the request's item type are offered (`acceptsItem`), and only deletions of that
    type (`acceptsDeletion`).
 4. `onUpdate` answers a `DwUpdateAction`, and the client applies it:

@@ -238,10 +238,10 @@ final class ListPinnedChatMessages extends DwListRequest<ChatMessage>
 /// The messages of one channel whose text contains [query], newest first, at
 /// most [maxResults]. A snapshot, not live: a search is asked again when its
 /// query changes. Staff only.
-final class SearchChatMessages extends DwListRequest<ChatMessage>
-    with _$SearchChatMessages
+final class ListChatMessagesMatching extends DwListRequest<ChatMessage>
+    with _$ListChatMessagesMatching
     implements DwSelfValidating {
-  const SearchChatMessages({required this.channelId, required this.query});
+  const ListChatMessagesMatching({required this.channelId, required this.query});
 
   static const int minQueryLength = 2;
   static const int maxResults = 100;

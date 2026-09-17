@@ -14,6 +14,11 @@ enum DwCheckType {
   /// fails first (#240).
   routeNameDuplicated,
 
+  /// A DTO in the shared package named against the naming law: one word, a
+  /// read not named `Get…`/`List…`, or a command named like a read. The class
+  /// name is the wire name, so it is fixed before a build carries it (#167).
+  contractNameInvalid,
+
   /// The app's localization is not wired: `flutter_localizations`,
   /// `generate: true`, `l10n.yaml` and a `.arb` catalogue.
   ///

@@ -481,11 +481,11 @@ ListPinnedChatMessages $ListPinnedChatMessagesFromJson(
   Map<String, Object?> json,
 ) => ListPinnedChatMessages(channelId: json['channelId']! as int);
 
-mixin _$SearchChatMessages on DwListRequest<ChatMessage> {
-  SearchChatMessages get _self => this as SearchChatMessages;
+mixin _$ListChatMessagesMatching on DwListRequest<ChatMessage> {
+  ListChatMessagesMatching get _self => this as ListChatMessagesMatching;
 
   @override
-  String get dwTypeName => 'SearchChatMessages';
+  String get dwTypeName => 'ListChatMessagesMatching';
 
   @override
   Map<String, Object?> toJson() => {
@@ -496,24 +496,25 @@ mixin _$SearchChatMessages on DwListRequest<ChatMessage> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SearchChatMessages &&
+      other is ListChatMessagesMatching &&
           other.channelId == _self.channelId &&
           other.query == _self.query;
 
   @override
   int get hashCode =>
-      Object.hash(SearchChatMessages, _self.channelId, _self.query);
+      Object.hash(ListChatMessagesMatching, _self.channelId, _self.query);
 
   @override
   String toString() =>
-      'SearchChatMessages(channelId: ${_self.channelId}, query: ${_self.query})';
+      'ListChatMessagesMatching(channelId: ${_self.channelId}, query: ${_self.query})';
 }
 
-SearchChatMessages $SearchChatMessagesFromJson(Map<String, Object?> json) =>
-    SearchChatMessages(
-      channelId: json['channelId']! as int,
-      query: json['query']! as String,
-    );
+ListChatMessagesMatching $ListChatMessagesMatchingFromJson(
+  Map<String, Object?> json,
+) => ListChatMessagesMatching(
+  channelId: json['channelId']! as int,
+  query: json['query']! as String,
+);
 
 mixin _$ChatAttachmentDraft on DwDataObject {
   ChatAttachmentDraft get _self => this as ChatAttachmentDraft;

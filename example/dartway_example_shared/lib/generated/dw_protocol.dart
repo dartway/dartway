@@ -53,6 +53,10 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol([
     'ListChatMessages',
     $ListChatMessagesFromJson,
   ),
+  DwProtocolEntry<ListChatMessagesMatching>(
+    'ListChatMessagesMatching',
+    $ListChatMessagesMatchingFromJson,
+  ),
   DwProtocolEntry<ListClubServices>(
     'ListClubServices',
     $ListClubServicesFromJson,
@@ -91,10 +95,6 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol([
   DwProtocolEntry<SaveAppSetting>('SaveAppSetting', $SaveAppSettingFromJson),
   DwProtocolEntry<SaveClubService>('SaveClubService', $SaveClubServiceFromJson),
   DwProtocolEntry<ScheduleSession>('ScheduleSession', $ScheduleSessionFromJson),
-  DwProtocolEntry<SearchChatMessages>(
-    'SearchChatMessages',
-    $SearchChatMessagesFromJson,
-  ),
   DwProtocolEntry<SendChatMessage>('SendChatMessage', $SendChatMessageFromJson),
   DwProtocolEntry<SessionBooking>('SessionBooking', $SessionBookingFromJson),
   DwProtocolEntry<SessionReview>('SessionReview', $SessionReviewFromJson),

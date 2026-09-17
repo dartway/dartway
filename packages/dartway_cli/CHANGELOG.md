@@ -2,6 +2,8 @@
 
 ## Unreleased — DartWay 1.0
 
+- **`dartway check` holds the contract's names to the naming law** (`contractNameInvalid`, error — #167): a DTO in the shared package named one word, a read not named `Get…`/`List…`, or a command named like a read. The class name is the wire name, so the check fires before a build carries it. The example's `SearchChatMessages` is `ListChatMessagesMatching`.
+
 - **`dartway create --language` sets the app's language** (#230). The project keeps only that translation (`en` or `ru`), makes it the template ARB and `AppLocaleController.productLocale`, and regenerates `lib/l10n/gen`. The skeleton no longer takes the device's language, and no longer falls back to whichever ARB sorts first.
 
 - **A host added to a live stand gets into its certificate.** `deploy run` left a lineage certbot already managed untouched, so a `storage_domain` or `site` added later was served with a certificate that did not name it. The certificate step now reads the lineage's domains and extends it (`--expand`, same name) when a served host is missing.

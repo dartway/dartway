@@ -65,7 +65,7 @@ void main() {
       const ReactToChatMessage(messageId: 4),
       const MarkChatRead(channelId: 1, messageId: 4),
       const ListPinnedChatMessages(channelId: 1),
-      const SearchChatMessages(channelId: 1, query: 'yoga'),
+      const ListChatMessagesMatching(channelId: 1, query: 'yoga'),
       const ListMyChatReadStates(),
       ChatReadState(
         id: 1,
@@ -157,7 +157,7 @@ void main() {
       ),
       ['messageTooLong@text', 'tooManyAttachments@attachments'],
     );
-    expect(codes(const SearchChatMessages(channelId: 1, query: ' a ')), [
+    expect(codes(const ListChatMessagesMatching(channelId: 1, query: ' a ')), [
       'searchQueryTooShort@query',
     ]);
     expect(codes(const SaveAppSetting(key: 'colour', value: 'red')), [

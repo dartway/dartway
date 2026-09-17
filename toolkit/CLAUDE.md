@@ -60,7 +60,7 @@ Two kinds of rule live in this file and read alike: the same prose, the same voi
 
 **How the boundary stays honest: law is what fails.** Much of it fails before any check runs, because it is built into the types and into the server's startup: a row class cannot be registered in the protocol (only DTOs travel), a handler cannot be declared without an access rule, a refusal cannot be built from a string, a registered request or command without a handler stops the server from starting. The rest is held by `dartway check`, which has **three** severities, not two — and several checks are warnings **precisely because they have a second legitimate reading**: `uiKitConstStyle` is fine for a project with one theme, `frameworkRefsDiverged` cannot tell a pin from an oversight. A check that deliberately declines to fail is not a rule a project is forbidden to decide for itself. So the `error` severity is law; a warning is a strong default, and the `info` is a nudge.
 
-**The law list is therefore derived rather than sorted** — it is `DwCheckType.severity` in `dartway_cli`, one `switch` statement, and reading it off is the whole method. Fourteen checks fail today:
+**The law list is therefore derived rather than sorted** — it is `DwCheckType.severity` in `dartway_cli`, one `switch` statement, and reading it off is the whole method. Fifteen checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -69,12 +69,13 @@ Two kinds of rule live in this file and read alike: the same prose, the same voi
 | The widget's contract with its parent | `widgetSizesItself` |
 | The declared top-level layout | `invalidTopLevelLayout` |
 | What the router refuses on the first frame | `routeNameDuplicated` |
+| The contract's names are its wire names (law 5) | `contractNameInvalid` |
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
 
 Eight further checks are warnings and one is a nudge; those are defaults, however firmly the prose around them is written. **Anything this table and the types do not hold is a default by construction** — no rule in this file or in the skills becomes law by being phrased definitely, and promoting one costs a failing check rather than a sentence.
 
-**The gap this leaves is named rather than smoothed over.** The naming law has no check at all; the contract law is held against JSON maps and stray DTOs by the types, but nothing fails on a `DwHttpRoute` the app calls instead of a request; "done" has only a warning (`featureSpecMissing`). `migrationsDrift` needs a Postgres (`DW_DATABASE_*`) and says it did not run rather than passing without one.
+**The gap this leaves is named rather than smoothed over.** The naming law is checked for the contract's DTO names only — variables, fields and every other class name are not; the contract law is held against JSON maps and stray DTOs by the types, but nothing fails on a `DwHttpRoute` the app calls instead of a request; "done" has only a warning (`featureSpecMissing`). `migrationsDrift` needs a Postgres (`DW_DATABASE_*`) and says it did not run rather than passing without one.
 
 ## Code generation: two generators, and no `build_runner`
 

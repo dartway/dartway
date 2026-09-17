@@ -61,7 +61,7 @@ final class ChatClub {
             if (m.isPinned) m,
         ]),
       )
-      ..onRequest<SearchChatMessages>(
+      ..onRequest<ListChatMessagesMatching>(
         (request, call) => DwCallOk([
           for (final m in chat.reversed)
             if (m.text.toLowerCase().contains(request.query.toLowerCase())) m,

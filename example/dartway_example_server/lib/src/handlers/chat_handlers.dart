@@ -88,7 +88,7 @@ final chatHandlers = <DwCallHandler>[
     },
   ),
 
-  DwCallHandler.list<SearchChatMessages, ChatMessage>(
+  DwCallHandler.list<ListChatMessagesMatching, ChatMessage>(
     access: ExampleAccess.staff,
     handle: (ctx, request) async {
       // LIKE's own characters in what was typed are matched literally.
@@ -112,7 +112,7 @@ final chatHandlers = <DwCallHandler>[
               matching;
         },
         orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
-        limit: SearchChatMessages.maxResults,
+        limit: ListChatMessagesMatching.maxResults,
       );
       return ChatObjects.messages(ctx.db, rows);
     },

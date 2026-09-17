@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../checker/dw_contract_names.dart';
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_framework_lock.dart';
@@ -97,6 +98,11 @@ class CheckCommand extends Command<int> {
       // Judge the server package, so they are out of scope for a run narrowed
       // to a folder of the Flutter package, and silent when the Flutter
       // package was found standing on its own.
+      errorCount += DwContractNamesInspector(
+        sharedPackageDir: layout?.sharedPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
       errorCount += DwGeneratedCodeInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
