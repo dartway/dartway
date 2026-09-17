@@ -43,11 +43,26 @@
       height: 100%
     }
 
+    /*
+      The document is painted with the app's canvas colour (AppTheme.light's
+      scaffold background), not the splash colour. On iOS a home-screen app's
+      status bar takes the document background, read once at launch — painted
+      with the splash, it stays a dark band above a light app for the whole
+      session, and repainting later changes nothing (#222). A project that
+      changes its canvas colour changes it here too.
+    */
     body {
       margin: 0;
       min-height: 100%;
+      background-color: #F5FAFC;
+    }
+
+    /* The splash is its own layer, removed on the first Flutter frame. */
+    #splash {
+      position: fixed;
+      top: 0; right: 0; bottom: 0; left: 0;
+      z-index: 9999;
       background-color: #05060C;
-          background-size: 100% 100%;
     }
 
     .center {
@@ -97,11 +112,11 @@
     }
   </style>
   <script id="splash-screen-script">
-    function removeSplashFromWeb() {
-      document.getElementById("splash")?.remove();
-      document.getElementById("splash-branding")?.remove();
-      document.body.style.background = "transparent";
-    }
+    // Not flutter_native_splash's removeSplashFromWeb(): it waits for a Dart
+    // call nothing makes, and it would make the document transparent.
+    window.addEventListener('flutter-first-frame', function () {
+      document.getElementById('splash')?.remove();
+    });
   </script>
   <!--
     The document must have nothing to scroll. On iOS, focusing a text field

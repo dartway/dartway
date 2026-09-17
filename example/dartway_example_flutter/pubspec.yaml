@@ -101,7 +101,10 @@ flutter_native_splash:
 
   android: true
   ios: true
-  web: true
+  # The web splash is written by hand in web/index.html: the generator would
+  # paint the document with the splash colour, which iOS keeps as the status
+  # bar colour for the whole session (#222).
+  web: false
 
   android_12:
     image: assets/dartway_splash_logo.png
