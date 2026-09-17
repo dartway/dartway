@@ -334,7 +334,7 @@ is not the project's concern; **the project's DTOs are**. What an old build does
 | add a new request or command | keeps working — it never calls it |
 | add a **required** field without a default to a request or command | its calls fail as malformed (`400`) |
 | rename or remove a field of a data object the old build reads | the answer does not decode on the old build |
-| add a value to an enum carried in a data object | an object holding the new value does not decode on the old build |
+| add a value to an enum carried in a data object | the old build reads an object holding it as "this app is out of date" and shows its update screen — no call fails, no list breaks; an open enum (below) reads it as `unknown` |
 | publish a new data object type on a channel old builds already listen to | the update does not decode: the old build reports a protocol error and reads that channel's requests again, every time |
 | rename or remove a request or command class | its calls answer "unknown call" (`404`) |
 | rename a refusal code | the old build shows its generic refusal text |
@@ -349,6 +349,20 @@ restart, not a release. The build is the `+N` of the app's version in `__FLUTTER
 
 Say which kind of change it is in the commit and the pull request; a breaking one names the
 `minAppBuild` it needs.
+
+### Open enums — rare, by declaration
+
+Every enum is strict: a name the build does not know is not a value to guess, it means the app is
+older than the data, and the client switches to the update screen by itself. That is what keeps an
+exhaustive `switch` over an enum honest.
+
+Mark an enum `with DwOpenEnum` — with a value named `unknown` — only when a value is **for display
+alone** and an unknown one can be shown neutrally or left out without anyone acting on it wrongly:
+the kind of an entry in an activity feed, the icon of a notification. **Never** when behaviour
+depends on the value: a status that decides what may happen next, a role, a permission, a kind of
+payment. Every reader turns an unknown name into `unknown` (the screen must handle it: hide the
+row, show a neutral label); `unknown` itself can never be written to a row, so nothing is
+overwritten with it. `dartway generate` refuses an open enum without `unknown`.
 
 ## 10. Generation
 

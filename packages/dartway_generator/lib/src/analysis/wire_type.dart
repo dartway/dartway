@@ -181,6 +181,18 @@ final class WireTypeReader {
       return BytesWire(nullable: nullable);
     }
     if (element is EnumElement) {
+      final open = element.mixins.any(
+        (mixin) => DwFrameworkTypes.isCoreClass(mixin.element, 'DwOpenEnum'),
+      );
+      if (open &&
+          !element.fields.any(
+            (field) => field.isEnumConstant && field.name == 'unknown',
+          )) {
+        throw UnsupportedType(
+          '`$display` is a DwOpenEnum and declares no value `unknown` to read '
+          'the names of a newer build as',
+        );
+      }
       return EnumWire(_requireVisible(type), nullable: nullable);
     }
     if (type.isDartCoreList || type.isDartCoreMap) {

@@ -379,6 +379,12 @@ sealed class _Entry implements _ChannelMember {
       error,
     );
     client._report(exception, stackTrace);
+    // A value newer than this build made the client out of date: the entry
+    // settles on that, as every entry does, not on a failure of its own.
+    if (client._incompatibility.value case final refusal?) {
+      finish(target, () => answerNotOk(target, DwApiIncompatible(refusal)));
+      return;
+    }
     finish(target, () {
       if (target.kind == _OpKind.reload) {
         dataSeq = null;

@@ -31,3 +31,13 @@ final class Note extends DwDataObject with _$Note {
   @override
   final String id;
 }
+
+enum Mood with DwOpenEnum { calm, loud }
+
+final class MoodNote extends DwDataObject with _$MoodNote {
+  const MoodNote({required this.id, required this.mood});
+
+  @override
+  final String id;
+  final Mood mood;
+}

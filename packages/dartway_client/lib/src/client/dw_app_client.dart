@@ -615,6 +615,21 @@ final class DwAppClient {
   // Incompatibility
   // ===========================================================================
 
+  /// Whether [error] — or what it wraps — is a value this build does not
+  /// know: an enum name a newer server wrote (`DwUnknownEnumValue`).
+  static bool _outdatedBy(Object? error) => switch (error) {
+    DwUnknownEnumValue() => true,
+    DwProtocolException(:final cause) => _outdatedBy(cause),
+    _ => false,
+  };
+
+  /// The server answered with a value this build does not know: every enum
+  /// is strict unless marked open, so nothing this build shows or does with
+  /// such data can be trusted to handle every case. The app is out of date,
+  /// exactly as when the server refuses its build (`dw.updateRequired`).
+  void _becomeOutdated() =>
+      _becomeIncompatible(DwCallRefusal(DwCoreRefusal.updateRequired));
+
   /// This build cannot talk to this server: terminal. The socket closes and
   /// stays closed, sleeping retries wake to the refusal, and every entry
   /// settles on it.
@@ -683,6 +698,9 @@ final class DwAppClient {
   }
 
   void _report(Object error, StackTrace stackTrace) {
+    // Data this build cannot read because it is newer: not a failure of the
+    // screen that asked, but an app that has to be updated.
+    if (_outdatedBy(error)) _becomeOutdated();
     final onError = _onError;
     if (onError != null) {
       onError(error, stackTrace);

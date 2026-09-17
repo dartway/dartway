@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:meta/meta.dart';
 import 'package:postgres/postgres.dart' as pg;
 
@@ -190,14 +191,21 @@ final class DwEnumType<E extends Enum> extends DwColumnType<E> {
   @override
   pg.Type<Object> get arrayParameterType => pg.Type.textArray;
 
+  /// The `unknown` value of a [DwOpenEnum] cannot be written: it stands for
+  /// a name this build did not know, and writing it would replace that name.
   @override
-  Object encode(E value) => value.name;
+  Object encode(E value) => DwJsonCodec.encodeEnum(value);
 
+  /// A name no value has fails the read — unless [E] is a [DwOpenEnum],
+  /// whose `unknown` it is read as.
   @override
   E decode(Object raw) {
     if (raw is String) {
       for (final value in values) {
         if (value.name == raw) return value;
+      }
+      if (DwJsonCodec.openFallback(values) case final fallback?) {
+        return fallback;
       }
       throw DwDecodeException('"$raw" is not a value of $E');
     }
@@ -258,7 +266,9 @@ final class DwEnumListType<E extends Enum> extends _DwJsonType<List<E>> {
   final List<E> values;
 
   @override
-  Object encode(List<E> value) => [for (final item in value) item.name];
+  Object encode(List<E> value) => [
+    for (final item in value) DwJsonCodec.encodeEnum(item),
+  ];
 
   @override
   Object encodeArrayElement(List<E> value) => jsonEncode(encode(value));
@@ -272,7 +282,9 @@ final class DwEnumListType<E extends Enum> extends _DwJsonType<List<E>> {
       for (final name in raw)
         values.firstWhere(
           (value) => value.name == name,
-          orElse: () => throw DwDecodeException('"$name" is not a value of $E'),
+          orElse: () =>
+              DwJsonCodec.openFallback(values) ??
+              (throw DwDecodeException('"$name" is not a value of $E')),
         ),
     ]);
   }

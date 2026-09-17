@@ -162,6 +162,12 @@ extension on DwAppClient {
               try {
                 return response.toResult(dto, protocol);
               } catch (error) {
+                if (DwAppClient._outdatedBy(error)) {
+                  _becomeOutdated();
+                  return DwCallRefused<R>(
+                    DwCallRefusal(DwCoreRefusal.updateRequired),
+                  );
+                }
                 // Generated codecs cast and throw TypeError; the envelope
                 // throws FormatException. Either way the server sent what
                 // this build cannot read.
@@ -277,6 +283,9 @@ extension on DwAppClient {
         jsonDecode(reply.body),
         protocol,
       );
+    } on DwUnknownEnumValue {
+      // Updates of a newer server this build cannot read: out of date.
+      return DwApiIncompatible(DwCallRefusal(DwCoreRefusal.updateRequired));
     } on FormatException catch (error) {
       cause = error;
     }

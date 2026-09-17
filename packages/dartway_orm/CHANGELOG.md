@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **Open enum columns** (D-071): `DwEnumType` and `DwEnumListType` of a `DwOpenEnum` read an unknown name as `unknown` and refuse to write `unknown`; strict enums still fail the read.
+
 - **`column.setIfNull(v)` in `updateWhere`**: `SET column = COALESCE(column, v)` on a nullable column, so "first unread" and a counter move in one statement.
 
 - **`column.increment(n)` in `updateWhere`**: `SET column = column + n` on a non-null `int` or `double` column, computed by the database so concurrent increments all count. Unread counters needed raw SQL before.

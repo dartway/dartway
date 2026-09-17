@@ -15,6 +15,7 @@ export 'src/protocol/dw_api_response.dart';
 export 'src/protocol/dw_close_code.dart';
 export 'src/protocol/dw_http_contract.dart';
 export 'src/protocol/dw_json_codec.dart';
+export 'src/protocol/dw_open_enum.dart';
 export 'src/protocol/dw_live_messages.dart';
 export 'src/protocol/dw_page_query.dart';
 export 'src/protocol/dw_wire_protocol.dart';
