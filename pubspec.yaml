@@ -20,6 +20,7 @@ workspace:
   - packages/dartway_shared_preferences
   - packages/dartway_studio_bridge
   - packages/dartway_telegram
+  - tool
 
 # `packages/dartway_generator` is deliberately NOT a workspace member: it pins
 # `analyzer` at the version it is written against, and `dartway_lints` (through

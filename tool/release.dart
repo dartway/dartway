@@ -27,6 +27,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_repo_tools/dartway_repo_tools.dart';
+
 const _host = 'pub.dev';
 
 /// How long to wait for a just-published version to become visible.
@@ -61,18 +63,20 @@ Future<void> main(List<String> args) async {
     try {
       published[package.name] = await _versionsOf(package.name);
     } on _Unreachable catch (failure) {
-      stderr.writeln('Could not ask $_host about ${package.name}: '
-          '${failure.reason}');
+      stderr.writeln(
+        'Could not ask $_host about ${package.name}: '
+        '${failure.reason}',
+      );
       exit(2);
     }
   }
 
   final List<_Package> plan;
   try {
-    plan = _order(
+    plan = ReleaseOrder.of(
       packages.where((p) => !published[p.name]!.contains(p.version)).toList(),
     );
-    _verifyOrder(plan);
+    ReleaseOrder.verify(plan);
   } on StateError catch (failure) {
     // The header states what each exit code means, and a promise about
     // behaviour is checked the same way as any other: an ordering failure is
@@ -83,8 +87,10 @@ Future<void> main(List<String> args) async {
   }
 
   if (plan.isEmpty) {
-    stdout.writeln('\n✓ every package is published at the version this tree '
-        'states. Nothing to release.');
+    stdout.writeln(
+      '\n✓ every package is published at the version this tree '
+      'states. Nothing to release.',
+    );
     return;
   }
 
@@ -96,15 +102,21 @@ Future<void> main(List<String> args) async {
     // on pub.dev permanently and makes the package public with whatever
     // maturity it has. Saying which is which is the whole reason to print a
     // plan rather than just publishing.
-    final was = known.isEmpty ? 'NEW — never published' : 'was ${_newest(known)}';
-    stdout.writeln('  ${(i + 1).toString().padLeft(2)}. '
-        '${p.name.padRight(32)} ${p.version.padRight(9)} ($was)');
+    final was = known.isEmpty
+        ? 'NEW — never published'
+        : 'was ${_newest(known)}';
+    stdout.writeln(
+      '  ${(i + 1).toString().padLeft(2)}. '
+      '${p.name.padRight(32)} ${p.version.padRight(9)} ($was)',
+    );
   }
 
   if (!publish) {
     stdout.writeln('\nThis was the plan only. Add --publish to carry it out.');
-    stdout.writeln('A published version cannot be withdrawn — only retracted, '
-        'and it stays visible.');
+    stdout.writeln(
+      'A published version cannot be withdrawn — only retracted, '
+      'and it stays visible.',
+    );
     return;
   }
 
@@ -118,33 +130,41 @@ Future<void> main(List<String> args) async {
     final p = plan[i];
     stdout.writeln('\n── ${i + 1}/${plan.length} ${p.name} ${p.version}');
 
-    final result = Process.runSync(
-      'dart',
-      ['pub', 'publish', '--force'],
-      workingDirectory: p.directory,
-    );
+    final result = Process.runSync('dart', [
+      'pub',
+      'publish',
+      '--force',
+    ], workingDirectory: p.directory);
     stdout.write(result.stdout);
     if (result.exitCode != 0) {
       stderr.write(result.stderr);
-      stderr.writeln('\n✗ ${p.name} failed to publish. Stopping here: the '
-          'packages after it in the order state carets on what did not go out.');
-      stderr.writeln('Published in this run: '
-          '${plan.take(i).map((e) => e.name).join(', ')}');
+      stderr.writeln(
+        '\n✗ ${p.name} failed to publish. Stopping here: the '
+        'packages after it in the order state carets on what did not go out.',
+      );
+      stderr.writeln(
+        'Published in this run: '
+        '${plan.take(i).map((e) => e.name).join(', ')}',
+      );
       exit(1);
     }
 
     if (i + 1 == plan.length) continue;
     if (!await _becameVisible(p)) {
-      stderr.writeln('\n✗ ${p.name} ${p.version} published, but $_host still '
-          'does not list it after ${_visibilityTimeout.inMinutes} minutes. '
-          'Stopping rather than failing the next package on version solving.');
+      stderr.writeln(
+        '\n✗ ${p.name} ${p.version} published, but $_host still '
+        'does not list it after ${_visibilityTimeout.inMinutes} minutes. '
+        'Stopping rather than failing the next package on version solving.',
+      );
       exit(1);
     }
   }
 
   stdout.writeln('\n✓ published ${plan.length} package(s).');
-  stdout.writeln('The release is not finished: `stable` is moved by the '
-      'promotion ritual in CLAUDE.md, not by this script.');
+  stdout.writeln(
+    'The release is not finished: `stable` is moved by the '
+    'promotion ritual in CLAUDE.md, not by this script.',
+  );
 }
 
 /// Why publishing must not start, or null when it may.
@@ -183,9 +203,12 @@ String? _refuseToPublishBecause() {
 /// say "the two", and there were three by the time anyone read it.)
 List<_Package> _packages() {
   final found = <_Package>[];
-  for (final directory in Directory('packages').existsSync()
-      ? Directory('packages').listSync(recursive: true).whereType<Directory>()
-      : <Directory>[]) {
+  for (final directory
+      in Directory('packages').existsSync()
+          ? Directory(
+              'packages',
+            ).listSync(recursive: true).whereType<Directory>()
+          : <Directory>[]) {
     final pubspec = File('${directory.path}/pubspec.yaml');
     if (!pubspec.existsSync()) continue;
 
@@ -228,64 +251,6 @@ Set<String> _dependencies(List<String> lines) {
     if (entry != null) deps.add(entry.group(1)!);
   }
   return deps;
-}
-
-/// The plan, ordered so that nothing is published before what it depends on.
-///
-/// Only packages inside the plan constrain each other: a dependency that is
-/// already published at the version stated is on pub.dev before this run starts.
-List<_Package> _order(List<_Package> plan) {
-  final byName = {for (final p in plan) p.name: p};
-  final ordered = <_Package>[];
-  final placed = <String>{};
-
-  // A dependency cycle cannot exist in a resolvable workspace, but a bug here
-  // must not become an infinite loop in a script that publishes.
-  while (ordered.length < plan.length) {
-    final ready = plan
-        .where((p) => !placed.contains(p.name))
-        .where((p) => p.dependencies.every(
-              (d) => !byName.containsKey(d) || placed.contains(d),
-            ))
-        .toList();
-
-    if (ready.isEmpty) {
-      final stuck = plan.where((p) => !placed.contains(p.name)).map((p) => p.name);
-      throw StateError(
-        'Cannot order the release: ${stuck.join(', ')} depend on each other. '
-        'A cycle among dartway packages is not resolvable on pub.dev either.',
-      );
-    }
-
-    for (final p in ready) {
-      ordered.add(p);
-      placed.add(p.name);
-    }
-  }
-  return ordered;
-}
-
-/// Checks the answer the ordering just gave, before anything acts on it.
-///
-/// The order is the whole value of this script and the one thing a mistake in
-/// it cannot be taken back from: publishing a dependent before its dependency
-/// fails on version solving with part of the release already out, permanently.
-/// So the result is verified rather than trusted — the check is four lines and
-/// reads nothing the sort read.
-void _verifyOrder(List<_Package> plan) {
-  final position = {for (var i = 0; i < plan.length; i++) plan[i].name: i};
-  for (var i = 0; i < plan.length; i++) {
-    for (final dependency in plan[i].dependencies) {
-      final at = position[dependency];
-      if (at != null && at > i) {
-        throw StateError(
-          'Ordering is wrong: ${plan[i].name} would be published at ${i + 1}, '
-          'before ${plan[at].name} at ${at + 1}, which it depends on. '
-          'Refusing to act on it.',
-        );
-      }
-    }
-  }
 }
 
 Future<bool> _becameVisible(_Package package) async {
@@ -331,9 +296,7 @@ Future<Set<String>> _versionsOf(String package) async {
     final body = await response.transform(utf8.decoder).join();
     final versions = (jsonDecode(body) as Map)['versions'] as List?;
     if (versions == null) throw const _Unreachable('no versions in reply');
-    return {
-      for (final entry in versions) (entry as Map)['version'] as String,
-    };
+    return {for (final entry in versions) (entry as Map)['version'] as String};
   } on _Unreachable {
     rethrow;
   } catch (error) {
@@ -368,11 +331,13 @@ List<int>? _parts(String version) {
   return [for (var i = 1; i <= 3; i++) int.parse(match.group(i)!)];
 }
 
-class _Package {
+class _Package implements ReleaseUnit {
   const _Package(this.name, this.version, this.directory, this.dependencies);
+  @override
   final String name;
   final String version;
   final String directory;
+  @override
   final Set<String> dependencies;
 }
 

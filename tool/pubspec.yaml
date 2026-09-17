@@ -1,0 +1,10 @@
+name: dartway_repo_tools
+description: The scripts this repository runs on itself, and the logic they judge it with.
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.11.0
+dependencies:
+  dartway_cli: ^0.10.1
+dev_dependencies:
+  test: ^1.25.0
