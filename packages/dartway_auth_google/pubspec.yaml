@@ -1,0 +1,30 @@
+name: dartway_auth_google
+description: "Sign in with Google for a DartWay app, reached as dw.signInWithGoogle(): the SDK initialised with a nonce the server checks, and the ID token sent as the sign-in command."
+version: 0.1.0-dev.1
+repository: https://github.com/dartway/dartway
+homepage: https://dartway.dev
+issue_tracker: https://github.com/dartway/dartway/issues
+topics: [dartway, auth, google, sign-in, flutter]
+publish_to: none
+
+resolution: workspace
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  crypto: ^3.0.6
+  dartway_auth_providers_shared: ^0.1.0-dev.1
+  dartway_core_flutter: ^0.20.0-dev.1
+  google_sign_in: ^7.2.0
+
+dev_dependencies:
+  # `DwFakeServer`: the sign-in runs through a real client against it.
+  dartway_client: ^0.20.0-dev.1
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

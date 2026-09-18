@@ -293,6 +293,14 @@ a server without a signing key, signs the person in and says in the log that the
 have nothing to work with; an exchange Apple refuses does not refuse the sign-in, which the identity
 token already proved.
 
+**The app's half is two packages, one per provider**, so a project takes what it offers:
+`dartway_auth_google` (`dw.signInWithGoogle()`) and `dartway_auth_apple` (`dw.signInWithApple()`).
+Each makes the nonce, gets the token from the provider's SDK, sends the command and signs the
+answered session in; what the provider told about the person is handed to an `introduce` callback
+whose answer joins `registration`, so the project names its own fields and neither package knows
+them. Apple's package also carries the `authorizationCode`; Google's nonce is fixed by
+`DwGoogleAuth.initialize`, because the Google SDK takes it there rather than per sign-in.
+
 **What a project still owes the stores.** Offering Google or Apple sign-in brings App Store
 guideline 4.8 into play — an app whose main account uses a third-party sign-in must also offer one
 that asks no more than name and e-mail and lets the person hide theirs; sign-in by code to a phone

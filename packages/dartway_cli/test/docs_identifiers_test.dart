@@ -218,16 +218,6 @@ final class _PublicSurface {
     ]) {
       dwMembers.addAll(_membersOf(File(path).readAsStringSync(), owner));
     }
-    for (final file in Directory(
-      core,
-    ).listSync(recursive: true).whereType<File>()) {
-      if (!file.path.endsWith('.dart')) continue;
-      final source = file.readAsStringSync();
-      for (final match in _extensionOnCore.allMatches(source)) {
-        dwMembers.addAll(_membersOf(source, match.group(1)!, extension: true));
-      }
-    }
-
     for (final package in packages.listSync().whereType<Directory>()) {
       final lib = Directory(p.join(package.path, 'lib'));
       if (!lib.existsSync()) continue;
@@ -237,6 +227,14 @@ final class _PublicSurface {
         wireCodes.addAll(
           _wireCodeLiteral.allMatches(source).map((m) => m.group(1)!),
         );
+        // `dw.` is not only the core's own members: a package of the
+        // framework may add one by extension — `dw.signInWithApple()` lives
+        // in dartway_auth_apple — and the prose names those the same way.
+        for (final match in _extensionOnCore.allMatches(source)) {
+          dwMembers.addAll(
+            _membersOf(source, match.group(1)!, extension: true),
+          );
+        }
         if (p.basename(file.path) == 'dw_analytics_event.dart') {
           // `DwAppEvent.eventName` is `'dw.$name'`: its values are event names.
           final body = RegExp(
@@ -273,7 +271,7 @@ final class _PublicSurface {
   final Set<String> wireCodes = {};
 
   static final _extensionOnCore = RegExp(
-    r'^extension (\w+) on DwFlutterToolbox(?:Core)?\b',
+    r'^extension (\w+) on (?:DwFlutterToolbox|DwFlutterCore)\b',
     multiLine: true,
   );
   static final _wireCodeLiteral = RegExp(r'''['"]dw\.([a-zA-Z]\w*)''');
