@@ -1,5 +1,7 @@
 import 'package:dartway_auth_providers_shared/dartway_auth_providers_shared.dart';
 
+import 'dw_apple_client_secret.dart';
+import 'dw_apple_endpoint.dart';
 import 'dw_jwks_cache.dart';
 
 /// What a project configures to let people sign in with one provider:
@@ -76,6 +78,53 @@ final class DwGoogleSignIn extends DwSignInProvider {
   Uri get keySetUri => Uri.https('www.googleapis.com', '/oauth2/v3/certs');
 }
 
+/// The key a project downloads from Apple once — a `.p8` file — and the two
+/// ids that say whose it is.
+///
+/// It exists for one thing: Apple's own endpoints take no password, only a
+/// **client secret** signed with this key. Without it an app can sign people
+/// in and cannot tell Apple when one of them leaves, which Apple requires of
+/// an app that offers Sign in with Apple.
+///
+/// Keep the `.p8` in the secret store, never in the repository: it signs on
+/// behalf of the whole team, and Apple hands it out once.
+final class DwAppleSigningKey {
+  DwAppleSigningKey({
+    required this.teamId,
+    required this.keyId,
+    required this.privateKeyPem,
+  }) {
+    // Read now rather than at the first deletion: a key that does not parse
+    // must stop a server from starting, not a person from leaving.
+    _secretFor('probe');
+  }
+
+  /// The ten-character team id from the developer account.
+  final String teamId;
+
+  /// The id Apple gave the key, as in `AuthKey_<keyId>.p8`.
+  final String keyId;
+
+  /// The file's text, `-----BEGIN PRIVATE KEY-----` and all.
+  final String privateKeyPem;
+
+  final Map<String, DwAppleClientSecret> _secrets = {};
+
+  DwAppleClientSecret _secretFor(String clientId) => _secrets.putIfAbsent(
+    clientId,
+    () => DwAppleClientSecret(
+      teamId: teamId,
+      keyId: keyId,
+      clientId: clientId,
+      privateKeyPem: privateKeyPem,
+    ),
+  );
+
+  /// A freshly signed client secret for a call about [clientId] — the same
+  /// client id the token was issued for, which is what Apple checks.
+  String mintFor(String clientId) => _secretFor(clientId).mint();
+}
+
 /// Sign in with Apple: an identity token from the Apple sign-in flow, ES256.
 ///
 /// Apple tells the person's name and e-mail **only at the very first
@@ -85,10 +134,20 @@ final class DwGoogleSignIn extends DwSignInProvider {
 final class DwAppleSignIn extends DwSignInProvider {
   DwAppleSignIn({
     required super.clientIds,
+    this.signingKey,
     super.requireNonce = true,
     super.clockSkew = const Duration(minutes: 2),
     super.fetchKeys,
-  });
+    DwApplePost? post,
+  }) : endpoint = DwAppleEndpoint(post: post);
+
+  /// The `.p8` key, when the project has one. Without it the app signs in and
+  /// nothing is kept for the revocation Apple asks for on deletion — see
+  /// [DwAppleSigningKey].
+  final DwAppleSigningKey? signingKey;
+
+  /// Apple's `/auth/token` and `/auth/revoke`.
+  final DwAppleEndpoint endpoint;
 
   @override
   DwAuthProvider get provider => DwAuthProvider.apple;

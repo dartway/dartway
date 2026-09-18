@@ -14,6 +14,9 @@ export 'package:dartway_auth_providers_shared/dartway_auth_providers_shared.dart
 export 'src/dw_id_token_check.dart' show DwProviderClaim;
 export 'src/dw_jwks_cache.dart'
     show DwJwksCache, DwJwksDocument, DwJwksFetch, DwJwksUnavailable;
+export 'src/dw_apple_endpoint.dart' show DwAppleAnswer, DwApplePost;
+export 'src/dw_provider_tokens_migrations.dart'
+    show dwAuthProvidersMigrations, dwAuthProvidersNamespace;
 export 'src/dw_sign_in_providers.dart'
-    show DwAppleSignIn, DwGoogleSignIn, DwSignInProvider;
+    show DwAppleSignIn, DwAppleSigningKey, DwGoogleSignIn, DwSignInProvider;
 export 'src/dw_sign_in_providers_module.dart' show DwSignInProvidersModule;

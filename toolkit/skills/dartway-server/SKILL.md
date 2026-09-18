@@ -465,7 +465,10 @@ modules: [
 ```
 
 The providers are independent (declare what you offer; the rest is a door this server does not
-have). `dw.providerCredentialRejected` means the token did not hold up, `dw.providerUnreachable`
+have). For Apple, add `signingKey: DwAppleSigningKey(...)` from the `.p8` in the secret store: the
+app sends `authorizationCode` with the sign-in, the server exchanges it for a refresh token, and
+deleting the account hands that token back to Apple through a job — required by App Store 5.1.1(v),
+and never in the way of a person leaving. `dw.providerCredentialRejected` means the token did not hold up, `dw.providerUnreachable`
 that the provider could not be asked for its keys — the app may retry the second, not the first.
 Details in `docs/4-server/auth-identity.md`.
 

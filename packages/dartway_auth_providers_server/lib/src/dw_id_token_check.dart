@@ -43,10 +43,14 @@ sealed class DwTokenVerdict {
 /// The token is the provider's, issued for this app, and names [subject].
 @internal
 final class DwTokenAccepted extends DwTokenVerdict {
-  const DwTokenAccepted(this.subject, this.claims);
+  const DwTokenAccepted(this.subject, this.claims, this.clientId);
 
   /// The provider's stable id of the person — what the identity is stored as.
   final String subject;
+
+  /// Which of the app's client ids the token was issued for. Apple's token
+  /// endpoints want the same one, and the client secret is signed for it.
+  final String clientId;
 
   /// The claims worth handing the project, under [DwProviderClaim] keys.
   final Map<String, String> claims;
@@ -130,7 +134,8 @@ final class DwIdTokenCheck {
       final List many => many.whereType<String>().toList(),
       _ => const <String>[],
     };
-    if (!audience.any(setup.clientIds.contains)) {
+    final forThisApp = audience.where(setup.clientIds.contains).toList();
+    if (forThisApp.isEmpty) {
       return DwTokenRejected(
         'issued for $audience, none of this app\'s client ids',
       );
@@ -151,7 +156,7 @@ final class DwIdTokenCheck {
     if (subject is! String || subject.isEmpty || subject.length > 255) {
       return const DwTokenRejected('the token names no subject');
     }
-    return DwTokenAccepted(subject, _claimsOf(claims));
+    return DwTokenAccepted(subject, _claimsOf(claims), forThisApp.first);
   }
 
   /// Why the token's nonce does not answer the one the app used, or null.

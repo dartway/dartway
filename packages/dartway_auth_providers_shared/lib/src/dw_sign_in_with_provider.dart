@@ -26,6 +26,7 @@ final class DwSignInWithProvider extends DwActionCommand<DwAuthSession> {
     required this.provider,
     required this.idToken,
     this.nonce,
+    this.authorizationCode,
     this.registration = const {},
   });
 
@@ -35,6 +36,15 @@ final class DwSignInWithProvider extends DwActionCommand<DwAuthSession> {
   /// it proves.
   final String idToken;
   final String? nonce;
+
+  /// Apple's one-time authorization code, when the app has it.
+  ///
+  /// It is what the server exchanges — once, at the first sign-in — for the
+  /// refresh token that lets it revoke the person's tokens with Apple when
+  /// they delete their account, which Apple requires of an app that offers
+  /// Sign in with Apple. Without it the sign-in works and the deletion has
+  /// nothing to revoke with.
+  final String? authorizationCode;
   final Map<String, String> registration;
 
   @override
@@ -45,6 +55,7 @@ final class DwSignInWithProvider extends DwActionCommand<DwAuthSession> {
     'provider': provider.name,
     'idToken': idToken,
     if (nonce != null) 'nonce': nonce,
+    if (authorizationCode != null) 'authorizationCode': authorizationCode,
     if (registration.isNotEmpty) 'registration': registration,
   };
 
@@ -53,6 +64,7 @@ final class DwSignInWithProvider extends DwActionCommand<DwAuthSession> {
         provider: DwJsonCodec.decodeEnum(json['provider'], DwAuthProvider.values),
         idToken: json['idToken']! as String,
         nonce: json['nonce'] as String?,
+        authorizationCode: json['authorizationCode'] as String?,
         registration: json['registration'] == null
             ? const {}
             : DwJsonCodec.decodeMap(json['registration'], (v) => v! as String),
@@ -63,10 +75,11 @@ final class DwSignInWithProvider extends DwActionCommand<DwAuthSession> {
       other is DwSignInWithProvider &&
       other.provider == provider &&
       other.idToken == idToken &&
-      other.nonce == nonce;
+      other.nonce == nonce &&
+      other.authorizationCode == authorizationCode;
 
   @override
-  int get hashCode => Object.hash(provider, idToken, nonce);
+  int get hashCode => Object.hash(provider, idToken, nonce, authorizationCode);
 }
 
 /// The refusals of a sign-in with a provider, beside `DwCoreRefusal`.

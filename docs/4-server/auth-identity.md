@@ -267,11 +267,36 @@ The identity is stored like any other: `dw_identity`, kind `google` or `apple`, 
 subject id. Nothing of the token is kept. An account can therefore hold a phone, an e-mail and a
 provider identity at once, and `DwAccountService.accountOfExternalIdentity` answers who a subject is.
 
+**Deleting an account tells Apple.** Sign in with Apple requires that an app revoke the person's
+tokens when they delete their account, and the only thing that can do it is a refresh token, which
+exists for one moment: the app sends Apple's one-time `authorizationCode` with the sign-in, and the
+server exchanges it. Give `DwAppleSignIn` a `signingKey` — the `.p8` file Apple hands out once, its
+key id and the team id — and the module does the rest:
+
+```dart
+DwAppleSignIn(
+  clientIds: ['com.club.app'],
+  signingKey: DwAppleSigningKey(
+    teamId: 'ABCDE12345',
+    keyId: 'XYZ9876543',
+    privateKeyPem: applePrivateKey,   // from the secret store, never the repo
+  ),
+),
+```
+
+The key signs a **client secret** — a short-lived JWT, half an hour — for every call to Apple; it is
+minted per call and stored nowhere. The refresh token is kept in `dw_provider_token`, which no
+handler reads and nothing leaves the server with. Deleting the account hands it to the
+`dw.auth_providers.revoke` job and deletes the row: **the deletion never waits on Apple and never
+fails because Apple is down**, and the job retries until Apple answers. A sign-in without a code, or
+a server without a signing key, signs the person in and says in the log that the revocation will
+have nothing to work with; an exchange Apple refuses does not refuse the sign-in, which the identity
+token already proved.
+
 **What a project still owes the stores.** Offering Google or Apple sign-in brings App Store
 guideline 4.8 into play — an app whose main account uses a third-party sign-in must also offer one
 that asks no more than name and e-mail and lets the person hide theirs; sign-in by code to a phone
-or an e-mail is not affected. Sign in with Apple also requires that deleting an account revokes the
-person's tokens with Apple, which needs a refresh token stored at sign-in: not yet in the framework.
+or an e-mail is not affected.
 
 ## Session keys
 

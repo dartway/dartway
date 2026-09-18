@@ -474,34 +474,35 @@ Future<DwDeployVerdict> _checkLockedDependencies(
   DwDeployContext context,
 ) async {
   final unlocked = <String>[];
-  final checked = <String>[];
+  final read = <String>[];
   for (final package in [context.serverPackage, context.flutterPackage]) {
     final file = context.dockerfileOf(package);
     if (!file.existsSync()) continue;
+    final gets = dwPubGetInstructions(file);
+    if (gets.isEmpty) {
+      // Said out loud: a green line naming one image reads as "every image",
+      // and an image whose dependency step this check cannot see is exactly
+      // where a false assurance costs a deploy.
+      read.add('$package: no pub get found');
+      continue;
+    }
     final lock = File(p.join(context.projectRoot.path, package, 'pubspec.lock'));
-    final gets = file
-        .readAsLinesSync()
-        .where((line) => RegExp(r'^\s*RUN\s.*\bpub\s+get\b').hasMatch(line))
-        .toList();
-    if (gets.isEmpty) continue;
-    checked.add(package);
     if (!lock.existsSync()) {
       unlocked.add('$package has no pubspec.lock');
       continue;
     }
-    for (final line in gets) {
-      if (!line.contains('--enforce-lockfile')) {
-        unlocked.add('$package/Dockerfile: ${line.trim()}');
+    for (final instruction in gets) {
+      if (!instruction.contains('--enforce-lockfile')) {
+        unlocked.add('$package/Dockerfile: ${_shortened(instruction)}');
       }
     }
+    read.add('$package: ${gets.length} pub get, --enforce-lockfile');
   }
-  if (checked.isEmpty) {
-    return const DwDeployVerdict.skip('no image runs pub get');
+  if (read.isEmpty && unlocked.isEmpty) {
+    return const DwDeployVerdict.skip('no image to read');
   }
   if (unlocked.isEmpty) {
-    return DwDeployVerdict.pass(
-      '${checked.join(' and ')} build --enforce-lockfile',
-    );
+    return DwDeployVerdict.pass(read.join('; '));
   }
   return DwDeployVerdict.fail(
     unlocked.join('; '),
@@ -513,6 +514,39 @@ Future<DwDeployVerdict> _checkLockedDependencies(
         'packages in production.',
   );
 }
+
+/// Every `RUN` of [dockerfile] that runs `pub get`, as one line each.
+///
+/// Continuations are joined first: `RUN --mount=type=cache,… \` with the
+/// `flutter pub get` on the next line is one instruction, and reading the
+/// file line by line sees neither half. That is not a corner case — it is how
+/// a cached Flutter build is written, and a check that misses it passes the
+/// very image the deploy fails on.
+List<String> dwPubGetInstructions(File dockerfile) {
+  final instructions = <String>[];
+  final buffer = StringBuffer();
+  for (final line in dockerfile.readAsLinesSync()) {
+    final trimmed = line.trimRight();
+    if (buffer.isEmpty && !RegExp(r'^\s*RUN\s').hasMatch(trimmed)) continue;
+    buffer.write(buffer.isEmpty ? trimmed : ' ${trimmed.trimLeft()}');
+    if (trimmed.endsWith(r'\')) continue;
+    final instruction = buffer
+        .toString()
+        .replaceAll(RegExp(r'\\\s+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ');
+    buffer.clear();
+    if (RegExp(r'\b(dart|flutter)\s+pub\s+get\b').hasMatch(instruction) ||
+        RegExp(r'\bpub\s+get\b').hasMatch(instruction)) {
+      instructions.add(instruction);
+    }
+  }
+  return instructions;
+}
+
+/// An instruction as a message can carry it.
+String _shortened(String instruction) => instruction.length <= 120
+    ? instruction
+    : '${instruction.substring(0, 117)}…';
 
 /// A redeploy that does not reach the browser, caught while it is still a line
 /// of configuration. A Flutter web build hashes nothing, so an immutable rule

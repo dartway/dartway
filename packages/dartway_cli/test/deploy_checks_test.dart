@@ -132,6 +132,43 @@ void main() {
       expect(unlocked.detail, contains('no pubspec.lock'));
     });
 
+    test('locked-dependencies reads a cached Flutter build, continuation '
+        'lines and all — the shape the web image is written in', () async {
+      write('shop_server/Dockerfile', 'FROM dart\n');
+      write('shop_server/pubspec.lock', '# locked\n');
+      write('shop_flutter/pubspec.lock', '# locked\n');
+      write('shop_flutter/Dockerfile', '''
+FROM flutter
+RUN --mount=type=cache,target=/root/.pub-cache,sharing=locked \\
+    flutter pub get
+''');
+      final loose = await evaluate('locked-dependencies');
+      expect(
+        loose.passed,
+        isFalse,
+        reason: 'the web image is where the deploy actually broke',
+      );
+      expect(loose.detail, contains('shop_flutter/Dockerfile'));
+
+      write('shop_flutter/Dockerfile', '''
+FROM flutter
+RUN --mount=type=cache,target=/root/.pub-cache,sharing=locked \\
+    flutter pub get --enforce-lockfile
+''');
+      expect((await evaluate('locked-dependencies')).passed, isTrue);
+    });
+
+    test('locked-dependencies says which image it could not read a pub get '
+        'in: a green line must not read as "every image"', () async {
+      write('shop_server/Dockerfile', 'FROM dart\nRUN dart pub get --enforce-lockfile\n');
+      write('shop_server/pubspec.lock', '# locked\n');
+      write('shop_flutter/Dockerfile', 'FROM flutter\nRUN flutter build web\n');
+      final verdict = await evaluate('locked-dependencies');
+      expect(verdict.passed, isTrue);
+      expect(verdict.detail, contains('shop_flutter: no pub get found'));
+      expect(verdict.detail, contains('shop_server: 1 pub get'));
+    });
+
     test('dockerfiles-present names every missing image', () async {
       final verdict = await evaluate('dockerfiles-present');
       expect(verdict.detail, contains('shop_server/Dockerfile'));
