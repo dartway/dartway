@@ -161,9 +161,10 @@ up (App Store Review Guideline 5.1.1(v)), whatever the sign-in method. `DwDelete
 `ctx.accounts.deleteAccount(accountId)` for an administrator's command — runs in one transaction:
 `DwAuthConfig.onAccountDeleting(ctx, accountId)` first, where the project deletes or anonymises its
 own rows (a row referencing `dw_account` without `ON DELETE CASCADE` must go there, or the deletion
-fails; refusing keeps the account); then the account's stored files (their objects leave the
-storage once it commits), every session key revoked (its live sessions close), and the account
-with its identities, keys, tickets and push devices. Analytics keep their events without the
+fails; refusing keeps the account); then the code tickets addressed to the account's identifiers (a ticket carries the phone or the
+e-mail and outlives the sign-in it served) and the recorded outcomes of its commands, the account's
+stored files (their objects leave the storage once it commits), every session key revoked (its live
+sessions close), and the account with its identities, keys and push devices. Analytics keep their events without the
 account. On the client, `dw.deleteAccount()` sends it and ends the session once the server
 confirms; the skeleton's profile page has the button, with a confirmation.
 

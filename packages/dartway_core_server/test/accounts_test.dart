@@ -114,6 +114,15 @@ void main() {
       expect(answer.status, 200, reason: answer.text);
 
       expect(await identities(email), 0);
+      expect(
+        await harness().db.query(
+          'SELECT 1 FROM dw_code_ticket WHERE identifier = @value',
+          params: {'value': email},
+        ),
+        isEmpty,
+        reason: 'a ticket carries the identifier and must not outlive it',
+      );
+      expect(await countOf('dw_command_outcome', session.id), 0);
       expect(await countOf('profile', session.id), 0);
       expect(await countOf('dw_auth_key', session.id), 0);
       expect(

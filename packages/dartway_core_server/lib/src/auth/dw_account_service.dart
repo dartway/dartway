@@ -465,6 +465,20 @@ final class DwAccountService {
       );
       if (found.isEmpty) return false;
       await _auth.onAccountDeleting?.call(ctx, accountId);
+      // Everything of this person the framework keeps outside the account's
+      // own rows: the code tickets addressed to their identifiers (a ticket
+      // carries the phone or the e-mail and outlives a sign-in), and the
+      // recorded outcomes of their commands (results, kept for a retry).
+      // Waiting for the cleanup job would leave both behind for days.
+      await db.execute(
+        'DELETE FROM dw_code_ticket WHERE account_id = @id OR identifier IN '
+        '(SELECT value FROM dw_identity WHERE account_id = @id)',
+        params: {'id': accountId},
+      );
+      await db.execute(
+        'DELETE FROM dw_command_outcome WHERE account_id = @id',
+        params: {'id': accountId},
+      );
       final files = await db.query(
         'SELECT id FROM dw_stored_file WHERE account_id = @id',
         params: {'id': accountId},

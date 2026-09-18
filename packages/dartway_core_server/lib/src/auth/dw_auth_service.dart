@@ -75,6 +75,9 @@ final class DwAuthService {
     ),
     DwCallHandler.command<DwDeleteMyAccount, void>(
       access: DwAccessRule.signedIn,
+      // Its own outcome would be the one row about this person left behind;
+      // a repeat finds no account and does nothing, which is the same answer.
+      recordsSuccess: false,
       handle: (ctx, command) async {
         await ctx.accounts.deleteAccount(ctx.requireAccountId);
       },
