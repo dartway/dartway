@@ -109,8 +109,10 @@ extension DwNavigationRouteExtension on DwNavigationRoute {
     for (var i = 0; i < template.length; i++) {
       final segment = template[i];
       // The same spelling the manifest index reads
-      // (`StudioPathTemplate.isPlaceholder`); the router cannot depend on the
-      // bridge, so the two agree by this comment and by the tests of both.
+      // (`StudioPathTemplate.isPlaceholder`). The router cannot depend on the
+      // bridge, so the two are kept in step by a test that reads both files:
+      // `dartway_cli/test/shared_spelling_test.dart`. It was a comment, and a
+      // comment is a rule with nothing to break.
       final expected = segment.startsWith(':')
           ? state.pathParameters[segment.substring(1)]
           : segment;

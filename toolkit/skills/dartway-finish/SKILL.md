@@ -216,6 +216,12 @@ behaviour is verified through the public kit widget.
   it stands (a widget never mounted, a rule never reached) or an expectation built by the code it
   checks (`dartway-testing` §6). **A mutation that changed two things proves neither**: if the red
   cannot be explained in a sentence naming one changed thing, ask for a smaller one.
+- **A rule that lives in a comment is a rule with nothing to break.** "Keep these two in step",
+  "do not call this outside a transaction", "the other copy of this predicate is over there" — ask
+  what fails if somebody ignores it tomorrow. If the answer is nothing, the fix is not a firmer
+  comment but a mechanism: one source instead of two copies, a check that refuses, a type that
+  cannot be built wrong. Where no mechanism is possible, say so in the comment — a reader who knows
+  a rule is unenforced treats it differently from one who assumes it is.
 - A new DTO without a line in the contract's round-trip test.
 - A widget test that does not end asserting the fake server met no errors.
 - **Do not ask for a coverage number and do not report one.**
