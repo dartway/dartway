@@ -30,6 +30,7 @@ void main() {
       expect(ids, [
         'update-checkout',
         'bridge-override',
+        'render-stack',
         'render-env',
         'compose-config',
         'build',
@@ -48,6 +49,16 @@ void main() {
     test('the environment is rendered before Compose reads the stack', () {
       before('render-env', 'compose-config');
       before('compose-config', 'build');
+    });
+
+    // The defect this order prevents: a compose file rendered by an older CLI
+    // met a build argument it did not carry, and the deploy failed inside
+    // `docker build` pointing at the project's Dockerfile.
+    test('the stack is rendered before anything reads it', () {
+      before('update-checkout', 'render-stack');
+      before('render-stack', 'render-env');
+      before('render-stack', 'compose-config');
+      before('render-stack', 'build');
     });
 
     // Migrations need the database, and the proxy is pointed at the server
@@ -407,6 +418,86 @@ esac
       expect(result.ok, isFalse);
       expect(result.stderr, contains('not healthy within 1 s'));
       expect(result.stderr, contains('column already exists'));
+    });
+  });
+
+  group('rendering the stack on every deploy', () {
+    late Directory temp;
+    late String appDir;
+    late DwDeployRunner runner;
+
+    setUp(() {
+      temp = Directory.systemTemp.createTempSync('dw_render_stack_');
+      appDir = p.join(temp.path, 'shop');
+      Directory(appDir).createSync(recursive: true);
+      runner = DwDeployRunner(
+        ssh: LocalShell(),
+        stack: stackVariants()['minio and a site']!,
+        appDir: appDir,
+      );
+    });
+    tearDown(() => temp.deleteSync(recursive: true));
+
+    File composeFile() => File(p.join(appDir, DwComposeFiles.rendered));
+    File nginxFile() => File(p.join(appDir, 'nginx.conf'));
+
+    test('writes both files where there were none, and says so', () async {
+      final result = await runner.renderStack();
+      expect(result.ok, isTrue, reason: result.stderr);
+      expect(result.stdout, contains('docker-compose.yml: rendered again'));
+      expect(result.stdout, contains('nginx.conf: rendered again'));
+      expect(composeFile().readAsStringSync(), contains('services:'));
+      expect(nginxFile().readAsStringSync(), contains('server {'));
+      for (final name in ['http', 'api', 'app']) {
+        expect(Directory(p.join(appDir, 'nginx.d', name)).existsSync(), isTrue);
+      }
+    });
+
+    test('a second run changes nothing and says that too: a routine push must '
+        'not read as an infrastructure change', () async {
+      await runner.renderStack();
+      final result = await runner.renderStack();
+      expect(result.stdout, contains('docker-compose.yml: unchanged'));
+      expect(result.stdout, contains('nginx.conf: unchanged'));
+    });
+
+    test('a file rendered by an older version is replaced — the defect this '
+        'step exists for', () async {
+      composeFile().writeAsStringSync('# rendered before the build arg existed\n');
+      final result = await runner.renderStack();
+      expect(result.stdout, contains('docker-compose.yml: rendered again'));
+      expect(
+        composeFile().readAsStringSync(),
+        contains('services:'),
+        reason: 'the stale file is gone, not appended to',
+      );
+    });
+
+    test('keeps the file itself, not just its name: the proxy has its '
+        'configuration bind-mounted', () async {
+      await runner.renderStack();
+      // `ls -i` prints the inode on every Unix; `stat` spells its flags
+      // differently on macOS and on Linux.
+      String inode() => (Process.runSync('ls', ['-i', nginxFile().path]).stdout
+              as String)
+          .trim()
+          .split(RegExp(r'\s+'))
+          .first;
+      final before = inode();
+      nginxFile().writeAsStringSync('# stale\n');
+      await runner.renderStack();
+      expect(inode(), before, reason: 'a mv would swap the inode');
+    });
+
+    test('leaves nothing behind in the checkout', () async {
+      await runner.renderStack();
+      expect(
+        Directory(appDir)
+            .listSync()
+            .map((e) => p.basename(e.path))
+            .where((name) => name.startsWith('.dw') || name.contains('tmp')),
+        isEmpty,
+      );
     });
   });
 

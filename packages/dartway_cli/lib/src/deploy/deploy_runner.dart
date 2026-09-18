@@ -5,6 +5,7 @@ import 'deploy_target.dart';
 import 'nginx_upstreams.dart';
 import 'outside_probe.dart';
 import 'remote_steps.dart';
+import 'renderer.dart';
 import 'secret_store.dart';
 import 'ssh_runner.dart';
 import 'stack.dart';
@@ -40,9 +41,15 @@ class DwDeployStep {
 /// environment, build, start the server — which migrates as it starts — then
 /// the web image and the proxy, and finally ask the result from outside.
 ///
-/// Rendering `docker-compose.yml` and `nginx.conf` is deliberately not here —
-/// that belongs to `setup`. A deploy that re-renders infrastructure on every
-/// run turns a routine push into an infrastructure change.
+/// `docker-compose.yml` and `nginx.conf` are rendered here too, on every run.
+/// They used to be written by `setup` alone, so that a routine push would not
+/// turn into an infrastructure change — but they are derived from
+/// `deploy/config.yaml` and the CLI, and a derived file written once goes
+/// stale in silence: a CLI that had learnt a new build argument met a compose
+/// file rendered before it existed, and the deploy died inside `docker build`
+/// blaming the project's Dockerfile. What keeps a push routine is that the
+/// rendering is reported and idempotent — "unchanged" on a run that changes
+/// nothing — not that it is skipped.
 class DwDeployRunner {
   DwDeployRunner({
     required this.ssh,
@@ -119,6 +126,51 @@ class DwDeployRunner {
   /// Keeps a hand-typed `docker compose` in the checkout equal to the deploy.
   /// See [DwComposeFiles.bridgeIn].
   Future<DwSshResult> bridgeOverride() => _as(DwComposeFiles.bridgeIn(appDir));
+
+  /// Renders the stack itself — the compose file and the proxy's
+  /// configuration — from `deploy/config.yaml` and this version of the CLI,
+  /// on every deploy, for the reason `.env` is rendered on every deploy: both
+  /// are derived files, and a derived file that is only written once goes
+  /// stale silently.
+  ///
+  /// It went stale exactly once and cost an afternoon: a CLI that had learnt
+  /// to pass a new build argument met a compose file rendered before it
+  /// existed, and the deploy failed inside `docker build` with a message
+  /// about the project's Dockerfile — while the file to fix was on the server
+  /// and not in the repository. Nothing named `deploy setup`, because nothing
+  /// knew.
+  ///
+  /// Written through `cat >`, never a `mv`: the proxy has its configuration
+  /// bind-mounted, and replacing the file would leave the container holding
+  /// the old one.
+  Future<DwSshResult> renderStack() {
+    final renderer = DwStackRenderer(stack: stack);
+    return _as(
+      "cd '$appDir'\n"
+      '${_renderFileScript(DwComposeFiles.rendered, renderer.composeFile)}\n'
+      "install -d 'nginx.d/http' 'nginx.d/api' 'nginx.d/app'\n"
+      '${_renderFileScript('nginx.conf', renderer.nginxFile)}',
+    );
+  }
+
+  /// Writes [contents] to [name] when it differs, and says which it was.
+  static String _renderFileScript(String name, String contents) {
+    // A marker the rendered text cannot hold: it is YAML and Nginx
+    // configuration, and neither carries a line of this shape.
+    const marker = 'DW_RENDERED_FILE_END';
+    return '''
+dw_new=\$(mktemp)
+cat >"\$dw_new" <<'$marker'
+$contents
+$marker
+if cmp -s "\$dw_new" '$name' 2>/dev/null; then
+  echo '$name: unchanged'
+else
+  cat "\$dw_new" >'$name'
+  echo '$name: rendered again by this version of dartway'
+fi
+rm -f "\$dw_new"''';
+  }
 
   /// Renders `.env` from the secret store — see
   /// [DwSecretStore.renderEnvironment]. Every deploy, so a secret changed with
@@ -422,6 +474,14 @@ echo "nginx restarted and running"
       id: 'bridge-override',
       title: 'Bridge a bare docker compose to the project override',
       run: bridgeOverride,
+    ),
+    // Before anything reads the stack: every Compose call below uses the
+    // rendered file, and a stale one fails deep inside a build.
+    DwDeployStep(
+      id: 'render-stack',
+      title: 'Render the stack and the proxy configuration',
+      run: renderStack,
+      showOutput: true,
     ),
     DwDeployStep(
       id: 'render-env',

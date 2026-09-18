@@ -13,7 +13,13 @@ COPY dartway_starter_shared/ dartway_starter_shared/
 COPY dartway_starter_server/ dartway_starter_server/
 
 WORKDIR /workspace/dartway_starter_server
-RUN dart pub get
+# `--enforce-lockfile`: a deploy builds exactly what was committed. Without it
+# pub is free to resolve a different set inside the container than the one the
+# project tested — that has already cost a failed deploy, where a transitive
+# package the app needs was dropped and pub then could not read its own
+# `package_graph.json`. With it, a lock that has drifted from the pubspec is an
+# honest error naming both.
+RUN dart pub get --enforce-lockfile
 RUN dart compile exe bin/server.dart -o /server
 
 FROM alpine:latest

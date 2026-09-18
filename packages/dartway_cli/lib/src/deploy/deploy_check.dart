@@ -177,6 +177,13 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     evaluate: _checkWebBackendUrl,
   ),
   DwDeployCheck(
+    id: 'locked-dependencies',
+    title: 'Every image builds the dependencies the lock file names',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkLockedDependencies,
+  ),
+  DwDeployCheck(
     id: 'web-cache-policy',
     title: 'The web image revalidates the files a build overwrites',
     stage: DwDeployCheckStage.local,
@@ -452,6 +459,58 @@ Future<DwDeployVerdict> _checkWebBackendUrl(DwDeployContext context) async {
         'declare, without a word, and the app compiles against whatever '
         'default it has. Declare it and pass it to flutter build web as a '
         '--dart-define.',
+  );
+}
+
+/// A deploy builds what was committed, or it is not the thing that was tested.
+///
+/// Without `--enforce-lockfile` pub is free to resolve a different set of
+/// packages inside the container than the project resolved on the machine that
+/// tested it. That is not theory: a deploy failed because pub dropped a
+/// transitive package the app reaches and then could not read its own
+/// `package_graph.json` — five minutes of digging for what would have been one
+/// honest line, "the lock file has drifted from the pubspec".
+Future<DwDeployVerdict> _checkLockedDependencies(
+  DwDeployContext context,
+) async {
+  final unlocked = <String>[];
+  final checked = <String>[];
+  for (final package in [context.serverPackage, context.flutterPackage]) {
+    final file = context.dockerfileOf(package);
+    if (!file.existsSync()) continue;
+    final lock = File(p.join(context.projectRoot.path, package, 'pubspec.lock'));
+    final gets = file
+        .readAsLinesSync()
+        .where((line) => RegExp(r'^\s*RUN\s.*\bpub\s+get\b').hasMatch(line))
+        .toList();
+    if (gets.isEmpty) continue;
+    checked.add(package);
+    if (!lock.existsSync()) {
+      unlocked.add('$package has no pubspec.lock');
+      continue;
+    }
+    for (final line in gets) {
+      if (!line.contains('--enforce-lockfile')) {
+        unlocked.add('$package/Dockerfile: ${line.trim()}');
+      }
+    }
+  }
+  if (checked.isEmpty) {
+    return const DwDeployVerdict.skip('no image runs pub get');
+  }
+  if (unlocked.isEmpty) {
+    return DwDeployVerdict.pass(
+      '${checked.join(' and ')} build --enforce-lockfile',
+    );
+  }
+  return DwDeployVerdict.fail(
+    unlocked.join('; '),
+    fix:
+        'Add --enforce-lockfile to every pub get in the images, and commit '
+        'pubspec.lock. The deploy then builds exactly the packages the '
+        'project was tested with, and a lock that no longer matches the '
+        'pubspec is an error naming both instead of a different set of '
+        'packages in production.',
   );
 }
 

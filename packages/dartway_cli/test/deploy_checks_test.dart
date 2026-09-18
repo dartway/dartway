@@ -111,6 +111,27 @@ void main() {
       },
     );
 
+    test('locked-dependencies: a deploy builds what was committed', () async {
+      write('shop_server/Dockerfile', 'FROM dart\nRUN dart pub get\n');
+      write('shop_server/pubspec.lock', '# locked\n');
+      final loose = await evaluate('locked-dependencies');
+      expect(loose.passed, isFalse);
+      expect(loose.detail, contains('RUN dart pub get'));
+      expect(loose.fix, contains('--enforce-lockfile'));
+
+      write(
+        'shop_server/Dockerfile',
+        'FROM dart\nRUN dart pub get --enforce-lockfile\n',
+      );
+      expect((await evaluate('locked-dependencies')).passed, isTrue);
+
+      // The flag is worth nothing without the file it enforces.
+      File(p.join(root.path, 'shop_server/pubspec.lock')).deleteSync();
+      final unlocked = await evaluate('locked-dependencies');
+      expect(unlocked.passed, isFalse);
+      expect(unlocked.detail, contains('no pubspec.lock'));
+    });
+
     test('dockerfiles-present names every missing image', () async {
       final verdict = await evaluate('dockerfiles-present');
       expect(verdict.detail, contains('shop_server/Dockerfile'));

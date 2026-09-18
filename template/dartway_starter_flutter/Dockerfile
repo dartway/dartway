@@ -11,7 +11,13 @@ COPY dartway_starter_shared/ dartway_starter_shared/
 COPY dartway_starter_flutter/ dartway_starter_flutter/
 
 WORKDIR /workspace/dartway_starter_flutter
-RUN flutter pub get
+# `--enforce-lockfile`: a deploy builds exactly what was committed. Without it
+# pub is free to resolve a different set inside the container than the one the
+# project tested — that has already cost a failed deploy, where a transitive
+# package the app needs was dropped and pub then could not read its own
+# `package_graph.json`. With it, a lock that has drifted from the pubspec is an
+# honest error naming both.
+RUN flutter pub get --enforce-lockfile
 
 # A web build compiles the server address into itself, so it has to be given
 # one: the app's own origin (`https://app.example.com`), where `/dw/` and

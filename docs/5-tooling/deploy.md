@@ -182,12 +182,18 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
 1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
    repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`);
 2. writes the override bridge;
-3. renders `.env` from the secret store, refusing — by key name and line number, never by value —
+3. **renders `docker-compose.yml` and `nginx.conf`** from `deploy/config.yaml` and this version of
+   the CLI, and says of each whether it changed. Both are derived files, and a derived file written
+   once goes stale in silence: a CLI that had learnt to pass a new build argument met a compose file
+   rendered before that argument existed, and the deploy died inside `docker build` blaming the
+   project's Dockerfile — while the file to fix was on the server and in no repository. The write
+   goes through `cat >`, never a rename, because the proxy has its configuration bind-mounted;
+4. renders `.env` from the secret store, refusing — by key name and line number, never by value —
    when the store is absent, a line is malformed, a key is declared twice, a key is one the compose
    file sets, or a required secret is missing or empty;
-4. checks the merged Compose configuration, then builds the images;
-5. with MinIO, starts it and runs `minio-init`, printing what it did; starts Postgres;
-6. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
+5. checks the merged Compose configuration, then builds the images;
+6. with MinIO, starts it and runs `minio-init`, printing what it did; starts Postgres;
+7. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
    flight are answered, live sockets close with "server stopping" — and from then on the proxy
    answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
    idempotency key, so a retry never runs it twice). The new image applies the migrations in a
@@ -198,21 +204,22 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    declares. When the migrations fail (they roll back) or the new server does not become healthy,
    the image that was serving is started again and the step fails with the server's own log; after
    a failure past the migrations the previous code runs on the new schema, and the message says so;
-7. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
-8. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
+8. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
+9. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
    the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
    stops the deploy before that restart;
-9. issues the certificate for every served host under one name — only when certbot does not already
+10. issues the certificate for every served host under one name — only when certbot does not already
    manage it, or when a host was added to the configuration since (a storage domain, a site): then
    the lineage is extended with `--expand`. A routine deploy stays off the rate limit. A host added
    to a live server needs `setup` first, so that nginx answers the ACME challenge for it;
-10. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
+11. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
     a second later on its configuration.
 
-`run` does not render `docker-compose.yml` or `nginx.conf`: a deploy that re-renders infrastructure on
-every push turns a routine change into an infrastructure one. `--dry-run` prints the plan and the
-probes, and executes nothing.
+What keeps a push routine is not that the rendering is skipped but that it is idempotent and
+reported: a run that changes nothing says "unchanged" for both files. Everything else infrastructural
+— users, directories, the secret store, the firewall, the first certificate — is still `setup` alone.
+`--dry-run` prints the plan and the probes, and executes nothing.
 
 
 ### A step outlives the connection that started it
@@ -291,6 +298,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `dependencies-inside-context` | error | No image resolves a package by a path outside the project — the context is the project root, so `pub get` in the image cannot find it though every checkout resolves. `pubspec_overrides.yaml` counts unless `.dockerignore` keeps it out. The usual cause is an unpublished framework taken from a local checkout: depend on it by git with a pinned ref instead |
 | `server-signals` | error | The server image's `ENTRYPOINT` (or `CMD`) is in exec form, so the binary is PID 1 and receives the SIGTERM a deploy sends; under `/bin/sh -c` it is killed mid-call when the grace period runs out |
 | `web-backend-url` | error | The web Dockerfile declares `ARG DW_BACKEND_URL` — Docker silently drops an undeclared build argument |
+| `locked-dependencies` | error | Every image's `pub get` runs `--enforce-lockfile`, and the package has a committed `pubspec.lock` — otherwise pub may resolve a different set inside the container than the project was tested with, and a deploy has already failed that way |
 | `web-cache-policy` | warning | The web image's Nginx configuration revalidates every Flutter entry point |
 | `nginx-upstreams` | error | Every `proxy_pass` in the rendered Nginx and in `deploy/nginx.d/` names a service of the stack or the override |
 | `override-web-build` | warning | `deploy/compose.override.yml` does not rebuild `web` — that would name the API address a second time, and nothing compares the copies |
