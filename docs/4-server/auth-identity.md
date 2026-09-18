@@ -183,6 +183,14 @@ behind its profiles on the first deletion. The three ways out are the hook itsel
 tombstone), a refusal inside it (`ctx.refuse(...)`) while the project has not decided — honest and
 reversible — or an empty hook with a comment saying those rows are meant to go.
 
+The message names the fact and not the conclusion: these tables go, not "you forgot to tell
+somebody". Who has to be told is the project's own — an admin channel here, a webhook there — and a
+framework that guessed would be wrong in half of them within a year. It does say what is available,
+because that is the next question: **the hook runs inside the deleting transaction**, so
+`ctx.publish` and `ctx.jobs` work from it, and whatever must be told about the person leaving is told
+in the same transaction or not at all. The example publishes its tombstone and its admin counters
+from exactly there.
+
 **What the project deletes, and what it keeps.** The hook answers one question per kind of row:
 *is this about that person alone, or does someone else hold on to it?* A person's own drafts,
 settings and files go with them. What other people read — a message in a chat, a post, a review, an

@@ -51,6 +51,10 @@ void main() {
             contains('user_profile'),
             contains('survey_answer'),
             contains('onAccountDeleting'),
+            // The question anybody reading that list asks next is who to
+            // tell; the answer is not what to publish but that publishing
+            // from here is possible at all.
+            contains('ctx.publish'),
           ),
         ),
       ),

@@ -54,6 +54,14 @@ SELECT DISTINCT rel::regclass::text AS name FROM cascading ORDER BY 1
 
   /// What to refuse to start with, when the project has cascading rows and
   /// has not said what deleting an account should do with them.
+  ///
+  /// It names the fact — these tables go — and never the conclusion — you
+  /// forgot to tell somebody. What is told, and to whom, is the project's:
+  /// one project publishes to an admin channel, the next enqueues a webhook,
+  /// and a framework that guessed would be wrong in half of them within a
+  /// year. What it does say is that the tool is there: the hook is inside the
+  /// deleting transaction, so publishing and enqueueing from it are possible
+  /// at all — which is the question somebody reading the list asks next.
   static String complaintFor(List<String> tables) =>
       'deleting an account would also delete ${tables.join(', ')}, and '
       'DwAuthConfig.onAccountDeleting is not set.\n'
@@ -66,10 +74,16 @@ SELECT DISTINCT rel::regclass::text AS name FROM cascading ORDER BY 1
       '  - or refuse deletion there (ctx.refuse(...)) while the project has '
       'not decided — honest, and reversible;\n'
       '  - or declare the hook empty, with a comment saying these rows are '
-      'meant to go.';
+      'meant to go.\n'
+      'The hook runs inside the transaction that deletes the account: '
+      'ctx.publish and ctx.jobs work from there, so whatever has to be told '
+      'about the person leaving is told in the same transaction, or not at '
+      'all.';
 
   /// What to say on every start when deletion does take project rows with
   /// it — the hook exists, and this is what it is dealing with.
   static String noticeFor(List<String> tables) =>
-      'deleting an account also deletes: ${tables.join(', ')}';
+      'deleting an account also deletes: ${tables.join(', ')} '
+      '(onAccountDeleting runs in that transaction; ctx.publish and ctx.jobs '
+      'work from there)';
 }
