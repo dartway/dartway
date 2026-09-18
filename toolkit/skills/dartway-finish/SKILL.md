@@ -214,7 +214,8 @@ behaviour is verified through the public kit widget.
   passes too. The author names the mutation and what it did — "removed the flag from the mapper:
   red" — and a test nobody could break is a test of nothing: look for a subject that is inert where
   it stands (a widget never mounted, a rule never reached) or an expectation built by the code it
-  checks (`dartway-testing` §6).
+  checks (`dartway-testing` §6). **A mutation that changed two things proves neither**: if the red
+  cannot be explained in a sentence naming one changed thing, ask for a smaller one.
 - A new DTO without a line in the contract's round-trip test.
 - A widget test that does not end asserting the fake server met no errors.
 - **Do not ask for a coverage number and do not report one.**

@@ -395,7 +395,11 @@ for one day across its own suite and found seven tests that had been passing wit
 anything, plus a cascade deletion nobody had noticed and a schema check its own new code walked
 around.
 
-Two shapes turn up again and again, and both look like ordinary green:
+All of them are one thing: **a claim with nothing that could make it false.** That is the question
+to ask of a test, and of a check, and of a startup guard — *name the state in which this must fail,
+and say whether it is reachable.* A claim with no such state is a ritual, however green.
+
+Three shapes turn up again and again, and all look like ordinary green:
 
 - **The subject is inert where the test stands.** A test of the Studio binding that never mounts the
   binding, a test of a rule whose enforcement runs only on a real connection, a test of a job that
@@ -403,6 +407,12 @@ Two shapes turn up again and again, and both look like ordinary green:
 - **The test compares a copy with the copy.** A manifest checked against a hand-written list of
   zones instead of against the router; an expected JSON built by the same function that encodes it.
   It cannot disagree with itself, so it goes red only when somebody edits both.
+- **The mutation proved something else.** The trap of this practice itself: an edit that changes two
+  things at once — the behaviour *and* who is watching it — goes red for the wrong reason and is
+  written down as proof. Removing a whole handler makes every test of that path fail, including the
+  ones that never asserted anything about it. Change one thing: a comparison, a flag, one line, the
+  value of one field. If the red cannot be explained in a sentence naming that one thing, it proved
+  nothing.
 
 This is the same rule the framework applies to its own work — `dartway-finish` asks for the
 mutation, and a change that cannot be broken in front of a reviewer is not covered.
