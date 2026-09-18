@@ -210,6 +210,11 @@ behaviour is verified through the public kit widget.
   button is hidden — the hidden button is not the rule, and the rule is what breaks. That belongs in a
   server acceptance test; a `matches` or a `validate()` belongs in the contract test; the widget test
   covers that the button sends the right command.
+- **Ask what was broken to prove the new test, not whether it passes.** A test that cannot fail
+  passes too. The author names the mutation and what it did — "removed the flag from the mapper:
+  red" — and a test nobody could break is a test of nothing: look for a subject that is inert where
+  it stands (a widget never mounted, a rule never reached) or an expectation built by the code it
+  checks (`dartway-testing` §6).
 - A new DTO without a line in the contract's round-trip test.
 - A widget test that does not end asserting the fake server met no errors.
 - **Do not ask for a coverage number and do not report one.**

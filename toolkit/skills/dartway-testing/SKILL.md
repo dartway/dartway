@@ -380,6 +380,33 @@ of stays at the one test it had. The number goes up and the suite gets worse.
 a percentage. The question at review is "**is the thing that would break covered, at the place where
 it lives**" — which is what `dartway-finish` asks.
 
+## 6. A test is proved by breaking the code, not by passing
+
+A new test that passes has proved nothing yet: a test that cannot fail passes too, and it passes
+for the rest of the project's life. So before a test is committed, **break the thing it is about and
+watch it go red** — change the comparison, drop the flag, return the wrong row, delete the line the
+test exists for. It stays green: it does not test what its name says, and the fix is the test, not
+the code.
+
+State the mutation in the review, by name: "removed `isDeleted` from the mapper — red; removed the
+blanking in the hook — red". A reviewer asked to *check* a test reads it and agrees with it. A
+reviewer asked to **break it and say whether it went red** finds the hollow ones: Studio did this
+for one day across its own suite and found seven tests that had been passing without exercising
+anything, plus a cascade deletion nobody had noticed and a schema check its own new code walked
+around.
+
+Two shapes turn up again and again, and both look like ordinary green:
+
+- **The subject is inert where the test stands.** A test of the Studio binding that never mounts the
+  binding, a test of a rule whose enforcement runs only on a real connection, a test of a job that
+  nothing runs. Whatever is passed in, the assertions hold — because nothing reads them.
+- **The test compares a copy with the copy.** A manifest checked against a hand-written list of
+  zones instead of against the router; an expected JSON built by the same function that encodes it.
+  It cannot disagree with itself, so it goes red only when somebody edits both.
+
+This is the same rule the framework applies to its own work — `dartway-finish` asks for the
+mutation, and a change that cannot be broken in front of a reviewer is not covered.
+
 ## Common mistakes
 
 - Testing an access rule through the UI instead of an acceptance test.
@@ -392,3 +419,7 @@ it lives**" — which is what `dartway-finish` asks.
 - `pumpAndSettle` on a screen with a spinner; ending a test with a notification on screen.
 - A `MaterialApp` in a test with the delegates but no locale.
 - Keeping a callback parameter on a widget "so it can be tested".
+- A test whose subject is inert where it stands — the widget never mounted, the rule never reached —
+  so it passes whatever it is given.
+- A test that compares a copy with the copy it is checking: a hand-written list beside the one the
+  code builds, an expectation encoded by the function under test.
