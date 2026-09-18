@@ -1,6 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_orm/dartway_orm.dart';
 
+import '../context/dw_call_context.dart';
 import '../handlers/dw_call_handler.dart';
 import '../jobs/dw_job_queue.dart';
 
@@ -34,6 +35,19 @@ abstract class DwServerModule {
   List<DwCallHandler> get handlers => const [];
 
   List<DwJobDefinition> get jobs => const [];
+
+  /// Runs in the transaction that deletes an account
+  /// (`DwAccountService.deleteAccount`), after the project's
+  /// `DwAuthConfig.onAccountDeleting` and before the framework removes its own
+  /// rows: where a module lets go of what it keeps for that person — a
+  /// provider's refresh token to revoke, a device to unregister. Throwing (or
+  /// refusing) keeps the account.
+  ///
+  /// Rows that reference `dw_account` with `ON DELETE CASCADE` need nothing
+  /// here. A module is part of a server, so this runs for a deletion inside
+  /// one (`ctx.accounts`, `server.accounts`) and not for
+  /// [DwAccountService.new] over a bare database, where no module exists.
+  Future<void> accountDeleting(DwCallContext ctx, int accountId) async {}
 
   /// Problems with this module in a server speaking [protocol]; empty when
   /// it can start.

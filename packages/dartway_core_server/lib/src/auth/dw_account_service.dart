@@ -42,22 +42,26 @@ final class DwAccountService {
   /// `DwServerSettings.tokenCacheTtl` — inside a server, use `ctx.accounts`
   /// or `server.accounts`, which take effect at once.
   DwAccountService(DwDatabaseHandle db, DwAuthConfig auth)
-    : this._(auth, _DetachedScope(db, auth));
+    : this._(auth, _DetachedScope(db, auth), const []);
 
-  DwAccountService._(this._auth, this._scope);
+  DwAccountService._(this._auth, this._scope, this._modules);
 
   /// Bound to a call: the call's database and effects.
   @internal
   DwAccountService.ofContext(DwRuntimeContext ctx, DwRuntime runtime)
-    : this._(runtime.auth, _ContextScope(ctx));
+    : this._(runtime.auth, _ContextScope(ctx), runtime.modules.values);
 
   /// Bound to a running server, outside any call.
   @internal
   DwAccountService.ofRuntime(DwRuntime runtime)
-    : this._(runtime.auth, _RuntimeScope(runtime));
+    : this._(runtime.auth, _RuntimeScope(runtime), runtime.modules.values);
 
   final DwAuthConfig _auth;
   final _Scope _scope;
+
+  /// The server's modules, told when an account is deleted. Empty with no
+  /// server in this process.
+  final Iterable<DwServerModule> _modules;
 
   // --- accounts ---------------------------------------------------------------
 
@@ -451,7 +455,8 @@ final class DwAccountService {
   /// answers whether it existed.
   ///
   /// In one transaction: `DwAuthConfig.onAccountDeleting` (the project's
-  /// rows), the account's stored files (their objects go once it commits),
+  /// rows), `DwServerModule.accountDeleting` of every module, the account's
+  /// stored files (their objects go once it commits),
   /// every session key revoked (its sessions close once it commits), then the
   /// account — identities, keys, code tickets and push devices with it;
   /// analytics keep their events without the account.
@@ -465,6 +470,12 @@ final class DwAccountService {
       );
       if (found.isEmpty) return false;
       await _auth.onAccountDeleting?.call(ctx, accountId);
+      // After the project, before the framework's own rows: a module holding
+      // something of this person (a provider's refresh token to revoke) lets
+      // go of it while the account is still there to name.
+      for (final module in _modules) {
+        await module.accountDeleting(ctx, accountId);
+      }
       // Everything of this person the framework keeps outside the account's
       // own rows: the code tickets addressed to their identifiers (a ticket
       // carries the phone or the e-mail and outlives a sign-in), and the

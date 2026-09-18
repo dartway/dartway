@@ -54,10 +54,35 @@ def dart_map(value, indent):
 
 def main():
     work = tempfile.mkdtemp(prefix='dw_provider_tokens_')
+    # The key a project downloads from Apple as a `.p8` and signs its client
+    # secret with. Unlike the others, its private half is kept: the tests sign
+    # with it and check the result against `openssl`.
+    secret_key = os.path.join(work, 'secret.p8')
     rsa = os.path.join(work, 'rsa.pem')
     ec = os.path.join(work, 'ec.pem')
     run(f'openssl genrsa -out {rsa} 2048 2>/dev/null')
     run(f'openssl ecparam -genkey -name prime256v1 -noout -out {ec} 2>/dev/null')
+
+    run(
+        f'openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 '
+        f'-pkeyopt ec_param_enc:named_curve -out {secret_key} 2>/dev/null'
+    )
+    secret_pem = open(secret_key).read().strip()
+    secret_text = run(
+        f'openssl ec -in {secret_key} -pubout -text -noout 2>/dev/null'
+    ).decode()
+    secret_point = bytes.fromhex(
+        ''.join(secret_text.split('pub:')[1].split('ASN1 OID')[0].split()).replace(':', '')
+    )
+    secret_jwk = {
+        'kty': 'EC',
+        'kid': 'secret-1',
+        'use': 'sig',
+        'alg': 'ES256',
+        'crv': 'P-256',
+        'x': b64u(secret_point[1:33]),
+        'y': b64u(secret_point[33:]),
+    }
 
     modulus = (
         run(f'openssl rsa -in {rsa} -noout -modulus 2>/dev/null')
@@ -213,6 +238,21 @@ def main():
     print('const Map<String, Object?> googleJwks = {')
     print("  'keys': [")
     print('    ' + dart_map(rsa_jwk, 4) + ',')
+    print('  ],')
+    print('};')
+    print()
+    print("/// The key a project signs Apple's client secret with — the `.p8`")
+    print('/// file, as downloaded. Its private half is kept on purpose: the tests')
+    print('/// sign with it and check what they signed.')
+    print('const String appleSecretKeyPem =')
+    print("    '''")
+    print(secret_pem)
+    print("''';")
+    print()
+    print('/// The public half of [appleSecretKeyPem], as a key set.')
+    print('const Map<String, Object?> appleSecretKeyJwks = {')
+    print("  'keys': [")
+    print('    ' + dart_map(secret_jwk, 4) + ',')
     print('  ],')
     print('};')
     for name, (token, description) in tokens.items():

@@ -750,6 +750,7 @@ final class TestApp {
     DwWireProtocol? protocol,
     DwDatabaseSchema? schema,
     DwFileStorage? files,
+    List<DwServerModule> modules = const [],
   }) => DwAppServer(
     protocol: protocol ?? testProtocol,
     schema: schema,
@@ -761,6 +762,7 @@ final class TestApp {
     jobs: jobs ?? this.jobs(),
     routes: routes,
     files: files,
+    modules: modules,
     alerts: alerts,
     logger: logger,
     settings: settings,
