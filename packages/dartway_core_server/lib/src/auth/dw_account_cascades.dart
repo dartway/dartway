@@ -19,38 +19,60 @@ import 'package:meta/meta.dart';
 /// that names `dw_account` but the one hanging off it.
 @internal
 abstract final class DwAccountCascades {
-  /// Every table a deleted account takes with it, in order, framework tables
-  /// included (their own rows are supposed to go).
+  /// Every table a deleted account takes with it, each with the way it gets
+  /// there: `dw_account → user_profile → team_invitation`.
   ///
-  /// Follows `ON DELETE CASCADE` through as many hops as it takes: a profile
-  /// off the account, an answer off the profile, a file off the answer.
-  static Future<List<String>> of(DwDatabaseHandle db) async {
+  /// Follows `ON DELETE CASCADE` through as many hops as it takes, and says
+  /// which hops — because the shape of the path is the question. A table
+  /// hanging straight off the account holds that person's own rows; one
+  /// reached through their profile is where somebody else's turn up, and a
+  /// flat list of names hides exactly that. It also ends an argument that has
+  /// no business being had: a reviewer and an author disagreed about how two
+  /// tables were connected, and the author was wrong.
+  ///
+  /// The shortest path per table, framework tables included (their own rows
+  /// are supposed to go).
+  static Future<List<List<String>>> of(DwDatabaseHandle db) async {
     final rows = await db.query('''
-WITH RECURSIVE cascading(rel, depth) AS (
-  SELECT c.conrelid, 1
+WITH RECURSIVE cascading(rel, path, depth) AS (
+  SELECT c.conrelid,
+         ARRAY['dw_account', c.conrelid::regclass::text],
+         1
     FROM pg_constraint c
    WHERE c.contype = 'f'
      AND c.confdeltype = 'c'
      AND c.confrelid = 'dw_account'::regclass
-  UNION
-  SELECT c.conrelid, cascading.depth + 1
+  UNION ALL
+  SELECT c.conrelid,
+         cascading.path || c.conrelid::regclass::text,
+         cascading.depth + 1
     FROM pg_constraint c
     JOIN cascading ON c.confrelid = cascading.rel
    WHERE c.contype = 'f'
      AND c.confdeltype = 'c'
      AND cascading.depth < 20
+     -- A table reached twice is a loop, and a loop adds no table.
+     AND NOT (c.conrelid::regclass::text = ANY (cascading.path))
 )
-SELECT DISTINCT rel::regclass::text AS name FROM cascading ORDER BY 1
+SELECT DISTINCT ON (rel) path FROM cascading
+ ORDER BY rel, array_length(path, 1), path
 ''');
-    return [for (final row in rows) row.get<String>('name')];
+    final paths = [
+      for (final row in rows) row.get<List<Object?>>('path').cast<String>(),
+    ];
+    paths.sort((a, b) => a.last.compareTo(b.last));
+    return paths;
   }
 
-  /// Of [tables], the ones that belong to the project rather than to the
+  /// Of [paths], the ones ending in a table of the project rather than of the
   /// framework or one of its modules.
-  static List<String> projectOnesOf(Iterable<String> tables) => [
-    for (final table in tables)
-      if (!table.startsWith('dw_')) table,
+  static List<List<String>> projectOnesOf(Iterable<List<String>> paths) => [
+    for (final path in paths)
+      if (!path.last.startsWith('dw_')) path,
   ];
+
+  /// `dw_account → user_profile → team_invitation`.
+  static String _arrows(List<String> path) => path.join(' → ');
 
   /// What to refuse to start with, when the project has cascading rows and
   /// has not said what deleting an account should do with them.
@@ -62,9 +84,11 @@ SELECT DISTINCT rel::regclass::text AS name FROM cascading ORDER BY 1
   /// year. What it does say is that the tool is there: the hook is inside the
   /// deleting transaction, so publishing and enqueueing from it are possible
   /// at all — which is the question somebody reading the list asks next.
-  static String complaintFor(List<String> tables) =>
-      'deleting an account would also delete ${tables.join(', ')}, and '
+  static String complaintFor(List<List<String>> paths) =>
+      'deleting an account would also delete '
+      '${paths.map((path) => path.last).join(', ')}, and '
       'DwAuthConfig.onAccountDeleting is not set.\n'
+      '${paths.map((path) => '  ${_arrows(path)}').join('\n')}\n'
       'DwDeleteMyAccount is part of every server: these rows are already '
       'reachable by the person they are about.\n'
       'Decide once, in DwAuthConfig:\n'
@@ -82,8 +106,9 @@ SELECT DISTINCT rel::regclass::text AS name FROM cascading ORDER BY 1
 
   /// What to say on every start when deletion does take project rows with
   /// it — the hook exists, and this is what it is dealing with.
-  static String noticeFor(List<String> tables) =>
-      'deleting an account also deletes: ${tables.join(', ')} '
+  static String noticeFor(List<List<String>> paths) =>
+      'deleting an account also deletes '
       '(onAccountDeleting runs in that transaction; ctx.publish and ctx.jobs '
-      'work from there)';
+      'work from there):\n'
+      '${paths.map((path) => '  ${_arrows(path)}').join('\n')}';
 }

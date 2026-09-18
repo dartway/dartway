@@ -1,6 +1,4 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_core_server/testing.dart'
-    show DwTestDatabase, DwTestServer;
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
@@ -51,6 +49,11 @@ void main() {
             contains('user_profile'),
             contains('survey_answer'),
             contains('onAccountDeleting'),
+            // The path, not only the name: a table hanging off the profile
+            // rather than off the account is where somebody else's rows turn
+            // up, and the shape says so without anyone knowing the domain.
+            contains('dw_account → user_profile'),
+            contains('dw_account → user_profile → survey_answer'),
             // The question anybody reading that list asks next is who to
             // tell; the answer is not what to publish but that publishing
             // from here is possible at all.
@@ -71,8 +74,25 @@ void main() {
     addTearDown(server.stop);
     final said = RecordingLogger.lines.join('\n');
     expect(said, contains('deleting an account also deletes'));
-    expect(said, contains('user_profile'));
-    expect(said, contains('survey_answer'));
+    expect(said, contains('dw_account → user_profile'));
+    expect(said, contains('dw_account → user_profile → survey_answer'));
+  });
+
+  test('two tables on the account are two paths of one hop, and neither is '
+      'shown under the other', () async {
+    // What a flat list invites: a reviewer and an author disagreed about how
+    // two such tables were connected, and the author's answer — one under the
+    // other — was wrong. A path cannot be read that way.
+    RecordingLogger.lines.clear();
+    final server = await start(
+      const _TwoOnTheAccountSchema(),
+      onAccountDeleting: (ctx, accountId) async {},
+    );
+    addTearDown(server.stop);
+    final said = RecordingLogger.lines.join('\n');
+    expect(said, contains('dw_account → push_device'));
+    expect(said, contains('dw_account → push_delivery'));
+    expect(said, isNot(contains('push_device → push_delivery')));
   });
 
   test('a project that points at the account without a cascade is not asked '
@@ -143,4 +163,33 @@ final class _NoCascadeSchema extends DwDatabaseMigration {
 
   @override
   Future<void> down(DwMigrationContext m) => m.sql('DROP TABLE user_profile');
+}
+
+/// Two tables hanging off the account by their own keys, with nothing between
+/// them — the shape whose connection was guessed wrong from a flat list.
+final class _TwoOnTheAccountSchema extends DwDatabaseMigration {
+  const _TwoOnTheAccountSchema();
+
+  @override
+  String get id => '20260918_000000_two_on_the_account';
+
+  @override
+  String get checksum => 'two-on-the-account-1';
+
+  @override
+  Future<void> up(DwMigrationContext m) => m.sql('''
+    CREATE TABLE push_device (
+      id bigserial PRIMARY KEY,
+      account_id bigint NOT NULL REFERENCES dw_account (id) ON DELETE CASCADE
+    );
+    CREATE TABLE push_delivery (
+      id bigserial PRIMARY KEY,
+      account_id bigint NOT NULL REFERENCES dw_account (id) ON DELETE CASCADE,
+      device_ids bigint[] NOT NULL DEFAULT '{}'
+    );
+  ''');
+
+  @override
+  Future<void> down(DwMigrationContext m) =>
+      m.sql('DROP TABLE push_delivery, push_device');
 }

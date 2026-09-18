@@ -172,8 +172,19 @@ confirms; the skeleton's profile page has the button, with a confirmation.
 it reads its own foreign keys and follows every `ON DELETE CASCADE` from `dw_account` — through as
 many hops as there are, because the row that hurts is usually not the one naming the account but the
 one hanging off it. If any of them belong to the project and `onAccountDeleting` is not set, the
-server does not start and names the tables. When the hook is set, the same list is logged on every
-start: *deleting an account also deletes: user_profile, survey_answer*.
+server does not start and names them. When the hook is set, the same list is logged on every start —
+and in both cases each table comes **with the path that reaches it**:
+
+```
+dw_account → user_profile
+dw_account → user_profile → team_invitation
+```
+
+The shape is the point. A table hanging straight off the account holds that person's own rows; one
+reached through their profile is where somebody else's turn up — an invitation addressed to a team
+rather than to whoever wrote it — and a flat list of names hides exactly that. It also settles a
+question nobody should have to argue: a reviewer and an author once disagreed about how two of these
+tables were connected, and the author's answer was wrong. A path cannot be read two ways.
 
 This exists because it happened. `DwDeleteMyAccount` is part of every server, so a project that had
 pointed its own rows at `dw_account` with a cascade — the obvious way to write that foreign key —
