@@ -14,4 +14,23 @@ class DwStudioUser {
 
   /// What to call this user on screen: a name, a nickname, an email.
   final String? label;
+
+  /// Two of these are the same user when they say the same thing.
+  ///
+  /// Not decoration: the app hands Studio a `ProviderListenable` and the
+  /// README builds it with `select((profile) => DwStudioUser(...))`, which
+  /// compares what it produces by equality. Without this, every rebuild of
+  /// the profile is a new user, the session is reported again and the feature
+  /// tree is rescanned — for a value that did not change.
+  @override
+  bool operator ==(Object other) =>
+      other is DwStudioUser &&
+      other.identifier == identifier &&
+      other.label == label;
+
+  @override
+  int get hashCode => Object.hash(identifier, label);
+
+  @override
+  String toString() => 'DwStudioUser($identifier, $label)';
 }

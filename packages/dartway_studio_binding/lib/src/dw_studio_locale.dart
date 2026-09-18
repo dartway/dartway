@@ -14,10 +14,19 @@ class DwStudioLocale {
   const DwStudioLocale({required this.provider, required this.select});
 
   /// The app's current locale, watched for changes — every change is reported
-  /// to Studio.
+  /// to Studio as a **language tag** (`Locale.toLanguageTag()`: `en`, `ru`,
+  /// `zh-Hans`, `pt-BR`), which is what the manifest lists.
   final ProviderListenable<Locale> provider;
 
-  /// Switches the app to [languageCode], a tag from the manifest's
-  /// `supportedLocales`. Called when Studio asks for another language.
-  final void Function(String languageCode) select;
+  /// Switches the app to [languageTag] — one of the manifest's
+  /// `supportedLocales`, in the same spelling. Called when Studio asks for
+  /// another language.
+  ///
+  /// **The tag, not the language code.** Both sides speak
+  /// `Locale.toLanguageTag()`, so build the manifest's `supportedLocales`
+  /// with it too; `en` and `ru` are the same either way, and the first
+  /// `zh-Hans` in a project is where a `languageCode` on one side and a tag
+  /// on the other stop matching and the language switcher asks for a
+  /// language the app does not know.
+  final void Function(String languageTag) select;
 }

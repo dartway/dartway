@@ -87,6 +87,26 @@ const _manifest = StudioProjectManifest(projectName: 'Binding test', zones: []);
 /// the binding asks for.
 final _userProvider = Provider<DwStudioUser?>((ref) => null);
 
+/// The app's language, switchable from a test. A Chinese one: this is where
+/// a language code and a language tag stop being the same string.
+final _locale = ValueNotifier<Locale>(
+  const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+);
+
+final class _LocaleNotifier extends Notifier<Locale> {
+  @override
+  Locale build() {
+    void publish() => state = _locale.value;
+    _locale.addListener(publish);
+    ref.onDispose(() => _locale.removeListener(publish));
+    return _locale.value;
+  }
+}
+
+final _localeProvider = NotifierProvider<_LocaleNotifier, Locale>(
+  _LocaleNotifier.new,
+);
+
 late final DwFlutterCore _core;
 late final DwFakeServer _server;
 
@@ -121,7 +141,7 @@ void main() {
   Future<void> drainRescanWindow(WidgetTester tester) async =>
       tester.pump(const Duration(milliseconds: 1200));
 
-  Future<void> mountBinding(WidgetTester tester) async {
+  Future<void> mountBinding(WidgetTester tester, {DwStudioLocale? locale}) async {
     studio = _FakeStudio();
     router = DwAppRouter<_RouterState>(
       navigationZones: [_Routes.values],
@@ -138,6 +158,7 @@ void main() {
             manifest: _manifest,
             router: router,
             user: _userProvider,
+            locale: locale,
             channel: studio,
             child: child ?? const SizedBox.shrink(),
           ),
@@ -151,6 +172,26 @@ void main() {
     // close before a test starts measuring, or its reports arrive mid-assertion.
     await drainRescanWindow(tester);
   }
+
+  testWidgets('the language the app reports is the tag the manifest lists, '
+      'not the bare language code', (tester) async {
+    // A Chinese app is where `languageCode` and a language tag stop being
+    // the same string, and Studio would ask for a language nobody has.
+    final asked = <String>[];
+    await mountBinding(
+      tester,
+      locale: DwStudioLocale(provider: _localeProvider, select: asked.add),
+    );
+
+    expect(studio.of<ManifestMessage>().last.currentLocale, 'zh-Hans');
+
+    _locale.value = const Locale.fromSubtags(
+      languageCode: 'pt',
+      countryCode: 'BR',
+    );
+    await tester.pump();
+    expect(studio.of<LocaleChangedMessage>().last.locale, 'pt-BR');
+  });
 
   testWidgets('an empty early re-scan is not reported as an empty screen', (
     tester,

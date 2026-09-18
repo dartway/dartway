@@ -374,6 +374,11 @@ dartway generate          # writes every *.dw.dart and lib/generated/ in both pa
 dartway generate --check  # exits non-zero when anything is out of date; CI runs it
 ```
 
+**`dartway` here means the CLI this project pins**, which is `dart run dartway_cli:dartway <command>`
+— the project carries it as a dev dependency at the version of the framework it pins. A globally
+activated `dartway` may be older than the project and write the wrong files or lack the command
+outright; it refuses rather than guessing, and names the invocation above.
+
 It writes, in `__SHARED_PKG__`, the `*.dw.dart` parts and `lib/generated/dw_protocol.dart` — the
 protocol registry `<project>Protocol` that the server and `DwFlutterCore` are built with; in
 `__SERVER_PKG__`, the row parts and `lib/generated/dw_schema.dart`. **Never edit `*.dw.dart` or

@@ -2,6 +2,27 @@ import 'studio_project_manifest.dart';
 import 'studio_screen_spec.dart';
 import 'studio_zone_spec.dart';
 
+/// How a declared path says "a value goes here": the spelling of a template
+/// segment, in one place.
+///
+/// A screen is declared once and read in three: the router matches a live
+/// route against it, this index matches an address against the manifest, and
+/// Studio highlights the template a screen came from. Three copies of
+/// `segment.startsWith(':')` is three chances for one of them to start
+/// meaning something else; this is the one Studio reads, because the manifest
+/// is what it is given.
+abstract final class StudioPathTemplate {
+  /// Whether [segment] stands for a value rather than for itself — the
+  /// `:id` of `/orders/:id`.
+  static bool isPlaceholder(String segment) => segment.startsWith(':');
+
+  /// The segments of [path], without the empty ones a leading or trailing
+  /// slash leaves behind.
+  static List<String> segmentsOf(String path) =>
+      path.split('/').where((segment) => segment.isNotEmpty).toList();
+}
+
+
 /// Lookup helpers over a [StudioProjectManifest]: resolve the spec for a
 /// route path and build breadcrumb labels from the parent chain.
 class StudioManifestIndex {
@@ -72,7 +93,7 @@ class StudioManifestIndex {
       var fits = true;
       for (var position = 0; position < templateSegments.length; position++) {
         final templateSegment = templateSegments[position];
-        if (templateSegment.startsWith(':')) continue;
+        if (StudioPathTemplate.isPlaceholder(templateSegment)) continue;
         if (templateSegment != addressSegments[position]) {
           fits = false;
           break;
@@ -89,7 +110,7 @@ class StudioManifestIndex {
   }
 
   static List<String> _segmentsOf(String path) =>
-      path.split('/').where((segment) => segment.isNotEmpty).toList();
+      StudioPathTemplate.segmentsOf(path);
 
   StudioZoneSpec zoneOf(StudioScreenSpec spec) => manifest.zones.firstWhere(
     (zone) => zone.screens.contains(spec),

@@ -12,8 +12,31 @@ import 'package:dartway_cli/src/commands/setup_ai_command.dart';
 import 'package:dartway_cli/src/commands/stats_command.dart';
 import 'package:dartway_cli/src/commands/test_command.dart';
 import 'package:dartway_cli/src/commands/update_command.dart';
+import 'package:dartway_cli/src/pinned_cli.dart';
+import 'package:dartway_cli/src/project_layout.dart';
+
+/// Commands that read or write an existing project, and so have to be the
+/// CLI that project pins. The rest either make a project (`create`,
+/// `quickstart`), repair its pins (`update`, `setup-ai`) or touch nothing
+/// (`doctor`).
+const Set<String> _projectCommands = {
+  'generate',
+  'check',
+  'test',
+  'deploy',
+  'dev',
+  'stats',
+};
 
 Future<void> main(List<String> args) async {
+  if (args.isNotEmpty && _projectCommands.contains(args.first)) {
+    final pinned = DwPinnedCli.of(findProjectRoot());
+    if (!pinned.isPinnedOne) {
+      stderr.writeln(pinned.complaintFor(args.join(' ')));
+      exitCode = 1;
+      return;
+    }
+  }
   final runner =
       CommandRunner<int>(
           'dartway',

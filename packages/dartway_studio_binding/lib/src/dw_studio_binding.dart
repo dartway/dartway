@@ -141,7 +141,7 @@ class _DwStudioBindingState extends ConsumerState<DwStudioBinding>
     if (locale != null) {
       ref.listenManual(
         locale.provider,
-        (_, next) => _host?.reportLocale(next.languageCode),
+        (_, next) => _host?.reportLocale(next.toLanguageTag()),
       );
     }
   }
@@ -172,7 +172,7 @@ class _DwStudioBindingState extends ConsumerState<DwStudioBinding>
 
   String _currentLocale() {
     final locale = widget.locale;
-    return locale == null ? '' : ref.read(locale.provider).languageCode;
+    return locale == null ? '' : ref.read(locale.provider).toLanguageTag();
   }
 
   StudioSessionState _currentSession() {

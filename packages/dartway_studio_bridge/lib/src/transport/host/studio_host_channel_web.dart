@@ -8,6 +8,7 @@ import '../../protocol/studio_bridge_protocol.dart';
 import '../studio_message_channel.dart';
 import '../studio_message_drop.dart';
 import '../studio_message_drop_report.dart';
+import 'studio_host_peer.dart';
 
 /// True when this page runs inside an iframe (a potential Studio frame).
 bool get isEmbeddedInStudioFrame {
@@ -36,9 +37,8 @@ class _StudioHostWebChannel implements StudioMessageChannel {
   final _controller = StreamController<StudioBridgeMessage>.broadcast();
   late final JSFunction _jsListener;
 
-  /// Studio's origin once the first valid bridge message arrives; targeted
-  /// replies go there instead of `*`.
-  String? _peerOrigin;
+  /// Who this channel listens to and answers — see [StudioHostPeer].
+  final StudioHostPeer _peer = StudioHostPeer();
 
   @override
   Stream<StudioBridgeMessage> get messages => _controller.stream;
@@ -49,6 +49,17 @@ class _StudioHostWebChannel implements StudioMessageChannel {
       return;
     }
     event as web.MessageEvent;
+    final parent = web.window.parent;
+    final source = event.source;
+    final fromParent =
+        parent != null &&
+        source != null &&
+        (source as JSObject).strictEquals(parent as JSObject).toDart;
+    if (_peer.refuse(fromParent: fromParent, origin: event.origin)
+        case final refusal?) {
+      _dropped(refusal, origin: event.origin);
+      return;
+    }
     final data = event.data;
     if (data == null || !data.isA<JSString>()) {
       _dropped(StudioMessageDropReason.nonStringData, origin: event.origin);
@@ -57,7 +68,7 @@ class _StudioHostWebChannel implements StudioMessageChannel {
     final payload = (data as JSString).toDart;
     final message = StudioBridgeMessage.tryDecode(payload);
     if (message != null) {
-      _peerOrigin = event.origin;
+      _peer.accepted(event.origin);
       _controller.add(message);
       return;
     }
@@ -92,8 +103,7 @@ class _StudioHostWebChannel implements StudioMessageChannel {
     final parent = web.window.parent;
     if (parent == null) return;
     final encoded = message.encode().toJS;
-    final peer = _peerOrigin;
-    parent.postMessage(encoded, (peer ?? '*').toJS);
+    parent.postMessage(encoded, (_peer.origin ?? '*').toJS);
   }
 
   @override

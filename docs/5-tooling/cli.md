@@ -9,6 +9,21 @@ runs the server tests on a database of their own, one deploys, and one counts li
 dart pub global activate dartway_cli
 ```
 
+**Inside a project, run the CLI the project pins.** Every DartWay project carries `dartway_cli` as a
+dev dependency of its Flutter package, at the same version as the rest of the framework it pins:
+
+```bash
+dart run dartway_cli:dartway generate       # the project's own CLI, whatever is on PATH
+```
+
+A globally activated `dartway` is a second copy with a life of its own, and the two drift — a global
+CLI from before a release has no `generate` at all, while the skills of the project it is standing
+in name `dartway generate` as the only way to write `*.dw.dart`. What that looks like is "unknown
+command", three steps from the cause. So `generate`, `check`, `test`, `deploy`, `dev` and `stats`
+refuse to run when the CLI that started them is not the one the project pins, and say which command
+would have worked. `create` and `quickstart` (there is no project yet), `update` and `setup-ai`
+(they repair the pins) and `doctor` (it touches nothing) run either way.
+
 **The complete, current option list of any command is `dartway help <command>`** — and for the
 nested ones, `dartway help deploy secret push`. That output is generated from the parser, so it
 cannot drift from the code. This page does not restate every flag. It names the ones whose

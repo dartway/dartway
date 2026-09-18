@@ -108,6 +108,9 @@ extension DwNavigationRouteExtension on DwNavigationRoute {
 
     for (var i = 0; i < template.length; i++) {
       final segment = template[i];
+      // The same spelling the manifest index reads
+      // (`StudioPathTemplate.isPlaceholder`); the router cannot depend on the
+      // bridge, so the two agree by this comment and by the tests of both.
       final expected = segment.startsWith(':')
           ? state.pathParameters[segment.substring(1)]
           : segment;
