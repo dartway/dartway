@@ -206,6 +206,19 @@ class DwStackRenderer {
         'reach the server.',
       )
       ..writeln('        DW_BACKEND_URL: ${_q(stack.appOrigin)}')
+      ..writeln(
+        '        # Where this build answers, for the Studio binding: it '
+        'admits a Studio',
+      )
+      ..writeln(
+        '        # whose access token was issued for this address and no '
+        'other. An app',
+      )
+      ..writeln(
+        '        # without the binding declares no such ARG and Docker drops '
+        'it.',
+      )
+      ..writeln('        STUDIO_APP_ORIGIN: ${_q(stack.appOrigin)}')
       ..writeln('    restart: unless-stopped')
       ..writeln('    expose:')
       ..writeln('      - "80"')

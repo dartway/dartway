@@ -2,6 +2,8 @@
 
 ## Unreleased — DartWay 1.0
 
+- **The web image is built with `STUDIO_APP_ORIGIN`** — the address it answers on, which the Studio binding checks a connecting Studio's token against. Projects kept it as a default in their Dockerfile, where a renamed stand makes it quietly wrong (reported by U90).
+
 - **`deploy run --resume` no longer repeats a step that failed**: it stops with that step's recorded reason and output (`step_failed` with `resumed: true`), and `--retry-failed` is how to run it again. A self-deploy resumes after every interruption, so a failing step used to be repeated until the attempts ran out, stopping the server each time (reported by Studio).
 
 - **The proxy and certbot images are pinned** (#269): `nginx:1.30.5-alpine`, `certbot/certbot:v5.8.0`, like Postgres and MinIO. A server set up earlier keeps the old names in its rendered `docker-compose.yml` until `deploy setup` renders it again.

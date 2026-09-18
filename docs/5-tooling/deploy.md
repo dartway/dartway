@@ -315,7 +315,8 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   and runs the binary on Alpine with `ca-certificates` — without them every outbound HTTPS call from
   the server fails — and `ENTRYPOINT ["/app/server"]` in exec form.
 - **The web image** builds with Flutter from the project root, takes `ARG DW_BACKEND_URL` (and refuses
-  to build without it), runs `flutter build web --release --dart-define=DW_BACKEND_URL=…`, and serves
+  to build without it) and `ARG STUDIO_APP_ORIGIN` (the same address, for the Studio binding's access
+  check; an app without the binding declares no such ARG and Docker drops it), runs `flutter build web --release --dart-define=DW_BACKEND_URL=…`, and serves
   the build with `nginx:1.30.5-alpine` and `<project>_flutter/nginx.conf`. It serves files only.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
   `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build

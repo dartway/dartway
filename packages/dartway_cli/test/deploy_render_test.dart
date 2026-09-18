@@ -109,12 +109,14 @@ void main() {
       },
     );
 
-    test('the web image is given the app origin it calls', () {
+    test('the web image is given the app origin it calls, and the one Studio '
+        'signs for', () {
       final web = _service(stackFrom(), 'web');
-      expect(
-        ((web['build'] as YamlMap)['args'] as YamlMap)['DW_BACKEND_URL'],
-        'https://app.example.com',
-      );
+      final args = (web['build'] as YamlMap)['args'] as YamlMap;
+      expect(args['DW_BACKEND_URL'], 'https://app.example.com');
+      // Without it every app keeps its own address as a default in its
+      // Dockerfile, where a stand rename makes it quietly wrong.
+      expect(args['STUDIO_APP_ORIGIN'], 'https://app.example.com');
     });
 
     test('MinIO: the bucket, the CORS origin, and the server reaching storage '
