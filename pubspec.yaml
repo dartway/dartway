@@ -7,6 +7,8 @@ workspace:
   - packages/dartway_analytics_flutter
   - packages/dartway_analytics_server
   - packages/dartway_analytics_shared
+  - packages/dartway_auth_providers_server
+  - packages/dartway_auth_providers_shared
   - packages/dartway_cli
   - packages/dartway_client
   - packages/dartway_core_flutter

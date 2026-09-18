@@ -104,6 +104,7 @@ packages/dartway_lints/example|verified by custom_lint, not by dart test"
 # and a list of files would be the thing that quietly falls behind.
 SERVICES="\
 packages/dartway_analytics_server|Postgres
+packages/dartway_auth_providers_server|Postgres
 packages/dartway_orm|Postgres
 packages/dartway_core_server|Postgres and storage
 packages/dartway_push_server|Postgres"

@@ -14,7 +14,7 @@ rate limits, attempts, locks, tokens, revocation — is built in and the same in
 | Table | What it holds |
 |---|---|
 | `dw_account` | an id and a creation time — the framework's whole idea of a person |
-| `dw_identity` | identifiers an account signs in with: kind (`phone`, `email`), normalized value, `verified_at`. Unique across accounts |
+| `dw_identity` | identifiers an account signs in with: kind (`phone`, `email`, or a provider's name — `google`, `apple`), normalized value or the provider's subject id, `verified_at`. Unique across accounts |
 | `dw_auth_key` | session keys: the SHA-256 of the token, kind (`app`, `personal`), label, last use, revocation |
 | `dw_code_ticket` | one row per code sent: the SHA-256 of the code, attempts, expiry, purpose (`signIn`, `attach`) |
 
@@ -192,6 +192,86 @@ template deletes the profile outright, which is right while nothing else points 
 
 On the client, the app sends these commands like any other and keeps the answered session with
 `dw.signIn(session)` ([Flutter core](../3-flutter/flutter-core.md)).
+
+## Signing in with Google and Apple
+
+`dartway_auth_providers_server` is the other door into the same accounts: the app gets a token from
+the provider's own SDK, sends it with `DwSignInWithProvider`, and the server signs in the account of
+the subject that token proves.
+
+```dart
+// Both sides build the protocol with the providers' DTOs in it:
+final appProtocol = DwWireProtocol(
+  [...dwAuthProvidersProtocolEntries, ...appEntries],
+  include: DwWireProtocol.core,
+);
+
+DwAppServer(
+  protocol: appProtocol,
+  modules: [
+    DwSignInProvidersModule([
+      DwGoogleSignIn(clientIds: [androidClientId, iosClientId, webClientId]),
+      DwAppleSignIn(clientIds: ['com.club.app']),
+    ]),
+  ],
+  auth: DwAuthConfig(
+    ...,
+    onExternalAccountCreated: (ctx, accountId, provider, subject, data) =>
+        AppAuth.createProfile(ctx, accountId, data),
+  ),
+);
+```
+
+`dartway_auth_providers_shared` carries the command and the refusals — it is what the app depends
+on; `dartway_auth_providers_server` verifies. They are separate packages from the core on purpose:
+a server that offers no provider does not register the command at all, and a command with no
+handler is a server that refuses to start.
+
+**The providers are independent.** A project declares the ones it offers; a token of a provider it
+did not declare is refused with `dw.forbidden`, as every door this server does not have is. There is
+no configuration that accepts "any provider": a provider is its issuer, its key set and its client
+ids together.
+
+**What is checked, and all of it is checked.** The token is three base64url parts; a key the
+provider publishes, of the id the header names and of the algorithm that key itself declares — never
+the algorithm the token claims — verifies the signature; the issuer is the provider's; the audience
+is one of **this app's client ids**; it has not expired (two minutes of clock skew) and is not dated
+into the future; the nonce is the one the app used, either as the app made it or as its SHA-256
+(Apple's flow hashes it); and it names a subject. A token is never half accepted.
+
+**The client ids are a list because Android, iOS and the web each have their own.** A server
+configured with one of them turns away the users of the other platforms, and the refusal says
+nothing they can act on — this is the mistake the shape of the API is there to prevent.
+
+**Keys rotate, so nothing is pinned.** The set is fetched on the first sign-in and held for as long
+as the provider's `Cache-Control` says (an hour when it says nothing, a day at most). A token naming
+a key id the held set does not have is what a rotation looks like, so the set is fetched again — at
+most once a minute, which is what keeps a stream of made-up key ids from becoming a stream of
+requests to the provider. A fetch that fails while a set is held keeps the held one.
+
+**Two refusals, and the difference matters to the app.** `dw.providerCredentialRejected` (field
+`idToken`) means the token did not hold up — ask the provider for another one. Which check failed is
+written to the server's log and not to the answer: it is a hint to whoever is trying tokens.
+`dw.providerUnreachable` (field `provider`) means the provider could not be asked for its keys and
+none are held — nothing is wrong with the token, and the app may simply try again.
+
+**What the provider told about the person reaches `onExternalAccountCreated`** in the registration
+map, under keys the server reserves: `dw.email`, `dw.emailVerified`, `dw.name`, `dw.givenName`,
+`dw.familyName`, `dw.picture`, `dw.realUser` (`DwProviderClaim`). They are the server's words: what
+the app sent under the `dw.` prefix is dropped first, so a project reading `dw.email` reads an
+e-mail a provider signed. Apple tells the name **only at the very first authorization** and never in
+the token, so an app that wants it sends it in `DwSignInWithProvider.registration` of that sign-in —
+or it is gone for good.
+
+The identity is stored like any other: `dw_identity`, kind `google` or `apple`, value the provider's
+subject id. Nothing of the token is kept. An account can therefore hold a phone, an e-mail and a
+provider identity at once, and `DwAccountService.accountOfExternalIdentity` answers who a subject is.
+
+**What a project still owes the stores.** Offering Google or Apple sign-in brings App Store
+guideline 4.8 into play — an app whose main account uses a third-party sign-in must also offer one
+that asks no more than name and e-mail and lets the person hide theirs; sign-in by code to a phone
+or an e-mail is not affected. Sign in with Apple also requires that deleting an account revokes the
+person's tokens with Apple, which needs a refresh token stored at sign-in: not yet in the framework.
 
 ## Session keys
 

@@ -440,10 +440,34 @@ it. `DwAuthConfig` in `lib/src/`:
   Never the third route: a `hidden` flag with the name and the phone still in the row. It is the
   cheapest to write and it is not a deletion — neither the member nor the law was offered it. And
   whichever route the project takes, **the app says which one before it asks to confirm**;
+- **`onExternalAccountCreated(ctx, accountId, provider, subject, registration)` creates the profile
+  for a sign-in with Google or Apple** — the same job `onAccountCreated` does for a code, and
+  **required** to sign in externally at all. The verified claims are in `registration` under
+  `DwProviderClaim` keys (`dw.email`, `dw.name`, …), which the app cannot write. Apple tells the
+  name only at the very first authorization, so an app that wants it sends it with that sign-in;
 - `onIdentifierChanged(ctx, change)` runs in the transaction of every identifier change the framework
   makes to an existing account (a confirmed attach or replace, `moveIdentities`, `removeIdentities`)
   — the place to mirror an identifier into a project row, or to republish the profile that shows it.
   The framework publishes nothing about identifiers itself.
+
+**Sign in with Google and Apple** is `dartway_auth_providers_server`, a module — the project never
+verifies a token itself. Its DTOs are a separate package (`dartway_auth_providers_shared`) and go
+into the protocol both sides build:
+
+```dart
+protocol: DwWireProtocol(dwAuthProvidersProtocolEntries, include: appProtocol),
+modules: [
+  DwSignInProvidersModule([
+    DwGoogleSignIn(clientIds: [android, ios, web]),   // a list: each platform has its own
+    DwAppleSignIn(clientIds: ['com.club.app']),
+  ]),
+],
+```
+
+The providers are independent (declare what you offer; the rest is a door this server does not
+have). `dw.providerCredentialRejected` means the token did not hold up, `dw.providerUnreachable`
+that the provider could not be asked for its keys — the app may retry the second, not the first.
+Details in `docs/4-server/auth-identity.md`.
 
 For everything else about accounts use **`DwAccountService`**, never SQL on `dw_account`,
 `dw_identity` or `dw_auth_key`:
