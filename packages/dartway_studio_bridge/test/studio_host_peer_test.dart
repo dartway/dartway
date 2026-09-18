@@ -1,8 +1,7 @@
-// Not part of the public API: the rule the app's side of the bridge applies
-// to every window message, and the one piece of that channel a VM test can
-// reach — the channel itself needs a browser.
+// The rule the app's side of the bridge applies to every window message —
+// and the one piece of that channel a VM test can reach, the channel itself
+// needing a browser.
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
-import 'package:dartway_studio_bridge/src/transport/host/studio_host_peer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// An app in a frame hears every window message there is. This is how it

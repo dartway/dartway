@@ -19,7 +19,10 @@ import '../studio_message_drop.dart';
 ///   the address the manifest — the passports of every screen — was sent to.
 ///
 /// Kept out of the web channel so that a VM test can reach it: the channel
-/// itself exists only where `dart:js_interop` does.
+/// itself exists only where `dart:js_interop` does. Public for the same
+/// reason it is separate — this is the rule both halves of the bridge live
+/// by, and the side that embeds a preview (Studio inside Studio) should be
+/// able to assert the rule its peer applies.
 final class StudioHostPeer {
   /// The origin of the peer, once one has been accepted. Until then the app
   /// answers `*`: the handshake has to start somewhere, and what it says

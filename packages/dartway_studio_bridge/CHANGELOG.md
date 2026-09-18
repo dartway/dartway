@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+**The app's side of the bridge knows which window is its peer.** It used to
+take the first window message that decoded and answer at whatever origin that
+message came from — with no check that it came from the frame embedding the
+app at all. A page in the same tab could become the address between the token
+check and the manifest, and the manifest carries the passport of every screen;
+a preview inside a preview (Studio in Studio) simply took the address over and
+the bridge went quiet with nothing to report.
+
+**`StudioHostPeer`** holds both rules now, and is public so that the side doing
+the embedding can assert the same ones: a message counts only when it comes
+from the parent window — by identity of the window object, never by an origin
+string anyone can claim — and the origin is pinned to the first accepted
+message, so a parent that navigates elsewhere ends the session instead of
+moving it.
+
+**`StudioPathTemplate`** names the spelling of a template segment (`:id`) once,
+where the manifest index reads it and Studio can read it too.
+
 ## 0.9.0
 
 **Silence now has a reason attached, on both sides of the wire.** A channel that

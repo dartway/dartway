@@ -20,6 +20,12 @@ export 'src/access/studio_bridge_token.dart';
 // App side.
 export 'src/host/studio_bridge_host.dart';
 
+// Who the app's side listens to. Public because it is the rule both halves
+// of the bridge live by, not an accident of the transport: Studio embeds
+// previews inside previews, and the side that does the embedding should be
+// able to assert the same rule its peer applies.
+export 'src/transport/host/studio_host_peer.dart';
+
 // Studio side.
 export 'src/client/studio_bridge_client.dart';
 export 'src/client/studio_bridge_event.dart';
