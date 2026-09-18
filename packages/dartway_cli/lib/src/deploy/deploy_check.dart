@@ -478,12 +478,34 @@ Future<DwDeployVerdict> _checkLockedDependencies(
   for (final package in [context.serverPackage, context.flutterPackage]) {
     final file = context.dockerfileOf(package);
     if (!file.existsSync()) continue;
+    // A multi-stage Dockerfile builds more than this package: a stage that
+    // checks out another repository and builds it there is somebody else's
+    // dependencies, judged against somebody else's lock file — which this
+    // project does not have. Only the ones resolving in the package's own
+    // directory are its own; the rest are named, not judged.
     final gets = dwPubGetInstructions(file);
-    if (gets.isEmpty) {
+    // A Dockerfile that never says `WORKDIR` says nothing about whose
+    // dependencies these are, and the project's are the likely answer; a
+    // `WORKDIR` naming another directory is evidence, and the only evidence
+    // there is.
+    bool isOwn(DwPubGet get) =>
+        get.workdir == '/' || p.posix.basename(get.workdir) == package;
+    final own = [
+      for (final get in gets)
+        if (isOwn(get)) get,
+    ];
+    final elsewhere = [
+      for (final get in gets)
+        if (!isOwn(get)) get.workdir,
+    ];
+    for (final workdir in elsewhere.toSet()) {
+      read.add('$package/Dockerfile builds something else in $workdir');
+    }
+    if (own.isEmpty) {
       // Said out loud: a green line naming one image reads as "every image",
       // and an image whose dependency step this check cannot see is exactly
       // where a false assurance costs a deploy.
-      read.add('$package: no pub get found');
+      read.add('$package: no pub get of its own found');
       continue;
     }
     final lock = File(p.join(context.projectRoot.path, package, 'pubspec.lock'));
@@ -491,12 +513,12 @@ Future<DwDeployVerdict> _checkLockedDependencies(
       unlocked.add('$package has no pubspec.lock');
       continue;
     }
-    for (final instruction in gets) {
-      if (!instruction.contains('--enforce-lockfile')) {
-        unlocked.add('$package/Dockerfile: ${_shortened(instruction)}');
+    for (final get in own) {
+      if (!get.instruction.contains('--enforce-lockfile')) {
+        unlocked.add('$package/Dockerfile: ${_shortened(get.instruction)}');
       }
     }
-    read.add('$package: ${gets.length} pub get, --enforce-lockfile');
+    read.add('$package: ${own.length} pub get, --enforce-lockfile');
   }
   if (read.isEmpty && unlocked.isEmpty) {
     return const DwDeployVerdict.skip('no image to read');
@@ -522,12 +544,34 @@ Future<DwDeployVerdict> _checkLockedDependencies(
 /// file line by line sees neither half. That is not a corner case — it is how
 /// a cached Flutter build is written, and a check that misses it passes the
 /// very image the deploy fails on.
-List<String> dwPubGetInstructions(File dockerfile) {
-  final instructions = <String>[];
+/// One `pub get` of a Dockerfile, and the directory it runs in.
+typedef DwPubGet = ({String instruction, String workdir});
+
+List<DwPubGet> dwPubGetInstructions(File dockerfile) {
+  final instructions = <DwPubGet>[];
   final buffer = StringBuffer();
+  // Docker resolves `WORKDIR` per stage and a relative one against the last;
+  // a stage starts at the image's, which for our purposes is the root.
+  var workdir = '/';
   for (final line in dockerfile.readAsLinesSync()) {
     final trimmed = line.trimRight();
-    if (buffer.isEmpty && !RegExp(r'^\s*RUN\s').hasMatch(trimmed)) continue;
+    if (buffer.isEmpty) {
+      if (RegExp(r'^\s*FROM\s', caseSensitive: false).hasMatch(trimmed)) {
+        workdir = '/';
+        continue;
+      }
+      if (RegExp(
+            r'^\s*WORKDIR\s',
+            caseSensitive: false,
+          ).hasMatch(trimmed)) {
+        final named = trimmed.trim().split(RegExp(r'\s+')).last;
+        workdir = named.startsWith('/')
+            ? p.posix.normalize(named)
+            : p.posix.normalize(p.posix.join(workdir, named));
+        continue;
+      }
+      if (!RegExp(r'^\s*RUN\s').hasMatch(trimmed)) continue;
+    }
     buffer.write(buffer.isEmpty ? trimmed : ' ${trimmed.trimLeft()}');
     if (trimmed.endsWith(r'\')) continue;
     final instruction = buffer
@@ -535,9 +579,8 @@ List<String> dwPubGetInstructions(File dockerfile) {
         .replaceAll(RegExp(r'\\\s+'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ');
     buffer.clear();
-    if (RegExp(r'\b(dart|flutter)\s+pub\s+get\b').hasMatch(instruction) ||
-        RegExp(r'\bpub\s+get\b').hasMatch(instruction)) {
-      instructions.add(instruction);
+    if (RegExp(r'\bpub\s+get\b').hasMatch(instruction)) {
+      instructions.add((instruction: instruction, workdir: workdir));
     }
   }
   return instructions;

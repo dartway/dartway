@@ -158,6 +158,48 @@ RUN --mount=type=cache,target=/root/.pub-cache,sharing=locked \\
       expect((await evaluate('locked-dependencies')).passed, isTrue);
     });
 
+    test("locked-dependencies judges the package's own pub get and not a "
+        'stage that builds somebody else', () async {
+      // Studio's server image builds the framework's CLI from a checkout of
+      // another repository, in /dartway. That `pub get` was being counted as
+      // the project's and checked against the project's lock.
+      write('shop_server/pubspec.lock', '# locked\n');
+      write('shop_server/Dockerfile', '''
+FROM dart AS cli
+WORKDIR /dartway
+RUN git clone https://example.test/dartway . \\
+ && dart pub get && dart compile exe bin/dartway.dart -o /dartway-cli
+
+FROM dart AS build
+WORKDIR /workspace
+COPY shop_shared/ shop_shared/
+COPY shop_server/ shop_server/
+WORKDIR /workspace/shop_server
+RUN dart pub get --enforce-lockfile
+''');
+      final verdict = await evaluate('locked-dependencies');
+      expect(
+        verdict.passed,
+        isTrue,
+        reason: "another repository's lock file is not this project's to check",
+      );
+      expect(verdict.detail, contains('builds something else in /dartway'));
+      expect(verdict.detail, contains('shop_server: 1 pub get'));
+
+      // And the package's own instruction is still judged.
+      write('shop_server/Dockerfile', '''
+FROM dart AS cli
+WORKDIR /dartway
+RUN dart pub get
+FROM dart AS build
+WORKDIR /workspace/shop_server
+RUN dart pub get
+''');
+      final loose = await evaluate('locked-dependencies');
+      expect(loose.passed, isFalse);
+      expect(loose.detail, contains('shop_server/Dockerfile: RUN dart pub get'));
+    });
+
     test('locked-dependencies says which image it could not read a pub get '
         'in: a green line must not read as "every image"', () async {
       write('shop_server/Dockerfile', 'FROM dart\nRUN dart pub get --enforce-lockfile\n');
@@ -165,7 +207,7 @@ RUN --mount=type=cache,target=/root/.pub-cache,sharing=locked \\
       write('shop_flutter/Dockerfile', 'FROM flutter\nRUN flutter build web\n');
       final verdict = await evaluate('locked-dependencies');
       expect(verdict.passed, isTrue);
-      expect(verdict.detail, contains('shop_flutter: no pub get found'));
+      expect(verdict.detail, contains('shop_flutter: no pub get of its own'));
       expect(verdict.detail, contains('shop_server: 1 pub get'));
     });
 

@@ -22,6 +22,50 @@ Directory findProjectRoot() {
   return Directory.current;
 }
 
+/// The DartWay project [start] is in: the nearest directory at or above it
+/// that holds `*_server` / `*_shared` packages, or is one of them.
+///
+/// Separate from [findProjectRoot], which answers the repository. A project
+/// is not always the repository — a monorepo holds several — and a command
+/// run from inside one of its packages must find the project, not the
+/// checkout. `dart run dartway_cli:dartway <command>` is run from the package
+/// that pins the CLI, which is exactly that case: `deploy` and `secret` read
+/// `Directory.current` and told a person standing in their own Flutter
+/// package that there was no DartWay project anywhere.
+Directory? findPackageProjectRoot(Directory start) {
+  var current = p.normalize(p.absolute(start.path));
+  while (true) {
+    final name = p.basename(current);
+    if (_isRolePackageName(name) &&
+        File(p.join(current, 'pubspec.yaml')).existsSync()) {
+      final parent = p.dirname(current);
+      // Inside a project, the root is the directory holding the packages.
+      return Directory(
+        _rolePackagesIn(parent).isNotEmpty ? parent : current,
+      );
+    }
+    if (_rolePackagesIn(current).isNotEmpty) return Directory(current);
+    final parent = p.dirname(current);
+    if (parent == current) return null;
+    current = parent;
+  }
+}
+
+bool _isRolePackageName(String name) =>
+    name.endsWith('_shared') || name.endsWith('_server');
+
+List<String> _rolePackagesIn(String root) {
+  final directory = Directory(root);
+  if (!directory.existsSync()) return const [];
+  return [
+    for (final entity in directory.listSync())
+      if (entity is Directory &&
+          _isRolePackageName(p.basename(entity.path)) &&
+          File(p.join(entity.path, 'pubspec.yaml')).existsSync())
+        entity.path,
+  ];
+}
+
 /// DartWay project layout: three sibling Dart packages in the project root
 /// whose role is defined by the directory name suffix — `*_server`,
 /// `*_flutter` and `*_shared`, the contract both of them speak.

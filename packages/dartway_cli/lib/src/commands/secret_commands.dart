@@ -42,7 +42,7 @@ abstract class _SecretCommandBase extends Command<int> {
       ..addOption('identity', help: 'SSH private key file.');
   }
 
-  late final Directory projectRoot = Directory.current;
+  late final Directory projectRoot = deployProjectRoot();
 
   DwStack resolveStack(ArgResults results) =>
       resolveDeployStack(this, results, projectRoot);

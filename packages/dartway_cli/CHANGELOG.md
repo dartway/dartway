@@ -2,6 +2,12 @@
 
 ## Unreleased — DartWay 1.0
 
+- **BEHAVIOUR (deploy): `deploy run` renders `docker-compose.yml` and `nginx.conf` on every run** (D-075), from `deploy/config.yaml` and the CLI's own version, saying of each whether it changed. They used to be written by `setup` alone, and a stack rendered by an older CLI met a build argument it did not carry: the deploy died inside `docker build` blaming the project's Dockerfile, while the file to fix was on the server and in no repository (reported by U90). A hand edit on a server is therefore overwritten — project additions belong in `deploy/compose.override.yml` and `deploy/nginx.d/`, which are not touched.
+
+- **`deploy` and `deploy secret` find the project instead of demanding to be run from its root.** They read the working directory, so `dart run dartway_cli:dartway deploy …` — which runs from the package that pins the CLI — answered "no `*_server` package found" to somebody standing inside their own project (reported by Studio). They now walk up to the directory holding the `*_server` and `*_shared` packages, as `generate` and `check` already did.
+
+- **`locked-dependencies` judges a package's own `pub get`, not a stage building something else.** A multi-stage Dockerfile that checks out another repository and builds it in its own `WORKDIR` had that `pub get` attributed to the project and checked against the project's lock file (reported by Studio). Instructions resolving elsewhere are now named in the verdict and not judged: another repository's lock is not this project's to check.
+
 - **The web image is built with `STUDIO_APP_ORIGIN`** — the address it answers on, which the Studio binding checks a connecting Studio's token against. Projects kept it as a default in their Dockerfile, where a renamed stand makes it quietly wrong (reported by U90).
 
 - **`deploy run --resume` no longer repeats a step that failed**: it stops with that step's recorded reason and output (`step_failed` with `resumed: true`), and `--retry-failed` is how to run it again. A self-deploy resumes after every interruption, so a failing step used to be repeated until the attempts ran out, stopping the server each time (reported by Studio).

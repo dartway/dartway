@@ -32,6 +32,21 @@ class DeployCommand extends Command<int> {
 
 /// The environment named by `--env`, read and validated, with the project's
 /// packages found by suffix.
+/// The project a deploy command was invoked for: the one around the working
+/// directory, which is not always the working directory itself —
+/// `dart run dartway_cli:dartway deploy …` runs from the package that pins
+/// the CLI.
+Directory deployProjectRoot() {
+  final root = findPackageProjectRoot(Directory.current);
+  if (root == null) {
+    throw StateError(
+      'No DartWay project at or above ${Directory.current.path}: a project is '
+      'a directory holding <name>_server and <name>_shared.',
+    );
+  }
+  return root;
+}
+
 DwStack resolveDeployStack(
   Command<int> command,
   ArgResults results,
@@ -86,7 +101,7 @@ class DeploySetupCommand extends Command<int> {
 
   @override
   Future<int> run() => runSetup(
-    resolveDeployStack(this, argResults!, Directory.current),
+    resolveDeployStack(this, argResults!, deployProjectRoot()),
     argResults!,
   );
 }
@@ -150,7 +165,7 @@ class DeployRunCommand extends Command<int> {
 
   @override
   Future<int> run() => runDeploy(
-    resolveDeployStack(this, argResults!, Directory.current),
+    resolveDeployStack(this, argResults!, deployProjectRoot()),
     argResults!,
   );
 }
@@ -189,7 +204,7 @@ class DeployCheckCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final projectRoot = Directory.current;
+    final projectRoot = deployProjectRoot();
     final results = argResults!;
     final stack = resolveDeployStack(this, results, projectRoot);
     final target = stack.target;
