@@ -405,8 +405,14 @@ Three shapes turn up again and again, and all look like ordinary green:
   binding, a test of a rule whose enforcement runs only on a real connection, a test of a job that
   nothing runs. Whatever is passed in, the assertions hold — because nothing reads them.
 - **The test compares a copy with the copy.** A manifest checked against a hand-written list of
-  zones instead of against the router; an expected JSON built by the same function that encodes it.
-  It cannot disagree with itself, so it goes red only when somebody edits both.
+  zones instead of against the router; an expected JSON built by the same function that encodes it;
+  the length of a list asserted against the length of what that list was built from. It cannot
+  disagree with itself, so it goes red only when somebody edits both — and in the tautological case,
+  never at all.
+
+  **This is the shape the mutation does not find**, and the only one: break something nearby and the
+  test goes red, which reads as proof. It is found by eye, by asking of each side where its value
+  came from — two sides from one source are one side written twice.
 - **The mutation proved something else.** The trap of this practice itself: an edit that changes two
   things at once — the behaviour *and* who is watching it — goes red for the wrong reason and is
   written down as proof. Removing a whole handler makes every test of that path fail, including the
