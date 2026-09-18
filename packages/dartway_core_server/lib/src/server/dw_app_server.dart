@@ -7,6 +7,7 @@ import 'package:meta/meta.dart';
 
 import '../alerts/dw_alert_sink.dart';
 import '../alerts/dw_server_logger.dart';
+import '../auth/dw_account_cascades.dart';
 import '../auth/dw_account_service.dart';
 import '../auth/dw_auth_config.dart';
 import '../auth/dw_auth_service.dart';
@@ -205,6 +206,26 @@ final class DwAppServer {
       final missing = await _missingFromDatabase(declared, opened.db);
       if (missing.isNotEmpty) throw DwStartupException(missing);
     }
+    await _checkAccountCascades(opened.db);
+  }
+
+  /// What deleting an account would take with it, read from the foreign keys
+  /// the database actually has — see [DwAccountCascades].
+  ///
+  /// Refuses to start when the project has rows cascading off `dw_account`
+  /// and has said nothing about deletion; names them on every start when it
+  /// has. The names are the point: the row that hurts is usually not the one
+  /// naming `dw_account` but the one hanging off it, and a project reading
+  /// "user_profile" would have missed the answers behind it.
+  Future<void> _checkAccountCascades(DwDatabaseHandle db) async {
+    final ofProject = DwAccountCascades.projectOnesOf(
+      await DwAccountCascades.of(db),
+    );
+    if (ofProject.isEmpty) return;
+    if (auth.onAccountDeleting == null) {
+      throw DwStartupException([DwAccountCascades.complaintFor(ofProject)]);
+    }
+    logger.info(DwAccountCascades.noticeFor(ofProject));
   }
 
   @internal

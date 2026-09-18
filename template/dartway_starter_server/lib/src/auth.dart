@@ -77,13 +77,23 @@ abstract final class AppAuth {
       if (profile != null) await AppPublications.profile(ctx, profile);
     },
 
-    // Deleting an account (`DwDeleteMyAccount`) is not configured here, and the
-    // starter's profile goes with it: `user_profile.account_id` is
-    // `ON DELETE CASCADE`, and nothing else points at the profile.
+    // Deleting an account (`DwDeleteMyAccount`) takes the starter's profile
+    // with it: `user_profile.account_id` is `ON DELETE CASCADE`, and the
+    // profile is the only row this project keeps about a person. Declared
+    // rather than left to the cascade alone — the server refuses to start
+    // when a project's rows hang off `dw_account` and nothing here says what
+    // should happen to them, because that is how a stand once lost every
+    // survey answer behind its profiles on the first deletion.
+    onAccountDeleting: (ctx, accountId) async {
+      // Nothing to do: the profile goes with the account, and it is all
+      // there is. The moment something else points at the profile — a
+      // message, an order, a review someone else reads — this is where the
+      // project decides, and the answer is usually a tombstone rather than a
+      // deletion.
+    },
     //
-    // Add `onAccountDeleting` as soon as something does — a message, a post, an
-    // order, a review someone else reads. Two honest answers, and the project
-    // picks one per kind of row:
+    // When something else does point at the profile, there are two honest
+    // answers, and the project picks one per kind of row:
     //
     //  * delete it, when it is about that person alone (their own drafts, their
     //    settings, their files);

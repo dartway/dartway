@@ -437,6 +437,12 @@ it. `DwAuthConfig` in `lib/src/`:
     carries nothing of the person. Worked out in full in `example/` — hook, migration, flag,
     acceptance test.
 
+  **The server checks this at startup and refuses to start when nobody has.** It follows every
+  `ON DELETE CASCADE` from `dw_account` — transitively — and a project table among them with no
+  `onAccountDeleting` stops the server with the table names. That is not pedantry: a project whose
+  `user_profile` cascaded off the account and whose `survey_answer` cascaded off the profile lost
+  both on the first deletion after its pin moved, and found out from a review.
+
   Never the third route: a `hidden` flag with the name and the phone still in the row. It is the
   cheapest to write and it is not a deletion — neither the member nor the law was offered it. And
   whichever route the project takes, **the app says which one before it asks to confirm**;

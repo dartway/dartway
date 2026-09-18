@@ -168,6 +168,21 @@ sessions close), and the account with its identities, keys and push devices. Ana
 account. On the client, `dw.deleteAccount()` sends it and ends the session once the server
 confirms; the skeleton's profile page has the button, with a confirmation.
 
+**The server refuses to start when it would delete project rows nobody decided about.** At startup
+it reads its own foreign keys and follows every `ON DELETE CASCADE` from `dw_account` — through as
+many hops as there are, because the row that hurts is usually not the one naming the account but the
+one hanging off it. If any of them belong to the project and `onAccountDeleting` is not set, the
+server does not start and names the tables. When the hook is set, the same list is logged on every
+start: *deleting an account also deletes: user_profile, survey_answer*.
+
+This exists because it happened. `DwDeleteMyAccount` is part of every server, so a project that had
+pointed its own rows at `dw_account` with a cascade — the obvious way to write that foreign key —
+made them deletable by the person they are about the moment its framework pin moved. Nothing in the
+project changed, nothing failed to compile, no test went red, and a stand lost every survey answer
+behind its profiles on the first deletion. The three ways out are the hook itself (delete or
+tombstone), a refusal inside it (`ctx.refuse(...)`) while the project has not decided — honest and
+reversible — or an empty hook with a comment saying those rows are meant to go.
+
 **What the project deletes, and what it keeps.** The hook answers one question per kind of row:
 *is this about that person alone, or does someone else hold on to it?* A person's own drafts,
 settings and files go with them. What other people read — a message in a chat, a post, a review, an
