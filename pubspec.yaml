@@ -22,6 +22,7 @@ workspace:
   - packages/dartway_router
   - packages/dartway_shared_preferences
   - packages/dartway_studio_bridge
+  - packages/dartway_studio_binding
   - packages/dartway_telegram
   - tool
 
