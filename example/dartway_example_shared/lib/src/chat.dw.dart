@@ -105,6 +105,7 @@ mixin _$ChatMessageQuote on DwDataObject {
     'id': _self.id,
     'sentAt': DwJsonCodec.encodeDateTime(_self.sentAt),
     'authorName': _self.authorName,
+    if (_self.authorDeleted) 'authorDeleted': _self.authorDeleted,
     'text': _self.text,
     'isDeleted': _self.isDeleted,
     if (_self.hasAttachments) 'hasAttachments': _self.hasAttachments,
@@ -117,6 +118,7 @@ mixin _$ChatMessageQuote on DwDataObject {
           other.id == _self.id &&
           other.sentAt == _self.sentAt &&
           other.authorName == _self.authorName &&
+          other.authorDeleted == _self.authorDeleted &&
           other.text == _self.text &&
           other.isDeleted == _self.isDeleted &&
           other.hasAttachments == _self.hasAttachments;
@@ -126,6 +128,7 @@ mixin _$ChatMessageQuote on DwDataObject {
     _self.id,
     _self.sentAt,
     _self.authorName,
+    _self.authorDeleted,
     _self.text,
     _self.isDeleted,
     _self.hasAttachments,
@@ -133,7 +136,7 @@ mixin _$ChatMessageQuote on DwDataObject {
 
   @override
   String toString() =>
-      'ChatMessageQuote(id: ${_self.id}, sentAt: ${_self.sentAt}, authorName: ${_self.authorName}, text: ${_self.text}, isDeleted: ${_self.isDeleted}, hasAttachments: ${_self.hasAttachments})';
+      'ChatMessageQuote(id: ${_self.id}, sentAt: ${_self.sentAt}, authorName: ${_self.authorName}, authorDeleted: ${_self.authorDeleted}, text: ${_self.text}, isDeleted: ${_self.isDeleted}, hasAttachments: ${_self.hasAttachments})';
 }
 
 ChatMessageQuote $ChatMessageQuoteFromJson(Map<String, Object?> json) =>
@@ -141,6 +144,9 @@ ChatMessageQuote $ChatMessageQuoteFromJson(Map<String, Object?> json) =>
       id: json['id']! as int,
       sentAt: DwJsonCodec.decodeDateTime(json['sentAt']),
       authorName: json['authorName']! as String,
+      authorDeleted: json['authorDeleted'] == null
+          ? false
+          : json['authorDeleted']! as bool,
       text: json['text']! as String,
       isDeleted: json['isDeleted']! as bool,
       hasAttachments: json['hasAttachments'] == null
@@ -153,6 +159,7 @@ extension ChatMessageQuoteCopyWith on ChatMessageQuote {
     int? id,
     DateTime? sentAt,
     String? authorName,
+    bool? authorDeleted,
     String? text,
     bool? isDeleted,
     bool? hasAttachments,
@@ -160,6 +167,7 @@ extension ChatMessageQuoteCopyWith on ChatMessageQuote {
     id: id ?? this.id,
     sentAt: sentAt ?? this.sentAt,
     authorName: authorName ?? this.authorName,
+    authorDeleted: authorDeleted ?? this.authorDeleted,
     text: text ?? this.text,
     isDeleted: isDeleted ?? this.isDeleted,
     hasAttachments: hasAttachments ?? this.hasAttachments,

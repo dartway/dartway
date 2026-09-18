@@ -179,6 +179,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatEdited => 'edited';
 
   @override
+  String get chatDeletedMember => 'Member who left';
+
+  @override
   String get chatDeletedMessage => 'Deleted message';
 
   @override

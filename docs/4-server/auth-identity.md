@@ -168,6 +168,28 @@ sessions close), and the account with its identities, keys and push devices. Ana
 account. On the client, `dw.deleteAccount()` sends it and ends the session once the server
 confirms; the skeleton's profile page has the button, with a confirmation.
 
+**What the project deletes, and what it keeps.** The hook answers one question per kind of row:
+*is this about that person alone, or does someone else hold on to it?* A person's own drafts,
+settings and files go with them. What other people read — a message in a chat, a post, a review, an
+order a colleague is fulfilling — cannot go without taking somebody else's history with it. Those
+rows keep pointing at the profile, and the profile becomes a **tombstone**: the row stays, its
+`account_id` is nulled (declare the column nullable with `ON DELETE SET NULL`), a `deleted_at` is
+stamped, and every personal field — name, phone, photo, anything the person wrote about themselves —
+is cleared in the hook. Its data objects carry a flag (`isDeleted`) and the screens name it: "member
+who left". Nothing of the person is left in the framework's tables either way; what is left is an
+author with no one behind it.
+
+What this is not: hiding the account behind a flag and keeping the name and the phone number. That
+is the shortcut every system is tempted by, and it is a deletion the person was not offered and the
+law does not recognise. Whichever route a project takes, the app says which one **before** it asks
+to confirm — "your account and your data are deleted; your messages stay, signed by a member who
+left" is honest, "everything will be deleted" while the profile survives is not.
+
+`example/` carries the tombstone end to end — the hook, the migration, the flag on the data objects,
+the acceptance test that another member's chat keeps its messages after their author leaves. The
+template deletes the profile outright, which is right while nothing else points at it, and says in
+`auth.dart` when that stops being true.
+
 On the client, the app sends these commands like any other and keeps the answered session with
 `dw.signIn(session)` ([Flutter core](../3-flutter/flutter-core.md)).
 

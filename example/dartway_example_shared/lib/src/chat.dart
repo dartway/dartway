@@ -63,13 +63,20 @@ final class ChatMessageQuote extends DwDataObject with _$ChatMessageQuote {
     required this.text,
     required this.isDeleted,
     this.hasAttachments = false,
+    this.authorDeleted = false,
   });
 
   /// The quoted message id.
   @override
   final int id;
   final DateTime sentAt;
+
+  /// Empty when [authorDeleted]: the screen names them itself.
   final String authorName;
+
+  /// The quoted message's author deleted their account. See
+  /// [PersonCard.isDeleted].
+  final bool authorDeleted;
 
   /// Empty for a deleted message.
   final String text;

@@ -5,6 +5,7 @@ import 'package:dartway_push_server/dartway_push_server.dart';
 import '../../generated/dw_schema.dart';
 import '../club_objects.dart';
 import '../entities/content.dart';
+import '../entities/people.dart';
 import '../example_context.dart';
 import 'admin_handlers.dart';
 
@@ -39,11 +40,14 @@ final contentHandlers = <DwCallHandler>[
       // Queued in this transaction: a refused or failed publication notifies
       // nobody. Who of the members receives it is the push eligibility rule's
       // decision (marketing consent), taken when the delivery is due.
+      // Everyone but the author, and nobody who left: a tombstone profile
+      // has no account to push to.
       final members = await ctx.db.userProfiles.find(
-        where: (t) => t.accountId.notEquals(me.accountId),
+        where: (t) =>
+            t.accountId.isNotNull() & t.accountId.notEquals(me.ownerAccountId),
       );
       await ctx.push.send(
-        [for (final member in members) member.accountId],
+        [for (final member in members) member.ownerAccountId],
         message: DwPushMessage(
           title: post.title,
           body: post.text.length > 140

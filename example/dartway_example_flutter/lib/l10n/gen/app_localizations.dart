@@ -404,6 +404,12 @@ abstract class AppLocalizations {
   /// **'edited'**
   String get chatEdited;
 
+  /// No description provided for @chatDeletedMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Member who left'**
+  String get chatDeletedMember;
+
   /// No description provided for @chatDeletedMessage.
   ///
   /// In en, this message translates to:

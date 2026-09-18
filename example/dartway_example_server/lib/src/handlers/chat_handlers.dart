@@ -5,6 +5,7 @@ import '../../generated/dw_schema.dart';
 import '../chat/chat_objects.dart';
 import '../chat/chat_reads.dart';
 import '../entities/chat.dart';
+import '../entities/people.dart';
 import '../example_channels.dart';
 import '../example_context.dart';
 
@@ -306,7 +307,7 @@ final chatHandlers = <DwCallHandler>[
       );
       // The caller's other devices: their unread badges follow.
       ctx.publish(
-        DwLiveChannel.forAccount(ExampleChannel.chatReads, me.accountId),
+        DwLiveChannel.forAccount(ExampleChannel.chatReads, me.ownerAccountId),
         state,
       );
       return state;

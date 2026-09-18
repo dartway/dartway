@@ -13,6 +13,7 @@ mixin _$PersonCard on DwDataObject {
     'firstName': _self.firstName,
     if (_self.lastName != null) 'lastName': _self.lastName,
     if (_self.imageUrl != null) 'imageUrl': _self.imageUrl,
+    if (_self.isDeleted) 'isDeleted': _self.isDeleted,
   };
 
   @override
@@ -22,15 +23,21 @@ mixin _$PersonCard on DwDataObject {
           other.id == _self.id &&
           other.firstName == _self.firstName &&
           other.lastName == _self.lastName &&
-          other.imageUrl == _self.imageUrl;
+          other.imageUrl == _self.imageUrl &&
+          other.isDeleted == _self.isDeleted;
 
   @override
-  int get hashCode =>
-      Object.hash(_self.id, _self.firstName, _self.lastName, _self.imageUrl);
+  int get hashCode => Object.hash(
+    _self.id,
+    _self.firstName,
+    _self.lastName,
+    _self.imageUrl,
+    _self.isDeleted,
+  );
 
   @override
   String toString() =>
-      'PersonCard(id: ${_self.id}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, imageUrl: ${_self.imageUrl})';
+      'PersonCard(id: ${_self.id}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, imageUrl: ${_self.imageUrl}, isDeleted: ${_self.isDeleted})';
 }
 
 PersonCard $PersonCardFromJson(Map<String, Object?> json) => PersonCard(
@@ -38,6 +45,7 @@ PersonCard $PersonCardFromJson(Map<String, Object?> json) => PersonCard(
   firstName: json['firstName']! as String,
   lastName: json['lastName'] as String?,
   imageUrl: json['imageUrl'] as String?,
+  isDeleted: json['isDeleted'] == null ? false : json['isDeleted']! as bool,
 );
 
 extension PersonCardCopyWith on PersonCard {
@@ -46,11 +54,13 @@ extension PersonCardCopyWith on PersonCard {
     String? firstName,
     DwFieldPatch<String> lastName = const DwFieldPatch.keep(),
     DwFieldPatch<String> imageUrl = const DwFieldPatch.keep(),
+    bool? isDeleted,
   }) => PersonCard(
     id: id ?? this.id,
     firstName: firstName ?? this.firstName,
     lastName: lastName.apply(this.lastName),
     imageUrl: imageUrl.apply(this.imageUrl),
+    isDeleted: isDeleted ?? this.isDeleted,
   );
 }
 
@@ -63,7 +73,7 @@ mixin _$UserProfile on DwDataObject {
   @override
   Map<String, Object?> toJson() => {
     'id': _self.id,
-    'accountId': _self.accountId,
+    if (_self.accountId != null) 'accountId': _self.accountId,
     'phone': _self.phone,
     'firstName': _self.firstName,
     if (_self.lastName != null) 'lastName': _self.lastName,
@@ -71,6 +81,7 @@ mixin _$UserProfile on DwDataObject {
     if (_self.gender != null) 'gender': _self.gender!.name,
     'role': _self.role.name,
     'agreedForMarketing': _self.agreedForMarketing,
+    if (_self.isDeleted) 'isDeleted': _self.isDeleted,
   };
 
   @override
@@ -85,7 +96,8 @@ mixin _$UserProfile on DwDataObject {
           other.imageUrl == _self.imageUrl &&
           other.gender == _self.gender &&
           other.role == _self.role &&
-          other.agreedForMarketing == _self.agreedForMarketing;
+          other.agreedForMarketing == _self.agreedForMarketing &&
+          other.isDeleted == _self.isDeleted;
 
   @override
   int get hashCode => Object.hash(
@@ -98,16 +110,17 @@ mixin _$UserProfile on DwDataObject {
     _self.gender,
     _self.role,
     _self.agreedForMarketing,
+    _self.isDeleted,
   );
 
   @override
   String toString() =>
-      'UserProfile(id: ${_self.id}, accountId: ${_self.accountId}, phone: ${_self.phone}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, imageUrl: ${_self.imageUrl}, gender: ${_self.gender}, role: ${_self.role}, agreedForMarketing: ${_self.agreedForMarketing})';
+      'UserProfile(id: ${_self.id}, accountId: ${_self.accountId}, phone: ${_self.phone}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, imageUrl: ${_self.imageUrl}, gender: ${_self.gender}, role: ${_self.role}, agreedForMarketing: ${_self.agreedForMarketing}, isDeleted: ${_self.isDeleted})';
 }
 
 UserProfile $UserProfileFromJson(Map<String, Object?> json) => UserProfile(
   id: json['id']! as int,
-  accountId: json['accountId']! as int,
+  accountId: json['accountId'] as int?,
   phone: json['phone']! as String,
   firstName: json['firstName']! as String,
   lastName: json['lastName'] as String?,
@@ -117,12 +130,13 @@ UserProfile $UserProfileFromJson(Map<String, Object?> json) => UserProfile(
       : DwJsonCodec.decodeEnum(json['gender'], UserGender.values),
   role: DwJsonCodec.decodeEnum(json['role'], UserRole.values),
   agreedForMarketing: json['agreedForMarketing']! as bool,
+  isDeleted: json['isDeleted'] == null ? false : json['isDeleted']! as bool,
 );
 
 extension UserProfileCopyWith on UserProfile {
   UserProfile copyWith({
     int? id,
-    int? accountId,
+    DwFieldPatch<int> accountId = const DwFieldPatch.keep(),
     String? phone,
     String? firstName,
     DwFieldPatch<String> lastName = const DwFieldPatch.keep(),
@@ -130,9 +144,10 @@ extension UserProfileCopyWith on UserProfile {
     DwFieldPatch<UserGender> gender = const DwFieldPatch.keep(),
     UserRole? role,
     bool? agreedForMarketing,
+    bool? isDeleted,
   }) => UserProfile(
     id: id ?? this.id,
-    accountId: accountId ?? this.accountId,
+    accountId: accountId.apply(this.accountId),
     phone: phone ?? this.phone,
     firstName: firstName ?? this.firstName,
     lastName: lastName.apply(this.lastName),
@@ -140,6 +155,7 @@ extension UserProfileCopyWith on UserProfile {
     gender: gender.apply(this.gender),
     role: role ?? this.role,
     agreedForMarketing: agreedForMarketing ?? this.agreedForMarketing,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
 }
 

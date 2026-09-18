@@ -270,7 +270,7 @@ class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: ChatQuoteBlock(
                 icon: Icons.reply,
-                title: l10n.chatReplyTo(replyTo.authorName),
+                title: l10n.chatReplyTo(replyTo.authorNameIn(l10n)),
                 text: replyTo.text.isEmpty ? l10n.chatPhoto : replyTo.text,
                 cancelTooltip: l10n.cancel,
                 onTap: () => session.showMessage(replyTo.id, replyTo.sentAt),

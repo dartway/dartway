@@ -58,12 +58,14 @@ class ChatMessageRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!isMine && first) ChatAuthorName(message.authorName),
+          if (!isMine && first) ChatAuthorName(message.authorNameIn(l10n)),
           if (message.replyTo case final quote?)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: ChatQuoteBlock(
-                title: quote.authorName,
+                title: quote.authorDeleted
+                    ? l10n.chatDeletedMember
+                    : quote.authorName,
                 text: quote.isDeleted
                     ? l10n.chatDeletedMessage
                     : quote.text.isEmpty && quote.hasAttachments
@@ -122,7 +124,7 @@ class ChatMessageRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isMine) ...[
-                ChatAuthorAvatar(name: message.authorName, visible: last),
+                ChatAuthorAvatar(name: message.authorNameIn(l10n), visible: last),
                 const SizedBox(width: 6),
               ],
               Flexible(

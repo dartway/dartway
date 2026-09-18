@@ -84,6 +84,7 @@
   "chatToday": "Today",
   "chatYesterday": "Yesterday",
   "chatEdited": "edited",
+  "chatDeletedMember": "Member who left",
   "chatDeletedMessage": "Deleted message",
   "chatPinnedMessage": "Pinned message",
   "chatPinnedPosition": "{index} of {count}",

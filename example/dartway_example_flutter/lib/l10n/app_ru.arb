@@ -58,6 +58,7 @@
   "chatToday": "Сегодня",
   "chatYesterday": "Вчера",
   "chatEdited": "изменено",
+  "chatDeletedMember": "Участник удалён",
   "chatDeletedMessage": "Удалённое сообщение",
   "chatPinnedMessage": "Закреплённое сообщение",
   "chatPinnedPosition": "{index} из {count}",

@@ -54,10 +54,14 @@ extension ChatMessageFacts on ChatMessage {
       sentAt.isSameLocalDay(older.sentAt) &&
       sentAt.difference(older.sentAt) <= chatGroupGap;
 
-  String get authorName => [
-    author.firstName,
-    if (author.lastName case final last? when last.isNotEmpty) last,
-  ].join(' ');
+  /// The author as the chat names them — or, for a member who deleted their
+  /// account, what is left to name: the club keeps their messages, not them.
+  String authorNameIn(AppLocalizations l10n) => author.isDeleted
+      ? l10n.chatDeletedMember
+      : [
+          author.firstName,
+          if (author.lastName case final last? when last.isNotEmpty) last,
+        ].join(' ');
 
   /// Whether [profileId]'s author may still edit it at [now].
   bool editableBy(int profileId, {DateTime? now}) =>

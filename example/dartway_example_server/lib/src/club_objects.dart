@@ -15,6 +15,7 @@ abstract final class ClubObjects {
     firstName: row.firstName,
     lastName: row.lastName,
     imageUrl: row.imageUrl,
+    isDeleted: row.deletedAt != null,
   );
 
   static UserProfile profile(UserProfileRow row) => UserProfile(
@@ -27,6 +28,7 @@ abstract final class ClubObjects {
     gender: row.gender,
     role: row.role,
     agreedForMarketing: row.agreedForMarketing,
+    isDeleted: row.deletedAt != null,
   );
 
   static ClubService service(ClubServiceRow row) => ClubService(
@@ -122,7 +124,10 @@ abstract final class ClubObjects {
       for (final row in rows)
         SessionBooking(
           id: row.id!,
-          accountId: clients[row.clientProfileId]!.accountId,
+          // A booking always belongs to someone who is here: the last thing
+          // a member's deletion does is cancel the ones still ahead, and the
+          // ones behind are read by nobody but them.
+          accountId: clients[row.clientProfileId]!.ownerAccountId,
           session: sessionsById[row.sessionId]!,
           status: row.status,
           createdAt: row.createdAt,

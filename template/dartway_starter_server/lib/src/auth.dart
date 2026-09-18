@@ -76,6 +76,27 @@ abstract final class AppAuth {
       );
       if (profile != null) await AppPublications.profile(ctx, profile);
     },
+
+    // Deleting an account (`DwDeleteMyAccount`) is not configured here, and the
+    // starter's profile goes with it: `user_profile.account_id` is
+    // `ON DELETE CASCADE`, and nothing else points at the profile.
+    //
+    // Add `onAccountDeleting` as soon as something does — a message, a post, an
+    // order, a review someone else reads. Two honest answers, and the project
+    // picks one per kind of row:
+    //
+    //  * delete it, when it is about that person alone (their own drafts, their
+    //    settings, their files);
+    //  * keep it and empty the profile instead — a **tombstone**: the row stays
+    //    with a `deleted_at` and no name, phone or photo, `account_id` nulled by
+    //    `ON DELETE SET NULL`, so other people's content keeps an author and the
+    //    screens say "member who left". The example does exactly this, in
+    //    `example/dartway_example_server/lib/src/example_auth.dart`.
+    //
+    // What may not be done is hiding the person behind a flag and keeping their
+    // name and phone: that is a deletion the law does not accept and the member
+    // was not told about. Whichever route the project takes, the app says which
+    // one before it asks the member to confirm.
     resendDelay: resendDelay,
   );
 

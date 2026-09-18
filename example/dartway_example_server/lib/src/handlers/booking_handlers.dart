@@ -139,7 +139,7 @@ final bookingHandlers = <DwCallHandler>[
       final object = (await ClubObjects.bookings(ctx.db, [
         booking,
       ], client: me)).single;
-      ctx.publish(ExampleChannels.bookingsOf(me.accountId), object);
+      ctx.publish(ExampleChannels.bookingsOf(me.ownerAccountId), object);
       return object;
     },
   ),
@@ -162,7 +162,7 @@ extension on DwCallContext {
     )).single;
     this
       ..publish(scheduleChannel, sessionObject)
-      ..publish(ExampleChannels.bookingsOf(client.accountId), object);
+      ..publish(ExampleChannels.bookingsOf(client.ownerAccountId), object);
     return object;
   }
 }

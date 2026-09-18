@@ -1,12 +1,15 @@
 import 'dart:io';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../generated/dw_schema.dart';
 import 'club_objects.dart';
+import 'entities/club.dart';
 import 'entities/people.dart';
 import 'example_channels.dart';
 import 'handlers/admin_handlers.dart';
+import 'handlers/schedule_handlers.dart';
 
 /// Signing in by a code to a phone, and the profile an account starts with.
 abstract final class ExampleAuth {
@@ -52,6 +55,63 @@ abstract final class ExampleAuth {
       ctx
         ..publish(adminChannel, await ctx.countAdminCounters())
         ..publish(adminChannel, ClubObjects.profile(profile));
+    },
+
+    // Deleting an account leaves a tombstone, not a hole. The person goes:
+    // name, phone, photo, the code they signed in with. The profile row stays,
+    // because other people's content points at it — their messages in a staff
+    // chat, the news they wrote, the reviews of visits the club counted — and
+    // a club that loses those loses somebody else's history, not theirs. What
+    // is left says one thing: a member who left.
+    //
+    // `user_profile.account_id` is `ON DELETE SET NULL`, so the framework's own
+    // deletion of the account unlinks the row a moment after this hook.
+    onAccountDeleting: (ctx, accountId) async {
+      final profile = await ctx.db.userProfiles.findFirst(
+        where: (t) => t.accountId.equals(accountId),
+      );
+      if (profile == null) return;
+      // Spots held for sessions still to come go back to the club: nobody is
+      // coming, and the next member should be able to book them.
+      final held = await ctx.db.sessionBookings.find(
+        where: (t) =>
+            t.clientProfileId.equals(profile.id!) &
+            t.status.equals(BookingStatus.booked),
+        lock: DwRowLock.forUpdate,
+      );
+      for (final booking in held) {
+        await ctx.db.sessionBookings.update(
+          booking.copyWith(status: BookingStatus.cancelled),
+        );
+        final session = (await ctx.db.clubSessions.findById(
+          booking.sessionId,
+          lock: DwRowLock.forUpdate,
+        ))!;
+        final freed = await ctx.db.clubSessions.update(
+          session.copyWith(bookedCount: session.bookedCount - 1),
+        );
+        ctx.publish(
+          scheduleChannel,
+          (await ClubObjects.sessions(ctx.db, [freed])).single,
+        );
+      }
+      final tombstone = await ctx.db.userProfiles.update(
+        profile.copyWith(
+          firstName: '',
+          lastName: const DwFieldPatch.clear(),
+          phone: '',
+          imageUrl: const DwFieldPatch.clear(),
+          gender: const DwFieldPatch.clear(),
+          testVerificationCode: const DwFieldPatch.clear(),
+          agreedForMarketing: false,
+          deletedAt: DwFieldPatch.set(DateTime.now()),
+        ),
+      );
+      // The admins' members table holds the row: it must show what it became,
+      // not what it was.
+      ctx
+        ..publish(adminChannel, ClubObjects.profile(tombstone))
+        ..publish(adminChannel, await ctx.countAdminCounters());
     },
 
     // The profile shows the phone the member signs in with. The framework owns

@@ -18,7 +18,8 @@ mixin _$UserProfileRow on DwTableRow {
           other.role == _self.role &&
           other.agreedForMarketing == _self.agreedForMarketing &&
           other.conditionsAcceptedAt == _self.conditionsAcceptedAt &&
-          other.testVerificationCode == _self.testVerificationCode;
+          other.testVerificationCode == _self.testVerificationCode &&
+          other.deletedAt == _self.deletedAt;
 
   @override
   int get hashCode => Object.hash(
@@ -33,17 +34,18 @@ mixin _$UserProfileRow on DwTableRow {
     _self.agreedForMarketing,
     _self.conditionsAcceptedAt,
     _self.testVerificationCode,
+    _self.deletedAt,
   );
 
   @override
   String toString() =>
-      'UserProfileRow(id: ${_self.id}, accountId: ${_self.accountId}, phone: ${_self.phone}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, imageUrl: ${_self.imageUrl}, gender: ${_self.gender}, role: ${_self.role}, agreedForMarketing: ${_self.agreedForMarketing}, conditionsAcceptedAt: ${_self.conditionsAcceptedAt}, testVerificationCode: ${_self.testVerificationCode})';
+      'UserProfileRow(id: ${_self.id}, accountId: ${_self.accountId}, phone: ${_self.phone}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, imageUrl: ${_self.imageUrl}, gender: ${_self.gender}, role: ${_self.role}, agreedForMarketing: ${_self.agreedForMarketing}, conditionsAcceptedAt: ${_self.conditionsAcceptedAt}, testVerificationCode: ${_self.testVerificationCode}, deletedAt: ${_self.deletedAt})';
 }
 
 extension UserProfileRowCopyWith on UserProfileRow {
   UserProfileRow copyWith({
     DwFieldPatch<int> id = const DwFieldPatch.keep(),
-    int? accountId,
+    DwFieldPatch<int> accountId = const DwFieldPatch.keep(),
     String? phone,
     String? firstName,
     DwFieldPatch<String> lastName = const DwFieldPatch.keep(),
@@ -53,9 +55,10 @@ extension UserProfileRowCopyWith on UserProfileRow {
     bool? agreedForMarketing,
     DateTime? conditionsAcceptedAt,
     DwFieldPatch<String> testVerificationCode = const DwFieldPatch.keep(),
+    DwFieldPatch<DateTime> deletedAt = const DwFieldPatch.keep(),
   }) => UserProfileRow(
     id: id.apply(this.id),
-    accountId: accountId ?? this.accountId,
+    accountId: accountId.apply(this.accountId),
     phone: phone ?? this.phone,
     firstName: firstName ?? this.firstName,
     lastName: lastName.apply(this.lastName),
@@ -65,17 +68,18 @@ extension UserProfileRowCopyWith on UserProfileRow {
     agreedForMarketing: agreedForMarketing ?? this.agreedForMarketing,
     conditionsAcceptedAt: conditionsAcceptedAt ?? this.conditionsAcceptedAt,
     testVerificationCode: testVerificationCode.apply(this.testVerificationCode),
+    deletedAt: deletedAt.apply(this.deletedAt),
   );
 }
 
 final class UserProfileTable extends DwTableDef<UserProfileRow> {
   const UserProfileTable() : super('user_profile');
 
-  DwTableColumn<int> get accountId => const DwTableColumn(
+  DwTableColumn<int?> get accountId => const DwTableColumn(
     'account_id',
     DwColumnType.bigint,
     unique: true,
-    references: DwForeignKey('dw_account', onDelete: DwOnDelete.cascade),
+    references: DwForeignKey('dw_account', onDelete: DwOnDelete.setNull),
   );
 
   DwTableColumn<String> get phone =>
@@ -105,6 +109,9 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
   DwTableColumn<String?> get testVerificationCode =>
       const DwTableColumn('test_verification_code', DwColumnType.text);
 
+  DwTableColumn<DateTime?> get deletedAt =>
+      const DwTableColumn('deleted_at', DwColumnType.timestamptz);
+
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
     id,
@@ -118,6 +125,7 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
     agreedForMarketing,
     conditionsAcceptedAt,
     testVerificationCode,
+    deletedAt,
   ];
 
   @override
@@ -138,6 +146,7 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
     agreedForMarketing: row.decode(agreedForMarketing),
     conditionsAcceptedAt: row.decode(conditionsAcceptedAt),
     testVerificationCode: row.decode(testVerificationCode),
+    deletedAt: row.decode(deletedAt),
   );
 
   @override
@@ -153,5 +162,6 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
     'agreed_for_marketing': row.agreedForMarketing,
     'conditions_accepted_at': row.conditionsAcceptedAt,
     'test_verification_code': row.testVerificationCode,
+    'deleted_at': row.deletedAt,
   };
 }

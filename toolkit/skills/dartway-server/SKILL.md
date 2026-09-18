@@ -424,8 +424,22 @@ it. `DwAuthConfig` in `lib/src/`:
   the code stays usable;
 - **`onAccountDeleting(ctx, accountId)` deletes or anonymises the project's rows** when the account is
   deleted (`DwDeleteMyAccount`, required by app stores). A row that references `dw_account` without a
-  cascade must go here; what someone else sees (messages in a shared chat) is usually anonymised, not
-  deleted. The framework removes its own part — files, keys, identities — after the hook;
+  cascade must go here. The framework removes its own part — files, keys, identities — after the
+  hook. Decide per kind of row, by one question: **is this about that person alone, or does someone
+  else hold on to it?**
+  - *Theirs alone* — their drafts, their settings, their files, the spots they booked: delete it (a
+    held spot is released, so the next member can take it).
+  - *Somebody else's too* — a message in a shared chat, a post, a review, an order being fulfilled:
+    keep the row and empty the **profile** instead. The profile column referencing the account is
+    nullable with `ON DELETE SET NULL`, the hook stamps `deletedAt` and clears every personal field
+    (name, phone, photo, a test code), the data objects carry `isDeleted`, and the screens say
+    "member who left". That is a **tombstone**: what others wrote keeps an author, and the author
+    carries nothing of the person. Worked out in full in `example/` — hook, migration, flag,
+    acceptance test.
+
+  Never the third route: a `hidden` flag with the name and the phone still in the row. It is the
+  cheapest to write and it is not a deletion — neither the member nor the law was offered it. And
+  whichever route the project takes, **the app says which one before it asks to confirm**;
 - `onIdentifierChanged(ctx, change)` runs in the transaction of every identifier change the framework
   makes to an existing account (a confirmed attach or replace, `moveIdentities`, `removeIdentities`)
   — the place to mirror an identifier into a project row, or to republish the profile that shows it.

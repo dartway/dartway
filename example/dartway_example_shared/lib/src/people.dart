@@ -17,6 +17,7 @@ final class PersonCard extends DwDataObject with _$PersonCard {
     required this.firstName,
     this.lastName,
     this.imageUrl,
+    this.isDeleted = false,
   });
 
   /// The profile id.
@@ -25,13 +26,18 @@ final class PersonCard extends DwDataObject with _$PersonCard {
   final String firstName;
   final String? lastName;
   final String? imageUrl;
+
+  /// The person deleted their account: the profile stays so that what they
+  /// wrote keeps an author, and carries nothing of them. The screen shows
+  /// them as a deleted member; [firstName] is empty.
+  final bool isDeleted;
 }
 
 /// A profile as its owner and the club's admins see it.
 final class UserProfile extends DwDataObject with _$UserProfile {
   const UserProfile({
     required this.id,
-    required this.accountId,
+    this.accountId,
     required this.phone,
     required this.firstName,
     required this.role,
@@ -39,14 +45,16 @@ final class UserProfile extends DwDataObject with _$UserProfile {
     this.lastName,
     this.imageUrl,
     this.gender,
+    this.isDeleted = false,
   });
 
   /// The profile id.
   @override
   final int id;
 
-  /// The account the profile belongs to — the key of its owner's channels.
-  final int accountId;
+  /// The account the profile belongs to — the key of its owner's channels;
+  /// `null` for a profile whose owner deleted their account.
+  final int? accountId;
   final String phone;
   final String firstName;
   final String? lastName;
@@ -54,6 +62,9 @@ final class UserProfile extends DwDataObject with _$UserProfile {
   final UserGender? gender;
   final UserRole role;
   final bool agreedForMarketing;
+
+  /// See [PersonCard.isDeleted].
+  final bool isDeleted;
 }
 
 /// The signed-in member's own profile, live on their own profile channel.

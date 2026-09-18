@@ -179,6 +179,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatEdited => 'изменено';
 
   @override
+  String get chatDeletedMember => 'Участник удалён';
+
+  @override
   String get chatDeletedMessage => 'Удалённое сообщение';
 
   @override

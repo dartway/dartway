@@ -76,7 +76,11 @@ final adminHandlers = <DwCallHandler>[
         command.profileId,
         lock: DwRowLock.forUpdate,
       );
-      if (row == null) ctx.refuse(DwCoreRefusal.notFound);
+      // A member who left has no role to give: their profile is a tombstone
+      // the club keeps for what they wrote, not a person to promote.
+      if (row == null || row.deletedAt != null) {
+        ctx.refuse(DwCoreRefusal.notFound);
+      }
       final updated = await ctx.db.userProfiles.update(
         row.copyWith(role: command.role),
       );
@@ -85,10 +89,10 @@ final adminHandlers = <DwCallHandler>[
         ..publish(adminChannel, profile)
         // To the admins' table, and to the member's own profile — not to the
         // admin's, whose "my profile" does not declare that channel.
-        ..publish(ExampleChannels.profileOf(updated.accountId), profile);
+        ..publish(ExampleChannels.profileOf(updated.ownerAccountId), profile);
       // Access is checked once, at subscription: a role taken away closes
       // what it opened.
-      final account = updated.accountId;
+      final account = updated.ownerAccountId;
       if (row.role == UserRole.admin && command.role != UserRole.admin) {
         ctx.revoke(adminChannel, account);
       }

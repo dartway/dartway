@@ -100,6 +100,8 @@ abstract final class ChatObjects {
               id: quote.id!,
               sentAt: quote.sentAt,
               authorName: _nameOf(authors[quote.authorProfileId]!),
+              authorDeleted:
+                  authors[quote.authorProfileId]!.deletedAt != null,
               text: quote.isDeleted ? '' : quote.text,
               isDeleted: quote.isDeleted,
               hasAttachments:

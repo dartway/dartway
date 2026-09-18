@@ -39,6 +39,7 @@ final class ClubHarness {
           normalize: ExampleAuth.config.normalize,
           onAccountCreated: ExampleAuth.config.onAccountCreated,
           onIdentifierChanged: ExampleAuth.config.onIdentifierChanged,
+          onAccountDeleting: ExampleAuth.config.onAccountDeleting,
           deliverCode: (ctx, kind, identifier, code) async =>
               harness.delivered[identifier] = code,
         ),

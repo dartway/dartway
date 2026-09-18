@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,11 @@ class NewsPostCard extends StatelessWidget {
             const Gap(12),
             Row(
               children: [
-                Expanded(child: AppText.caption(post.author.firstName)),
+                Expanded(child: AppText.caption(
+                    post.author.isDeleted
+                        ? context.l10n.chatDeletedMember
+                        : post.author.firstName,
+                  )),
                 AppText.caption(
                   '${post.createdAt.dayLabel} · ${post.createdAt.timeLabel}',
                 ),

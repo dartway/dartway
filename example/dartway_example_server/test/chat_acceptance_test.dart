@@ -584,6 +584,49 @@ void main() {
       );
       expect(stored, hasLength(1));
     });
+    test('a member who deletes their account leaves their messages behind, '
+        'signed by nobody', () async {
+      final boris = await club.staff('79993000091', 'Boris');
+      final galina = await club.staff('79993000092', 'Galina');
+      final channel = await club.chatChannel('Front desk');
+      final borisProfileId = await club.profileIdOf(boris);
+      final mine = await boris.send(channel.id!, 'I am off to another club');
+      final hers = await galina.send(channel.id!, 'Good luck!');
+
+      expect(await boris.client.deleteAccount(), isA<DwCallOk<void>>());
+
+      final window = galina.client.watchWindow(
+        ListChatMessages(channelId: channel.id!),
+      );
+      addTearDown(window.close);
+      await eventually(() => itemsOf(window).length == 2);
+      final left = itemsOf(window).firstWhere((m) => m.id == mine.id);
+      expect(left.text, 'I am off to another club');
+      expect(left.author.id, borisProfileId, reason: 'the author is the same row');
+      expect(left.author.isDeleted, isTrue);
+      expect(left.author.firstName, isEmpty);
+      expect(
+        itemsOf(window).firstWhere((m) => m.id == hers.id).author.isDeleted,
+        isFalse,
+      );
+
+      // Nothing of the person is left in the row that outlived them.
+      final tombstone = (await club.db.userProfiles.findById(borisProfileId))!;
+      expect(tombstone.accountId, isNull);
+      expect(tombstone.deletedAt, isNotNull);
+      expect(tombstone.phone, isEmpty);
+      expect(tombstone.lastName, isNull);
+      expect(tombstone.imageUrl, isNull);
+      expect(
+        await club.db.query(
+          'SELECT 1 FROM dw_account WHERE id = @id',
+          params: {'id': boris.accountId},
+        ),
+        isEmpty,
+        reason: 'the account itself is gone, only the tombstone stays',
+      );
+    });
+
   });
 
   group('attachments on real storage', () {
