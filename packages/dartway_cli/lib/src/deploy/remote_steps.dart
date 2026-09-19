@@ -124,7 +124,8 @@ class DwRemoteSteps {
   }
 
   /// Records that step [id] exited 0 without doing its work, so a resumed
-  /// deployment runs it again instead of taking the exit code's word.
+  /// deployment stops on it instead of taking the exit code's word
+  /// (`--retry-failed` is what runs it again).
   Future<DwSshResult> reject(String id) =>
       ssh.runAs(deployUser, ": > '$directory/$id.rejected'");
 
