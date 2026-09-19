@@ -53,16 +53,13 @@ abstract final class DwJsonCodec {
     );
   }
 
-  /// The name [value] is stored as. Throws [StateError] for the `unknown`
-  /// value of an open enum: it stands for a name this build did not know,
-  /// and storing it would replace that name. Used where a value is written
-  /// to keep — a row column; the wire carries `unknown` as itself.
+  /// The name [value] is stored as. Throws [DwUnknownEnumWrite] for the
+  /// `unknown` value of an open enum: it stands for a name this build did not
+  /// know, and storing it would replace that name. Used where a value is
+  /// written to keep — a row column; the wire carries `unknown` as itself.
   static String encodeEnum(Enum value) {
     if (value is DwOpenEnum && value.isUnknown) {
-      throw StateError(
-        '${value.runtimeType}.unknown stands for a value this build does not '
-        'know and cannot be written; update the app',
-      );
+      throw DwUnknownEnumWrite(value.runtimeType);
     }
     return value.name;
   }

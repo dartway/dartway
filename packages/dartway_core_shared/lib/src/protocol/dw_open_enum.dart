@@ -41,3 +41,22 @@ final class DwUnknownEnumValue extends FormatException {
   final Type enumType;
   final String value;
 }
+
+/// An attempt to store the `unknown` of an open enum: it stands for a name
+/// this build did not know, and writing it would replace that name.
+///
+/// A type of its own rather than a bare error, because a call can answer it.
+/// The build sending `unknown` back is older than the data it is writing, so
+/// on a call this is `DwCoreRefusal.updateRequired` — the caller cannot
+/// correct its input, only become a build that knows the value. Left as a
+/// failure anywhere else: a write with no caller has nobody to tell.
+final class DwUnknownEnumWrite implements Exception {
+  DwUnknownEnumWrite(this.enumType);
+
+  final Type enumType;
+
+  @override
+  String toString() =>
+      '$enumType.${DwOpenEnum.fallbackName} stands for a value this build '
+      'does not know and cannot be written; update the app';
+}

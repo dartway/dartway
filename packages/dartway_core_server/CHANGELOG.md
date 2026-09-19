@@ -4,6 +4,7 @@
 
 The rewrite (see docs/1.0).
 
+- **A call that takes the `unknown` of an open enum to a write is answered `dw.updateRequired`** (D-071, #274). It used to leave the guard's throw to the generic catch: a 500 with an incident id for the caller and an alert for the operator, on an input the framework refuses on purpose. The build sending `unknown` back is older than the data it is writing and cannot correct its input, only update. Outside a call — a job, a module, a subscription — the same throw is still a failure.
 - **The seam for external sign-in** (D-073, in progress): `DwAccountService.signInWithExternalIdentity(provider:, subject:)` signs in — or creates — the account of an identity a provider proved, with `DwAuthConfig.onExternalAccountCreated` for the project's row, and `accountOfExternalIdentity` to look one up. The verification of a provider's token lives in `dartway_auth_providers_server`.
 
 - **Deleting an account** (D-072, nothing of the person left in the framework's tables — code tickets addressed to their identifiers and the outcomes of their commands go with the account, rather than waiting for the cleanup): `DwDeleteMyAccount` and `DwAccountService.deleteAccount` — `DwAuthConfig.onAccountDeleting` for the project's rows, then the account's files, keys (sessions end) and the account with its identities, in one transaction.

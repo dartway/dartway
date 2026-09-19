@@ -38,10 +38,17 @@ void main() {
     expect(FeedKind.unknown.isUnknown, isTrue);
   });
 
-  test('unknown is never written', () {
+  test('unknown is never written, and says so by its own type', () {
     expect(DwJsonCodec.encodeEnum(FeedKind.renamed), 'renamed');
-    expect(() => DwJsonCodec.encodeEnum(FeedKind.unknown), throwsStateError);
     expect(DwJsonCodec.encodeEnum(PlanStatus.draft), 'draft');
+    expect(
+      () => DwJsonCodec.encodeEnum(FeedKind.unknown),
+      throwsA(
+        isA<DwUnknownEnumWrite>()
+            .having((e) => e.enumType, 'enumType', FeedKind)
+            .having((e) => '$e', 'toString', contains('update the app')),
+      ),
+    );
   });
 
   test('an open enum without unknown is named when it is first read', () {

@@ -4,6 +4,7 @@
 
 The rewrite (see docs/1.0).
 
+- **Writing the `unknown` of an open enum throws `DwUnknownEnumWrite`**, not a bare `StateError` (D-071). The guarantee is unchanged — no build overwrites a value it did not know — but a type the call layer can catch is what lets the server answer it as `dw.updateRequired` instead of reporting an incident.
 - **`DwDeleteMyAccount`** — the built-in command that deletes the caller's account (D-072).
 
 - **`DwOpenEnum`, and unknown enum names as newer data** (D-071). `DwJsonCodec.decodeEnum` throws `DwUnknownEnumValue` (a `FormatException`) for a name a strict enum does not have, and reads it as `unknown` for an enum `with DwOpenEnum`; `DwJsonCodec.encodeEnum` refuses to write `unknown`.
