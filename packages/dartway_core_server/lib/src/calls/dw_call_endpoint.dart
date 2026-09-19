@@ -393,6 +393,16 @@ final class DwCallEndpoint {
   ) => switch (error) {
     DwRefusalException(:final refusal) => _refused(refusal),
     DwNotAuthenticatedException() => const DwApiResponse.unauthenticated(),
+    // The call carried the `unknown` of an open enum and the handler took it
+    // to a write. Stopping the write is right — no build overwrites a value
+    // it did not know (D-071) — but the outcome is an answer, not an
+    // incident: the caller is a build older than the data it is writing, and
+    // that is what `updateRequired` says. As a failure it paged the operator
+    // for an input the framework refused on purpose, and told the caller
+    // "internal server error" for a rule they could not have read.
+    DwUnknownEnumWrite() => _refused(
+      DwCallRefusal(DwCoreRefusal.updateRequired),
+    ),
     _ => DwApiResponse.failed(
       runtime.alerts.report(
         where: where,

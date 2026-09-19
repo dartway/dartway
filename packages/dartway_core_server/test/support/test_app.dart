@@ -506,6 +506,11 @@ final class TestApp {
             ctx.refuse(DwCoreRefusal.conflict, params: {'n': n});
           case 'outdated':
             ctx.refuse(DwCoreRefusal.updateRequired);
+          case 'unknownEnum':
+            // The guard itself, reached the way a handler reaches it: the
+            // column type a row write uses, on a value this build read as
+            // `unknown` off the wire.
+            const DwEnumType(FeedTone.values).encode(FeedTone.unknown);
           case 'failOnce' when failedOnce.add(command.label):
             throw StateError('first execution fails');
           case 'conflictOnce' when failedOnce.add(command.label):

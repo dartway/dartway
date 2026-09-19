@@ -365,6 +365,14 @@ row, show a neutral label); `unknown` can never be written to a **row**, so noth
 overwritten with it, and it does travel on the wire as itself — an older server answering from a
 row it cannot read sends `unknown` instead of failing the answer. `dartway generate` refuses an open enum without `unknown`.
 
+**An open enum in a command is the case those two halves create together**, and the framework
+answers it rather than leaving it to you: a build that read `unknown` off the wire and sends it
+back in a command is older than the data it is writing, so the call is answered
+`dw.updateRequired` — the update screen — and nothing is stored. Not an incident and not the
+caller's mistake: no alert reaches the operator, and no "internal server error" reaches the user.
+Prefer not to put an open enum in a command at all: it is a display value, and a command that
+carries one is asking an app to write back something it could not read.
+
 ## 10. Generation
 
 After any change to a DTO file (and to a row class on the server), from the project root:

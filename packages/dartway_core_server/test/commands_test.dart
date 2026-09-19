@@ -75,6 +75,23 @@ void main() {
       }
     });
 
+    test('a command that takes an unknown open enum to a write is answered '
+        'as updateRequired, and nobody is paged', () async {
+      final incidents = harness().app.alerts.incidents.length;
+      final answer = await harness().caller().call(
+        const Count('open-enum', mode: 'unknownEnum'),
+        key: 'r-open-enum',
+      );
+      expect(answer.status, 426);
+      expect(answer.refusal.isCode(DwCoreRefusal.updateRequired), isTrue);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(
+        harness().app.alerts.incidents.length,
+        incidents,
+        reason: 'a refusal the caller can act on is not an incident',
+      );
+    });
+
     test('a failure is not stored: the same key executes again', () async {
       final caller = harness().caller();
       final first = await caller.call(

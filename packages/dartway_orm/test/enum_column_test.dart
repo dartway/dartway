@@ -34,8 +34,14 @@ void main() {
 
     test('never writes unknown, so the name it stands for is not replaced', () {
       expect(column.encode(FeedKind.created), 'created');
-      expect(() => column.encode(FeedKind.unknown), throwsStateError);
-      expect(() => list.encode([FeedKind.unknown]), throwsStateError);
+      expect(
+        () => column.encode(FeedKind.unknown),
+        throwsA(isA<DwUnknownEnumWrite>()),
+      );
+      expect(
+        () => list.encode([FeedKind.unknown]),
+        throwsA(isA<DwUnknownEnumWrite>()),
+      );
     });
   });
 }

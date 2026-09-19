@@ -2,6 +2,11 @@
 // generate` produces (omission of absent fields, value equality).
 import 'package:dartway_core_server/dartway_core_server.dart';
 
+/// An open enum, for the write guard: a build meeting a value it does not
+/// know reads it as `unknown`, and sending that back to a write is what
+/// D-071 refuses.
+enum FeedTone with DwOpenEnum { plain, unknown }
+
 enum TestChannel with DwChannelKind {
   notes,
   account,
