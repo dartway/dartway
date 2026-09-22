@@ -68,7 +68,7 @@ The monorepo exists so that its parts evolve together. A change to the **public 
 6. **the package's `CHANGELOG.md`**;
 7. **the carets**, by the versioning rules below: the family in lockstep, satellites by D-032;
 8. **the wire** — a change to how anything travels bumps `dwProtocolVersion` and refreshes the wire golden (see "The wire is a protocol");
-9. **`docs/migrations/`** — a note when the change asks a project on the framework to edit its own code, **including during the rewrite** (D-080). The projects already on it follow the branch, and a note is shown to a project below the version it names — so such a change also **raises the version**: the family's prerelease in lockstep (`0.20.0-dev.N`), or the satellite's own, with the carets in `template/` and `example/`. What D-031 still means is that a project coming from 0.x is recreated rather than migrated, and no note is written for that journey.
+9. **`docs/migrations/`** — a note whenever the change asks a project to edit its own code, written in the same pull request, with no exemption for the rewrite (D-080). A note is shown to a project below the version it names, so such a change also **raises the version** that delivers it: the family's prerelease in lockstep (`0.20.0-dev.N`), or the satellite's own, with the carets in `template/` and `example/`. The one journey without a note is a project coming from 0.x — it is recreated on the rewrite rather than migrated (D-031).
 
 Four of these are held by checks rather than by memory, and they are the reason the list can be trusted:
 

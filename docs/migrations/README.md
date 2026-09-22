@@ -13,8 +13,13 @@ update is reading errors instead of instructions.
 
 ## When a note is written
 
-**In the same pull request as the change, and only when a project has work to do.** The test is
-whether an application on the framework, doing nothing wrong, would have to touch its own code:
+**In the same pull request as the change, and only when a project has work to do.** There is no
+exemption: not for work in progress, not for a package nobody has published yet, not for the
+rewrite. A change reaches `master`, so it reaches the projects that follow `master`, and what they
+have to edit is decided by the person who broke it — not by each project on its own.
+
+The test is whether an application on the framework, doing nothing wrong, would have to touch its
+own code:
 
 - a public symbol renamed, removed or given a different signature;
 - a changed default that alters behaviour a project relies on;
@@ -30,22 +35,22 @@ The `framework-finish` skill asks for this by name, and the reason it is a step 
 is that the author of a change is the last person who can see it as a stranger would, and the only
 one who still knows what they broke.
 
-## During the rewrite, too
+## The version is what delivers the note
 
-The DartWay 1.0 rewrite is not released and its packages stay `0.x`; what it does **not** have is
-projects standing still. Studio, U90 and Molodey are already on it and follow it, so a change that
-asks them to edit their own code owes them a note exactly as a released change would — and they
-learn about it the same way, through `dartway update`.
+A note is shown to a project **below** the version it names — that is the whole of the filtering.
+So a change that writes a note also **moves the version**, in the same pull request:
 
-That works only if the version moves, because a note is shown to a project **below** the version it
-names. **So a change inside the rewrite that asks for an edit raises the family's prerelease**
-(`0.20.0-dev.1` → `dev.2`, in lockstep across the six) or the satellite's own version, writes the
-note against that number, and raises the carets in `template/` and `example/` with it. Each `dev.N`
-is a release to the projects that follow the branch, whatever it is to pub.dev.
+- **the core family**, in lockstep across the six, including during the rewrite: `0.20.0-dev.1` →
+  `0.20.0-dev.2`. Each `dev.N` is a release to the projects that follow the branch, whatever it is
+  to pub.dev — the family stood at `dev.1` from the day it was set until D-080, which made every
+  note written against it invisible to everyone;
+- **a satellite**, on its own version, by the usual rules (a pending patch in front of a breaking
+  change becomes a minor);
+- **the carets** in `template/` and `example/`, raised with it.
 
-What is still true from D-031: **nothing of 0.x is preserved**. A project coming from 0.x is
-recreated on the rewrite rather than migrated, databases included, and no note is written for that
-journey. The notes here address a project that is already on the rewrite and moving along it.
+The one journey that gets no note is a project coming from 0.x: it is recreated on the rewrite
+rather than migrated, databases included (D-031). Everything a project does *after* it is on the
+framework is a note's business.
 
 ## The form
 

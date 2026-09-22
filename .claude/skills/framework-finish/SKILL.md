@@ -108,12 +108,12 @@ The mirrors above keep this repository consistent with itself. This step is the 
 outward — to an application that is **behind**, and whose author will read what you write here
 weeks from now with none of today's context.
 
-**The rewrite is not exempt** (D-080). The projects already on it follow the branch, so a change
-that asks them to edit their own code carries a note — and, because a note reaches a project only
-when it is *below* the version named, the same change raises the version: the family's prerelease
-in lockstep (`0.20.0-dev.N`), or the satellite's own, with the carets in `template/` and
-`example/`. What D-031 still means is that a project coming from 0.x is recreated on the rewrite
-rather than migrated, and that journey gets no note.
+**No exemption, including for the rewrite** (D-080). A note is written in the same pull request as
+the change — and because a note reaches a project only when it is *below* the version named, the
+same pull request raises the version that delivers it: the family's prerelease in lockstep
+(`0.20.0-dev.N`), or the satellite's own, with the carets in `template/` and `example/`. The one
+journey without a note is a project coming from 0.x, which is recreated on the rewrite rather than
+migrated (D-031).
 
 **The test: would an application on the framework, doing nothing wrong, have to touch its own code
 because of this change?** If yes, the change is not finished until `docs/migrations/` holds a note
