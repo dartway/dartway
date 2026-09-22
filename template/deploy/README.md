@@ -5,11 +5,11 @@ any: provisioning, rendering, the secret store, restarts and verification belong
 to the framework.
 
 ```sh
-cp deploy/config.yaml.example deploy/config.yaml   # then fill it in
+# deploy/config.yaml already describes "local"; uncomment a deployment in it
 
 dartway deploy check --env staging --local  # the working copy only
 dartway deploy setup --env staging          # provision + render the stack
-dartway deploy secret set SMS_API_TOKEN --env staging   # what cannot be generated
+dartway secret set SMS_API_TOKEN --env staging   # what cannot be generated
 dartway deploy check --env staging          # DNS, the server, the site
 dartway deploy run   --env staging          # update, build, start, verify
 ```
@@ -18,13 +18,13 @@ dartway deploy run   --env staging          # update, build, start, verify
 
 | File | Owns |
 |---|---|
-| `config.yaml` | the whole environment: machine, repository, the `api` / `app` / optional `site` hosts, optional storage, required secrets and files |
+| `config.yaml` | every environment of this project: `local` — what your own machine starts a server with — and each deployment's machine, repository, `api` / `app` / optional `site` hosts and optional storage. Plus `requires`, what the project needs wherever it runs |
 | `../dartway_starter_server/Dockerfile` | the server image: `dart compile exe`, the binary as PID 1 |
 | `../dartway_starter_flutter/Dockerfile` | the web image; the deploy passes it the app's origin as `DW_BACKEND_URL` |
 | `../dartway_starter_flutter/nginx.conf` | how that image serves the build — files only — and above all **what a browser may keep** |
 | `compose.override.yml` | anything this project adds to a standard deployment — create it when that happens. Read from the checkout on every deploy |
 | `nginx.d/{http,api,app}/*.conf` | extra directives for the front proxy, if ever needed. A `proxy_pass` here must name a service the stack declares — `deploy check` and the deploy both refuse otherwise |
-| `secrets.yaml` | optional, **git-ignored**: the maintainer's copy of every environment's secrets, moved with `secret push` / `secret pull` |
+| `secrets.yaml` | **git-ignored**: the half of every environment that cannot be committed — your own `local` keys, and the maintainer's copy of each server's, moved with `secret push` / `secret pull` |
 
 `docker-compose.yml`, `nginx.conf` and `.env` are rendered on the server and are
 not part of this repository.
@@ -95,6 +95,25 @@ copy; tell whoever you can reach to hard-reload.
 
 ## Secrets
 
+### On this machine
+
+`local` is an environment like any other, and its two halves are the two files
+above: `config.yaml` > `local` for what the team shares, `secrets.yaml` >
+`local` for what is yours. The server, the seed and `migrate` read both through
+`DwLocalEnvironment`; a real environment variable beats them, and a deployed
+server has neither file — `.dockerignore` keeps `deploy/` out of every image.
+
+```sh
+dartway secret list --env local            # both halves, each key marked
+dartway secret set SMS_API_TOKEN --env local
+```
+
+There is nothing to `init` (the coordinates are committed), nothing to `push`
+or `pull` (this *is* the file), and no `put-file`: a document a local server
+reads is a path on this machine, so point a variable at it.
+
+### On a server
+
 The store is one file on the server, `~/.config/<project>/secrets.env`,
 outside the checkout so the `git reset --hard` of a deploy cannot touch it:
 
@@ -122,7 +141,7 @@ effect on the next `run`.
 are the project's to deliver:
 
 - `APP_BOOTSTRAP_ADMIN` — the phone or e-mail made an administrator on every
-  start: `dartway deploy secret set APP_BOOTSTRAP_ADMIN --env staging`. Whoever
+  start: `dartway secret set APP_BOOTSTRAP_ADMIN --env staging`. Whoever
   receives its codes is the admin, so it has no default; unset, the admin panel
   is out of reach and the server says so in its log.
 - `DW_MIN_APP_BUILD` — the oldest app build still served; older builds are shown

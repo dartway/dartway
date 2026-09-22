@@ -498,7 +498,7 @@ search box), `moveIdentities`, `removeIdentities`, `issueKey`, `listKeys`, `revo
 
 ```bash
 dartway generate --check      # generated code matches the sources
-dart run bin/migrate.dart check   # from __SERVER_PKG__, with DW_DATABASE_* set: migrations replay into the declared schema
+dart run bin/migrate.dart check   # from __SERVER_PKG__, against the local database: migrations replay into the declared schema
 dartway test                  # server tests against a throwaway Postgres (and storage)
 dartway check                 # layout, generated code, migrations drift (with DW_DATABASE_*), and the Flutter checks
 ```

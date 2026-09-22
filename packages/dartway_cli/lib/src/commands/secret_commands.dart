@@ -5,13 +5,16 @@ import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../deploy/deploy_target.dart';
+import '../deploy/local_environment.dart';
 import '../deploy/local_secrets_file.dart';
 import '../deploy/secret_store.dart';
 import '../deploy/ssh_runner.dart';
 import '../deploy/stack.dart';
 import 'deploy_command.dart';
 
-/// Manages the runtime secret store on a deployment target.
+/// Manages the secrets of every environment: the store on a deployed server,
+/// and the `local` environment on this machine.
 class SecretCommand extends Command<int> {
   SecretCommand() {
     addSubcommand(SecretInitCommand());
@@ -27,14 +30,20 @@ class SecretCommand extends Command<int> {
 
   @override
   String get description =>
-      'Manage runtime secrets on the server. Values are never printed.';
+      'Manage the secrets of an environment — a server, or "local" on this '
+      'machine. Values are never printed.';
 }
 
 /// Shared plumbing: every secret command names an environment and connects.
 abstract class _SecretCommandBase extends Command<int> {
   _SecretCommandBase() {
     argParser
-      ..addOption('env', help: 'Environment declared in deploy/config.yaml.')
+      ..addOption(
+        'env',
+        help:
+            'Environment declared in deploy/config.yaml, or "local" for this '
+            'machine.',
+      )
       ..addOption(
         'as',
         help: 'SSH login. Defaults to ssh_user from the config.',
@@ -43,6 +52,19 @@ abstract class _SecretCommandBase extends Command<int> {
   }
 
   late final Directory projectRoot = deployProjectRoot();
+
+  /// Whether this call is about the developer's own machine rather than a
+  /// server. `local` is an environment like any other here; it is only the
+  /// storage and the delivery that differ, and both are files.
+  bool get isLocal => argResults!.option('env') == DwDeployTarget.localSection;
+
+  DwLocalEnvironment get localEnvironment => DwLocalEnvironment(projectRoot);
+
+  /// Says why a command that only a server can answer was refused.
+  int refuseLocal(String because) {
+    stderr.writeln('"${DwDeployTarget.localSection}" $because');
+    return 1;
+  }
 
   DwStack resolveStack(ArgResults results) =>
       resolveDeployStack(this, results, projectRoot);
@@ -68,11 +90,20 @@ class SecretInitCommand extends _SecretCommandBase {
       'MinIO keys). Existing values are never replaced.';
 
   @override
-  String get invocation => 'dartway deploy secret init --env <environment>';
+  String get invocation => 'dartway secret init --env <environment>';
 
   @override
   Future<int> run() async {
     final results = argResults!;
+    if (isLocal) {
+      return refuseLocal(
+        'generates nothing. Its database and storage coordinates are '
+        'committed in ${DwLocalEnvironment.configPath} > '
+        '${DwLocalEnvironment.section}, where everyone on the team reads the '
+        'same ones; what is yours alone goes in with "dartway secret set '
+        '<KEY> --env ${DwLocalEnvironment.section}".',
+      );
+    }
     final stack = resolveStack(results);
     final store = openStore(stack, results);
 
@@ -102,7 +133,7 @@ class SecretInitCommand extends _SecretCommandBase {
       stderr.writeln(
         'The store still lacks a value for ${notFilled.join(', ')} after '
         'generation. An existing empty value is never replaced — remove the '
-        'line from ${store.file} or set it with "dartway deploy secret set".',
+        'line from ${store.file} or set it with "dartway secret set".',
       );
       return 1;
     }
@@ -122,7 +153,7 @@ class SecretInitCommand extends _SecretCommandBase {
     if (outstanding.isNotEmpty) {
       stdout.writeln(
         'Still to deliver by hand: ${outstanding.join(', ')} '
-        '(dartway deploy secret set <KEY> --env ${stack.target.environment})',
+        '(dartway secret set <KEY> --env ${stack.target.environment})',
       );
     }
     return 0;
@@ -140,8 +171,7 @@ class SecretSetCommand extends _SecretCommandBase {
       'appears in shell history or a process list.';
 
   @override
-  String get invocation =>
-      'dartway deploy secret set <KEY> --env <environment>';
+  String get invocation => 'dartway secret set <KEY> --env <environment>';
 
   @override
   Future<int> run() async {
@@ -150,6 +180,7 @@ class SecretSetCommand extends _SecretCommandBase {
       usageException('Name exactly one key to set.');
     }
     final key = results.rest.single;
+    if (isLocal) return _storeLocally(key);
     final stack = resolveStack(results);
     if (stack.reservedSecretKeys.contains(key)) {
       stderr.writeln(
@@ -200,6 +231,52 @@ class SecretSetCommand extends _SecretCommandBase {
     return 0;
   }
 
+  /// Writes one value into `deploy/secrets.yaml` > `local`.
+  ///
+  /// The value is read from stdin here too: a local machine is not a reason
+  /// for a key to land in the shell history, which is a file that outlives
+  /// the project.
+  Future<int> _storeLocally(String key) async {
+    if (!dwIsSecretKeyName(key)) {
+      stderr.writeln(
+        '"$key" is not a secret name: upper case letters, digits and '
+        'underscores, not starting with a digit or with COMPOSE_.',
+      );
+      return 1;
+    }
+    if (stdin.hasTerminal) {
+      final endOfInput = Platform.isWindows ? 'Ctrl+Z then Enter' : 'Ctrl+D';
+      stdout.writeln('Reading the value from stdin; end with $endOfInput.');
+    }
+    final value = utf8.decode(await _readAllStdin()).trim();
+    if (value.isEmpty) {
+      stderr.writeln('Refusing to store an empty value for "$key".');
+      return 1;
+    }
+
+    localEnvironment.store(key, value);
+    final stored = localEnvironment.mine[key];
+    if (stored != value) {
+      stderr.writeln(
+        'The write reported success and ${DwLocalEnvironment.secretsPath} > '
+        '${DwLocalEnvironment.section} does not hold $key.',
+      );
+      return 1;
+    }
+
+    stdout.writeln(
+      'Stored $key in ${DwLocalEnvironment.secretsPath} > '
+      '${DwLocalEnvironment.section}.',
+    );
+    if (localEnvironment.committed.containsKey(key)) {
+      stdout.writeln(
+        'It also has a value in ${DwLocalEnvironment.configPath}; yours wins.',
+      );
+    }
+    stdout.writeln('A running server keeps the environment it started with.');
+    return 0;
+  }
+
   Future<List<int>> _readAllStdin() async {
     final bytes = <int>[];
     await for (final chunk in stdin) {
@@ -219,11 +296,12 @@ class SecretListCommand extends _SecretCommandBase {
       'List stored secret names and files. Values are never read.';
 
   @override
-  String get invocation => 'dartway deploy secret list --env <environment>';
+  String get invocation => 'dartway secret list --env <environment>';
 
   @override
   Future<int> run() async {
     final results = argResults!;
+    if (isLocal) return _listLocal();
     final stack = resolveStack(results);
     final store = openStore(stack, results);
 
@@ -231,7 +309,7 @@ class SecretListCommand extends _SecretCommandBase {
     if (!names.ok) {
       stderr.writeln(
         'No readable store at ${store.file}: ${names.error}. '
-        'Create it with "dartway deploy secret init".',
+        'Create it with "dartway secret init".',
       );
       return 1;
     }
@@ -263,6 +341,58 @@ class SecretListCommand extends _SecretCommandBase {
     );
     return 0;
   }
+
+  /// What the `local` environment holds, and what it is missing.
+  ///
+  /// Both halves in one list, each key marked with the file it comes from: the
+  /// question a developer asks is "is it set", not "which file is it in", and
+  /// an answer that makes them open two files is the reason the old
+  /// copy-pasted block survived so long.
+  int _listLocal() {
+    final environment = localEnvironment;
+    final committed = environment.committed;
+    final mine = environment.mine;
+    if (committed.isEmpty && mine.isEmpty) {
+      stdout.writeln(
+        'Nothing for "${DwLocalEnvironment.section}" in '
+        '${DwLocalEnvironment.configPath} or '
+        '${DwLocalEnvironment.secretsPath}.',
+      );
+    }
+
+    final required = environment.requiredSecrets;
+    stdout.writeln(
+      'Local environment: ${DwLocalEnvironment.configPath} (committed) and '
+      '${DwLocalEnvironment.secretsPath} (yours)',
+    );
+    for (final key in {...committed.keys, ...mine.keys}.toList()..sort()) {
+      final value = mine[key] ?? committed[key]!;
+      final notes = [
+        if (mine.containsKey(key)) 'secrets.yaml' else 'config.yaml',
+        if (mine.containsKey(key) && committed.containsKey(key))
+          'overrides config.yaml',
+        if (required.contains(key)) 'required',
+        if (value.isEmpty) 'empty',
+      ];
+      stdout.writeln('  $key  (${notes.join(', ')})');
+    }
+
+    final missing = required
+        .where((key) => (mine[key] ?? committed[key] ?? '').isEmpty)
+        .toList();
+    if (missing.isNotEmpty) {
+      stdout
+        ..writeln('  missing: ${missing.join(', ')}')
+        ..writeln(
+          '  The project declares them under "requires" in '
+          '${DwLocalEnvironment.configPath}; deliver each with '
+          '"dartway secret set <KEY> --env ${DwLocalEnvironment.section}".',
+        );
+    }
+    // A listing reports; the gate that fails on a missing secret is
+    // "dartway check".
+    return 0;
+  }
 }
 
 /// Uploads a secret file into the store.
@@ -282,8 +412,7 @@ class SecretPutFileCommand extends _SecretCommandBase {
       'Upload a secret file (service account JSON and similar) to the server.';
 
   @override
-  String get invocation =>
-      'dartway deploy secret put-file <path> --env <environment>';
+  String get invocation => 'dartway secret put-file <path> --env <environment>';
 
   @override
   Future<int> run() async {
@@ -297,6 +426,13 @@ class SecretPutFileCommand extends _SecretCommandBase {
       return 1;
     }
 
+    if (isLocal) {
+      return refuseLocal(
+        'mounts nothing: a document a locally started server reads is a path '
+        'on this machine, so point a variable at it — "dartway secret set '
+        'GOOGLE_APPLICATION_CREDENTIALS --env ${DwLocalEnvironment.section}".',
+      );
+    }
     final stack = resolveStack(results);
     final store = openStore(stack, results);
     final name = results.option('name') ?? p.basename(local.path);
@@ -362,11 +498,17 @@ class SecretPushCommand extends _SecretCommandBase {
 
   @override
   String get invocation =>
-      'dartway deploy secret push --env <environment> [--dry-run] [--prune]';
+      'dartway secret push --env <environment> [--dry-run] [--prune]';
 
   @override
   Future<int> run() async {
     final results = argResults!;
+    if (isLocal) {
+      return refuseLocal(
+        'is already ${DwLocalEnvironment.secretsPath} > '
+        '${DwLocalEnvironment.section}. There is nowhere to send it.',
+      );
+    }
     final stack = resolveStack(results);
     final environment = stack.target.environment;
     final store = openStore(stack, results);
@@ -438,7 +580,7 @@ class SecretPushCommand extends _SecretCommandBase {
       stderr.writeln(
         'Refusing to push: the server holds keys this file does not — '
         '${orphaned.join(', ')}.\n'
-        'Add them locally ("dartway deploy secret pull"), or pass --prune to '
+        'Add them locally ("dartway secret pull"), or pass --prune to '
         'drop them.',
       );
       return 1;
@@ -450,8 +592,7 @@ class SecretPushCommand extends _SecretCommandBase {
       stderr.writeln(
         'Refusing to push: this would blank values the server has — '
         '${wouldEmpty.join(', ')}.\n'
-        'Fill them locally, take the server values with "dartway deploy '
-        'secret pull", or pass --allow-emptying.',
+        'Fill them locally, take the server values with "dartway secret pull", or pass --allow-emptying.',
       );
       return 1;
     }
@@ -518,11 +659,17 @@ class SecretPullCommand extends _SecretCommandBase {
 
   @override
   String get invocation =>
-      'dartway deploy secret pull --env <environment> [--dry-run]';
+      'dartway secret pull --env <environment> [--dry-run]';
 
   @override
   Future<int> run() async {
     final results = argResults!;
+    if (isLocal) {
+      return refuseLocal(
+        'is already ${DwLocalEnvironment.secretsPath} > '
+        '${DwLocalEnvironment.section}. There is nowhere to read it from.',
+      );
+    }
     final stack = resolveStack(results);
     final environment = stack.target.environment;
     final store = openStore(stack, results);
@@ -576,7 +723,7 @@ class SecretPullCommand extends _SecretCommandBase {
         ..writeln(
           '  Differing values are reported, never rewritten — the local file '
           'is the one you maintain. Resolve them by hand, or overwrite the '
-          'server with "dartway deploy secret push".',
+          'server with "dartway secret push".',
         );
     }
     if (localOnly.isNotEmpty) {

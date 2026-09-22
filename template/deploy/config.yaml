@@ -1,0 +1,144 @@
+# Every environment this project runs in, including this machine.
+#
+# The server has no configuration file of its own — it is configured by its
+# environment. This file is the half of that environment which belongs in Git;
+# `deploy/secrets.yaml`, which is git-ignored, is the half that does not. A key
+# this file does not know is an error, not a silence.
+#
+#   local       what your own machine starts a server with, read by
+#               `bin/server.dart` through `DwLocalEnvironment` — no deploy, no
+#               machine, no domains
+#   <name>      a deployment: `dartway deploy setup|check|run --env <name>`
+#
+#   dartway secret list --env local       what is set and what is missing
+#   dartway secret set <KEY> --env local  a value that is yours alone
+
+# What this project needs wherever it runs, beyond what the framework asks
+# for. Declared once here rather than per environment: a list repeated in three
+# places drifts in the one direction nobody notices.
+#
+#   secrets   short values the server reads from its environment — an API
+#             token, an SMS key — named as environment variables. Listing them
+#             turns "the server starts and fails on first use" into a deploy
+#             that refuses to begin, and into a named line of
+#             `dartway secret list`
+#   files     whole documents — a service-account JSON — delivered to a server
+#             with `dartway secret put-file` and mounted read-only at
+#             /run/secrets/<name>. Locally, point a variable at a path instead
+#
+# requires:
+#   secrets:
+#     - SMS_API_TOKEN
+#   files:
+#     - fcm-service-account.json
+
+# Your machine. These are the coordinates of the containers in
+# `dartway_starter_server/docker-compose.yaml`, and they are committed on
+# purpose: they are the same for everyone on the team and they guard nothing.
+# What is yours alone — a real API token — goes in deploy/secrets.yaml under
+# the same `local`, and overrides what is written here.
+#
+# An exported variable beats both, so one `DW_DATABASE_NAME=… dart run …`
+# still works without editing anything.
+local:
+  DW_DATABASE_HOST: 127.0.0.1
+  DW_DATABASE_PORT: 8090
+  DW_DATABASE_NAME: dartway_starter
+  DW_DATABASE_USER: postgres
+  DW_DATABASE_PASSWORD: dartway_dev_pw
+  DW_DATABASE_SSL: false
+
+  DW_STORAGE_ENDPOINT: http://127.0.0.1:8100
+  DW_STORAGE_ACCESS_KEY: dartway_dev
+  DW_STORAGE_SECRET_KEY: dartway_dev_storage_pw
+  # Creates both buckets and sets their access on the first start. For a MinIO
+  # this project owns, never for a storage somebody else administers.
+  DW_STORAGE_PROVISION: true
+
+  # The phone or e-mail made an administrator on every start. Whoever receives
+  # its codes is the admin, so it has no default.
+  # APP_BOOTSTRAP_ADMIN: you@example.com
+
+# A deployment. Uncomment, fill in, and `dartway deploy setup --env staging`.
+#
+# staging:
+#   # Where to connect and who to become. The first login provisions the
+#   # machine, which needs root — either by connecting as root or through
+#   # passwordless sudo, which is what cloud images give their default user.
+#   # Everything afterwards runs as the deploy user, who owns the checkout.
+#   host: 203.0.113.10
+#   ssh_user: root
+#   deploy_user: your-project-admin
+#   os: ubuntu
+#
+#   # The server mirrors this repository: a deploy resets the checkout to the
+#   # tip of the branch, so a stray edit on the machine cannot block one.
+#   repo: git@github.com:your-org/your-project.git
+#   branch: master
+#
+#   # Where Let's Encrypt writes about expiring certificates.
+#   ssl_email: ops@example.com
+#
+#   # Three hosts, one server process, one certificate covering all of them.
+#   #
+#   # api_domain — the server itself, for mobile apps and webhooks: everything
+#   #   on it is proxied to the server, the live socket (/dw/live) included.
+#   # app_domain — the Flutter web app. The front proxy serves the web image
+#   #   and sends /dw/ and /health on this host to the server, so the app talks
+#   #   to its own origin: no CORS, no preflight. The web build is given this
+#   #   origin as DW_BACKEND_URL.
+#   api_domain: api.example.com
+#   app_domain: app.example.com
+#
+#   # Optional. The marketing site on the root domain: a directory of the
+#   # repository served as static files (it must be committed — the server only
+#   # has what Git has), or `none` when the site lives elsewhere and this
+#   # deployment does not serve it.
+#   site:
+#     domain: example.com
+#     source: app_site/build
+#
+#   # Optional. File storage for uploads (presigned direct uploads, D-034), in
+#   # two buckets: public files (a rule with visibility public — avatars) are
+#   # read by anyone at DW_STORAGE_PUBLIC_BASE_URL/<key>; private ones only
+#   # through short presigned links the server gives after canRead.
+#   #
+#   #   minio    — a MinIO container in the stack, for staging. Browsers upload
+#   #              to it directly, so it needs a host of its own. Its keys are
+#   #              generated into the secret store; its CORS rule admits PUT
+#   #              from app_domain with the headers a presigned upload is bound
+#   #              to. Every deploy creates <project>-public (anonymous
+#   #              s3:GetObject, no listing) and <project>-private (nothing
+#   #              unsigned), and the server gets both names and
+#   #              DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<project>-public.
+#   #              The outside check reads a probe object from both without
+#   #              credentials: public 200, private refused, neither listed.
+#   #   external — an S3-compatible storage somebody else runs. Deliver
+#   #              DW_STORAGE_ENDPOINT, DW_STORAGE_ACCESS_KEY and
+#   #              DW_STORAGE_SECRET_KEY, and the buckets your rules need —
+#   #              DW_STORAGE_PUBLIC_BUCKET with DW_STORAGE_PUBLIC_BASE_URL for
+#   #              public purposes, DW_STORAGE_PRIVATE_BUCKET for private ones —
+#   #              (and optionally DW_STORAGE_REGION, DW_STORAGE_PATH_STYLE)
+#   #              with `dartway secret set`. Make the public bucket readable
+#   #              anonymously (objects, not listing) and the private one not at
+#   #              all, and give both a CORS rule allowing PUT from
+#   #              https://<app_domain> with the headers content-type,
+#   #              content-length and if-none-match. The server checks both
+#   #              buckets as it starts and refuses to start on a bucket more or
+#   #              less public than declared.
+#   storage: minio
+#   storage_domain: files.example.com
+#
+#   # Optional. Pull the stack's base images through a mirror when Docker Hub
+#   # rate-limits. The project's own Dockerfiles name their base images
+#   # themselves.
+#   registry_mirror: mirror.gcr.io
+#
+#   # Optional. Ports to open beyond SSH, 80 and 443.
+#   firewall_ports: [5432]
+#
+#   # Optional. What only this deployment needs, beyond the project's
+#   # `requires` above.
+#   requires:
+#     secrets:
+#       - SENTRY_DSN

@@ -2,23 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
+      // No "env" here on purpose: the server reads deploy/config.yaml > local
+      // and deploy/secrets.yaml > local through DwLocalEnvironment, so this
+      // configuration never holds a copy that can drift — or a real key that
+      // would be committed with it.
       "name": "Server",
       "type": "dart",
       "request": "launch",
       "cwd": "dartway_starter_server",
-      "program": "bin/server.dart",
-      "env": {
-        "DW_DATABASE_HOST": "127.0.0.1",
-        "DW_DATABASE_PORT": "8090",
-        "DW_DATABASE_NAME": "dartway_starter",
-        "DW_DATABASE_USER": "postgres",
-        "DW_DATABASE_PASSWORD": "dartway_dev_pw",
-        "DW_DATABASE_SSL": "false",
-        "DW_STORAGE_ENDPOINT": "http://127.0.0.1:8100",
-        "DW_STORAGE_ACCESS_KEY": "dartway_dev",
-        "DW_STORAGE_SECRET_KEY": "dartway_dev_storage_pw",
-        "DW_STORAGE_PROVISION": "true"
-      }
+      "program": "bin/server.dart"
     },
     {
       "name": "Flutter",

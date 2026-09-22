@@ -1,0 +1,26 @@
+# Every environment this project runs in. The example is not deployed anywhere,
+# so it declares only `local`: what your own machine starts its server with.
+#
+# The server reads no configuration file. `bin/server.dart` puts this section
+# into its environment through `DwLocalEnvironment`, together with
+# `deploy/secrets.yaml > local` — git-ignored, for what is yours alone. A real
+# environment variable beats both.
+#
+#   dartway secret list --env local       what is set and what is missing
+#   dartway secret set <KEY> --env local  a value that is yours alone
+
+local:
+  DW_DATABASE_HOST: 127.0.0.1
+  DW_DATABASE_PORT: 5432
+  DW_DATABASE_NAME: club
+  DW_DATABASE_USER: club
+  DW_DATABASE_PASSWORD: club
+  DW_DATABASE_SSL: false
+
+  # Uploads need a public and a private bucket; with a local MinIO the
+  # endpoint and the keys are enough. Without DW_STORAGE_ENDPOINT the server
+  # runs without uploads.
+  # DW_STORAGE_ENDPOINT: http://127.0.0.1:9000
+  # DW_STORAGE_ACCESS_KEY: club
+  # DW_STORAGE_SECRET_KEY: club-secret
+  # DW_STORAGE_PROVISION: true

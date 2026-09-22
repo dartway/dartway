@@ -2,6 +2,14 @@
 
 ## Unreleased — DartWay 1.0
 
+- **`local` is an environment of `deploy/config.yaml`, and `dartway secret` is a top-level command** (D-078). The two files that describe every environment now describe this machine too: `config.yaml > local` holds what the team shares, `secrets.yaml > local` what is the developer's own, and `dartway secret list --env local` answers "what is set, what is missing" in the same words it answers for a server. `dartway deploy secret …` is now `dartway secret …`, and `init`, `put-file`, `push` and `pull` say why they have nothing to do for `local`.
+
+- **`requires` is read at the top level of `deploy/config.yaml`**, where it states what the project needs wherever it runs; an environment's own `requires` adds to it. The same list repeated per environment drifted in the one direction nobody notices — the environment that was forgotten is the one whose deploy stops.
+
+- **Two advisory checks in `dartway check`**: `localSecretMissing` (a `requires` secret with no value for `local`) and `devComposeDrifted` (the development containers' credentials in `docker-compose.yaml` against the ones the server is told to reach them by — two files stating the same password, with nothing making them agree). `migrationsDrift` takes the same local environment, so it stops asking for a `DW_DATABASE_*` the project has already declared.
+
+- **`deploy/config.yaml.example` is gone**: the skeleton ships `deploy/config.yaml` itself, with `local` filled in and a deployment commented out beside it. A new project runs before it has a server to deploy to, and one file is one file.
+
 - **BEHAVIOUR (deploy): `deploy run` renders `docker-compose.yml` and `nginx.conf` on every run** (D-075), from `deploy/config.yaml` and the CLI's own version, saying of each whether it changed. They used to be written by `setup` alone, and a stack rendered by an older CLI met a build argument it did not carry: the deploy died inside `docker build` blaming the project's Dockerfile, while the file to fix was on the server and in no repository (reported by U90). A hand edit on a server is therefore overwritten — project additions belong in `deploy/compose.override.yml` and `deploy/nginx.d/`, which are not touched.
 
 - **`deploy` and `deploy secret` find the project instead of demanding to be run from its root.** They read the working directory, so `dart run dartway_cli:dartway deploy …` — which runs from the package that pins the CLI — answered "no `*_server` package found" to somebody standing inside their own project (reported by Studio). They now walk up to the directory holding the `*_server` and `*_shared` packages, as `generate` and `check` already did.

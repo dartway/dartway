@@ -2,7 +2,7 @@
 name: dartway-migrations
 description: >-
   Changing the database schema of a DartWay project (DartWay projects): a row class changed →
-  `dartway generate` → `dart run bin/migrate.dart create <name>` with DW_DATABASE_* set (it
+  `dartway generate` → `dart run bin/migrate.dart create <name>` against the local database (it
   replays every migration on a scratch database and diffs against the row classes) → review the
   draft and resolve every `decisionRequired(...)` (a drop that may be a rename, a NOT NULL column
   on a table with rows — `addColumn(..., backfill:)`, a NOT NULL change, a type change) → `rehash`
@@ -29,9 +29,10 @@ checks that every table and column the generated schema declares exists. So a ro
 without a migration is not a warning at review — it is a server that refuses to start in the next
 environment.
 
-Everything below runs **from `__SERVER_PKG__`**, with `DW_DATABASE_*` set to a Postgres where the
-user may create databases (the development one from `docker compose` will do; `dartway-run` has
-the environment). There is no `dartway migrate` command: the project's own `bin/migrate.dart`
+Everything below runs **from `__SERVER_PKG__`**, against the Postgres `deploy/config.yaml > local`
+names — `bin/migrate.dart` reads it through `DwLocalEnvironment`, so nothing has to be exported,
+and an exported `DW_DATABASE_*` still wins when you need another database. The user must be able to
+create databases on it (the development one from `docker compose` is). There is no `dartway migrate` command: the project's own `bin/migrate.dart`
 wraps `DwMigrationCli`, because only the project knows its schema and its migration list.
 
 ```text

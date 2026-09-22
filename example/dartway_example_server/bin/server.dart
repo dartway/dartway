@@ -3,7 +3,10 @@ import 'dart:io';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 
-/// Starts the example server. Configured by the environment:
+/// Starts the example server. Configured by the environment — and on a
+/// developer's machine `DwLocalEnvironment.overlay` puts
+/// `deploy/config.yaml > local` and `deploy/secrets.yaml > local` into it
+/// first, so nothing has to be exported. A real variable beats both:
 ///
 /// - `DW_DATABASE_*` — the database (see `DwDatabaseConfig.fromEnvironment`);
 /// - `DW_MIGRATE_ONLY=true` — applies the migrations and exits without
@@ -34,7 +37,7 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 ///   before starting (`DwFileStorageSetup.provision`): for a development
 ///   MinIO the project owns, never for a storage somebody else administers.
 Future<void> main() async {
-  final env = Platform.environment;
+  final env = DwLocalEnvironment.overlay(Platform.environment);
   final storage = ExampleFiles.storageConfig(env);
   if (storage != null && env['DW_STORAGE_PROVISION'] == 'true') {
     await DwFileStorageSetup.provision(storage);

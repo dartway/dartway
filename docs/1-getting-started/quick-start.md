@@ -62,21 +62,29 @@ dart pub get
 — on `8100` (its web console on `8101`). There is no test database among them: `dartway test` starts
 its own for each run. The first run pulls images and can take minutes.
 
-The server is configured by its environment alone; there is no configuration file. In the shell that
-runs it:
+The server is configured by its environment alone; there is no configuration file it reads. **There
+is nothing to export**: `bin/server.dart`, `bin/seed_dev.dart` and `bin/migrate.dart` call
+`DwLocalEnvironment.overlay`, which puts two sections into that environment before it is read —
+
+| Section | In Git | What |
+|---|---|---|
+| `deploy/config.yaml` > `local` | yes | the development containers' own coordinates, the same for everyone on the team |
+| `deploy/secrets.yaml` > `local` | no | the keys that are this developer's own |
+
+— in that order, and a real environment variable beats both, so `DW_DATABASE_NAME=other dart run
+bin/server.dart` still works. A deployed server has neither file: `.dockerignore` keeps `deploy/` out
+of every image, and Compose hands it the environment the deploy rendered.
+
+Your own administrator identifier is the commented `APP_BOOTSTRAP_ADMIN` line of that `local`
+section — see step 5. The full list the server reads — `PORT`, `DW_MIN_APP_BUILD`,
+`DW_ALLOWED_ORIGINS` and the rest of `DW_STORAGE_*` — is documented at the top of `bin/server.dart`.
+
+A key that must not be committed goes beside them without opening an editor:
 
 ```bash
-export DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=8090 DW_DATABASE_NAME=my_app \
-       DW_DATABASE_USER=postgres DW_DATABASE_PASSWORD=dartway_dev_pw DW_DATABASE_SSL=false \
-       DW_STORAGE_ENDPOINT=http://127.0.0.1:8100 \
-       DW_STORAGE_ACCESS_KEY=dartway_dev DW_STORAGE_SECRET_KEY=dartway_dev_storage_pw \
-       DW_STORAGE_PROVISION=true \
-       APP_BOOTSTRAP_ADMIN=you@example.com     # your own phone or e-mail — see step 5
+dartway secret list --env local             # what is set, what is missing
+dartway secret set SMS_API_TOKEN --env local
 ```
-
-These are the development containers' own values, written in `docker-compose.yaml` beside them. The
-full list the server reads — `PORT`, `DW_MIN_APP_BUILD`, `DW_ALLOWED_ORIGINS` and the rest of
-`DW_STORAGE_*` — is documented at the top of `bin/server.dart`.
 
 Wait until Postgres accepts connections — a container reported as started is not yet a database
 listening:
@@ -116,8 +124,9 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/health
 
 `200` means the server is up and reaches its database.
 
-In VS Code the **Server** launch configuration of the project carries the same environment, except
-`APP_BOOTSTRAP_ADMIN`.
+In VS Code the **Server** launch configuration starts the same `bin/server.dart`, and carries no
+environment of its own — it reads the same two sections, so pressing play and running it by hand are
+the same run.
 
 ## 4. Run the app
 

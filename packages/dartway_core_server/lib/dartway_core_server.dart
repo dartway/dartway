@@ -40,5 +40,6 @@ export 'src/jobs/dw_job_queue.dart'
         dwDefaultJobBackoff;
 export 'src/routes/dw_http_route.dart';
 export 'src/server/dw_app_server.dart';
+export 'src/server/dw_local_environment.dart' show DwLocalEnvironment;
 export 'src/server/dw_server_module.dart';
 export 'src/server/dw_server_settings.dart';

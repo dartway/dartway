@@ -47,8 +47,8 @@ docker compose up -d
 # poll until Postgres accepts connections — do not sleep a fixed time:
 docker compose exec -T postgres pg_isready -U postgres
 dart pub get
-dart run bin/server.dart          # in the background, with the environment below; does not exit
-dart run bin/seed_dev.dart        # once, after the server logged "listening", same DW_DATABASE_*
+dart run bin/server.dart          # in the background; does not exit
+dart run bin/seed_dev.dart        # once, after the server logged "listening"
 ```
 
 ```bash
@@ -59,9 +59,17 @@ flutter run                       # desktop, iOS simulator or Android emulator
 
 ### The environment
 
-Read the values from `__SERVER_PKG__/docker-compose.yaml` — the database name (`POSTGRES_DB`), the
-password, the MinIO root user and password — or from the project's `README.md`, which lists them
-ready to export. `.vscode/launch.json` carries the same set for the server configuration.
+**Export nothing.** `bin/server.dart`, `bin/seed_dev.dart` and `bin/migrate.dart` call
+`DwLocalEnvironment.overlay`, which reads `deploy/config.yaml > local` (committed: the coordinates
+of the containers `docker compose up -d` started) and `deploy/secrets.yaml > local` (git-ignored:
+what is this machine's own) into the environment before it is used. An exported variable still
+beats both, which is how you override one value without editing a file.
+
+Read what is set — and what the project declares it needs and is missing — with
+`dartway secret list --env local`; add one with `dartway secret set <KEY> --env local`, which reads
+the value from stdin. **Ask the human before putting any real key anywhere.**
+
+The values that section holds, and what each is for:
 
 | Variable | Local value | Why |
 |---|---|---|
@@ -71,7 +79,7 @@ ready to export. `.vscode/launch.json` carries the same set for the server confi
 | `DW_STORAGE_ENDPOINT` | `http://127.0.0.1:8100` | The compose MinIO. Unset: the server runs without uploads |
 | `DW_STORAGE_ACCESS_KEY`, `DW_STORAGE_SECRET_KEY` | the MinIO root user and password | |
 | `DW_STORAGE_PROVISION` | `true` | Creates both buckets and sets their access before starting — for a storage the project owns, never for one somebody else administers |
-| `APP_BOOTSTRAP_ADMIN` | **ask the human** | See below |
+| `APP_BOOTSTRAP_ADMIN` | **ask the human** | A commented line in `local`, see below |
 | `PORT` | `8080` (default) | |
 | `DW_MIN_APP_BUILD`, `DW_ALLOWED_ORIGINS` | unset | See the failure table |
 
@@ -161,7 +169,7 @@ only one.
 | Symptom | Cause | Action |
 |---|---|---|
 | `docker: command not found` / `Cannot connect to the Docker daemon` | Docker Desktop is not running | Ask the human to start it |
-| `Invalid argument(s): database configuration: DW_DATABASE_HOST is not set; …` | The environment did not reach the process | Export the variables in the shell that runs the server (and the seed, and `migrate`) |
+| `Invalid argument(s): database configuration: DW_DATABASE_HOST is not set; …` | The environment did not reach the process: the entry point was run from outside the project, or `deploy/config.yaml > local` has no such key | Run it from the project (the overlay looks for `deploy/config.yaml` above the working directory) and check `dartway secret list --env local` |
 | `Connection refused` / `SocketException` on start | Postgres not accepting connections yet, or not on 8090 | `pg_isready` until it succeeds; `docker compose ps` |
 | An SSL / TLS negotiation error against `127.0.0.1` | `DW_DATABASE_SSL` unset — SSL is on by default | `DW_DATABASE_SSL=false` locally |
 | `DwStartupException: the server cannot start:` `- X is a registered request without a handler` (or `command`) | A request or command exists in the contract and no handler answers it | Write the handler and add it to the server's handler list (`dartway-server`). Deliberate: the alternative is a button that fails for the first user who presses it |

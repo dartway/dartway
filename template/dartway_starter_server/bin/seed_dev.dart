@@ -12,12 +12,15 @@ const personaCode = '111111';
 /// fixed code — one by phone, one by e-mail — and enough members to page
 /// through the admin table. Refuses to run twice.
 ///
-/// `dart run bin/seed_dev.dart` against the database in `DW_DATABASE_*`, after
-/// the server has migrated it once. Never against production: the personas'
+/// `dart run bin/seed_dev.dart` against the database in `DW_DATABASE_*` — on a
+/// developer's machine, the one `deploy/config.yaml > local` names — after the
+/// server has migrated it once. Never against production: the personas'
 /// fixed code is access to their accounts.
 Future<void> main() async {
   final database = await DwPostgresDatabase.open(
-    DwDatabaseConfig.fromEnvironment(Platform.environment),
+    DwDatabaseConfig.fromEnvironment(
+      DwLocalEnvironment.overlay(Platform.environment),
+    ),
   );
   try {
     final db = database.db;

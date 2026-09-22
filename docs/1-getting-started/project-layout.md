@@ -214,9 +214,11 @@ place is a database that no longer agrees with its history.
 
 ## `deploy/`
 
-The deployment is configuration, not scripts: `deploy/config.yaml` (from `config.yaml.example`)
-describes the environment — the machine, the `api` and `app` hosts, an optional site, storage,
-required secrets — and `dartway deploy setup`, `check` and `run` do the rest. The server's `Dockerfile`
+The deployment is configuration, not scripts: `deploy/config.yaml` describes **every** environment of
+the project — each deployment's machine, `api` and `app` hosts, optional site and storage, and
+`local`, which is what your own machine starts a server with — plus `requires`, what the project
+needs wherever it runs. `dartway deploy setup`, `check` and `run` do the rest; `deploy/secrets.yaml`
+is the git-ignored half of the same file, and `dartway secret` maintains it. The server's `Dockerfile`
 and the Flutter package's `Dockerfile` and `nginx.conf` are the images it builds. `deploy/README.md`
 explains the stack; [deploy](../5-tooling/deploy.md) explains the command.
 

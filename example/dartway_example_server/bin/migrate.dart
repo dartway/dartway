@@ -10,6 +10,7 @@ Future<void> main(List<String> args) async {
     schema: dartwayExampleSchema,
     migrations: appMigrations,
     directory: 'lib/src/migrations',
+    environment: DwLocalEnvironment.overlay(Platform.environment),
     modules: {
       'dw': DwAppServer.frameworkMigrations,
       dwPushNamespace: dwPushMigrations,

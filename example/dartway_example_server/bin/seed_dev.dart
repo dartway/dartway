@@ -17,7 +17,9 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 /// the server has migrated it once.
 Future<void> main() async {
   final database = await DwPostgresDatabase.open(
-    DwDatabaseConfig.fromEnvironment(Platform.environment),
+    DwDatabaseConfig.fromEnvironment(
+      DwLocalEnvironment.overlay(Platform.environment),
+    ),
   );
   try {
     final db = database.db;

@@ -285,7 +285,7 @@ Checks, all green before `dartway-finish`:
 
 ```bash
 dartway generate --check              # generated code matches its sources
-dart run bin/migrate.dart check       # in __SERVER_PKG__, DW_DATABASE_* set: migrations match the rows
+dart run bin/migrate.dart check       # in __SERVER_PKG__, against the local database: migrations match the rows
 dartway test                          # server tests with a throwaway Postgres and storage
 flutter test                          # in __FLUTTER_PKG__
 dartway check                         # layout, features, UI kit, l10n, generated code, migrations

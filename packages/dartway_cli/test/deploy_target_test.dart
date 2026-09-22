@@ -1,5 +1,6 @@
 import 'package:dartway_cli/src/deploy/deploy_target.dart';
 import 'package:test/test.dart';
+import 'package:yaml/yaml.dart';
 
 import 'support/deploy_fixtures.dart';
 
@@ -13,6 +14,93 @@ Matcher _refusal(List<String> fragments) => throwsA(
 
 void main() {
   group('deploy/config.yaml', () {
+    test('what the project requires is declared once, above the machines', () {
+      const text = '''
+requires:
+  secrets: [SMS_API_TOKEN]
+  files: [fcm.json]
+
+staging:
+  host: 203.0.113.10
+  ssh_user: root
+  deploy_user: deployer
+  os: ubuntu
+  repo: git@github.com:acme/shop.git
+  branch: master
+  ssl_email: ops@example.com
+  api_domain: api.example.com
+  app_domain: app.example.com
+  requires:
+    secrets: [SENTRY_DSN]
+''';
+
+      final target = DwDeployTarget.parse(text, environment: 'staging');
+
+      expect(target.requiredSecrets, ['SMS_API_TOKEN', 'SENTRY_DSN']);
+      expect(target.requiredSecretFiles, ['fcm.json']);
+    });
+
+    test('a bad name is named where it was written', () {
+      const text = '''
+requires:
+  secrets: [sms_api_token]
+
+staging:
+  host: 203.0.113.10
+  ssh_user: root
+  deploy_user: deployer
+  os: ubuntu
+  repo: git@github.com:acme/shop.git
+  branch: master
+  ssl_email: ops@example.com
+  api_domain: api.example.com
+  app_domain: app.example.com
+''';
+
+      expect(
+        () => DwDeployTarget.parse(text, environment: 'staging'),
+        _refusal(['deploy/config.yaml > requires > secrets', 'sms_api_token']),
+      );
+    });
+
+    test('"local" is not a deployment, and says what it is instead', () {
+      expect(
+        () => DwDeployTarget.parse(
+          '${configYaml()}\nlocal:\n  DW_DATABASE_PORT: 8090\n',
+          environment: 'local',
+        ),
+        _refusal(['not a deployment', 'dartway secret list --env local']),
+      );
+    });
+
+    test('neither "local" nor "requires" is offered as an environment', () {
+      final document = loadYaml('''
+requires:
+  secrets: [SMS_API_TOKEN]
+local:
+  DW_DATABASE_PORT: 8090
+staging:
+  host: 203.0.113.10
+production:
+  host: 203.0.113.11
+''');
+
+      expect(DwDeployTarget.deployableIn(document as YamlMap), [
+        'staging',
+        'production',
+      ]);
+    });
+
+    test('an unknown environment lists the deployable ones only', () {
+      expect(
+        () => DwDeployTarget.parse(
+          '${configYaml()}\nlocal:\n  DW_DATABASE_PORT: 8090\n',
+          environment: 'produciton',
+        ),
+        _refusal(['Declared: staging']),
+      );
+    });
+
     test('a complete environment reads into the stack it describes', () {
       final target = targetFrom(
         extra:

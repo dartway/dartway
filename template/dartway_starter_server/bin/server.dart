@@ -3,8 +3,12 @@ import 'dart:io';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_server/dartway_starter_server.dart';
 
-/// Starts the server. Configured by the environment alone — there is no
-/// configuration file:
+/// Starts the server. Configured by the environment alone — the server reads
+/// no configuration file, and on a developer's machine
+/// `DwLocalEnvironment.overlay` puts `deploy/config.yaml > local` and
+/// `deploy/secrets.yaml > local` into that environment before it is read. A
+/// real environment variable beats both, and a deployed server has neither
+/// file. The variables:
 ///
 /// - `DW_DATABASE_*` — the database (`DwDatabaseConfig.fromEnvironment`:
 ///   `HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SSL`, `MAX_CONNECTIONS`).
@@ -34,7 +38,7 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 /// - `APP_BOOTSTRAP_ADMIN` — the phone or e-mail of the first administrator,
 ///   made one on every start; unset for none.
 Future<void> main() async {
-  final env = Platform.environment;
+  final env = DwLocalEnvironment.overlay(Platform.environment);
   final adminIdentifier = env[AppBootstrap.adminVariable]?.trim() ?? '';
   // Checked before anything starts: a mistyped admin is a startup error.
   if (adminIdentifier.isNotEmpty) {

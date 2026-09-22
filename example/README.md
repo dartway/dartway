@@ -30,15 +30,19 @@ Inside this monorepo the packages build against the framework's working copy
 through `dependency_overrides`; copied out, delete those blocks.
 
 ```bash
-# the database: any Postgres; the variables below point the server at it
-export DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=5432 DW_DATABASE_NAME=club \
-       DW_DATABASE_USER=club DW_DATABASE_PASSWORD=club DW_DATABASE_SSL=false
+# the database: any Postgres on the coordinates deploy/config.yaml > local
+# names (127.0.0.1:5432, database "club", user and password "club")
 
 cd dartway_example_server
 dart pub get
 dart run bin/server.dart          # applies the migrations, serves :8080
 dart run bin/seed_dev.dart        # in another terminal, once
 ```
+
+Nothing to export: the entry points read `deploy/config.yaml` > `local` through
+`DwLocalEnvironment`, and a key that is yours alone goes in the git-ignored
+`deploy/secrets.yaml` > `local` (`dartway secret set <KEY> --env local`). An
+exported variable still beats both.
 
 Uploads need file storage — a public and a private bucket; with a local MinIO
 the endpoint and keys are enough (`dartway_example_server/README.md`, "File

@@ -25,13 +25,14 @@ would have worked. `create` and `quickstart` (there is no project yet), `update`
 (they repair the pins) and `doctor` (it touches nothing) run either way.
 
 **The complete, current option list of any command is `dartway help <command>`** — and for the
-nested ones, `dartway help deploy secret push`. That output is generated from the parser, so it
+nested ones, `dartway help secret push`. That output is generated from the parser, so it
 cannot drift from the code. This page does not restate every flag. It names the ones whose
 *meaning* is not obvious from a one-line help string, and states the defaults a reader has to know
 before relying on them.
 
 The commands, as `packages/dartway_cli/bin/dartway.dart` registers them: `quickstart`, `doctor`,
-`create`, `setup-ai`, `update`, `generate`, `check`, `dev`, `deploy`, `stats`, `test`. A usage error
+`create`, `setup-ai`, `update`, `generate`, `check`, `dev`, `deploy`, `secret`, `stats`, `test`. A
+usage error
 exits `64`; a refusal the command explains exits `1`.
 
 **There is no `migrate` command.** Migrations belong to the project: `dart run bin/migrate.dart
@@ -352,13 +353,27 @@ Why a database per run rather than a compose service, and how a suite uses it, i
 dartway deploy setup --env staging
 dartway deploy check --env staging
 dartway deploy run   --env staging
-dartway deploy secret set SMS_API_TOKEN --env staging
+dartway secret set SMS_API_TOKEN --env staging
 ```
 
-`setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys,
-`check` asserts that a deployment would work without changing anything, and `secret` manages the
-secret store on the server (`init`, `set`, `list`, `put-file`, `push`, `pull`). Everything is
+`setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys, and
+`check` asserts that a deployment would work without changing anything. Everything is
 described by `deploy/config.yaml`. The whole story is [Deploying the server](deploy.md).
+
+## `dartway secret` — the values that are not in Git
+
+```bash
+dartway secret list --env local               # this machine: both halves, names only
+dartway secret set SMS_API_TOKEN --env local  # the value is read from stdin
+dartway secret list --env staging             # a server: the store, names only
+```
+
+One command for every environment, because `local` is an environment. What differs is where the
+values live: for a server, a file on it (`init`, `set`, `list`, `put-file`, `push`, `pull`); for
+`local`, `deploy/secrets.yaml > local` on this machine, where `init`, `put-file`, `push` and `pull`
+have nothing to do and say so. **Values are never printed** — a question about a secret is answered
+by its name, its file, and whether it is empty. [Deploying the server](deploy.md#secrets) has the
+whole story.
 
 ## `dartway stats` — what actually grew
 

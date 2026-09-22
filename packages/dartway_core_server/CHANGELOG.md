@@ -4,6 +4,8 @@
 
 The rewrite (see docs/1.0).
 
+- **`DwLocalEnvironment.overlay(Platform.environment)`** (D-078): a project's entry points read `deploy/config.yaml > local` (committed: the development database and storage the team shares) and `deploy/secrets.yaml > local` (git-ignored: what is this developer's own) into their environment, in one visible line. A real environment variable still wins, and a deployed server has neither file — `.dockerignore` keeps `deploy/` out of every image — so the deployed path is unchanged. It ends the block of `DW_DATABASE_*` that every project copied into a launch configuration, a README and a shell profile. It costs `yaml` as a dependency: the parser is carried into a production binary that never calls it.
+
 - **A call that takes the `unknown` of an open enum to a write is answered `dw.updateRequired`** (D-071, #274). It used to leave the guard's throw to the generic catch: a 500 with an incident id for the caller and an alert for the operator, on an input the framework refuses on purpose. The build sending `unknown` back is older than the data it is writing and cannot correct its input, only update. Outside a call — a job, a module, a subscription — the same throw is still a failure.
 - **The seam for external sign-in** (D-073, in progress): `DwAccountService.signInWithExternalIdentity(provider:, subject:)` signs in — or creates — the account of an identity a provider proved, with `DwAuthConfig.onExternalAccountCreated` for the project's row, and `accountOfExternalIdentity` to look one up. The verification of a provider's token lives in `dartway_auth_providers_server`.
 
