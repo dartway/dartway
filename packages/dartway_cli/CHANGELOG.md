@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — DartWay 1.0
+## 0.11.0 — DartWay 1.0
+
+**Breaking:** `dartway deploy secret …` is now `dartway secret …` (D-078).
 
 - **`dartway quickstart` names `DW_ADMIN_IDENTIFIER`**, the framework's own name for the first administrator (D-079); the skeleton's `APP_BOOTSTRAP_ADMIN` is gone.
 

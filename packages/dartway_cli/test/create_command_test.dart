@@ -125,17 +125,22 @@ void main() {
           reason: package,
         );
       }
+      // Read rather than written down: the family's version moves whenever a
+      // change owes the projects a migration note (D-080), and an expectation
+      // spelled out here would have to be edited every time — which is how it
+      // ends up asserting last month's number.
+      final family = _familyVersion(repository);
       expect(
         read(project, 'shop_server/pubspec.yaml'),
         allOf(
-          contains('dartway_core_server: ^0.20.0-dev.1'),
-          contains('dartway_generator: ^0.20.0-dev.1'),
+          contains('dartway_core_server: ^$family'),
+          contains('dartway_generator: ^$family'),
         ),
       );
       expect(
         read(project, 'shop_flutter/pubspec.yaml'),
         allOf(
-          contains('dartway_core_flutter: ^0.20.0-dev.1'),
+          contains('dartway_core_flutter: ^$family'),
           contains('dartway_cli:'),
         ),
       );
@@ -315,3 +320,18 @@ bool _isText(File file) {
   const binary = {'.png', '.jpg', '.ico', '.jar', '.webp', '.ttf'};
   return !binary.contains(p.extension(file.path));
 }
+
+/// The one version the core family carries, read from the checkout under test.
+String _familyVersion(Directory repository) =>
+    RegExp(r'^version:\s*(\S+)', multiLine: true)
+        .firstMatch(
+          File(
+            p.join(
+              repository.path,
+              'packages',
+              'dartway_core_server',
+              'pubspec.yaml',
+            ),
+          ).readAsStringSync(),
+        )!
+        .group(1)!;

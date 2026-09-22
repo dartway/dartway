@@ -147,7 +147,7 @@ lands in that repository.
 | `--[no-]git` | on | Initialize a repository with an initial commit |
 
 **`--framework-path` is how a project is built against a framework that is not published.** The
-rewrite's package family (`^0.20.0-dev.1`) is not on pub.dev yet, so a project created from this
+rewrite's package family (`^0.20.0-dev.2`) is not on pub.dev yet, so a project created from this
 tree cannot resolve on its own; `--framework-path` resolves the same pubspecs against the same
 checkout the template was written against. The block it writes says to remove it once the versions
 are published.

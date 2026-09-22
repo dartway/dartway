@@ -18,7 +18,7 @@ DartWay 1.0 is the framework rebuilt on a stack it owns end to end, on one branc
 
 ## Monorepo map
 
-The core family moves in lockstep (one version, `0.20.0-dev.1`, across all six); every other package is a satellite with a version of its own (D-030, D-032).
+The core family moves in lockstep (one version, `0.20.0-dev.2`, across all six); every other package is a satellite with a version of its own (D-030, D-032).
 
 | Folder | Role |
 |---|---|
@@ -68,7 +68,7 @@ The monorepo exists so that its parts evolve together. A change to the **public 
 6. **the package's `CHANGELOG.md`**;
 7. **the carets**, by the versioning rules below: the family in lockstep, satellites by D-032;
 8. **the wire** — a change to how anything travels bumps `dwProtocolVersion` and refreshes the wire golden (see "The wire is a protocol");
-9. **`docs/migrations/`** — a note when the change asks a released project to edit its own code. **Until the rewrite has a release there is nothing to migrate from** (D-031: nothing is preserved, projects move in their own branches), so no note is written for a change inside the rewrite; from the first release on, the rule below applies in full.
+9. **`docs/migrations/`** — a note when the change asks a project on the framework to edit its own code, **including during the rewrite** (D-080). The projects already on it follow the branch, and a note is shown to a project below the version it names — so such a change also **raises the version**: the family's prerelease in lockstep (`0.20.0-dev.N`), or the satellite's own, with the carets in `template/` and `example/`. What D-031 still means is that a project coming from 0.x is recreated rather than migrated, and no note is written for that journey.
 
 Four of these are held by checks rather than by memory, and they are the reason the list can be trusted:
 

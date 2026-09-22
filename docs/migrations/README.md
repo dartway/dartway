@@ -30,17 +30,22 @@ The `framework-finish` skill asks for this by name, and the reason it is a step 
 is that the author of a change is the last person who can see it as a stranger would, and the only
 one who still knows what they broke.
 
-## Not before the rewrite has a release
+## During the rewrite, too
 
-The DartWay 1.0 rewrite (`dartway_core_*` and the packages around it on this branch) has not been
-released, and until it is, **nothing is preserved and nothing is owed**: versions stay `0.x`, the
-projects moving onto it are recreated on it rather than migrated, databases included (D-031). A note
-is a promise to a project that stands on a released version, so notes for the rewrite are written
-once releases of it exist — from the first one on, every change that asks a project to edit its own
-code carries one, in the same pull request.
+The DartWay 1.0 rewrite is not released and its packages stay `0.x`; what it does **not** have is
+projects standing still. Studio, U90 and Molodey are already on it and follow it, so a change that
+asks them to edit their own code owes them a note exactly as a released change would — and they
+learn about it the same way, through `dartway update`.
 
-A note already in this folder is filtered like any other: a project that does not depend on the
-packages it names, or already has the version it lands in, is never shown it.
+That works only if the version moves, because a note is shown to a project **below** the version it
+names. **So a change inside the rewrite that asks for an edit raises the family's prerelease**
+(`0.20.0-dev.1` → `dev.2`, in lockstep across the six) or the satellite's own version, writes the
+note against that number, and raises the carets in `template/` and `example/` with it. Each `dev.N`
+is a release to the projects that follow the branch, whatever it is to pub.dev.
+
+What is still true from D-031: **nothing of 0.x is preserved**. A project coming from 0.x is
+recreated on the rewrite rather than migrated, databases included, and no note is written for that
+journey. The notes here address a project that is already on the rewrite and moving along it.
 
 ## The form
 

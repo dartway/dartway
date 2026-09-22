@@ -1,10 +1,12 @@
 # Changelog
 
+## 0.20.0-dev.2
+
+- **`DwMigrationCli(environment: …)`** — where `DW_DATABASE_*` is read from when no `database` is given; the process environment by default. A project whose entry points take their development coordinates from a file passes the environment that file produced, so `migrate` runs against the same database the server does without exporting anything (D-078).
+
 ## 0.20.0-dev.1
 
 The rewrite (see docs/1.0).
-
-- **`DwMigrationCli(environment: …)`** — where `DW_DATABASE_*` is read from when no `database` is given; the process environment by default. A project whose entry points take their development coordinates from a file passes the environment that file produced, so `migrate` runs against the same database the server does without exporting anything (D-078).
 
 - **`DwEnumType` and `DwEnumListType` refuse to write `unknown` with `DwUnknownEnumWrite`** instead of a bare `StateError` (D-071). Catch the new type; on a call the framework now turns it into `dw.updateRequired` rather than an incident.
 - **Open enum columns** (D-071): `DwEnumType` and `DwEnumListType` of a `DwOpenEnum` read an unknown name as `unknown` and refuse to write `unknown`; strict enums still fail the read.
