@@ -43,3 +43,5 @@ export 'src/server/dw_app_server.dart';
 export 'src/server/dw_local_environment.dart' show DwLocalEnvironment;
 export 'src/server/dw_server_module.dart';
 export 'src/server/dw_server_settings.dart';
+export 'src/server/dw_startup_step.dart'
+    show DwFirstAdministrator, DwStartupStep;

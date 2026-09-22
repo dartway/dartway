@@ -96,7 +96,7 @@ put `deploy/config.yaml > local` — the coordinates of those two containers, co
   development MinIO; the server then checks that the public one reads anonymously and
   the private one does not, and refuses to start otherwise.
 - **Ask the human which phone number or e-mail should be the administrator** and put it
-  in `APP_BOOTSTRAP_ADMIN` — the commented line in `deploy/config.yaml > local`. Ask rather than choose, and never invent a value: whoever can
+  in `DW_ADMIN_IDENTIFIER` — the commented line in `deploy/config.yaml > local`. Ask rather than choose, and never invent a value: whoever can
   *receive* the one-time code on that identifier becomes the administrator. Unset, the
   server still starts and says on boot that the admin panel is out of reach.
 - **`bin/server.dart` is a long-running process.** Start it in the background. Waiting
@@ -135,7 +135,7 @@ Nothing is sent over SMS or e-mail in development: **the one-time code is printe
 server log** (`Sign-in code for <identifier>: <code>`). Read the real one out of the
 server output and pass it on — telling the human to "enter anything" is wrong: the code
 is checked. The seeded accounts sign in with the code `111111` (the seed prints them).
-Tell the human to sign in with the identifier in `APP_BOOTSTRAP_ADMIN`; the server logs
+Tell the human to sign in with the identifier in `DW_ADMIN_IDENTIFIER`; the server logs
 on boot whether it created or promoted that administrator.
 
 A good first thing to show: sign in as the admin in two browser windows, change a

@@ -7,6 +7,7 @@ import 'package:dartway_push_server/dartway_push_server.dart';
 
 import 'generated/dw_schema.dart';
 import 'src/example_auth.dart';
+import 'src/example_bootstrap.dart';
 import 'src/example_channels.dart';
 import 'src/example_files.dart';
 import 'src/example_push.dart';
@@ -20,6 +21,7 @@ import 'src/migrations/migrations.dart';
 
 export 'generated/dw_schema.dart';
 export 'src/example_auth.dart' show ExampleAuth;
+export 'src/example_bootstrap.dart' show ExampleBootstrap;
 export 'src/example_files.dart' show ExampleFiles;
 export 'src/example_push.dart' show ExamplePush;
 export 'src/migrations/migrations.dart' show appMigrations;
@@ -58,6 +60,7 @@ abstract final class ExampleServer {
       ...adminHandlers,
     ],
     channels: ExampleChannels.rules,
+    startup: [DwFirstAdministrator(grant: ExampleBootstrap.grantAdmin)],
     files: storage == null ? null : ExampleFiles.storage(storage),
     modules: [push ?? ExamplePush.module()],
     port: port,

@@ -46,7 +46,7 @@ dartway secret set SMS_API_TOKEN --env local
 ```
 
 A real environment variable beats both files, so `DW_DATABASE_NAME=other dart
-run bin/server.dart` still works without editing anything. `APP_BOOTSTRAP_ADMIN`
+run bin/server.dart` still works without editing anything. `DW_ADMIN_IDENTIFIER`
 — the phone or e-mail made an administrator on every start — is a line in
 `local` waiting to be uncommented. Without `DW_STORAGE_*` the server runs
 without uploads.
@@ -73,7 +73,7 @@ dart run dartway_cli:dartway dev proxy --web-dir build/web   # open http://local
 **Signing in.** Nothing is sent over SMS or e-mail in development: the code is
 printed in the server log (`Sign-in code for …`). The seeded accounts sign in
 with the code **111111**: the admin **79990000001**, the members
-**79990000002** and **boris@example.com**. `APP_BOOTSTRAP_ADMIN` makes the
+**79990000002** and **boris@example.com**. `DW_ADMIN_IDENTIFIER` makes the
 phone or e-mail it names an administrator on every start — whoever receives
 its codes is the admin, so there is no default. A real delivery goes into
 `deliverCode` in `dartway_starter_server/lib/src/auth.dart`.

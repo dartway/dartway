@@ -35,16 +35,11 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 ///   (`https://app.example.com,http://localhost:5000`). A web app served
 ///   through the same host, as the deploy and `dartway dev` serve it, needs
 ///   none;
-/// - `APP_BOOTSTRAP_ADMIN` — the phone or e-mail of the first administrator,
-///   made one on every start; unset for none.
+/// - `DW_ADMIN_IDENTIFIER` — the phone or e-mail of the first administrator,
+///   made one on every start by the framework's `DwFirstAdministrator` step
+///   (declared in `DartwayStarterServer.build`); unset for none.
 Future<void> main() async {
   final env = DwLocalEnvironment.overlay(Platform.environment);
-  final adminIdentifier = env[AppBootstrap.adminVariable]?.trim() ?? '';
-  // Checked before anything starts: a mistyped admin is a startup error.
-  if (adminIdentifier.isNotEmpty) {
-    AppBootstrap.parseAdminIdentifier(adminIdentifier);
-  }
-
   final storage = AppFiles.storageConfig(env);
   if (storage != null && env['DW_STORAGE_PROVISION'] == 'true') {
     await DwFileStorageSetup.provision(storage);
@@ -67,15 +62,5 @@ Future<void> main() async {
     server.logger.warning(
       'DW_STORAGE_ENDPOINT is not set: profile photos cannot be uploaded.',
     );
-  }
-  if (adminIdentifier.isEmpty) {
-    server.logger.warning(
-      'No administrator is declared: set ${AppBootstrap.adminVariable} to reach the '
-      'admin panel.',
-    );
-  } else if (await AppBootstrap.ensureAdministrator(server, adminIdentifier)) {
-    server.logger.info('Administrator ensured: $adminIdentifier');
-  } else {
-    server.logger.info('Administrator already in place: $adminIdentifier');
   }
 }

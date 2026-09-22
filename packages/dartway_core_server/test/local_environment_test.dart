@@ -73,10 +73,10 @@ staging:
   });
 
   test('secrets override the committed half', () {
-    writeConfig("local:\n  APP_BOOTSTRAP_ADMIN: 'you@example.com'\n");
-    writeSecrets("local:\n  APP_BOOTSTRAP_ADMIN: 'me@example.com'\n");
+    writeConfig("local:\n  DW_ADMIN_IDENTIFIER: 'you@example.com'\n");
+    writeSecrets("local:\n  DW_ADMIN_IDENTIFIER: 'me@example.com'\n");
 
-    expect(overlay(const {})['APP_BOOTSTRAP_ADMIN'], 'me@example.com');
+    expect(overlay(const {})['DW_ADMIN_IDENTIFIER'], 'me@example.com');
   });
 
   test('finds the project root from a package below it', () {

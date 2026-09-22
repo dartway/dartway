@@ -1,21 +1,17 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../generated/dw_schema.dart';
 import 'entities/people.dart';
 
-/// What this project means by "an administrator", for the framework's
+/// What this club means by "an administrator", for the framework's
 /// [DwFirstAdministrator] step.
 ///
 /// The framework brings the account named by `DW_ADMIN_IDENTIFIER` into
-/// existence at every start — accounts and identities are its own — and this
-/// is the half that is the project's: a role on the profile row.
-abstract final class AppBootstrap {
+/// existence at every start; the role on the profile row is the project's
+/// half — here the staff role that opens the admin panel.
+abstract final class ExampleBootstrap {
   /// Grants [accountId] the admin role, in the startup step's transaction.
-  ///
-  /// Idempotent, and quiet when there was nothing to do: the step already
-  /// says at every start who the administrator is, and a second line saying
-  /// the role was already there is noise in every log of every restart.
   static Future<void> grantAdmin(DwCallContext ctx, int accountId) async {
     final profile = (await ctx.db.userProfiles.findFirst(
       where: (t) => t.accountId.equals(accountId),

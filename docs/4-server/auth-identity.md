@@ -378,11 +378,14 @@ Three ways to get one, by where the code runs:
 
 - `ctx.accounts` in a handler, job or route — writes join the call's transaction, and revoked
   sessions close after it commits;
-- `server.accounts` next to a running server — a startup bootstrap
-  ([app server](app-server.md#work-after-start-serveraccounts-and-serverdb));
-- `DwAccountService(db, auth)` over a bare database, where no server runs in the process — a seed
-  script (`template/dartway_starter_server/bin/seed_dev.dart`). Its hooks get a context whose
-  `publish`, `revoke` and `jobs` throw rather than drop what they are given (D-022).
+- `ctx.accounts` in a **startup step** — the first administrator, in the step's transaction
+  ([app server](app-server.md#startup-steps));
+- `server.accounts` next to a running server;
+- `DwAccountService(db, auth)` over a bare database, where no server runs in the process. Its hooks
+  get a context whose `publish`, `revoke` and `jobs` throw rather than drop what they are given
+  (D-022). The skeleton's seed does **not** use this: it starts the project's own server on port
+  `0` and works in a real context, so the accounts it creates are created by the project's real
+  `DwAuthConfig` rather than by a second copy of it.
 
 | Method | Returns | Notes |
 |---|---|---|

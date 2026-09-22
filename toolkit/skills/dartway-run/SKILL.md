@@ -4,7 +4,7 @@ description: >-
   Bring a DartWay project up locally and confirm it is alive (DartWay projects): `dartway doctor`,
   Postgres (127.0.0.1:8090) and MinIO (8100, console 8101) from docker compose, `pg_isready` polled
   rather than slept on, the environment the server reads (DW_DATABASE_*, DW_STORAGE_*,
-  DW_STORAGE_PROVISION, APP_BOOTSTRAP_ADMIN asked from the human), `dart run bin/server.dart` in the
+  DW_STORAGE_PROVISION, DW_ADMIN_IDENTIFIER asked from the human), `dart run bin/server.dart` in the
   background (it migrates as it starts), the dev seed, `/health` 200 reported as a fact, the sign-in
   code read from the server log, `flutter run`, and `dartway dev web` / `dartway dev proxy` for the
   browser. Diagnoses the typical failures: a startup exception listing problems, a request or
@@ -79,7 +79,7 @@ The values that section holds, and what each is for:
 | `DW_STORAGE_ENDPOINT` | `http://127.0.0.1:8100` | The compose MinIO. Unset: the server runs without uploads |
 | `DW_STORAGE_ACCESS_KEY`, `DW_STORAGE_SECRET_KEY` | the MinIO root user and password | |
 | `DW_STORAGE_PROVISION` | `true` | Creates both buckets and sets their access before starting — for a storage the project owns, never for one somebody else administers |
-| `APP_BOOTSTRAP_ADMIN` | **ask the human** | A commented line in `local`, see below |
+| `DW_ADMIN_IDENTIFIER` | **ask the human** | A commented line in `local`, see below |
 | `PORT` | `8080` (default) | |
 | `DW_MIN_APP_BUILD`, `DW_ALLOWED_ORIGINS` | unset | See the failure table |
 
@@ -97,8 +97,8 @@ Everything else about storage (`dartway-uploads`) has development defaults in th
   migration step for bringing a project up; `dart run bin/migrate.dart status` (same `DW_DATABASE_*`)
   shows what is applied, and that is the fact to report. Changing the schema is `dartway-migrations`.
 - **The first administrator is declared, not seeded.** The admin role is granted by an admin, so the
-  very first one is named in `APP_BOOTSTRAP_ADMIN` (a phone number or an e-mail) and made an admin on
-  every start. **Ask the human which identifier to use, and never invent one**: whoever can receive
+  very first one is named in `DW_ADMIN_IDENTIFIER` (a phone number or an e-mail) and made an admin on
+  every start by the framework's `DwFirstAdministrator` startup step, before the port opens. **Ask the human which identifier to use, and never invent one**: whoever can receive
   the one-time code on it becomes the administrator. Left unset, the server still starts and warns
   that no administrator is declared — it postpones the admin panel, it blocks nothing. A value that
   is neither a phone nor an e-mail stops the server before it starts, on purpose.
@@ -131,7 +131,7 @@ Then read the server's own lines and report them:
 Nothing is sent over SMS or e-mail in development: **the one-time code is printed in the server
 log**, as `Sign-in code for <identifier>: <code>`. Read the real one and pass it on — never invent a
 code and never suggest "enter anything": the code is checked, and a wrong one counts against the
-attempts. Signing in with the `APP_BOOTSTRAP_ADMIN` identifier yields the administrator; any other
+attempts. Signing in with the `DW_ADMIN_IDENTIFIER` identifier yields the administrator; any other
 identifier signs up a regular member. Seeded accounts use the seed's fixed code.
 
 A good first demonstration: the admin signed in in two windows, a change in the admin panel in one,
@@ -182,12 +182,12 @@ only one.
 | `- file storage … could not be checked at http://127.0.0.1:8100: …` | MinIO is not running, or unreachable | `docker compose up -d`; or unset `DW_STORAGE_ENDPOINT` to run without uploads |
 | `SocketException: Failed to create server socket … Address already in use` (port 8080) | A server is already running — another terminal, a background run from earlier | Do not start a second one: `curl …/health`. Otherwise find the process holding the port |
 | `port is already allocated` on `docker compose up` (8090 / 8100 / 8101) | Another project's containers or a leftover | `docker ps`; stop the conflicting container. DartWay projects share these development ports |
-| `Invalid argument (APP_BOOTSTRAP_ADMIN): is neither a phone number nor an e-mail address` | A mistyped administrator | Ask the human for the value again |
+| `Invalid argument (DW_ADMIN_IDENTIFIER): is neither a phone number nor an e-mail address` | A mistyped administrator | Ask the human for the value again |
 | The app shows "update the app" / calls answer `426` | `incompatible`: the build is below `DW_MIN_APP_BUILD` (`dw.updateRequired`), or the app and the server speak different protocol versions (`dw.protocolUnsupported`) — the app and the server resolve `dartway_core_*` versions that speak different protocols | Unset or lower `DW_MIN_APP_BUILD` locally; otherwise `dart pub get` in every package so the family resolves one version (`dartway-update`) |
 | The browser app loads, and every call or the live socket fails | Opened on another origin than the proxy's, or `127.0.0.1` instead of `localhost` | `http://localhost:8000` through `dartway dev web` / `dev proxy`; `DW_ALLOWED_ORIGINS` only for a socket from a genuinely different origin |
 | Uploads work on desktop and fail on an emulator or a phone; photos do not load there | The storage endpoint is `127.0.0.1`, which the device cannot reach, and it is signed into every URL | `DW_STORAGE_ENDPOINT` at an address the device reaches; restart the server |
 | A widget or acceptance test fails to reach a database | Not a bring-up problem | `dartway-testing`: `dartway test` creates its own |
-| The admin panel is not offered after signing in | Signed in with an identifier other than `APP_BOOTSTRAP_ADMIN` | Fix the variable and restart: the promotion happens on start |
+| The admin panel is not offered after signing in | Signed in with an identifier other than `DW_ADMIN_IDENTIFIER` | Fix the variable and restart: the promotion happens on start |
 
 ## What not to do
 

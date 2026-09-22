@@ -57,7 +57,7 @@ local:
 
   # The phone or e-mail made an administrator on every start. Whoever receives
   # its codes is the admin, so it has no default.
-  # APP_BOOTSTRAP_ADMIN: you@example.com
+  # DW_ADMIN_IDENTIFIER: you@example.com
 
 # A deployment. Uncomment, fill in, and `dartway deploy setup --env staging`.
 #

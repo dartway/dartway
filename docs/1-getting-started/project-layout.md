@@ -81,7 +81,7 @@ my_app_server/
     files.dart             one DwUploadRule per upload purpose
     objects.dart           rows → the data objects clients see, related data in batches
     publications.dart      what a change publishes, and to whom
-    bootstrap.dart         APP_BOOTSTRAP_ADMIN: the first administrator, ensured on every start
+    bootstrap.dart         the admin role granted to the first administrator (DwFirstAdministrator)
   test/                    acceptance tests on a real server, database and storage
   docker-compose.yaml      development Postgres and MinIO
   Dockerfile               the server image the deploy builds

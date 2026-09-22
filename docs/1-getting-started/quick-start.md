@@ -75,7 +75,7 @@ is nothing to export**: `bin/server.dart`, `bin/seed_dev.dart` and `bin/migrate.
 bin/server.dart` still works. A deployed server has neither file: `.dockerignore` keeps `deploy/` out
 of every image, and Compose hands it the environment the deploy rendered.
 
-Your own administrator identifier is the commented `APP_BOOTSTRAP_ADMIN` line of that `local`
+Your own administrator identifier is the commented `DW_ADMIN_IDENTIFIER` line of that `local`
 section — see step 5. The full list the server reads — `PORT`, `DW_MIN_APP_BUILD`,
 `DW_ALLOWED_ORIGINS` and the rest of `DW_STORAGE_*` — is documented at the top of `bin/server.dart`.
 
@@ -175,7 +175,7 @@ work.
 The seeded accounts sign in with the code **`111111`**: the administrator `79990000001`, the members
 `79990000002` and `boris@example.com`.
 
-`APP_BOOTSTRAP_ADMIN` makes the phone or e-mail it names an administrator on every start. The admin
+`DW_ADMIN_IDENTIFIER` makes the phone or e-mail it names an administrator on every start. The admin
 role is granted by an admin, so the first one has to be declared somewhere, and it is declared per
 environment rather than shipped: whoever receives the codes for that identifier is the admin, and a
 default in a public template would hand every project that forgot to change it to a stranger. Unset,

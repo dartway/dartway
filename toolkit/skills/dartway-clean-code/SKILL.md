@@ -792,8 +792,8 @@ and fail there, or check it on boot — either is fine; what is not fine is a fa
 gap. A value the server cannot start without also belongs under `requires.secrets` in
 `deploy/config.yaml`: then a deployment missing it refuses to begin instead of failing on first use.
 
-The skeleton follows this: the first administrator, read from the environment in the server's
-`bin/server.dart`, is deliberately left without a default. A default administrator in a public
+The skeleton follows this: the first administrator, read from the environment by the framework's
+`DwFirstAdministrator` startup step, is deliberately left without a default. A default administrator in a public
 template would mean every project that forgot to change it has an administrator whose sign-in codes
 a stranger receives.
 

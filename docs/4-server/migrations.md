@@ -105,6 +105,29 @@ project created from an older template has an initial migration older than frame
 it relies on, and it still runs after them. Within the project, declare `dependsOn` when a
 migration must follow one with a later id.
 
+## Data in a migration, and data that does not belong in one
+
+A migration may write rows — seeding the first settings, backfilling a column it just added — and
+the ledger makes that exactly-once in every environment. **The question to ask first is who owns
+those rows afterwards.**
+
+Rows the operators own from the moment they exist — a starting price list, the first settings,
+which they then edit in the admin panel — belong in a migration. The code put them there once and
+never looks again.
+
+Rows that have to keep agreeing with the code do **not**. Notification templates, the reasons a
+project refuses something, a lookup table a `switch` in the code reads: the day one of them
+changes, a migration leaves no good move. Editing the applied one is refused by its checksum (and
+would stop every server that applied it); a new migration that updates rows has to guess which of
+them somebody has since corrected by hand; and `down` deletes rows nobody asked it to. Declare
+them in a **startup step** instead ([app server](app-server.md#startup-steps)) and the next start
+of every environment converges on the declaration.
+
+**Write data in SQL, not through row classes.** A migration is read against the schema of its own
+day, forever; written through today's row classes it silently changes meaning the next time a
+field is renamed, while its checksum says nothing happened. That is why `DwMigrationContext`
+offers `sql` and `query` and no typed tables.
+
 ## Namespaces
 
 - `dw` — the framework's own tables: accounts, identities, session keys, code tickets, command

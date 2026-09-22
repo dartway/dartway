@@ -16,174 +16,163 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 /// `dart run bin/seed_dev.dart` against the database in `DW_DATABASE_*`, after
 /// the server has migrated it once.
 Future<void> main() async {
-  final database = await DwPostgresDatabase.open(
-    DwDatabaseConfig.fromEnvironment(
-      DwLocalEnvironment.overlay(Platform.environment),
+  final env = DwLocalEnvironment.overlay(Platform.environment);
+  final server = ExampleServer.build(
+    database: DwDatabaseConfig.fromEnvironment(env),
+    // The same storage the real server is configured with: a server built
+    // without it declares no file jobs, and the job runner would drop the
+    // recurring rows of the one that does.
+    storage: ExampleFiles.storageConfig(env),
+    // Bound to whatever port is free: the seed serves nobody, it only needs
+    // what a server has — a migrated database, the project's auth, a context.
+    port: 0,
+  );
+  await server.start();
+  try {
+    await server.runInContext(_seed, scope: 'seed');
+  } finally {
+    await server.stop();
+  }
+}
+
+/// One transaction, because `runInContext` is one: a seed that failed half-way
+/// would otherwise leave half of itself behind. The accounts are created by
+/// the project's real `DwAuthConfig` — the same `onAccountCreated` a sign-in
+/// runs — rather than by a second copy of it declared here.
+Future<void> _seed(DwCallContext ctx) async {
+  final db = ctx.db;
+  if (await db.clubServices.exists()) {
+    ctx.log.info('already seeded');
+    return;
+  }
+  Future<UserProfileRow> persona(
+    String phone,
+    String name,
+    UserRole role, {
+    String? fixedCode,
+  }) async {
+    final account = await ctx.accounts.ensure(DwIdentifierKind.phone, phone);
+    final profile = (await db.userProfiles.findFirst(
+      where: (t) => t.accountId.equals(account.accountId),
+    ))!;
+    return db.userProfiles.update(
+      profile.copyWith(
+        firstName: name,
+        role: role,
+        testVerificationCode: fixedCode == null
+            ? const DwFieldPatch.keep()
+            : DwFieldPatch.set(fixedCode),
+      ),
+    );
+  }
+
+  final admin = await persona(
+    '79990000001',
+    'Anna',
+    UserRole.admin,
+    fixedCode: '111111',
+  );
+  final coach = await persona(
+    '79990000002',
+    'Boris',
+    UserRole.staff,
+    fixedCode: '111111',
+  );
+  await persona('79990000003', 'Vera', UserRole.client, fixedCode: '111111');
+  final galina = await persona(
+    '79990000004',
+    'Galina',
+    UserRole.staff,
+    fixedCode: '111111',
+  );
+  // Members to page through: the admin table shows ten at a time.
+  const names = [
+    'Daria',
+    'Egor',
+    'Zhanna',
+    'Ilya',
+    'Kira',
+    'Lev',
+    'Maria',
+    'Nikita',
+    'Olga',
+    'Pavel',
+    'Raisa',
+    'Semyon',
+    'Tamara',
+    'Ulyana',
+    'Fedor',
+  ];
+  for (final (index, name) in names.indexed) {
+    await persona(
+      '7999100${index.toString().padLeft(4, '0')}',
+      name,
+      UserRole.client,
+    );
+  }
+
+  final services = await db.clubServices.insertAll([
+    const ClubServiceRow(
+      title: 'Yoga',
+      description: 'A slow morning flow for every level.',
+      durationMinutes: 60,
+      price: 1200,
+    ),
+    const ClubServiceRow(
+      title: 'Strength',
+      description: 'Barbell basics in a small group.',
+      durationMinutes: 50,
+      price: 1500,
+    ),
+    const ClubServiceRow(
+      title: 'Personal training',
+      description: 'One coach, one client, your plan.',
+      durationMinutes: 60,
+      price: 3500,
+    ),
+  ]);
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  await db.clubSessions.insertAll([
+    for (var day = 1; day <= 7; day++) ...[
+      ClubSessionRow(
+        serviceId: services[0].id!,
+        coachProfileId: coach.id,
+        startsAt: today.add(Duration(days: day, hours: 9)),
+        capacity: 12,
+      ),
+      if (day.isOdd)
+        ClubSessionRow(
+          serviceId: services[2].id!,
+          coachProfileId: coach.id,
+          startsAt: today.add(Duration(days: day, hours: 12)),
+          capacity: 1,
+        ),
+      ClubSessionRow(
+        serviceId: services[1].id!,
+        coachProfileId: coach.id,
+        startsAt: today.add(Duration(days: day, hours: 18)),
+        capacity: 8,
+      ),
+    ],
+  ]);
+
+  final chat = await _seedChat(db, admin: admin, staff: [coach, galina]);
+  await db.newsPosts.insert(
+    NewsPostRow(
+      authorProfileId: coach.id!,
+      title: 'The club is open',
+      text: 'Book your first class in the schedule.',
+      createdAt: now,
     ),
   );
-  try {
-    final db = database.db;
-    if (await db.clubServices.exists()) {
-      stdout.writeln('Already seeded.');
-      return;
-    }
-    // One transaction: a seed that fails half-way leaves nothing behind.
-    final chat = await db.transaction((tx) async {
-      // No server runs during seeding, so nobody is subscribed: the seed's auth
-      // creates the profile without publishing anything.
-      final accounts = DwAccountService(
-        tx,
-        DwAuthConfig(
-          normalize: ExampleAuth.config.normalize,
-          deliverCode: ExampleAuth.config.deliverCode,
-          onAccountCreated: (ctx, accountId, kind, identifier, origin) =>
-              ExampleAuth.createProfile(
-                ctx.db,
-                accountId,
-                identifier,
-                const {},
-              ),
-        ),
-      );
-
-      Future<UserProfileRow> persona(
-        String phone,
-        String name,
-        UserRole role, {
-        String? fixedCode,
-      }) async {
-        final account = await accounts.ensure(DwIdentifierKind.phone, phone);
-        final profile = (await tx.userProfiles.findFirst(
-          where: (t) => t.accountId.equals(account.accountId),
-        ))!;
-        return tx.userProfiles.update(
-          profile.copyWith(
-            firstName: name,
-            role: role,
-            testVerificationCode: fixedCode == null
-                ? const DwFieldPatch.keep()
-                : DwFieldPatch.set(fixedCode),
-          ),
-        );
-      }
-
-      final admin = await persona(
-        '79990000001',
-        'Anna',
-        UserRole.admin,
-        fixedCode: '111111',
-      );
-      final coach = await persona(
-        '79990000002',
-        'Boris',
-        UserRole.staff,
-        fixedCode: '111111',
-      );
-      await persona(
-        '79990000003',
-        'Vera',
-        UserRole.client,
-        fixedCode: '111111',
-      );
-      final galina = await persona(
-        '79990000004',
-        'Galina',
-        UserRole.staff,
-        fixedCode: '111111',
-      );
-      // Members to page through: the admin table shows ten at a time.
-      const names = [
-        'Daria',
-        'Egor',
-        'Zhanna',
-        'Ilya',
-        'Kira',
-        'Lev',
-        'Maria',
-        'Nikita',
-        'Olga',
-        'Pavel',
-        'Raisa',
-        'Semyon',
-        'Tamara',
-        'Ulyana',
-        'Fedor',
-      ];
-      for (final (index, name) in names.indexed) {
-        await persona(
-          '7999100${index.toString().padLeft(4, '0')}',
-          name,
-          UserRole.client,
-        );
-      }
-
-      final services = await tx.clubServices.insertAll([
-        const ClubServiceRow(
-          title: 'Yoga',
-          description: 'A slow morning flow for every level.',
-          durationMinutes: 60,
-          price: 1200,
-        ),
-        const ClubServiceRow(
-          title: 'Strength',
-          description: 'Barbell basics in a small group.',
-          durationMinutes: 50,
-          price: 1500,
-        ),
-        const ClubServiceRow(
-          title: 'Personal training',
-          description: 'One coach, one client, your plan.',
-          durationMinutes: 60,
-          price: 3500,
-        ),
-      ]);
-
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      await tx.clubSessions.insertAll([
-        for (var day = 1; day <= 7; day++) ...[
-          ClubSessionRow(
-            serviceId: services[0].id!,
-            coachProfileId: coach.id,
-            startsAt: today.add(Duration(days: day, hours: 9)),
-            capacity: 12,
-          ),
-          if (day.isOdd)
-            ClubSessionRow(
-              serviceId: services[2].id!,
-              coachProfileId: coach.id,
-              startsAt: today.add(Duration(days: day, hours: 12)),
-              capacity: 1,
-            ),
-          ClubSessionRow(
-            serviceId: services[1].id!,
-            coachProfileId: coach.id,
-            startsAt: today.add(Duration(days: day, hours: 18)),
-            capacity: 8,
-          ),
-        ],
-      ]);
-
-      final chat = await _seedChat(tx, admin: admin, staff: [coach, galina]);
-      await tx.newsPosts.insert(
-        NewsPostRow(
-          authorProfileId: coach.id!,
-          title: 'The club is open',
-          text: 'Book your first class in the schedule.',
-          createdAt: now,
-        ),
-      );
-      return chat;
-    });
-    stdout.writeln(
-      'Seeded: admin 79990000001, staff 79990000002 and 79990000004, '
-      'client 79990000003 — code 111111. Chat: ${chat.messages} messages in '
-      '${chat.channels} channels; 79990000002 reopens "Front desk" '
-      '$_unreadAtFrontDesk messages before its end.',
-    );
-  } finally {
-    await database.close();
-  }
+  ctx.log.info(
+    'seeded: admin 79990000001, staff 79990000002 and 79990000004, '
+    'client 79990000003 — code 111111. Chat: ${chat.messages} messages in '
+    '${chat.channels} channels; 79990000002 reopens "Front desk" '
+    '$_unreadAtFrontDesk messages before its end.',
+  );
 }
 
 /// Messages of "Front desk" after 79990000002's read position: the chat
@@ -197,7 +186,7 @@ const _unreadAtFrontDesk = 40;
 /// Every table is one `insertAll`; replies are a second one, since they need
 /// the ids of the messages they quote.
 Future<({int channels, int messages})> _seedChat(
-  DwDatabaseHandle tx, {
+  DwDatabaseHandle db, {
   required UserProfileRow admin,
   required List<UserProfileRow> staff,
 }) async {
@@ -206,7 +195,7 @@ Future<({int channels, int messages})> _seedChat(
   final members = [admin, ...staff];
   final now = DateTime.now();
 
-  final channels = await tx.chatChannels.insertAll(const [
+  final channels = await db.chatChannels.insertAll(const [
     ChatChannelRow(title: 'Front desk'),
     ChatChannelRow(title: 'Coaches'),
     ChatChannelRow(title: 'Maintenance'),
@@ -275,7 +264,7 @@ Future<({int channels, int messages})> _seedChat(
   ];
 
   const deskReplies = 40;
-  final plain = await tx.chatMessages.insertAll([
+  final plain = await db.chatMessages.insertAll([
     ...history(desk, 600 - deskReplies, 21, _deskLines),
     ...history(coaches, 80, 21, _coachLines),
     ...history(maintenance, 10, 14, _maintenanceLines),
@@ -305,14 +294,14 @@ Future<({int channels, int messages})> _seedChat(
       ),
     );
   }
-  final repliesStored = await tx.chatMessages.insertAll(replies);
+  final repliesStored = await db.chatMessages.insertAll(replies);
 
   // Pins: a few notes worth keeping at the top of "Front desk".
   final pinned = <int>{};
   while (pinned.length < 5) {
     pinned.add(deskPlain[random.nextInt(deskPlain.length)].id!);
   }
-  await tx.chatMessages.updateWhere(
+  await db.chatMessages.updateWhere(
     where: (t) => t.id.inList(pinned),
     set: (t) => [
       t.pinnedAt.set(now.subtract(const Duration(days: 1))),
@@ -335,7 +324,7 @@ Future<({int channels, int messages})> _seedChat(
       ),
     );
   }
-  await tx.chatMessageReactions.insertAll(reactions);
+  await db.chatMessageReactions.insertAll(reactions);
 
   int byPosition(ChatMessageRow a, ChatMessageRow b) {
     final bySent = a.sentAt.compareTo(b.sentAt);
@@ -356,7 +345,7 @@ Future<({int channels, int messages})> _seedChat(
       );
   final deskInOrder = inOrder(desk);
   final [boris, galina] = staff;
-  await tx.chatReadPositions.insertAll([
+  await db.chatReadPositions.insertAll([
     // The admin has read everything.
     for (final channel in channels) position(admin, inOrder(channel).last),
     // Boris stopped mid-history in "Front desk", and is up to date elsewhere.

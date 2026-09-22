@@ -140,8 +140,9 @@ effect on the next `run`.
 `../dartway_starter_server/bin/server.dart` lists every variable. Two of them
 are the project's to deliver:
 
-- `APP_BOOTSTRAP_ADMIN` — the phone or e-mail made an administrator on every
-  start: `dartway secret set APP_BOOTSTRAP_ADMIN --env staging`. Whoever
+- `DW_ADMIN_IDENTIFIER` — the phone or e-mail made an administrator on every
+  start by the framework's `DwFirstAdministrator` step:
+  `dartway secret set DW_ADMIN_IDENTIFIER --env staging`. Whoever
   receives its codes is the admin, so it has no default; unset, the admin panel
   is out of reach and the server says so in its log.
 - `DW_MIN_APP_BUILD` — the oldest app build still served; older builds are shown
