@@ -6,6 +6,7 @@ import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 import 'generated/dw_schema.dart';
 import 'src/auth.dart';
+import 'src/bootstrap.dart';
 import 'src/channels.dart';
 import 'src/files.dart';
 import 'src/handlers/admin_handlers.dart';
@@ -41,6 +42,7 @@ abstract final class DartwayStarterServer {
     auth: auth ?? AppAuth.config(),
     handlers: [...profileHandlers, ...adminHandlers, ...settingsHandlers],
     channels: AppChannels.rules,
+    startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
     files: storage == null ? null : AppFiles.storage(storage),
     port: port,
     settings: settings,

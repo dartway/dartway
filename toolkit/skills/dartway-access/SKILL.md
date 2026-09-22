@@ -92,10 +92,11 @@ rules beside it.
 
 - **nobody changes their own role** — refuse it with a project refusal code (the skeleton's
   `ownRoleLocked`): an admin demoting themselves locks the panel's only way back;
-- **the first admin is declared per environment**, not granted by a default: the skeleton's
-  `APP_BOOTSTRAP_ADMIN` names an identifier made admin on every start (through
-  `server.accounts.ensure`). A default admin identifier in a template would hand every project that
-  forgot it to whoever receives that identifier's codes.
+- **the first admin is declared per environment**, not granted by a default: `DW_ADMIN_IDENTIFIER`
+  names an identifier the framework's `DwFirstAdministrator` startup step brings into existence at
+  every start, handing the account to the project's `grant` — which is where the role is given. A
+  default admin identifier in a template would hand every project that forgot it to whoever
+  receives that identifier's codes.
 
 A role taken away also closes what it opened: `ctx.revoke(channel, accountId)` for every channel
 the role could subscribe to (`dartway-realtime`).

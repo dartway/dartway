@@ -1,3 +1,4 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_server/dartway_starter_server.dart';
 import 'package:dartway_starter_server/src/entities/people.dart';
@@ -179,15 +180,22 @@ void main() {
   test('the declared first administrator: created with the account, '
       'promoted on a later start, quiet when nothing changed', () async {
     final server = app.server.server;
-    expect(
-      () => AppBootstrap.parseAdminIdentifier('not an identifier'),
-      throwsArgumentError,
+    DwFirstAdministrator declaring(String identifier) => DwFirstAdministrator(
+      grant: AppBootstrap.grantAdmin,
+      environment: {DwFirstAdministrator.defaultVariable: identifier},
     );
+    Future<void> start(String identifier) =>
+        server.runInContext(declaring(identifier).run);
 
+    // A mistyped identifier is a server that does not start, judged before
+    // anything opens.
     expect(
-      await AppBootstrap.ensureAdministrator(server, 'Admin@Example.com'),
-      isTrue,
+      declaring('not an identifier').problems(AppAuth.config()),
+      [contains(DwFirstAdministrator.defaultVariable)],
     );
+    expect(declaring('Admin@Example.com').problems(AppAuth.config()), isEmpty);
+
+    await start('Admin@Example.com');
     final created = (await app.db.userProfiles.findFirst(
       where: (t) => t.role.equals(UserRole.admin) & t.firstName.equals('Admin'),
     ))!;
@@ -196,16 +204,19 @@ void main() {
       isNull,
       reason: "a tool accepts nothing on anyone's behalf",
     );
-    expect(
-      await AppBootstrap.ensureAdministrator(server, 'admin@example.com'),
-      isFalse,
-    );
+
+    // The identifier is stored normalised, so the next start finds the same
+    // account rather than creating a second one.
+    final profiles = await app.db.userProfiles.count();
+    await start('admin@example.com');
+    expect(await app.db.userProfiles.count(), profiles);
 
     // Demoted in the panel, back on the next start.
     await app.db.userProfiles.update(created.copyWith(role: UserRole.user));
+    await start('admin@example.com');
     expect(
-      await AppBootstrap.ensureAdministrator(server, 'admin@example.com'),
-      isTrue,
+      (await app.db.userProfiles.findById(created.id!))!.role,
+      UserRole.admin,
     );
 
     final device = await app.client();

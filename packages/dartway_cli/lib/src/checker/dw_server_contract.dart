@@ -178,8 +178,10 @@ class DwMigrationsInspector {
 
     if ((_environment['DW_DATABASE_HOST'] ?? '').isEmpty) {
       _notes.add(
-        'set DW_DATABASE_* to a Postgres where throwaway databases can be '
-        'created (the development one will do) to replay the migrations',
+        'no database to replay the migrations on: point DW_DATABASE_* — or '
+        'deploy/config.yaml > local, which the entry points read — at a '
+        'Postgres where throwaway databases can be created (the development '
+        'one will do)',
       );
     } else {
       final result = _probe(['run', migrateScript, 'check'], serverDir.path);

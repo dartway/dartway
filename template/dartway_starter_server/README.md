@@ -14,7 +14,7 @@ The server, on `dartway_core_server`. How to run, seed and test it:
   access rule
 - `lib/src/auth.dart` — sign-in: identifier rule, code delivery, the profile a
   new account starts with, the consent a sign-up needs
-- `lib/src/bootstrap.dart` — the first administrator (`APP_BOOTSTRAP_ADMIN`)
+- `lib/src/bootstrap.dart` — the first administrator (`DW_ADMIN_IDENTIFIER`)
 - `lib/src/call_context.dart` — the caller's profile and the access rules
 - `lib/src/channels.dart` — who may listen to which channel
 - `lib/src/files.dart` — upload rules and the storage configuration

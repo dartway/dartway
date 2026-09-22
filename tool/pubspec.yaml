@@ -5,6 +5,6 @@ resolution: workspace
 environment:
   sdk: ^3.11.0
 dependencies:
-  dartway_cli: ^0.10.1
+  dartway_cli: ^0.11.0
 dev_dependencies:
   test: ^1.25.0

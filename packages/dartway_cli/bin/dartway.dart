@@ -8,6 +8,7 @@ import 'package:dartway_cli/src/commands/dev_command.dart';
 import 'package:dartway_cli/src/commands/doctor_command.dart';
 import 'package:dartway_cli/src/commands/generate_command.dart';
 import 'package:dartway_cli/src/commands/quickstart_command.dart';
+import 'package:dartway_cli/src/commands/secret_commands.dart';
 import 'package:dartway_cli/src/commands/setup_ai_command.dart';
 import 'package:dartway_cli/src/commands/stats_command.dart';
 import 'package:dartway_cli/src/commands/test_command.dart';
@@ -52,6 +53,7 @@ Future<void> main(List<String> args) async {
         ..addCommand(CheckCommand())
         ..addCommand(DevCommand())
         ..addCommand(DeployCommand())
+        ..addCommand(SecretCommand())
         ..addCommand(StatsCommand())
         ..addCommand(TestCommand());
 

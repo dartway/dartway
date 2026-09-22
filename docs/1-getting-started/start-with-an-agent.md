@@ -45,7 +45,7 @@ missing:
 
 ## What the assistant will ask you
 
-**Which phone number or e-mail should be the administrator.** It goes into `APP_BOOTSTRAP_ADMIN`, and
+**Which phone number or e-mail should be the administrator.** It goes into `DW_ADMIN_IDENTIFIER`, and
 the brief tells the assistant to ask rather than choose: whoever can *receive* the one-time code on
 that identifier becomes the admin. An invented value is an admin nobody can sign in as — or someone
 else can.

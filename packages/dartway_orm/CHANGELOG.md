@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.2
+
+- **`DwMigrationCli(environment: …)`** — where `DW_DATABASE_*` is read from when no `database` is given; the process environment by default. A project whose entry points take their development coordinates from a file passes the environment that file produced, so `migrate` runs against the same database the server does without exporting anything (D-078).
+
 ## 0.20.0-dev.1
 
 The rewrite (see docs/1.0).

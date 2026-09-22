@@ -29,6 +29,7 @@ import '../migrations/dw_framework_migrations.dart';
 import '../routes/dw_http_route.dart';
 import 'dw_runtime.dart';
 import 'dw_server_module.dart';
+import 'dw_startup_step.dart';
 import 'dw_server_settings.dart';
 
 /// The server refused to start: its declaration is inconsistent. Every
@@ -70,6 +71,7 @@ final class DwAppServer {
     this.channels = const [],
     this.jobs = const [],
     this.routes = const [],
+    this.startup = const [],
     this.files,
     this.modules = const [],
     this.port = 8080,
@@ -114,6 +116,11 @@ final class DwAppServer {
   final List<DwChannelRule> channels;
   final List<DwJobDefinition> jobs;
   final List<DwHttpRoute> routes;
+
+  /// Work done at every start, after the migrations and before the port
+  /// opens: the first administrator, rows that must agree with the code.
+  /// A step that throws stops the start.
+  final List<DwStartupStep> startup;
 
   /// File uploads: storage, a rule per purpose, who reads private files.
   /// Without it the framework's file calls fail as incidents and `ctx.files`
@@ -302,6 +309,22 @@ final class DwAppServer {
       );
       await runner.start();
 
+      // After the job runner, so a step may enqueue; before the front binds,
+      // so nothing has been served when it runs. A throw leaves the start in
+      // the catch below — in a deployment, with the previous server serving.
+      for (final step in startup) {
+        try {
+          await _runIn(runtime, 'startup:${step.name}', step.run);
+        } catch (error, stackTrace) {
+          logger.error(
+            'startup step "${step.name}" failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+          rethrow;
+        }
+      }
+
       front = DwHttpFront(
         runtime: runtime,
         settings: settings,
@@ -403,7 +426,16 @@ final class DwAppServer {
     Future<T> Function(DwCallContext ctx) work, {
     String scope = 'server',
   }) async {
-    final runtime = _require.runtime;
+    return _runIn(_require.runtime, scope, work);
+  }
+
+  /// [runInContext] against a runtime the server holds but has not published
+  /// yet — which is what a startup step runs in.
+  Future<T> _runIn<T>(
+    DwRuntime runtime,
+    String scope,
+    Future<T> Function(DwCallContext ctx) work,
+  ) async {
     final ctx = runtime.context(scope: scope, kind: DwContextKind.background);
     final result = await ctx.transaction((_) => work(ctx));
     runtime.deliver(ctx);
@@ -419,6 +451,9 @@ final class DwAppServer {
   @internal
   List<String> validate() {
     final problems = <String>[];
+    for (final step in startup) {
+      problems.addAll(step.problems(auth));
+    }
     // Each handler factory bounds its call class by kind (`single` takes a
     // `DwSingleRequest`, `command` a `DwActionCommand`), so a handler of the
     // wrong kind does not compile; what is left to check is the registry.

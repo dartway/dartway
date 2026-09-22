@@ -73,7 +73,7 @@ Two kinds of rule live in this file and read alike: the same prose, the same voi
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
 
-Eight further checks are warnings and one is a nudge; those are defaults, however firmly the prose around them is written. **Anything this table and the types do not hold is a default by construction** — no rule in this file or in the skills becomes law by being phrased definitely, and promoting one costs a failing check rather than a sentence.
+Ten further checks are warnings and one is a nudge; those are defaults, however firmly the prose around them is written. **Anything this table and the types do not hold is a default by construction** — no rule in this file or in the skills becomes law by being phrased definitely, and promoting one costs a failing check rather than a sentence.
 
 **The gap this leaves is named rather than smoothed over.** The naming law is checked for the contract's DTO names only — variables, fields and every other class name are not; the contract law is held against JSON maps and stray DTOs by the types, but nothing fails on a `DwHttpRoute` the app calls instead of a request; "done" has only a warning (`featureSpecMissing`). `migrationsDrift` needs a Postgres (`DW_DATABASE_*`) and says it did not run rather than passing without one.
 
@@ -301,7 +301,7 @@ PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commi
 - **Publish what a command changed** to every channel that shows it, after commit (`ctx.publish`); publish to someone's "my" channel with `DwLiveChannel.forAccount`; close access that was removed with `ctx.revoke`. A request never publishes. Playbook — `dartway-realtime`, access in `dartway-access`.
 - **Accounts, identities and session keys are the framework's.** The profile row references the account; it is created in `onAccountCreated`, in the same transaction as the account. A project never queries `dw_*` tables: `DwAccountService` (`ctx.accounts`) is the whole surface.
 - **The schema moves by migrations**: a row class changes → `dartway generate` → `dart run bin/migrate.dart create <name>` → review the draft → `check`. The server applies pending migrations as it starts and refuses to start on a missing, changed or dirty one. Playbook — `dartway-migrations`.
-- **Configuration is the environment** (`DW_DATABASE_*`, `DW_STORAGE_*`, the project's own); there is no configuration file, and secrets are never printed.
+- **Configuration is the environment** (`DW_DATABASE_*`, `DW_STORAGE_*`, the project's own); the server reads no configuration file, and secrets are never printed. On a developer's machine the entry points call `DwLocalEnvironment.overlay`, which puts `deploy/config.yaml > local` (committed) and `deploy/secrets.yaml > local` (git-ignored, never read by you) into that environment — so nothing is exported, and a real variable still beats both. `dartway secret list --env local` says what is set and what is missing.
 
 ## Flutter (`__FLUTTER_PKG__`)
 

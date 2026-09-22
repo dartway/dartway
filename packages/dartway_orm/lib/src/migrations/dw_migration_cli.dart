@@ -38,6 +38,7 @@ final class DwMigrationCli {
     this.namespace = 'app',
     this.modules = const {},
     this.database,
+    this.environment,
     this.scratchDatabasePrefix = 'dw_scratch_',
     DateTime Function()? clock,
     StringSink? out,
@@ -72,8 +73,16 @@ final class DwMigrationCli {
   /// before the project's. Their tables are not part of [schema].
   final Map<String, List<DwDatabaseMigration>> modules;
 
-  /// Defaults to `DW_DATABASE_*` from the environment.
+  /// Defaults to `DW_DATABASE_*` from [environment].
   final DwDatabaseConfig? database;
+
+  /// Where `DW_DATABASE_*` is read from when [database] is not given.
+  ///
+  /// Defaults to the process environment. A project whose entry points take
+  /// their development coordinates from a file passes the environment that
+  /// file produced, so `migrate` runs on the same database the server does
+  /// without exporting anything.
+  final Map<String, String>? environment;
 
   /// `create` and `check` work on throwaway databases with this prefix.
   final String scratchDatabasePrefix;
@@ -104,7 +113,8 @@ usage: migrate <command>
   };
 
   DwDatabaseConfig get _config =>
-      database ?? DwDatabaseConfig.fromEnvironment(Platform.environment);
+      database ??
+      DwDatabaseConfig.fromEnvironment(environment ?? Platform.environment);
 
   Future<int> _run(List<String> args) async {
     if (args.isEmpty) return _usageError('no command given');

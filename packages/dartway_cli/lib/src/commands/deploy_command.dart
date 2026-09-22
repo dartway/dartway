@@ -12,7 +12,6 @@ import '../deploy/stack.dart';
 import '../project_layout.dart';
 import 'deploy_run.dart';
 import 'deploy_setup.dart';
-import 'secret_commands.dart';
 
 /// Deployment commands.
 class DeployCommand extends Command<int> {
@@ -20,7 +19,6 @@ class DeployCommand extends Command<int> {
     addSubcommand(DeploySetupCommand());
     addSubcommand(DeployRunCommand());
     addSubcommand(DeployCheckCommand());
-    addSubcommand(SecretCommand());
   }
 
   @override

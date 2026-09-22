@@ -155,7 +155,29 @@ enum DwCheckType {
   /// the framework's own packages already allow (D-032): the override was
   /// how a project took a satellite before the core raised its caret, and
   /// now it only hides the next raise.
-  frameworkOverrideOutlived;
+  frameworkOverrideOutlived,
+
+  /// A secret the project declares under the hoisted `requires.secrets` that
+  /// the `local` environment has no value for — `deploy/config.yaml > local`
+  /// and `deploy/secrets.yaml > local` together.
+  ///
+  /// A warning, not a law: a key the server only reaches on a path nobody
+  /// runs locally is a legitimate thing to leave unset, and a project told to
+  /// deliver it before it can work at all is told so by the code that needs
+  /// it. What this ends is the other case — the developer who does not know
+  /// the key exists, because the only place it was ever written down was a
+  /// deployment's configuration.
+  localSecretMissing,
+
+  /// The development containers' own credentials in the server package's
+  /// `docker-compose.yaml` no longer match `deploy/config.yaml > local`, which
+  /// is what the server is started with.
+  ///
+  /// Two files state the same password because one is read by Compose and the
+  /// other by the server, and nothing makes them agree. Changing one produces
+  /// a server that cannot log in to the database on the next machine — or,
+  /// worse, on this one after the volume is recreated.
+  devComposeDrifted;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -176,6 +198,8 @@ enum DwCheckType {
     DwCheckType.unusedFeatureFile ||
     DwCheckType.frameworkRefsDiverged ||
     DwCheckType.frameworkOverrideOutlived ||
+    DwCheckType.localSecretMissing ||
+    DwCheckType.devComposeDrifted ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

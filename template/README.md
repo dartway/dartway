@@ -29,21 +29,27 @@ project up: `dartway quickstart` prints everything it needs to know, and
 cd dartway_starter_server
 docker compose up -d          # Postgres on 8090, MinIO on 8100 (console 8101)
 
-export DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=8090 \
-       DW_DATABASE_NAME=dartway_starter DW_DATABASE_USER=postgres \
-       DW_DATABASE_PASSWORD=dartway_dev_pw DW_DATABASE_SSL=false \
-       DW_STORAGE_ENDPOINT=http://127.0.0.1:8100 \
-       DW_STORAGE_ACCESS_KEY=dartway_dev DW_STORAGE_SECRET_KEY=dartway_dev_storage_pw \
-       DW_STORAGE_PROVISION=true \
-       APP_BOOTSTRAP_ADMIN=you@example.com
-
 dart pub get
 dart run bin/server.dart      # applies the migrations, serves :8080
-dart run bin/seed_dev.dart    # once, in another terminal with the same DW_DATABASE_*
+dart run bin/seed_dev.dart    # once, in another terminal
 ```
 
-`DW_STORAGE_PROVISION=true` creates the two buckets and sets their access on
-the first start. Without `DW_STORAGE_*` the server runs without uploads.
+**Nothing to export.** The server, the seed and `migrate` read
+`deploy/config.yaml` > `local` — the coordinates of those two containers,
+committed because they are the same for everyone here — through
+`DwLocalEnvironment`. A key that is yours alone goes beside them in the
+git-ignored `deploy/secrets.yaml` > `local`:
+
+```bash
+dartway secret list --env local            # what is set, what is missing
+dartway secret set SMS_API_TOKEN --env local
+```
+
+A real environment variable beats both files, so `DW_DATABASE_NAME=other dart
+run bin/server.dart` still works without editing anything. `DW_ADMIN_IDENTIFIER`
+— the phone or e-mail made an administrator on every start — is a line in
+`local` waiting to be uncommented. Without `DW_STORAGE_*` the server runs
+without uploads.
 
 The app, in another terminal:
 
@@ -67,7 +73,7 @@ dart run dartway_cli:dartway dev proxy --web-dir build/web   # open http://local
 **Signing in.** Nothing is sent over SMS or e-mail in development: the code is
 printed in the server log (`Sign-in code for …`). The seeded accounts sign in
 with the code **111111**: the admin **79990000001**, the members
-**79990000002** and **boris@example.com**. `APP_BOOTSTRAP_ADMIN` makes the
+**79990000002** and **boris@example.com**. `DW_ADMIN_IDENTIFIER` makes the
 phone or e-mail it names an administrator on every start — whoever receives
 its codes is the admin, so there is no default. A real delivery goes into
 `deliverCode` in `dartway_starter_server/lib/src/auth.dart`.

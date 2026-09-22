@@ -9,8 +9,10 @@ import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_framework_lock.dart';
 import '../checker/dw_framework_overrides.dart';
 import '../checker/dw_l10n_wiring.dart';
+import '../checker/dw_local_environment.dart';
 import '../checker/dw_layout.dart';
 import '../checker/dw_server_contract.dart';
+import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 
 /// Runs the built-in DartWay convention checks: the Flutter package's
@@ -110,6 +112,12 @@ class CheckCommand extends Command<int> {
       ).run();
       errorCount += DwMigrationsInspector(
         serverPackageDir: layout?.serverPackageDir,
+        // The same environment `bin/migrate.dart` will start with, so a
+        // project whose database coordinates live in deploy/config.yaml is not
+        // told to export what it already declared.
+        environment: DwLocalEnvironment(
+          layout?.root ?? flutterPackageDir,
+        ).overlay(Platform.environment),
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();
@@ -123,6 +131,12 @@ class CheckCommand extends Command<int> {
       ).run();
       errorCount += DwFrameworkOverridesInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run();
+      errorCount += DwLocalEnvironmentInspector(
+        projectRoot: layout?.root ?? flutterPackageDir,
+        serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run();

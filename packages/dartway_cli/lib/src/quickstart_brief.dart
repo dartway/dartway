@@ -72,18 +72,17 @@ The order is not arbitrary; each line explains why it comes where it does.
     cd my_app/my_app_server
     docker compose up -d
     dart pub get
-    # the environment below, in the shell that runs the server and the seed
     dart run bin/server.dart
-    dart run bin/seed_dev.dart     # once, in a second shell with the same environment
+    dart run bin/seed_dev.dart     # once, in a second shell
 
-The server is configured by its environment alone — there is no configuration file:
+The server is configured by its environment alone — there is no configuration file
+it reads. **Nothing has to be exported**: `bin/server.dart`, the seed and `migrate`
+put `deploy/config.yaml > local` — the coordinates of those two containers, committed
+— into that environment through `DwLocalEnvironment`, together with the git-ignored
+`deploy/secrets.yaml > local`. An exported variable beats both files.
 
-    DW_DATABASE_HOST=127.0.0.1 DW_DATABASE_PORT=8090 DW_DATABASE_NAME=my_app
-    DW_DATABASE_USER=postgres DW_DATABASE_PASSWORD=dartway_dev_pw DW_DATABASE_SSL=false
-    DW_STORAGE_ENDPOINT=http://127.0.0.1:8100
-    DW_STORAGE_ACCESS_KEY=dartway_dev DW_STORAGE_SECRET_KEY=dartway_dev_storage_pw
-    DW_STORAGE_PROVISION=true
-    APP_BOOTSTRAP_ADMIN=<the human's phone or e-mail — see below>
+    dartway secret list --env local            # what is set, what is missing
+    dartway secret set <KEY> --env local       # a value that is yours alone
 
 - **`docker compose up -d`** starts Postgres (host port 8090) and MinIO, the object
   storage for uploads (8100, console 8101). The first run pulls images and can take
@@ -97,7 +96,7 @@ The server is configured by its environment alone — there is no configuration 
   development MinIO; the server then checks that the public one reads anonymously and
   the private one does not, and refuses to start otherwise.
 - **Ask the human which phone number or e-mail should be the administrator** and put it
-  in `APP_BOOTSTRAP_ADMIN`. Ask rather than choose, and never invent a value: whoever can
+  in `DW_ADMIN_IDENTIFIER` — the commented line in `deploy/config.yaml > local`. Ask rather than choose, and never invent a value: whoever can
   *receive* the one-time code on that identifier becomes the administrator. Unset, the
   server still starts and says on boot that the admin panel is out of reach.
 - **`bin/server.dart` is a long-running process.** Start it in the background. Waiting
@@ -136,7 +135,7 @@ Nothing is sent over SMS or e-mail in development: **the one-time code is printe
 server log** (`Sign-in code for <identifier>: <code>`). Read the real one out of the
 server output and pass it on — telling the human to "enter anything" is wrong: the code
 is checked. The seeded accounts sign in with the code `111111` (the seed prints them).
-Tell the human to sign in with the identifier in `APP_BOOTSTRAP_ADMIN`; the server logs
+Tell the human to sign in with the identifier in `DW_ADMIN_IDENTIFIER`; the server logs
 on boot whether it created or promoted that administrator.
 
 A good first thing to show: sign in as the admin in two browser windows, change a

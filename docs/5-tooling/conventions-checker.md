@@ -71,11 +71,14 @@ From the project root or from inside the `*_flutter` package, in this order:
 4. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
 5. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
    and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
-6. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
+6. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
+   development containers' credentials against what the server is told to reach them by
+   (`devComposeDrifted`);
+7. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
    in the zones and `shared/` — the other sixteen checks.
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 6 and skips
-steps 1–5 and the UI kit pass: each of those judges a whole package or the whole project, and has
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 7 and skips
+steps 1–6 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
 
@@ -102,7 +105,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Fifteen errors, eight warnings, one info — `DwCheckType` and its `severity` in
+Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -130,6 +133,8 @@ Fifteen errors, eight warnings, one info — `DwCheckType` and its `severity` in
 | `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
+| `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
+| `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
 | `fileLong` | info | Over 200 lines |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,
@@ -210,13 +215,22 @@ prints is `dartway generate`, and generated files are never edited by hand. See
 [Data objects and generation](../2-core/data-objects-and-generation.md).
 
 **`migrationsDrift`** runs the project's `bin/migrate.dart check`, which replays the migrations on
-throwaway databases next to the one `DW_DATABASE_*` names — so it needs a Postgres where databases can
+throwaway databases next to the one `DW_DATABASE_*` — or `deploy/config.yaml > local`, which the
+check reads the same way the entry points do — names — so it needs a Postgres where databases can
 be created; the development one will do. It fails on migrations that do not produce the schema the
 row classes declare, a migration edited after its checksum was sealed or left unregistered, and a down
 that does not undo its up. The fixes it prints: a schema change the migrations miss is
 `dart run bin/migrate.dart create <name>`; an edited migration applied nowhere yet is
 `dart run bin/migrate.dart rehash <id>`. An error, because a schema the migrations do not produce is a
 server that refuses to start in the next environment. See [Migrations](../4-server/migrations.md).
+
+**`localSecretMissing` and `devComposeDrifted`** judge the environment this machine starts a server
+with (D-078). Both are warnings: a key the server only reaches on a path nobody runs locally is a
+legitimate thing to leave unset, and a project that points `local` at a database of its own is not
+drifting. What they end is the silent case — a developer who does not know a key exists because the
+only place it was written down was a deployment's configuration, and two files stating the same
+password with nothing making them agree. `dartway secret list --env local` is the same answer on
+demand.
 
 ## Why `notAFeature` and `featureSpecMissing` are one rule
 

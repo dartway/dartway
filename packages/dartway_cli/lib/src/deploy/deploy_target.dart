@@ -132,8 +132,9 @@ class DwDeployTarget {
     if (!file.existsSync()) {
       throw StateError(
         'No $configRelativePath in ${projectRoot.path}.\n'
-        'Copy deploy/config.yaml.example over it and fill it in, or run this '
-        'command from a DartWay project root.',
+        'Every DartWay project has one — it holds the "$localSection" '
+        'environment as well as the deployments. Run this from a project '
+        'root, or write the file.',
       );
     }
     return parse(file.readAsStringSync(), environment: environment);
@@ -150,9 +151,18 @@ class DwDeployTarget {
     if (document is! YamlMap) {
       throw StateError('$configRelativePath must be a map of environments.');
     }
+    if (environment == localSection) {
+      throw StateError(
+        '"$localSection" is not a deployment. It is the environment this '
+        'machine starts a server with — $configRelativePath > $localSection '
+        'for what the team shares, deploy/secrets.yaml > $localSection for '
+        'what is yours. Read it with "dartway secret list --env '
+        '$localSection".',
+      );
+    }
     final section = document[environment];
     if (section == null) {
-      final known = document.keys.join(', ');
+      final known = deployableIn(document).join(', ');
       throw StateError(
         'No "$environment" environment in $configRelativePath. '
         'Declared: ${known.isEmpty ? '<none>' : known}.',
@@ -248,42 +258,32 @@ class DwDeployTarget {
       );
     }
 
-    final requires = guarded(() => reader.optionalMap('requires'));
-    DwYamlReader? requiresReader;
-    if (requires != null) {
-      _unknownKeys(
-        requires,
-        const {'secrets', 'files'},
-        '$source > requires',
-        problems,
-      );
-      requiresReader = DwYamlReader(requires, source: '$source > requires');
-    }
-    final requiredSecrets =
-        guarded(() => requiresReader?.optionalStringList('secrets')) ??
-        const <String>[];
-    final requiredSecretFiles =
-        guarded(() => requiresReader?.optionalStringList('files')) ??
-        const <String>[];
-    for (final key in requiredSecrets) {
-      if (!dwIsSecretKeyName(key)) {
-        problems.add(
-          '$source > requires > secrets: "$key" is not a secret name — an '
-          'environment variable in upper case letters, digits and '
-          'underscores, not starting with a digit or COMPOSE_',
-        );
-      }
-    }
-    for (final name in requiredSecretFiles) {
-      if (!dwIsSecretFileName(name)) {
-        problems.add(
-          '$source > requires > files: "$name" is not a file name. Each entry '
-          'names one file in the secret store, mounted into the server under '
-          'the same name; a pattern or a path cannot be mounted',
-        );
-      }
-    }
-
+    // What the project requires is a property of the project, not of one of
+    // its machines: it is declared once at the top of the file, and an
+    // environment adds what only it needs. Before this was hoisted, every
+    // environment repeated the same list and they drifted apart in the one
+    // direction nobody notices — the environment that was forgotten is the one
+    // whose deploy stops.
+    final projectRequires = _requiresOf(
+      document,
+      source: configRelativePath,
+      problems: problems,
+      guarded: guarded,
+    );
+    final environmentRequires = _requiresOf(
+      section,
+      source: source,
+      problems: problems,
+      guarded: guarded,
+    );
+    final requiredSecrets = {
+      ...projectRequires.secrets,
+      ...environmentRequires.secrets,
+    }.toList();
+    final requiredSecretFiles = {
+      ...projectRequires.files,
+      ...environmentRequires.files,
+    }.toList();
     final firewallPorts =
         guarded(() => reader.optionalIntList('firewall_ports')) ??
         const <int>[];
@@ -318,6 +318,51 @@ class DwDeployTarget {
       '$configRelativePath is not deployable:\n'
       '${problems.map((problem) => '  - $problem').join('\n')}',
     );
+  }
+
+  /// One `requires:` block, validated where it was written.
+  static _DwRequires _requiresOf(
+    YamlMap map, {
+    required String source,
+    required List<String> problems,
+    required T? Function<T>(T Function()) guarded,
+  }) {
+    final requires = guarded(
+      () => DwYamlReader(map, source: source).optionalMap('requires'),
+    );
+    if (requires == null) return const _DwRequires([], []);
+
+    _unknownKeys(
+      requires,
+      const {'secrets', 'files'},
+      '$source > requires',
+      problems,
+    );
+    final reader = DwYamlReader(requires, source: '$source > requires');
+    final secrets =
+        guarded(() => reader.optionalStringList('secrets')) ?? const <String>[];
+    final files =
+        guarded(() => reader.optionalStringList('files')) ?? const <String>[];
+
+    for (final key in secrets) {
+      if (!dwIsSecretKeyName(key)) {
+        problems.add(
+          '$source > requires > secrets: "$key" is not a secret name — an '
+          'environment variable in upper case letters, digits and '
+          'underscores, not starting with a digit or COMPOSE_',
+        );
+      }
+    }
+    for (final name in files) {
+      if (!dwIsSecretFileName(name)) {
+        problems.add(
+          '$source > requires > files: "$name" is not a file name. Each entry '
+          'names one file in the secret store, mounted into the server under '
+          'the same name; a pattern or a path cannot be mounted',
+        );
+      }
+    }
+    return _DwRequires(secrets, files);
   }
 
   /// Hosts that are not host names, and hosts that are declared twice.
@@ -397,8 +442,29 @@ class DwDeployTarget {
     if (document is! YamlMap) {
       return const [];
     }
-    return document.keys.map((key) => key.toString()).toList();
+    return deployableIn(document);
   }
+
+  /// The environments of [document] that describe a machine to deploy to.
+  ///
+  /// The file also holds what belongs to the project rather than to one of its
+  /// machines: the hoisted `requires:`, and `local` — the environment a
+  /// developer's own machine starts a server with, which has no host to reach
+  /// and nothing to provision.
+  static List<String> deployableIn(YamlMap document) => [
+    for (final key in document.keys)
+      if (!_projectKeys.contains(key.toString())) key.toString(),
+  ];
+
+  /// Top-level keys of `deploy/config.yaml` that are not deployments.
+  static const _projectKeys = {'requires', localSection};
+
+  /// The section holding the environment a developer's machine starts a server
+  /// with, in this file and in `deploy/secrets.yaml`.
+  ///
+  /// Read by the project's own entry point through `DwLocalEnvironment`, never
+  /// by a deploy.
+  static const String localSection = 'local';
 }
 
 /// Whether [key] can be a key of the secret store: an environment variable
@@ -419,3 +485,11 @@ bool dwIsSecretFileName(String name) =>
     name != '.' &&
     name != '..' &&
     name != 'secrets.env';
+
+/// One `requires:` block: what a server needs delivered before it starts.
+class _DwRequires {
+  const _DwRequires(this.secrets, this.files);
+
+  final List<String> secrets;
+  final List<String> files;
+}

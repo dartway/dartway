@@ -168,7 +168,7 @@ In this order, because each answers a question the next cannot:
 ```bash
 dartway generate                                          # the generator moved with the family
 dartway generate --check
-(cd __SERVER_PKG__ && dart run bin/migrate.dart check)     # DW_DATABASE_* set: migrations still produce the schema
+(cd __SERVER_PKG__ && dart run bin/migrate.dart check)     # against the local database: migrations still produce the schema
 (cd __SHARED_PKG__ && dart analyze && dart test)
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && flutter analyze && dart run custom_lint)

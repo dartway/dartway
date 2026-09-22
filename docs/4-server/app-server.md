@@ -175,7 +175,7 @@ values in. The skeleton's (`template/dartway_starter_server/bin/server.dart`) re
 | `DW_STORAGE_PROVISION=true` | `DwFileStorageSetup.provision` before starting — for a storage the project owns |
 | `DW_MIN_APP_BUILD` | `DwServerSettings.minAppBuild` |
 | `DW_ALLOWED_ORIGINS` | `DwServerSettings.allowedOrigins`, comma-separated |
-| `APP_BOOTSTRAP_ADMIN` | the first administrator, below |
+| `DW_ADMIN_IDENTIFIER` | the first administrator, below |
 
 The example's `bin/server.dart` is the same without the administrator. A value the project wants
 configurable is one more line there; the framework does not grow a settings loader for it.
@@ -211,42 +211,72 @@ A running server exposes `server.db` (the pool's `DwDatabaseHandle`), `server.ac
 `DwAccountService` whose revocations end sessions on this server at once), `server.boundPort` and
 `server.logger`. All but the logger throw `StateError` before `start()`.
 
-The skeleton uses them for its first administrator. The admin role is granted by an admin, which
-leaves the first one nowhere to come from; `APP_BOOTSTRAP_ADMIN` names it per environment.
-`bin/server.dart` parses the identifier before anything starts (a mistyped admin is a startup
-error), starts the server, then calls:
+The skeleton used to use them for its first administrator; that is now a **startup step**, below.
+
+A script with no server running builds `DwAccountService(db, auth)` over a bare database instead —
+see [auth and identity](auth-identity.md#dwaccountservice). A script that has a server (the seed
+starts one on port `0`) uses `ctx.accounts` and needs no such thing.
+
+## Startup steps
+
+**`DwAppServer(startup: [...])` is work done at every start, after the migrations and before the
+port opens.** The lifecycle is the concept: a step is idempotent by construction — it states what
+must be true and makes it so — and nothing has been served when it runs, so a step that throws
+stops the start with the previous version still serving.
+
+It runs in a background context, in one transaction, so `ctx.db`, `ctx.accounts`, `ctx.publish`
+and `ctx.jobs` are the ones a handler has. `DwStartupStep.problems(auth)` is judged with the
+server's own, before the database is even opened: a value read from the environment is checked
+there.
+
+What goes where, and this is the whole of it:
+
+| Lifecycle | Where |
+|---|---|
+| once per database, recorded, in every environment | a **migration** |
+| at every start, in every environment, idempotent | a **startup step** |
+| whenever a developer feels like it, never in production | a **script** (`bin/seed_dev.dart`) |
+
+The rule for data that is neither obviously one nor the other is **who owns the row afterwards**.
+Rows the operators own from the moment they exist — the first settings, a starting price list —
+are seeded once by a migration and never touched by code again. Rows that must agree with the code
+— notification templates, the reasons a project refuses something — are a startup step: change the
+declaration and the next start of every environment converges on it, with no applied migration to
+edit and no `down` that would delete rows somebody has since corrected.
+
+### `DwFirstAdministrator`
+
+The case every project has. The admin role is granted by an admin, which leaves the first one
+nowhere to come from; `DW_ADMIN_IDENTIFIER` names it per environment, and there is no default
+because whoever receives the codes sent to that identifier *is* the administrator.
 
 ```dart
-// AppBootstrap
-static Future<bool> ensureAdministrator(
-  DwAppServer server,
-  String rawIdentifier,
-) async {
-  final (:kind, :identifier) = parseAdminIdentifier(rawIdentifier);
-  // Created through the framework like any sign-in, so the account, its
-  // identifier and its profile appear together (`onAccountCreated` runs with a
-  // tool origin).
-  final (:accountId, :created) = await server.accounts.ensure(kind, identifier);
-  final profile = (await server.db.userProfiles.findFirst(
+DwAppServer(
+  startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+  ...
+);
+
+// AppBootstrap — the project's half: the framework goes as far as the account.
+static Future<void> grantAdmin(DwCallContext ctx, int accountId) async {
+  final profile = (await ctx.db.userProfiles.findFirst(
     where: (t) => t.accountId.equals(accountId),
   ))!;
-  if (profile.role == UserRole.admin) return created;
-  await server.db.userProfiles.update(
+  if (profile.role == UserRole.admin) return;
+  await ctx.db.userProfiles.update(
     profile.copyWith(
       role: UserRole.admin,
       firstName: profile.firstName.isEmpty ? 'Admin' : null,
     ),
   );
-  return true;
 }
 ```
 
-That is `template/dartway_starter_server/lib/src/bootstrap.dart`. It runs on every start and acts
-only when the identifier is not an admin yet, so an admin demoted in the panel is back on the next
-start. There is no default identifier: whoever receives the codes sent to it becomes the admin.
-
-A script with no server running (the seed) builds `DwAccountService(db, auth)` over a bare
-database instead — see [auth and identity](auth-identity.md#dwaccountservice).
+The framework ensures the account the way a sign-in does (`onAccountCreated` runs with a tool
+origin, so the project's profile appears with it) and hands it to `grant`. Unset, the variable is a
+warning at every start and nothing else. Set to something the project's `normalize` refuses, it is
+a server that does not start. It runs at **every** start, so an identifier demoted in the panel is
+an administrator again next time — which is the only way back into a project that locked itself
+out; the way to stop it is to take the identifier out of the environment.
 
 ### `server.runInContext`
 

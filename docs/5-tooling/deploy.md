@@ -5,11 +5,11 @@ scripts in a project and no reason to write any: provisioning, rendering, the se
 restarts and verification belong to the framework.
 
 ```bash
-cp deploy/config.yaml.example deploy/config.yaml     # then fill it in
+# deploy/config.yaml already describes "local"; add a deployment beside it
 
 dartway deploy check --env staging --local            # the working copy only
 dartway deploy setup --env staging                    # provision the server, render the stack
-dartway deploy secret set SMS_API_TOKEN --env staging # what cannot be generated
+dartway secret set SMS_API_TOKEN --env staging        # what cannot be generated
 dartway deploy check --env staging                    # DNS, the server, the deployed hosts
 dartway deploy run   --env staging                    # update, build, start, verify
 ```
@@ -22,10 +22,13 @@ environments `deploy/config.yaml` declares. Every one that connects takes `--as 
 
 ## One file describes an environment
 
-`deploy/config.yaml` holds one environment per top-level key. **The server has no configuration
-file of its own** — it is configured by its environment, which the deploy derives from this file
-(database coordinates, storage, port) and from the secret store on the server (passwords, keys).
-Nothing writes `config.yaml`; the deploy only reads it.
+`deploy/config.yaml` holds one environment per top-level key, plus two keys that belong to the
+project rather than to one of its machines: `requires` (below) and `local`, which is what a
+developer's own machine starts a server with and is not a deployment at all — see
+[Secrets](#secrets). **The server has no configuration file of its own** — it is configured by its
+environment, which the deploy derives from this file (database coordinates, storage, port) and from
+the secret store on the server (passwords, keys). Nothing writes `config.yaml`; the deploy only
+reads it.
 
 | Key | Required | Meaning |
 |---|---|---|
@@ -44,6 +47,11 @@ Nothing writes `config.yaml`; the deploy only reads it.
 | `firewall_ports` | no | TCP ports to open beyond SSH, 80 and 443 |
 | `requires.secrets` | no | Secrets nobody can generate, as environment variable names |
 | `requires.files` | no | Secret documents, by file name, mounted into the server |
+
+`requires` is also read at the **top level** of the file, where it states what the project needs
+wherever it runs; an environment's own `requires` adds to it. Declaring it once is the point: the
+same list repeated per environment drifts in the one direction nobody notices, and the environment
+that was forgotten is the one whose deploy stops.
 
 The file is validated as it is read, **every problem at once**, and an unknown key is one of them: a
 key the deploy does not read is a setting somebody believes is in force. Every domain must be a host
@@ -341,6 +349,28 @@ a content hash. `web-cache-policy` reads that configuration; the outside probe a
 hard-reload.
 
 ## Secrets
+
+### `local`: this machine
+
+`local` is an environment like any other in these two files, and the only one with no machine to
+reach: `deploy/config.yaml > local` holds what the team shares — the coordinates of the development
+containers — and `deploy/secrets.yaml > local` holds what is the developer's own. The project's
+entry points read both through `DwLocalEnvironment` (`dartway_core_server`), in that order, and a
+real environment variable beats them. A deployed server reads neither: `.dockerignore` admits only
+the packages into a build context, so `deploy/` never enters an image, and the runtime stage holds
+nothing but the compiled binary.
+
+```bash
+dartway secret list --env local             # both halves, each key marked with its file
+dartway secret set SMS_API_TOKEN --env local
+```
+
+`init` has nothing to generate there (the coordinates are committed), `push` and `pull` have nowhere
+to go (the file *is* the store), and `put-file` has nothing to mount — a document a local server
+reads is a path on that machine, so a variable points at it. Each says so rather than doing
+something surprising.
+
+### On a server
 
 **The store** is one file on the server, `/home/<deploy_user>/.config/<project>/secrets.env`, mode
 600, outside the checkout so the `git reset --hard` of a deploy cannot touch it. Lines are

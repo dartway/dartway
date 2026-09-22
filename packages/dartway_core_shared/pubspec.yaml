@@ -2,7 +2,7 @@ name: dartway_core_shared
 description: >
   The shared contract of DartWay: DTO kinds, results and refusals, channels
   and the wire protocol spoken between a DartWay server and its clients.
-version: 0.20.0-dev.1
+version: 0.20.0-dev.2
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

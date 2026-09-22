@@ -32,7 +32,9 @@ keys), `dartway-realtime` (what to publish where), `dartway-migrations` (schema 
 __SERVER_PKG__/
   bin/server.dart          starts the server from the environment
   bin/migrate.dart         apply | rollback | status | create <name> | check | rehash
-  bin/seed_dev.dart        development data
+  bin/seed_dev.dart        development data: starts this server on port 0 and
+                           works in a real context, so the project's own auth
+                           creates the accounts
   lib/__SERVER_PKG__.dart  the library: builds the DwAppServer
   lib/generated/           written by `dartway generate` — never edited
   lib/src/                 everything else
@@ -487,18 +489,46 @@ For everything else about accounts use **`DwAccountService`**, never SQL on `dw_
 | Where the code runs | Service |
 |---|---|
 | a handler, job or route | `ctx.accounts` — joins the call's transaction |
-| next to a started server (a startup bootstrap) | `server.accounts` |
-| a script with no server (a seed) | `DwAccountService(db, auth)` |
+| a startup step (`DwAppServer(startup: …)`) | `ctx.accounts` — joins the step's transaction |
+| next to a started server | `server.accounts` |
+| a script with no server at all | `DwAccountService(db, auth)` |
 
 It offers `ensure`, `find`, `listIdentities`, `listIdentitiesOf` (batch), `accountsMatching` (an admin
 search box), `moveIdentities`, `removeIdentities`, `issueKey`, `listKeys`, `revokeKey`, `revokeKeys`
 — keys and revocation in `dartway-access`.
 
+## 9a. Startup steps — what must be true before the first call
+
+`DwAppServer(startup: [...])` runs after the migrations and before the port opens, in a background
+context and one transaction (`ctx.db`, `ctx.accounts`, `ctx.publish`, `ctx.jobs`). A step that
+throws stops the start — in a deployment, with the previous server still serving.
+
+```dart
+startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+```
+
+`DwFirstAdministrator` brings the account named by `DW_ADMIN_IDENTIFIER` into existence and hands
+it to `grant`, which is where the project gives its own admin role — the framework knows accounts,
+not roles.
+
+**Where data goes, and it is decided by who owns the row afterwards:**
+
+| Lifecycle | Where |
+|---|---|
+| once per database, in every environment | a migration (write it in SQL, never through row classes) |
+| at every start, in every environment, idempotent | a startup step |
+| whenever a developer wants it, never in production | `bin/seed_dev.dart` |
+
+Rows the operators own once they exist (the first settings) are a migration. Rows that must keep
+agreeing with the code (notification templates, a lookup a `switch` reads) are a **startup step**:
+an applied migration cannot be edited, and a `down` for data deletes what somebody has since
+corrected.
+
 ## 10. Checks
 
 ```bash
 dartway generate --check      # generated code matches the sources
-dart run bin/migrate.dart check   # from __SERVER_PKG__, with DW_DATABASE_* set: migrations replay into the declared schema
+dart run bin/migrate.dart check   # from __SERVER_PKG__, against the local database: migrations replay into the declared schema
 dartway test                  # server tests against a throwaway Postgres (and storage)
 dartway check                 # layout, generated code, migrations drift (with DW_DATABASE_*), and the Flutter checks
 ```
