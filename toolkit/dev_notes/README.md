@@ -27,7 +27,7 @@ Every finding has exactly one home. Take the first line that fits:
 | **has no address in code** — cross-cutting, infrastructural, a decision with a price | here |
 
 The test is whether the finding has an address in code. If it does, it lives next to that code, where
-the compiler, `dartway check`, Studio and the next reader all pass by it. If it does not, there is
+the compiler, `dart run dartway_cli:dartway check`, Studio and the next reader all pass by it. If it does not, there is
 nowhere to put it but here. The full rule, and what a `knownIssues` line is for, is in
 `.claude/CLAUDE.md` — do not re-derive it from this paragraph.
 

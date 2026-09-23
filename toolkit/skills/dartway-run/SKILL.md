@@ -6,7 +6,7 @@ description: >-
   rather than slept on, the environment the server reads (DW_DATABASE_*, DW_STORAGE_*,
   DW_STORAGE_PROVISION, DW_ADMIN_IDENTIFIER asked from the human), `dart run bin/server.dart` in the
   background (it migrates as it starts), the dev seed, `/health` 200 reported as a fact, the sign-in
-  code read from the server log, `flutter run`, and `dartway dev web` / `dartway dev proxy` for the
+  code read from the server log, `flutter run`, and `dart run dartway_cli:dartway dev web` / `dart run dartway_cli:dartway dev proxy` for the
   browser. Diagnoses the typical failures: a startup exception listing problems, a request or
   command without a handler, a migration refusal or a schema check, the bucket probe, a busy port,
   SSL against local Postgres, 426 "update the app". Use when asked to "bring the project up", "run
@@ -88,7 +88,7 @@ Everything else about storage (`dartway-uploads`) has development defaults in th
 ### Why exactly this way
 
 - **`docker compose up -d` starts Postgres and MinIO.** The first run pulls images and can take
-  minutes; that is normal. There is no test database in compose: `dartway test` starts its own.
+  minutes; that is normal. There is no test database in compose: `dart run dartway_cli:dartway test` starts its own.
 - **A container reported "Started" is not yet Postgres listening.** There are seconds between the
   two, and a server started in that window exits on "connection refused". Poll `pg_isready` until it
   succeeds.
@@ -173,7 +173,7 @@ only one.
 | `Connection refused` / `SocketException` on start | Postgres not accepting connections yet, or not on 8090 | `pg_isready` until it succeeds; `docker compose ps` |
 | An SSL / TLS negotiation error against `127.0.0.1` | `DW_DATABASE_SSL` unset — SSL is on by default | `DW_DATABASE_SSL=false` locally |
 | `DwStartupException: the server cannot start:` `- X is a registered request without a handler` (or `command`) | A request or command exists in the contract and no handler answers it | Write the handler and add it to the server's handler list (`dartway-server`). Deliberate: the alternative is a button that fails for the first user who presses it |
-| `- the … handler answers X, which the protocol does not register` / `- X has more than one handler` | Generated registry stale, or a handler listed twice | `dartway generate`; remove the duplicate |
+| `- the … handler answers X, which the protocol does not register` / `- X has more than one handler` | Generated registry stale, or a handler listed twice | `dart run dartway_cli:dartway generate`; remove the duplicate |
 | `- channel kind "…" has more than one rule`, `- job "…" …`, `- route … is reserved by the framework`, `- upload purpose …` | The declaration is inconsistent | Fix what the line names |
 | `DwMigrationRefused: refused to migrate:` `- … was edited after it was applied` / `is applied but no longer registered` / `is dirty` | The database's ledger and the code disagree — often a branch switch | `dartway-migrations`, "When the server refuses to start". Never "fix" it by editing the ledger without the human |
 | `DwMigrationFailed: up of app/… failed: <postgres error>` | A migration ran and Postgres refused it | Read the SQL error; `dartway-migrations` |
@@ -184,9 +184,9 @@ only one.
 | `port is already allocated` on `docker compose up` (8090 / 8100 / 8101) | Another project's containers or a leftover | `docker ps`; stop the conflicting container. DartWay projects share these development ports |
 | `Invalid argument (DW_ADMIN_IDENTIFIER): is neither a phone number nor an e-mail address` | A mistyped administrator | Ask the human for the value again |
 | The app shows "update the app" / calls answer `426` | `incompatible`: the build is below `DW_MIN_APP_BUILD` (`dw.updateRequired`), or the app and the server speak different protocol versions (`dw.protocolUnsupported`) — the app and the server resolve `dartway_core_*` versions that speak different protocols | Unset or lower `DW_MIN_APP_BUILD` locally; otherwise `dart pub get` in every package so the family resolves one version (`dartway-update`) |
-| The browser app loads, and every call or the live socket fails | Opened on another origin than the proxy's, or `127.0.0.1` instead of `localhost` | `http://localhost:8000` through `dartway dev web` / `dev proxy`; `DW_ALLOWED_ORIGINS` only for a socket from a genuinely different origin |
+| The browser app loads, and every call or the live socket fails | Opened on another origin than the proxy's, or `127.0.0.1` instead of `localhost` | `http://localhost:8000` through `dart run dartway_cli:dartway dev web` / `dev proxy`; `DW_ALLOWED_ORIGINS` only for a socket from a genuinely different origin |
 | Uploads work on desktop and fail on an emulator or a phone; photos do not load there | The storage endpoint is `127.0.0.1`, which the device cannot reach, and it is signed into every URL | `DW_STORAGE_ENDPOINT` at an address the device reaches; restart the server |
-| A widget or acceptance test fails to reach a database | Not a bring-up problem | `dartway-testing`: `dartway test` creates its own |
+| A widget or acceptance test fails to reach a database | Not a bring-up problem | `dartway-testing`: `dart run dartway_cli:dartway test` creates its own |
 | The admin panel is not offered after signing in | Signed in with an identifier other than `DW_ADMIN_IDENTIFIER` | Fix the variable and restart: the promotion happens on start |
 
 ## What not to do
@@ -203,7 +203,7 @@ only one.
 
 ## After a change
 
-- **A DTO, a row class or a handler changed:** `dartway generate` from the project root, then restart
+- **A DTO, a row class or a handler changed:** `dart run dartway_cli:dartway generate` in `__FLUTTER_PKG__`, then restart
   the server. A row class change also needs a migration — `dartway-migrations` — or the server refuses
   with the schema line above.
 - **Before calling it done:** `dartway-finish`.

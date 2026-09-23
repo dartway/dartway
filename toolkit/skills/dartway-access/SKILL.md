@@ -204,7 +204,7 @@ the change in `DwAuthConfig.onIdentifierChanged`, which runs in the changing tra
 ## 9. Tests that prove access
 
 Access that is not tested is a hope. In `__SERVER_PKG__/test/` (real server, real clients,
-`dartway test`), **one refused call per rule**:
+`dart run dartway_cli:dartway test`), **one refused call per rule**:
 
 ```dart
 Matcher refusedWith(DwRefusalCode code) => isA<DwCallRefused<Object?>>()

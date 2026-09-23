@@ -160,7 +160,7 @@ final int? scanFileId;
 
 `onDelete: DwOnDelete.setNull` for an optional file on a row that outlives it;
 `DwOnDelete.cascade` for a row that *is* the attachment (a row per attached file). Then
-`dartway generate` and a migration (`dartway-migrations`); `dw_stored_file` is the framework's table
+`dart run dartway_cli:dartway generate` and a migration (`dartway-migrations`); `dw_stored_file` is the framework's table
 and exists in every database.
 
 **A file id arriving in a command is a number anyone can type.** Before writing it onto a row, check
@@ -354,7 +354,7 @@ for one object.
 
 The level follows the behaviour (`dartway-testing`).
 
-**The rules — server acceptance on real storage.** `dartway test` starts a MinIO for the run and
+**The rules — server acceptance on real storage.** `dart run dartway_cli:dartway test` starts a MinIO for the run and
 passes `DW_STORAGE_ENDPOINT` / `_ACCESS_KEY` / `_SECRET_KEY`; each test file provisions its own pair
 of buckets:
 

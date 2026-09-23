@@ -7,6 +7,7 @@ import 'dw_feature_tree.dart';
 import 'dw_layout.dart';
 import 'dw_route_names.dart';
 import 'dw_unused_feature_files.dart';
+import 'dw_check_tally.dart';
 
 /// Line-length model: nothing is said below 200 lines, >200 is a nudge
 /// (info) and >350 a warning.
@@ -99,7 +100,7 @@ class DwFlutterInspector {
 
   /// Runs the checks and prints the report. Returns the number of
   /// error-severity findings (0 = the check passes).
-  Future<int> run() async {
+  Future<int> run({DwCheckTally? tally}) async {
     print('Checking for ${activeTypes.map((t) => t.name).join(', ')}');
 
     final libDir = Directory(_libPath);
@@ -146,7 +147,7 @@ class DwFlutterInspector {
     await _checkFiles(libDir, scope);
     if (scope == null) await _checkRouteNames(libDir);
 
-    return _report(trees, scope);
+    return _report(trees, scope, tally);
   }
 
   String _resolve(String relative) =>
@@ -685,7 +686,11 @@ class DwFlutterInspector {
 
   // ------------------------------------------------------------------ report
 
-  int _report(Map<String, List<DwFeatureNode>> trees, String? scope) {
+  int _report(
+    Map<String, List<DwFeatureNode>> trees,
+    String? scope,
+    DwCheckTally? tally,
+  ) {
     final byOwner = <String, List<_Finding>>{};
     for (final finding in _findings) {
       byOwner.putIfAbsent(finding.owner, () => []).add(finding);
@@ -727,12 +732,11 @@ class DwFlutterInspector {
       print('');
     }
 
-    print('📊 By check:');
-    for (final entry in _stats.entries) {
-      print(
-        '• [${entry.key.severity.name.toUpperCase()}] ${entry.key.name} — '
-        '${entry.value}',
-      );
+    // The tally is printed by the command, over every section: printed from
+    // here it knew only this inspector's findings, and left out the layout
+    // errors counted in the verdict beside it (#287).
+    for (final MapEntry(key: type, value: count) in _stats.entries) {
+      tally?.add(type, count);
     }
 
     // The verdict is not printed here. This inspector knows its own findings

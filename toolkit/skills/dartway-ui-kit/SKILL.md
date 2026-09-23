@@ -32,15 +32,15 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
 ## Core principles
 
 1. **One import.** Components are imported only through the root `ui_kit.dart`. Never import
-   individual buttons/colors/styles directly — `dartway check` fails on it (`forbiddenUiKitImport`).
+   individual buttons/colors/styles directly — `dart run dartway_cli:dartway check` fails on it (`forbiddenUiKitImport`).
 2. **Everything is declared in `ui_kit.dart`.** Every component file starts with `part of '../ui_kit.dart';`
-   (a file without it fails `dartway check` as `uiKitPartMissing`). The root file assembles everything
+   (a file without it fails `dart run dartway_cli:dartway check` as `uiKitPartMissing`). The root file assembles everything
    with `part` directives and re-exports `dartway_core_flutter`.
 3. **No raw styling in features.** Inside a zone (`app/`, `admin/`, `auth/`, `common/`) and in `shared/`
    the following are **forbidden**: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`, `Theme.of(context)`,
    `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a wish — the
    `forbidden_ui_style_usage` rule from `dartway_lints` (via `custom_lint`) allows them **only inside
-   `ui_kit/`** and recognizes `BuildContext` by type, not by variable name, and `dartway check` fails on
+   `ui_kit/`** and recognizes `BuildContext` by type, not by variable name, and `dart run dartway_cli:dartway check` fails on
    the same usages (`forbiddenUiUsage`).
 
    **What to do when Flutter demands a style, not a widget** (`Icon(color:)`,
@@ -55,7 +55,7 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
    context, so changing `ThemeData` does not touch it. Nothing diagnoses it — the analyzer is quiet,
    the tests are green — and it surfaces on the day somebody asks for a light theme, as a rewrite of
    every read in the kit at once. Take colours and text styles from the palette
-   (`context.colorScheme`, a `resolve(context)` token); `dartway check` warns on a `static const
+   (`context.colorScheme`, a `resolve(context)` token); `dart run dartway_cli:dartway check` warns on a `static const
    Color`/`TextStyle` under `lib/ui_kit/` (`uiKitConstStyle`). **`ui_kit/theme/` is exempt** — that is
    where the theme is assembled and a seed colour has to live somewhere. Geometry stays `const`: a
    radius does not depend on the theme. One theme in a project means a palette with one set of
@@ -146,9 +146,9 @@ almost always mean the wrong asset was taken, not a deliberate stretch. Somethin
 area by width with `fit` is **not an icon but a cover**: it has its own widget and its own parameters.
 
 - **a raw path in a feature is forbidden** — `Image.asset('assets/…')` in a screen means the image
-  cannot be found by search and will survive a file rename only by accident (`dartway check` warns:
+  cannot be found by search and will survive a file rename only by accident (`dart run dartway_cli:dartway check` warns:
   `forbiddenAssetPath`);
-- `flutter_gen` is not needed: that a path leads to an existing file is checked by `dartway check`
+- `flutter_gen` is not needed: that a path leads to an existing file is checked by `dart run dartway_cli:dartway check`
   (`assetPathMissing`, an error) — and the same checker catches raw paths, which the generator never
   could;
 - **fonts** never reach the code: they are declared in the pubspec and arrive through text styles. Sounds
@@ -187,7 +187,7 @@ The kit does not import app models and does not switch on domain enums. If a wid
 on the reason a course is locked, and that enum carries user-facing texts inside — **a widget with two
 constructors moves into the kit**, and the domain `switch` stays in the feature as a single line. Moving
 the enum itself into the kit is not allowed: the texts would come with it, and text constants have no
-place in the kit (`dartway check` warns on a string literal under `ui_kit/`: `uiKitContainsText`).
+place in the kit (`dart run dartway_cli:dartway check` warns on a string literal under `ui_kit/`: `uiKitContainsText`).
 
 **The kit does not know the language either.** A kit widget takes **every** visible string as a
 parameter and never reads `context.l10n`: the locale belongs to the app, and a label baked into the
@@ -216,7 +216,7 @@ final l10n = context.l10n;
 AppText.body(l10n.bookSpot)
 ```
 
-A new string = add a key to **every** ARB the project keeps (a new project keeps one — the language it was created in; a second is added deliberately, with a switch that sets `appLocaleProvider`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the output of `dartway generate` does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
+A new string = add a key to **every** ARB the project keeps (a new project keeps one — the language it was created in; a second is added deliberately, with a switch that sets `appLocaleProvider`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the output of `dart run dartway_cli:dartway generate` does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
 
 ```dart
 // ui_kit/theme/app_text.dart

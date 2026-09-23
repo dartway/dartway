@@ -7,7 +7,7 @@ description: >-
   constructors) with channels, commands (DwActionCommand<R>, one result value), DwFieldPatch for
   clearable fields, defaults on the wire, DwSelfValidating, the project's refusal enum
   (DwRefusalCodes), channel kinds (DwChannelKind), upload purposes (DwUploadPurpose), naming
-  (two words, Get…/List…, verb+object), and generation (`dartway generate`, `*.dw.dart`,
+  (two words, Get…/List…, verb+object), and generation (`dart run dartway_cli:dartway generate`, `*.dw.dart`,
   lib/generated/ — never edited). Also what a DTO change costs installed app builds and when to
   raise minAppBuild. Use when adding or changing a data object, a request, a command, a refusal
   code, a channel kind or an upload purpose, or when choosing which request kind a screen needs.
@@ -210,7 +210,7 @@ context; a field for them is an invitation to forge them.
 
 The answer `R` is **one value** (D-006): a data object, a JSON primitive (`int`, `double`, `num`,
 `String`, `bool`), or nothing (`DwActionCommand<void>`; a nullable `R` may answer `null`). A
-collection is wrapped in a data object; `dartway generate` refuses any other `R`. Usually the answer is the object the command changed; the
+collection is wrapped in a data object; `dart run dartway_cli:dartway generate` refuses any other `R`. Usually the answer is the object the command changed; the
 other objects it changed reach the screens through publications (`dartway-realtime`), not through
 the answer.
 
@@ -363,7 +363,7 @@ depends on the value: a status that decides what may happen next, a role, a perm
 payment. Every reader turns an unknown name into `unknown` (the screen must handle it: hide the
 row, show a neutral label); `unknown` can never be written to a **row**, so nothing stored is
 overwritten with it, and it does travel on the wire as itself — an older server answering from a
-row it cannot read sends `unknown` instead of failing the answer. `dartway generate` refuses an open enum without `unknown`.
+row it cannot read sends `unknown` instead of failing the answer. `dart run dartway_cli:dartway generate` refuses an open enum without `unknown`.
 
 **An open enum in a command is the case those two halves create together**, and the framework
 answers it rather than leaving it to you: a build that read `unknown` off the wire and sends it
@@ -378,8 +378,9 @@ carries one is asking an app to write back something it could not read.
 After any change to a DTO file (and to a row class on the server), from the project root:
 
 ```bash
-dartway generate          # writes every *.dw.dart and lib/generated/ in both packages
-dartway generate --check  # exits non-zero when anything is out of date; CI runs it
+cd __FLUTTER_PKG__
+dart run dartway_cli:dartway generate          # writes every *.dw.dart and lib/generated/ in both packages
+dart run dartway_cli:dartway generate --check  # exits non-zero when anything is out of date; CI runs it
 ```
 
 **`dartway` here means the CLI this project pins**, which is `dart run dartway_cli:dartway <command>`
@@ -391,7 +392,7 @@ It writes, in `__SHARED_PKG__`, the `*.dw.dart` parts and `lib/generated/dw_prot
 protocol registry `<project>Protocol` that the server and `DwFlutterCore` are built with; in
 `__SERVER_PKG__`, the row parts and `lib/generated/dw_schema.dart`. **Never edit `*.dw.dart` or
 `lib/generated/` by hand**, and commit them with the source change: a stale codec is the wire, so a
-field its part does not know compiles, starts, and travels without that field. `dartway check`
+field its part does not know compiles, starts, and travels without that field. `dart run dartway_cli:dartway check`
 reports drift as `generatedCodeStale`, an error.
 
 The generator runs from the server package's dev dependency (`dartway_generator`), so it always
@@ -423,5 +424,5 @@ The skeleton's shared package ships such a test; extend it rather than starting 
 - [ ] `validate()` covers input rules, reads fields only; data rules stay in the handler.
 - [ ] New refusal codes documented; the app has a text for each.
 - [ ] The change is additive for installed builds, or `minAppBuild` is named.
-- [ ] `dartway generate` run and its output committed; `dartway generate --check` passes.
+- [ ] `dart run dartway_cli:dartway generate` run and its output committed; `dart run dartway_cli:dartway generate --check` passes.
 - [ ] The shared contract test covers the new DTOs.

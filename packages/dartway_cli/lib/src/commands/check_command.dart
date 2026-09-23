@@ -14,6 +14,7 @@ import '../checker/dw_layout.dart';
 import '../checker/dw_server_contract.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
+import '../checker/dw_check_tally.dart';
 
 /// Runs the built-in DartWay convention checks: the Flutter package's
 /// structure and UI kit, the project layout, and the server's contract with
@@ -77,6 +78,7 @@ class CheckCommand extends Command<int> {
     stdout.writeln('Checking ${flutterPackageDir.path} ...');
 
     var errorCount = 0;
+    final tally = DwCheckTally();
 
     // The layout check judges the whole package, so it has nothing to say when
     // the run is narrowed to one folder — the same reason `--dir` skips the
@@ -87,7 +89,7 @@ class CheckCommand extends Command<int> {
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
 
       // Judges the package's wiring rather than any file in it, so it has
       // nothing to say about a run narrowed to a folder either.
@@ -95,7 +97,7 @@ class CheckCommand extends Command<int> {
         flutterPackageDir: flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
 
       // Judge the server package, so they are out of scope for a run narrowed
       // to a folder of the Flutter package, and silent when the Flutter
@@ -104,12 +106,12 @@ class CheckCommand extends Command<int> {
         sharedPackageDir: layout?.sharedPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
       errorCount += DwGeneratedCodeInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
       errorCount += DwMigrationsInspector(
         serverPackageDir: layout?.serverPackageDir,
         // The same environment `bin/migrate.dart` will start with, so a
@@ -120,7 +122,7 @@ class CheckCommand extends Command<int> {
         ).overlay(Platform.environment),
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
 
       // Judges the project rather than any one package, so it is skipped by
       // `--dir` for the same reason the layout check is.
@@ -128,18 +130,18 @@ class CheckCommand extends Command<int> {
         projectRoot: layout?.root ?? flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
       errorCount += DwFrameworkOverridesInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
       errorCount += DwLocalEnvironmentInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
-      ).run();
+      ).run(tally: tally);
     }
 
     errorCount += await DwFlutterInspector(
@@ -147,7 +149,21 @@ class CheckCommand extends Command<int> {
       filterType: filterType,
       filterSeverity: filterSeverity,
       targetDirPath: results.option('dir'),
-    ).run();
+    ).run(tally: tally);
+
+    for (final line in tally.summary) {
+      stdout.writeln(line == tally.summary.first ? '\n$line' : line);
+    }
+    // Two summaries of one run that disagree are the tool contradicting
+    // itself, and the tally is the one people copy from (#287). A section
+    // that counts an error without recording it here is a bug in the check,
+    // said as one rather than printed as a smaller number.
+    if (tally.errors != errorCount) {
+      throw StateError(
+        'dartway check counted $errorCount errors and its tally '
+        '${tally.errors}: a section reports findings it does not record.',
+      );
+    }
 
     // Said once, by the only place that has both counts. The Flutter inspector
     // used to print it from inside itself, knowing nothing of the layout check

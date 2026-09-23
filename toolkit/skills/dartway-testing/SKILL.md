@@ -4,7 +4,7 @@ description: >-
   How a DartWay project tests itself, by where the behaviour lives: the contract in
   __SHARED_PKG__ (`dart test` — codecs round-trip through the protocol, `validate()` codes and
   fields, a request's `onUpdate` and channels); the server as acceptance tests on a real Postgres
-  and MinIO (`dartway test`; `DwTestDatabase` per test file, `DwTestServer.start`, the real client
+  and MinIO (`dart run dartway_cli:dartway test`; `DwTestDatabase` per test file, `DwTestServer.start`, the real client
   from `connectClient()`, raw wire through `caller()` / `openLive()`, `DwTestStorage`, `wakeJobs`);
   screens as widget tests on the in-memory server from `package:dartway_client/testing.dart`
   (`DwFakeServer`, `DwFakeStorage`, `dwFakeTablePage` …) with the app's own `DwFlutterCore` built
@@ -27,7 +27,7 @@ can live, and each has its own kind of test:
 | The behaviour | Lives in | Its test | Runs with |
 |---|---|---|---|
 | What a DTO carries, which field a command refuses, what an arriving object does to a request, which channel a request listens on | The contract, `__SHARED_PKG__` | **Contract test**, pure Dart | `dart test` in `__SHARED_PKG__` |
-| Who may call what, what a command writes and publishes, who may subscribe, what a job does, where a file lands | Handlers, access and channel rules, jobs, upload rules — `__SERVER_PKG__` | **Acceptance test** against a real server on a real database and storage | `dartway test` |
+| Who may call what, what a command writes and publishes, who may subscribe, what a job does, where a file lands | Handlers, access and channel rules, jobs, upload rules — `__SERVER_PKG__` | **Acceptance test** against a real server on a real database and storage | `dart run dartway_cli:dartway test` |
 | What a screen shows, what the user's action sends, how a refusal or a live update looks | A feature — `__FLUTTER_PKG__` | **Widget test** on the in-memory server | `flutter test` in `__FLUTTER_PKG__` |
 | A calculation, a parse, a state machine with no I/O | A plain class or an extension | **Unit test**, in whichever package holds it | `dart test` / `flutter test` |
 
@@ -91,7 +91,7 @@ expect(
 
 Write one whenever a request has `matches`, a custom `onUpdate`, a `sort`, or a caller channel.
 
-## 2. The server — acceptance tests with `dartway test`
+## 2. The server — acceptance tests with `dart run dartway_cli:dartway test`
 
 A handler's access rule, what it writes, what it publishes and to whom run inside a real call against
 a real database. A mock of the context would only restate the code, so the test starts the project's
@@ -100,13 +100,14 @@ real server and talks to it the way an app does.
 ### Running them
 
 ```bash
-dartway test                          # from the project root
-dartway test -- --name 'refund'       # arguments after -- go to dart test
-dartway test --keep                   # leave the database container up to inspect a failure
-dartway test --no-storage             # a server without uploads
+cd __FLUTTER_PKG__
+dart run dartway_cli:dartway test                          # finds the project from here
+dart run dartway_cli:dartway test -- --name 'refund'       # arguments after -- go to dart test
+dart run dartway_cli:dartway test --keep                   # leave the database container up to inspect a failure
+dart run dartway_cli:dartway test --no-storage             # a server without uploads
 ```
 
-`dartway test` starts a Postgres and a MinIO for the run on ports Docker picks, passes their
+`dart run dartway_cli:dartway test` starts a Postgres and a MinIO for the run on ports Docker picks, passes their
 coordinates as `DW_DATABASE_*` (the maintenance database `postgres`) and `DW_STORAGE_ENDPOINT` /
 `_ACCESS_KEY` / `_SECRET_KEY`, runs `dart test` in `__SERVER_PKG__`, and removes both containers at
 the end — Ctrl-C included.
@@ -204,7 +205,7 @@ database what the client could observe — that ties the test to the schema inst
   delivered after commit, nothing delivered if it throws. Use it for a service that has rules of its
   own; what a command publishes to whom is still tested through the command.
 - **`DwTestStorage.create(prefix:)`** provisions a public and a private bucket for the file on the
-  MinIO `dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
+  MinIO `dart run dartway_cli:dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
   the server stops. `storage.keys(bucket)` lists what landed where. What to test — `dartway-uploads`.
 
 ### What deserves an acceptance test
@@ -365,7 +366,7 @@ text and nothing else changed; that a published update changes the screen withou
 - **Cosmetics.** A recoloured button, a padding, a rename. A test written for a checkbox contradicts
   KISS and YAGNI, and it will be deleted by the first person who touches the widget.
 - **Generated code.** Codecs, the protocol registry, table definitions, the schema. The contract's
-  round-trip test covers what matters about them; `dartway generate --check` covers the rest.
+  round-trip test covers what matters about them; `dart run dartway_cli:dartway generate --check` covers the rest.
 - **A UI rule that mirrors a server rule.** Asserting that the pay button is hidden from a viewer is
   fine as UI, but it says nothing about access — write the acceptance test for the rule and let the
   widget test be about the button.
@@ -376,7 +377,7 @@ We do not set a percentage and we do not gate anything on one. A threshold is me
 what is easy to cover — getters, mappers, generated wrappers — while the calculation everyone is afraid
 of stays at the one test it had. The number goes up and the suite gets worse.
 
-`dartway check` does not ask whether a feature has a test either: that is not a gap with a name, it is
+`dart run dartway_cli:dartway check` does not ask whether a feature has a test either: that is not a gap with a name, it is
 a percentage. The question at review is "**is the thing that would break covered, at the place where
 it lives**" — which is what `dartway-finish` asks.
 

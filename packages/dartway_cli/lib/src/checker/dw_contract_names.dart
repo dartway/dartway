@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'dw_check_type.dart';
+import 'dw_check_tally.dart';
 
 /// The naming law over the contract in the shared package
 /// ([DwCheckType.contractNameInvalid], #167): a DTO name has two words or
@@ -73,7 +74,7 @@ class DwContractNamesInspector {
     return null;
   }
 
-  int run() {
+  int run({DwCheckTally? tally}) {
     final shared = sharedPackageDir;
     if (!_enabled || shared == null) return 0;
     final lib = Directory(p.join(shared.path, 'lib'));
@@ -100,6 +101,7 @@ class DwContractNamesInspector {
     for (final finding in _findings) {
       print('  ${DwCheckType.contractNameInvalid.reportLabel}: $finding');
     }
+    tally?.add(DwCheckType.contractNameInvalid, _findings.length);
     return DwCheckType.contractNameInvalid.severity == DwCheckSeverity.error
         ? _findings.length
         : 0;

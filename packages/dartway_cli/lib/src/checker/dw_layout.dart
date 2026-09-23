@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'dw_check_type.dart';
 import 'dw_feature_tree.dart';
+import 'dw_check_tally.dart';
 
 /// The zones of a Flutter app: the folders that hold features, and the only
 /// ones asked for a `DwFeatureSpec`.
@@ -69,7 +70,7 @@ class DwLayoutInspector {
 
   /// Runs the checks and prints the section. Returns the number of findings
   /// (all of them errors — the layout is either the declared one or not).
-  int run() {
+  int run({DwCheckTally? tally}) {
     if (!_enabled) return 0;
 
     _checkFlutterPackage();
@@ -81,6 +82,7 @@ class DwLayoutInspector {
     for (final finding in _findings) {
       print('  ${DwCheckType.invalidTopLevelLayout.reportLabel}: $finding');
     }
+    tally?.add(DwCheckType.invalidTopLevelLayout, _findings.length);
     return _findings.length;
   }
 

@@ -94,9 +94,16 @@ class TestCommand extends Command<int> {
   @override
   String get invocation => 'dartway test [-- <dart test arguments>]';
 
+  /// The project [from] is in — its root, or any package of it. The pinned
+  /// form, `dart run dartway_cli:dartway test`, runs in the Flutter package
+  /// that pins the CLI, where this read only the working directory and
+  /// answered that there was no `*_server` package (#289).
+  static ProjectLayout projectOf(Directory from) =>
+      ProjectLayout.detect(findPackageProjectRoot(from) ?? from);
+
   @override
   Future<int> run() async {
-    final layout = ProjectLayout.detect(Directory.current);
+    final layout = projectOf(Directory.current);
     final serverDir = layout.serverPackageDir;
     if (!serverDir.existsSync()) {
       stderr.writeln('No server package at ${serverDir.path}.');

@@ -40,9 +40,7 @@ Directory? findPackageProjectRoot(Directory start) {
         File(p.join(current, 'pubspec.yaml')).existsSync()) {
       final parent = p.dirname(current);
       // Inside a project, the root is the directory holding the packages.
-      return Directory(
-        _rolePackagesIn(parent).isNotEmpty ? parent : current,
-      );
+      return Directory(_rolePackagesIn(parent).isNotEmpty ? parent : current);
     }
     if (_rolePackagesIn(current).isNotEmpty) return Directory(current);
     final parent = p.dirname(current);
