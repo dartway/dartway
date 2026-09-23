@@ -70,7 +70,11 @@ final class DefaultValueWriter {
     }
     if (element.name == 'Duration' &&
         element.library.uri.toString() == 'dart:core') {
-      final microseconds = _field(value, '_duration')?.toIntValue();
+      // The field holding the length is private to the SDK and has moved:
+      // `_duration` up to Dart 3.12, `inMicroseconds` from 3.13.
+      final microseconds =
+          (_field(value, 'inMicroseconds') ?? _field(value, '_duration'))
+              ?.toIntValue();
       if (microseconds == null) {
         throw const UnsupportedDefault('the Duration could not be read');
       }

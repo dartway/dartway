@@ -13,7 +13,7 @@ dart pub global activate dartway_cli
 dartway doctor
 ```
 
-`doctor` checks Dart (`>=3.11`), Flutter (`>=3.41`), git with an identity, a reachable pub host, a
+`doctor` checks Dart (`>=3.11`), Flutter (`>=3.44`), git with an identity, a reachable pub host, a
 running Docker daemon, and whether globally activated executables are on `PATH`. Each failure prints
 the command that fixes it.
 

@@ -117,18 +117,17 @@ abstract interface class DwFeatureWidget {
   /// not an edge case: an inactive bottom-nav tab kept alive behind an
   /// `IndexedStack`, or the route sitting under a pushed opaque one, stays in
   /// the element tree. Counting those would report roughly the whole app on
-  /// every screen. So the walk stops at the three widgets Flutter itself uses
-  /// to park a subtree out of sight: an offstage [Offstage], an invisible
-  /// [Visibility] (what `IndexedStack` wraps its unselected children in) and a
-  /// disabled [TickerMode] (what `Overlay` wraps the routes below an opaque
-  /// one in).
+  /// every screen. So the walk stops where Flutter itself parks a subtree out
+  /// of sight: an offstage [Offstage], an invisible [Visibility], an
+  /// unselected `IndexedStack` child and a disabled [TickerMode] (what
+  /// `Overlay` wraps the routes below an opaque one in).
   static List<DwFeatureSpec> scanMounted() {
     final root = WidgetsBinding.instance.rootElement;
     if (root == null) return const [];
 
     final found = <String, DwFeatureSpec>{};
     void visit(Element element) {
-      if (_isParkedOffscreen(element.widget)) return;
+      if (_isParkedOffscreen(element)) return;
       if (element.widget case DwFeatureWidget feature) {
         found[feature.dwFeature.id] = feature.dwFeature;
       }
@@ -159,7 +158,7 @@ abstract interface class DwFeatureWidget {
 
     DwFeatureSpec? found;
     void visit(Element element) {
-      if (_isParkedOffscreen(element.widget)) return;
+      if (_isParkedOffscreen(element)) return;
       if (element.widget case DwFeatureWidget feature) {
         final rect = _paintedGlobalRect(element.renderObject);
         if (rect != null && rect.contains(globalPosition)) {
@@ -217,11 +216,21 @@ abstract interface class DwFeatureWidget {
     return rect;
   }
 
-  /// Whether [widget] roots a subtree Flutter itself parks out of sight:
+  /// Whether [element] roots a subtree Flutter itself parks out of sight:
   /// see [scanMounted] for why being mounted is not the same as being on
   /// screen.
-  static bool _isParkedOffscreen(Widget widget) =>
-      (widget is Offstage && widget.offstage) ||
-      (widget is Visibility && !widget.visible) ||
-      (widget is TickerMode && !widget.enabled);
+  ///
+  /// An unselected `IndexedStack` child is recognised by what the stack does
+  /// to it rather than by a wrapper type. Up to Flutter 3.44 the stack wraps
+  /// it in an invisible [Visibility]; from 3.47 in a private visibility scope
+  /// and an excluding [ExcludeFocus], and the scope is readable only through
+  /// [Visibility.of]. Asking only at an excluding [ExcludeFocus] keeps that
+  /// lookup — which registers a dependency — off every other element.
+  static bool _isParkedOffscreen(Element element) => switch (element.widget) {
+    Offstage(:final offstage) => offstage,
+    Visibility(:final visible) => !visible,
+    TickerMode(:final enabled) => !enabled,
+    ExcludeFocus(:final excluding) => excluding && !Visibility.of(element),
+    _ => false,
+  };
 }

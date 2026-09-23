@@ -14,6 +14,11 @@ include: package:flutter_lints/flutter.yaml
 # direct theme access are flagged everywhere outside `ui_kit/`. A convention
 # that only lives in a document is a convention that drifts.
 analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
   plugins:
     - custom_lint
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.20.0-dev.2
+
+- **Flutter `>=3.44.0`** (#290): the package fails to compile on 3.41. The repository itself is written against 3.47.2 (#280).
+- **`DwFeatureWidget.scanMounted` no longer reports the unselected tabs of an `IndexedStack` on Flutter 3.47**, which stopped wrapping them in a `Visibility` widget; it asks `Visibility.of` instead, which answers on 3.44 and 3.47 alike.
+
 ## 0.20.0-dev.1
 
 The rewrite (see docs/1.0).

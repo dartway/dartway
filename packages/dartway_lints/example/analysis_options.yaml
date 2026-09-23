@@ -1,5 +1,7 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  exclude:
+    - build/**
   plugins:
     - custom_lint

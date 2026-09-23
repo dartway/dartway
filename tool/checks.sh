@@ -39,6 +39,7 @@ cd "$(dirname "$0")/.."
 
 MODE="${1:-all}"
 FAILED=()
+UNRUN=()
 
 # A mistyped mode must not look like a clean run. This script is invoked by hand
 # as well as by CI, and "tool/checks.sh tests" printing "everything green"
@@ -146,6 +147,30 @@ run() {
   fi
 }
 
+# `run` for the analyzer, which has two ways of exiting non-zero: it found
+# errors, or it never finished. A killed analysis server — jetsam under memory
+# pressure, or macOS refusing a page of its snapshot — prints its own line and
+# says nothing about the code, so it goes to UNRUN, not FAILED. Reporting the
+# two the same way sends one reader hunting for a defect that is not in the
+# diff and teaches the next that some roots "are always red here", which is
+# how a real error gets waved through.
+analyze_root() {
+  local label="$1"; shift
+  echo "── $label"
+  local out status
+  out="$(mktemp)"
+  "$@" 2>&1 | tee "$out"
+  status=${PIPESTATUS[0]}
+  if [ "$status" -ne 0 ]; then
+    if grep -qE 'analysis server crashed|analysis server exited with code' "$out"; then
+      UNRUN+=("$label")
+    else
+      FAILED+=("$label")
+    fi
+  fi
+  rm -f "$out"
+}
+
 resolve() {
   echo "══ resolving"
   flutter pub get >/dev/null || { echo "root pub get failed"; exit 1; }
@@ -163,10 +188,12 @@ analyze() {
   # rewrites — gating on it would make red mean "the generator again".
   # `tool` is in here so the scripts this repository runs on itself are held
   # to the same analyzer as the code they check.
-  run "packages + tool (workspace)" dart analyze --no-fatal-warnings packages tool
+  analyze_root "packages + tool (workspace)" \
+    dart analyze --no-fatal-warnings packages tool
   for package in $(packages); do
     is_member "$package" && continue
-    run "$package" bash -c "cd '$package' && dart analyze --no-fatal-warnings"
+    analyze_root "$package" \
+      bash -c "cd '$package' && dart analyze --no-fatal-warnings"
   done
 }
 
@@ -237,13 +264,23 @@ resolve
 [ "$MODE" = services ] && service_suites
 
 echo
-if [ ${#FAILED[@]} -eq 0 ]; then
+if [ ${#FAILED[@]} -eq 0 ] && [ ${#UNRUN[@]} -eq 0 ]; then
   case "$MODE" in
     all) echo "✓ analyze and test green — the services suites are 'tool/checks.sh services'" ;;
     *) echo "✓ $MODE green" ;;
   esac
   exit 0
 fi
-echo "✗ failed: ${#FAILED[@]}"
-printf '  %s\n' "${FAILED[@]}"
-exit 1
+if [ ${#FAILED[@]} -gt 0 ]; then
+  echo "✗ failed: ${#FAILED[@]}"
+  printf '  %s\n' "${FAILED[@]}"
+fi
+# Not green either: a root nobody analyzed is a root nobody checked. Exit 2,
+# as `tool/self_check.dart` does, for a check that could not be carried out.
+if [ ${#UNRUN[@]} -gt 0 ]; then
+  echo "? not analyzed — the analysis server died, nothing was said about the code: ${#UNRUN[@]}"
+  printf '  %s\n' "${UNRUN[@]}"
+  echo "  run the root again on its own; if it dies again, look at memory and the SDK, not the diff"
+fi
+[ ${#FAILED[@]} -gt 0 ] && exit 1
+exit 2

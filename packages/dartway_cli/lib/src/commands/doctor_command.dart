@@ -29,7 +29,7 @@ class DoctorCommand extends Command<int> {
   /// Minimum SDK versions, taken from the template's pubspecs. Bump them there
   /// and here in the same change.
   static const _minDartVersion = '3.11.0';
-  static const _minFlutterVersion = '3.41.0';
+  static const _minFlutterVersion = '3.44.0';
 
   /// Long enough for a slow but working link, short enough that doctor stays a
   /// command you run without planning for it.

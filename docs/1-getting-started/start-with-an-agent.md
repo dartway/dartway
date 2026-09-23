@@ -30,7 +30,7 @@ equally readable by you — [the quick start](quick-start.md) is the same path, 
 The brief starts with `dartway doctor`, which reports each of these and prints the fix for whatever is
 missing:
 
-- **Dart `>=3.11` and Flutter `>=3.41`.**
+- **Dart `>=3.11` and Flutter `>=3.44`.**
 - **git, with an identity.** `create` commits the project it makes; without `user.name` and
   `user.email` that commit is the step that does not happen.
 - **A pub host that answers.** Every step begins with `pub get`, and pub sets no deadline on a

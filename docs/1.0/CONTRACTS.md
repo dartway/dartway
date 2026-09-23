@@ -193,7 +193,7 @@ Stack facts every package relies on (verified against sources, `docs/1.0/DECISIO
 - **postgres 3.5.12** — SSL required unless disabled; **a pool has one connection unless `maxConnectionCount` is set**; `runTx` cannot nest (use SAVEPOINT); a parameterised `execute` is three round trips and there is no statement cache (the ORM caches prepared statements per connection); `numeric` decodes as `String`; enums in native Postgres enum types decode as raw bytes — **DartWay stores enums as `text`**; pooled connections cannot `LISTEN`.
 - **analyzer** — pinned in the generator package only.
 
-Toolchain: Flutter 3.44.0 / Dart 3.12 (`/Users/eugen/fvm/versions/3.44.0/bin`).
+Toolchain: written against Flutter 3.47.2 / Dart 3.13 (`.fvmrc`), compiling on Flutter 3.44.0 and newer (D-081).
 
 ---
 

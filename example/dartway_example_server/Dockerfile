@@ -1,7 +1,7 @@
 # Built from the **project root**: the shared contract package is a path
 # dependency of this one, so a context narrower than the root cannot resolve
 # it. Every path below is relative to the root.
-FROM dart:3.12.0 AS build
+FROM dart:3.13.2 AS build
 
 WORKDIR /workspace
 COPY dartway_example_shared/ dartway_example_shared/

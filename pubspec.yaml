@@ -1,7 +1,7 @@
 name: dartway_framework
 environment:
   sdk: ^3.11.0
-  flutter: ^3.41.0
+  flutter: ^3.44.0
 
 workspace:
   - packages/dartway_analytics_flutter
