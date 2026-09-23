@@ -11,7 +11,7 @@ while its `.fvmrc` pins another version — every project created before `dartwa
 moves its `.fvmrc` past 3.44.0, the last image published. Flutter pins some of the packages an app
 resolves, so the lock your Flutter writes is refused by the image's
 `flutter pub get --enforce-lockfile`, inside `docker build`, with a list of changed packages.
-`dartway deploy check` names the mismatch first (`web-flutter-version`, an error).
+`dart run dartway_cli:dartway deploy check` names the mismatch first (`web-flutter-version`, an error).
 
 A project whose image tag and `.fvmrc` agree has nothing to do until it moves its Flutter.
 
@@ -38,5 +38,5 @@ Flutter layer is cached until `.fvmrc` changes.
 
 ## How to check
 
-`dartway deploy check --env <environment> --local`: `web-flutter-version` passes with
+`dart run dartway_cli:dartway deploy check --env <environment> --local`: `web-flutter-version` passes with
 "read from .fvmrc".

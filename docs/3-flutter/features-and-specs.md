@@ -27,7 +27,7 @@ lib/app/bookings/
   `app/learning/lesson/lesson_page.dart` is fine, because `learning` is a group and `lesson` is a
   feature.
 
-Nothing is configured. `dartway check` builds this tree from the file system and grades every
+Nothing is configured. `dart run dartway_cli:dartway check` builds this tree from the file system and grades every
 feature, so the model is the folder layout itself rather than a manifest that can disagree with it.
 
 Two rules follow, and the checker enforces both:
@@ -89,7 +89,7 @@ compiler does not check it, the checker cannot see it, and the reader — increa
 believes it.
 
 A feature whose entry point is a widget but declares no spec gets a `featureSpecMissing` warning
-from `dartway check`. A feature whose entry point is an extension or a function
+from `dart run dartway_cli:dartway check`. A feature whose entry point is an extension or a function
 (`context.showInviteDialog()`) has nothing to hang a spec on, and the checker leaves it alone.
 
 ## The fields
@@ -129,7 +129,7 @@ feature is rewritten?**
 - A trap survives — *"the server sends the date in UTC, the screen shows it local."*
 - A map of the code does not — *"the list comes from `dw.request(ListMyBookings())` and is drawn
   by a `ListView`."* That is what the code already says, and unlike the code it starts lying the moment
-  someone moves the widget. Nothing checks it: not the compiler, not `dartway check`.
+  someone moves the widget. Nothing checks it: not the compiler, not `dart run dartway_cli:dartway check`.
 
 Which is the whole point of the field. Everything a reader can get by opening the file belongs in
 the file; this list is for what they would otherwise have to re-derive — or get wrong.

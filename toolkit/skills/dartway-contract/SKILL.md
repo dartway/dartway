@@ -375,7 +375,7 @@ carries one is asking an app to write back something it could not read.
 
 ## 10. Generation
 
-After any change to a DTO file (and to a row class on the server), from the project root:
+After any change to a DTO file (and to a row class on the server), starting at the project root — the pinned CLI runs in `__FLUTTER_PKG__`:
 
 ```bash
 cd __FLUTTER_PKG__

@@ -61,7 +61,7 @@ final class PublishNews extends DwActionCommand<NewsPost>
 }
 ```
 
-`dartway generate` writes the `_$…` mixins — the JSON codec and value equality — and the protocol
+`dart run dartway_cli:dartway generate` writes the `_$…` mixins — the JSON codec and value equality — and the protocol
 registry both sides share. The server answers each call with one handler. Abridged from
 `example/dartway_example_server/lib/src/handlers/content_handlers.dart`:
 
@@ -217,10 +217,10 @@ model owns your domain, and the first field it lacks becomes a fork you carry th
   the parameter is required.
 - The server applies its migrations as it starts and exits non-zero when one fails, or when a table
   or column the schema declares is missing.
-- `dartway generate --check` fails on generated code that no longer matches its sources, and the
+- `dart run dartway_cli:dartway generate --check` fails on generated code that no longer matches its sources, and the
   project's `bin/migrate.dart check` on migrations that do not produce the schema the row classes
   declare.
-- `dartway check` grades the project against its conventions: the layout, features, the UI kit,
+- `dart run dartway_cli:dartway check` grades the project against its conventions: the layout, features, the UI kit,
   generated code, migrations.
 - A change to what travels on the wire is a protocol version change, held by a golden test in the
   framework.

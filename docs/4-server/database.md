@@ -49,7 +49,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
 }
 ```
 
-The rules, each enforced by `dartway generate`:
+The rules, each enforced by `dart run dartway_cli:dartway generate`:
 
 - the class is named `<Entity>Row` and extends `DwTableRow` — a row and the data object clients see
   (`SessionBooking`) never share a name, and a row never leaves the server;

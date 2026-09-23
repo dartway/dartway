@@ -59,7 +59,7 @@ dart pub get
 ```
 
 `docker compose up -d` starts Postgres on host port `8090` and MinIO — the object storage for uploads
-— on `8100` (its web console on `8101`). There is no test database among them: `dartway test` starts
+— on `8100` (its web console on `8101`). There is no test database among them: `dart run dartway_cli:dartway test` starts
 its own for each run. The first run pulls images and can take minutes.
 
 The server is configured by its environment alone; there is no configuration file it reads. **There
@@ -156,12 +156,13 @@ dart run dartway_cli:dartway dev web        # open http://localhost:8000
 exactly: to a browser, `127.0.0.1` is another origin.
 
 The skeleton's Flutter package lists `dartway_cli` as a dev dependency, so `dart run dartway_cli:dartway`
-runs the CLI version the project pinned. A globally activated `dartway dev web` does the same from the
-project root or the Flutter package, with whatever version you activated.
+runs the CLI version the project pinned. A globally activated `dartway` runs the project's commands
+only when it is that version, and otherwise refuses and names the form above.
 
 For a release build behind the same proxy:
 
 ```bash
+cd my_app_flutter
 flutter build web --dart-define=DW_BACKEND_URL=http://localhost:8000
 dart run dartway_cli:dartway dev proxy --web-dir build/web
 ```
@@ -194,7 +195,7 @@ whole stack — Postgres, a handler, a channel, a widget — the write end inclu
    channels they live on, the commands that change it.
 2. **Server**, in `my_app_server/lib/src/`: a row class, and one handler per request and command with
    its access rule, publishing what a command changed.
-3. `dartway generate` — codecs, the protocol registry, tables and the schema.
+3. `dart run dartway_cli:dartway generate` — codecs, the protocol registry, tables and the schema.
 4. `dart run bin/migrate.dart create <name>` in the server package, with `DW_DATABASE_*` set — a
    migration drafted from the row classes. Review it: it is yours.
 5. **App**: a widget reading `ref.watch(dw.request(MyRequest()))` and a button running
@@ -210,12 +211,12 @@ full: [data objects and generation](../2-core/data-objects-and-generation.md),
 From the project root:
 
 ```bash
-dartway generate --check                                  # generated code matches its sources
+(cd my_app_flutter && dart run dartway_cli:dartway generate --check) # generated code matches its sources
 (cd my_app_server && dart run bin/migrate.dart check)     # migrations produce the schema (DW_DATABASE_*)
-dartway test                                              # server tests on a real Postgres and MinIO
+(cd my_app_flutter && dart run dartway_cli:dartway test)  # server tests on a real Postgres and MinIO
 (cd my_app_shared && dart test)                           # the contract
 (cd my_app_flutter && flutter test)                       # the app, on an in-memory server
-dartway check                                             # the conventions
+(cd my_app_flutter && dart run dartway_cli:dartway check) # the conventions
 ```
 
 - **`generate --check`** writes nothing and fails when a generated file is out of date. It runs the
@@ -224,12 +225,12 @@ dartway check                                             # the conventions
 - **`migrate.dart check`** replays the migrations into throwaway databases next to the one in
   `DW_DATABASE_*`, compares the result with the schema the row classes declare, and rolls them down
   and up again.
-- **`dartway test`** starts a Postgres and a MinIO for the run, on ports Docker picks, passes them to
+- **`dart run dartway_cli:dartway test`** starts a Postgres and a MinIO for the run, on ports Docker picks, passes them to
   the suite as `DW_DATABASE_*` and `DW_STORAGE_*`, and removes them when the run ends. Each test file
   creates its own database and buckets. Nothing is shared with the development containers or with
   another project — a fixed test port is how a suite ends up green against a neighbour's database.
   `--keep` leaves the containers up to inspect a failing run; arguments after `--` go to `dart test`.
-- **`dartway check`** fails on error-level findings — the layout, features, the UI kit, stale
+- **`dart run dartway_cli:dartway check`** fails on error-level findings — the layout, features, the UI kit, stale
   generated code and, with `DW_DATABASE_*` set, the migrations check above. Warnings do not fail it.
 
 ## When it goes sideways

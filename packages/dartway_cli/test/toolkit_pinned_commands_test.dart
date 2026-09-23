@@ -4,8 +4,8 @@ import 'package:dartway_cli/src/pinned_cli.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
-/// The toolkit, and the README every project is created with, teach the
-/// commands the CLI runs.
+/// The toolkit, the README every project is created with, and the public
+/// documentation teach the commands the CLI runs.
 ///
 /// A project command — [DwPinnedCli.projectCommands] — refuses to run from a
 /// `dartway` that is not the one the project pins, and names the form that
@@ -47,9 +47,12 @@ void main() {
         fenced = !fenced;
         continue;
       }
+      // A heading names the command a section is about; it is not typed.
+      if (!fenced && line.startsWith('#')) continue;
       for (final match in bare.allMatches(line)) {
         final inCode =
-            fenced || '`'.allMatches(line.substring(0, match.start)).length.isOdd;
+            fenced ||
+            '`'.allMatches(line.substring(0, match.start)).length.isOdd;
         if (inCode) {
           findings.add(
             '${p.relative(file.path, from: repository.path)}:${index + 1}: '
@@ -61,8 +64,7 @@ void main() {
     return findings;
   }
 
-  test('no command block teaches the bare form a project command refuses',
-      () {
+  test('no command block teaches the bare form a project command refuses', () {
     final files = [
       ...Directory(p.join(repository.path, 'toolkit'))
           .listSync(recursive: true)
@@ -70,6 +72,17 @@ void main() {
           .where((file) => file.path.endsWith('.md')),
       File(p.join(repository.path, 'template', 'README.md')),
       File(p.join(repository.path, 'template', 'CLAUDE.md')),
+      // The public documentation too, but not the rewrite's record nor the
+      // migration notes, whose before-and-after lines quote what was.
+      ...Directory(p.join(repository.path, 'docs'))
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.md'))
+          .where((file) {
+            final relative = p.relative(file.path, from: repository.path);
+            return !p.isWithin('docs/1.0', relative) &&
+                !p.isWithin('docs/migrations', relative);
+          }),
     ];
     final findings = [for (final file in files) ...findingsIn(file)];
     expect(

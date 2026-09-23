@@ -6,7 +6,7 @@ another:
 | Tier | Runs with | Proves | Needs |
 |---|---|---|---|
 | Contract | `dart test` in `<project>_shared` | every data object, request and command survives the wire and comes back equal | nothing |
-| Server acceptance | `dartway test` from the project root | handlers, access rules, publishing, migrations — on a real Postgres and a real S3 storage, through real clients | Docker |
+| Server acceptance | `dart run dartway_cli:dartway test` in the Flutter package | handlers, access rules, publishing, migrations — on a real Postgres and a real S3 storage, through real clients | Docker |
 | Widgets | `flutter test` in `<project>_flutter` | a screen reads, commands, refuses and follows live updates as the user sees it | nothing: an in-memory server |
 
 The skeleton ships a worked example of each, and the reference application in `example/` another:
@@ -36,10 +36,11 @@ one that left it.
 ## Server acceptance: `dartway test`
 
 ```bash
-dartway test                        # from the project root
-dartway test -- --name 'sign-in'    # arguments after -- go to `dart test`
-dartway test --keep                 # leave the containers up after the run
-dartway test --no-storage           # a server without uploads
+cd <project>_flutter
+dart run dartway_cli:dartway test                        # finds the project from here
+dart run dartway_cli:dartway test -- --name 'sign-in'    # arguments after -- go to `dart test`
+dart run dartway_cli:dartway test --keep                 # leave the containers up after the run
+dart run dartway_cli:dartway test --no-storage           # a server without uploads
 ```
 
 The command starts `postgres:17-alpine` and `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` —
@@ -161,14 +162,14 @@ screen, so settling by frames waits out the timeout instead of the traffic.
 The order the setup brief (`dartway quickstart`) gives an agent, from the project root:
 
 ```bash
-dartway generate --check
-dartway test
+(cd <project>_flutter && dart run dartway_cli:dartway generate --check)
+(cd <project>_flutter && dart run dartway_cli:dartway test)
 (cd my_app_shared && dart test)
 (cd my_app_flutter && flutter test)
-dartway check
+(cd <project>_flutter && dart run dartway_cli:dartway check)
 ```
 
-`dartway check` also reports `migrationsDrift` when `DW_DATABASE_*` names a Postgres it may create
+`dart run dartway_cli:dartway check` also reports `migrationsDrift` when `DW_DATABASE_*` names a Postgres it may create
 throwaway databases on; see [The conventions checker](conventions-checker.md).
 
 ## The framework's own tiers
@@ -188,7 +189,7 @@ outside it, then:
   `packages/dartway_lints/example`, whose `test/` files violate the rules on purpose and are that
   package's real suite. A package is left out only by being named in the script, with its reason:
   `example/dartway_example_server` and `template/dartway_starter_server` (project servers, run by
-  `dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
+  `dart run dartway_cli:dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
   directory runs — the direction that fails loudly;
 - **services**: the suites of `packages/dartway_orm`, `packages/dartway_core_server` and
   `packages/dartway_push_server`, against the Postgres of `DW_DATABASE_*` and the S3-compatible
@@ -198,9 +199,9 @@ outside it, then:
   variable set, or with nothing answering on the database's or the storage's port, it stops before
   running anything and names what is missing — it never skips.
 
-**The database suites of `example/` and `template/`** run through `dartway test`, exactly as a
+**The database suites of `example/` and `template/`** run through `dart run dartway_cli:dartway test`, exactly as a
 project runs them: `.github/workflows/database.yml` installs the CLI from the commit, resolves the
-project and runs `dartway test` from its root, one job per project. It runs on a daily schedule, by
+project and runs `dart run dartway_cli:dartway test` from its root, one job per project. It runs on a daily schedule, by
 hand, and on a change to the workflow file itself — not on every pull request yet, because these are
 the suites that test races, and a race is what goes intermittently red on a busier runner.
 

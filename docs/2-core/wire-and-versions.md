@@ -126,7 +126,7 @@ closed, and `DwFlutterConfig.updateRequiredScreen` replaces the app — see
 
 **Calls are same-origin by deployment, and the server sends no CORS headers — also in development
 (D-039).** In production the web app's host proxies `/dw/` and `/health` to the server
-([../5-tooling/deploy.md](../5-tooling/deploy.md)); locally `dartway dev` does the same
+([../5-tooling/deploy.md](../5-tooling/deploy.md)); locally `dart run dartway_cli:dartway dev` does the same
 ([../5-tooling/cli.md](../5-tooling/cli.md)). A cross-origin browser call cannot get through anyway:
 a JSON body needs a preflight, and the server never answers one. Native apps send no `Origin` and are
 unaffected.

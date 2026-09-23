@@ -53,7 +53,7 @@ disagree, nothing changed), `3` `check` found a difference, `64` usage.
 
 ### 1. Change the row class, then generate
 
-Edit the row class (or add one), then from the project root:
+Edit the row class (or add one), then, starting at the project root — the pinned CLI runs in `__FLUTTER_PKG__`:
 
 ```bash
 cd __FLUTTER_PKG__
