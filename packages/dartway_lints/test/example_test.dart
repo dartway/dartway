@@ -14,56 +14,63 @@ import 'package:test/test.dart';
 void main() {
   final example = p.join(Directory.current.path, 'example');
 
-  test('dart analyze reports exactly what example/ marks', () async {
-    final rules = {
-      'deep_relative_import',
-      'forbidden_provider_scope',
-      'forbidden_ui_style_usage',
-    };
+  // Minutes, not the default seconds: on a machine that has not run it before,
+  // the analysis server resolves and compiles the plugin before analyzing.
+  test(
+    'dart analyze reports exactly what example/ marks',
+    timeout: const Timeout(Duration(minutes: 5)),
+    () async {
+      final rules = {
+        'deep_relative_import',
+        'forbidden_provider_scope',
+        'forbidden_ui_style_usage',
+      };
 
-    final expected = <String>{};
-    for (final file in Directory(example)
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((file) => file.path.endsWith('.dart'))
-        .where((file) => !file.path.contains('.dart_tool'))) {
-      final lines = file.readAsLinesSync();
-      for (var index = 0; index < lines.length; index++) {
-        final marker = RegExp(
-          r'^\s*// expect_lint: (\w+)\s*$',
-        ).firstMatch(lines[index]);
-        if (marker != null) {
-          expected.add(
-            '${p.relative(file.path, from: example)}:${index + 2}: '
-            '${marker[1]}',
-          );
+      final expected = <String>{};
+      for (final file
+          in Directory(example)
+              .listSync(recursive: true)
+              .whereType<File>()
+              .where((file) => file.path.endsWith('.dart'))
+              .where((file) => !file.path.contains('.dart_tool'))) {
+        final lines = file.readAsLinesSync();
+        for (var index = 0; index < lines.length; index++) {
+          final marker = RegExp(
+            r'^\s*// expect_lint: (\w+)\s*$',
+          ).firstMatch(lines[index]);
+          if (marker != null) {
+            expected.add(
+              '${p.relative(file.path, from: example)}:${index + 2}: '
+              '${marker[1]}',
+            );
+          }
         }
       }
-    }
-    expect(expected, isNotEmpty, reason: 'the fixture marks nothing');
+      expect(expected, isNotEmpty, reason: 'the fixture marks nothing');
 
-    final result = await Process.run('dart', [
-      'analyze',
-      '--format=machine',
-    ], workingDirectory: example);
-    // SEVERITY|TYPE|CODE|FILE|LINE|COLUMN|LENGTH|MESSAGE
-    final reported = <String>{
-      for (final line in '${result.stdout}\n${result.stderr}'.split('\n'))
-        if (line.split('|') case [
-          _,
-          _,
-          final code,
-          final file,
-          final lineNumber,
-          ...,
-        ] when rules.contains(code.toLowerCase()))
-          '${p.relative(file, from: example)}:$lineNumber: '
-              '${code.toLowerCase()}',
-    };
-    expect(
-      reported,
-      expected,
-      reason: 'analyzer output:\n${result.stdout}${result.stderr}',
-    );
-  });
+      final result = await Process.run('dart', [
+        'analyze',
+        '--format=machine',
+      ], workingDirectory: example);
+      // SEVERITY|TYPE|CODE|FILE|LINE|COLUMN|LENGTH|MESSAGE
+      final reported = <String>{
+        for (final line in '${result.stdout}\n${result.stderr}'.split('\n'))
+          if (line.split('|') case [
+            _,
+            _,
+            final code,
+            final file,
+            final lineNumber,
+            ...,
+          ] when rules.contains(code.toLowerCase()))
+            '${p.relative(file, from: example)}:$lineNumber: '
+                '${code.toLowerCase()}',
+      };
+      expect(
+        reported,
+        expected,
+        reason: 'analyzer output:\n${result.stdout}${result.stderr}',
+      );
+    },
+  );
 }

@@ -68,7 +68,6 @@ dev_dependencies:
 
   dartway_cli: ^0.11.1
 
-
 # Inside the monorepo the example builds against the LOCAL framework packages.
 # Copied out into a standalone project — drop the whole dependency_overrides block.
 dependency_overrides:

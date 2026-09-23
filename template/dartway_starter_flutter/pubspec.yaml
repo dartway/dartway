@@ -73,7 +73,6 @@ dev_dependencies:
   # `check` grades this package against the conventions.
   dartway_cli: ^0.11.1
 
-
 # Inside the monorepo the template builds against the LOCAL framework packages.
 # `dartway create` removes this whole block when it copies the template.
 dependency_overrides:
