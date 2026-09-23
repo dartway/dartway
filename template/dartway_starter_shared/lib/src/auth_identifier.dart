@@ -10,13 +10,6 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 /// with an unknown identifier creates an account, the person would get a second,
 /// empty one instead of a refusal.
 abstract final class AuthIdentifier {
-  /// Which kind [identifier] is. The at sign decides, and nothing else: this
-  /// sorts, it does not validate — [normalize] does, and the code that arrives
-  /// proves the rest.
-  static DwIdentifierKind kindOf(String identifier) => identifier.contains('@')
-      ? DwIdentifierKind.email
-      : DwIdentifierKind.phone;
-
   /// [raw] in its stored form, or `null` when it is not an identifier of
   /// [kind]: an address without a domain, a number shorter than ten or longer
   /// than fifteen digits, a number typed as an e-mail.
@@ -28,7 +21,7 @@ abstract final class AuthIdentifier {
   /// Idempotent: applied to its own result it changes nothing.
   static String? normalize(DwIdentifierKind kind, String raw) {
     final trimmed = raw.trim();
-    if (kindOf(trimmed) != kind) return null;
+    if (DwIdentifierKind.of(trimmed) != kind) return null;
     return switch (kind) {
       DwIdentifierKind.email => switch (trimmed.toLowerCase()) {
         final email when _email.hasMatch(email) => email,

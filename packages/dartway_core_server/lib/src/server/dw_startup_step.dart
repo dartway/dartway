@@ -71,7 +71,7 @@ final class DwFirstAdministrator extends DwStartupStep {
   const DwFirstAdministrator({
     required this.grant,
     this.variable = defaultVariable,
-    this.kindOf = _kindOf,
+    this.kindOf = DwIdentifierKind.of,
     Map<String, String>? environment,
   }) : _environment = environment;
 
@@ -82,9 +82,10 @@ final class DwFirstAdministrator extends DwStartupStep {
 
   final String variable;
 
-  /// Which kind of identifier the value is. The default reads an `@` as the
-  /// e-mail it can only be; a project whose identifiers are neither replaces
-  /// it — and its `DwAuthConfig.normalize` has the last word either way.
+  /// Which kind of identifier the value is. The default is the framework's
+  /// rule, [DwIdentifierKind.of]; a project whose identifiers are neither
+  /// replaces it — and its `DwAuthConfig.normalize` has the last word either
+  /// way.
   final DwIdentifierKind Function(String identifier) kindOf;
 
   /// Grants the project's own administrator role to [accountId], in the
@@ -94,10 +95,6 @@ final class DwFirstAdministrator extends DwStartupStep {
 
   final Map<String, String>? _environment;
 
-  static DwIdentifierKind _kindOf(String identifier) =>
-      identifier.contains('@')
-      ? DwIdentifierKind.email
-      : DwIdentifierKind.phone;
 
   Map<String, String> get _values => _environment ?? Platform.environment;
 

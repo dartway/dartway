@@ -5,7 +5,18 @@ import '../wire/dw_server_call.dart';
 import '../wire/dw_wire_object.dart';
 
 /// The kinds of identifier an account signs in with by one-time code.
-enum DwIdentifierKind { phone, email }
+enum DwIdentifierKind {
+  phone,
+  email;
+
+  /// The kind [identifier] is: an `@` makes it an e-mail, anything else a
+  /// phone. It sorts, it does not validate — the project's
+  /// `DwAuthConfig.normalize` does, and the code that arrives proves the rest.
+  /// One rule for the framework and every project, so an app and the server
+  /// cannot come to disagree on which kind a stored identifier is (#283).
+  static DwIdentifierKind of(String identifier) =>
+      identifier.contains('@') ? email : phone;
+}
 
 /// Asks the server to send a one-time code to an identifier.
 ///

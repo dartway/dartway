@@ -69,7 +69,7 @@ final class AppHarness {
     DwAppClient client,
     String identifier,
   ) async {
-    final kind = AuthIdentifier.kindOf(identifier);
+    final kind = DwIdentifierKind.of(identifier);
     final ticket = (await client.command(
       DwRequestCode(kind: kind, identifier: identifier),
     )).valueOrThrow;

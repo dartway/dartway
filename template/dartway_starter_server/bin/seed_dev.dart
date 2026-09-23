@@ -62,7 +62,7 @@ Future<void> _seed(DwCallContext ctx) async {
     bool marketing = false,
   }) async {
     final (:accountId, created: _) = await ctx.accounts.ensure(
-      AuthIdentifier.kindOf(identifier),
+      DwIdentifierKind.of(identifier),
       identifier,
     );
     final profile = (await ctx.db.userProfiles.findFirst(

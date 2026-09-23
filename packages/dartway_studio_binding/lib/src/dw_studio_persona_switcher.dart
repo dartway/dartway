@@ -18,12 +18,6 @@ class DwStudioPersonaSwitcher {
   /// as a pending state instead of a session that refuses to change.
   final ValueNotifier<bool> isBusy = ValueNotifier(false);
 
-  /// The kind an identifier is: what Studio sends is a phone or an e-mail,
-  /// and the server normalises it either way.
-  static DwIdentifierKind kindOf(String identifier) => identifier.contains('@')
-      ? DwIdentifierKind.email
-      : DwIdentifierKind.phone;
-
   Future<void> signInWith({
     required String identifier,
     required String verificationCode,
@@ -33,7 +27,10 @@ class DwStudioPersonaSwitcher {
     try {
       if (_core.client.accountId != null) await _core.signOut();
       final ticket = await _core.client.command(
-        DwRequestCode(kind: kindOf(identifier), identifier: identifier),
+        DwRequestCode(
+          kind: DwIdentifierKind.of(identifier),
+          identifier: identifier,
+        ),
       );
       switch (ticket) {
         case DwCallOk(:final value):

@@ -20,7 +20,7 @@ void main() {
     AppMember member,
     String identifier,
   ) async {
-    final kind = AuthIdentifier.kindOf(identifier);
+    final kind = DwIdentifierKind.of(identifier);
     final ticket = (await member.client.command(
       DwRequestIdentifierCode(kind: kind, identifier: identifier),
     )).valueOrThrow;

@@ -584,6 +584,40 @@ void main() {
       },
     );
 
+    test('describe answers what the confirmed files are, public or private, '
+        'in one batch (#285)', () async {
+      final avatar = await upload(alice, TestUpload.avatar);
+      final document = await upload(
+        bob,
+        TestUpload.document,
+        type: 'text/plain',
+      );
+      final unfinished = await ticketFor(alice, start(TestUpload.avatar));
+      final command = DescribeFiles([
+        avatar.id,
+        document.id,
+        unfinished.id,
+        1 << 40,
+      ]);
+      final described = (await anonymous.call(command)).value(command).urls;
+      expect(described, {
+        '${avatar.id}': [
+          avatar.fileName,
+          avatar.byteSize,
+          avatar.contentType,
+          'avatar',
+          avatar.url,
+        ].join('|'),
+        '${document.id}': [
+          document.fileName,
+          document.byteSize,
+          'text/plain',
+          'document',
+          '',
+        ].join('|'),
+      });
+    });
+
     for (final (purpose, type, public) in [
       (TestUpload.avatar, 'image/png', true),
       (TestUpload.document, 'text/plain', false),

@@ -311,6 +311,24 @@ final class ResolveUrls extends DwActionCommand<FileUrls> {
   ]);
 }
 
+/// Describes files through `ctx.files.describe`, each as
+/// `name|size|type|purpose|url`.
+final class DescribeFiles extends DwActionCommand<FileUrls> {
+  const DescribeFiles(this.fileIds);
+
+  final List<int> fileIds;
+
+  @override
+  String get dwTypeName => 'DescribeFiles';
+
+  @override
+  Map<String, Object?> toJson() => {'fileIds': fileIds};
+
+  static DescribeFiles fromJson(Map<String, Object?> json) => DescribeFiles([
+    for (final id in json['fileIds']! as List<Object?>) id! as int,
+  ]);
+}
+
 /// Deletes a file from a read, which must not be allowed.
 final class DropFromRead extends DwListRequest<NoteView> {
   const DropFromRead(this.fileId);
@@ -400,6 +418,7 @@ final DwWireProtocol filesProtocol = DwWireProtocol([
   const DwProtocolEntry<SetAvatar>('SetAvatar', SetAvatar.fromJson),
   const DwProtocolEntry<DropFile>('DropFile', DropFile.fromJson),
   const DwProtocolEntry<ResolveUrls>('ResolveUrls', ResolveUrls.fromJson),
+  const DwProtocolEntry<DescribeFiles>('DescribeFiles', DescribeFiles.fromJson),
   const DwProtocolEntry<DropFromRead>('DropFromRead', DropFromRead.fromJson),
   const DwProtocolEntry<FileUrls>('FileUrls', FileUrls.fromJson),
   const DwProtocolEntry<StoreMade>('StoreMade', StoreMade.fromJson),
@@ -430,6 +449,21 @@ List<DwCallHandler> fileHandlers() => [
         command.fileIds,
       )).entries)
         '$key': value,
+    }),
+  ),
+  DwCallHandler.command<DescribeFiles, FileUrls>(
+    access: DwAccessRule.anonymous,
+    handle: (ctx, command) async => FileUrls({
+      for (final MapEntry(:key, :value) in (await ctx.files.describe(
+        command.fileIds,
+      )).entries)
+        '$key': [
+          value.fileName,
+          value.byteSize,
+          value.contentType,
+          value.purpose,
+          value.url ?? '',
+        ].join('|'),
     }),
   ),
   DwCallHandler.command<StoreMade, DwStoredFile>(

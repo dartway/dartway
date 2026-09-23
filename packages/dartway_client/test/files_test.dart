@@ -285,6 +285,86 @@ void main() {
     await expectLater(pending, throwsA(isA<DwClientStoppedException>()));
   });
 
+  group('cancel (#284)', () {
+    test('aborts a put in flight and sends no confirmation', () async {
+      storage.chunkDelay = const Duration(milliseconds: 50);
+      final cancel = Completer<void>();
+      final pending = client.files.upload(
+        Upload.avatar,
+        DwUploadSource.bytes(bytes(300 * 1024)),
+        fileName: 'big.png',
+        contentType: 'image/png',
+        cancel: cancel.future,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      cancel.complete();
+      await expectLater(
+        pending,
+        throwsA(isA<DwUploadCancelledException>()),
+      );
+      expect(server.calls.map((call) => call.wireName), ['DwStartUpload']);
+      expect(storage.objects, isEmpty);
+    });
+
+    test('before the ticket arrives, puts nothing', () async {
+      final cancel = Completer<void>()..complete();
+      await expectLater(
+        client.files.upload(
+          Upload.avatar,
+          DwUploadSource.bytes(bytes(5)),
+          fileName: 'a.png',
+          contentType: 'image/png',
+          cancel: cancel.future,
+        ),
+        throwsA(isA<DwUploadCancelledException>()),
+      );
+      expect(storage.puts, 0);
+      expect(server.calls.map((call) => call.wireName), ['DwStartUpload']);
+    });
+
+    test('ends the wait before a retry', () async {
+      final failing = DwMemoryStorageTransport(
+        (put) async => const DwStorageReply(status: 503, body: ''),
+      );
+      final retrying = await connect(
+        transport: failing,
+        options: const DwClientOptions(
+          retryDelay: Duration(seconds: 30),
+          maxRetryDelay: Duration(seconds: 30),
+          releaseDelay: Duration.zero,
+          liveIdleDelay: Duration.zero,
+        ),
+      );
+      final cancel = Completer<void>();
+      final pending = retrying.files.upload(
+        Upload.avatar,
+        DwUploadSource.bytes(bytes(5)),
+        fileName: 'a.png',
+        contentType: 'image/png',
+        cancel: cancel.future,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      cancel.complete();
+      await expectLater(
+        pending.timeout(const Duration(seconds: 5)),
+        throwsA(isA<DwUploadCancelledException>()),
+      );
+    });
+
+    test('after the file is confirmed, changes nothing', () async {
+      final cancel = Completer<void>();
+      final result = await client.files.upload(
+        Upload.avatar,
+        DwUploadSource.bytes(bytes(5)),
+        fileName: 'a.png',
+        contentType: 'image/png',
+        cancel: cancel.future,
+      );
+      cancel.complete();
+      expect(result.isOk, isTrue);
+    });
+  });
+
   test('getLink reads a link for a confirmed file', () async {
     final file = (await upload(DwUploadSource.bytes(bytes(5)))).valueOrNull!;
     final link = (await client.files.getLink(file.id)).valueOrNull!;

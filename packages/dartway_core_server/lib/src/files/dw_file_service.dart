@@ -36,10 +36,26 @@ abstract interface class DwFileService {
   /// unfinished and absent ids are not in the answer.
   Future<Map<int, String>> publicUrls(Iterable<int> fileIds);
 
+  /// What the confirmed files among [fileIds] are — name, size, content type,
+  /// purpose, and the URL of a public one — in one query; unfinished and
+  /// absent ids are not in the answer.
+  ///
+  /// For server code listing what rows reference: an editor's screen showing
+  /// `intro.mp4 · 894 MB` before it is replaced. Like [read], it asks no
+  /// `canRead`: the server describes, and the handler decides who is told.
+  /// Batched, because the caller is always assembling a list (#285).
+  Future<Map<int, DwStoredFile>> describe(Iterable<int> fileIds);
+
   /// Deletes the file: its row now, in the caller's transaction, and its
   /// object once that transaction commits — by a framework job, retried until
   /// storage confirms, so a crash after the commit cannot leave the object
   /// behind. Answers whether the file existed.
+  ///
+  /// It is also how a file is let go of that nothing references: an upload
+  /// the user abandoned after it finished — a page left without saving. The
+  /// framework does not know which rows reference a file, so it never
+  /// decides that for the project: the project's own command checks that
+  /// the caller uploaded the file and that nothing holds it, then deletes.
   ///
   /// Throws [StateError] in a request: reads have no side effects.
   Future<bool> delete(int fileId);
@@ -573,6 +589,10 @@ final class DwUnconfiguredFiles implements DwFileService {
       fileIds.isEmpty ? const {} : _fail();
 
   @override
+  Future<Map<int, DwStoredFile>> describe(Iterable<int> fileIds) async =>
+      fileIds.isEmpty ? const {} : _fail();
+
+  @override
   Future<bool> delete(int fileId) async => _fail();
 
   @override
@@ -636,6 +656,21 @@ final class _DwContextFiles implements DwFileService {
           row.get<String>('bucket'),
           row.get<String>('object_key'),
         ),
+    };
+  }
+
+  @override
+  Future<Map<int, DwStoredFile>> describe(Iterable<int> fileIds) async {
+    final ids = fileIds.toSet().toList();
+    if (ids.isEmpty) return const {};
+    final rows = await _ctx.db.query(
+      'SELECT ${DwFileStore._columns}, bucket, object_key FROM dw_stored_file '
+      'WHERE id = ANY(@ids::int8[]) AND confirmed_at IS NOT NULL',
+      params: {'ids': ids},
+    );
+    return {
+      for (final row in rows)
+        row.get<int>('id'): _store.storedFile(DwFileStore._record(row), row),
     };
   }
 

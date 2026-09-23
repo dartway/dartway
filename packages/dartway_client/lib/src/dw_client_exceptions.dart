@@ -79,6 +79,22 @@ final class DwTimeoutException implements Exception {
       '${lastError == null ? '' : '; last error: $lastError'})';
 }
 
+/// The upload was cancelled by the app (`upload(cancel:)`) before storage
+/// confirmed it. The ticket stays unfinished, and the server's cleanup of
+/// unfinished uploads removes the row and whatever bytes arrived (#284).
+final class DwUploadCancelledException implements Exception {
+  const DwUploadCancelledException();
+
+  @override
+  bool operator ==(Object other) => other is DwUploadCancelledException;
+
+  @override
+  int get hashCode => (DwUploadCancelledException).hashCode;
+
+  @override
+  String toString() => 'DwUploadCancelledException()';
+}
+
 /// The client was stopped before the call was answered.
 final class DwClientStoppedException implements Exception {
   const DwClientStoppedException();

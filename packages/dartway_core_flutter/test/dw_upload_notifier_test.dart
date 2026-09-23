@@ -210,6 +210,47 @@ void main() {
     await dw.dispose();
   });
 
+  testWidgets('cancel stops the transfer, confirms nothing and goes back to '
+      'idle without a report (#284)', (tester) async {
+    final dw = core();
+    await dw.init();
+    storage.chunkDelay = const Duration(milliseconds: 5);
+    final notifier = dw.uploader();
+    addTearDown(notifier.dispose);
+
+    final pending = notifier.upload(
+      AppUpload.avatar,
+      DwUploadSource.bytes(bytes(256 * 1024)),
+      fileName: 'big.jpg',
+      contentType: 'image/jpeg',
+    );
+    for (
+      var i = 0;
+      i < 5 && notifier.value == const DwUploadProgress(0, 256 * 1024);
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 5));
+    }
+    notifier.cancel();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 5));
+    }
+    expect(await pending, isNull);
+    expect(notifier.value, const DwUploadIdle());
+    expect(notifier.isBusy, isFalse);
+    expect(storage.objects, isEmpty);
+    expect(
+      server.calls.map((call) => call.wireName),
+      isNot(contains('DwFinishUpload')),
+    );
+    expect(reports, isEmpty);
+
+    // Cancelling with nothing running changes nothing.
+    notifier.cancel();
+    expect(notifier.value, const DwUploadIdle());
+    await dw.dispose();
+  });
+
   testWidgets('a network that stays down until the ticket expires is shown, '
       'not reported', (tester) async {
     final dw = core();

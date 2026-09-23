@@ -35,13 +35,22 @@ final class DwFileClient {
   ///
   /// Throws [StateError] when [source] yields another number of bytes than
   /// its `byteSize` — the caller's bug, not retried.
+  ///
+  /// When [cancel] completes before the upload is confirmed, the transfer is
+  /// aborted, no confirmation is sent, and the future completes with
+  /// [DwUploadCancelledException]. The ticket stays unfinished, so the
+  /// server's cleanup of unfinished uploads removes it with whatever bytes
+  /// arrived — a cancelled gigabyte does not stay in the bucket (#284). Once
+  /// the confirmation is sent the file is the caller's, cancelled or not.
   Future<DwCallResult<DwStoredFile>> upload(
     DwUploadPurpose purpose,
     DwUploadSource source, {
     required String fileName,
     required String contentType,
     void Function(int sentBytes, int totalBytes)? onProgress,
+    Future<void>? cancel,
   }) async {
+    final cancellation = _Cancellation(cancel);
     final started = await _client.command(
       DwStartUpload(
         purpose: purpose,
@@ -61,7 +70,9 @@ final class DwFileClient {
       case DwCallFailed(:final incidentId):
         return DwCallFailed(incidentId);
     }
-    await _put(ticket, source, onProgress);
+    cancellation.check();
+    await _put(ticket, source, onProgress, cancellation);
+    cancellation.check();
     return _client.command(DwFinishUpload(ticketId: ticket.id));
   }
 
@@ -74,6 +85,7 @@ final class DwFileClient {
     DwUploadTicket ticket,
     DwUploadSource source,
     void Function(int sentBytes, int totalBytes)? onProgress,
+    _Cancellation cancellation,
   ) async {
     final client = _client;
     final url = Uri.parse(ticket.uploadUrl);
@@ -96,6 +108,7 @@ final class DwFileClient {
       if (client._lifecycle == _Lifecycle.stopped) {
         throw const DwClientStoppedException();
       }
+      cancellation.check();
       final attempt = _Attempt(
         source: source,
         total: total,
@@ -104,6 +117,8 @@ final class DwFileClient {
       );
       void abort(Object error) => attempt.abort(error);
       client._pendingCalls.add(abort);
+      cancellation.onCancel = () =>
+          attempt.abort(const DwUploadCancelledException());
       DwStorageReply? reply;
       try {
         reply = await client.storageTransport.put(
@@ -119,6 +134,7 @@ final class DwFileClient {
         lastError = error;
       } finally {
         client._pendingCalls.remove(abort);
+        cancellation.onCancel = null;
         attempt.finish();
       }
       if (attempt.stoppedBy case final error?) throw error;
@@ -156,9 +172,38 @@ final class DwFileClient {
       final left = ticket.expiresAt.difference(DateTime.now());
       if (left <= Duration.zero) throw giveUp();
       final delay = client._backoff(failures);
-      await client._retryAfter(delay < left ? delay : left);
+      await Future.any([
+        client._retryAfter(delay < left ? delay : left),
+        cancellation.cancelled,
+      ]);
+      cancellation.check();
       if (!DateTime.now().isBefore(ticket.expiresAt)) throw giveUp();
     }
+  }
+}
+
+/// An upload's cancellation: whether it was asked for, and the running
+/// attempt to abort when it is.
+final class _Cancellation {
+  _Cancellation(Future<void>? cancel) {
+    cancel?.then((_) {
+      _requested = true;
+      if (!_signal.isCompleted) _signal.complete();
+      onCancel?.call();
+    });
+  }
+
+  bool _requested = false;
+  final Completer<void> _signal = Completer<void>();
+
+  /// Completes when the upload is cancelled; never, when it cannot be.
+  Future<void> get cancelled => _signal.future;
+
+  /// Aborts the attempt running now.
+  void Function()? onCancel;
+
+  void check() {
+    if (_requested) throw const DwUploadCancelledException();
   }
 }
 
