@@ -86,7 +86,7 @@ Six checks, each with the exact fix when it fails:
 | Check | Why it is here |
 |---|---|
 | Dart `>=3.11.0` | The SDK running the CLI is the one that runs the project |
-| Flutter `>=3.41.0` | |
+| Flutter `>=3.44.0` | |
 | git, with `user.name` and `user.email` | `create` commits the new project. A missing binary fails; a missing identity warns — the project is complete, but has no initial commit |
 | A pub host that answers | `pub get` sets no deadline on a connection that opens and goes quiet, so a filtered route surfaces as a resolve step that hangs without a word. The probe asks for bytes rather than a socket (a TCP connect succeeds even when the TLS handshake after it is filtered), waits 10 seconds, and honours `PUB_HOSTED_URL` |
 | A responding Docker daemon | Postgres and MinIO come from it, for development and for `dartway test`. Not installed and not running are reported apart |

@@ -3,7 +3,7 @@
 # explicitly, because the server needs the shared contract package beside it
 # and a context can only be one directory. Every path below is relative to the
 # root.
-FROM dart:3.12.0 AS build
+FROM dart:3.13.2 AS build
 
 WORKDIR /workspace
 # Every path dependency by name. One whose directory never enters the build

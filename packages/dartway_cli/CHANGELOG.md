@@ -4,6 +4,8 @@
 
 **Breaking:** `dartway deploy secret …` is now `dartway secret …` (D-078).
 
+- **`doctor` asks for Flutter `>=3.44.0`** (#290), the minimum `dartway_core_flutter` compiles on.
+
 - **`dartway quickstart` names `DW_ADMIN_IDENTIFIER`**, the framework's own name for the first administrator (D-079); the skeleton's `APP_BOOTSTRAP_ADMIN` is gone.
 
 - **`local` is an environment of `deploy/config.yaml`, and `dartway secret` is a top-level command** (D-078). The two files that describe every environment now describe this machine too: `config.yaml > local` holds what the team shares, `secrets.yaml > local` what is the developer's own, and `dartway secret list --env local` answers "what is set, what is missing" in the same words it answers for a server. `dartway deploy secret …` is now `dartway secret …`, and `init`, `put-file`, `push` and `pull` say why they have nothing to do for `local`.

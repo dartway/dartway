@@ -226,16 +226,15 @@ void main() {
   test('a recurring job runs on its schedule, and the schedule survives a '
       'restart', () async {
     await eventually(() async => (await logged('tick')).length >= 3);
-    final before = (await harness().db.query(
-      "SELECT next_run_at FROM dw_recurring_job WHERE name = 'tick'",
-    )).single.get<DateTime>('next_run_at');
 
     final app = harness().app;
     final config = harness().database.config;
     await harness().server.stop();
-    // Push the next run far out while stopped: a restart must keep it (the
-    // interval did not change), not reset it to now.
+    // Let the next run fall due while stopped. The restart declares the job
+    // with an interval of an hour; the run already due must stay due, not be
+    // pushed an hour out — so the slow tick has to arrive.
     await Future<void>.delayed(const Duration(milliseconds: 50));
+    final slowTick = app.jobEvents.stream.firstWhere((e) => e == 'slow tick');
     harness().server = await DwTestServer.start(
       app.server(
         config,
@@ -256,13 +255,12 @@ void main() {
       rows.single['every_micros'],
       const Duration(hours: 1).inMicroseconds,
     );
-    final after = rows.single.get<DateTime>('next_run_at');
-    // LEAST(previous next run, now + new interval): the run already due stays.
-    expect(after.isAfter(before.subtract(const Duration(seconds: 1))), isTrue);
-    expect(
-      after.isBefore(DateTime.now().add(const Duration(minutes: 59))),
-      isTrue,
-    );
+    // LEAST(previous next run, now + new interval): the run already due
+    // stays. Asserted by the run happening rather than by reading
+    // `next_run_at` against this process's clock: Postgres writes it with its
+    // own `now()`, and the runner may already have run the job and moved it
+    // an hour on by the time the row is read.
+    await slowTick.timeout(const Duration(seconds: 10));
     final framework = await harness().db.query(
       'SELECT name FROM dw_recurring_job ORDER BY name',
     );
