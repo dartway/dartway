@@ -293,6 +293,19 @@ void main() {
     });
   });
 
+  test('a resume while the stored choice is still being read stands', () async {
+    final stored = Completer<bool>();
+    final push = DwPush(
+      transports: [DwFakePushTransport(issuedToken: 'device-12')],
+      isEnabled: () => stored.future,
+    );
+    await world.start(push, session: alice);
+    await push.resume();
+    stored.complete(false);
+    await settle();
+    expect(world.registrations.single.$2.token, 'device-12');
+  });
+
   group('setup', () {
     test('picks the first transport the platform and device can run', () async {
       final rustore = DwFakePushTransport(

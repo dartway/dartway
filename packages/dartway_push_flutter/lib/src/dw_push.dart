@@ -142,12 +142,13 @@ class DwPush extends DwFlutterPlugin {
   /// Its failures are reported rather than thrown: nothing awaits it.
   Future<void> _start() async {
     try {
-      if (!(await _answer(
+      final enabled = await _answer(
         'isEnabled',
         () async => await isEnabled?.call() ?? true,
-      ))) {
-        _paused = true;
-      }
+      );
+      // The app's own pause() or resume() since init returned is the newer
+      // word, and a stored choice that arrives after it does not undo it.
+      if (!enabled && !_chosen) _paused = true;
       final transport = await _select();
       if (transport == null || _disposed) {
         _attached.complete(null);
@@ -234,6 +235,7 @@ class DwPush extends DwFlutterPlugin {
   /// registration for the signed-in account and registers nothing until
   /// [resume]. The choice is the app's to keep ([isEnabled]).
   Future<DwCallResult<void>?> pause() async {
+    _chosen = true;
     _paused = true;
     final token = _token;
     if (token == null || _core.client.accountId == null) return null;
@@ -246,8 +248,13 @@ class DwPush extends DwFlutterPlugin {
 
   bool _paused = false;
 
+  /// Whether the app called [pause] or [resume] — then [isEnabled], asked in
+  /// the background, no longer decides.
+  bool _chosen = false;
+
   /// Registers again after [pause].
   Future<void> resume() async {
+    _chosen = true;
     _paused = false;
     await _sync();
   }
