@@ -23,8 +23,18 @@ import 'dw_push_transport_client.dart';
 /// await dw.plugins.push.requestPermission();   // when the user understands why
 /// ```
 ///
-/// On `dw.init()` it picks the first transport this platform and device can
-/// use, starts listening, and from then on keeps the server's registration in
+/// On `dw.init()` it checks the protocol and returns; everything that asks the
+/// platform — which transport this device can use, listening, the permission,
+/// the token, the notification that started the app — continues in the
+/// background, off the app's start. Those are vendor SDK calls that may never
+/// answer (on iOS, firebase_messaging waits for an APNs registration that the
+/// simulator, or a bundle id differing from `GoogleService-Info.plist`, never
+/// delivers), and one of them awaited in `init` kept an app on its splash for
+/// good (#294). A push that arrives a second late costs nothing; an app that
+/// does not open costs everything. A call still unanswered after
+/// [reportUnansweredAfter] is reported, and still waited for.
+///
+/// From then on it keeps the server's registration in
 /// step with two facts that arrive independently: the device token and the
 /// signed-in account. Whenever both are known and that pair has not been
 /// registered, it sends `DwRegisterPushToken` — once per pair: a token
@@ -40,6 +50,7 @@ class DwPush extends DwFlutterPlugin {
     required List<DwPushTransportClient> transports,
     this.platform,
     this.isEnabled,
+    this.reportUnansweredAfter = const Duration(seconds: 10),
   }) : transports = List.unmodifiable(transports);
 
   /// The transports this app ships, most preferred first: the first that
@@ -54,12 +65,22 @@ class DwPush extends DwFlutterPlugin {
   /// [resume]. Without it push is on.
   final Future<bool> Function()? isEnabled;
 
+  /// How long a platform call of the background start may stay unanswered
+  /// before it is reported through the error pipeline, naming the call. The
+  /// report does not cancel it: the answer is still taken whenever it comes.
+  final Duration reportUnansweredAfter;
+
   /// A failing transport costs push, not the app.
   @override
   bool get blocksStartup => false;
 
   late final DwFlutterCore _core;
   DwPushTransportClient? _transport;
+
+  /// Completes once the transport is chosen and attached — with `null` when
+  /// none can run here. What asks the transport waits for it.
+  final Completer<DwPushTransportClient?> _attached = Completer();
+  bool _disposed = false;
   StreamSubscription<int?>? _accounts;
 
   String? _token;
@@ -73,7 +94,8 @@ class DwPush extends DwFlutterPlugin {
   final StreamController<DwPushReceived> _received =
       StreamController.broadcast();
 
-  /// The transport in use; `null` when none can run here.
+  /// The transport in use; `null` when none can run here, and until the
+  /// background start has chosen one.
   DwPushTransportClient? get transport => _transport;
 
   /// The device token, once issued.
@@ -103,10 +125,6 @@ class DwPush extends DwFlutterPlugin {
         );
       }
     }
-    _paused = !(await isEnabled?.call() ?? true);
-    _transport = await _select();
-    final transport = _transport;
-    if (transport == null) return;
 
     // The account first: the client reads the stored session after the
     // plugins start, and its stream replays whatever it holds.
@@ -117,25 +135,90 @@ class DwPush extends DwFlutterPlugin {
       _accountId = accountId;
       unawaited(_sync());
     });
-    await transport.attach(
-      DwPushTransportEvents(
-        onToken: _onToken,
-        onOpened: _onOpened,
-        onReceived: _onReceived,
-      ),
-    );
-    if (await transport.permission() == DwPushPermission.granted) {
-      await _fetchToken();
+    unawaited(_start());
+  }
+
+  /// The part of the start that asks the platform, run after `init` returned.
+  /// Its failures are reported rather than thrown: nothing awaits it.
+  Future<void> _start() async {
+    try {
+      if (!(await _answer(
+        'isEnabled',
+        () async => await isEnabled?.call() ?? true,
+      ))) {
+        _paused = true;
+      }
+      final transport = await _select();
+      if (transport == null || _disposed) {
+        _attached.complete(null);
+        return;
+      }
+      await _answer(
+        'attach',
+        () => transport.attach(
+          DwPushTransportEvents(
+            onToken: _onToken,
+            onOpened: _onOpened,
+            onReceived: _onReceived,
+          ),
+        ),
+      );
+      if (_disposed) {
+        // Disposed while attaching: nothing detaches a transport it never saw.
+        await transport.detach();
+        _attached.complete(null);
+        return;
+      }
+      _transport = transport;
+      _attached.complete(transport);
+      // Apart, so that one call that never answers holds up only itself.
+      await Future.wait([
+        () async {
+          if (await _answer('permission', transport.permission) ==
+              DwPushPermission.granted) {
+            await _fetchToken();
+          }
+        }(),
+        () async {
+          if (await _answer('takeInitialOpen', transport.takeInitialOpen)
+              case final data?) {
+            _onOpened(data, DwPushOpenSource.coldStart);
+          }
+        }(),
+      ]);
+    } catch (error, stackTrace) {
+      if (!_attached.isCompleted) _attached.complete(null);
+      _core.handleError(error, stackTrace, source: DwErrorSource.client);
     }
-    if (await transport.takeInitialOpen() case final data?) {
-      _onOpened(data, DwPushOpenSource.coldStart);
+  }
+
+  /// [call], reported once if it has not answered after
+  /// [reportUnansweredAfter] — and still awaited: a late answer is an answer.
+  Future<T> _answer<T>(String name, Future<T> Function() call) async {
+    final watch = Timer(reportUnansweredAfter, () {
+      if (_disposed) return;
+      _core.handleError(
+        TimeoutException(
+          'push: $name did not answer in '
+          '${reportUnansweredAfter.inMilliseconds} ms — push waits for it, '
+          'the app does not',
+          reportUnansweredAfter,
+        ),
+        StackTrace.current,
+        source: DwErrorSource.client,
+      );
+    });
+    try {
+      return await call();
+    } finally {
+      watch.cancel();
     }
   }
 
   /// Asks the user for permission — at a moment they understand why — and
   /// registers the token when the answer is yes.
   Future<DwPushPermission> requestPermission() async {
-    final transport = _transport;
+    final transport = await _attached.future;
     if (transport == null) return DwPushPermission.unsupported;
     final answer = await transport.requestPermission();
     if (answer == DwPushPermission.granted) await _fetchToken();
@@ -144,7 +227,8 @@ class DwPush extends DwFlutterPlugin {
 
   /// The permission as it stands, without asking.
   Future<DwPushPermission> permission() async =>
-      await _transport?.permission() ?? DwPushPermission.unsupported;
+      await (await _attached.future)?.permission() ??
+      DwPushPermission.unsupported;
 
   /// The user turned notifications off in the app: removes this device's
   /// registration for the signed-in account and registers nothing until
@@ -169,6 +253,7 @@ class DwPush extends DwFlutterPlugin {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
     await _accounts?.cancel();
     await _transport?.detach();
     await _opened.close();
@@ -178,13 +263,16 @@ class DwPush extends DwFlutterPlugin {
   Future<DwPushTransportClient?> _select() async {
     for (final candidate in transports) {
       if (!candidate.isSupportedPlatform) continue;
-      if (await candidate.isAvailable()) return candidate;
+      final name = '${candidate.transport.name}.isAvailable';
+      if (await _answer(name, candidate.isAvailable)) return candidate;
     }
     return null;
   }
 
   Future<void> _fetchToken() async {
-    final token = await _transport?.token();
+    final transport = _transport;
+    if (transport == null) return;
+    final token = await _answer('token', transport.token);
     if (token != null && token.isNotEmpty) _onToken(token);
   }
 

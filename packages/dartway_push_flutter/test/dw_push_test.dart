@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dartway_client/testing.dart';
@@ -82,6 +83,47 @@ final class World {
     await settle();
     return core;
   }
+}
+
+/// A transport whose named calls never answer — the iOS simulator, or a
+/// bundle id that differs from `GoogleService-Info.plist` (#294).
+final class SilentTransport extends DwPushTransportClient {
+  SilentTransport(this.silent);
+
+  final Set<String> silent;
+
+  Future<T> _call<T>(String name, T answer) =>
+      silent.contains(name) ? Completer<T>().future : Future.value(answer);
+
+  @override
+  DwPushTransport get transport => DwPushTransport.fcm;
+
+  @override
+  bool get isSupportedPlatform => true;
+
+  @override
+  Future<bool> isAvailable() => _call('isAvailable', true);
+
+  @override
+  Future<DwPushPermission> permission() =>
+      _call('permission', DwPushPermission.granted);
+
+  @override
+  Future<DwPushPermission> requestPermission() =>
+      _call('requestPermission', DwPushPermission.granted);
+
+  @override
+  Future<void> attach(DwPushTransportEvents events) => _call('attach', null);
+
+  @override
+  Future<void> detach() async {}
+
+  @override
+  Future<String?> token() => _call('token', 'device-silent');
+
+  @override
+  Future<Map<Object?, Object?>?> takeInitialOpen() =>
+      _call('takeInitialOpen', null);
 }
 
 Future<void> settle() async {
@@ -291,6 +333,44 @@ void main() {
         );
       },
     );
+  });
+
+  group('a platform that does not answer', () {
+    for (final call in [
+      'isAvailable',
+      'attach',
+      'permission',
+      'token',
+      'takeInitialOpen',
+    ]) {
+      test('$call is not waited for by the start, and is reported', () async {
+        final push = DwPush(
+          transports: [
+            SilentTransport({call}),
+          ],
+          reportUnansweredAfter: const Duration(milliseconds: 50),
+        );
+        // Returns at all: before #294 a silent call kept `dw.init` waiting.
+        await world.start(push);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(
+          world.reports.map((r) => '${r.error}'),
+          contains(contains('$call did not answer')),
+        );
+      });
+    }
+
+    test('a silent takeInitialOpen does not hold up the token', () async {
+      await world.start(
+        DwPush(
+          transports: [
+            SilentTransport({'takeInitialOpen'}),
+          ],
+        ),
+        session: alice,
+      );
+      expect(world.registrations.single.$2.token, 'device-silent');
+    });
   });
 
   group('opened notifications', () {

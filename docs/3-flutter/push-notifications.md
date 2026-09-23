@@ -35,12 +35,22 @@ await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 DwFirebasePush.registerBackgroundHandler();
 ```
 
-On `dw.init()` the plugin takes **the first transport that supports the platform and is available
-on the device** — the list above means RuStore on Android phones that have it, FCM everywhere else.
-A Firebase transport without an initialized Firebase app is not available, so a build without a
-Firebase project simply has no push. A plugin whose start fails does not block the app
-(`blocksStartup` is false): the failure is reported, and `dw.plugins.maybeOf<DwPush>()` answers
-`null`.
+The plugin takes **the first transport that supports the platform and is available on the
+device** — the list above means RuStore on Android phones that have it, FCM everywhere else. A
+Firebase transport without an initialized Firebase app is not available, so a build without a
+Firebase project simply has no push.
+
+**Push is not on the path of the app opening.** `dw.init()` waits only for the plugin's own checks;
+choosing the transport, listening, the permission, the token and the notification that started the
+app continue in the background. Those are vendor SDK calls that may never answer — on iOS,
+firebase_messaging waits for an APNs registration that the simulator never delivers, and neither
+does a device whose bundle id differs from `GoogleService-Info.plist` — and one of them awaited at
+start kept an app on its splash screen. A call still unanswered after
+`DwPush(reportUnansweredAfter:)` (ten seconds) is reported by name, `push: takeInitialOpen did not
+answer in 10000 ms`, and still waited for. Right after `dw.init()`, `push.transport` and
+`push.token` may therefore still be `null`; `requestPermission()` and `permission()` wait for the
+transport. A plugin whose start fails does not block the app (`blocksStartup` is false): the
+failure is reported, and `dw.plugins.maybeOf<DwPush>()` answers `null`.
 
 The plugin reads everything it needs from the core it is initialized with — the client, its
 protocol, its session — and never the app's `dw`, which does not exist yet while the `plugins:`
