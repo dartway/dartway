@@ -321,13 +321,18 @@ Back to a link after signing in:
     : Uri(path: AuthRoutes.login.fullPath, queryParameters: {'from': target.location})
         .toString(),
 
-// The sign-in zone: once signed in, go on to it.
+// The sign-in zone: once signed in, go on to it — if it is one of the app's own paths.
 (session, target) => session.isAuthenticated
-    ? target.uri.queryParameters['from'] ?? AppRoutes.home.fullPath
+    ? ownPath(target.uri.queryParameters['from']) ?? AppRoutes.home.fullPath
     : null,
+
+String? ownPath(String? location) =>
+    location != null && location.startsWith('/') && !location.startsWith('//')
+        ? location
+        : null;
 ```
 
-Accept only your own paths from `from` (a leading `/`, not `//`) if anything outside the app can
+Accept only your own paths from `from` (a leading `/`, not `//`): anything outside the app can
 write the link.
 
 **Important**: When using guards, you must provide `routerState` to `DwAppRouter`:
