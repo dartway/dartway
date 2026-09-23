@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.1
+
+- **The web image installs the Flutter the project's `.fvmrc` names** (D-082). The skeleton's build stage cloned nothing and started `FROM ghcr.io/cirruslabs/flutter:3.44.0`, while the skeleton pins 3.47.2, which no image publishes: Flutter pins some of the packages an app resolves, so the image's `pub get --enforce-lockfile` refused every new project's lock. A new local check, `web-flutter-version` (error), compares an image built `FROM` a Flutter image with `.fvmrc`. Migration note: `docs/migrations/2026-09-23-web-image-flutter-from-fvmrc.md`.
+
+- **The web image grants everyone read on the files it serves** (#292). The skeleton's `Dockerfile` runs `chmod -R a+rX build/web` after the build: `COPY` keeps modes, and under a deploy user's umask of `077` the assets a commit added were served as 403 while every page answered 200. A new local check, `web-file-modes` (warning), names a web image that leaves the modes to the build host. Migration note: `docs/migrations/2026-09-23-web-image-file-modes.md`.
+- **Deploy ssh sessions notice a dead connection** (#286): every `ssh` and `scp` call opens with `ServerAliveInterval=30` and `ServerAliveCountMax=4`. A step is watched through one session that is silent while a web build runs; a NAT dropped it, and the CLI waited for an hour on a step that had long finished. A connection lost now ends within two minutes, and the watch reconnects and reads the step's result.
+- **A project without `pubspec.lock` is told to resolve, not to edit its images** (#278). `locked-dependencies` said "add `--enforce-lockfile`" to a project whose Dockerfiles carry it — the first deploy of a project nobody has resolved yet, since `dartway create` does not copy the skeleton's lock. It now says to run `pub get` in both packages and commit the locks.
+
 ## 0.11.0 — DartWay 1.0
 
 **Breaking:** `dartway deploy secret …` is now `dartway secret …` (D-078).

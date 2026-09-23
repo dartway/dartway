@@ -38,3 +38,25 @@ jobs:
 
       - run: flutter build web --release
         working-directory: example/dartway_example_flutter
+
+  floor:
+    # The floor the framework promises (`flutter: '>=3.44.0'`, D-081, D-082):
+    # the skeleton compiled on the oldest Flutter it claims. Everything else in
+    # CI runs on the pin, so without this job the floor is a sentence nobody
+    # checks. Resolved without the committed lock, which the pin wrote.
+    name: template on the floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+
+      - run: rm pubspec.lock && flutter pub get
+        working-directory: template/dartway_starter_flutter
+
+      - run: flutter build web --release
+        working-directory: template/dartway_starter_flutter

@@ -58,20 +58,36 @@ class DwSshRunner {
 
   String get target => '$user@$host';
 
-  List<String> get _baseArgs => [
+  /// How often an established connection asks the server whether it is still
+  /// there, and how many unanswered asks end it: a dead connection is noticed
+  /// within two minutes.
+  ///
+  /// `ConnectTimeout` covers opening a connection, not one that goes quiet.
+  /// A deployment step is watched through one long session that is silent by
+  /// design while a web build runs for tens of minutes; a NAT dropped it, and
+  /// without keepalives the CLI waited for an hour on a step that had long
+  /// finished (#286).
+  static const serverAliveIntervalSeconds = 30;
+  static const serverAliveCountMax = 4;
+
+  /// The options every `ssh` and `scp` call opens its connection with.
+  List<String> get connectionOptions => [
     // Never prompt: a check that blocks waiting for a passphrase is worse
     // than one that fails.
     '-o', 'BatchMode=yes',
     '-o', 'StrictHostKeyChecking=accept-new',
     '-o', 'ConnectTimeout=$connectTimeoutSeconds',
+    '-o', 'ServerAliveInterval=$serverAliveIntervalSeconds',
+    '-o', 'ServerAliveCountMax=$serverAliveCountMax',
     if (identityFile != null) ...[
       '-i',
       identityFile!,
       '-o',
       'IdentitiesOnly=yes',
     ],
-    target,
   ];
+
+  List<String> get _baseArgs => [...connectionOptions, target];
 
   /// Runs [command] through the remote shell and captures its output.
   Future<DwSshResult> run(String command) async {
@@ -159,22 +175,7 @@ class DwSshRunner {
 
   /// Copies a local file to [remotePath] on the target.
   Future<DwSshResult> upload(String localPath, String remotePath) async {
-    final args = [
-      '-o',
-      'BatchMode=yes',
-      '-o',
-      'StrictHostKeyChecking=accept-new',
-      '-o',
-      'ConnectTimeout=$connectTimeoutSeconds',
-      if (identityFile != null) ...[
-        '-i',
-        identityFile!,
-        '-o',
-        'IdentitiesOnly=yes',
-      ],
-      localPath,
-      '$target:$remotePath',
-    ];
+    final args = [...connectionOptions, localPath, '$target:$remotePath'];
     try {
       final result = await Process.run('scp', args);
       return DwSshResult(

@@ -135,6 +135,22 @@ void main() {
     // The example asks for framework versions that are not published yet, and
     // its overrides point outside any build context.
     vendorFramework(project: project, monorepo: monorepo);
+    // Vendoring moves the overrides, so the locks name paths that are gone;
+    // the images build `--enforce-lockfile`, and a project resolves before it
+    // deploys (#278).
+    for (final (package, tool) in [
+      ('dartway_example_shared', 'dart'),
+      ('dartway_example_server', 'dart'),
+      ('dartway_example_flutter', 'flutter'),
+    ]) {
+      final resolved = await Process.run(tool, [
+        'pub',
+        'get',
+      ], workingDirectory: p.join(project.path, package));
+      if (resolved.exitCode != 0) {
+        throw StateError('$tool pub get in $package: ${resolved.stderr}');
+      }
+    }
 
     final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     port = socket.port;
@@ -187,6 +203,7 @@ void main() {
       appDir: appDir,
       storeDir: p.join(root.path, 'store'),
       probe: probe,
+      buildContext: project.path,
     );
 
     final store = runner.store;

@@ -123,6 +123,18 @@ jobs:
           dart run tool/vendor_framework.dart \
             "$RUNNER_TEMP/create/imagecheck" "$GITHUB_WORKSPACE"
 
+      - name: Resolve the project, as its developer has by the first deploy
+        # `dartway create` does not copy the skeleton's lock, so a project
+        # resolves for itself; the Dockerfiles build with `--enforce-lockfile`,
+        # so an image of an unresolved project fails before reaching anything
+        # this job asks about (#278). Resolved after vendoring, so the lock
+        # names the packages under test.
+        run: |
+          cd "$RUNNER_TEMP/create/imagecheck"
+          (cd imagecheck_shared && dart pub get)
+          (cd imagecheck_server && dart pub get)
+          (cd imagecheck_flutter && flutter pub get)
+
       # Kept as instrumentation, not ceremony: see the note on the matrix.
       - name: Disk before the build
         run: df -h /

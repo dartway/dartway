@@ -58,6 +58,7 @@ class DwDeployRunner {
     String? storeDir,
     DwOutsideProbe? probe,
     this.remote,
+    this.buildContext = '.',
   }) : appDir = appDir ?? stack.target.appDir,
        store = DwSecretStore(
          ssh: ssh,
@@ -74,6 +75,12 @@ class DwDeployRunner {
 
   final DwSecretStore store;
   final DwOutsideProbe probe;
+
+  /// Where the rendered compose file builds the images from, relative to
+  /// [appDir]: the checkout itself on a server. The local stack proof builds
+  /// from a copy of the project elsewhere, and the stack is rendered again on
+  /// every run (D-075), so the runner has to know it rather than the file.
+  final String buildContext;
 
   /// Runs every step detached from the connection, when set — see
   /// [DwRemoteSteps]. Without it a step lives as long as its `ssh` call, which
@@ -144,7 +151,7 @@ class DwDeployRunner {
   /// bind-mounted, and replacing the file would leave the container holding
   /// the old one.
   Future<DwSshResult> renderStack() {
-    final renderer = DwStackRenderer(stack: stack);
+    final renderer = DwStackRenderer(stack: stack, buildContext: buildContext);
     return _as(
       "cd '$appDir'\n"
       '${_renderFileScript(DwComposeFiles.rendered, renderer.composeFile)}\n'
