@@ -103,28 +103,28 @@ packages:
       path: "../../dartway_client"
       relative: true
     source: path
-    version: "0.20.0-dev.2"
+    version: "0.20.0-dev.3"
   dartway_core_flutter:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "0.20.0-dev.2"
+    version: "0.20.0-dev.3"
   dartway_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../dartway_core_shared"
       relative: true
     source: path
-    version: "0.20.0-dev.2"
+    version: "0.20.0-dev.3"
   dartway_router:
     dependency: "direct overridden"
     description:
       path: "../../dartway_router"
       relative: true
     source: path
-    version: "1.1.2"
+    version: "2.0.0"
   fake_async:
     dependency: transitive
     description:

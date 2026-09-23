@@ -1,6 +1,10 @@
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
+import 'package:dartway_starter_flutter/dartway_starter_app.dart';
 import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../support/app_test_app.dart';
 
@@ -88,6 +92,39 @@ void main() {
     expect(verify.registration, isEmpty);
     expect(find.text('Hello, Vera'), findsOneWidget);
     expect(app.logs, isEmpty);
+
+    await app.stop(tester);
+  });
+
+  testWidgets('a link opened without a session ends where it pointed, '
+      'after signing in', (tester) async {
+    final fake = FakeApp();
+    fake.server
+      ..onCommand<DwRequestCode>((command, call) => DwCallOk(ticket('t-1')))
+      ..onCommand<DwVerifyCode>((command, call) => const DwCallOk(testSession));
+    final app = await TestApp.start(tester, fake, session: null);
+    final router = ProviderScope.containerOf(
+      tester.element(find.byType(AppRoot)),
+    ).read(appRouterProvider).router;
+
+    router.go(AppNavigationZone.profile.fullPath);
+    await app.settle(tester);
+    expect(find.text('Get a code'), findsOneWidget);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.queryParameters['from'],
+      AppNavigationZone.profile.fullPath,
+    );
+
+    await app.enter(tester, find.byType(TextField), '+7 999 000-00-02');
+    await app.tap(tester, find.text('Get a code'));
+    await app.enter(tester, find.byType(TextField), '111111');
+    await app.tap(tester, find.text('Continue'));
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      AppNavigationZone.profile.fullPath,
+    );
+    expect(find.text('Sign out'), findsOneWidget);
 
     await app.stop(tester);
   });

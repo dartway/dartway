@@ -26,6 +26,7 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
 
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-    (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
+    (state, target) =>
+        state.isSignedIn ? null : AuthNavigationZone.signInFrom(target),
   ];
 }

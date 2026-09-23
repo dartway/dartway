@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.3
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.
+
 ## 0.20.0-dev.2
 
 - **A migration is written with `// dart format off` as its first line** (#291). The checksum ignores whitespace, not the trailing commas `dart format` adds and removes as it wraps, so `dart format lib` broke the seal of every migration it reached and the server refused to start. `create` formats the draft, then marks it, then seals it; the formatter skips a marked file, `--set-exit-if-changed` included. Migrations created earlier are not touched — adding the line is an edit too. `check` on a changed file now says what to do when the migration is applied somewhere: restore it, not `rehash` it.

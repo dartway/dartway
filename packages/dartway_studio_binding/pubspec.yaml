@@ -24,7 +24,7 @@ dependencies:
   # a DwAppRouter concept — the reason this is a package of its own rather than
   # a corner of core_flutter, where the dependency would reach apps that never
   # open Studio.
-  dartway_router: ^1.1.2
+  dartway_router: ^2.0.0
   # The wire. Both this package and Studio depend on it; its version means the
   # protocol, which is why host-side changes do not belong there.
   dartway_studio_bridge: ^0.9.0

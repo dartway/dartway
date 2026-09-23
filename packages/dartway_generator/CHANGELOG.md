@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.3
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.
+
 ## 0.20.0-dev.2
 
 - **A `Duration` default is read on Dart 3.13**, where the SDK moved the length of a `Duration` constant from `_duration` to `inMicroseconds`: a DTO field defaulting to a `Duration` stopped generation with "the Duration could not be read". Both fields are read, since the family's floor is Dart 3.11.

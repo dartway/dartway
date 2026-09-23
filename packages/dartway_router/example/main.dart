@@ -64,7 +64,11 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-        (session) => session.isLoggedIn ? AppRoutes.catalog.fullPath : null,
+        // Signed in: on to where the app zone turned them away from, if
+        // anywhere.
+        (session, target) => session.isLoggedIn
+            ? target.uri.queryParameters['from'] ?? AppRoutes.catalog.fullPath
+            : null,
       ];
 }
 
@@ -126,7 +130,13 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-        (session) => !session.isLoggedIn ? AuthRoutes.auth.fullPath : null,
+        // Signed out: to sign-in, remembering where they were going.
+        (session, target) => session.isLoggedIn
+            ? null
+            : Uri(
+                path: AuthRoutes.auth.fullPath,
+                queryParameters: {'from': target.location},
+              ).toString(),
       ];
 }
 

@@ -87,7 +87,7 @@ packages:
       path: "../../packages/dartway_core_shared"
       relative: true
     source: path
-    version: "0.20.0-dev.2"
+    version: "0.20.0-dev.3"
   file:
     dependency: transitive
     description:

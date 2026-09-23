@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.3
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.
+
 ## 0.20.0-dev.2
 
 - **`ctx.files.describe(fileIds)`** (#285): what the confirmed files among the ids are, as `DwStoredFile`s — name, size, content type, purpose, a public file's URL — in one query. A screen listing what rows hold read `dw_stored_file` with SQL for it, bound to columns that are the framework's. `delete` now says it is also how a confirmed file nothing references is let go of.

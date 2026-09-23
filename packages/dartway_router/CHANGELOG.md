@@ -1,3 +1,9 @@
+## 2.0.0 - 2026-09-23
+
+### Breaking
+
+**A zone guard is told where the person was going** (#288). `DwNavigationGuard` takes a second argument, a `DwNavigationTarget` — the location asked for (`uri`, `location`), the route's name and its path parameters — so a guard that turns someone away can name the place: "sign in, then back to `/orders/42`". The guard could only answer no, and `options.redirect`, which sees the destination, never runs once a guard has answered: the two did not compose. Every guard gains the parameter: `(state) => …` becomes `(state, target) => …`, or `(state, _) => …`.
+
 ## 1.1.2 - 2026-08-19
 
 ### Fixed

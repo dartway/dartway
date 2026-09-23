@@ -1,6 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+/// Where a navigation was going when a guard is asked about it.
+///
+/// A guard that turns someone away can name the place it turned them away
+/// from — the one thing "back to it after signing in" needs (#288). The
+/// router's own value rather than go_router's `GoRouterState`: a guard needs
+/// the address, not the transport's whole state.
+final class DwNavigationTarget {
+  const DwNavigationTarget({
+    required this.uri,
+    this.routeName,
+    this.pathParameters = const {},
+  });
+
+  /// The location asked for, query included: `/orders/42?tab=items`.
+  final Uri uri;
+
+  /// The name of the route it resolves to; `null` for a location no route
+  /// of this router names.
+  final String? routeName;
+
+  /// The route's path parameters: `{'id': '42'}` for `/orders/:id`.
+  final Map<String, String> pathParameters;
+
+  /// [uri] as a string, to hand back to `go` later.
+  String get location => uri.toString();
+
+  @override
+  bool operator ==(Object other) =>
+      other is DwNavigationTarget &&
+      other.uri == uri &&
+      other.routeName == routeName &&
+      _sameEntries(other.pathParameters, pathParameters);
+
+  @override
+  int get hashCode => Object.hash(
+    uri,
+    routeName,
+    Object.hashAllUnordered(
+      pathParameters.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
+  );
+
+  @override
+  String toString() => 'DwNavigationTarget($location)';
+
+  static bool _sameEntries(Map<String, String> a, Map<String, String> b) =>
+      a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
+}
+
 /// Type definition for navigation guards.
 ///
 /// A guard is a function that can redirect navigation based on the router state.
@@ -9,24 +58,25 @@ import 'package:go_router/go_router.dart';
 /// intended route.
 ///
 /// Guards receive the [RouterState] instance (which extends [Listenable]) and
-/// can check authentication, permissions, or any other condition.
+/// can check authentication, permissions, or any other condition — and the
+/// [DwNavigationTarget] being entered, so a guard that says no can say where
+/// the person was going.
 ///
 /// Return `null` to allow navigation to proceed, or return a path string to
 /// redirect to a different route.
 ///
-/// Example:
+/// Example — a sign-in gate that brings the person back afterwards:
 /// ```dart
 /// List<DwNavigationGuard<AppSession>> get zoneGuards => [
-///   (session) {
-///     if (!session.isAuthenticated) {
-///       return '/login';
-///     }
-///     return null; // Allow navigation
-///   },
+///   (session, target) => session.isAuthenticated
+///       ? null
+///       : Uri(path: '/login', queryParameters: {'from': target.location})
+///           .toString(),
 /// ];
 /// ```
 typedef DwNavigationGuard<RouterState extends Listenable> = String? Function(
   RouterState refreshListenable,
+  DwNavigationTarget target,
 );
 
 /// Type definition for shell route page builders.

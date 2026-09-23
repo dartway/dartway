@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.3
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.
+
 ## 0.20.0-dev.2
 
 - **An upload can be cancelled** (#284): `files.upload(cancel:)` takes a future; when it completes before the confirmation is sent, the put is aborted — mid-transfer, before the ticket answers, or during the wait before a retry — nothing is confirmed, and the upload ends with `DwUploadCancelledException`. The ticket stays unfinished, and the server's cleanup removes it with whatever bytes arrived: a cancelled gigabyte no longer finishes on its own and stays in the bucket.

@@ -95,7 +95,6 @@ final class DwFirstAdministrator extends DwStartupStep {
 
   final Map<String, String>? _environment;
 
-
   Map<String, String> get _values => _environment ?? Platform.environment;
 
   String get _declared => (_values[variable] ?? '').trim();
@@ -111,7 +110,7 @@ final class DwFirstAdministrator extends DwStartupStep {
     if (auth.normalize(kind, declared) != null) return const [];
     return [
       '$variable is not an identifier this project accepts: "$declared" '
-      '(read as a ${kind.name})',
+          '(read as a ${kind.name})',
     ];
   }
 

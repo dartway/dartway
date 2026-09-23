@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.3
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.
+
 ## 0.20.0-dev.2
 
 - **`DwIdentifierKind.of(identifier)`** (#283): the framework's one rule for which kind an identifier is — an `@` makes it an e-mail, anything else a phone. It lived as private copies in `DwFirstAdministrator`, the Studio binding and the skeleton, and every app signing in from a stored identifier wrote a fourth.

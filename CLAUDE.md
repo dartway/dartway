@@ -18,7 +18,7 @@ DartWay 1.0 is the framework rebuilt on a stack it owns end to end, on one branc
 
 ## Monorepo map
 
-The core family moves in lockstep (one version, `0.20.0-dev.2`, across all six); every other package is a satellite with a version of its own (D-030, D-032).
+The core family moves in lockstep (one version, `0.20.0-dev.3`, across all six); every other package is a satellite with a version of its own (D-030, D-032).
 
 | Folder | Role |
 |---|---|
