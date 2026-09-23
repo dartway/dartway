@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartway_client/dartway_client.dart';
 import 'package:flutter/foundation.dart';
 
@@ -114,6 +116,9 @@ class DwUploadNotifier extends ValueNotifier<DwUploadState> {
   /// Whether an upload is running; another one is refused meanwhile.
   bool get isBusy => value is DwUploadProgress;
 
+  /// Completed by [cancel] to stop the running upload.
+  Completer<void>? _cancel;
+
   /// Uploads [source] and answers the file, or `null` when the upload ended
   /// in [DwUploadError] — the state says why. Throws [StateError] while
   /// another upload of this notifier runs.
@@ -127,6 +132,7 @@ class DwUploadNotifier extends ValueNotifier<DwUploadState> {
       throw StateError('This DwUploadNotifier is already uploading.');
     }
     _set(DwUploadProgress(0, source.byteSize));
+    final cancel = _cancel = Completer<void>();
     try {
       final result = await files.upload(
         purpose,
@@ -134,6 +140,7 @@ class DwUploadNotifier extends ValueNotifier<DwUploadState> {
         fileName: fileName,
         contentType: contentType,
         onProgress: (sent, total) => _set(DwUploadProgress(sent, total)),
+        cancel: cancel.future,
       );
       switch (result) {
         case DwCallOk(:final value):
@@ -149,6 +156,9 @@ class DwUploadNotifier extends ValueNotifier<DwUploadState> {
           _set(DwUploadError(error, stackTrace));
           onError?.call(error, stackTrace);
       }
+    } on DwUploadCancelledException {
+      // Asked for: back to idle, with nothing to report.
+      _set(const DwUploadIdle());
     } catch (error, stackTrace) {
       _set(DwUploadError(error, stackTrace));
       final expected = switch (error) {
@@ -159,8 +169,25 @@ class DwUploadNotifier extends ValueNotifier<DwUploadState> {
         _ => false,
       };
       if (!expected) onError?.call(error, stackTrace);
+    } finally {
+      _cancel = null;
     }
     return null;
+  }
+
+  /// Stops the running upload: the transfer is aborted, nothing is confirmed,
+  /// [upload] answers `null` and the state goes back to [DwUploadIdle]. The
+  /// ticket stays unfinished, and the server's cleanup removes it with
+  /// whatever bytes arrived — so a user who changes their mind does not leave
+  /// a gigabyte in the bucket (#284). Does nothing when no upload runs, or
+  /// once the upload is being confirmed and the file is already theirs.
+  ///
+  /// [dispose] does not cancel: an upload still running when the screen goes
+  /// away finishes, and whoever awaits [upload] gets the file. A screen that
+  /// wants its upload gone with it calls [cancel] first.
+  void cancel() {
+    final cancel = _cancel;
+    if (cancel != null && !cancel.isCompleted) cancel.complete();
   }
 
   /// Back to [DwUploadIdle] — after the result was used, or to dismiss an

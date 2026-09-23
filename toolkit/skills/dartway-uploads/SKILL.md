@@ -231,6 +231,14 @@ request (reads have no side effects), and answers whether the file existed.
 **Delete the file a command replaces or clears**; otherwise it stays in the bucket for ever, owned
 by nobody. The foreign key's `onDelete` decides what happens to rows still pointing at it.
 
+**A file uploaded and then abandoned** — a page left without saving — is confirmed and held by no
+row, and no framework cleanup takes it: the framework does not know which rows reference a file.
+When the flow allows it, give the app a command that releases it: `requireOwned` (it is the
+caller's), check that no row holds it, then `ctx.files.delete`.
+
+**Name, size or type of files a list shows** (`intro.mp4 · 894 MB`): `ctx.files.describe(fileIds)`,
+one query for the page — never read `dw_stored_file` with SQL; its columns are the framework's.
+
 **The server works on a file itself with `ctx.files.read(fileId)`, `ctx.files.readLink(fileId)` and
 `ctx.files.store(purpose, accountId:, bytes:, contentType:, fileName:)`** — a model reading a private
 photo, a generated image kept for its owner. They ask no `canRead`/`canUpload`: the server is the
@@ -280,6 +288,10 @@ return dw.command(AttachInvoiceScan(invoiceId: invoiceId, scanFileId: file.id));
 - **Picking the file is the app's**: the framework carries no picker plugin. Take the content type
   from the picker (fall back to the extension), and check the size against the shared constant
   before uploading when the picker can say it.
+- **A user who changes their mind**: `uploader.cancel()` aborts the transfer and confirms nothing;
+  `upload` answers `null` and the state is `DwUploadIdle` again. The server's cleanup takes the
+  unfinished ticket and its bytes. Offer it on any upload large enough to watch; `dispose()` does
+  not cancel.
 - **Retries are built in**: the put is retried after network failures, stalls and storage's
   transient answers for as long as the ticket is valid; an attempt whose answer was lost is
   recognised on the retry. Do not wrap it in a retry of your own.

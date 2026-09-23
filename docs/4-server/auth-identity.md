@@ -124,7 +124,7 @@ Registered by the framework in every server; a project may not register handlers
 
 | Command | Access | Result | What it does |
 |---|---|---|---|
-| `DwRequestCode(kind, identifier)` | anonymous | `DwCodeTicket` | normalizes, applies the limits, creates a ticket and delivers the code |
+| `DwRequestCode(kind, identifier)` | anonymous | `DwCodeTicket` | normalizes, applies the limits, creates a ticket and delivers the code. `DwIdentifierKind.of(identifier)` is the framework's one rule for the kind — an `@` makes it an e-mail, anything else a phone; it sorts and does not validate, `normalize` does |
 | `DwVerifyCode(ticketId, code, registration)` | anonymous | `DwAuthSession` | checks the code; creates the account when the identifier has none; makes an `app` session key |
 | `DwSignOut()` | signed in | none | revokes the caller's session key |
 | `DwDeleteMyAccount()` | signed in | none | deletes the caller's account — see below |

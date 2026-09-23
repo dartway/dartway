@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Signs in with `DwIdentifierKind.of`** (#283) instead of a copy of the rule of its own.
 - **`DwStudioUser` compares by value.** The README builds it inside a `select`,
   which keeps what it produces only while it stays equal to the last one:
   without `==` every emission of the profile was a new person, and with it went

@@ -192,7 +192,8 @@ A row references a file by id (`avatarFileId`). `ctx.files` is the `DwFileServic
 |---|---|
 | `requireOwned(fileId, purpose, {field})` | the caller's confirmed file of that purpose as a `DwStoredFile`; otherwise refuses `dw.fileNotOwned` on `field` — one code whether the file is absent, someone else's, unfinished or of another purpose, so a caller learns nothing about files that are not theirs |
 | `publicUrls(fileIds)` | the URLs of the confirmed public files among the ids, in one query; private, unfinished and absent ids are not in the answer |
-| `delete(fileId)` | deletes the row in the caller's transaction and enqueues the object's deletion in the same transaction — retried until storage confirms, so a crash after the commit cannot leave the object behind. Answers whether the file existed. Throws in a request |
+| `describe(fileIds)` | what the confirmed files among the ids are — `DwStoredFile`s with name, size, content type, purpose and a public file's URL — in one query; unfinished and absent ids are not in the answer. The server's view: no `canRead` is asked, the handler decides who is told. For a screen that lists what rows hold (`intro.mp4 · 894 MB`) without reading `dw_stored_file` by hand |
+| `delete(fileId)` | deletes the row in the caller's transaction and enqueues the object's deletion in the same transaction — retried until storage confirms, so a crash after the commit cannot leave the object behind. Answers whether the file existed. Throws in a request. It is also how a confirmed file nothing references is let go of — an upload finished on a page the user left without saving: the framework does not know which rows reference a file, so the project's own command checks the caller uploaded it and nothing holds it, then deletes it |
 
 **Check every file id a client sends.** A file id is a number anyone can type; without
 `requireOwned`, a member could put someone else's private document on their own profile. From the
@@ -304,8 +305,9 @@ where nothing could find them. Delete an account's files through `ctx.files` fir
 
 - **No multipart upload**: one `PUT` per file, so the storage's single-request limit is the largest
   file.
-- **No cancel**: an abandoned upload stays pending until its ticket expires, counts against
-  `maxPendingUploads` until then, and is removed by cleanup after its grace.
+- **No sweep of confirmed files nothing references**: the framework does not know which rows hold
+  a file id. An upload cancelled in the app (`DwUploadNotifier.cancel`) is never confirmed and goes
+  with the cleanup above; one confirmed and then abandoned is the project's to `delete`.
 - **Browser uploads are cross-origin** to the storage, so both buckets' CORS configuration must
   allow `PUT` from the app's origin with the headers `content-type` and `if-none-match`. The
   framework does not configure it, and no test covers a browser upload (D-035).

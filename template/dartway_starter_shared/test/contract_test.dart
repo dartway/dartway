@@ -134,11 +134,6 @@ void main() {
   });
 
   group('AuthIdentifier', () {
-    test('sorts by the at sign', () {
-      expect(AuthIdentifier.kindOf('a@b.co'), DwIdentifierKind.email);
-      expect(AuthIdentifier.kindOf('+7 999'), DwIdentifierKind.phone);
-    });
-
     test('stores a phone as digits, a trunk 8 as the country code 7', () {
       const phone = DwIdentifierKind.phone;
       expect(
@@ -168,7 +163,7 @@ void main() {
 
     test('is idempotent', () {
       for (final raw in ['+7 999 000-00-01', ' Ann@Example.com ']) {
-        final kind = AuthIdentifier.kindOf(raw);
+        final kind = DwIdentifierKind.of(raw);
         final once = AuthIdentifier.normalize(kind, raw)!;
         expect(AuthIdentifier.normalize(kind, once), once);
       }

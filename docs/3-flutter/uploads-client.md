@@ -97,6 +97,14 @@ the screen owns and disposes.
 tells you first). An upload still running when the screen is disposed finishes on its own; its states
 are no longer published.
 
+**`cancel()` stops the running upload**: the transfer is aborted, nothing is confirmed, `upload`
+answers `null` and the state goes back to `DwUploadIdle` — nothing is reported. The ticket stays
+unfinished, and the server's cleanup removes it with whatever bytes arrived, so a user who changes
+their mind about a gigabyte does not leave it in the bucket. Once the confirmation is sent the file is
+theirs, and `cancel()` changes nothing. `dispose()` does not cancel: a screen that wants its upload
+gone with it calls `cancel()` first. Underneath, `client.files.upload(cancel:)` takes a future that
+ends the upload when it completes, with `DwUploadCancelledException`.
+
 **What goes to error reporting, and what stays on screen.** The notifier created by `dw.uploader()`
 reports to the app's error pipeline (`DwErrorSource.client`) only what an operator must see: a server
 failure, storage **rejecting** an upload (`DwUploadFailure.rejected` — a bucket misconfiguration), or an
