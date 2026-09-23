@@ -54,7 +54,7 @@ enum RoutesWithGuards implements DwNavigationRoute<TestRouterState> {
 
   @override
   List<DwNavigationGuard<TestRouterState>> get zoneGuards => [
-        (state) => null,
+        (state, target) => null,
       ];
 }
 
@@ -84,6 +84,64 @@ enum NestedRoutes implements DwNavigationRoute<TestRouterState> {
 
   @override
   List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+}
+
+/// Every target the vault's guard was asked about.
+final vaultTargets = <DwNavigationTarget>[];
+
+// A zone behind a sign-in gate that remembers where the person was going.
+enum VaultRoutes implements DwNavigationRoute<TestRouterState> {
+  vault(DwNavigationRouteDescriptor.zoneRoot(pageWidget: ProfilePage()));
+
+  const VaultRoutes(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => 'vault';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [
+        (state, target) {
+          vaultTargets.add(target);
+          return state.isAuthorized
+              ? null
+              : Uri(path: '/sign-in', queryParameters: {'from': target.location})
+                  .toString();
+        },
+      ];
+}
+
+// The sign-in zone: once signed in, back to where the vault turned them away.
+enum SignInRoutes implements DwNavigationRoute<TestRouterState> {
+  signIn(DwNavigationRouteDescriptor.zoneRoot(pageWidget: AuthPage()));
+
+  const SignInRoutes(this.descriptor);
+
+  @override
+  final DwNavigationRouteDescriptor<TestRouterState> descriptor;
+
+  @override
+  String get zoneRoot => 'sign-in';
+
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+
+  @override
+  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [
+        (state, target) =>
+            state.isAuthorized ? target.uri.queryParameters['from'] : null,
+      ];
 }
 
 // Test routes
@@ -329,6 +387,43 @@ void main() {
       );
 
       expect(router.router, isA<GoRouter>());
+    });
+
+    testWidgets('a guard is told where the person was going, and can bring '
+        'them back after signing in (#288)', (tester) async {
+      vaultTargets.clear();
+      final routerState = TestRouterState();
+      final router = DwAppRouter<TestRouterState>(
+        navigationZones: [TestRoutes.values, VaultRoutes.values, SignInRoutes.values],
+        pageBuilder: DwPageBuilder.material,
+        routerState: routerState,
+      );
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router.router));
+      await tester.pumpAndSettle();
+
+      router.router.go('/vault?tab=items');
+      await tester.pumpAndSettle();
+      expect(find.text('Auth'), findsOneWidget);
+      expect(
+        vaultTargets.first,
+        DwNavigationTarget(
+          uri: Uri.parse('/vault?tab=items'),
+          routeName: 'vault',
+        ),
+      );
+      expect(
+        router.router.routerDelegate.currentConfiguration.uri
+            .queryParameters['from'],
+        '/vault?tab=items',
+      );
+
+      routerState.authorize();
+      await tester.pumpAndSettle();
+      expect(find.text('Profile'), findsOneWidget);
+      expect(
+        router.router.routerDelegate.currentConfiguration.uri.toString(),
+        '/vault?tab=items',
+      );
     });
 
     group('topRouteFromState', () {

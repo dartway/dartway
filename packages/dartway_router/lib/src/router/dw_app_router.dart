@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../navigation_zones/dw_navigation_route.dart';
 import '../navigation_zones/dw_navigation_route_extension.dart';
+import '../navigation_zones/dw_navigation_types.dart';
 import 'dw_go_router_options.dart';
 
 class DwAppRouter<RouterState extends Listenable> {
@@ -172,9 +173,14 @@ class DwAppRouter<RouterState extends Listenable> {
         if (targetRoute != null &&
             targetRoute.zoneGuards.isNotEmpty &&
             routerState != null) {
+          final target = DwNavigationTarget(
+            uri: state.uri,
+            routeName: state.topRoute?.name,
+            pathParameters: state.pathParameters,
+          );
           // Execute guards in order until one returns a redirect path
           for (final guard in targetRoute.zoneGuards) {
-            final redirectPath = guard(routerState!);
+            final redirectPath = guard(routerState!, target);
             if (redirectPath != null) {
               return redirectPath;
             }

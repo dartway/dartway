@@ -64,9 +64,21 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-        (session) => session.isLoggedIn ? AppRoutes.catalog.fullPath : null,
+        // Signed in: on to where the app zone turned them away from — one of
+        // the app's own paths, whatever else the link says.
+        (session, target) => session.isLoggedIn
+            ? _ownPath(target.uri.queryParameters['from']) ??
+                AppRoutes.catalog.fullPath
+            : null,
       ];
 }
+
+/// [location] when it is one of this app's own paths: a leading `/`, not `//`
+/// — anything outside the app can write the link.
+String? _ownPath(String? location) =>
+    location != null && location.startsWith('/') && !location.startsWith('//')
+        ? location
+        : null;
 
 // -----------------------------------------------------------------------------
 // Routes: app zone (protected by guard)
@@ -126,7 +138,13 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-        (session) => !session.isLoggedIn ? AuthRoutes.auth.fullPath : null,
+        // Signed out: to sign-in, remembering where they were going.
+        (session, target) => session.isLoggedIn
+            ? null
+            : Uri(
+                path: AuthRoutes.auth.fullPath,
+                queryParameters: {'from': target.location},
+              ).toString(),
       ];
 }
 

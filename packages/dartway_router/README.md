@@ -120,7 +120,7 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-    (session) {
+    (session, target) {
       if (!session.isAuthenticated) {
         return AuthRoutes.login.fullPath;
       }
@@ -300,7 +300,7 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-    (session) {
+    (session, target) {
       if (!session.isAuthenticated) {
         return AuthRoutes.login.fullPath;
       }
@@ -309,6 +309,31 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
   ];
 }
 ```
+
+A guard receives the router state and the `DwNavigationTarget` being entered — `uri`, `location`,
+`routeName` and `pathParameters` — so a guard that turns someone away can say where they were going.
+Back to a link after signing in:
+
+```dart
+// The protected zone: remember where the person was going.
+(session, target) => session.isAuthenticated
+    ? null
+    : Uri(path: AuthRoutes.login.fullPath, queryParameters: {'from': target.location})
+        .toString(),
+
+// The sign-in zone: once signed in, go on to it — if it is one of the app's own paths.
+(session, target) => session.isAuthenticated
+    ? ownPath(target.uri.queryParameters['from']) ?? AppRoutes.home.fullPath
+    : null,
+
+String? ownPath(String? location) =>
+    location != null && location.startsWith('/') && !location.startsWith('//')
+        ? location
+        : null;
+```
+
+Accept only your own paths from `from` (a leading `/`, not `//`): anything outside the app can
+write the link.
 
 **Important**: When using guards, you must provide `routerState` to `DwAppRouter`:
 
@@ -621,7 +646,7 @@ Abstract interface for navigation routes. Routes are defined as enums implementi
 - `shellRouteBuilder` - Simple shell builder (state not preserved across tabs)
 - `statefulShellRouteBuilder` - Stateful shell builder (state preserved per branch)
 - `shellRouteBuilder` - Optional shell route builder
-- `zoneGuards` - List of navigation guards
+- `zoneGuards` - List of navigation guards, each `(routerState, DwNavigationTarget target) => String?`
 
 #### `DwNavigationRouteDescriptor<RouterState>`
 

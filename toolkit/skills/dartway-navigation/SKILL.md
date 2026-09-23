@@ -75,13 +75,22 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   /// A guard returns a redirect path, or null if access is allowed. That way no
-  /// screen in the zone checks authorization on its own.
+  /// screen in the zone checks authorization on its own. It is told the
+  /// `DwNavigationTarget` being entered, so a sign-in gate remembers where the
+  /// person was going.
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-        (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
+        (state, target) =>
+            state.isSignedIn ? null : AuthNavigationZone.signInFrom(target),
       ];
 }
 ```
+
+**Back to the link after signing in is already wired**: `AuthNavigationZone.signInFrom(target)`
+sends a signed-out person to sign-in with `?from=<where they were going>`, and the auth zone's
+guard sends them on once signed in. A gate into a new zone uses `signInFrom`, not
+`AuthNavigationZone.auth.fullPath`; the sign-in screen never navigates after signing in on its own,
+or the link is lost.
 
 A role-specific zone — the same guards, one after another:
 
@@ -91,10 +100,11 @@ A role-specific zone — the same guards, one after another:
 
   @override
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-        (state) => !state.isSignedIn ? AuthNavigationZone.auth.fullPath : null,
+        (state, target) =>
+            state.isSignedIn ? null : AuthNavigationZone.signInFrom(target),
         // Only once the role is known: an admin opening /admin while the
         // profile is still loading must not be sent away for it.
-        (state) => state.role != null && state.role != UserRole.admin
+        (state, _) => state.role != null && state.role != UserRole.admin
             ? AppNavigationZone.home.fullPath
             : null,
       ];

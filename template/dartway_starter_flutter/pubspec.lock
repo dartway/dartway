@@ -222,21 +222,21 @@ packages:
       path: "../../packages/dartway_client"
       relative: true
     source: path
-    version: "0.20.0-dev.2"
+    version: "0.20.0-dev.3"
   dartway_core_flutter:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_core_flutter"
       relative: true
     source: path
-    version: "0.20.0-dev.2"
+    version: "0.20.0-dev.3"
   dartway_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_core_shared"
       relative: true
     source: path
-    version: "0.20.0-dev.2"
+    version: "0.20.0-dev.3"
   dartway_lints:
     dependency: "direct dev"
     description:
@@ -250,7 +250,7 @@ packages:
       path: "../../packages/dartway_router"
       relative: true
     source: path
-    version: "1.1.2"
+    version: "2.0.0"
   dartway_shared_preferences:
     dependency: "direct main"
     description:

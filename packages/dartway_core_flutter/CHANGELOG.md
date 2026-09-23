@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.3
+
+- **BREAKING: re-exports `dartway_router` 2.0.0** (#288): a zone guard takes the `DwNavigationTarget` it is asked about — `(state) => …` becomes `(state, target) => …`. The skeleton's gates use it to bring a person back to the link they opened after signing in. Migration note: `docs/migrations/2026-09-23-zone-guard-target.md`.
+
 ## 0.20.0-dev.2
 
 - **`DwUploadNotifier.cancel()`** (#284): stops the running upload — the transfer is aborted, nothing is confirmed, `upload` answers `null`, the state goes back to `DwUploadIdle`, and nothing is reported. `dispose()` still does not cancel.
