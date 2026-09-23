@@ -153,6 +153,11 @@ class CreateCommand extends Command<int> {
     }
     _formatRenamedCode(targetDir);
     _rewritePubspecs(targetDir, frameworkPackages);
+    _pinLintsPlugin(
+      targetDir,
+      monorepoDir: monorepoDir,
+      frameworkPackages: frameworkPackages,
+    );
     if (frameworkPath != null) {
       stdout.writeln(
         'The framework packages resolve from $frameworkPath/packages '
@@ -420,6 +425,55 @@ class CreateCommand extends Command<int> {
             );
       pubspecFile.writeAsStringSync('${rewritten.join('\n')}\n');
     }
+  }
+
+  /// Points the Flutter package's `plugins: dartway_lints:` at the published
+  /// plugin, or at the checkout's with `--framework-path`.
+  ///
+  /// The template names it by a path into this repository, which leads
+  /// nowhere in a project; an analyzer plugin is not a pub dependency, so
+  /// `dependency_overrides` never reached it. The version is the one the
+  /// template was taken from.
+  void _pinLintsPlugin(
+    Directory projectRoot, {
+    required Directory monorepoDir,
+    required Map<String, String>? frameworkPackages,
+  }) {
+    final options = File(
+      p.join(
+        ProjectLayout.detect(projectRoot).flutterPackageDir.path,
+        'analysis_options.yaml',
+      ),
+    );
+    if (!options.existsSync()) return;
+    final pattern = RegExp(
+      r'^(  dartway_lints:)\n    path: [^\n]+$',
+      multiLine: true,
+    );
+    final source = options.readAsStringSync();
+    if (!pattern.hasMatch(source)) return;
+    final String pin;
+    if (frameworkPackages?['dartway_lints'] case final path?) {
+      pin = "\n    path: '$path'";
+    } else {
+      final version = RegExp(r'^version:\s*(\S+)', multiLine: true)
+          .firstMatch(
+            File(
+              p.join(
+                monorepoDir.path,
+                'packages',
+                'dartway_lints',
+                'pubspec.yaml',
+              ),
+            ).readAsStringSync(),
+          )
+          ?.group(1);
+      if (version == null) return;
+      pin = ' ^$version';
+    }
+    options.writeAsStringSync(
+      source.replaceFirstMapped(pattern, (match) => '${match[1]}$pin'),
+    );
   }
 
   String _toPascalCase(String snakeCaseName) => snakeCaseName

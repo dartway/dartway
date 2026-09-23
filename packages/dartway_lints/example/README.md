@@ -1,22 +1,13 @@
 # Example — the UI kit is the single source of styles
 
-Add the linter to your app:
+Enable the plugin in your app's `analysis_options.yaml`:
 
 ```yaml
-# pubspec.yaml
-dev_dependencies:
-  custom_lint: ^0.8.0
-  dartway_lints: ^0.1.0
+plugins:
+  dartway_lints: ^0.4.0
 ```
 
-```yaml
-# analysis_options.yaml
-analyzer:
-  plugins:
-    - custom_lint
-```
-
-Then `dart run custom_lint` (or just look at your IDE).
+Then look at your IDE, or run `dart analyze`.
 
 ## What it catches
 
@@ -53,3 +44,9 @@ declared. Generated files are exempt too.
 
 The rule is not about aesthetics. A design system only survives if there is exactly one place that
 decides what a title looks like — and a machine, not a reviewer, is what keeps it that way.
+
+## This folder
+
+The files here are the fixture the plugin is proved on: every diagnostic they must produce is marked
+`// expect_lint: <rule>` on the line above, and `test/example_test.dart` in the plugin package runs
+`dart analyze` here and requires exactly those.

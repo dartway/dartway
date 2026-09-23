@@ -176,7 +176,7 @@ Inside, files are grouped by how often you reach for them — `1_essentials/`, `
 `3_special/` — plus `theme/`, `layout/`, `utils/` and `assets/`. The kit is one library: every file is
 a `part of` `ui_kit.dart`, and the rest of the app imports that file and nothing deeper.
 
-The boundary is enforced by `dartway_lints` through `custom_lint`: raw `Color(...)`, `TextStyle(...)`,
+The boundary is enforced by `dartway_lints`, an analyzer plugin: raw `Color(...)`, `TextStyle(...)`,
 `BorderRadius` and direct theme access **outside** `ui_kit/` are flagged, because a style that leaks
 into a feature is a style nobody can change centrally. The same package limits a relative import to
 two levels up (`deep_relative_import`): past that the path names nothing, and a `package:` import says

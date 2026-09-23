@@ -171,7 +171,7 @@ In this order, because each answers a question the next cannot:
 (cd __SERVER_PKG__ && dart run bin/migrate.dart check)     # against the local database: migrations still produce the schema
 (cd __SHARED_PKG__ && dart analyze && dart test)
 (cd __SERVER_PKG__ && dart analyze)
-(cd __FLUTTER_PKG__ && flutter analyze && dart run custom_lint)
+(cd __FLUTTER_PKG__ && dart analyze --fatal-infos)
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)
 (cd __FLUTTER_PKG__ && flutter test)
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)

@@ -1,6 +1,7 @@
 // The kit is where styles are allowed to be written — that is the whole point
-// of the rule. Not a single lint may fire in this file: `custom_lint` reports
-// any lint that no `expect_lint` asked for, so an over-eager rule fails here.
+// of the rule. Not a single lint may fire in this file: the plugin's
+// example_test fails on any lint that no `expect_lint` asked for, so an
+// over-eager rule fails here.
 //
 // ignore_for_file: unused_local_variable, prefer_const_constructors
 

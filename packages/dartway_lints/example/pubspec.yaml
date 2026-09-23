@@ -1,16 +1,16 @@
 name: dartway_lints_example
 description: >-
-  The fixture dartway_lints is tested against: files that must trigger its rules
-  and files that must not. `dart run custom_lint` here is the package's test
-  suite — the rules' bugs live in how they match AST nodes, which only the
-  analyzer can prove.
+  The fixture dartway_lints is proved on: files that must trigger its rules and
+  files that must not, each expected diagnostic marked `// expect_lint: <rule>`
+  on the line above. `test/example_test.dart` in the plugin package runs
+  `dart analyze` here and compares — the rules' bugs live in how they match
+  real Flutter code, which only the analyzer can prove.
 publish_to: none
 version: 0.1.0
 
-# Deliberately not a workspace member: workspace members share one
-# `.dart_tool/package_config.json` at the root, and custom_lint looks for its
-# plugins in the analyzed package's own — inside the workspace it silently loads
-# none and finds no issues in a file written entirely out of violations.
+# Not a workspace member: the plugin it enables is enabled by path from
+# analysis_options.yaml, and the fixture resolves the Flutter it is written
+# against on its own.
 
 environment:
   sdk: ^3.11.0
@@ -24,7 +24,4 @@ dependencies:
   flutter_riverpod: ^3.0.0
 
 dev_dependencies:
-  custom_lint: ^0.8.0
   flutter_lints: ^6.0.0
-  dartway_lints:
-    path: ../

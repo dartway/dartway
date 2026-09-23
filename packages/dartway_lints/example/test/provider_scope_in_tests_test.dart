@@ -1,7 +1,7 @@
 // The over-eager half of the fixture: a test builds its own root scope with
 // overrides, and that is the sanctioned way to swap a provider for a fake. Not
-// a single lint may fire in this file — custom_lint fails on an unexpected
-// report exactly as it does on a missing one.
+// a single lint may fire in this file — the plugin's example_test fails on an
+// unexpected report exactly as it does on a missing one.
 //
 // ignore_for_file: unused_local_variable
 

@@ -185,9 +185,9 @@ outside it, then:
   that is not a workspace member. Errors fail; warnings do not, because the one standing warning is
   in generated code the generator rewrites;
 - **test**: every package with a `test/` directory, with `flutter test` where the pubspec names
-  `flutter_test` and `dart test` otherwise — plus `dart run custom_lint` in
-  `packages/dartway_lints/example`, whose `test/` files violate the rules on purpose and are that
-  package's real suite. A package is left out only by being named in the script, with its reason:
+  `flutter_test` and `dart test` otherwise. `packages/dartway_lints/example` is a fixture: its files
+  violate the rules on purpose, and `dartway_lints`' own `test/example_test.dart` runs `dart analyze`
+  over it and compares the diagnostics with the ones it marks. A package is left out only by being named in the script, with its reason:
   `example/dartway_example_server` and `template/dartway_starter_server` (project servers, run by
   `dart run dartway_cli:dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
   directory runs — the direction that fails loudly;

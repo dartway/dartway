@@ -144,6 +144,27 @@ void main() {
           contains('dartway_cli:'),
         ),
       );
+      // The analyzer plugin is not a pub dependency: the template's path into
+      // this repository becomes the version the template was taken from.
+      final lints = RegExp(r'^version:\s*(\S+)', multiLine: true)
+          .firstMatch(
+            File(
+              p.join(
+                repository.path,
+                'packages',
+                'dartway_lints',
+                'pubspec.yaml',
+              ),
+            ).readAsStringSync(),
+          )!
+          .group(1);
+      expect(
+        read(project, 'shop_flutter/analysis_options.yaml'),
+        allOf(
+          contains('  dartway_lints: ^$lints'),
+          isNot(contains('packages/dartway_lints')),
+        ),
+      );
     },
   );
 
@@ -174,13 +195,18 @@ void main() {
       'dartway_client',
       'dartway_core_flutter',
       'dartway_core_shared',
-      'dartway_lints',
       'dartway_router',
       'dartway_shared_preferences',
     });
     expect(
       read(project, 'shop_server/pubspec.yaml'),
       contains("path: '${p.join(repository.path, 'packages', 'dartway_orm')}'"),
+    );
+    expect(
+      read(project, 'shop_flutter/analysis_options.yaml'),
+      contains(
+        "    path: '${p.join(repository.path, 'packages', 'dartway_lints')}'",
+      ),
     );
   });
 

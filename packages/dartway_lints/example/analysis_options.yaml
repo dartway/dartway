@@ -3,5 +3,8 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - build/**
-  plugins:
-    - custom_lint
+
+# The plugin this fixture proves, by path — a project names a version instead.
+plugins:
+  dartway_lints:
+    path: ../
