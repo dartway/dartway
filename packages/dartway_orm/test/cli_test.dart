@@ -297,6 +297,33 @@ dev_dependencies:
       );
     });
 
+    test('a sealed migration is one the formatter leaves alone (#291)', () async {
+      expect(
+        await cli(schema: fixtureSchema).run(['create', 'initial']),
+        DwMigrationCli.exitOk,
+      );
+      final drafted = File(
+        p.join(migrationsDir(), 'm20260914_083005_initial.dart'),
+      ).readAsStringSync();
+      expect(drafted.split('\n').first, '// dart format off');
+      // Edited by hand in a shape the formatter would rewrite — a trailing
+      // comma it removes, which the checksum does not ignore — then sealed.
+      final edited = DwMigrationChecksum.seal(
+        drafted.replaceFirst(
+          "await m.dropTable('club_session');",
+          "await m.dropTable(\n      'club_session',\n    );",
+        ),
+      );
+      final formatted = DartFormatter(
+        languageVersion: Version(3, 11, 0),
+      ).format(edited);
+      expect(formatted, edited);
+      expect(
+        DwMigrationChecksum.declared(formatted),
+        DwMigrationChecksum.of(formatted),
+      );
+    });
+
     test('a project that declares dartway_core_server only as a dev '
         'dependency imports dartway_orm', () {
       final project = DwMigrationProject.fromPubspec('''

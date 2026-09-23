@@ -1,3 +1,4 @@
+// dart format off
 // Draft written by `migrate create`. Review it before applying:
 // from now on it is an ordinary migration, and it is yours.
 import 'package:dartway_core_server/dartway_core_server.dart';
@@ -9,7 +10,7 @@ final class M20260914204255Initial extends DwDatabaseMigration {
   String get id => '20260914_204255_initial';
 
   @override
-  String get checksum => '7306f285c8b6860181f7f89b50468aac';
+  String get checksum => 'c157de565389b56eace82f0574f9caa5';
 
   @override
   Future<void> up(DwMigrationContext m) async {

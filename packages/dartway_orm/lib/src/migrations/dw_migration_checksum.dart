@@ -6,8 +6,10 @@ import 'package:meta/meta.dart';
 /// The checksum of a migration's source file.
 ///
 /// Computed over the source with the checksum literal itself emptied — a
-/// file cannot contain its own hash — and with all whitespace removed, so
-/// running `dart format` over a migration does not "change" it.
+/// file cannot contain its own hash — and with all whitespace removed. That
+/// is not enough to survive `dart format`, which adds and removes trailing
+/// commas as it wraps; a migration is therefore written with
+/// `// dart format off` as its first line, and the formatter leaves it alone.
 @internal
 abstract final class DwMigrationChecksum {
   static final RegExp _declaration = RegExp(
