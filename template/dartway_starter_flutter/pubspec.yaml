@@ -71,7 +71,7 @@ dev_dependencies:
   # `dart run dartway_cli:dartway <command>`: `dev web` serves the web app and
   # the server on one origin locally, as the deployment does (no CORS);
   # `check` grades this package against the conventions.
-  dartway_cli: ^0.11.0
+  dartway_cli: ^0.11.1
 
   # The UI-kit law is enforced here, not just written down: raw Color/TextStyle/
   # BorderRadius and direct theme access outside `ui_kit/` are lints. Needs

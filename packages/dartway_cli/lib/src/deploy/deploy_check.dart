@@ -184,6 +184,22 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     evaluate: _checkLockedDependencies,
   ),
   DwDeployCheck(
+    id: 'web-flutter-version',
+    title: 'The web image builds on the Flutter the project resolved with',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkWebFlutterVersion,
+  ),
+  DwDeployCheck(
+    id: 'web-file-modes',
+    title: 'The web image serves files its nginx can read',
+    stage: DwDeployCheckStage.local,
+    // Whether the modes are wrong depends on the umask of the host that pulls
+    // the checkout, which a reading of the Dockerfile cannot see.
+    severity: DwCheckSeverity.warning,
+    evaluate: _checkWebFileModes,
+  ),
+  DwDeployCheck(
     id: 'web-cache-policy',
     title: 'The web image revalidates the files a build overwrites',
     stage: DwDeployCheckStage.local,
@@ -462,6 +478,97 @@ Future<DwDeployVerdict> _checkWebBackendUrl(DwDeployContext context) async {
   );
 }
 
+/// The web image builds on the Flutter the project's `.fvmrc` names.
+///
+/// The SDK pins some of the packages an app resolves (`meta`, `vector_math`,
+/// …), so a lock written on one Flutter cannot be satisfied on another, and
+/// the image's `pub get --enforce-lockfile` refuses it inside `docker build`
+/// with a list of changed packages that names no SDK. An image that reads its
+/// version from `.fvmrc` agrees by construction; one built `FROM` a Flutter
+/// image is compared by its tag.
+Future<DwDeployVerdict> _checkWebFlutterVersion(DwDeployContext context) async {
+  final dockerfile = context.dockerfileOf(context.flutterPackage);
+  final fvmrc = File(
+    p.join(context.projectRoot.path, context.flutterPackage, '.fvmrc'),
+  );
+  if (!dockerfile.existsSync()) {
+    return const DwDeployVerdict.skip('no web Dockerfile');
+  }
+  if (!fvmrc.existsSync()) {
+    return DwDeployVerdict.skip('${context.flutterPackage} has no .fvmrc');
+  }
+  final pinned = RegExp(
+    r'"flutter"\s*:\s*"([^"]+)"',
+  ).firstMatch(fvmrc.readAsStringSync())?.group(1);
+  if (pinned == null) {
+    return DwDeployVerdict.skip(
+      '${context.flutterPackage}/.fvmrc names no Flutter',
+    );
+  }
+  final lines = dockerfile.readAsLinesSync();
+  if (lines.any((line) => RegExp(r'^\s*COPY\s.*\.fvmrc\b').hasMatch(line))) {
+    return DwDeployVerdict.pass('Flutter $pinned, read from .fvmrc');
+  }
+  final image = lines
+      .map(
+        RegExp(
+          r'^\s*FROM\s+(\S*flutter\S*):(\S+)',
+          caseSensitive: false,
+        ).firstMatch,
+      )
+      .nonNulls
+      .firstOrNull;
+  if (image == null) {
+    return const DwDeployVerdict.skip(
+      'cannot tell which Flutter builds the web image',
+    );
+  }
+  final tag = image.group(2)!;
+  if (tag == pinned)
+    return DwDeployVerdict.pass('Flutter $pinned, ${image.group(1)}');
+  return DwDeployVerdict.fail(
+    '${context.flutterPackage}/Dockerfile builds on ${image.group(1)}:$tag, '
+    '.fvmrc pins Flutter $pinned',
+    fix:
+        'Build on the Flutter the project resolves with: a lock written on one '
+        'Flutter does not satisfy another. Install it in the build stage from '
+        '.fvmrc, as the skeleton does (docs/migrations/'
+        '2026-09-23-web-image-flutter-from-fvmrc.md), or use an image tagged '
+        '$pinned.',
+  );
+}
+
+/// The files a web image serves are readable by the user nginx runs as.
+///
+/// `COPY` keeps modes, and the checkout's come from the umask of the deploy
+/// user on the server: under `077` the assets a commit adds reach the image as
+/// `rw-------`, nginx answers them 403, and nothing reports it — the build and
+/// the deploy succeed, every page answers 200, and an image with an
+/// `errorBuilder` shows its placeholder (#292). The image normalises the modes
+/// itself, with a `chmod` granting everyone read (`a+rX`), or `COPY --chmod`.
+Future<DwDeployVerdict> _checkWebFileModes(DwDeployContext context) async {
+  final file = context.dockerfileOf(context.flutterPackage);
+  if (!file.existsSync()) {
+    return const DwDeployVerdict.skip('no web Dockerfile');
+  }
+  final normalises = RegExp(
+    r'\bchmod\b.*\s(a|o|go|og|ugo)\+rX?(\s|,|$)|--chmod=',
+  );
+  final line = file.readAsLinesSync().firstWhere(
+    normalises.hasMatch,
+    orElse: () => '',
+  );
+  if (line.isNotEmpty) return DwDeployVerdict.pass(line.trim());
+  return DwDeployVerdict.fail(
+    '${context.flutterPackage}/Dockerfile leaves the modes of the files it '
+    'serves to the host that builds it',
+    fix:
+        'Add `RUN chmod -R a+rX build/web` after `flutter build web`, in the '
+        'build stage: `COPY` keeps modes, and under a deploy user\'s umask of '
+        '077 the files a commit adds are served as 403.',
+  );
+}
+
 /// A deploy builds what was committed, or it is not the thing that was tested.
 ///
 /// Without `--enforce-lockfile` pub is free to resolve a different set of
@@ -474,6 +581,7 @@ Future<DwDeployVerdict> _checkLockedDependencies(
   DwDeployContext context,
 ) async {
   final unlocked = <String>[];
+  final missing = <String>[];
   final read = <String>[];
   for (final package in [context.serverPackage, context.flutterPackage]) {
     final file = context.dockerfileOf(package);
@@ -508,9 +616,11 @@ Future<DwDeployVerdict> _checkLockedDependencies(
       read.add('$package: no pub get of its own found');
       continue;
     }
-    final lock = File(p.join(context.projectRoot.path, package, 'pubspec.lock'));
+    final lock = File(
+      p.join(context.projectRoot.path, package, 'pubspec.lock'),
+    );
     if (!lock.existsSync()) {
-      unlocked.add('$package has no pubspec.lock');
+      missing.add(package);
       continue;
     }
     for (final get in own) {
@@ -520,14 +630,34 @@ Future<DwDeployVerdict> _checkLockedDependencies(
     }
     read.add('$package: ${own.length} pub get, --enforce-lockfile');
   }
-  if (read.isEmpty && unlocked.isEmpty) {
+  if (read.isEmpty && unlocked.isEmpty && missing.isEmpty) {
     return const DwDeployVerdict.skip('no image to read');
   }
-  if (unlocked.isEmpty) {
+  if (unlocked.isEmpty && missing.isEmpty) {
     return DwDeployVerdict.pass(read.join('; '));
   }
+  if (unlocked.isEmpty) {
+    // The first deploy of a project nobody has resolved yet — `dartway
+    // create` does not copy the skeleton's lock (#278). The images are fine;
+    // what they enforce does not exist, and saying "add the flag" to someone
+    // whose Dockerfile carries it sends them to the wrong file.
+    return DwDeployVerdict.fail(
+      [
+        for (final package in missing) '$package has no pubspec.lock',
+      ].join('; '),
+      fix:
+          'Resolve the project and commit what it writes: `dart pub get` in '
+          '${context.serverPackage}, `flutter pub get` in '
+          '${context.flutterPackage} (`dartway quickstart` begins with both), '
+          'then `git add */pubspec.lock`. The images build exactly the '
+          'packages that lock names.',
+    );
+  }
   return DwDeployVerdict.fail(
-    unlocked.join('; '),
+    [
+      ...unlocked,
+      for (final package in missing) '$package has no pubspec.lock',
+    ].join('; '),
     fix:
         'Add --enforce-lockfile to every pub get in the images, and commit '
         'pubspec.lock. The deploy then builds exactly the packages the '
@@ -560,10 +690,7 @@ List<DwPubGet> dwPubGetInstructions(File dockerfile) {
         workdir = '/';
         continue;
       }
-      if (RegExp(
-            r'^\s*WORKDIR\s',
-            caseSensitive: false,
-          ).hasMatch(trimmed)) {
+      if (RegExp(r'^\s*WORKDIR\s', caseSensitive: false).hasMatch(trimmed)) {
         final named = trimmed.trim().split(RegExp(r'\s+')).last;
         workdir = named.startsWith('/')
             ? p.posix.normalize(named)

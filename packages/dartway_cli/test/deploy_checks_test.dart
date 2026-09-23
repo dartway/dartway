@@ -111,6 +111,59 @@ void main() {
       },
     );
 
+    test('web-flutter-version: the image builds on the Flutter the lock '
+        'was written with', () async {
+      write('shop_flutter/.fvmrc', '{\n  "flutter": "3.47.2"\n}');
+      write(
+        'shop_flutter/Dockerfile',
+        'FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build\n',
+      );
+      final behind = await evaluate('web-flutter-version');
+      expect(behind.passed, isFalse);
+      expect(behind.detail, contains('3.44.0'));
+      expect(behind.detail, contains('3.47.2'));
+
+      write(
+        'shop_flutter/Dockerfile',
+        'FROM ghcr.io/cirruslabs/flutter:3.47.2 AS build\n',
+      );
+      expect((await evaluate('web-flutter-version')).passed, isTrue);
+
+      write(
+        'shop_flutter/Dockerfile',
+        'FROM debian AS build\nCOPY shop_flutter/.fvmrc /tmp/fvmrc\n',
+      );
+      expect((await evaluate('web-flutter-version')).passed, isTrue);
+
+      write('shop_flutter/Dockerfile', 'FROM debian AS build\n');
+      expect((await evaluate('web-flutter-version')).skipped, isTrue);
+    });
+
+    test('web-file-modes: the image, not the host, decides who reads the '
+        'site', () async {
+      write('shop_flutter/Dockerfile', 'FROM nginx\nRUN flutter build web\n');
+      final loose = await evaluate('web-file-modes');
+      expect(loose.passed, isFalse);
+      expect(loose.fix, contains('chmod -R a+rX build/web'));
+
+      for (final normalising in [
+        'RUN chmod -R a+rX build/web',
+        'RUN flutter build web && chmod -R o+r build/web',
+        'COPY --chmod=644 --from=build /app/build/web /usr/share/nginx/html',
+      ]) {
+        write('shop_flutter/Dockerfile', 'FROM nginx\n$normalising\n');
+        expect(
+          (await evaluate('web-file-modes')).passed,
+          isTrue,
+          reason: normalising,
+        );
+      }
+
+      // Taking read away is not granting it.
+      write('shop_flutter/Dockerfile', 'FROM nginx\nRUN chmod -R o-r build\n');
+      expect((await evaluate('web-file-modes')).passed, isFalse);
+    });
+
     test('locked-dependencies: a deploy builds what was committed', () async {
       write('shop_server/Dockerfile', 'FROM dart\nRUN dart pub get\n');
       write('shop_server/pubspec.lock', '# locked\n');
@@ -130,6 +183,10 @@ void main() {
       final unlocked = await evaluate('locked-dependencies');
       expect(unlocked.passed, isFalse);
       expect(unlocked.detail, contains('no pubspec.lock'));
+      // Its Dockerfile already carries the flag: the fix is to resolve, not
+      // to edit the image (#278).
+      expect(unlocked.fix, contains('pub get'));
+      expect(unlocked.fix, isNot(contains('--enforce-lockfile')));
     });
 
     test('locked-dependencies reads a cached Flutter build, continuation '

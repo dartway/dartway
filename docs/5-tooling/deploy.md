@@ -307,6 +307,8 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `server-signals` | error | The server image's `ENTRYPOINT` (or `CMD`) is in exec form, so the binary is PID 1 and receives the SIGTERM a deploy sends; under `/bin/sh -c` it is killed mid-call when the grace period runs out |
 | `web-backend-url` | error | The web Dockerfile declares `ARG DW_BACKEND_URL` — Docker silently drops an undeclared build argument |
 | `locked-dependencies` | error | Every image's `pub get` runs `--enforce-lockfile`, and the package has a committed `pubspec.lock` — otherwise pub may resolve a different set inside the container than the project was tested with, and a deploy has already failed that way |
+| `web-flutter-version` | error | The web image builds on the Flutter `.fvmrc` names — it installs it from `.fvmrc`, or its Flutter image carries that tag. Flutter pins some packages an app resolves, so a lock written on one Flutter fails `--enforce-lockfile` on another |
+| `web-file-modes` | warning | The web image grants everyone read on the files it serves (`chmod -R a+rX build/web`). `COPY` keeps modes, and under a deploy user's umask of `077` the files a commit adds are served as 403 while every page answers 200 |
 | `web-cache-policy` | warning | The web image's Nginx configuration revalidates every Flutter entry point |
 | `nginx-upstreams` | error | Every `proxy_pass` in the rendered Nginx and in `deploy/nginx.d/` names a service of the stack or the override |
 | `override-web-build` | warning | `deploy/compose.override.yml` does not rebuild `web` — that would name the API address a second time, and nothing compares the copies |

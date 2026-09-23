@@ -2,7 +2,25 @@
 # renders: the shared contract package is a path dependency of this one, so a
 # context narrower than the root cannot resolve it. Every path below is relative
 # to the root.
-FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
+FROM debian:bookworm-slim AS build
+
+# Flutter at the version the project's `.fvmrc` names, installed here rather
+# than taken from a Flutter image. The SDK pins some of the packages an app
+# resolves (`meta`, `vector_math`, …), so a lock written on one Flutter is not
+# satisfiable on another and `--enforce-lockfile` below refuses it: the image
+# has to build on the Flutter the project resolved with. Images trail Flutter
+# releases by months, and `.fvmrc` stays the one place the version is stated.
+# The layer is cached until `.fvmrc` changes.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils \
+ && rm -rf /var/lib/apt/lists/*
+COPY dartway_example_flutter/.fvmrc /tmp/fvmrc
+RUN version="$(sed -n 's/.*"flutter"[^"]*"\([^"]*\)".*/\1/p' /tmp/fvmrc)" \
+ && test -n "$version" \
+ && git clone --quiet --depth 1 --branch "$version" \
+      https://github.com/flutter/flutter.git /opt/flutter
+ENV PATH="/opt/flutter/bin:$PATH"
+RUN flutter --disable-analytics && flutter precache --web
 
 WORKDIR /workspace
 COPY dartway_example_shared/ dartway_example_shared/
@@ -26,6 +44,13 @@ ARG DW_BACKEND_URL
 RUN test -n "$DW_BACKEND_URL"
 RUN flutter build web --release \
     --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
+
+# `COPY` keeps each file's mode, and the checkout's modes come from the umask
+# of whoever pulled it on the server: under `077` a newly added asset reaches
+# the image as `rw-------`, nginx's workers answer it 403, and the deploy, its
+# checks and every page still look fine. Normalised here, in the build stage,
+# so the image does not depend on the build host and no layer copies the site.
+RUN chmod -R a+rX build/web
 
 FROM nginx:1.30.5-alpine
 
