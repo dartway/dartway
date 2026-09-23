@@ -123,6 +123,10 @@ plugins: [DwSharedPreferences(), DwPush(transports: [DwRuStorePush(), DwFirebase
 
 - Registration is automatic: token + signed-in account, once per pair. **Do not call anything on
   sign-out** — the server stops sending when the session key is revoked.
+- `dw.init()` does not wait for push: the transport, the token and the cold-start notification
+  arrive in the background, and a platform call that stays silent is reported by name. Do not read
+  `dw.plugins.push.transport` or `.token` right after `dw.init()`, and do not wrap push calls in
+  timeouts of your own.
 - Ask permission at a moment the user understands: `dw.plugins.push.requestPermission()`.
 - A settings toggle: `dw.plugins.push.pause()` / `resume()`, and `DwPush(isEnabled: ...)` reading
   the stored choice at start.

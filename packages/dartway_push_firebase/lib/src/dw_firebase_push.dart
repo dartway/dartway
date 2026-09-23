@@ -21,6 +21,12 @@ Future<void> dwFirebasePushBackgroundHandler(RemoteMessage message) async {}
 /// `web/firebase-messaging-sw.js` of this package into the app's `web/`
 /// unchanged except for the config: the order of its handlers is what makes
 /// a click open the notification's link.
+///
+/// On iOS none of FCM's calls answer before APNs has registered the install,
+/// and some never answer when that does not happen: in the simulator, which
+/// has no APNs, or on a device whose bundle id differs from the one in
+/// `GoogleService-Info.plist`. `DwPush` keeps them off the app's start and
+/// reports the one that stays silent.
 class DwFirebasePush extends DwPushTransportClient {
   DwFirebasePush({this.webVapidKey});
 
