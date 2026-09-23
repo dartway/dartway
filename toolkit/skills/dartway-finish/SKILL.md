@@ -4,7 +4,7 @@ description: >-
   Finishing a dartway task before a commit/PR (DartWay projects): the "definition of done".
   Audits the diff against the base branch using the dartway-clean-code contract (contract, server,
   app), runs the checks (`dart run dartway_cli:dartway generate --check`, `dart run bin/migrate.dart check` when row
-  classes or migrations changed, the analyzers and custom_lint, the shared package's `dart test`,
+  classes or migrations changed, the analyzers with the `dartway_lints` plugin, the shared package's `dart test`,
   `dart run dartway_cli:dartway test`, `flutter test`, `dart run dartway_cli:dartway check`), reconciles the descriptions that live in the
   code — `DwFeatureSpec` for a screen, doc comments above handlers and rules for the server, above
   DTOs for the contract — with what changed, compares `TODO(dartway, checked: …)` workaround markers
@@ -236,7 +236,7 @@ run and why.
 (cd __SERVER_PKG__ && dart run bin/migrate.dart check)      # when row classes or migrations changed; needs DW_DATABASE_*
 (cd __SHARED_PKG__ && dart analyze && dart test)            # the contract
 (cd __SERVER_PKG__ && dart analyze)
-(cd __FLUTTER_PKG__ && flutter analyze && dart run custom_lint)
+(cd __FLUTTER_PKG__ && dart analyze --fatal-infos)            # the lint set and dartway_lints
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server acceptance, real Postgres and MinIO
 (cd __FLUTTER_PKG__ && flutter test)                        # screens on the in-memory server
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # the conventions; errors fail it
@@ -246,9 +246,10 @@ run and why.
   part makes the rest answer questions about a tree that does not exist.
 - **Analyze whole packages, without a path argument.** `dart analyze lib` skips `test/` — where moves and
   API changes settle. A green `dart analyze lib` with 59 compilation errors in `test/` actually happened.
-- **`dart run custom_lint` in the Flutter package is mandatory.** `flutter analyze` does NOT run its
-  rules, and `dartway_lints` is what catches raw styles outside the kit and a `ProviderScope` written
-  by the app. A green `flutter analyze` with a red `custom_lint` is a classic trap.
+- **`dart analyze --fatal-infos` in the Flutter package, not `flutter analyze`.** `flutter analyze`
+  does NOT run analyzer plugins, and `dartway_lints` is what catches raw styles outside the kit and a
+  `ProviderScope` written by the app. A green `flutter analyze` over a plugin warning is a classic
+  trap; `dart analyze --fatal-infos` fails where `flutter analyze` does, and on the plugin too.
 - **`dart run dartway_cli:dartway test` and `flutter test` actually run, not "the tests probably weren't touched".** The
   analyzer proves the code compiles and says nothing about behaviour. A test failing after a refactor
   starts with the hypothesis "I broke it", and only after checking against the base branch becomes "it

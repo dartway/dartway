@@ -68,13 +68,6 @@ dev_dependencies:
 
   dartway_cli: ^0.11.1
 
-  # The UI-kit law is enforced here, not just written down: raw Color/TextStyle/
-  # BorderRadius and direct theme access outside `ui_kit/` are lints. Needs
-  # `analyzer: plugins: [custom_lint]` in analysis_options.yaml, and runs in the
-  # IDE and via `dart run custom_lint`.
-  custom_lint: ^0.8.0
-  dartway_lints: ^0.3.0
-
 # Inside the monorepo the example builds against the LOCAL framework packages.
 # Copied out into a standalone project — drop the whole dependency_overrides block.
 dependency_overrides:
@@ -86,8 +79,6 @@ dependency_overrides:
     path: ../../packages/dartway_core_flutter
   dartway_core_shared:
     path: ../../packages/dartway_core_shared
-  dartway_lints:
-    path: ../../packages/dartway_lints
   dartway_push_firebase:
     path: ../../packages/dartway_push_firebase
   dartway_push_flutter:

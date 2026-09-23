@@ -1,6 +1,27 @@
 # dartway_lints
 
-Custom lint rules enforcing [DartWay](https://dartway.dev) conventions.
+Lint rules enforcing [DartWay](https://dartway.dev) conventions, as an
+analyzer plugin.
+
+## Setup
+
+Enable the plugin in the Flutter package's `analysis_options.yaml` — a
+top-level section, not under `analyzer:`:
+
+```yaml
+plugins:
+  dartway_lints: ^0.4.0
+```
+
+That is all: the analysis server fetches and runs the plugin itself, so the
+package is not a dependency of the project. Restart the analysis server after
+changing the section. The rules show in the IDE and in `dart analyze`;
+`flutter analyze` does not run analyzer plugins, so a CI step runs
+`dart analyze --fatal-infos`, which fails where `flutter analyze` does and on
+these rules too. Suppress one with `// ignore: dartway_lints/<rule>`.
+
+Projects created by `dartway create` have it enabled already. Requires Dart 3.12
+(Flutter 3.44) or newer.
 
 ## Rules
 

@@ -9,18 +9,25 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
-# DartWay's own rules (package:dartway_lints), run through custom_lint: the UI
-# kit is the single source of styles, so raw Color/TextStyle/BorderRadius and
-# direct theme access are flagged everywhere outside `ui_kit/`. A convention
-# that only lives in a document is a convention that drifts.
 analyzer:
   exclude:
     - build/**
     - android/**
     - ios/**
     - web/**
-  plugins:
-    - custom_lint
+
+# DartWay's own rules, the dartway_lints analyzer plugin: the UI kit is the
+# single source of styles, so raw Color/TextStyle/BorderRadius and direct theme
+# access are flagged everywhere outside `ui_kit/`; relative imports stay short;
+# ProviderScope is left to the bootstrap and tests. A convention that only lives
+# in a document is a convention that drifts. They show in the IDE and in
+# `dart analyze` — `flutter analyze` does not run analyzer plugins.
+#
+# In the framework's repository this names the local package by path; a
+# project names the published version.
+plugins:
+  dartway_lints:
+    path: ../../packages/dartway_lints
 
 linter:
   # The lint rules applied to this project can be customized in the

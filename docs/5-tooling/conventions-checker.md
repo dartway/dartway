@@ -26,7 +26,7 @@ is decidable without understanding what the code means**.
 
 | The answer is… | Where the rule goes | Example |
 |---|---|---|
-| decidable from the shape of an expression | `dartway_lints` (a `custom_lint` rule, live in the IDE) | is this a raw `Color` outside `ui_kit/`? |
+| decidable from the shape of an expression | `dartway_lints` (an analyzer plugin, live in the IDE and in `dart analyze`) | is this a raw `Color` outside `ui_kit/`? |
 | decidable from the shape of the project | `dart run dartway_cli:dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
 | **only decidable by reading the meaning** | `/dartway-checkup` | is this string something a *user* reads, or an identifier, a key, a date pattern? |
 
@@ -43,20 +43,20 @@ exemption that swallows the whole line is how a rule stops firing without anyone
 
 A rule that needs understanding is not a weaker rule. It is a rule for a reader.
 
-## Three commands, and none of them implies the others
+## Two commands, and neither implies the other
 
 ```bash
 cd <project>_flutter
-flutter analyze            # the analyzer and the lint set
-dart run custom_lint       # DartWay's own rules
+dart analyze --fatal-infos                      # the analyzer, the lint set and DartWay's own rules
 dart run dartway_cli:dartway check              # the structural conventions
 ```
 
-**`flutter analyze` does not execute `custom_lint` plugins.** The skeleton declares `dartway_lints`
-and lists `custom_lint` under `analyzer: plugins:`, the IDE underlines violations — and a CI running
-only `flutter analyze` reports a clean build while enforcing none of it.
+**`flutter analyze` does not run analyzer plugins.** The skeleton enables `dartway_lints` under
+`plugins:` in its `analysis_options.yaml`, the IDE underlines violations, `dart analyze` reports them
+— and a CI running only `flutter analyze` reports a clean build while enforcing none of them.
+`dart analyze --fatal-infos` fails where `flutter analyze` does, and on the plugin's warnings too.
 
-The skeleton ships no CI workflow of its own. **A project that adds one runs all three, plus its
+The skeleton ships no CI workflow of its own. **A project that adds one runs both, plus its
 tests** — not because CI is a virtue, but because these are the checks the project has already
 declared, and a rule configured and not executed reads as covered. If a package has a `test/` folder,
 CI runs it: a suite excluded from CI stops compiling, and nobody learns that from the exclusion.

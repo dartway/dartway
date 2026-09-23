@@ -20,7 +20,7 @@
 **/build/
 **/.fvm/
 **/ephemeral/
-# custom_lint.log alone reaches hundreds of megabytes when the analyzer trips.
+# Logs are never an input to an image, and some grow to hundreds of megabytes.
 **/*.log
 # `dart pub get` applies a package's pubspec_overrides.yaml wherever it finds
 # it, and that file is where a local checkout of an unpublished framework lives

@@ -1,7 +1,7 @@
 // Feature code. Every style here is a style that escaped the kit, so every one
 // of them must be reported: the annotation above each line makes the analyzer
-// prove it — custom_lint fails when the promised lint does not appear, and
-// equally when a lint appears that nobody promised.
+// prove it — the plugin's example_test fails when the promised lint does not
+// appear, and equally when a lint appears that nobody promised.
 //
 // ignore_for_file: unused_local_variable, prefer_const_constructors
 

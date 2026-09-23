@@ -1,20 +1,28 @@
 name: dartway_lints
-description: "Custom lint rules enforcing DartWay conventions: the UI kit as the single source of styles, relative imports kept short, ProviderScope left to the app bootstrap and tests, and a stored model rebuilt with copyWith rather than field by field."
-version: 0.3.1
+description: "DartWay's convention rules as an analyzer plugin: the UI kit as the single source of styles, relative imports kept short, and ProviderScope left to the app bootstrap and tests. Shown in the IDE, dart analyze and flutter analyze."
+version: 0.4.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
 topics: [dartway, lints, linter, flutter]
 
-resolution: workspace
+# Not a workspace member: the plugin pins the analyzer the SDK's plugin API is
+# written against (14), and the workspace cannot resolve it — flutter_test pins
+# a `test` that caps the analyzer below 14. A plugin is resolved by the analysis
+# server on its own anyway, never inside the project it analyzes.
 
 environment:
   sdk: ^3.9.0
 
 dependencies:
-  # analyzer is capped at <9 by custom_lint_builder itself (0.8.1, the latest,
-  # requires ^8.0.0), so the newest analyzer is out of reach for every
-  # custom_lint plugin — not just this one. The lower bound must be >=8.0.0 for
-  # the same reason: with 7.4.0 the package does not resolve at all.
-  analyzer: '>=8.0.0 <9.0.0'
-  custom_lint_builder: ^0.8.1
+  # The plugin API moves with the analyzer, which moves with the SDK: 0.3.23
+  # pins analyzer 14.4.0, and loads on Dart 3.12 (Flutter 3.44) and 3.13
+  # (Flutter 3.47) alike.
+  analysis_server_plugin: ^0.3.23
+  analyzer: ^14.4.0
+
+dev_dependencies:
+  analyzer_testing: any
+  path: ^1.9.0
+  test: ^1.25.0
+  test_reflective_loader: ^0.2.0

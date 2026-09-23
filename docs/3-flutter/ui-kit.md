@@ -80,7 +80,7 @@ the root file gathers them with `part` directives and re-exports `dartway_core_f
 
 Inside feature code, raw styling is forbidden: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`,
 `Theme.of(context)`, `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a
-wish. `dartway_lints` ships `forbidden_ui_style_usage` (a `custom_lint` rule) which allows all of
+wish. `dartway_lints` ships `forbidden_ui_style_usage` (an analyzer plugin rule) which allows all of
 them only inside a path containing `ui_kit`, and recognises a `BuildContext` **by its static type**,
 so renaming the variable to `ctx` does not help. `dart run dartway_cli:dartway check` flags the same patterns
 independently.

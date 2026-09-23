@@ -39,7 +39,7 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
 3. **No raw styling in features.** Inside a zone (`app/`, `admin/`, `auth/`, `common/`) and in `shared/`
    the following are **forbidden**: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`, `Theme.of(context)`,
    `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a wish — the
-   `forbidden_ui_style_usage` rule from `dartway_lints` (via `custom_lint`) allows them **only inside
+   `forbidden_ui_style_usage` rule of the `dartway_lints` analyzer plugin allows them **only inside
    `ui_kit/`** and recognizes `BuildContext` by type, not by variable name, and `dart run dartway_cli:dartway check` fails on
    the same usages (`forbiddenUiUsage`).
 

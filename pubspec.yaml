@@ -16,7 +16,6 @@ workspace:
   - packages/dartway_core_flutter
   - packages/dartway_core_server
   - packages/dartway_core_shared
-  - packages/dartway_lints
   - packages/dartway_orm
   - packages/dartway_push_firebase
   - packages/dartway_push_flutter
@@ -30,12 +29,11 @@ workspace:
   - packages/dartway_telegram
   - tool
 
-# `packages/dartway_generator` is deliberately NOT a workspace member: it pins
-# `analyzer` at the version it is written against, and `dartway_lints` (through
-# custom_lint) pins an older one. A tool resolves on its own.
+# `packages/dartway_generator` and `packages/dartway_lints` are deliberately NOT
+# workspace members: each pins the `analyzer` it is written against, and the
+# workspace cannot hold it — `flutter_test` pins a `test` that caps the analyzer
+# below 14. A tool resolves on its own.
 
-# `packages/dartway_lints/example` is deliberately NOT a workspace member: a
-# member has no `.dart_tool/package_config.json` of its own (the workspace root
-# holds the only one), and that is exactly where custom_lint looks for its
-# plugins — inside the workspace it loads none and reports "No issues found" on
-# a file full of violations. It resolves standalone instead.
+# `packages/dartway_lints/example` resolves standalone too: it is the fixture
+# the plugin is proved on, enabling it by path the way a project enables it by
+# version.

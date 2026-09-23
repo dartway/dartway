@@ -20,5 +20,3 @@ dist/
 # Machine-local Claude Code settings. Everything else under .claude/ is
 # tracked: the skills there are how this framework is developed.
 .claude/settings.local.json
-# custom_lint run artifact
-custom_lint.log

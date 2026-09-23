@@ -88,15 +88,15 @@ fi
 # test`, which applies the project's migrations to a Postgres and a MinIO of its
 # own, in `database.yml` (pull requests and nightly). The lints fixture is not a `dart test`
 # suite at all — the files under its `test/` are written to violate the rules and
-# deliberately have no `main`; its own pubspec says `dart run custom_lint` is the
-# suite, and that runs below.
+# deliberately have no `main`; `dartway_lints`' own `test/example_test.dart` runs
+# the analyzer over it.
 # Kept as a plain list rather than an associative array: those need bash 4, and
 # macOS ships 3.2 — a script that only runs in CI is the thing this is trying to
 # stop being.
 SKIP="\
 example/dartway_example_server|a project server, run by dartway test (database.yml)
 template/dartway_starter_server|a project server, run by dartway test (database.yml)
-packages/dartway_lints/example|verified by custom_lint, not by dart test"
+packages/dartway_lints/example|a fixture, proved by dartway_lints' example_test"
 
 # Packages whose suites need the services, run by `services` and by nothing
 # else. Named whole rather than file by file: their own support code fails a
@@ -183,9 +183,11 @@ resolve() {
 
 analyze() {
   echo "══ analyze"
-  # Errors only. One warning stands today and it is in generated code
+  # Errors only. The warnings that stand are in generated code
   # (`dw_updates_transport.dart`), which nobody reviews and the generator
-  # rewrites — gating on it would make red mean "the generator again".
+  # rewrites — gating on it would make red mean "the generator again" — and in
+  # `packages/dartway_lints/example`, a fixture written to break the lint rules,
+  # whose warnings its own test counts.
   # `tool` is in here so the scripts this repository runs on itself are held
   # to the same analyzer as the code they check.
   analyze_root "packages + tool (workspace)" \
@@ -213,9 +215,6 @@ test_suites() {
     fi
     run "$package" bash -c "cd '$package' && $(runner_of "$package") test"
   done
-  # The linter's own suite, run the way its package declares.
-  run "packages/dartway_lints/example (custom_lint)" \
-    bash -c "cd packages/dartway_lints/example && dart run custom_lint"
 }
 
 # Stops the run, before anything is resolved or run, unless every variable the
