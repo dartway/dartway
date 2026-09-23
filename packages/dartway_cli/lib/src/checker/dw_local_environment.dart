@@ -5,6 +5,7 @@ import 'package:yaml/yaml.dart';
 
 import '../deploy/local_environment.dart';
 import 'dw_check_type.dart';
+import 'dw_check_tally.dart';
 
 /// Reports what the `local` environment is missing, and where it has drifted
 /// from the containers it describes.
@@ -40,7 +41,7 @@ class DwLocalEnvironmentInspector {
   List<String> findingsOf(DwCheckType type) =>
       List.unmodifiable(_findings[type] ?? const []);
 
-  int run() {
+  int run({DwCheckTally? tally}) {
     if (_types.isEmpty) return 0;
 
     final environment = DwLocalEnvironment(projectRoot);
@@ -73,6 +74,7 @@ class DwLocalEnvironmentInspector {
       for (final finding in findings) {
         print('  ${type.reportLabel}: $finding');
       }
+      tally?.add(type, findings.length);
       if (type.severity == DwCheckSeverity.error) errors += findings.length;
     }
     return errors;

@@ -1,6 +1,6 @@
 # Why a checker when you already have the analyzer?
 
-`dartway check` looks at the things the analyzer and the lints cannot see. The analyzer reads a
+`dart run dartway_cli:dartway check` looks at the things the analyzer and the lints cannot see. The analyzer reads a
 file; the checker reads the **project**: which folder is a feature, who imports whose internals,
 whether a screen styles itself, whether an asset path leads anywhere, whether the generated code
 still matches its sources and the migrations still produce the schema. All of that compiles. Some
@@ -27,7 +27,7 @@ is decidable without understanding what the code means**.
 | The answer is… | Where the rule goes | Example |
 |---|---|---|
 | decidable from the shape of an expression | `dartway_lints` (a `custom_lint` rule, live in the IDE) | is this a raw `Color` outside `ui_kit/`? |
-| decidable from the shape of the project | `dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
+| decidable from the shape of the project | `dart run dartway_cli:dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
 | **only decidable by reading the meaning** | `/dartway-checkup` | is this string something a *user* reads, or an identifier, a key, a date pattern? |
 
 The third row is the one worth defending. `'Issues'`, `'issues/board'` and `'dd.MM'` are the same
@@ -46,9 +46,10 @@ A rule that needs understanding is not a weaker rule. It is a rule for a reader.
 ## Three commands, and none of them implies the others
 
 ```bash
+cd <project>_flutter
 flutter analyze            # the analyzer and the lint set
 dart run custom_lint       # DartWay's own rules
-dartway check              # the structural conventions
+dart run dartway_cli:dartway check              # the structural conventions
 ```
 
 **`flutter analyze` does not execute `custom_lint` plugins.** The skeleton declares `dartway_lints`
@@ -87,7 +88,7 @@ counts as one), `0` otherwise — warnings and infos print and pass. An unknown 
 error, `64`. Run outside a DartWay project, the command says so and exits `1`.
 
 **A check that could not run says so, and does not pass or fail.** When the generator does not run to
-a verdict — an unresolved package, a declaration it refuses — `dartway check` prints its first lines
+a verdict — an unresolved package, a declaration it refuses — `dart run dartway_cli:dartway check` prints its first lines
 under "Not checked". When `DW_DATABASE_HOST` is not set, the migrations are not replayed and the run
 says what to set. A finding invented from a probe that could not run is how a check earns a
 reputation for lying; a silent pass is worse.
@@ -121,7 +122,7 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `barrelFile` | error | A file that only re-exports |
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone |
-| `generatedCodeStale` | error | A generated file that `dartway generate` would write differently, or whose source is gone |
+| `generatedCodeStale` | error | A generated file that `dart run dartway_cli:dartway generate` would write differently, or whose source is gone |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
@@ -211,7 +212,7 @@ over every pass.
 **`generatedCodeStale`** runs the generator the server package resolved in check mode. The codecs are
 the wire, so this has no second reading: a request missing from the registry is refused as unknown by
 a server that has its handler, and a field missing from a codec simply does not travel. The fix it
-prints is `dartway generate`, and generated files are never edited by hand. See
+prints is `dart run dartway_cli:dartway generate`, and generated files are never edited by hand. See
 [Data objects and generation](../2-core/data-objects-and-generation.md).
 
 **`migrationsDrift`** runs the project's `bin/migrate.dart check`, which replays the migrations on

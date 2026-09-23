@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
 import 'dw_check_type.dart';
+import 'dw_check_tally.dart';
 
 /// One `dartway_*` package as a `pubspec.lock` recorded it.
 class DwLockedFrameworkPackage {
@@ -158,7 +159,7 @@ class DwFrameworkLockInspector {
   /// Runs the check and prints its section. Returns the number of
   /// error-severity findings — zero while this check is a warning, and correct
   /// on its own terms if that ever changes.
-  int run() {
+  int run({DwCheckTally? tally}) {
     if (!_enabled) return 0;
 
     _collectFindings();
@@ -168,6 +169,7 @@ class DwFrameworkLockInspector {
     for (final finding in _findings) {
       print('  ${DwCheckType.frameworkRefsDiverged.reportLabel}: $finding');
     }
+    tally?.add(DwCheckType.frameworkRefsDiverged, _findings.length);
 
     return DwCheckType.frameworkRefsDiverged.severity == DwCheckSeverity.error
         ? _findings.length

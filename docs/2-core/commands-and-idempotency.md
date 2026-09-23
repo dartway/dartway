@@ -16,7 +16,7 @@ The result is **one value, untagged**:
 | `void` | nothing |
 | a nullable `R` | may be `null` |
 
-Any other `R` — a `List`, a `Map`, `Object`, an enum — is refused by `dartway generate`, naming the
+Any other `R` — a `List`, a `Map`, `Object`, an enum — is refused by `dart run dartway_cli:dartway generate`, naming the
 command: it would compile and fail when the first result is encoded.
 
 **A collection is wrapped in a DTO (D-006).** The client decodes the result from the command's type

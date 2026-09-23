@@ -194,7 +194,7 @@ process publishes only to sockets connected to that process. Scaling out is proc
 ## Same origin, and `allowedOrigins`
 
 The app reaches the server on the same origin it is served from: the deploy proxies `/dw/` and
-`/health` to the server, and `dartway dev` does the same locally
+`/health` to the server, and `dart run dartway_cli:dartway dev` does the same locally
 ([deploy](../5-tooling/deploy.md), [CLI](../5-tooling/cli.md)). So the server answers no CORS
 preflight, ever. A browser cannot send a cross-origin `application/json` call without one, which
 closes that door for calls without a list to maintain.

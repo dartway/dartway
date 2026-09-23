@@ -36,7 +36,7 @@ __SERVER_PKG__/
                            works in a real context, so the project's own auth
                            creates the accounts
   lib/__SERVER_PKG__.dart  the library: builds the DwAppServer
-  lib/generated/           written by `dartway generate` — never edited
+  lib/generated/           written by `dart run dartway_cli:dartway generate` — never edited
   lib/src/                 everything else
   lib/src/migrations/      fixed: migration files and migrations.dart
   test/
@@ -44,7 +44,7 @@ __SERVER_PKG__/
 
 The top level of `lib/` is closed: the package library, `generated/`, `src/`. Anything else there —
 and a missing `lib/src/migrations/migrations.dart` — is `invalidTopLevelLayout`, an error of
-`dartway check`. Inside `src/` arrange by the domain; the skeleton keeps row classes in `entities/`,
+`dart run dartway_cli:dartway check`. Inside `src/` arrange by the domain; the skeleton keeps row classes in `entities/`,
 handlers in `handlers/` (a list per area), and one file each for the auth config, the context
 extension, the channel rules, the upload rules, rows → data objects, and publications.
 
@@ -127,7 +127,7 @@ and copying a few fields into it is cheaper than a history nobody reads.
 Rebuild a stored row with its generated `copyWith`, never by listing fields in the
 constructor — a field added later silently takes its default in every row that path writes.
 
-After changing a row class: `dartway generate`, then `dart run bin/migrate.dart create <name>` from
+After changing a row class: `dart run dartway_cli:dartway generate`, then `dart run bin/migrate.dart create <name>` from
 `__SERVER_PKG__`, review the draft it writes, apply — `dartway-migrations`.
 
 ## 3. Queries
@@ -527,10 +527,10 @@ corrected.
 ## 10. Checks
 
 ```bash
-dartway generate --check      # generated code matches the sources
-dart run bin/migrate.dart check   # from __SERVER_PKG__, against the local database: migrations replay into the declared schema
-dartway test                  # server tests against a throwaway Postgres (and storage)
-dartway check                 # layout, generated code, migrations drift (with DW_DATABASE_*), and the Flutter checks
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)  # generated code matches the sources
+(cd __SERVER_PKG__ && dart run bin/migrate.dart check)       # against the local database: migrations replay into the declared schema
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server tests against a throwaway Postgres (and storage)
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # layout, generated code, migrations drift (with DW_DATABASE_*), and the Flutter checks
 ```
 
 A server test starts the real server on a throwaway database and calls it with real clients
@@ -550,5 +550,5 @@ call per access rule — `dartway-testing`, `dartway-access`.
 - [ ] Every object a command changed is published to every channel that shows it (`dartway-realtime`).
 - [ ] No SQL on `dw_*` tables; accounts through `DwAccountService`.
 - [ ] A new profile is created in `onAccountCreated`, in the account's transaction.
-- [ ] Row class changed → `dartway generate`, migration drafted and reviewed.
-- [ ] `dartway test` and `dartway check` pass.
+- [ ] Row class changed → `dart run dartway_cli:dartway generate`, migration drafted and reviewed.
+- [ ] `dart run dartway_cli:dartway test` and `dart run dartway_cli:dartway check` pass.

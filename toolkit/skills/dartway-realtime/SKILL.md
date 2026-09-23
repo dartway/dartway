@@ -263,7 +263,7 @@ of the item and the fields.
 ## 7. Test it
 
 Realtime is where silent failures live; each half gets a test in `__SERVER_PKG__/test/`, run by
-`dartway test`.
+`dart run dartway_cli:dartway test`.
 
 **Two real clients** — the author changes, the other one hears it without asking:
 

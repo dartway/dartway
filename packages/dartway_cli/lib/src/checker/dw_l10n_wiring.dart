@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
 import 'dw_check_type.dart';
+import 'dw_check_tally.dart';
 
 /// Verifies that the app's localization is actually wired.
 ///
@@ -48,7 +49,7 @@ class DwL10nWiringInspector {
   /// report is printed, the wording is the contract.
   List<String> get findings => List.unmodifiable(_findings);
 
-  int run() {
+  int run({DwCheckTally? tally}) {
     if (!_enabled) return 0;
     if (!Directory(p.join(flutterPackageDir.path, 'lib')).existsSync()) {
       return 0;
@@ -61,6 +62,7 @@ class DwL10nWiringInspector {
     for (final finding in _findings) {
       print('  ${DwCheckType.l10nNotWired.reportLabel}: $finding');
     }
+    tally?.add(DwCheckType.l10nNotWired, _findings.length);
     print(
       '\n  Every project is localized — that is a requirement, not a report on\n'
       '  how the project began. The skeleton ships all of the above; a project\n'

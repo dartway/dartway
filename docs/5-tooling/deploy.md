@@ -5,13 +5,14 @@ scripts in a project and no reason to write any: provisioning, rendering, the se
 restarts and verification belong to the framework.
 
 ```bash
+cd <project>_flutter
 # deploy/config.yaml already describes "local"; add a deployment beside it
 
-dartway deploy check --env staging --local            # the working copy only
-dartway deploy setup --env staging                    # provision the server, render the stack
+dart run dartway_cli:dartway deploy check --env staging --local            # the working copy only
+dart run dartway_cli:dartway deploy setup --env staging                    # provision the server, render the stack
 dartway secret set SMS_API_TOKEN --env staging        # what cannot be generated
-dartway deploy check --env staging                    # DNS, the server, the deployed hosts
-dartway deploy run   --env staging                    # update, build, start, verify
+dart run dartway_cli:dartway deploy check --env staging                    # DNS, the server, the deployed hosts
+dart run dartway_cli:dartway deploy run   --env staging                    # update, build, start, verify
 ```
 
 Every subcommand takes `--env <environment>` and refuses to guess without it, naming the
@@ -76,7 +77,7 @@ sends `/dw/`, `/dw/live` and `/health` to the server, so a browser makes same-or
 no preflight, and the server answers none. The web build is given that origin as
 `DW_BACKEND_URL`. The api host proxies everything to the server — calls, the live socket, and the
 project's own doors (`DwHttpRoute`) such as a webhook. The server serves no static files. Local
-development has the same shape through `dartway dev` ([The CLI](cli.md)).
+development has the same shape through `dart run dartway_cli:dartway dev` ([The CLI](cli.md)).
 
 **Storage has a host of its own because a presigned URL signs its host.** Browsers upload to MinIO
 directly (see [Uploads](../4-server/uploads.md)); a storage hidden behind the app's origin would be
@@ -185,7 +186,7 @@ up a change to the rendered files. `--dry-run` prints the rendered `docker-compo
 ## `run` — deploy
 
 First `run` evaluates the working-copy checks of `deploy check` and refuses on any error, pointing at
-`dartway deploy check --local` for the detail. Then:
+`dart run dartway_cli:dartway deploy check --local` for the detail. Then:
 
 1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
    repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`);
@@ -241,7 +242,7 @@ running. Nothing the invoking machine does — losing its network, or dying beca
 of the stack whose server step 7 replaces — stops a step midway.
 
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
-steps after the interruption still need someone to run them: **`dartway deploy run --env <env>
+steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>
 --resume`**. It reads the record of the last deployment on the server and, in that deployment's
 plan, passes over the steps that finished, waits for a step still running instead of starting it a
 second time, judges again from its output a finished step whose success is checked beyond its exit

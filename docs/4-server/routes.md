@@ -119,7 +119,7 @@ the project's, with a unique constraint on the event id.
 
 In a deploy, the API domain proxies every path to the server; the app's own domain proxies only
 `/dw/` and `/health`. So a webhook URL given to a provider is on the API domain
-([deploy](../5-tooling/deploy.md)). In development, `dartway dev` forwards `/dw/*` and `/health`,
+([deploy](../5-tooling/deploy.md)). In development, `dart run dartway_cli:dartway dev` forwards `/dw/*` and `/health`,
 and a project door only when named with `--api-path /webhooks/payments`
 ([CLI](../5-tooling/cli.md)).
 

@@ -479,7 +479,7 @@ Three things make it worth copying, and each is a rule of its own:
 the element it belongs to, collapsed by default. For a server boundary, the error pipeline. What must
 not happen is the trace being skipped because there was no obvious place to put it.
 
-**This is a default, not a law** (`.claude/CLAUDE.md` draws the line between the two): `dartway check`
+**This is a default, not a law** (`.claude/CLAUDE.md` draws the line between the two): `dart run dartway_cli:dartway check`
 cannot see it, and a project that has a better answer for its own boundary may record one. What is
 not a matter of taste is the failure it prevents — a rejection indistinguishable from every other
 reason nothing arrived.
@@ -530,7 +530,7 @@ Otherwise the refactoring legalizes the violation: the file got cleaner, and the
 
 The same principle as 1.7, but about size: **how much space a widget gets is the parent's call.**
 A widget that inflates itself breaks on the first reuse — and it breaks at runtime, the analyzer
-says nothing about it. `dartway check` fails on the two unarguable shapes — `Expanded` or
+says nothing about it. `dart run dartway_cli:dartway check` fails on the two unarguable shapes — `Expanded` or
 `SizedBox.expand` as the root of `build` (`widgetSizesItself`); the rest is the review's.
 
 ```dart
@@ -723,7 +723,7 @@ await ctx.db.featureRequests.update(FeatureRequestRow(
 await ctx.db.featureRequests.update(row.copyWith(status: RequestStatus.approved));
 ```
 
-**The ban takes nothing away.** `dartway generate` writes a `copyWith` for every data object and every
+**The ban takes nothing away.** `dart run dartway_cli:dartway generate` writes a `copyWith` for every data object and every
 row. A non-nullable field takes the new value or keeps the old one; a nullable field takes a
 `DwFieldPatch` — `keep` by default — so "leave it" and "clear it" are different calls, and the one
 reason to reach for a field-by-field rebuild ("I need to clear a nullable field") does not exist.

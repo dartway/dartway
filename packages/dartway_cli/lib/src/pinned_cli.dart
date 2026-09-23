@@ -19,6 +19,20 @@ import 'package:path/path.dart' as p;
 class DwPinnedCli {
   const DwPinnedCli._(this.pinnedVersion, this.runningVersion);
 
+  /// Commands that read or write an existing project, and so have to be the
+  /// CLI that project pins. The rest either make a project (`create`,
+  /// `quickstart`), repair its pins (`update`, `setup-ai`) or touch nothing
+  /// (`doctor`). The toolkit's command blocks are held to it by
+  /// `toolkit_pinned_commands_test.dart`.
+  static const Set<String> projectCommands = {
+    'generate',
+    'check',
+    'test',
+    'deploy',
+    'dev',
+    'stats',
+  };
+
   /// The version the project pins, or null when it pins none (a directory
   /// that is not a DartWay project, or a project without the dev dependency).
   final String? pinnedVersion;

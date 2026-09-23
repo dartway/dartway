@@ -2,12 +2,12 @@
 name: dartway-migrations
 description: >-
   Changing the database schema of a DartWay project (DartWay projects): a row class changed →
-  `dartway generate` → `dart run bin/migrate.dart create <name>` against the local database (it
+  `dart run dartway_cli:dartway generate` → `dart run bin/migrate.dart create <name>` against the local database (it
   replays every migration on a scratch database and diffs against the row classes) → review the
   draft and resolve every `decisionRequired(...)` (a drop that may be a rename, a NOT NULL column
   on a table with rows — `addColumn(..., backfill:)`, a NOT NULL change, a type change) → `rehash`
   after any hand edit, before the migration is applied anywhere → `status` / `apply` / `rollback`
-  → `check` (and `dartway check`'s `migrationsDrift`). Never edit an applied migration, never
+  → `check` (and `dart run dartway_cli:dartway check`'s `migrationsDrift`). Never edit an applied migration, never
   import row classes into one, data work in SQL through `m.sql` / `m.query`. The server applies
   pending migrations as it starts and refuses to start when the ledger and the code disagree
   (missing, changed, dirty). Use when a row class, a column, an index or a foreign key changes,
@@ -19,7 +19,7 @@ description: >-
 The schema has two descriptions, and this skill keeps them equal:
 
 - **the row classes** in `__SERVER_PKG__/lib/src/` (`@DwSqlTable`, `@DwForeignKey`, `@DwUniqueColumn`,
-  `DwTableIndex` …), from which `dartway generate` writes `lib/generated/dw_schema.dart` — the
+  `DwTableIndex` …), from which `dart run dartway_cli:dartway generate` writes `lib/generated/dw_schema.dart` — the
   schema the code expects;
 - **the migrations** in `__SERVER_PKG__/lib/src/migrations/` — Dart classes extending
   `DwDatabaseMigration`, registered in `migrations.dart`, which is what actually builds a database.
@@ -53,16 +53,17 @@ disagree, nothing changed), `3` `check` found a difference, `64` usage.
 
 ### 1. Change the row class, then generate
 
-Edit the row class (or add one), then from the project root:
+Edit the row class (or add one), then, starting at the project root — the pinned CLI runs in `__FLUTTER_PKG__`:
 
 ```bash
-dartway generate
+cd __FLUTTER_PKG__
+dart run dartway_cli:dartway generate
 ```
 
 **Generate first, always.** `bin/migrate.dart` passes the *generated* schema to the CLI. Run
 `create` before `generate` and the diff is taken against yesterday's schema: the draft comes out
 empty ("no schema changes"), and you ship a data-only migration for a change that never happened.
-`dartway generate --check` (and `dartway check`'s `generatedCodeStale`) is how to tell the tree is
+`dart run dartway_cli:dartway generate --check` (and `dart run dartway_cli:dartway check`'s `generatedCodeStale`) is how to tell the tree is
 current.
 
 ### 2. Write the draft
@@ -96,7 +97,7 @@ one is replaced, which is the point: an unresolved decision fails in the editor,
 and in every build, and cannot be deployed by accident.
 
 **While a decision is open, `bin/migrate.dart` itself does not compile** — it imports the
-migration list. Resolve the draft before running any other `migrate` command, `dartway test` or
+migration list. Resolve the draft before running any other `migrate` command, `dart run dartway_cli:dartway test` or
 the server.
 
 Each decision carries a comment with the options. The cases:
@@ -215,7 +216,7 @@ On scratch databases, never on yours, it verifies:
 create that a row class has no way to declare — a check constraint, a partial index, a multi-column
 foreign key — so it is left out of the comparison on purpose). `FAIL` lines fail it with exit `3`.
 
-`dartway check` runs the same command as its `migrationsDrift` check — an error — when
+`dart run dartway_cli:dartway check` runs the same command as its `migrationsDrift` check — an error — when
 `DW_DATABASE_*` is set, and says "Not checked" rather than passing when it is not. So "`dartway
 check` is green" proves the migrations only if the output did not say it skipped them.
 
@@ -270,7 +271,7 @@ branch meets code from another. Name that to the human rather than "fixing" eith
 
 ## What not to do
 
-- **Do not run `create` before `dartway generate`**, and do not hand-edit
+- **Do not run `create` before `dart run dartway_cli:dartway generate`**, and do not hand-edit
   `lib/generated/dw_schema.dart` to make a diff appear.
 - **Do not accept a drop + add pair without asking whether it is a rename.**
 - **Do not replace `decisionRequired` with whatever compiles.** An empty backfill string, a
@@ -285,7 +286,7 @@ branch meets code from another. Name that to the human rather than "fixing" eith
 
 ## Checklist
 
-- [ ] Row class changed → `dartway generate` → `create <name>`.
+- [ ] Row class changed → `dart run dartway_cli:dartway generate` → `create <name>`.
 - [ ] Every `decisionRequired` resolved, in `up` and in `down`; drop + add pairs checked for renames.
 - [ ] No imports of row classes or `lib/` in the migration; data work in `m.sql` / `m.query`.
 - [ ] `rehash` after the last edit, before the first apply.

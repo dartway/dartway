@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'dw_check_type.dart';
+import 'dw_check_tally.dart';
 
 /// How a check runs a Dart command in a package: `dart <arguments>` in
 /// [workingDirectory]. Injected so the tests can drive the reporting without
@@ -68,7 +69,7 @@ class DwGeneratedCodeInspector {
 
   /// Runs the check and prints the section. Returns the number of
   /// error-severity findings.
-  int run() {
+  int run({DwCheckTally? tally}) {
     final serverDir = serverPackageDir;
     if (!_enabled || serverDir == null || !serverDir.existsSync()) return 0;
 
@@ -112,10 +113,11 @@ class DwGeneratedCodeInspector {
     for (final finding in _findings) {
       print('  ${DwCheckType.generatedCodeStale.reportLabel}: $finding');
     }
+    tally?.add(DwCheckType.generatedCodeStale, _findings.length);
     if (_findings.isNotEmpty) {
       print(
-        '\n  Fix — from ${serverDir.parent.path}:\n'
-        '    dartway generate\n'
+        '\n  Fix — in the Flutter package of ${serverDir.parent.path}:\n'
+        '    dart run dartway_cli:dartway generate\n'
         '  and commit what it writes. Generated files are never edited by '
         'hand.',
       );
@@ -171,7 +173,7 @@ class DwMigrationsInspector {
   List<String> get findings => List.unmodifiable(_findings);
   List<String> get notes => List.unmodifiable(_notes);
 
-  int run() {
+  int run({DwCheckTally? tally}) {
     final serverDir = serverPackageDir;
     if (!_enabled || serverDir == null) return 0;
     if (!File(p.join(serverDir.path, migrateScript)).existsSync()) return 0;
@@ -218,6 +220,7 @@ class DwMigrationsInspector {
     for (final finding in _findings) {
       print('  ${DwCheckType.migrationsDrift.reportLabel}: $finding');
     }
+    tally?.add(DwCheckType.migrationsDrift, _findings.length);
     if (_findings.isNotEmpty) {
       print(
         '\n  A schema change the migrations miss: '

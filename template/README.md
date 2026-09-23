@@ -88,7 +88,7 @@ its codes is the admin, so there is no default. A real delivery goes into
 2. **Server** — a row class in `lib/src/entities/` (`@DwSqlTable`), a handler
    per request and command in `lib/src/handlers/` with its access rule,
    publishing what a command changed to the channels that show it.
-3. `dartway generate` — codecs, the protocol registry, tables and the schema.
+3. `dart run dartway_cli:dartway generate` — codecs, the protocol registry, tables and the schema.
 4. `dart run bin/migrate.dart create <name>` (with `DW_DATABASE_*` set) — a
    migration from the row classes; review it, it is yours.
 5. **App** — a screen with `ref.watch(dw.request(MyRequest()))`, a button with
@@ -98,16 +98,20 @@ The `.claude/` toolkit guides an AI assistant through the same steps.
 
 ## Checks and tests
 
+The project's own commands run the CLI it pins, from the Flutter package:
+`dart run dartway_cli:dartway <command>` in `dartway_starter_flutter/`. A
+globally activated `dartway` refuses them when it is another version.
+
 ```bash
-dartway generate --check                                  # generated code is up to date
+(cd dartway_starter_flutter && dart run dartway_cli:dartway generate --check) # generated code is up to date
 (cd dartway_starter_server && dart run bin/migrate.dart check)   # migrations produce the schema (DW_DATABASE_*)
-dartway test                                              # server acceptance, real Postgres and MinIO
+(cd dartway_starter_flutter && dart run dartway_cli:dartway test) # server acceptance, real Postgres and MinIO
 (cd dartway_starter_shared && dart test)                  # the contract
 (cd dartway_starter_flutter && flutter test)              # the app on an in-memory server
-dartway check                                             # the conventions
+(cd dartway_starter_flutter && dart run dartway_cli:dartway check) # the conventions
 ```
 
-`dartway test` starts a Postgres and a MinIO for the run, on ports Docker
+`dart run dartway_cli:dartway test` starts a Postgres and a MinIO for the run, on ports Docker
 picks, and removes them when it ends: nothing is shared with the development
 containers or with another project, and nothing survives. Each test file
 creates its own database and its own buckets.
@@ -116,7 +120,7 @@ creates its own database and its own buckets.
 
 `deploy/README.md`: one server process configured by its environment, the web
 app on its own host with `/dw/` proxied to the server, Postgres and optional
-MinIO — `dartway deploy setup`, then `dartway deploy`.
+MinIO — `dart run dartway_cli:dartway deploy setup`, then `dart run dartway_cli:dartway deploy`.
 
 ## Continuous integration
 

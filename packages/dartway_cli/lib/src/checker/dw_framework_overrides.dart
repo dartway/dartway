@@ -7,6 +7,7 @@ import 'package:yaml/yaml.dart';
 
 import 'dw_check_type.dart';
 import 'dw_framework_lock.dart';
+import 'dw_check_tally.dart';
 
 /// Reports a `dependency_overrides` pin on a framework package that the
 /// framework has caught up with (D-032).
@@ -42,7 +43,7 @@ class DwFrameworkOverridesInspector {
 
   List<String> get findings => List.unmodifiable(_findings);
 
-  int run() {
+  int run({DwCheckTally? tally}) {
     if (!_enabled) return 0;
     _collectFindings();
     if (_findings.isEmpty) return 0;
@@ -50,6 +51,7 @@ class DwFrameworkOverridesInspector {
     for (final finding in _findings) {
       print('  ${DwCheckType.frameworkOverrideOutlived.reportLabel}: $finding');
     }
+    tally?.add(DwCheckType.frameworkOverrideOutlived, _findings.length);
     return DwCheckType.frameworkOverrideOutlived.severity ==
             DwCheckSeverity.error
         ? _findings.length

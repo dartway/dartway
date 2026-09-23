@@ -48,7 +48,7 @@ short and points at skills for the how.
 
 **The laws are the checker's error set.** A law is a rule a project does not override; everything
 else in the toolkit is a default a project may replace with its own rule. The line is not drawn by
-taste: the published law list is exactly the checks `dartway check` fails on (fifteen today), and
+taste: the published law list is exactly the checks `dart run dartway_cli:dartway check` fails on (fifteen today), and
 `packages/dartway_cli/test/toolkit_law_list_test.dart` holds the two together. A check that is only a
 warning is one with a second legitimate reading, and a project cannot be forbidden to decide that for
 itself.
@@ -84,7 +84,7 @@ skills → `dartway-finish`.
 Two commands come with them. **`/commit`** writes one conventional-commit line in English and decides
 nothing local — whether commits carry a ticket belongs to the project's own `CLAUDE.md`. **`/dartway-checkup`**
 reports the state of the whole project and what is worth taking into work next: it runs the
-project's gates first (`dartway check`, `dartway generate --check`, the analyzers, the tests), compares
+project's gates first (`dart run dartway_cli:dartway check`, `dart run dartway_cli:dartway generate --check`, the analyzers, the tests), compares
 them with what CI actually runs, measures how far the project trails the framework, and only then
 spends reading on features.
 

@@ -13,7 +13,7 @@ my_app/
   my_app_shared/     the contract: data objects, requests, commands, channels, refusal codes
   my_app_server/     row classes, handlers, access and channel rules, migrations
   my_app_flutter/    the app: features, navigation, the UI kit
-  deploy/            the deployment's configuration — dartway deploy reads it
+  deploy/            the deployment's configuration — dart run dartway_cli:dartway deploy reads it
   .claude/           the agent toolkit, installed by create and committed
   docs/dev_notes/    the project's own findings, one file per finding
   CLAUDE.md          the project's own rules for agents — yours, never overwritten
@@ -195,15 +195,15 @@ someone.
 
 | File | Written by | From |
 |---|---|---|
-| `*_shared/lib/src/**/*.dw.dart` | `dartway generate` | data objects, requests, commands: codecs and equality |
-| `*_shared/lib/generated/dw_protocol.dart` | `dartway generate` | every DTO of the contract: the protocol registry |
-| `*_server/lib/src/entities/*.dw.dart` | `dartway generate` | row classes: the typed table definitions |
-| `*_server/lib/generated/dw_schema.dart` | `dartway generate` | row classes: the schema and the `db.<table>` getters |
+| `*_shared/lib/src/**/*.dw.dart` | `dart run dartway_cli:dartway generate` | data objects, requests, commands: codecs and equality |
+| `*_shared/lib/generated/dw_protocol.dart` | `dart run dartway_cli:dartway generate` | every DTO of the contract: the protocol registry |
+| `*_server/lib/src/entities/*.dw.dart` | `dart run dartway_cli:dartway generate` | row classes: the typed table definitions |
+| `*_server/lib/generated/dw_schema.dart` | `dart run dartway_cli:dartway generate` | row classes: the schema and the `db.<table>` getters |
 | `*_server/lib/src/migrations/m<timestamp>_<name>.dart` | `dart run bin/migrate.dart create <name>` | the difference between the schema and the migrations — a draft you review, then yours |
 | `*_flutter/lib/l10n/gen/` | Flutter's `gen-l10n` | the ARB files |
 
 **Generated files are never edited by hand, and they are committed.** The next generation would erase
-an edit silently, and `dartway generate --check` — part of `dartway check` — fails on any generated
+an edit silently, and `dart run dartway_cli:dartway generate --check` — part of `dart run dartway_cli:dartway check` — fails on any generated
 file that no longer matches its sources, or whose source is gone. The codecs are the wire: a field a
 stale part does not know compiles, starts, and travels without that field.
 
@@ -217,7 +217,7 @@ place is a database that no longer agrees with its history.
 The deployment is configuration, not scripts: `deploy/config.yaml` describes **every** environment of
 the project — each deployment's machine, `api` and `app` hosts, optional site and storage, and
 `local`, which is what your own machine starts a server with — plus `requires`, what the project
-needs wherever it runs. `dartway deploy setup`, `check` and `run` do the rest; `deploy/secrets.yaml`
+needs wherever it runs. `dart run dartway_cli:dartway deploy setup`, `check` and `run` do the rest; `deploy/secrets.yaml`
 is the git-ignored half of the same file, and `dartway secret` maintains it. The server's `Dockerfile`
 and the Flutter package's `Dockerfile` and `nginx.conf` are the images it builds. `deploy/README.md`
 explains the stack; [deploy](../5-tooling/deploy.md) explains the command.

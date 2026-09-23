@@ -3,9 +3,9 @@ name: dartway-finish
 description: >-
   Finishing a dartway task before a commit/PR (DartWay projects): the "definition of done".
   Audits the diff against the base branch using the dartway-clean-code contract (contract, server,
-  app), runs the checks (`dartway generate --check`, `dart run bin/migrate.dart check` when row
+  app), runs the checks (`dart run dartway_cli:dartway generate --check`, `dart run bin/migrate.dart check` when row
   classes or migrations changed, the analyzers and custom_lint, the shared package's `dart test`,
-  `dartway test`, `flutter test`, `dartway check`), reconciles the descriptions that live in the
+  `dart run dartway_cli:dartway test`, `flutter test`, `dart run dartway_cli:dartway check`), reconciles the descriptions that live in the
   code — `DwFeatureSpec` for a screen, doc comments above handlers and rules for the server, above
   DTOs for the contract — with what changed, compares `TODO(dartway, checked: …)` workaround markers
   with pubspec.lock, then SHOWS suggestions and applies ONLY what was confirmed — it never changes
@@ -45,7 +45,7 @@ package: `__SHARED_PKG__`, `__SERVER_PKG__`, `__FLUTTER_PKG__`.
 
 **Exclude generated code from the audit** — it is not reviewed, it is regenerated: `**/generated/**`,
 `*.dw.dart`, `lib/l10n/gen/`. We audit handwritten code only. A generated file in the diff whose
-source did not change is a signal, not a subject: `dartway generate` was run over a different tree,
+source did not change is a signal, not a subject: `dart run dartway_cli:dartway generate` was run over a different tree,
 or not run at all (A.5).
 
 ### A.2 Auditing the code against the contract
@@ -155,7 +155,7 @@ to look for: it is **in the same diff**.
 - **The contract changed** — reconcile the doc comments above the DTOs, their fields, the refusal codes
   and the channel kinds: what a field means, its invariants, which channel a request listens on and
   why. Both sides of the stack read this meaning; it is written once, here.
-- A new feature without a `DwFeatureSpec` is not finished. `dartway check` emits `featureSpecMissing`.
+- A new feature without a `DwFeatureSpec` is not finished. `dart run dartway_cli:dartway check` emits `featureSpecMissing`.
 - Tempted to write a document about what you just did — don't. If the urge is about one feature, the
   description did not fit into the spec, and the question is why the spec does not answer it. If it is
   cross-cutting (an analytics event registry, a settings catalogue, a role matrix), it belongs in code —
@@ -178,7 +178,7 @@ Check separately, by eye, the things that only break at runtime:
   provider on every build. `dw.request(...)` and friends are keyed by the request's generated equality;
   a hand-written family needs a record or a class with `==` and `hashCode`.
 - **A request or command added to the contract without a handler.** It compiles on both sides; the
-  server refuses to start. `dartway test` catches it, and so does starting the server — make sure one
+  server refuses to start. `dart run dartway_cli:dartway test` catches it, and so does starting the server — make sure one
   of them ran (A.5).
 
 ### A.3b Tests are part of the refactoring surface
@@ -232,28 +232,28 @@ In this order; each answers a question the next cannot. Report each as run and i
 run and why.
 
 ```bash
-dartway generate --check                                   # generated code matches its sources
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check) # generated code matches its sources
 (cd __SERVER_PKG__ && dart run bin/migrate.dart check)      # when row classes or migrations changed; needs DW_DATABASE_*
 (cd __SHARED_PKG__ && dart analyze && dart test)            # the contract
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && flutter analyze && dart run custom_lint)
-dartway test                                                # server acceptance, real Postgres and MinIO
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server acceptance, real Postgres and MinIO
 (cd __FLUTTER_PKG__ && flutter test)                        # screens on the in-memory server
-dartway check                                               # the conventions; errors fail it
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # the conventions; errors fail it
 ```
 
-- **`dartway generate --check` first.** Everything after it compiles against generated code; a stale
+- **`dart run dartway_cli:dartway generate --check` first.** Everything after it compiles against generated code; a stale
   part makes the rest answer questions about a tree that does not exist.
 - **Analyze whole packages, without a path argument.** `dart analyze lib` skips `test/` — where moves and
   API changes settle. A green `dart analyze lib` with 59 compilation errors in `test/` actually happened.
 - **`dart run custom_lint` in the Flutter package is mandatory.** `flutter analyze` does NOT run its
   rules, and `dartway_lints` is what catches raw styles outside the kit and a `ProviderScope` written
   by the app. A green `flutter analyze` with a red `custom_lint` is a classic trap.
-- **`dartway test` and `flutter test` actually run, not "the tests probably weren't touched".** The
+- **`dart run dartway_cli:dartway test` and `flutter test` actually run, not "the tests probably weren't touched".** The
   analyzer proves the code compiles and says nothing about behaviour. A test failing after a refactor
   starts with the hypothesis "I broke it", and only after checking against the base branch becomes "it
   was red before me".
-- **`dartway check`**: errors are law and fail it; look at the features the task touched in its per-feature
+- **`dart run dartway_cli:dartway check`**: errors are law and fail it; look at the features the task touched in its per-feature
   report, not just the counter. **It runs `migrationsDrift` only with `DW_DATABASE_*` set** — when it
   prints that migrations were not checked, it has not passed them; run `migrate check` yourself.
 - **A `frameworkRefsDiverged` warning is worth acting on even when the task did not cause it** — the
@@ -371,8 +371,8 @@ For every item give a **concrete proposed edit**, ready to apply. Mark anything 
   files the task never touched, and the diff stops answering "what did this change":
   `git diff --name-only origin/__BASE_BRANCH__...HEAD -- '*.dart' | xargs dart format`. A package that
   really needs formatting is its own commit.
-- After applying, re-run the checks the edits touch (a DTO edit → `dartway generate --check` and the
-  contract test; a handler → `dartway test`; a widget → `flutter test` and `dartway check`).
+- After applying, re-run the checks the edits touch (a DTO edit → `dart run dartway_cli:dartway generate --check` and the
+  contract test; a handler → `dart run dartway_cli:dartway test`; a widget → `flutter test` and `dart run dartway_cli:dartway check`).
 - Do not touch anything debatable/architectural, even if the author said "all of it" — ask again about
   such items separately.
 - At the end — a short summary: what was applied, what is left to the author, which checks are green.

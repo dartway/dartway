@@ -13,13 +13,14 @@ dart pub global activate dartway_cli
 dev dependency of its Flutter package, at the same version as the rest of the framework it pins:
 
 ```bash
+cd <project>_flutter
 dart run dartway_cli:dartway generate       # the project's own CLI, whatever is on PATH
 ```
 
 A globally activated `dartway` is a second copy with a life of its own, and the two drift — a global
-CLI from before a release has no `generate` at all, while the skills of the project it is standing
-in name `dartway generate` as the only way to write `*.dw.dart`. What that looks like is "unknown
-command", three steps from the cause. So `generate`, `check`, `test`, `deploy`, `dev` and `stats`
+CLI from before a release has no `generate` at all, while the project it is standing in has no
+other way to write `*.dw.dart`. What that looks like is "unknown command", three steps from the
+cause. So `generate`, `check`, `test`, `deploy`, `dev` and `stats`
 refuse to run when the CLI that started them is not the one the project pins, and say which command
 would have worked. `create` and `quickstart` (there is no project yet), `update` and `setup-ai`
 (they repair the pins) and `doctor` (it touches nothing) run either way.
@@ -89,7 +90,7 @@ Six checks, each with the exact fix when it fails:
 | Flutter `>=3.44.0` | |
 | git, with `user.name` and `user.email` | `create` commits the new project. A missing binary fails; a missing identity warns — the project is complete, but has no initial commit |
 | A pub host that answers | `pub get` sets no deadline on a connection that opens and goes quiet, so a filtered route surfaces as a resolve step that hangs without a word. The probe asks for bytes rather than a socket (a TCP connect succeeds even when the TLS handshake after it is filtered), waits 10 seconds, and honours `PUB_HOSTED_URL` |
-| A responding Docker daemon | Postgres and MinIO come from it, for development and for `dartway test`. Not installed and not running are reported apart |
+| A responding Docker daemon | Postgres and MinIO come from it, for development and for `dart run dartway_cli:dartway test`. Not installed and not running are reported apart |
 | The pub global bin directory on `PATH` | The cause of `dartway: command not found` right after a successful install. A warning: `dart pub global run dartway_cli:dartway` works regardless |
 
 Exit code `1` when anything fails, `0` otherwise (warnings included), so an agent or a CI step can
@@ -118,7 +119,7 @@ What the copy does beyond copying:
 - skips `.dart_tool`, `build`, `.git`, `.idea`, `.fvm`, `ephemeral`, `node_modules` and
   `pubspec.lock`;
 - runs `dart format` over `bin/`, `lib/` and `test/` of every package — a rename changes the length
-  of names, and without this the first commit would not be formatted and `dartway generate
+  of names, and without this the first commit would not be formatted and `dart run dartway_cli:dartway generate
   --check` would depend on where lines happened to break;
 - strips the monorepo-only `dependency_overrides` block (with the comments above it) from every
   package pubspec. Those overrides point at sibling folders of the monorepo; in a project they lead
@@ -228,9 +229,10 @@ in that order.
 ## `dartway generate` — the generated code
 
 ```bash
-dartway generate            # write
-dartway generate --check    # write nothing; exit 1 when a generated file is out of date or stale
-dartway generate -v         # list every file written or removed
+cd <project>_flutter
+dart run dartway_cli:dartway generate            # write
+dart run dartway_cli:dartway generate --check    # write nothing; exit 1 when a generated file is out of date or stale
+dart run dartway_cli:dartway generate -v         # list every file written or removed
 ```
 
 Runs `dartway_generator` over the project: DTO codecs (`*.dw.dart` parts) and the protocol registry
@@ -248,16 +250,17 @@ there. Only when no package resolves it does it fall back to a globally activate
 `dartway_generator`; without either it stops and says how to add one. Run `dart pub get` first: an
 unresolved package has no package config to find the generator in.
 
-The exit code is the generator's. `--check` is what CI runs, and what `dartway check` reports as
+The exit code is the generator's. `--check` is what CI runs, and what `dart run dartway_cli:dartway check` reports as
 `generatedCodeStale`.
 
 ## `dartway check` — the conventions, enforced
 
 ```bash
-dartway check
-dartway check --type forbiddenUiUsage
-dartway check --level error
-dartway check --dir lib/app/invoices
+cd <project>_flutter
+dart run dartway_cli:dartway check
+dart run dartway_cli:dartway check --type forbiddenUiUsage
+dart run dartway_cli:dartway check --level error
+dart run dartway_cli:dartway check --dir lib/app/invoices
 ```
 
 Runs the convention checks from the project root or from inside the `*_flutter` package: the
@@ -275,18 +278,19 @@ What each check means, which ones fail, and why is [The conventions checker](con
 ## `dartway dev` — the web app and the server on one origin
 
 ```bash
-dartway dev web                                  # flutter run -d web-server + the proxy
-dartway dev web --api http://localhost:8080 -- --profile   # after -- goes to `flutter run`
+cd <project>_flutter
+dart run dartway_cli:dartway dev web                                  # flutter run -d web-server + the proxy
+dart run dartway_cli:dartway dev web --api http://localhost:8080 -- --profile   # after -- goes to `flutter run`
 
-dartway dev proxy                                # the origin alone, in front of servers you run
-dartway dev proxy --web http://localhost:5000    # `flutter run -d web-server --web-port 5000`
-dartway dev proxy --web-dir build/web            # a built app instead
+dart run dartway_cli:dartway dev proxy                                # the origin alone, in front of servers you run
+dart run dartway_cli:dartway dev proxy --web http://localhost:5000    # `flutter run -d web-server --web-port 5000`
+dart run dartway_cli:dartway dev proxy --web-dir build/web            # a built app instead
 ```
 
 **The server answers no CORS, in development too** (D-039). A deployed web app reaches `/dw/*` and
 `/health` on its own origin, because the front proxy serves the app and proxies those paths beside
 it — see [Deploying the server](deploy.md). `flutter run -d chrome` breaks that on a laptop: the app
-is served from a port of its own and every call is cross-origin. `dartway dev` restores the deployed
+is served from a port of its own and every call is cross-origin. `dart run dartway_cli:dartway dev` restores the deployed
 shape: **one origin, `http://localhost:8000` by default**, where `/dw/*` (the `/dw/live` socket
 included) and `/health` go to the server and everything else to the web app.
 
@@ -327,9 +331,10 @@ Two things to know:
 ## `dartway test` — the server tests, on a database of their own
 
 ```bash
-dartway test                        # from the project root
-dartway test -- --name 'sign-in'    # everything after -- goes to `dart test`
-dartway test --keep                 # leave the containers up to look inside them
+cd <project>_flutter
+dart run dartway_cli:dartway test                        # finds the project from here
+dart run dartway_cli:dartway test -- --name 'sign-in'    # everything after -- goes to `dart test`
+dart run dartway_cli:dartway test --keep                 # leave the containers up to look inside them
 ```
 
 Starts a Postgres and a MinIO for this run on ports Docker picks, waits until both accept
@@ -350,9 +355,10 @@ Why a database per run rather than a compose service, and how a suite uses it, i
 ## `dartway deploy` — the server, without a folder of shell scripts
 
 ```bash
-dartway deploy setup --env staging
-dartway deploy check --env staging
-dartway deploy run   --env staging
+cd <project>_flutter
+dart run dartway_cli:dartway deploy setup --env staging
+dart run dartway_cli:dartway deploy check --env staging
+dart run dartway_cli:dartway deploy run   --env staging
 dartway secret set SMS_API_TOKEN --env staging
 ```
 
@@ -378,7 +384,8 @@ whole story.
 ## `dartway stats` — what actually grew
 
 ```bash
-dartway stats
+cd <project>_flutter
+dart run dartway_cli:dartway stats
 ```
 
 Files, total lines, average, maximum and minimum per top-level folder of the Flutter package's

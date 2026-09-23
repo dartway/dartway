@@ -3,7 +3,7 @@ name: dartway-feature-scaffold
 description: >-
   Step-by-step playbook for building a DartWay feature end to end: (1) the contract in
   __SHARED_PKG__ — data object, requests with channels, commands with DwSelfValidating, refusal
-  codes; (2) the server in __SERVER_PKG__ — row class, `dartway generate`, a reviewed migration
+  codes; (2) the server in __SERVER_PKG__ — row class, `dart run dartway_cli:dartway generate`, a reviewed migration
   draft, one handler per call with its access rule, rows mapped to data objects in batch, publishing
   what a command changed; (3) the Flutter feature in __FLUTTER_PKG__ — a folder with one public file
   declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)),
@@ -50,7 +50,7 @@ Decide what the screen shows and what the user changes, then declare it (`dartwa
    timestamps or a status the server moves; `DwFieldPatch` for clearable fields;
    `implements DwSelfValidating` for input rules.
 4. **Refusal codes** in the project's refusal enum, each with a doc comment saying when it happens.
-5. Export the new file from `lib/__SHARED_PKG__.dart`, run `dartway generate`, and extend the shared
+5. Export the new file from `lib/__SHARED_PKG__.dart`, run `dart run dartway_cli:dartway generate`, and extend the shared
    contract test (round trip, `validate()`, `onUpdate`).
 
 If the change alters a DTO that installed app builds already use, check the table in
@@ -62,7 +62,7 @@ Details in `dartway-server`; the order:
 
 1. **Row class** (`InvoiceRow extends DwTableRow`, `@DwSqlTable`, foreign keys, indexes for the
    queries the handlers will make). Nullable only when the domain allows absence.
-2. **`dartway generate`** — writes the row part and `lib/generated/dw_schema.dart`
+2. **`dart run dartway_cli:dartway generate`** — writes the row part and `lib/generated/dw_schema.dart`
    (`db.invoices`).
 3. **Migration draft:** from `__SERVER_PKG__`, `dart run bin/migrate.dart create <snake_name>`. It
    writes a draft into `lib/src/migrations/` and registers it. **Review it before applying** — from
@@ -86,7 +86,7 @@ A feature lives in a **zone**, and the zones are four folders at the top of `lib
 itself), `admin/` (the admin panel), `auth/` (signing in), `common/` (features more than one zone draws
 on). The rest of the top level is closed too: `core/`, `shared/`, `ui_kit/`, `l10n/`, plus `main.dart`
 and `__FLUTTER_APP_FILE__`. There is no `data/` (the data layer is `dw.request` and `dw.command` over
-the contract) and no `domain/` (the rules live in the contract and the handlers). `dartway check`
+the contract) and no `domain/` (the rules live in the contract and the handlers). `dart run dartway_cli:dartway check`
 reports anything else as `invalidTopLevelLayout` — a zone name used lower down included: `app/admin/`
 is not the admin panel, it is a group that has quietly left every check written for zones.
 
@@ -151,7 +151,7 @@ provider in one file — provider first.
 
 1. **Navigation** — the entry and exit points; a route if needed (`dartway-navigation`).
 2. **The public widget**, `implements DwFeatureWidget` with its `DwFeatureSpec` (below). Without it
-   `dartway check` warns `featureSpecMissing`.
+   `dart run dartway_cli:dartway check` warns `featureSpecMissing`.
 3. **Reads:** `ref.watch(dw.request(...))` (or `dw.pages` / `dw.table` / `dw.window`), with the section
    it exists for rendering its error — the skeleton's shared section extension (`dartway-data-layer`).
 4. **Changes:** `dw.action((_) => dw.command(...))` on the button, in the widget that owns it; a
@@ -274,7 +274,7 @@ Tests (`dartway-testing`), by layer:
 
 - **shared** (`dart test` in `__SHARED_PKG__`): round trip of the new DTOs, `validate()`, `onUpdate`
   of the new requests;
-- **server** (`dartway test`): each handler's behaviour on real clients and a real database; **one
+- **server** (`dart run dartway_cli:dartway test`): each handler's behaviour on real clients and a real database; **one
   refused call per access rule** (`dartway-access`); a second client hearing what a command published
   (`dartway-realtime`);
 - **Flutter** (`flutter test` in `__FLUTTER_PKG__`): a widget test of the feature over the fake server
@@ -284,11 +284,11 @@ Tests (`dartway-testing`), by layer:
 Checks, all green before `dartway-finish`:
 
 ```bash
-dartway generate --check              # generated code matches its sources
-dart run bin/migrate.dart check       # in __SERVER_PKG__, against the local database: migrations match the rows
-dartway test                          # server tests with a throwaway Postgres and storage
-flutter test                          # in __FLUTTER_PKG__
-dartway check                         # layout, features, UI kit, l10n, generated code, migrations
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)  # generated code matches its sources
+(cd __SERVER_PKG__ && dart run bin/migrate.dart check)       # against the local database: migrations match the rows
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server tests with a throwaway Postgres and storage
+(cd __FLUTTER_PKG__ && flutter test)
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # layout, features, UI kit, l10n, generated code, migrations
 ```
 
 Then run `dartway-finish`: it audits the diff against the cleanliness contract, reconciles the
@@ -297,11 +297,11 @@ Then run `dartway-finish`: it audits the diff against the cleanliness contract, 
 ## Checklist
 
 - [ ] Contract: data object, requests (kind, fields, channels), commands (input only, `validate()`),
-      refusal codes; `dartway generate`; shared test extended.
+      refusal codes; `dart run dartway_cli:dartway generate`; shared test extended.
 - [ ] Server: row class, generated, migration drafted **and reviewed**; one handler per call with an
       access rule; batch mapping; every change published; channel rule for a new kind.
 - [ ] Flutter: one public widget with a `DwFeatureSpec`; blocks in `widgets/`; constructible from its
       address; reads with an error branch; changes through `dw.action`; texts and refusal texts in
       every `.arb`.
 - [ ] Tests at each layer, including refused calls and a live update.
-- [ ] `dartway generate --check`, `migrate check`, `dartway test`, `flutter test`, `dartway check` pass.
+- [ ] `dart run dartway_cli:dartway generate --check`, `migrate check`, `dart run dartway_cli:dartway test`, `flutter test`, `dart run dartway_cli:dartway check` pass.

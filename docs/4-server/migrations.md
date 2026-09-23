@@ -196,7 +196,7 @@ transaction: an irreversible migration in the middle leaves the database as it w
    order.
 4. Drops the throwaway database.
 
-Run `dartway generate` first: `create` reads the generated schema, not the row class sources.
+Run `dart run dartway_cli:dartway generate` first: `create` reads the generated schema, not the row class sources.
 
 No schema difference writes an empty migration, for data work. A change the diff cannot decide is
 written as a call to `decisionRequired('…')`, with a comment naming the options:
@@ -226,7 +226,7 @@ check.
 
 ## `check`
 
-`check` is what CI runs, and what `dartway check` runs as `migrationsDrift`:
+`check` is what CI runs, and what `dart run dartway_cli:dartway check` runs as `migrationsDrift`:
 
 1. **Files** — every migration's declared checksum matches its source; every file is registered in
    `migrations.dart`, and every registered migration has a file.
@@ -241,7 +241,7 @@ check.
 It needs `DW_DATABASE_*` pointing at a Postgres where throwaway databases can be created — the
 development one will do.
 
-`dartway check` runs `dart run bin/migrate.dart check` in the server package when
+`dart run dartway_cli:dartway check` runs `dart run bin/migrate.dart check` in the server package when
 `DW_DATABASE_HOST` is set. Findings are `migrationsDrift` errors: a schema the migrations do not
 produce is a server that refuses to start in the next environment. Without a database it prints
 that the check did not run — never that the migrations are fine. See
@@ -259,5 +259,5 @@ So a deploy needs no separate migration step. `bin/migrate.dart` is for developm
 
 ## Related
 
-- [Database](database.md) — row classes and what `dartway generate` writes.
+- [Database](database.md) — row classes and what `dart run dartway_cli:dartway generate` writes.
 - [Migration notes](../migrations/README.md) — the edits a project owes when the framework changes; not database migrations.

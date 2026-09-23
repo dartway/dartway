@@ -66,7 +66,7 @@ layers that are not relevant.
 2. **Server rows and schema** (`__SERVER_PKG__`) — row classes (`@DwSqlTable`, foreign keys, unique
    columns, indexes); for money and counters, an event row rather than a field updated in place.
    `dartway-server`.
-3. **Generation and migration** — `dartway generate` (codecs, the protocol registry, tables, the schema),
+3. **Generation and migration** — `dart run dartway_cli:dartway generate` (codecs, the protocol registry, tables, the schema),
    then `dart run bin/migrate.dart create <name>` and the review of the draft: every decision named
    (rename or drop, the backfill for a `NOT NULL` column on a table with rows). `dartway-migrations`.
 4. **Handlers** — one per new request and command, each with its access rule (`DwAccessRule` — who may
@@ -117,7 +117,7 @@ Call out explicitly:
 A "definition of done" checklist for this task:
 
 - **Functionally** — the key scenarios (including the edge cases) pass, in the running app (`dartway-run`).
-- **Generated and migrated** — `dartway generate --check` is clean; `dart run bin/migrate.dart check`
+- **Generated and migrated** — `dart run dartway_cli:dartway generate --check` is clean; `dart run bin/migrate.dart check`
   passes; the migration applies on a database with rows.
 - **Tests** — the new/updated contract, acceptance and widget tests are green; the bugfix is covered by a
   regression test.

@@ -7,7 +7,7 @@ description: >-
   versions — the core family (`dartway_core_shared`, `dartway_core_server`, `dartway_core_flutter`
   and the packages released with it, `dartway_client`, `dartway_generator`) together to one
   version, satellites (`dartway_router`, `dartway_lints`, `dartway_shared_preferences`,
-  `dartway_cli`, …) each on its own — regenerate with `dartway generate`, and prove the result with
+  `dartway_cli`, …) each on its own — regenerate with `dart run dartway_cli:dartway generate`, and prove the result with
   the checks, the tests and a run. Use when the framework has released, when `dartway update`
   reports the project is behind, or when a fix the project is waiting for has landed upstream; runs
   as /dartway-update.
@@ -151,7 +151,7 @@ Then `dart pub get` in `__SHARED_PKG__` and `__SERVER_PKG__`, `flutter pub get` 
 - **From git** instead of pub: `dart pub upgrade <the dartway packages>` in each directory
   `dartway update` named. A git dependency is pinned when it is added and stays there until something
   upgrades it *by name*, so upgrading one package at a time is how a project ends up running two
-  framework releases against each other. `dartway check` reports that state as `frameworkRefsDiverged`.
+  framework releases against each other. `dart run dartway_cli:dartway check` reports that state as `frameworkRefsDiverged`.
 
 **Satellites move on their own.** `dartway_router` (arrives through `dartway_core_flutter`),
 `dartway_lints`, `dartway_shared_preferences`, `dartway_studio_bridge`, `dartway_telegram`,
@@ -166,22 +166,22 @@ it outlives its reason silently.
 In this order, because each answers a question the next cannot:
 
 ```bash
-dartway generate                                          # the generator moved with the family
-dartway generate --check
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate) # the generator moved with the family
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)
 (cd __SERVER_PKG__ && dart run bin/migrate.dart check)     # against the local database: migrations still produce the schema
 (cd __SHARED_PKG__ && dart analyze && dart test)
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && flutter analyze && dart run custom_lint)
-dartway test
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)
 (cd __FLUTTER_PKG__ && flutter test)
-dartway check
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)
 ```
 
 - **Regenerate even when no DTO or row class changed.** Generated codecs, the protocol registry and the
-  schema are written by the generator the project now resolves; `dartway check` reports a stale tree as
+  schema are written by the generator the project now resolves; `dart run dartway_cli:dartway check` reports a stale tree as
   `generatedCodeStale`, and the codecs are the wire. Commit what it writes.
 - **The framework's own migrations are applied by the server as it starts** (the `dw` namespace) —
-  nothing to write in the project. `migrate check` and `dartway test` replay them together with the
+  nothing to write in the project. `migrate check` and `dart run dartway_cli:dartway test` replay them together with the
   project's, which is what proves they agree.
 - **Then run the app** (`dartway-run`): an update can be green everywhere and still land on a blank
   screen, because what changed was a default or a wiring step rather than an API.
