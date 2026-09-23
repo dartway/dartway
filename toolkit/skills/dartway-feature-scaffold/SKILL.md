@@ -284,12 +284,11 @@ Tests (`dartway-testing`), by layer:
 Checks, all green before `dartway-finish`:
 
 ```bash
-cd __FLUTTER_PKG__
-dart run dartway_cli:dartway generate --check              # generated code matches its sources
-dart run bin/migrate.dart check       # in __SERVER_PKG__, against the local database: migrations match the rows
-dart run dartway_cli:dartway test                          # server tests with a throwaway Postgres and storage
-flutter test                          # in __FLUTTER_PKG__
-dart run dartway_cli:dartway check                         # layout, features, UI kit, l10n, generated code, migrations
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)  # generated code matches its sources
+(cd __SERVER_PKG__ && dart run bin/migrate.dart check)       # against the local database: migrations match the rows
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server tests with a throwaway Postgres and storage
+(cd __FLUTTER_PKG__ && flutter test)
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # layout, features, UI kit, l10n, generated code, migrations
 ```
 
 Then run `dartway-finish`: it audits the diff against the cleanliness contract, reconciles the

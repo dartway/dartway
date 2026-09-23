@@ -527,11 +527,10 @@ corrected.
 ## 10. Checks
 
 ```bash
-cd __FLUTTER_PKG__
-dart run dartway_cli:dartway generate --check      # generated code matches the sources
-dart run bin/migrate.dart check   # from __SERVER_PKG__, against the local database: migrations replay into the declared schema
-dart run dartway_cli:dartway test                  # server tests against a throwaway Postgres (and storage)
-dart run dartway_cli:dartway check                 # layout, generated code, migrations drift (with DW_DATABASE_*), and the Flutter checks
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)  # generated code matches the sources
+(cd __SERVER_PKG__ && dart run bin/migrate.dart check)       # against the local database: migrations replay into the declared schema
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server tests against a throwaway Postgres (and storage)
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # layout, generated code, migrations drift (with DW_DATABASE_*), and the Flutter checks
 ```
 
 A server test starts the real server on a throwaway database and calls it with real clients
