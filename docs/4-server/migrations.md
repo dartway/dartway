@@ -60,7 +60,7 @@ reviewed by hand — a column renamed rather than dropped and re-added).
 | Member | Meaning |
 |---|---|
 | `id` | `YYYYMMDD_HHMMSS_name`, unique in its namespace; the file is `m<id>.dart` |
-| `checksum` | a hash of the file's source, written by `create` and refreshed by `rehash`. The ledger stores it; an applied migration whose checksum changed refuses the next run. It is a declared literal because a compiled server has no sources to hash. Whitespace does not count, so `dart format` does not change it |
+| `checksum` | a hash of the file's source, written by `create` and refreshed by `rehash`. The ledger stores it; an applied migration whose checksum changed refuses the next run. It is a declared literal because a compiled server has no sources to hash. Whitespace does not count; the commas `dart format` adds and removes when it wraps do, so `create` writes `// dart format off` as the file's first line and the formatter leaves a migration alone |
 | `supersededChecksums` | checksums of earlier texts the ledger accepts in place of `checksum`. Empty by default, and for one case only: a migration that **could not apply** on some databases is corrected, and the earlier text, wherever it did apply, left exactly what the correction leaves — those databases keep their row, the rest run the correction. A change to what an applied migration does is a new migration |
 | `dependsOn` | `DwMigrationRef(namespace, id)`s that must be applied first; may name another namespace. Empty by default |
 | `transactional` | `true` by default. `false` only for statements Postgres refuses inside a transaction (`CREATE INDEX CONCURRENTLY`); such a migration is recorded `dirty` before it starts, so a crash halfway blocks the next run until someone looks |
@@ -212,7 +212,10 @@ surfaces in the editor, in `dart analyze` and in every build, and cannot be depl
 
 Once written, the draft is an ordinary migration and the author's. Editing it before it is applied
 anywhere is expected; then run `rehash <id>`, or `check` reports the file as changed since sealing.
-Editing it after it is applied somewhere is what the checksum refuses.
+Editing it after it is applied somewhere is what the checksum refuses — reformatting included: an
+applied migration that `check` reports as changed is restored as it was sealed, not rehashed.
+Migrations created before `// dart format off` was written have no such line, and adding it is an
+edit too; those are kept out of `dart format` by hand.
 
 A pending migration edited and not yet rehashed is also refused where it would be applied, as long
 as its source is on disk: `migrate apply`, and a server run from its sources with

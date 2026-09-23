@@ -323,8 +323,10 @@ usage: migrate <command>
     for (final file in files) {
       if (file.declaredChecksum != file.computedChecksum) {
         fail(
-          '${file.path}: the source changed since its checksum was sealed; '
-          'if it is not applied anywhere, run `rehash ${file.id}`',
+          '${file.path}: the source changed since its checksum was sealed. '
+          'Applied anywhere: restore the file as it was sealed (`git checkout` '
+          'it) — an applied migration is never edited, reformatting included. '
+          'Applied nowhere yet: run `rehash ${file.id}`',
         );
       }
     }

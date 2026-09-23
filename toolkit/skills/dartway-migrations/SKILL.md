@@ -150,8 +150,11 @@ up/down/up round trip in `check` at that point (a note, not a failure).
 
 ### 5. Seal it: `rehash` after every hand edit
 
-The draft is sealed with a checksum of its source (whitespace ignored, so `dart format` changes
-nothing). Resolving a decision is an edit, so the declared checksum is now wrong:
+The draft is sealed with a checksum of its source. Whitespace is ignored, but the commas `dart
+format` adds and removes are not — so a migration starts with `// dart format off`, and the
+formatter skips it. **Never remove that line, and never reformat a migration by hand.** An
+applied migration that `check` reports as changed is restored (`git checkout` the file), not
+rehashed. Resolving a decision is an edit, so the declared checksum is now wrong:
 
 ```bash
 dart run bin/migrate.dart rehash                 # every edited migration

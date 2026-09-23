@@ -20,14 +20,20 @@ abstract final class DwDraftWriter {
   /// library name, and an id starts with its date.
   static String fileName(String id) => 'm$id.dart';
 
+  /// The first line of every migration: a sealed file is never reformatted.
+  static const formatterOff = '// dart format off';
+
   /// The source of a migration moving the schema by [changes], importing
   /// [project]'s ORM library, formatted for [project] and then sealed with its
   /// checksum.
   ///
-  /// Formatted before sealing, so the file is written as the project's
-  /// `dart format` leaves it: formatting it again changes nothing, and nobody
-  /// is tempted to reformat a sealed file by hand. (The checksum ignores
-  /// whitespace either way.)
+  /// Formatted, then marked `// dart format off`, then sealed. The checksum
+  /// ignores whitespace but not the commas the formatter adds and removes
+  /// when it wraps or joins an argument list — and a formatter release
+  /// changes where it wraps — so `dart format lib`, the most routine command
+  /// in a Dart project, broke the seal of every migration it reached, and the
+  /// server refused to start (#291). The marker makes the formatter skip the
+  /// file, `--set-exit-if-changed` included.
   static String migration({
     required String id,
     required String className,
@@ -87,7 +93,9 @@ abstract final class DwDraftWriter {
       buffer.writeln('  }');
     }
     buffer.writeln('}');
-    return DwMigrationChecksum.seal(project.format(buffer.toString()));
+    return DwMigrationChecksum.seal(
+      '$formatterOff\n${project.format(buffer.toString())}',
+    );
   }
 
   /// The registration file: every migration of [classesById] (id → class
