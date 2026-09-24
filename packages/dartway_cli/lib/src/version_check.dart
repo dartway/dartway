@@ -19,8 +19,20 @@ bool isAtLeastVersion(String version, String minimum) {
   return true;
 }
 
+/// The dotted release numbers before any pre-release or build suffix.
+///
+/// Splitting the whole string on `[.\-+]` (the previous shape of this
+/// function) reads a suffix's own digits as extra release components:
+/// `0.20.0-dev.4` became `[0, 20, 0, 4]`, a version `isAtLeastVersion` then
+/// judged *greater* than the plain `0.20.0` it was a prerelease of — exactly
+/// backwards, and invisible until a package left `-dev.N` behind, which none
+/// of the versions this was tested against ever did (#307). The suffix is cut
+/// off first, whole, so nothing inside it is ever mistaken for a release
+/// component.
 List<int> _numericParts(String version) => version
-    .split(RegExp(r'[.\-+]'))
+    .split(RegExp(r'[-+]'))
+    .first
+    .split('.')
     .map(int.tryParse)
     .whereType<int>()
     .toList();

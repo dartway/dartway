@@ -34,5 +34,17 @@ void main() {
       expect(isAtLeastVersion('3.12.0-beta.1', '3.11.0'), isTrue);
       expect(isAtLeastVersion('3.11.0+hotfix', '3.11.0'), isTrue);
     });
+
+    test('a plain release satisfies a minimum stated as one of its own '
+        'pre-releases — the bug `migration_notes_test.dart` found: '
+        '`0.20.0-dev.4`\'s trailing "4" used to be read as a fourth release '
+        'component, making the plain `0.20.0` that shipped it compare as '
+        '*older* than the dev build it replaced (#307)', () {
+      expect(isAtLeastVersion('0.20.0', '0.20.0-dev.4'), isTrue);
+      expect(isAtLeastVersion('0.20.0', '0.20.0-dev.1'), isTrue);
+      // Still correctly behind a pre-release of a version that has not
+      // shipped yet.
+      expect(isAtLeastVersion('0.19.0', '0.20.0-dev.1'), isFalse);
+    });
   });
 }
