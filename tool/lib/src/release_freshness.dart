@@ -33,10 +33,14 @@ library;
 /// first version of this check, which only read `lib/`, `bin/` and
 /// `pubspec.yaml`).
 ///
-/// Excluded: `test/` and `example/` prove behaviour rather than being it —
-/// pub does not even ship `example/` inside the archive that resolves as a
-/// dependency — and a `CHANGELOG.md` or `README.md` edit does not change what
-/// ships, only how it reads.
+/// Excluded: `test/` and `example/` prove behaviour rather than being it. Pub
+/// does archive both (verified by `dart pub publish --dry-run` — `example/`
+/// is browsable on pub.dev the same way `README.md` is), but neither reaches
+/// a project that depends on the package: nothing under either directory is
+/// on the package's own `lib/<library>.dart` export surface, so a build that
+/// resolves this package never touches them. A `CHANGELOG.md` or `README.md`
+/// edit is excluded for a different reason — it does not change what ships,
+/// only how it reads.
 bool isArchiveRelevantPath(String relativePath) {
   final segments = relativePath.split(RegExp(r'[\\/]'));
   if (segments.contains('test') || segments.contains('example')) return false;

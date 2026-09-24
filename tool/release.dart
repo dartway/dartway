@@ -386,7 +386,13 @@ List<String> _changedPathsSince(String directory, DateTime since) {
     '--',
     directory,
   ]);
-  if (result.exitCode != 0) return const [];
+  if (result.exitCode != 0) {
+    // Not "nothing changed" — that reads a git failure as a clean bill of
+    // health and would wave a genuinely stale package through. This is the
+    // same "cannot answer" the header's exit code 2 is for everywhere else.
+    stderr.writeln('git log failed for $directory: ${result.stderr}'.trim());
+    exit(2);
+  }
   final paths = (result.stdout as String)
       .split('\n')
       .map((line) => line.trim())
