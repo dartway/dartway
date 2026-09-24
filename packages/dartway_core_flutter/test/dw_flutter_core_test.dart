@@ -439,7 +439,7 @@ void main() {
   testWidgets('a build the server no longer supports gets the update-required '
       'screen over the app', (tester) async {
     final world = World();
-    world.server.minAppBuild = 6;
+    world.server.contractVersion = '1.0.0';
     final dw = world.core(
       appVersion: '1.0.0+5',
       updateRequiredScreen: (context, refusal) => Directionality(

@@ -7,7 +7,7 @@
 
 const String wireGolden = r'''
 {
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "shapes": {
     "http.contract": {
       "callPath": "/dw/RenameBooking",

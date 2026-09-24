@@ -21,7 +21,7 @@ void main() {
       final call = h.server.calls.single;
       expect(call.wireName, 'ListRooms');
       expect(call.call, const ListRooms(minRank: 15));
-      expect(call.headers['dw-protocol'], '1');
+      expect(call.headers['dw-protocol'], '$dwProtocolVersion');
       expect(call.headers['dw-app-version'], '1.0.0+1');
       expect(call.headers['content-type'], DwHttpContract.jsonContentType);
       expect(call.authorization, 'Bearer token-7');

@@ -14,7 +14,9 @@ browser: `../README.md`.
   `lib/l10n/gen/`
 
 `lib/app_version.dart` repeats the `version:` of `pubspec.yaml` (a test holds
-them equal): the server compares its build number with `DW_MIN_APP_BUILD`.
+them equal). Which builds the server still serves is decided by the contract:
+the `version:` of `dartway_starter_shared`, raised in a breaking line whenever a
+change removes or renames anything an installed app sends or reads.
 
 ```bash
 flutter test          # widget tests on the in-memory DwFakeServer

@@ -86,8 +86,9 @@ GET  /health               liveness + database reachability
 - Headers:
   - `Authorization: Bearer <token>` (absent = anonymous);
   - `Dw-Idempotency-Key: <key>` — required for commands, forbidden for requests;
-  - `Dw-Protocol: 1` — required; unsupported → 426;
-  - `Dw-App-Version: <semver>+<build>` — sent by the framework client; below the project's `minAppBuild` → 426 `dw.updateRequired`;
+  - `Dw-Protocol: 2` — required; unsupported → 426;
+  - `Dw-Contract-Version: <semver>` — the project's contract the app was compiled with (the shared package's `version:`); an older breaking line than the server's, or none → 426 `dw.updateRequired` (D-084);
+  - `Dw-App-Version: <semver>+<build>` — sent by the framework client; labels the session key, decides nothing;
   - `Dw-Live-Connection: <id>` — optional: the id the server gave this client's WebSocket; lets the server exclude that connection from the socket broadcast of this command's updates; the channels it subscribes to travel in the response instead. With it or without, a successful command's response carries the publications to channels the caller may read: those its named connection subscribes to, and every other one whose rule (`canSubscribe`) allows the caller when asked after commit — minus channels the command revoked for the caller, and none for an anonymous caller or one whose key the command revoked (D-053). A named connection that is unknown, closing, or of another account counts as none.
 - Only POST. Body limit 1 MiB by default.
 
@@ -171,7 +172,7 @@ Window cursors are opaque strings the server builds from the sort value and the 
 
 ## R2.5 Versions
 
-`Dw-Protocol` (framework envelope) and `Dw-App-Version` (the app build). The server's `DwServerSettings.minAppBuild` (int, default 0) can be changed without a release (read from settings/environment at startup; a project may also load it from the database). The Flutter layer turns `dw.updateRequired` into a full-screen "update the app" page with project-supplied text and store links.
+`Dw-Protocol` (framework envelope) and `Dw-Contract-Version` (the project's contract, by semantic versioning: an older breaking line is refused, D-084). The minimum is the code's, raised in the change that breaks the contract; nothing is read from the environment. The Flutter layer turns `dw.updateRequired` into a full-screen "update the app" page with project-supplied text and store links.
 
 ## R2.6 External doors
 

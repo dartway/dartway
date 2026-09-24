@@ -21,8 +21,9 @@ import '../server/dw_server_settings.dart';
 /// call is known to be well-formed:
 ///
 /// 1. `Dw-Protocol` (missing: 400; another version: 426) and
-///    `Dw-App-Version` (below `minAppBuild`: 426) — an incompatible client
-///    learns that before anything else, whatever else it got wrong;
+///    `Dw-Contract-Version` (an older breaking line than the server's
+///    contract, or none: 426) — an incompatible client learns that before
+///    anything else, whatever else it got wrong;
 /// 2. the method, the wire name (unknown: 404), the content type, the
 ///    idempotency key (required for a command, forbidden for a request), the
 ///    live connection and authorization headers, the query and the body —
@@ -93,14 +94,31 @@ final class DwCallEndpoint {
         DwCallRefusal(DwCoreRefusal.protocolUnsupported),
       );
     }
-    final appVersion = _header(http, DwHttpContract.appVersionHeader);
-    final int build;
-    if (appVersion == null) {
-      // A client that says nothing is as old as a client can be.
-      build = 0;
-    } else {
+    if (_protocol.contractVersion case final served?) {
+      final sent = _header(http, DwHttpContract.contractVersionHeader);
+      final DwContractVersion? client;
       try {
-        build = DwAppVersion.parse(appVersion).build;
+        client = sent == null ? null : DwContractVersion.parse(sent);
+      } on FormatException catch (error) {
+        _malformed(
+          path,
+          'the ${DwHttpContract.contractVersionHeader} header',
+          error,
+        );
+      }
+      // A client that says nothing is as old as a client can be.
+      if (client == null || client.isOlderLineThan(served)) {
+        return DwApiResponse.incompatible(
+          DwCallRefusal(DwCoreRefusal.updateRequired),
+        );
+      }
+    }
+    // For people: the label of the session key a sign-in makes. Held to its
+    // format all the same, so a label is always one the parser reads.
+    final appVersion = _header(http, DwHttpContract.appVersionHeader);
+    if (appVersion != null) {
+      try {
+        DwAppVersion.parse(appVersion);
       } on FormatException catch (error) {
         _malformed(
           path,
@@ -108,11 +126,6 @@ final class DwCallEndpoint {
           error,
         );
       }
-    }
-    if (build < settings.minAppBuild) {
-      return DwApiResponse.incompatible(
-        DwCallRefusal(DwCoreRefusal.updateRequired),
-      );
     }
 
     // 2. Shape.

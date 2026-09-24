@@ -65,7 +65,7 @@ framework's — through `DwFlutterConfig.refusalText`: see
 | `dw.unknownChannel` | A subscription to a channel kind the server has no rule for |
 | `dw.tooManyRequests` | Asked too often. Built with `DwCallRefusal.tooManyRequests(duration)`: `retryAfter` holds whole seconds, at least one, read back with `refusal.retryAfter`; the HTTP answer carries `Retry-After` |
 | `dw.codeExpired` | A one-time code can no longer be verified — unknown ticket, used, expired or out of attempts; `field` is `code`. The user needs a new code, not another try |
-| `dw.updateRequired` | The app build is below the server's `minAppBuild` — or it sent back the `unknown` of an open enum in a call that writes it, which says the same thing about that build |
+| `dw.updateRequired` | The app was compiled with an older breaking line of the project's contract than the server's (`Dw-Contract-Version`) — or it sent back the `unknown` of an open enum in a call that writes it, which says the same thing about that build |
 | `dw.protocolUnsupported` | The client speaks another `Dw-Protocol` |
 
 The last two are **incompatibilities** (`DwCoreRefusal.incompatibilities`), not rules: they answer

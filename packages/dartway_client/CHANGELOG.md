@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.4
+
+- **Calls and the live socket carry the contract version** of the protocol the client is built with (#296). **BREAKING (testing):** `DwFakeServer.minAppBuild` is `DwFakeServer.contractVersion` — set a newer breaking line to play a server that moved on. Migration note: `docs/migrations/2026-09-24-contract-version.md`.
+
 ## 0.20.0-dev.3
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.

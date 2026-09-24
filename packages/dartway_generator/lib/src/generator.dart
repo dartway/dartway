@@ -631,6 +631,10 @@ final class _Run {
         '${diagnostic.column}';
   }
 
+  static final _semver = RegExp(
+    r'^\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$',
+  );
+
   GeneratedFile _emitProtocol(DwProjectPackage package) {
     final entries = <ProtocolEntry>[];
     final registered = <(ClassElement, _Library)>[];
@@ -677,6 +681,25 @@ final class _Run {
       }
     }
 
+    final pubspec = File(p.join(package.root, 'pubspec.yaml'));
+    final version = RegExp(
+      r'^version:\s*([^\s#]+)',
+      multiLine: true,
+    ).firstMatch(pubspec.readAsStringSync())?[1];
+    if (version == null || !_semver.hasMatch(version)) {
+      diagnostics.add(
+        DwGenerationDiagnostic(
+          '${package.name} declares no semantic `version:`. It is the '
+          "version of the project's contract: the server answers an app "
+          'compiled with an older breaking line (the major version, or '
+          'the minor one below 1.0) with the update screen. Declare it, '
+          'and raise the breaking line whenever a change removes or '
+          'renames anything an installed app sends or reads',
+          path: pubspec.path,
+        ),
+      );
+    }
+
     final path = p.join(package.lib, 'generated', 'dw_protocol.dart');
     return GeneratedFile(
       path,
@@ -684,6 +707,7 @@ final class _Run {
         ProtocolEmitter.emit(
           variable: '${camelCase(package.baseName)}Protocol',
           entries: entries,
+          contractVersion: version ?? '0.0.0',
         ),
         languageVersion: package.languageVersion,
         options: _formatterOptions(package),

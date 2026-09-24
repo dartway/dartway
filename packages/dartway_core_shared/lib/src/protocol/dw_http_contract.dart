@@ -2,7 +2,7 @@
 /// `DwApiResponse` body, the transport, the live messages. A client sends it
 /// on every call (`Dw-Protocol`) and on the live upgrade (`?protocol=`); a
 /// server that does not speak it answers `426` with `dw.protocolUnsupported`.
-const int dwProtocolVersion = 1;
+const int dwProtocolVersion = 2;
 
 /// The HTTP contract between a DartWay client and its server, declared once
 /// for both sides:
@@ -59,9 +59,15 @@ abstract final class DwHttpContract {
   /// [dwProtocolVersion]; required on every call.
   static const String protocolHeader = 'Dw-Protocol';
 
-  /// The app build, `<semver>+<build>` (see `DwAppVersion`); a build below the
-  /// server's minimum answers `426` with `dw.updateRequired`.
+  /// The app build, `<semver>+<build>` (see `DwAppVersion`). For people: the
+  /// label of the session key the app signs in with. Compatibility is the
+  /// contract's, in [contractVersionHeader].
   static const String appVersionHeader = 'Dw-App-Version';
+
+  /// The version of the project's contract the app was compiled with (see
+  /// `DwContractVersion`): a client of an older breaking line than the
+  /// server's is answered `426` with `dw.updateRequired`.
+  static const String contractVersionHeader = 'Dw-Contract-Version';
 
   /// The id the server gave this client's live connection (the `hello`
   /// message). Optional: it excludes that connection from the socket
@@ -102,13 +108,17 @@ abstract final class DwHttpContract {
 
   /// Live upgrade: the app version, as in [appVersionHeader].
   static const String liveAppVersionParameter = 'app';
+
+  /// Live upgrade: the contract version, as in [contractVersionHeader].
+  static const String liveContractVersionParameter = 'contract';
 }
 
 /// An app build as the client reports it: `1.4.2+87`.
 ///
-/// The server compares [build] with its `minAppBuild`; the name is for
-/// people. One parser for both sides, so a version the client can send is a
-/// version the server can read.
+/// For people — it labels the session key the app signs in with. Whether an
+/// app may call is the contract's question (`DwContractVersion`). One parser
+/// for both sides, so a version the client can send is a version the server
+/// can read.
 final class DwAppVersion {
   /// Throws [ArgumentError] for a negative build or a name that is not a
   /// semantic version.
@@ -154,4 +164,73 @@ final class DwAppVersion {
   /// The header value.
   @override
   String toString() => '$name+$build';
+}
+
+/// The version of a project's contract — its shared package's `version:`,
+/// which the generator writes into the protocol both sides are compiled with.
+///
+/// Semantic versioning decides compatibility, and nothing else does: a change
+/// that breaks an installed app — a request, command, field or value removed
+/// or renamed — raises the **breaking line** (the major version, or the minor
+/// one below 1.0); anything additive does not. A server answers a client of
+/// an older line than its own `426` with `dw.updateRequired`, and the app
+/// shows its update screen. The minimum lives in the code, raised in the pull
+/// request that breaks the contract, rather than in an environment someone
+/// has to remember at deploy (#296).
+///
+/// A client of a newer line than the server is not refused: the server is the
+/// one behind, and a call it does not know is answered as unknown.
+final class DwContractVersion {
+  /// Throws [ArgumentError] for a text that is not a semantic version.
+  DwContractVersion(this.text) {
+    final match = _semver.firstMatch(text);
+    if (match == null) {
+      throw ArgumentError.value(text, 'text', 'is not a semantic version');
+    }
+    final major = int.parse(match[1]!);
+    line = major > 0 ? '$major' : '0.${int.parse(match[2]!)}';
+    _major = major;
+    _minor = int.parse(match[2]!);
+  }
+
+  /// Reads a header value; [FormatException] for anything but a semantic
+  /// version.
+  static DwContractVersion parse(String text) {
+    try {
+      return DwContractVersion(text);
+    } on ArgumentError catch (error) {
+      throw FormatException('${error.message}', text);
+    }
+  }
+
+  static final _semver = RegExp(
+    r'^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$',
+  );
+
+  final String text;
+
+  /// The breaking line: `3` for `3.4.1`, `0.7` for `0.7.2`.
+  late final String line;
+
+  late final int _major;
+  late final int _minor;
+
+  /// Whether this version belongs to an older breaking line than [other]:
+  /// an app on it cannot speak [other]'s contract.
+  bool isOlderLineThan(DwContractVersion other) {
+    if (_major != other._major) return _major < other._major;
+    if (_major > 0) return false;
+    return _minor < other._minor;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DwContractVersion && other.text == text;
+
+  @override
+  int get hashCode => text.hashCode;
+
+  /// The header value.
+  @override
+  String toString() => text;
 }

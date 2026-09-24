@@ -62,8 +62,9 @@ A browser app calls its server on the same origin (`/dw/` proxied next to the
 web build, as the deploy does), so the web build names that origin:
 `flutter build web --dart-define=DW_BACKEND_URL=https://app.example.com`.
 The server's `DW_ALLOWED_ORIGINS` lists further origins allowed to open the
-live socket — full origins, `https://app.example.com,http://localhost:5000` —
-and `DW_MIN_APP_BUILD` the oldest app build it still serves.
+live socket — full origins, `https://app.example.com,http://localhost:5000`.
+Which app builds it still serves is the shared package's `version:` — the
+contract's — not an environment variable.
 
 ## Code generation and migrations
 

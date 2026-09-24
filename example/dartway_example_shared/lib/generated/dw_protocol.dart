@@ -9,95 +9,117 @@ import '../src/people.dart';
 import '../src/schedule.dart';
 import '../src/settings.dart';
 
-final DwWireProtocol dartwayExampleProtocol = DwWireProtocol([
-  DwProtocolEntry<AdminCounters>('AdminCounters', $AdminCountersFromJson),
-  DwProtocolEntry<AppSetting>('AppSetting', $AppSettingFromJson),
-  DwProtocolEntry<BookSession>('BookSession', $BookSessionFromJson),
-  DwProtocolEntry<CancelBooking>('CancelBooking', $CancelBookingFromJson),
-  DwProtocolEntry<CancelSession>('CancelSession', $CancelSessionFromJson),
-  DwProtocolEntry<ChangeRole>('ChangeRole', $ChangeRoleFromJson),
-  DwProtocolEntry<ChatAttachment>('ChatAttachment', $ChatAttachmentFromJson),
-  DwProtocolEntry<ChatAttachmentDraft>(
-    'ChatAttachmentDraft',
-    $ChatAttachmentDraftFromJson,
-  ),
-  DwProtocolEntry<ChatChannel>('ChatChannel', $ChatChannelFromJson),
-  DwProtocolEntry<ChatMessage>('ChatMessage', $ChatMessageFromJson),
-  DwProtocolEntry<ChatMessageQuote>(
-    'ChatMessageQuote',
-    $ChatMessageQuoteFromJson,
-  ),
-  DwProtocolEntry<ChatMessageReaction>(
-    'ChatMessageReaction',
-    $ChatMessageReactionFromJson,
-  ),
-  DwProtocolEntry<ChatReadState>('ChatReadState', $ChatReadStateFromJson),
-  DwProtocolEntry<ClubService>('ClubService', $ClubServiceFromJson),
-  DwProtocolEntry<ClubSession>('ClubSession', $ClubSessionFromJson),
-  DwProtocolEntry<DeleteChatMessage>(
-    'DeleteChatMessage',
-    $DeleteChatMessageFromJson,
-  ),
-  DwProtocolEntry<EditChatMessage>('EditChatMessage', $EditChatMessageFromJson),
-  DwProtocolEntry<GetAdminCounters>(
-    'GetAdminCounters',
-    $GetAdminCountersFromJson,
-  ),
-  DwProtocolEntry<GetMyProfile>('GetMyProfile', $GetMyProfileFromJson),
-  DwProtocolEntry<ListAppSettings>('ListAppSettings', $ListAppSettingsFromJson),
-  DwProtocolEntry<ListChatChannels>(
-    'ListChatChannels',
-    $ListChatChannelsFromJson,
-  ),
-  DwProtocolEntry<ListChatMessages>(
-    'ListChatMessages',
-    $ListChatMessagesFromJson,
-  ),
-  DwProtocolEntry<ListChatMessagesMatching>(
-    'ListChatMessagesMatching',
-    $ListChatMessagesMatchingFromJson,
-  ),
-  DwProtocolEntry<ListClubServices>(
-    'ListClubServices',
-    $ListClubServicesFromJson,
-  ),
-  DwProtocolEntry<ListMyBookings>('ListMyBookings', $ListMyBookingsFromJson),
-  DwProtocolEntry<ListMyChatReadStates>(
-    'ListMyChatReadStates',
-    $ListMyChatReadStatesFromJson,
-  ),
-  DwProtocolEntry<ListNews>('ListNews', $ListNewsFromJson),
-  DwProtocolEntry<ListPinnedChatMessages>(
-    'ListPinnedChatMessages',
-    $ListPinnedChatMessagesFromJson,
-  ),
-  DwProtocolEntry<ListUpcomingSessions>(
-    'ListUpcomingSessions',
-    $ListUpcomingSessionsFromJson,
-  ),
-  DwProtocolEntry<ListUserProfiles>(
-    'ListUserProfiles',
-    $ListUserProfilesFromJson,
-  ),
-  DwProtocolEntry<MarkAttended>('MarkAttended', $MarkAttendedFromJson),
-  DwProtocolEntry<MarkChatRead>('MarkChatRead', $MarkChatReadFromJson),
-  DwProtocolEntry<NewsAlert>('NewsAlert', $NewsAlertFromJson),
-  DwProtocolEntry<NewsPost>('NewsPost', $NewsPostFromJson),
-  DwProtocolEntry<PersonCard>('PersonCard', $PersonCardFromJson),
-  DwProtocolEntry<PinChatMessage>('PinChatMessage', $PinChatMessageFromJson),
-  DwProtocolEntry<PublishNews>('PublishNews', $PublishNewsFromJson),
-  DwProtocolEntry<ReactToChatMessage>(
-    'ReactToChatMessage',
-    $ReactToChatMessageFromJson,
-  ),
-  DwProtocolEntry<RemoveNews>('RemoveNews', $RemoveNewsFromJson),
-  DwProtocolEntry<ReviewVisit>('ReviewVisit', $ReviewVisitFromJson),
-  DwProtocolEntry<SaveAppSetting>('SaveAppSetting', $SaveAppSettingFromJson),
-  DwProtocolEntry<SaveClubService>('SaveClubService', $SaveClubServiceFromJson),
-  DwProtocolEntry<ScheduleSession>('ScheduleSession', $ScheduleSessionFromJson),
-  DwProtocolEntry<SendChatMessage>('SendChatMessage', $SendChatMessageFromJson),
-  DwProtocolEntry<SessionBooking>('SessionBooking', $SessionBookingFromJson),
-  DwProtocolEntry<SessionReview>('SessionReview', $SessionReviewFromJson),
-  DwProtocolEntry<UpdateMyProfile>('UpdateMyProfile', $UpdateMyProfileFromJson),
-  DwProtocolEntry<UserProfile>('UserProfile', $UserProfileFromJson),
-], include: DwWireProtocol.core);
+final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
+  [
+    DwProtocolEntry<AdminCounters>('AdminCounters', $AdminCountersFromJson),
+    DwProtocolEntry<AppSetting>('AppSetting', $AppSettingFromJson),
+    DwProtocolEntry<BookSession>('BookSession', $BookSessionFromJson),
+    DwProtocolEntry<CancelBooking>('CancelBooking', $CancelBookingFromJson),
+    DwProtocolEntry<CancelSession>('CancelSession', $CancelSessionFromJson),
+    DwProtocolEntry<ChangeRole>('ChangeRole', $ChangeRoleFromJson),
+    DwProtocolEntry<ChatAttachment>('ChatAttachment', $ChatAttachmentFromJson),
+    DwProtocolEntry<ChatAttachmentDraft>(
+      'ChatAttachmentDraft',
+      $ChatAttachmentDraftFromJson,
+    ),
+    DwProtocolEntry<ChatChannel>('ChatChannel', $ChatChannelFromJson),
+    DwProtocolEntry<ChatMessage>('ChatMessage', $ChatMessageFromJson),
+    DwProtocolEntry<ChatMessageQuote>(
+      'ChatMessageQuote',
+      $ChatMessageQuoteFromJson,
+    ),
+    DwProtocolEntry<ChatMessageReaction>(
+      'ChatMessageReaction',
+      $ChatMessageReactionFromJson,
+    ),
+    DwProtocolEntry<ChatReadState>('ChatReadState', $ChatReadStateFromJson),
+    DwProtocolEntry<ClubService>('ClubService', $ClubServiceFromJson),
+    DwProtocolEntry<ClubSession>('ClubSession', $ClubSessionFromJson),
+    DwProtocolEntry<DeleteChatMessage>(
+      'DeleteChatMessage',
+      $DeleteChatMessageFromJson,
+    ),
+    DwProtocolEntry<EditChatMessage>(
+      'EditChatMessage',
+      $EditChatMessageFromJson,
+    ),
+    DwProtocolEntry<GetAdminCounters>(
+      'GetAdminCounters',
+      $GetAdminCountersFromJson,
+    ),
+    DwProtocolEntry<GetMyProfile>('GetMyProfile', $GetMyProfileFromJson),
+    DwProtocolEntry<ListAppSettings>(
+      'ListAppSettings',
+      $ListAppSettingsFromJson,
+    ),
+    DwProtocolEntry<ListChatChannels>(
+      'ListChatChannels',
+      $ListChatChannelsFromJson,
+    ),
+    DwProtocolEntry<ListChatMessages>(
+      'ListChatMessages',
+      $ListChatMessagesFromJson,
+    ),
+    DwProtocolEntry<ListChatMessagesMatching>(
+      'ListChatMessagesMatching',
+      $ListChatMessagesMatchingFromJson,
+    ),
+    DwProtocolEntry<ListClubServices>(
+      'ListClubServices',
+      $ListClubServicesFromJson,
+    ),
+    DwProtocolEntry<ListMyBookings>('ListMyBookings', $ListMyBookingsFromJson),
+    DwProtocolEntry<ListMyChatReadStates>(
+      'ListMyChatReadStates',
+      $ListMyChatReadStatesFromJson,
+    ),
+    DwProtocolEntry<ListNews>('ListNews', $ListNewsFromJson),
+    DwProtocolEntry<ListPinnedChatMessages>(
+      'ListPinnedChatMessages',
+      $ListPinnedChatMessagesFromJson,
+    ),
+    DwProtocolEntry<ListUpcomingSessions>(
+      'ListUpcomingSessions',
+      $ListUpcomingSessionsFromJson,
+    ),
+    DwProtocolEntry<ListUserProfiles>(
+      'ListUserProfiles',
+      $ListUserProfilesFromJson,
+    ),
+    DwProtocolEntry<MarkAttended>('MarkAttended', $MarkAttendedFromJson),
+    DwProtocolEntry<MarkChatRead>('MarkChatRead', $MarkChatReadFromJson),
+    DwProtocolEntry<NewsAlert>('NewsAlert', $NewsAlertFromJson),
+    DwProtocolEntry<NewsPost>('NewsPost', $NewsPostFromJson),
+    DwProtocolEntry<PersonCard>('PersonCard', $PersonCardFromJson),
+    DwProtocolEntry<PinChatMessage>('PinChatMessage', $PinChatMessageFromJson),
+    DwProtocolEntry<PublishNews>('PublishNews', $PublishNewsFromJson),
+    DwProtocolEntry<ReactToChatMessage>(
+      'ReactToChatMessage',
+      $ReactToChatMessageFromJson,
+    ),
+    DwProtocolEntry<RemoveNews>('RemoveNews', $RemoveNewsFromJson),
+    DwProtocolEntry<ReviewVisit>('ReviewVisit', $ReviewVisitFromJson),
+    DwProtocolEntry<SaveAppSetting>('SaveAppSetting', $SaveAppSettingFromJson),
+    DwProtocolEntry<SaveClubService>(
+      'SaveClubService',
+      $SaveClubServiceFromJson,
+    ),
+    DwProtocolEntry<ScheduleSession>(
+      'ScheduleSession',
+      $ScheduleSessionFromJson,
+    ),
+    DwProtocolEntry<SendChatMessage>(
+      'SendChatMessage',
+      $SendChatMessageFromJson,
+    ),
+    DwProtocolEntry<SessionBooking>('SessionBooking', $SessionBookingFromJson),
+    DwProtocolEntry<SessionReview>('SessionReview', $SessionReviewFromJson),
+    DwProtocolEntry<UpdateMyProfile>(
+      'UpdateMyProfile',
+      $UpdateMyProfileFromJson,
+    ),
+    DwProtocolEntry<UserProfile>('UserProfile', $UserProfileFromJson),
+  ],
+  include: DwWireProtocol.core,
+  contractVersion: '1.0.0',
+);

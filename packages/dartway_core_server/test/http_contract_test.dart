@@ -134,7 +134,7 @@ void main() {
       final answer = await anonymous.raw(
         'GET',
         '/dw/ListNotes',
-        headers: {DwHttpContract.protocolHeader: '1'},
+        headers: {DwHttpContract.protocolHeader: '$dwProtocolVersion'},
       );
       expectFailure(answer, DwFailureKind.malformedCall, 400);
     });
@@ -151,7 +151,7 @@ void main() {
       final other = await anonymous.raw(
         'GET',
         '/dw/NoSuchCall',
-        headers: {DwHttpContract.protocolHeader: '2'},
+        headers: {DwHttpContract.protocolHeader: '${dwProtocolVersion + 1}'},
       );
       expect(other.status, 426);
       expect(other.reasonPhrase, 'Upgrade Required');
@@ -244,7 +244,7 @@ void main() {
         addTearDown(socket.destroy);
         socket.write(
           'POST /dw/ListNotes HTTP/1.1\r\nHost: 127.0.0.1\r\n'
-          'Dw-Protocol: 1\r\nContent-Type: application/json\r\n'
+          'Dw-Protocol: $dwProtocolVersion\r\nContent-Type: application/json\r\n'
           '${extraHeaders.map((h) => '$h\r\n').join()}'
           'Content-Length: 2\r\nConnection: close\r\n\r\n{}',
         );
@@ -299,7 +299,7 @@ void main() {
         'POST',
         '/dw/FeedNotes',
         headers: {
-          DwHttpContract.protocolHeader: '1',
+          DwHttpContract.protocolHeader: '$dwProtocolVersion',
           DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
         },
         body: utf8.encode('{"prefix":"x"}'),
@@ -311,7 +311,7 @@ void main() {
         harness().server.httpBase.resolve('/dw/FeedNotes?offset=1&offset=2'),
       );
       request.headers
-        ..set(DwHttpContract.protocolHeader, '1')
+        ..set(DwHttpContract.protocolHeader, '$dwProtocolVersion')
         ..set(DwHttpContract.contentTypeHeader, DwHttpContract.jsonContentType);
       request.write('{"prefix":"x"}');
       final response = await request.close();
@@ -380,7 +380,7 @@ void main() {
         harness().server.httpBase.resolve('/dw/ListNotes'),
       );
       request.headers
-        ..set(DwHttpContract.protocolHeader, '1')
+        ..set(DwHttpContract.protocolHeader, '$dwProtocolVersion')
         ..set(DwHttpContract.contentTypeHeader, DwHttpContract.jsonContentType)
         ..contentLength = 64 << 20;
       final outcome = await () async {

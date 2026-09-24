@@ -33,6 +33,22 @@ void main() {
     },
   );
 
+  test('a shared package without a version has no contract version: '
+      'refused, and nothing is written (#296)', () async {
+    final project = TempProject.create(['app_shared']);
+    project.copyFixture('types');
+    final pubspec = File(project.path('app_shared/pubspec.yaml'));
+    pubspec.writeAsStringSync(
+      pubspec.readAsStringSync().replaceFirst('version: 0.1.0\n', ''),
+    );
+    final report = await project.generate();
+    expect(
+      report.diagnostics.map((d) => d.message),
+      contains(startsWith('app_shared declares no semantic `version:`')),
+    );
+    expect(report.written, isEmpty);
+  });
+
   group('project layout', () {
     test('a directory without DartWay packages', () async {
       final empty = Directory.systemTemp.createTempSync('dw_empty_');

@@ -133,7 +133,6 @@ app on one server process.
 
 | Field | Default | Why it exists |
 |---|---|---|
-| `minAppBuild` | `0` | The oldest app build served. A call whose `Dw-App-Version` build is lower (or absent while this is above 0) is answered `426` `dw.updateRequired`; the live socket closes `incompatible`. Read at start: raising it is a restart, not a release. See [update required](../3-flutter/update-required.md). |
 | `maxBodyBytes` | 1 MiB | The largest call body; a call over it is malformed (`400`). A handler can override it for its own call; a route passes its own to `DwHttpRequest.bytes` (`413` over it). |
 | `bodyReadTimeout` | 30 s | A body dripped one byte at a time holds a connection and a buffer. A late call body is malformed (`400`); a route's is `408`. |
 | `pingInterval` | 20 s | Live sockets are pinged; a peer silent until the next ping is dropped, instead of lingering until TCP gives up on a dead mobile link. |
@@ -173,7 +172,6 @@ values in. The skeleton's (`template/dartway_starter_server/bin/server.dart`) re
 | `PORT` | `port`, 8080 by default |
 | `DW_STORAGE_*` | the storage configuration; without `DW_STORAGE_ENDPOINT` the server runs without uploads |
 | `DW_STORAGE_PROVISION=true` | `DwFileStorageSetup.provision` before starting — for a storage the project owns |
-| `DW_MIN_APP_BUILD` | `DwServerSettings.minAppBuild` |
 | `DW_ALLOWED_ORIGINS` | `DwServerSettings.allowedOrigins`, comma-separated |
 | `DW_ADMIN_IDENTIFIER` | the first administrator, below |
 

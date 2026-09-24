@@ -121,18 +121,16 @@ final class DwLiveEndpoint {
     if (query[DwHttpContract.liveProtocolParameter] != '$dwProtocolVersion') {
       return (DwCloseCode.incompatible, DwCoreRefusal.protocolUnsupported.code);
     }
-    final app = query[DwHttpContract.liveAppVersionParameter];
-    final int build;
-    if (app == null) {
-      build = 0;
-    } else {
-      try {
-        build = DwAppVersion.parse(app).build;
-      } on FormatException {
-        return (DwCloseCode.protocolError, 'dw.protocol');
-      }
+    final served = runtime.protocol.contractVersion;
+    if (served == null) return null;
+    final sent = query[DwHttpContract.liveContractVersionParameter];
+    final DwContractVersion? client;
+    try {
+      client = sent == null ? null : DwContractVersion.parse(sent);
+    } on FormatException {
+      return (DwCloseCode.protocolError, 'dw.protocol');
     }
-    if (build < settings.minAppBuild) {
+    if (client == null || client.isOlderLineThan(served)) {
       return (DwCloseCode.incompatible, DwCoreRefusal.updateRequired.code);
     }
     return null;

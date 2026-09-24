@@ -242,7 +242,7 @@ void main() {
     test('an update-required answer is terminal: surfaced once, calls fail '
         'fast, watches show it', () async {
       final h = Harness(signedIn: false, appVersion: '1.0.0+3')..serveRooms();
-      h.server.minAppBuild = 4;
+      h.server.contractVersion = '1.0.0';
       await h.start();
       final incompatibility = DwStreamRecording(h.client.incompatibilityStream);
       final watch = h.client.watch(const ListRoomsOffline());
@@ -267,7 +267,7 @@ void main() {
 
     test('a protocol the server does not speak is incompatible too', () async {
       final h = Harness(signedIn: false)..serveRooms();
-      h.server.protocolVersion = 2;
+      h.server.protocolVersion = dwProtocolVersion + 1;
       await h.start();
       final result = await h.client.fetch(const ListRoomsOffline());
       expect(

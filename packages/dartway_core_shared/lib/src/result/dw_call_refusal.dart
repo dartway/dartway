@@ -45,9 +45,11 @@ enum DwCoreRefusal implements DwRefusalCode {
   /// needs a new code, not another try.
   codeExpired,
 
-  /// The app build is below the server's minimum (`Dw-App-Version`). An
-  /// incompatibility, not a rule: it answers `incompatible` with `426`, and
-  /// the app shows a full-screen "update the app" page.
+  /// The app was compiled with an older breaking line of the project's
+  /// contract than the server's (`Dw-Contract-Version`), or sent back the
+  /// `unknown` of an open enum (D-071). An incompatibility, not a rule: it
+  /// answers `incompatible` with `426`, and the app shows a full-screen
+  /// "update the app" page.
   updateRequired,
 
   /// The client speaks a protocol version the server does not

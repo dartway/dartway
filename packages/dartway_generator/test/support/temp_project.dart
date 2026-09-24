@@ -63,6 +63,7 @@ final class TempProject {
     writeFile(
       p.join(name, 'pubspec.yaml'),
       'name: $name\n'
+      'version: 0.1.0\n'
       'publish_to: none\n'
       'environment:\n'
       '  sdk: ^3.11.0\n'

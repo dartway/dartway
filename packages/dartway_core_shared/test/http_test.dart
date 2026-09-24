@@ -6,7 +6,7 @@ import 'support/protocol.dart';
 void main() {
   group('call contract', () {
     test('paths', () {
-      expect(dwProtocolVersion, 1);
+      expect(dwProtocolVersion, 2);
       expect(DwHttpContract.livePath, '/dw/live');
       expect(DwHttpContract.healthPath, '/health');
       expect(DwHttpContract.callPath('BookSession'), '/dw/BookSession');

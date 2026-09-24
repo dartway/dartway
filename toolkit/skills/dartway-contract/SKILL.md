@@ -9,7 +9,7 @@ description: >-
   (DwRefusalCodes), channel kinds (DwChannelKind), upload purposes (DwUploadPurpose), naming
   (two words, Get…/List…, verb+object), and generation (`dart run dartway_cli:dartway generate`, `*.dw.dart`,
   lib/generated/ — never edited). Also what a DTO change costs installed app builds and when to
-  raise minAppBuild. Use when adding or changing a data object, a request, a command, a refusal
+  raise the contract's breaking line (the shared package's version). Use when adding or changing a data object, a request, a command, a refusal
   code, a channel kind or an upload purpose, or when choosing which request kind a screen needs.
 ---
 
@@ -340,15 +340,17 @@ is not the project's concern; **the project's DTOs are**. What an old build does
 | rename a refusal code | the old build shows its generic refusal text |
 
 **Prefer the additive change:** a new optional field, a new call beside the old one, the old handler
-kept until no supported build uses it. When a breaking change is unavoidable, raise the server's
-minimum build to the first build that speaks the new contract: `DwServerSettings.minAppBuild`. A
-call whose `Dw-App-Version` build is lower is answered `426` with `dw.updateRequired`, and the app
-shows its update-required screen instead of failing call by call. The value is read when the server
-starts — the skeleton's `bin/server.dart` takes it from `DW_MIN_APP_BUILD` — so raising it takes a
-restart, not a release. The build is the `+N` of the app's version in `__FLUTTER_PKG__/pubspec.yaml`.
+kept until no supported build uses it. When a breaking change is unavoidable, **raise the breaking
+line of `__SHARED_PKG__/pubspec.yaml`'s `version:` in the same change** — the minor while it is below
+1.0 (`0.4.2` → `0.5.0`), the major after (`2.3.0` → `3.0.0`) — and run `dart run dartway_cli:dartway generate`.
+That version is the contract's (`DwContractVersion`): the generator writes it into the protocol both
+sides are compiled with, every call carries it as `Dw-Contract-Version`, and a server answers an app of
+an older line `426` with `dw.updateRequired` — the app shows its update-required screen instead of
+failing call by call. An additive change raises the patch, or nothing. Nothing is set in an
+environment at deploy time: the minimum ships with the code that needs it.
 
-Say which kind of change it is in the commit and the pull request; a breaking one names the
-`minAppBuild` it needs.
+Say which kind of change it is in the commit and the pull request; a breaking one names the contract
+version it raises to.
 
 ### Open enums — rare, by declaration
 
@@ -423,6 +425,6 @@ The skeleton's shared package ships such a test; extend it rather than starting 
 - [ ] Clearable edit fields are `DwFieldPatch<T>` defaulting to `keep()`.
 - [ ] `validate()` covers input rules, reads fields only; data rules stay in the handler.
 - [ ] New refusal codes documented; the app has a text for each.
-- [ ] The change is additive for installed builds, or `minAppBuild` is named.
+- [ ] The change is additive for installed builds, or it raises the breaking line of `__SHARED_PKG__`'s `version:`.
 - [ ] `dart run dartway_cli:dartway generate` run and its output committed; `dart run dartway_cli:dartway generate --check` passes.
 - [ ] The shared contract test covers the new DTOs.

@@ -25,7 +25,7 @@ void main() {
       server.listen((request) async {
         if (request.uri.path == '/dw/live') {
           expect(request.uri.queryParameters, {
-            'protocol': '1',
+            'protocol': '$dwProtocolVersion',
             'app': '3.1.0+42',
           });
           final socket = await WebSocketTransformer.upgrade(request);
@@ -76,7 +76,7 @@ void main() {
       final watch = client.watch(const _LiveRooms());
       await until(() => watch.isLive);
       expect(dataOf(watch.state), [a, b]);
-      expect(postHeaders.single.value('dw-protocol'), '1');
+      expect(postHeaders.single.value('dw-protocol'), '$dwProtocolVersion');
       expect(postHeaders.single.value('dw-app-version'), '3.1.0+42');
       expect(
         postHeaders.single.value('authorization'),
