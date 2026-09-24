@@ -12,6 +12,8 @@ import '../state/dw_request_state.dart';
 import '../transport/dw_http_transport.dart';
 import '../transport/dw_live_connection.dart';
 import '../transport/dw_storage_transport.dart';
+import '../transport/dw_storage_transport_stub.dart'
+    if (dart.library.js_interop) '../transport/dw_storage_transport_web.dart';
 import '../transport/dw_web_socket_connector.dart';
 
 part 'calls.dart';
@@ -105,7 +107,7 @@ final class DwAppClient {
        httpTransport = httpTransport ?? DwHttpClientTransport(),
        _ownsTransport = httpTransport == null,
        liveConnector = liveConnector ?? const DwWebSocketConnector(),
-       storageTransport = storageTransport ?? DwHttpStorageTransport(),
+       storageTransport = storageTransport ?? dwDefaultStorageTransport(),
        _ownsStorageTransport = storageTransport == null,
        _onError = onError,
        _random = random ?? Random.secure();

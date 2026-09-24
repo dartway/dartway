@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.1-dev.1
+
+- Nothing changed here; the family moves in lockstep with `dartway_client`, fixed for #309.
+
 ## 0.20.0
 
 - First publication of the rewrite to pub.dev.

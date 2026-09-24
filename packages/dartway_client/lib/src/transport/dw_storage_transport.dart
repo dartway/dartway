@@ -77,6 +77,7 @@ final class DwStoragePut {
     required this.byteSize,
     required this.body,
     required this.abort,
+    this.reportSent = _ignoreSent,
   });
 
   /// A presigned URL: a credential for one object, never logged.
@@ -87,13 +88,46 @@ final class DwStoragePut {
 
   final int byteSize;
 
-  /// Read once, at the pace the network takes it: the client counts progress
-  /// by what the transport pulls.
+  /// Read once. Reading a chunk is not the same as sending it — see
+  /// [reportSent] — but a transport still has to read every one to hand the
+  /// bytes over at all, and doing so keeps the attempt's watchdog convinced
+  /// the pipeline is alive even before anything reaches the network: a slow
+  /// source (a big file read off disk, say) is not a stalled connection.
   final Stream<List<int>> body;
 
   /// Completes when the client gives up on the attempt (a stalled network,
   /// a stopped client): the transport stops sending and throws.
   final Future<void> abort;
+
+  /// Tells the client how many bytes have actually left for the network so
+  /// far — cumulative, not a delta, and never decreasing. Call it as often as
+  /// the transport can measure that.
+  ///
+  /// Streaming [body] at the network's pace (the socket's backpressure)
+  /// means every chunk read from it qualifies, since reading and sending
+  /// happen together — `DwHttpStorageTransport` calls it that way.
+  /// `XMLHttpRequest.upload.onprogress` in a browser is a transport-specific
+  /// source of the same fact, needed there because a browser cannot stream a
+  /// request body into `XMLHttpRequest` at all: the whole body is read into
+  /// memory before anything is sent, and reporting *that* as progress is
+  /// exactly the bug this callback exists to avoid — a browser's `fetch`
+  /// does the same thing, silently, which is why it cannot be trusted for
+  /// uploads of any size (`DwHttpStorageTransport`'s own doc).
+  ///
+  /// Drives the client's progress callback and the attempt's watchdog: once
+  /// the whole body is confirmed sent, the watchdog stops timing the network
+  /// for a stall and starts timing the wait for storage's reply instead,
+  /// bounded by how much longer the upload ticket is valid rather than by
+  /// the network's stall timeout — a reply can legitimately take longer to
+  /// arrive than a byte would take to stall, and discarding a fully-sent
+  /// upload over that is exactly the wasted retransmission this exists to
+  /// avoid. A transport that never calls this loses nothing but the
+  /// precision: [body] being fully read already keeps the watchdog alive
+  /// (above), and the wait for the reply then falls back to the plain stall
+  /// timeout, as if this callback did not exist.
+  final void Function(int sentBytes) reportSent;
+
+  static void _ignoreSent(int sentBytes) {}
 
   @override
   String toString() => 'DwStoragePut(${url.host}, $byteSize bytes)';
@@ -127,11 +161,16 @@ abstract interface class DwStorageTransport {
 }
 
 /// Sends uploads with `package:http`: a streamed body on `dart:io`, so
-/// progress follows the socket.
+/// progress follows the socket — each chunk `send` pulls from the body is
+/// reported through [DwStoragePut.reportSent] as it is pulled, which on
+/// `dart:io` is when it is handed to the socket.
 ///
 /// In a browser the fetch-based client reads the whole body before sending
-/// it: the upload works, and its progress jumps to the end first, then the
-/// transfer happens without further progress.
+/// it: the upload works, but every chunk is pulled at once, so
+/// [DwStoragePut.reportSent] jumps to the end immediately and the transfer
+/// itself happens without any further progress — use
+/// [DwXhrStorageTransport] there instead (`DwAppClient`'s default on the
+/// web, D-087).
 final class DwHttpStorageTransport implements DwStorageTransport {
   DwHttpStorageTransport([http.Client? client])
     : _client = client ?? http.Client();
@@ -140,14 +179,20 @@ final class DwHttpStorageTransport implements DwStorageTransport {
 
   @override
   Future<DwStorageReply> put(DwStoragePut put) async {
-    final request = _PutRequest(put.url, put.body, put.abort)
+    var sent = 0;
+    final body = put.body.map((chunk) {
+      sent += chunk.length;
+      put.reportSent(sent);
+      return chunk;
+    });
+    final request = _PutRequest(put.url, body, put.abort)
       ..contentLength = put.byteSize
       ..headers.addAll(put.headers);
     final response = await _client.send(request);
     // An error body is a few hundred bytes of XML; a success has none. Read
     // with the abort in force, so a stalled answer ends too.
-    final body = await response.stream.bytesToString(utf8);
-    return DwStorageReply(status: response.statusCode, body: body);
+    final responseBody = await response.stream.bytesToString(utf8);
+    return DwStorageReply(status: response.statusCode, body: responseBody);
   }
 
   @override

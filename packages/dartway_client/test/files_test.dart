@@ -218,6 +218,126 @@ void main() {
     expect(storage.puts, 1);
   });
 
+  group('the wait for the reply once the transport reports the body sent '
+      '(#309)', () {
+    test('a transport that reads the whole body at once — the way a browser '
+        "fetch does — but reports the network's real progress is not "
+        'aborted by a reply slower than the stall timeout', () async {
+      final fallback = storage.transport;
+      final bufferingButHonest = DwMemoryStorageTransport((put) async {
+        // Like `fetch`/`XMLHttpRequest`: the body is read into memory in
+        // one go, instantly. Unlike the bug this transport reports the
+        // real send separately, so that read is never mistaken for it.
+        put.reportSent(put.byteSize);
+        // Storage answers slower than the stall timeout — plausible for
+        // a large upload — but well inside the ticket's life.
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        return fallback.put(put);
+      });
+      final client2 = await connect(
+        transport: bufferingButHonest,
+        options: const DwClientOptions(
+          callTimeout: Duration(milliseconds: 50),
+          retryDelay: Duration(milliseconds: 1),
+          maxRetryDelay: Duration(milliseconds: 5),
+          releaseDelay: Duration.zero,
+          liveIdleDelay: Duration.zero,
+        ),
+      );
+      final result = await client2.files.upload(
+        Upload.avatar,
+        DwUploadSource.bytes(bytes(5)),
+        fileName: 'a.png',
+        contentType: 'image/png',
+      );
+      expect(result.isOk, isTrue);
+      expect(
+        storage.puts,
+        1,
+        reason: 'no retry: the wait for the reply was not read as a stall',
+      );
+    });
+
+    test('progress reported by the transport, slower than the stall timeout '
+        'but in time, keeps re-arming the watchdog', () async {
+      final fallback = storage.transport;
+      final trickling = DwMemoryStorageTransport((put) async {
+        // Real network progress in two steps, each under the stall
+        // timeout, together well over it — and nothing else touches the
+        // watchdog: `put.body` is read only at the very end, by
+        // `fallback.put`.
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        put.reportSent(put.byteSize ~/ 2);
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        put.reportSent(put.byteSize);
+        return fallback.put(put);
+      });
+      final client2 = await connect(
+        transport: trickling,
+        options: const DwClientOptions(
+          callTimeout: Duration(milliseconds: 100),
+          retryDelay: Duration(milliseconds: 1),
+          maxRetryDelay: Duration(milliseconds: 5),
+          releaseDelay: Duration.zero,
+          liveIdleDelay: Duration.zero,
+        ),
+      );
+      final result = await client2.files.upload(
+        Upload.avatar,
+        DwUploadSource.bytes(bytes(5)),
+        fileName: 'a.png',
+        contentType: 'image/png',
+      );
+      expect(result.isOk, isTrue);
+      expect(storage.puts, 1);
+    });
+
+    test('a transport that reads the whole body but never reports it sent '
+        'still gives up on a genuine stall at the plain stall timeout, not '
+        "the ticket's — a body read is not proof a network took it", () async {
+      var stalled = true;
+      final fallback = storage.transport;
+      final silentlyBuffering = DwMemoryStorageTransport((put) async {
+        if (stalled) {
+          stalled = false;
+          // Reads (and so validates) the whole body, same as a real
+          // transport would, but never calls `reportSent` — an old
+          // transport that never adopted it, or one that genuinely
+          // cannot tell. Then never answers — until the client aborts.
+          await put.body.drain<void>();
+          await put.abort;
+          throw StateError('aborted');
+        }
+        // The retry's own attempt, untouched: `fallback` reads its body
+        // itself.
+        return fallback.put(put);
+      });
+      final client2 = await connect(
+        transport: silentlyBuffering,
+        options: const DwClientOptions(
+          callTimeout: Duration(milliseconds: 100),
+          retryDelay: Duration(milliseconds: 1),
+          maxRetryDelay: Duration(milliseconds: 5),
+          releaseDelay: Duration.zero,
+          liveIdleDelay: Duration.zero,
+        ),
+      );
+      final result = await client2.files
+          .upload(
+            Upload.avatar,
+            DwUploadSource.bytes(bytes(5)),
+            fileName: 'a.png',
+            contentType: 'image/png',
+          )
+          // Storage's ticket lasts 15 minutes by default: if reading the
+          // body were mistaken for reporting it sent, this would hang
+          // until then instead of aborting within the stall timeout.
+          .timeout(const Duration(seconds: 5));
+      expect(result.isOk, isTrue);
+      expect(storage.puts, 1);
+    });
+  });
+
   test('refusals of the start and of the finish are results, and nothing is '
       'put after a refused start', () async {
     storage.refuseStart = (command) => DwCallRefusal(
@@ -298,10 +418,7 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 60));
       cancel.complete();
-      await expectLater(
-        pending,
-        throwsA(isA<DwUploadCancelledException>()),
-      );
+      await expectLater(pending, throwsA(isA<DwUploadCancelledException>()));
       expect(server.calls.map((call) => call.wireName), ['DwStartUpload']);
       expect(storage.objects, isEmpty);
     });

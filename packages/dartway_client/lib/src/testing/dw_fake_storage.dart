@@ -104,12 +104,14 @@ final class DwFakeStorage {
     final ticket = id == null ? null : _tickets[id];
     final builder = BytesBuilder(copy: false);
     // Read as a network would, so the client's progress and stall detection
-    // see a transfer.
+    // see a transfer: reported the same way `DwHttpStorageTransport` reports
+    // it, chunk by chunk as this fake pulls the body.
     final subscription = put.body.listen(null);
     final done = Completer<void>();
     subscription
       ..onData((chunk) async {
         builder.add(chunk);
+        put.reportSent(builder.length);
         if (chunkDelay > Duration.zero) {
           subscription.pause();
           await Future<void>.delayed(chunkDelay);
