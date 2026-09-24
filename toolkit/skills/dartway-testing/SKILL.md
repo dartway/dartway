@@ -153,8 +153,9 @@ tearDownAll(() async {
 
 **The skeleton's harness does all of this once**, in `__SERVER_PKG__/test/support/`: start and stop,
 a signed-up member by identifier and delivered code, an administrator promoted in the database, a
-watch that waits until it is live, a matcher for a refusal code, a counting HTTP transport, a
-recording live connector. Use it and extend it; a new test file is `setUpAll` → harness start,
+watch that waits until it is live, a matcher for a refusal code. The counting HTTP transport, the
+recording live connector and the polling wait are the framework's (`DwCountingTransport`,
+`DwRecordingConnector`, `dwWaitUntil` in `testing.dart`), not copies to keep. Use it and extend it; a new test file is `setUpAll` → harness start,
 `tearDownAll` → harness stop.
 
 ### Three ways to talk to the server
@@ -174,7 +175,7 @@ final paid = (await client.command(const PayInvoice(invoiceId: 7))).valueOrThrow
 ```
 
 A second member's client is how "the other device sees it live" and "someone else is refused" are
-tested. Wait for live state with a small polling helper (the skeleton's harness has one) rather than a
+tested. Wait for live state with `dwWaitUntil` (`testing.dart`) rather than a
 fixed delay.
 
 **Raw calls — for the wire.** `server.caller(token: …)` sends a call exactly as a client would and

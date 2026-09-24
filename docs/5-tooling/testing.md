@@ -78,6 +78,9 @@ end-to-end test imports nothing else of the framework:
 | `caller(token:)` → `DwTestCaller` | Raw calls as a client sends them: the path, the headers and the body, a fresh `Dw-Idempotency-Key` per command. `call(dto)` answers a `DwTestAnswer` — `status`, `headers`, `response`, `value(call)`, `updates`, `refusal`; `raw(...)` sends anything. For tests of the wire itself |
 | `openLive()` → `DwTestLiveSocket` | A raw live socket that has read its `hello`: `authenticate`, `subscribe`, `waitFor`, `expect<T>`, `expectSilence` |
 | `connectClient()` | A started, real `DwAppClient` of this server — real HTTP, the real live socket — with `dwTestClientOptions` (millisecond retries, no release delay). Transports passed in wrap the real ones, to lose an answer or watch the frames |
+| `DwCountingTransport` | Real HTTP for `connectClient(httpTransport:)`, counting posts per wire name (`posts('ListMyInvoices')`) and keeping the last answer to each: how a test proves an update arrived live and not by a re-read |
+| `DwRecordingConnector` | The real live socket for `connectClient(liveConnector:)`, keeping every frame the server sent: `updatesOn`, `refusalsOf`, `closuresOf` a channel |
+| `dwWaitUntil(condition)` | Polls until a condition holds, and throws a `TimeoutException` naming `reason` when it does not: for what arrives on the socket or after a job, never a fixed delay |
 
 The skeleton wraps them once per test file (`template/dartway_starter_server/test/support/app_harness.dart`):
 

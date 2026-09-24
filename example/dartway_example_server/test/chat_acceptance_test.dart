@@ -83,7 +83,7 @@ void main() {
           ListChatMessages(channelId: channel.id!),
         );
         addTearDown(window.close);
-        await eventually(() => window.state is DwRequestRefused);
+        await dwWaitUntil(() => window.state is DwRequestRefused);
         expect(
           (window.state as DwRequestRefused).refusal.isCode(
             DwCoreRefusal.forbidden,
@@ -160,7 +160,7 @@ void main() {
       // At the newest: a page, then older pages to the start.
       final newest = boris.client.watchWindow(request);
       addTearDown(newest.close);
-      await eventually(() => newest.isLive);
+      await dwWaitUntil(() => newest.isLive);
       expect(texts(newest), [for (var i = 69; i >= 30; i--) 'm$i']);
       expect(dataOf(newest.state)!.hasNewer, isFalse);
       while (dataOf(newest.state)!.hasOlder) {
@@ -173,7 +173,7 @@ void main() {
       final anchor = DwWindowCursor.encode(rows[21].sentAt, rows[21].id!);
       final around = galina.client.watchWindow(request, anchor: anchor);
       addTearDown(around.close);
-      await eventually(() => around.isLive);
+      await dwWaitUntil(() => around.isLive);
       final opened = dataOf(around.state)!;
       expect(opened.items.map((m) => m.text), contains('m21'));
       expect((opened.hasOlder, opened.hasNewer), (true, true));
@@ -182,7 +182,7 @@ void main() {
       // shown; the window at the newest shows it at once.
       final sent = await boris.send(channel.id!, 'live one');
       expect(texts(newest).first, 'live one', reason: 'from the response');
-      await eventually(() => dataOf(around.state)!.unseenNewerCount == 1);
+      await dwWaitUntil(() => dataOf(around.state)!.unseenNewerCount == 1);
       expect(texts(around), isNot(contains('live one')));
 
       while (dataOf(around.state)!.hasNewer) {
@@ -223,7 +223,7 @@ void main() {
         galinaWindow.close();
         borisWindow.close();
       });
-      await eventually(() => galinaWindow.isLive && borisWindow.isLive);
+      await dwWaitUntil(() => galinaWindow.isLive && borisWindow.isLive);
 
       final question = await boris.send(
         channel.id!,
@@ -231,7 +231,7 @@ void main() {
       );
       expect(question.text, 'Who has the storage key?', reason: 'trimmed');
       expect(question.author.firstName, 'Boris');
-      await eventually(
+      await dwWaitUntil(
         () => itemsOf(galinaWindow).any((m) => m.id == question.id),
       );
 
@@ -244,7 +244,7 @@ void main() {
       expect(reply.replyTo?.text, 'Who has the storage key?');
       expect(reply.replyTo?.authorName, 'Boris');
       expect(reply.replyTo?.isDeleted, isFalse);
-      await eventually(
+      await dwWaitUntil(
         () =>
             itemsOf(borisWindow).firstOrNull?.replyTo?.id == question.id &&
             itemsOf(borisWindow).first.id == reply.id,
@@ -270,7 +270,7 @@ void main() {
       )).valueOrThrow;
       expect(edited.text, 'Who has the pool key?');
       expect(edited.editedAt, isNotNull);
-      await eventually(
+      await dwWaitUntil(
         () =>
             itemsOf(galinaWindow).any(
               (m) => m.id == question.id && m.text == 'Who has the pool key?',
@@ -319,7 +319,7 @@ void main() {
         DeleteChatMessage(messageId: question.id),
       );
       expect(deleted, isA<DwCallOk<void>>());
-      await eventually(
+      await dwWaitUntil(
         () =>
             itemsOf(galinaWindow).every((m) => m.id != question.id) &&
             itemsOf(
@@ -368,7 +368,7 @@ void main() {
         ListPinnedChatMessages(channelId: channel.id!),
       );
       addTearDown(pinned.close);
-      await eventually(() => pinned.isLive);
+      await dwWaitUntil(() => pinned.isLive);
       expect(dataOf(pinned.state), isEmpty);
       List<int> pinnedIds() => [for (final m in dataOf(pinned.state)!) m.id];
 
@@ -381,7 +381,7 @@ void main() {
       await boris.client.command(
         PinChatMessage(messageId: second.id, pinned: true),
       );
-      await eventually(
+      await dwWaitUntil(
         () => pinnedIds().length == 2,
         reason: 'both pins arrived',
       );
@@ -394,7 +394,7 @@ void main() {
       expect(pinnedIds(), [second.id], reason: 'from the response');
 
       await boris.client.command(DeleteChatMessage(messageId: second.id));
-      await eventually(() => pinnedIds().isEmpty);
+      await dwWaitUntil(() => pinnedIds().isEmpty);
       expect(
         (await galina.client.fetch(
           ListPinnedChatMessages(channelId: channel.id!),
@@ -412,7 +412,7 @@ void main() {
 
       final states = galina.client.watch(const ListMyChatReadStates());
       addTearDown(states.close);
-      await eventually(() => states.isLive);
+      await dwWaitUntil(() => states.isLive);
       ChatReadState stateOf(int channelId) =>
           dataOf(states.state)!.singleWhere((s) => s.id == channelId);
       expect(stateOf(channel.id!).unreadCount, 0);
@@ -421,7 +421,7 @@ void main() {
       final m1 = await boris.send(channel.id!, 'one');
       final m2 = await boris.send(channel.id!, 'two');
       final m3 = await boris.send(channel.id!, 'three');
-      await eventually(
+      await dwWaitUntil(
         () => stateOf(channel.id!).unreadCount == 3,
         reason: "Galina's count grew live",
       );
@@ -452,20 +452,20 @@ void main() {
       );
 
       final m4 = await boris.send(channel.id!, 'four');
-      await eventually(() => stateOf(channel.id!).unreadCount == 2);
+      await dwWaitUntil(() => stateOf(channel.id!).unreadCount == 2);
 
       final window = galina.client.watchWindow(
         ListChatMessages(channelId: channel.id!),
         anchor: stateOf(channel.id!).lastReadCursor,
       );
       addTearDown(window.close);
-      await eventually(() => window.isLive);
+      await dwWaitUntil(() => window.isLive);
       final ids = [for (final m in itemsOf(window)) m.id];
       expect(ids, [m4.id, m3.id, m2.id, m1.id]);
 
       // A deleted unread message is not waiting any more.
       await boris.client.command(DeleteChatMessage(messageId: m3.id));
-      await eventually(() => stateOf(channel.id!).unreadCount == 1);
+      await dwWaitUntil(() => stateOf(channel.id!).unreadCount == 1);
       // Nothing of Coaches changed along the way.
       expect(stateOf(other.id!).unreadCount, 0);
     });
@@ -536,7 +536,7 @@ void main() {
         ListChatMessages(channelId: channel.id!),
       );
       addTearDown(window.close);
-      await eventually(() => window.isLive);
+      await dwWaitUntil(() => window.isLive);
 
       Future<ChatMessage> react(
         ClubMember member,
@@ -558,14 +558,14 @@ void main() {
         galinaId: ChatReaction.fire,
         annaId: ChatReaction.thumbsUp,
       });
-      await eventually(
+      await dwWaitUntil(
         () => reactionsOf(itemsOf(window).single).length == 2,
         reason: "Boris's window heard the reactions",
       );
       expect(reactionsOf(await react(galina, null)), {
         annaId: ChatReaction.thumbsUp,
       });
-      await eventually(() => reactionsOf(itemsOf(window).single).length == 1);
+      await dwWaitUntil(() => reactionsOf(itemsOf(window).single).length == 1);
 
       final taps = await Future.wait([
         for (final reaction in [
@@ -599,7 +599,7 @@ void main() {
         ListChatMessages(channelId: channel.id!),
       );
       addTearDown(window.close);
-      await eventually(() => itemsOf(window).length == 2);
+      await dwWaitUntil(() => itemsOf(window).length == 2);
       final left = itemsOf(window).firstWhere((m) => m.id == mine.id);
       expect(left.text, 'I am off to another club');
       expect(left.author.id, borisProfileId, reason: 'the author is the same row');

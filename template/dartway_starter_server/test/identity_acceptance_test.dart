@@ -67,7 +67,7 @@ void main() {
     // From the answer alone, for the author; over the socket, for the admin.
     expect(dataOf(profile.state)!.email, 'vera.new@example.com');
     expect(dataOf(profile.state)!.phone, '79990005002');
-    await eventually(
+    await dwWaitUntil(
       () => dataOf(card.state)!.profile.email == 'vera.new@example.com',
     );
     expect(dataOf(card.state)!.identifiers.map((i) => (i.kind, i.value)), [

@@ -269,11 +269,11 @@ Realtime is where silent failures live; each half gets a test in `__SERVER_PKG__
 
 ```dart
 final watch = manager.watch(const ListInvoicesPage());   // DwRequestWatch, live
-await eventually(() => watch.isLive);
+await dwWaitUntil(() => watch.isLive);
 
 (await member.command(PayInvoice(invoiceId: id))).valueOrThrow;
 
-await eventually(
+await dwWaitUntil(
   () => switch (watch.state) {
     DwRequestData(:final value) =>
       value.items.any((i) => i.id == id && i.status == InvoiceStatus.paid),
@@ -283,9 +283,9 @@ await eventually(
 ```
 
 Clients come from `DwTestServer.connectClient()` (`package:dartway_core_server/testing.dart`) and are
-signed in through the real sign-in; `eventually` is a polling helper of the test support — the
-skeleton's server harness has both, plus a counter of HTTP calls to prove an update arrived live and
-not by a re-read.
+signed in through the real sign-in; `dwWaitUntil` polls until the condition holds, and
+`DwCountingTransport` counts HTTP calls to prove an update arrived live and not by a re-read — both
+from the same library.
 
 **The rule itself**, over a raw socket:
 

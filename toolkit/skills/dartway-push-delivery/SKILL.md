@@ -139,7 +139,7 @@ plugins: [DwSharedPreferences(), DwPush(transports: [DwRuStorePush(), DwFirebase
 
 - **Server**, on Postgres with `DwFakePushService` (`package:dartway_push_server/testing.dart`) —
   build the module with `fcm.fcmProvider()`, register a device with `DwRegisterPushToken` from a
-  real client, run the command, `eventually` read `dw_push_delivery.outcome` and `fcm.sends`:
+  real client, run the command, `dwWaitUntil` read `dw_push_delivery.outcome` and `fcm.sends`:
   who was notified, who was skipped, what the payload decodes to, and that a refused command sent
   nothing.
 - **App**, with `DwFakePushTransport` (`package:dartway_push_flutter/testing.dart`) and the

@@ -45,7 +45,7 @@ void main() {
       // The author's dashboard from the answer; the member's own profile over
       // their socket, without asking.
       expect(dataOf(counters.state)!.admins, admins + 1);
-      await eventually(
+      await dwWaitUntil(
         () => dataOf(veraProfile.state)!.role == UserRole.admin,
         reason: "Vera's profile hears the promotion",
       );
@@ -61,12 +61,12 @@ void main() {
       (await anna.client.command(
         ChangeUserRole(profileId: await vera.profileId, role: UserRole.user),
       )).valueOrThrow;
-      await eventually(
+      await dwWaitUntil(
         () => dataOf(veraProfile.state)!.role == UserRole.user,
         reason: "Vera's profile hears the demotion",
       );
       // Access is checked at subscription: the channel it opened is closed.
-      await eventually(
+      await dwWaitUntil(
         () => vera.live.closuresOf(adminChannel).isNotEmpty,
         reason: 'the admin channel is revoked',
       );
@@ -120,7 +120,7 @@ void main() {
     final members = dataOf(counters.state)!.members;
 
     final newcomer = await app.signUp('79990006023', firstName: 'Newcomer');
-    await eventually(
+    await dwWaitUntil(
       () => dataOf(table.state)!.total == before.total + 1,
       reason: 'the page reads itself again',
     );
@@ -129,7 +129,7 @@ void main() {
       newcomer.accountId,
       reason: 'newest first',
     );
-    await eventually(() => dataOf(counters.state)!.members == members + 1);
+    await dwWaitUntil(() => dataOf(counters.state)!.members == members + 1);
   });
 
   test("a member's own change: the member's screens update from the response, "
@@ -151,7 +151,7 @@ void main() {
     final updates = vera.http.lastReply('UpdateMyProfile')['updates']! as Map;
     expect(updates.keys, ['profile:${vera.accountId}']);
 
-    await eventually(
+    await dwWaitUntil(
       () => anna.live.received.any(
         (frame) =>
             frame['k'] == 'upd' &&
@@ -171,7 +171,7 @@ void main() {
     (await anna.client.command(
       const SaveAppSetting(key: AppSettingKeys.appName, value: 'Acme'),
     )).valueOrThrow;
-    await eventually(
+    await dwWaitUntil(
       () => dataOf(settings.state)!.any(
         (setting) =>
             setting.id == AppSettingKeys.appName && setting.value == 'Acme',
