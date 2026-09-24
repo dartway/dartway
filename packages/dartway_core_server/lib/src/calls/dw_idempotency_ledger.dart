@@ -69,26 +69,45 @@ Future<void> dwRecordOutcome(
   },
 );
 
-/// Overwrites [key]'s already-recorded outcome with [status]/[result] — for a
-/// `transactional: false` handler whose own transaction recorded a
-/// provisional success (`DwCallContext.recordProvisionalOutcome`) that its
-/// post-transaction work then proved wrong: a refusal from a delivery, say,
-/// once the ticket it would have refused before existing is already real.
-/// Does nothing if the row is gone (cleared by [dwClearOutcome] on the same
-/// call, in the exception branch instead) — the two never both run.
+/// Settles [key]'s outcome as [status]/[result], whether or not a row is
+/// there already — for a `transactional: false` handler whose own
+/// transaction recorded a provisional success (`DwRuntimeContext.recordProvisionalOutcome`)
+/// that its post-transaction work then proved wrong: a refusal from a
+/// delivery, say, once the ticket it would have refused before existing is
+/// already real.
+///
+/// An upsert, not a plain update, on purpose: the provisional row this is
+/// meant to correct lives in the *same* transaction the handler's own
+/// transactional part does, so a handler that calls
+/// `recordProvisionalOutcome` and then throws **before that transaction
+/// commits** takes the provisional row down with it on rollback — a plain
+/// `UPDATE` would then touch zero rows, and the refusal would go
+/// unrecorded, unlike a transactional command's own refusal, always
+/// recorded (`DwCallEndpoint._executeCommand`'s own `on DwRefusalException`).
+/// `_requestCode`'s own shape never hits this —
+/// nothing throws between the provisional write and that transaction's own
+/// return — but the mechanism has to be correct for a handler that puts
+/// more transactional work after the provisional write, not only for the
+/// one caller that exists today. [type] is `dw_command_outcome.type`'s own
+/// `NOT NULL`: the insert branch needs it whether or not the row it is
+/// settling already agreed.
 @internal
 Future<void> dwOverwriteOutcome(
   DwDatabaseHandle db,
   String key,
   int? accountId,
+  String type,
   String status,
   Object? result,
 ) => db.execute(
-  'UPDATE dw_command_outcome SET status = @status, result = @result::jsonb '
-  'WHERE key = @key AND account_id IS NOT DISTINCT FROM @account::int8',
+  'INSERT INTO dw_command_outcome (key, account_id, type, status, result) '
+  'VALUES (@key, @account::int8, @type, @status, @result::jsonb) '
+  'ON CONFLICT ON CONSTRAINT dw_command_outcome_key '
+  'DO UPDATE SET status = EXCLUDED.status, result = EXCLUDED.result',
   params: {
     'key': key,
     'account': accountId,
+    'type': type,
     'status': status,
     'result': result == null ? null : jsonEncode(result),
   },

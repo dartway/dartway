@@ -107,29 +107,6 @@ abstract class DwCallContext {
     String? field,
   });
 
-  /// For a `transactional: false` command handler (`DwCallHandler.command`)
-  /// whose own transaction — the part that has to be atomic, a ticket, a
-  /// charge — commits before the handler's post-transaction work (a call to
-  /// an external provider) runs: records [value] as this call's outcome
-  /// now, on [db] — the transaction still open when called from inside the
-  /// handler's own [transaction], the same one [value] describes.
-  ///
-  /// A duplicate send of the same idempotency key that arrives once that
-  /// transaction commits, but before the handler itself returns, replays
-  /// [value] instead of running the handler a second time — which, without
-  /// this, would repeat whatever the transactional part does once per key
-  /// (a second ticket, a second charge) for a caller that only meant to ask
-  /// once. If the handler then throws, the framework corrects what this
-  /// recorded: a `DwRefusalException` overwrites it with the refusal, so a
-  /// later replay answers that instead of a stale success; anything else
-  /// (an incident) removes it, so a later resend runs the handler again.
-  ///
-  /// Outside a `transactional: false` command that records its success, or
-  /// after the call already made a secret (`DwCallHandler.command`'s
-  /// `recordsSuccess`, `markSecret`), this does nothing — nothing has primed
-  /// it to record anywhere, the same as calling it from a request or a job.
-  Future<void> recordProvisionalOutcome(Object? value);
-
   /// Background jobs; an enqueue joins the enclosing transaction.
   DwJobQueue get jobs;
 
@@ -305,7 +282,40 @@ final class DwRuntimeContext extends DwCallContext {
   bool get recordedProvisionalOutcome => _recordedProvisionalOutcome;
   bool _recordedProvisionalOutcome = false;
 
-  @override
+  /// **Internal — not part of `DwCallContext`.** For a `transactional: false`
+  /// command handler (`DwCallHandler.command`) whose own transaction — the
+  /// part that has to be atomic, a ticket, a charge — commits before the
+  /// handler's post-transaction work (a call to an external provider) runs:
+  /// records [value] as this call's outcome now, on [db] — the transaction
+  /// still open when called from inside the handler's own [transaction], the
+  /// same one [value] describes.
+  ///
+  /// A duplicate send of the same idempotency key that arrives once that
+  /// transaction commits, but before the handler itself returns, replays
+  /// [value] instead of running the handler a second time — which, without
+  /// this, would repeat whatever the transactional part does once per key (a
+  /// second ticket, a second charge) for a caller that only meant to ask
+  /// once. If the handler then throws, `DwCallEndpoint` corrects what this
+  /// recorded: a `DwRefusalException` upserts it into a refused outcome
+  /// (`dwOverwriteOutcome` — an upsert, not a plain update, because the row
+  /// this call itself wrote may have just rolled back with the transaction
+  /// it was part of, if the handler throws before that transaction commits),
+  /// so a later replay answers the refusal instead of a stale success;
+  /// anything else (an incident) removes it, so a later resend runs the
+  /// handler again.
+  ///
+  /// Kept off `DwCallContext` on purpose: only `DwAuthService._requestCode`
+  /// calls this today, cast down from the `DwCallContext` it is given (safe
+  /// because the framework only ever constructs a `DwRuntimeContext` for a
+  /// command a handler runs — `DwAccountService`'s own `_DetachedContext`
+  /// never reaches one). Widening this to every project's own handlers is a
+  /// real design question — a second caller, when one turns up, is the time
+  /// to answer it — not a per-hook add-on.
+  ///
+  /// Outside a `transactional: false` command that records its success, or
+  /// after the call already made a secret (`DwCallHandler.command`'s
+  /// `recordsSuccess`, `markSecret`), this does nothing — nothing has primed
+  /// it to record anywhere, the same as calling it from a request or a job.
   Future<void> recordProvisionalOutcome(Object? value) async {
     final target = _idempotencyTarget;
     if (target == null || _madeSecret) return;

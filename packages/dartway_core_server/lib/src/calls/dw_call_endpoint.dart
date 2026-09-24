@@ -356,21 +356,28 @@ final class DwCallEndpoint {
   /// must not re-run the handler: that would repeat the transactional part
   /// (a second ticket, a second charge) for one idempotency key.
   ///
-  /// The way out is [DwCallContext.recordProvisionalOutcome]: a handler that
-  /// wants this protection calls it as the last thing inside its own
-  /// transaction, with what its answer will be if nothing past that point
-  /// fails. [dwStoredOutcome] at the top of [_executeCommand] finds that row
-  /// for a duplicate send arriving after the transaction commits, and
-  /// replays it — the handler never runs a second time. If [handler] then
-  /// throws once its transaction has already committed and recorded that
-  /// row:
-  /// - a [DwRefusalException] overwrites it with the refusal, so a later
-  ///   replay of [key] answers the refusal rather than the stale success;
-  /// - anything else (an incident) removes it instead, so a later resend of
-  ///   [key] runs [handler] again — consistent with how any other incident
-  ///   is never recorded under the idempotency key at all, and, for this
-  ///   auth's own `deliverCode`, correctly meets the identifier's own
-  ///   `resendDelay` refusal rather than a free retry.
+  /// The way out is `DwRuntimeContext.recordProvisionalOutcome` — not part of
+  /// [DwCallContext], and today only `DwAuthService._requestCode` calls it,
+  /// cast down from the [DwCallContext] its own handler signature is given.
+  /// A handler that wants this protection calls it as the last thing inside
+  /// its own transaction, with what its answer will be if nothing past that
+  /// point fails. [dwStoredOutcome] at the top of [_executeCommand] finds
+  /// that row for a duplicate send arriving after the transaction commits,
+  /// and replays it — the handler never runs a second time. If [handler]
+  /// then throws once its transaction has already committed and recorded
+  /// that row:
+  /// - a [DwRefusalException] upserts it into a refused outcome
+  ///   ([dwOverwriteOutcome] — an upsert, not a plain update: the row this
+  ///   call wrote may itself have just rolled back, if the handler throws
+  ///   before its own transaction has committed at all, which is not this
+  ///   auth's own shape but is one this mechanism has to hold up under
+  ///   anyway), so a later replay of [key] answers the refusal rather than
+  ///   the stale success;
+  /// - anything else (an incident) removes it instead ([dwClearOutcome]), so
+  ///   a later resend of [key] runs [handler] again — consistent with how
+  ///   any other incident is never recorded under the idempotency key at
+  ///   all, and, for this auth's own `deliverCode`, correctly meets the
+  ///   identifier's own `resendDelay` refusal rather than a free retry.
   ///
   /// A handler that never calls `recordProvisionalOutcome` sees no
   /// difference from before this existed: the row is written once, here,
@@ -396,6 +403,7 @@ final class DwCallEndpoint {
           runtime.db,
           key,
           accountId,
+          typeName,
           'refused',
           refusal.refusal.toJson(),
         );

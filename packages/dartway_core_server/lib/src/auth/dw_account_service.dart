@@ -950,11 +950,6 @@ final class _DetachedContext extends DwCallContext {
     DwCallRefusal(code, params: params, field: field),
   );
 
-  // No idempotency key exists to record under: this context belongs to a
-  // bare database, not a command a server dispatched.
-  @override
-  Future<void> recordProvisionalOutcome(Object? value) async {}
-
   @override
   T memo<T>(Object key, T Function() create) {
     if (_memo.containsKey(key)) return _memo[key] as T;

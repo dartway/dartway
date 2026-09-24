@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_core_server/src/context/dw_call_context.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:test/test.dart';
 
@@ -124,6 +125,19 @@ final class TestApp {
   /// Completed to let every identifier in [gatedDelivery] through. A test
   /// replaces it with a fresh one before gating an identifier.
   Completer<void> deliveryGate = Completer();
+
+  /// Completed to let `CountProvisional`'s handler past the point where it
+  /// has called the internal `recordProvisionalOutcome` hook, still inside
+  /// its own open transaction. A test replaces it with a fresh one before
+  /// sending a `CountProvisional`.
+  Completer<void> provisionalGate = Completer();
+
+  /// Set by `CountProvisional`'s handler right before it awaits
+  /// [provisionalGate] — an in-memory signal a test polls instead of a query
+  /// (which, gated inside an open transaction, is exactly the thing under
+  /// test: whether the provisional row is visible to another connection
+  /// yet).
+  bool provisionalGateReached = false;
 
   /// Identifiers whose delivery refuses (`dw.invalid` on `identifier`)
   /// instead of throwing — the way an SMS provider rejecting the number's
@@ -584,6 +598,29 @@ final class TestApp {
         }
         return n;
       },
+    ),
+    DwCallHandler.command<CountProvisional, int>(
+      access: DwAccessRule.anonymous,
+      transactional: false,
+      handle: (ctx, command) => ctx.transaction((tx) async {
+        final n = await _count(tx, command.label);
+        // The same call `DwAuthService._requestCode` makes, from inside
+        // this handler's own transaction — exactly the internal hook this
+        // test exists to exercise, cast the same way (see its own doc
+        // comment for why the cast is safe).
+        await (ctx as DwRuntimeContext).recordProvisionalOutcome(n);
+        provisionalGateReached = true;
+        await provisionalGate.future;
+        if (command.mode == 'refuse') {
+          // Still inside this transaction: rolls back the counter increment
+          // and (were it not for `dwOverwriteOutcome` being an upsert) the
+          // provisional row along with it.
+          throw DwRefusalException(
+            DwCallRefusal(DwCoreRefusal.conflict, params: {'n': n}),
+          );
+        }
+        return n;
+      }),
     ),
     DwCallHandler.command<Ping, String>(
       access: DwAccessRule.anonymous,

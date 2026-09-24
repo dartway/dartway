@@ -287,8 +287,14 @@ final class DwAuthService {
       // instead of running this method a second time and meeting the
       // resend-delay refusal above for a ticket that already exists. If
       // `deliverCode` then throws, `DwCallEndpoint` corrects this row for
-      // us — see `DwCallContext.recordProvisionalOutcome`.
-      await ctx.recordProvisionalOutcome(ticket);
+      // us — see `DwRuntimeContext.recordProvisionalOutcome`.
+      //
+      // Not part of `DwCallContext`: the framework only ever hands a command
+      // handler a real `DwRuntimeContext`, so the cast is safe here — it is
+      // not, in general, a promise every `DwCallContext` this file sees is
+      // one, only that this particular handler, wired through
+      // `DwCallHandler.command`, always is.
+      await (ctx as DwRuntimeContext).recordProvisionalOutcome(ticket);
       return (ticket, code, accountId);
     });
     await auth.deliverCode(ctx, kind, identifier, code, accountId);
