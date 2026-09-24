@@ -7,14 +7,15 @@ In client repos the harness is installed by the CLI and **committed** (`.claude/
 ## Structure
 
 ```
-CLAUDE.md                     # the generic methodology (the always-in-context "brain"): laws, naming,
-                              #   the shared/server/flutter packages, the skill catalog; installed as .claude/CLAUDE.md
-skills/dartway-*/SKILL.md     # the DartWay methodology — 19 skills:
+CLAUDE.md                     # the always-in-context part: the laws, what each package holds, and
+                              #   when to load which skill; installed as .claude/CLAUDE.md. Paid in
+                              #   every session, so what only one kind of task needs is a skill (#281)
+skills/dartway-*/SKILL.md     # the DartWay methodology — 22 skills, loaded on demand:
                               #   process: requirements, plan, run, finish, update
                               #   contract and server: contract, server, realtime, access, migrations,
-                              #     uploads, push-delivery
+                              #     uploads, push-delivery, analytics
                               #   app: feature-scaffold, data-layer, navigation, ui-kit, on-device
-                              #   everywhere: clean-code, testing
+                              #   everywhere: clean-code, testing, documentation, framework-notes
 commands/{commit,dartway-checkup}.md
 dev_notes/{README,_coverage}.md   # installed into the project's docs/dev_notes/ (see below)
 settings.json                 # default permissions, merged into .claude/settings.json

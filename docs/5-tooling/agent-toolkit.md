@@ -80,6 +80,8 @@ skills → `dartway-finish`.
 | `dartway-update` | Moving onto a newer framework: `dartway update`, the migration notes, then the versions |
 | `dartway-push-delivery` | Server-side push delivery |
 | `dartway-analytics` | Events tracked in the app and on the server, stored in the project's Postgres |
+| `dartway-documentation` | Where descriptions live — `DwFeatureSpec`, doc comments, registries in code — and what `docs/adr/` and `docs/dev_notes/` must earn |
+| `dartway-framework-notes` | Filing a finding back to the framework as an issue: what must not travel, the labels, the marker a workaround leaves in the code |
 
 Two commands come with them. **`/commit`** writes one conventional-commit line in English and decides
 nothing local — whether commits carry a ticket belongs to the project's own `CLAUDE.md`. **`/dartway-checkup`**
