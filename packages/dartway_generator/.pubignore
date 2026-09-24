@@ -1,0 +1,7 @@
+# Copied into a throwaway project and run from there by the generator's own
+# tests (`TempProject.copyFixture`/`runScript`); it imports the `app_shared`
+# package that fixture generates on the fly, which is not — and must not be —
+# a real dependency of this package. Excluding it from the published archive
+# keeps pub's static analysis from flagging that import as a missing
+# dependency, without touching what the tests read from the source tree.
+test/fixtures/types/app_shared/bin/round_trip.dart

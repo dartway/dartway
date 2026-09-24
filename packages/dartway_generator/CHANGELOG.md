@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0
+
+- First publication of the rewrite to pub.dev.
+
 ## 0.20.0-dev.4
 
 - **The shared package's `version:` is the contract version** (#296): written into `dw_protocol.dart` as `contractVersion:`; a shared package without a semantic version is refused. Migration note: `docs/migrations/2026-09-24-contract-version.md`.

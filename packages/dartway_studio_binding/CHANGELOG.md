@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - **Requires `dartway_router` 2.0.0** (#288), where a zone guard takes the navigation target.
 - **Signs in with `DwIdentifierKind.of`** (#283) instead of a copy of the rule of its own.

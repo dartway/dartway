@@ -1,5 +1,5 @@
 group = 'dev.dartway.push.rustore'
-version = '0.3.0-dev.1'
+version = '0.5.0'
 
 buildscript {
     ext.kotlin_version = '2.1.0'

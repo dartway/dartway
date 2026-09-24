@@ -21,11 +21,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-# The 1.0 client is not published yet; the tour resolves it from the monorepo.
-dependency_overrides:
-  dartway_client:
-    path: ../../dartway_client
-  dartway_core_shared:
-    path: ../../dartway_core_shared
-  dartway_router:
-    path: ../../dartway_router
+# Inside the monorepo the tour builds against the LOCAL framework packages —
+# the same reason example/dartway_example_flutter and template/*/pubspec.yaml
+# carry a dependency_overrides block for the same three packages. Here it
+# lives in the sibling pubspec_overrides.yaml instead of in this file: pub
+# reads it the same way (merged in as if it were this file's own
+# dependency_overrides:), but it is excluded from the published archive
+# (../.pubignore), so `dart pub publish`'s own tour — the "copy, flutter run"
+# this package's description promises — resolves the three from pub.dev with
+# nothing to delete first.

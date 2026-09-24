@@ -1,12 +1,12 @@
 // Points a created project at a local monorepo's framework packages by path.
 //
-// The DartWay family a project asks for (`^0.20.0-dev.1`) is not on pub.dev
-// while the rewrite is being built, so a project `dartway create` makes from
-// this tree cannot resolve by itself. `create --framework-path` answers the
-// question "does what this tree hands a stranger build, test and run?" by
-// resolving the same pubspecs against the same tree the template was written
-// against — the way the template itself resolves inside the monorepo, with
-// absolute paths instead of `../../packages`.
+// A project `dartway create` makes normally resolves the DartWay family from
+// pub.dev (`^0.20.0`). `create --framework-path` is for building against a
+// local checkout instead — this tree's own unreleased changes, or a fork —
+// answering the question "does what this tree hands a stranger build, test
+// and run?" by resolving the same pubspecs against the same tree the
+// template was written against — the way the template itself resolves
+// inside the monorepo, with absolute paths instead of `../../packages`.
 //
 // `tool/vendor_framework.dart` answers a neighbouring question for Docker,
 // where a build context cannot reach a path outside the project and the

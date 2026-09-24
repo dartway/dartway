@@ -123,6 +123,23 @@ void main() {
       expect(gaps.single.isAhead, isTrue);
     });
 
+    test('a project on a pre-release of the version the framework has moved '
+        'past is behind, not merely different — the case isAtLeastVersion '
+        'answered wrong once a package left `-dev.N` for a plain release '
+        '(review of #308)', () {
+      writeLock('app_server', [
+        hostedEntry('dartway_core_server', '0.20.0-dev.1'),
+      ]);
+
+      final gaps = compareToFramework(
+        projectRoot: sandbox,
+        frameworkVersions: const {'dartway_core_server': '0.20.0'},
+      );
+
+      expect(gaps.single.isBehind, isTrue);
+      expect(gaps.single.isAhead, isFalse);
+    });
+
     test('a git dependency states its version too, and is marked as git', () {
       // The instruction differs by source — a caret is edited, a git pin is
       // upgraded — so the report has to know which it is looking at.

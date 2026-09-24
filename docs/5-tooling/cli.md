@@ -147,11 +147,11 @@ lands in that repository.
 | `--notes-tracker` | `dartway/dartway` | GitHub repository where findings about the framework are filed; `none` files nothing outside the project |
 | `--[no-]git` | on | Initialize a repository with an initial commit |
 
-**`--framework-path` is how a project is built against a framework that is not published.** The
-rewrite's package family (`^0.20.0-dev.4`) is not on pub.dev yet, so a project created from this
-tree cannot resolve on its own; `--framework-path` resolves the same pubspecs against the same
-checkout the template was written against. The block it writes says to remove it once the versions
-are published.
+**`--framework-path` is how a project is built against a framework checkout that is not published** —
+this tree's own unreleased changes, or a fork. The rewrite's package family (`^0.20.0`) is on
+pub.dev, so a project created normally resolves on its own; `--framework-path` instead resolves the
+same pubspecs against the local checkout the template was written against. The block it writes says
+to remove it once the versions it points at are published.
 
 The last thing `create` prints points at `dartway doctor` and `dartway quickstart` and says to ask
 whatever assistant you use to bring the project up. The manual sequence is in the project's

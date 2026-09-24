@@ -118,6 +118,26 @@ void main() {
       expect(note.appliesTo({'dartway_router': '1.0.0'}), isFalse);
     });
 
+    test('a project on an earlier pre-release of the very version a note '
+        'lands in still has the note ahead of it — the case isAtLeastVersion '
+        'could not tell from "same release" (review of #308)', () {
+      final devNote = DwMigrationNote(
+        path: 'n.md',
+        title: 't',
+        affects: const {'dartway_core_server': '0.20.0-dev.4'},
+        body: '',
+      );
+      expect(
+        devNote.appliesTo({'dartway_core_server': '0.20.0-dev.2'}),
+        isTrue,
+      );
+      expect(
+        devNote.appliesTo({'dartway_core_server': '0.20.0-dev.4'}),
+        isFalse,
+      );
+      expect(devNote.appliesTo({'dartway_core_server': '0.20.0'}), isFalse);
+    });
+
     test('one package behind is enough when a note names several', () {
       final wide = DwMigrationNote(
         path: 'n.md',

@@ -25,5 +25,5 @@ dev_dependencies:
   crypto: ^3.0.0
   # `dartway dev proxy` is proven against a real server's live-socket origin
   # check, not against a reading of it.
-  dartway_core_server: ^0.20.0-dev.1
+  dartway_core_server: ^0.20.0
   test: ^1.25.0

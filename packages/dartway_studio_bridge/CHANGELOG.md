@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0
 
 **The app's side of the bridge knows which window is its peer.** It used to
 take the first window message that decoded and answer at whatever origin that

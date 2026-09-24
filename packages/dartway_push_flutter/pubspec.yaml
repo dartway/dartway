@@ -1,11 +1,10 @@
 name: dartway_push_flutter
 description: "Push notifications for a DartWay app, reached as dw.plugins.push: token registration that follows the session, permission on demand, and opened notifications with their typed payload. Carries no vendor SDK — add dartway_push_firebase or dartway_push_rustore."
-version: 0.3.0-dev.1
+version: 0.5.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
 topics: [dartway, push, notifications, flutter]
-publish_to: none
 
 resolution: workspace
 
@@ -17,12 +16,12 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_core_flutter: ^0.20.0-dev.1
-  dartway_push_shared: ^0.3.0-dev.1
+  dartway_core_flutter: ^0.20.0
+  dartway_push_shared: ^0.5.0
 
 dev_dependencies:
   # `DwFakeServer`: the plugin registers through a real client against it.
-  dartway_client: ^0.20.0-dev.1
+  dartway_client: ^0.20.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

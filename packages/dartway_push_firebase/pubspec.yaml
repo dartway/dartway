@@ -1,11 +1,10 @@
 name: dartway_push_firebase
 description: "Firebase Cloud Messaging transport for DartWay push on Android, iOS and web — tokens, permission, opened notifications, and a web service worker whose click opens the notification's link."
-version: 0.3.0-dev.1
+version: 0.5.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
 topics: [dartway, push, notifications, firebase, fcm]
-publish_to: none
 
 resolution: workspace
 
@@ -17,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_push_flutter: ^0.3.0-dev.1
+  dartway_push_flutter: ^0.5.0
 
   # Both majors that active projects run: U90 is on firebase_core 3.
   firebase_core: ">=3.13.1 <5.0.0"

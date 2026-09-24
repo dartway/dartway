@@ -1,0 +1,13 @@
+# Everything git already ignores at the repository root (.dart_tool/, build/,
+# .flutter-plugins*, …) still applies: those patterns live in the root
+# .gitignore, a different file from this one, and pub only replaces the
+# .gitignore *of this same directory* — which does not exist — not the
+# root's. Verified by dry-run: neither directory appears in the archive with
+# or without this file.
+#
+# example/pubspec_overrides.yaml is local-only, the same way pub already
+# treats every package's own pubspec_overrides.yaml: it points at sibling
+# packages by path (../../dartway_client, …), which do not exist in a
+# downloaded archive. Named explicitly rather than relying on pub's own
+# default exclusion of that filename, so the reason travels with the rule.
+example/pubspec_overrides.yaml
