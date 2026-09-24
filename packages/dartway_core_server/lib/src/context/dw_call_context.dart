@@ -7,6 +7,7 @@ import 'package:meta/meta.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_service.dart';
 import '../auth/dw_auth_store.dart';
+import '../calls/dw_idempotency_ledger.dart';
 import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
@@ -105,6 +106,29 @@ abstract class DwCallContext {
     Map<String, Object?> params = const {},
     String? field,
   });
+
+  /// For a `transactional: false` command handler (`DwCallHandler.command`)
+  /// whose own transaction — the part that has to be atomic, a ticket, a
+  /// charge — commits before the handler's post-transaction work (a call to
+  /// an external provider) runs: records [value] as this call's outcome
+  /// now, on [db] — the transaction still open when called from inside the
+  /// handler's own [transaction], the same one [value] describes.
+  ///
+  /// A duplicate send of the same idempotency key that arrives once that
+  /// transaction commits, but before the handler itself returns, replays
+  /// [value] instead of running the handler a second time — which, without
+  /// this, would repeat whatever the transactional part does once per key
+  /// (a second ticket, a second charge) for a caller that only meant to ask
+  /// once. If the handler then throws, the framework corrects what this
+  /// recorded: a `DwRefusalException` overwrites it with the refusal, so a
+  /// later replay answers that instead of a stale success; anything else
+  /// (an incident) removes it, so a later resend runs the handler again.
+  ///
+  /// Outside a `transactional: false` command that records its success, or
+  /// after the call already made a secret (`DwCallHandler.command`'s
+  /// `recordsSuccess`, `markSecret`), this does nothing — nothing has primed
+  /// it to record anywhere, the same as calling it from a request or a job.
+  Future<void> recordProvisionalOutcome(Object? value);
 
   /// Background jobs; an enqueue joins the enclosing transaction.
   DwJobQueue get jobs;
@@ -259,6 +283,46 @@ final class DwRuntimeContext extends DwCallContext {
   bool _madeSecret = false;
 
   void markSecret() => _madeSecret = true;
+
+  /// Set by `DwCallEndpoint` right before running a `transactional: false`
+  /// command handler that records its success: what [recordProvisionalOutcome]
+  /// writes under, if the handler calls it. `null` everywhere else — a
+  /// request, a job, a transactional command (recorded by the endpoint's own
+  /// transaction instead) or a non-transactional one whose `recordsSuccess`
+  /// is `false`.
+  ({String key, int? accountId, String typeName})? _idempotencyTarget;
+
+  void primeIdempotency({
+    required String key,
+    required int? accountId,
+    required String typeName,
+  }) => _idempotencyTarget = (key: key, accountId: accountId, typeName: typeName);
+
+  /// Whether [recordProvisionalOutcome] wrote a row during this call —
+  /// `DwCallEndpoint` reads this once the handler returns or throws, to
+  /// decide whether a refusal or an exception must correct an
+  /// already-recorded row instead of writing a fresh one.
+  bool get recordedProvisionalOutcome => _recordedProvisionalOutcome;
+  bool _recordedProvisionalOutcome = false;
+
+  @override
+  Future<void> recordProvisionalOutcome(Object? value) async {
+    final target = _idempotencyTarget;
+    if (target == null || _madeSecret) return;
+    // The same encoding `DwCommandHandler.run` gives a result before this
+    // endpoint would otherwise store it — a raw DTO here would fail
+    // `jsonEncode` (or encode differently), and a later replay must decode
+    // to the same thing a normal, unhurried recording would have produced.
+    await dwRecordOutcome(
+      db,
+      target.key,
+      target.accountId,
+      target.typeName,
+      'ok',
+      protocol.encodeValue(value),
+    );
+    _recordedProvisionalOutcome = true;
+  }
 
   @override
   final DwWireProtocol protocol;

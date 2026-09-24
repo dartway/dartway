@@ -280,6 +280,15 @@ final class DwAuthService {
         expiresAt: row.get<DateTime>('expires_at'),
         resendAfter: row.get<DateTime>('created_at').add(auth.resendDelay),
       );
+      // Recorded now, in this same transaction — not after `deliverCode`
+      // below returns, like a transactional command's outcome would be. A
+      // duplicate send of the same idempotency key arriving once this
+      // commits, while `deliverCode` is still running, replays this ticket
+      // instead of running this method a second time and meeting the
+      // resend-delay refusal above for a ticket that already exists. If
+      // `deliverCode` then throws, `DwCallEndpoint` corrects this row for
+      // us — see `DwCallContext.recordProvisionalOutcome`.
+      await ctx.recordProvisionalOutcome(ticket);
       return (ticket, code, accountId);
     });
     await auth.deliverCode(ctx, kind, identifier, code, accountId);

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
-import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
 import '../alerts/dw_alert_sink.dart';
@@ -13,6 +12,7 @@ import '../handlers/dw_call_handler.dart';
 import '../http/dw_request_body.dart';
 import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
+import 'dw_idempotency_ledger.dart';
 
 /// Answers `POST /dw/<WireName>`: the call contract of R2.2, from the headers
 /// to the `DwApiResponse`.
@@ -296,20 +296,15 @@ final class DwCallEndpoint {
     // the key's lock; looking here as well would cost every first send a
     // round trip.
     if (!handler.transactional) {
-      final stored = await _storedOutcome(runtime.db, key, accountId);
+      final stored = await dwStoredOutcome(runtime.db, key, accountId);
       if (stored != null) return _replay(stored, typeName);
     }
     _requireSignIn(handler.access, ctx);
+    _validate(command);
+    if (!handler.transactional) {
+      return _runNonTransactional(handler, command, key, accountId, ctx, typeName);
+    }
     try {
-      _validate(command);
-      if (!handler.transactional) {
-        await _check(handler.access, ctx, command);
-        final value = await handler.run(ctx, command);
-        if (handler.recordsSuccess && !ctx.madeSecret) {
-          await _record(runtime.db, key, accountId, typeName, 'ok', value);
-        }
-        return DwApiResponse.ok(value);
-      }
       for (var attempt = 1; ; attempt++) {
         try {
           return await ctx.transaction((tx) async {
@@ -319,12 +314,12 @@ final class DwCallEndpoint {
               DwLockSpace.idempotencyKey,
               dwLockKey('$accountId/$key'),
             );
-            final stored = await _storedOutcome(tx, key, accountId);
+            final stored = await dwStoredOutcome(tx, key, accountId);
             if (stored != null) return _replay(stored, typeName);
             await _check(handler.access, ctx, command);
             final value = await handler.run(ctx, command);
             if (handler.recordsSuccess && !ctx.madeSecret) {
-              await _record(tx, key, accountId, typeName, 'ok', value);
+              await dwRecordOutcome(tx, key, accountId, typeName, 'ok', value);
             }
             return DwApiResponse.ok(value);
           });
@@ -341,7 +336,7 @@ final class DwCallEndpoint {
     } on DwRefusalException catch (refusal) {
       // The transaction has rolled back; the refusal is the outcome, and a
       // retry of the same intent is answered the same.
-      await _record(
+      await dwRecordOutcome(
         runtime.db,
         key,
         accountId,
@@ -351,6 +346,82 @@ final class DwCallEndpoint {
       );
       rethrow;
     }
+  }
+
+  /// `transactional: false`: [handler] opens its own transaction for the
+  /// part that has to be atomic (a ticket, a charge) and does its
+  /// post-transaction work — commonly a call to an external provider —
+  /// after that transaction has already committed. A duplicate send of [key]
+  /// that arrives once it has committed, but before [handler] finishes,
+  /// must not re-run the handler: that would repeat the transactional part
+  /// (a second ticket, a second charge) for one idempotency key.
+  ///
+  /// The way out is [DwCallContext.recordProvisionalOutcome]: a handler that
+  /// wants this protection calls it as the last thing inside its own
+  /// transaction, with what its answer will be if nothing past that point
+  /// fails. [dwStoredOutcome] at the top of [_executeCommand] finds that row
+  /// for a duplicate send arriving after the transaction commits, and
+  /// replays it — the handler never runs a second time. If [handler] then
+  /// throws once its transaction has already committed and recorded that
+  /// row:
+  /// - a [DwRefusalException] overwrites it with the refusal, so a later
+  ///   replay of [key] answers the refusal rather than the stale success;
+  /// - anything else (an incident) removes it instead, so a later resend of
+  ///   [key] runs [handler] again — consistent with how any other incident
+  ///   is never recorded under the idempotency key at all, and, for this
+  ///   auth's own `deliverCode`, correctly meets the identifier's own
+  ///   `resendDelay` refusal rather than a free retry.
+  ///
+  /// A handler that never calls `recordProvisionalOutcome` sees no
+  /// difference from before this existed: the row is written once, here,
+  /// after the handler returns, exactly as it always was.
+  Future<DwApiResponse> _runNonTransactional(
+    DwCommandHandler handler,
+    DwActionCommand<Object?> command,
+    String key,
+    int? accountId,
+    DwRuntimeContext ctx,
+    String typeName,
+  ) async {
+    await _check(handler.access, ctx, command);
+    if (handler.recordsSuccess) {
+      ctx.primeIdempotency(key: key, accountId: accountId, typeName: typeName);
+    }
+    final Object? value;
+    try {
+      value = await handler.run(ctx, command);
+    } on DwRefusalException catch (refusal) {
+      if (ctx.recordedProvisionalOutcome) {
+        await dwOverwriteOutcome(
+          runtime.db,
+          key,
+          accountId,
+          'refused',
+          refusal.refusal.toJson(),
+        );
+      } else {
+        await dwRecordOutcome(
+          runtime.db,
+          key,
+          accountId,
+          typeName,
+          'refused',
+          refusal.refusal.toJson(),
+        );
+      }
+      rethrow;
+    } catch (_) {
+      if (ctx.recordedProvisionalOutcome) {
+        await dwClearOutcome(runtime.db, key, accountId);
+      }
+      rethrow;
+    }
+    if (handler.recordsSuccess &&
+        !ctx.madeSecret &&
+        !ctx.recordedProvisionalOutcome) {
+      await dwRecordOutcome(runtime.db, key, accountId, typeName, 'ok', value);
+    }
+    return DwApiResponse.ok(value);
   }
 
   void _requireSignIn(DwAccessRule access, DwCallContext ctx) {
@@ -383,7 +454,7 @@ final class DwCallEndpoint {
     }
   }
 
-  DwApiResponse _replay(_StoredOutcome stored, String typeName) {
+  DwApiResponse _replay(DwStoredOutcome stored, String typeName) {
     if (stored.type != typeName) {
       // One key, two intents: a client bug that must not execute either way.
       return DwApiResponse.refused(
@@ -521,60 +592,12 @@ final class DwCallEndpoint {
     );
   }
 
-  // --- idempotency --------------------------------------------------------------
-
-  Future<_StoredOutcome?> _storedOutcome(
-    DwDatabaseHandle db,
-    String key,
-    int? accountId,
-  ) async {
-    final rows = await db.query(
-      'SELECT type, status, result FROM dw_command_outcome '
-      'WHERE key = @key AND account_id IS NOT DISTINCT FROM @account::int8',
-      params: {'key': key, 'account': accountId},
-    );
-    if (rows.isEmpty) return null;
-    final row = rows.single;
-    return _StoredOutcome(
-      row.get<String>('type'),
-      row.get<String>('status'),
-      row['result'],
-    );
-  }
-
-  Future<void> _record(
-    DwDatabaseHandle db,
-    String key,
-    int? accountId,
-    String type,
-    String status,
-    Object? result,
-  ) => db.execute(
-    'INSERT INTO dw_command_outcome (key, account_id, type, status, result) '
-    'VALUES (@key, @account::int8, @type, @status, @result::jsonb) '
-    'ON CONFLICT ON CONSTRAINT dw_command_outcome_key DO NOTHING',
-    params: {
-      'key': key,
-      'account': accountId,
-      'type': type,
-      'status': status,
-      'result': result == null ? null : jsonEncode(result),
-    },
-  );
 }
 
 final class _Rejected implements Exception {
   const _Rejected(this.response);
 
   final DwApiResponse response;
-}
-
-final class _StoredOutcome {
-  const _StoredOutcome(this.type, this.status, this.result);
-
-  final String type;
-  final String status;
-  final Object? result;
 }
 
 /// The token of an `Authorization: Bearer` header [value], or `null` when

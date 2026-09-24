@@ -112,6 +112,23 @@ final class TestApp {
 
   /// Identifiers whose delivery throws.
   final Set<String> failingDelivery = {};
+
+  /// Identifiers whose `deliverCode` waits on [deliveryGate] before doing
+  /// anything else — a slow provider a test holds open and then releases, to
+  /// see what a duplicate send of the same idempotency key meets while the
+  /// ticket's own transaction has already committed but delivery has not
+  /// finished (framework issue: idempotency vs. the post-commit `deliverCode`
+  /// split, #310).
+  final Set<String> gatedDelivery = {};
+
+  /// Completed to let every identifier in [gatedDelivery] through. A test
+  /// replaces it with a fresh one before gating an identifier.
+  Completer<void> deliveryGate = Completer();
+
+  /// Identifiers whose delivery refuses (`dw.invalid` on `identifier`)
+  /// instead of throwing — the way an SMS provider rejecting the number's
+  /// format would, through `ctx.refuse`.
+  final Set<String> refusingDelivery = {};
   final List<int> createdAccounts = [];
 
   /// Account id → the origin `onAccountCreated` was given.
@@ -192,9 +209,13 @@ final class TestApp {
       // The caller attaching the identifier (null for a sign-in) — not
       // [accountId], which is who the identifier already belongs to.
       codeCallers[identifier] = ctx.accountId;
+      if (gatedDelivery.contains(identifier)) await deliveryGate.future;
       // `reviewer`'s fixed code goes nowhere — its own decision, made here
       // rather than by the framework withholding the call.
       if (identifier == reviewer) return;
+      if (refusingDelivery.contains(identifier)) {
+        ctx.refuse(DwCoreRefusal.invalid, field: 'identifier');
+      }
       if (failingDelivery.contains(identifier)) {
         throw StateError('delivery provider is down');
       }

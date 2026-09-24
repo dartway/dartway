@@ -21,10 +21,10 @@ abstract final class ExampleAuth {
     },
 
     // Demo personas and store reviewers sign in with a fixed code set on
-    // their profile; everyone else gets a random one — `codeLength` digits,
-    // matching the default below, left unset.
-    generateCode: (ctx, kind, identifier, accountId) async =>
-        await ExampleAuth._testCode(ctx, accountId) ?? dwRandomCode(6),
+    // their profile; everyone else gets `null` — the framework's own
+    // default, `codeLength` random digits (6, left unset here).
+    generateCode: (ctx, kind, identifier, accountId) =>
+        ExampleAuth._testCode(ctx, accountId),
 
     // The example sends no SMS: the code is written to the server log, which
     // is enough to sign in locally. A real project delivers it here — except

@@ -45,10 +45,10 @@ abstract final class AppAuth {
     normalize: AuthIdentifier.normalize,
 
     // Store reviewers, demo personas and end-to-end tests sign in with a fixed
-    // code set on their profile; nobody else has one. `codeLength` is left at
-    // its default (6) below, so the fallback here matches it.
-    generateCode: (ctx, kind, identifier, accountId) async =>
-        await AppAuth._testCode(ctx, accountId) ?? dwRandomCode(6),
+    // code set on their profile; nobody else has one — `null` for them, the
+    // framework's own default, `codeLength` random digits (6, left unset).
+    generateCode: (ctx, kind, identifier, accountId) =>
+        AppAuth._testCode(ctx, accountId),
 
     deliverCode: (ctx, kind, identifier, code, accountId) async {
       if (await AppAuth._testCode(ctx, accountId) != null) return;

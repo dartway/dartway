@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -203,6 +204,155 @@ void main() {
     app().failingDelivery.remove(id);
     await age(id, const Duration(seconds: 31));
     expect((await requestCode(id)).status, 200);
+  });
+
+  test(
+    'a refusal from deliverCode reaches the client as an ordinary refusal, '
+    'even though deliverCode now runs after the ticket has committed',
+    () async {
+      const id = 'refused-delivery@example.com';
+      app().refusingDelivery.add(id);
+      final answer = await requestCode(id);
+      expect(answer.status, 422);
+      expect(answer.refusal, DwCallRefusal(DwCoreRefusal.invalid, field: 'identifier'));
+    },
+  );
+
+  group('idempotency vs. the post-commit deliverCode split (review round 3, '
+      'framework issue #310/#311)', () {
+    /// Waits until `deliverCode` for [id] has entered — the ticket's own
+    /// transaction has committed by then, and (with [id] in
+    /// `app().gatedDelivery`) delivery is now waiting on `app().deliveryGate`.
+    Future<void> waitForDeliveryToStart(String id) async {
+      for (var i = 0; i < 200 && !app().codeCallers.containsKey(id); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(
+        app().codeCallers.containsKey(id),
+        isTrue,
+        reason: 'deliverCode never reached the gate in time',
+      );
+    }
+
+    test(
+      'a duplicate send of the same key, arriving once the ticket has '
+      'committed but before deliverCode returns, replays that ticket '
+      'instead of running the handler again — which would meet the '
+      'resend-delay refusal for a ticket that already exists',
+      () async {
+        const id = 'gated-dup-ok@example.com';
+        app().gatedDelivery.add(id);
+        app().deliveryGate = Completer();
+        final firstFuture = caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-ok',
+        );
+        await waitForDeliveryToStart(id);
+        final during = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-ok',
+        );
+        expect(during.status, 200);
+        expect(
+          (during.response as DwApiOk).replayed,
+          isTrue,
+          reason: 'replayed — the handler did not run a second time',
+        );
+        final duringTicket = during.value(anyRequest);
+        app().deliveryGate.complete();
+        final first = await firstFuture;
+        expect(first.status, 200);
+        expect(first.value(anyRequest).id, duringTicket.id);
+        final tickets = await harness().db.query(
+          'SELECT count(*) AS n FROM dw_code_ticket WHERE identifier = @id',
+          params: {'id': id},
+        );
+        expect(
+          tickets.single.get<int>('n'),
+          1,
+          reason: 'one ticket — the duplicate never ran the handler at all',
+        );
+        // The provisional row is not a transient thing that only answers
+        // while delivery is still in flight: a send after everything has
+        // settled still replays the same ticket.
+        final after = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-ok',
+        );
+        expect(after.value(anyRequest).id, duringTicket.id);
+        expect((after.response as DwApiOk).replayed, isTrue);
+      },
+    );
+
+    test(
+      'a duplicate send of the same key, arriving after delivery failed, '
+      'meets the resend-delay refusal — never a stale "ok" for a code that '
+      'was never sent',
+      () async {
+        const id = 'gated-dup-fail@example.com';
+        app().gatedDelivery.add(id);
+        app().deliveryGate = Completer();
+        app().failingDelivery.add(id);
+        final firstFuture = caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-fail',
+        );
+        await waitForDeliveryToStart(id);
+        app().deliveryGate.complete();
+        final first = await firstFuture;
+        expect(first.status, 500);
+        final second = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-fail',
+        );
+        expect(
+          second.status,
+          429,
+          reason:
+              'the ticket is real and counted against the limit; a resend '
+              'must wait it out, like any other — an incident is never '
+              'stored under the idempotency key, so this reruns the '
+              'handler rather than replaying anything',
+        );
+      },
+    );
+
+    test(
+      'a duplicate send of the same key, arriving after deliverCode '
+      'refused, gets that refusal too — the provisional success is '
+      'overwritten, not left standing',
+      () async {
+        const id = 'gated-dup-refused@example.com';
+        app().gatedDelivery.add(id);
+        app().deliveryGate = Completer();
+        app().refusingDelivery.add(id);
+        final firstFuture = caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-refused',
+        );
+        await waitForDeliveryToStart(id);
+        app().deliveryGate.complete();
+        final first = await firstFuture;
+        expect(first.status, 422);
+        expect(
+          first.refusal,
+          DwCallRefusal(DwCoreRefusal.invalid, field: 'identifier'),
+        );
+        final replay = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-refused',
+        );
+        expect(
+          replay.status,
+          422,
+          reason:
+              'the provisional "ok" this ticket recorded before delivery '
+              'was attempted must have been overwritten by the refusal — '
+              'not left as a stale success for a code that was refused',
+        );
+        expect(replay.refusal, first.refusal);
+      },
+    );
   });
 
   test(
