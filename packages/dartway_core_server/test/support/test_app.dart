@@ -163,6 +163,17 @@ final class TestApp {
   /// `generateCode` and `deliverCode` decide independently (issue #310).
   static const reviewerSent = 'reviewer-sent@example.com';
 
+  /// How many times `generateCode` has run, across every identifier — so a
+  /// test can prove it is not called at all when a request is refused before
+  /// either hook runs (the rate limit).
+  int generateCodeCalls = 0;
+
+  /// identifier → `ctx.accountId` on the last `generateCode` for it: the
+  /// caller attaching it, `null` for a sign-in — the same thing
+  /// [codeCallers] records for `deliverCode`, so a test can check both hooks
+  /// see the same caller.
+  final Map<String, int?> generateCodeCallers = {};
+
   DwAuthConfig auth({
     Duration resendDelay = const Duration(seconds: 30),
     int maxRequestsPerWindow = 3,
@@ -190,13 +201,19 @@ final class TestApp {
       delivered[identifier] = code;
       deliveredTo.add(identifier);
     },
-    generateCode: (ctx, kind, identifier, accountId) async => switch (identifier) {
-      reviewer => '000000',
-      reviewerSent => '111111',
-      // The framework's own default, called out here so a project that wants
-      // it for most identifiers and something else for a few does not have
-      // to reimplement it.
-      _ => dwRandomCode(6),
+    generateCode: (ctx, kind, identifier, accountId) async {
+      generateCodeCalls++;
+      // The caller attaching the identifier, the same as `deliverCode` sees
+      // — not [accountId], which is who the identifier already belongs to.
+      generateCodeCallers[identifier] = ctx.accountId;
+      return switch (identifier) {
+        reviewer => '000000',
+        reviewerSent => '111111',
+        // `null` here is the framework's own default (`codeLength` random
+        // digits) — not `dwRandomCode(6)` called by hand, which would drift
+        // from `codeLength` the moment one changed without the other.
+        _ => null,
+      };
     },
     onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
       createdAccounts.add(accountId);

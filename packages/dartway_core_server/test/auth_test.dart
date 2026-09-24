@@ -146,6 +146,28 @@ void main() {
     expect(app().deliveredTo.where((i) => i == id), hasLength(3));
   });
 
+  test('generateCode does not run when the request is refused by the resend '
+      'delay or by the window — the limit is checked first', () async {
+    const id = 'genlimit@example.com';
+    expect((await requestCode(id)).status, 200);
+    final afterFirst = app().generateCodeCalls;
+    // Too soon for a resend.
+    expect((await requestCode(id)).status, 429);
+    expect(app().generateCodeCalls, afterFirst);
+
+    await age(id, const Duration(seconds: 31));
+    expect((await requestCode(id)).status, 200);
+    await age(id, const Duration(seconds: 31));
+    expect((await requestCode(id)).status, 200);
+    final afterThree = app().generateCodeCalls;
+    expect(afterThree, afterFirst + 2);
+
+    // Three in the window: the fourth is refused before generateCode runs.
+    await age(id, const Duration(seconds: 31));
+    expect((await requestCode(id)).status, 429);
+    expect(app().generateCodeCalls, afterThree);
+  });
+
   test(
     'parallel requests for one identifier are limited under a lock',
     () async {
@@ -158,7 +180,8 @@ void main() {
     },
   );
 
-  test('a failed delivery leaves no ticket and fails the call', () async {
+  test('a failed delivery leaves its ticket — real and already counted '
+      'against the limit — and fails the call', () async {
     const id = 'down@example.com';
     app().failingDelivery.add(id);
     expect((await requestCode(id)).status, 500);
@@ -166,8 +189,19 @@ void main() {
       'SELECT count(*) AS n FROM dw_code_ticket WHERE identifier = @id',
       params: {'id': id},
     );
-    expect(tickets.single['n'], 0);
+    expect(
+      tickets.single['n'],
+      1,
+      reason:
+          'the ticket is written before deliverCode runs, so delivery '
+          'throwing does not undo it — deliverCode runs after that '
+          'transaction has committed',
+    );
+    // Too soon for a resend: the failed attempt still counts, the same
+    // as a successful one would.
+    expect((await requestCode(id)).status, 429);
     app().failingDelivery.remove(id);
+    await age(id, const Duration(seconds: 31));
     expect((await requestCode(id)).status, 200);
   });
 
@@ -243,36 +277,78 @@ void main() {
     );
   });
 
-  test(
-    'a fixed code can also be delivered — generateCode and deliverCode are '
-    'independent (issue #310)',
-    () async {
-      final ticket = (await requestCode(
-        TestApp.reviewerSent,
-      )).value(anyRequest);
-      expect(app().deliveredTo, contains(TestApp.reviewerSent));
-      expect(app().delivered[TestApp.reviewerSent], '111111');
-      final session = (await verify(ticket.id, '111111')).value(anyVerify);
-      expect(session.isNewAccount, isTrue);
-    },
-  );
+  test('a fixed code can also be delivered — generateCode and deliverCode are '
+      'independent (issue #310)', () async {
+    final ticket = (await requestCode(TestApp.reviewerSent)).value(anyRequest);
+    expect(app().deliveredTo, contains(TestApp.reviewerSent));
+    expect(app().delivered[TestApp.reviewerSent], '111111');
+    final session = (await verify(ticket.id, '111111')).value(anyVerify);
+    expect(session.isNewAccount, isTrue);
+  });
 
-  test(
-    'a project that does not set generateCode gets a random code of '
-    'codeLength digits',
-    () {
-      // The harness's own `generateCode` calls `dwRandomCode` for every
-      // identifier but the two fixed ones — this is that helper, unmediated:
-      // the framework's actual default when a project sets no `generateCode`
-      // at all.
-      final codes = {for (var i = 0; i < 20; i++) dwRandomCode(6)};
-      for (final code in codes) {
-        expect(code, matches(RegExp(r'^\d{6}$')));
+  test('dwRandomCode draws digits-only codes of the requested length', () {
+    // Deterministic: a format check, not a claim about randomness — nothing
+    // here can fail while the generator is correct, whatever it draws.
+    for (final length in [4, 6, 8, 12]) {
+      for (var i = 0; i < 50; i++) {
+        expect(dwRandomCode(length), matches(RegExp('^\\d{$length}\$')));
       }
-      // 20 draws of 6 digits colliding would be a broken generator, not luck.
-      expect(codes, hasLength(20));
-    },
-  );
+    }
+  });
+
+  test('dwRandomCode is not stuck on one value', () {
+    // Not "no two of N collide" — with a 6-digit code that has a real, if
+    // small, chance of failing on entirely correct code (the birthday bound
+    // on 20 draws over 10^6 outcomes is already worth avoiding). Drawing far
+    // more and asking only for more than one distinct value keeps the same
+    // intent — the generator is not returning a constant — at a false-failure
+    // probability indistinguishable from zero.
+    final codes = {for (var i = 0; i < 300; i++) dwRandomCode(6)};
+    expect(codes.length, greaterThan(1));
+  });
+
+  test('a project that sets no generateCode at all gets a random code of '
+      "codeLength digits, through the real server's default path", () async {
+    // TestApp's own `generateCode` is always set (it needs to answer
+    // `reviewer`/`reviewerSent`, and everyone else gets `null`, which
+    // already exercises the framework's fallback — see the two tests
+    // above). What TestApp cannot exercise is `auth.generateCode` being
+    // unset entirely, so this builds a server with a `DwAuthConfig` of its
+    // own: no `generateCode` field at all, and a `codeLength` (8) that is
+    // not TestApp's default (6) — proving the fallback reads `codeLength`
+    // itself rather than a length baked in somewhere.
+    final testApp = TestApp();
+    final delivered = <String, String>{};
+    final isolated = await Harness.start(
+      app: testApp,
+      build: (app, config) => app.server(
+        config,
+        auth: DwAuthConfig(
+          normalize: (kind, raw) => raw.trim().toLowerCase(),
+          deliverCode: (ctx, kind, identifier, code, accountId) async {
+            delivered[identifier] = code;
+          },
+          codeLength: 8,
+        ),
+      ),
+    );
+    try {
+      final isolatedCaller = isolated.caller();
+      final codes = <String>{};
+      for (var i = 0; i < 5; i++) {
+        final identifier = 'nogenerate$i@example.com';
+        (await isolatedCaller.call(
+          DwRequestCode(kind: DwIdentifierKind.email, identifier: identifier),
+        )).value(anyRequest);
+        final code = delivered[identifier]!;
+        expect(code, matches(RegExp(r'^\d{8}$')));
+        codes.add(code);
+      }
+      expect(codes.length, greaterThan(1));
+    } finally {
+      await isolated.stop();
+    }
+  });
 
   test('two tickets of one new identifier verified at once create one '
       'account', () async {
