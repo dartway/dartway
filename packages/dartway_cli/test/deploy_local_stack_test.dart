@@ -132,8 +132,9 @@ void main() {
     File(p.join(project.path, 'app_site', 'build', 'index.html'))
       ..createSync(recursive: true)
       ..writeAsStringSync('<!DOCTYPE html><html><body>The club</body></html>');
-    // The example asks for framework versions that are not published yet, and
-    // its overrides point outside any build context.
+    // The example builds against the local framework packages inside the
+    // monorepo (the same reason every example and template here does), and
+    // its dependency_overrides point outside any build context.
     vendorFramework(project: project, monorepo: monorepo);
     // Vendoring moves the overrides, so the locks name paths that are gone;
     // the images build `--enforce-lockfile`, and a project resolves before it

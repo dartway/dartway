@@ -21,7 +21,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-# The 1.0 client is not published yet; the tour resolves it from the monorepo.
+# Inside the monorepo the tour builds against the LOCAL framework packages —
+# the same reason example/dartway_example_flutter and template/*/pubspec.yaml
+# carry this block. Copied out of the monorepo (the "copy, flutter run" this
+# package's description promises): drop this whole dependency_overrides
+# block; dartway_core_flutter's own pubspec states hosted carets on all three,
+# and they resolve from pub.dev once published.
 dependency_overrides:
   dartway_client:
     path: ../../dartway_client
