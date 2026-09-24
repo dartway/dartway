@@ -1,0 +1,14 @@
+# Read by pub as if it were this directory's own pubspec.yaml
+# `dependency_overrides:` — kept in its own file, rather than in pubspec.yaml
+# itself, so it can be excluded from the published archive
+# (../.pubignore) without touching the pubspec a stranger's copy of the tour
+# actually needs. Inside the monorepo this resolves the tour against the
+# LOCAL framework packages, the same three every other example and template
+# here overrides for the same reason.
+dependency_overrides:
+  dartway_client:
+    path: ../../dartway_client
+  dartway_core_shared:
+    path: ../../dartway_core_shared
+  dartway_router:
+    path: ../../dartway_router

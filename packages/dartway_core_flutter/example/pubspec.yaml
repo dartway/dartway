@@ -23,14 +23,10 @@ flutter:
 
 # Inside the monorepo the tour builds against the LOCAL framework packages —
 # the same reason example/dartway_example_flutter and template/*/pubspec.yaml
-# carry this block. Copied out of the monorepo (the "copy, flutter run" this
-# package's description promises): drop this whole dependency_overrides
-# block; dartway_core_flutter's own pubspec states hosted carets on all three,
-# and they resolve from pub.dev once published.
-dependency_overrides:
-  dartway_client:
-    path: ../../dartway_client
-  dartway_core_shared:
-    path: ../../dartway_core_shared
-  dartway_router:
-    path: ../../dartway_router
+# carry a dependency_overrides block for the same three packages. Here it
+# lives in the sibling pubspec_overrides.yaml instead of in this file: pub
+# reads it the same way (merged in as if it were this file's own
+# dependency_overrides:), but it is excluded from the published archive
+# (../.pubignore), so `dart pub publish`'s own tour — the "copy, flutter run"
+# this package's description promises — resolves the three from pub.dev with
+# nothing to delete first.
