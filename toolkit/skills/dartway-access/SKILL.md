@@ -34,8 +34,9 @@ omission.
 | Rule | Who | For |
 |---|---|---|
 | `DwAccessRule.anonymous` | anyone, with or without a session | calls that must work before sign-in: a public landing read, a sign-up-like flow of the project's own. The framework's sign-in commands are built in — you do not declare them |
-| `DwAccessRule.signedIn` | any signed-in account | "my" calls, and anything every member may do — the handler still checks ownership |
+| `DwAccessRule.signedIn` | any signed-in account | "my" calls, and anything every member may do; a call naming a row by id is `resource` |
 | `DwAccessRule.check<C>((ctx, call) async => …)` | a signed-in account for which the check is true; otherwise `dw.forbidden` | roles, and rules on the call's real parameters |
+| `DwAccessRule.resource<C, R>(load: …, allows: …)` | a signed-in account that may reach the row the call names; otherwise `dw.notFound` | "is this mine", "am I in this project" — the handler reads the row as `ctx.accessed<R>()` |
 
 Order on the server: the sign-in requirement (anonymous caller → `unauthenticated`, `401`), then
 `validate()`, then the check, then the handler. The check runs in the handler's context — inside the
@@ -103,18 +104,30 @@ the role could subscribe to (`dartway-realtime`).
 
 ## 3. Someone else's row does not exist
 
-A rule answers **whether the caller may make this call at all**. Whether the row the call names is
-theirs is the handler's check, and its answer is `dw.notFound`, not `dw.forbidden`:
+Whether the row a call names is the caller's is answered **once, in the rule**, and its answer is
+`dw.notFound`, not `dw.forbidden`. `DwAccessRule.resource` loads the row, decides, and hands it to
+the handler — never `signedIn` with the same check written inline, where every handler writes it a
+little differently:
 
 ```dart
-final row = await ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate);
-// Someone else's invoice does not exist for the caller.
-if (row == null || row.ownerProfileId != (await ctx.callerProfile).id) {
-  ctx.refuse(DwCoreRefusal.notFound);
-}
+DwCallHandler.command<PayInvoice, Invoice>(
+  access: DwAccessRule.resource<PayInvoice, InvoiceRow>(
+    // Locked: the rule runs inside the command's transaction.
+    load: (ctx, command) =>
+        ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate),
+    // Someone else's invoice does not exist for the caller.
+    allows: (ctx, command, invoice) async =>
+        invoice.ownerProfileId == (await ctx.callerProfile).id,
+  ),
+  handle: (ctx, command) async {
+    final invoice = ctx.accessed<InvoiceRow>();
+    // …
+  },
+),
 ```
 
-In a single-request handler, return `null` — the framework refuses `dw.notFound`.
+A rule shared by many calls of one kind of row is a function returning the rule, next to the
+project's other rules.
 
 Why: `forbidden` for someone else's id and `notFound` for a free id tell a caller which ids exist —
 typing ids one by one enumerates other people's data. `dw.forbidden` is right when the caller may

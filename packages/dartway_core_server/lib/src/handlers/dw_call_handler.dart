@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:meta/meta.dart';
 
@@ -24,6 +26,27 @@ sealed class DwAccessRule {
   static DwAccessRule check<C extends DwServerCall<Object?>>(
     Future<bool> Function(DwCallContext ctx, C call) check,
   ) => DwCheckAccess<C>._(check);
+
+  /// A signed-in account that may reach the resource the call addresses:
+  /// [load] reads it (a row by the call's id, locked if the handler writes
+  /// it), [allows] decides on it, and the handler receives it as
+  /// `ctx.accessed<R>()` — read once, not again inside the handler.
+  ///
+  /// A resource that does not exist and one the caller may not reach are
+  /// both refused `dw.notFound`, so a caller learns nothing about rows that
+  /// are not theirs. For "is this mine" and "am I in this project": the rule
+  /// every handler used to write inline after `signedIn`, and the one that
+  /// drifted into three different answers to the same question.
+  ///
+  /// [C] is checked against the handler's class at startup, as with [check];
+  /// both run in the handler's context, inside a transactional command's
+  /// transaction.
+  static DwAccessRule
+  resource<C extends DwServerCall<Object?>, R extends Object>({
+    required Future<R?> Function(DwCallContext ctx, C call) load,
+    required FutureOr<bool> Function(DwCallContext ctx, C call, R resource)
+    allows,
+  }) => DwResourceAccess<C, R>._(load, allows);
 }
 
 final class DwAnonymousAccess extends DwAccessRule {
@@ -34,19 +57,64 @@ final class DwSignedInAccess extends DwAccessRule {
   const DwSignedInAccess._() : super._();
 }
 
-final class DwCheckAccess<C extends DwServerCall<Object?>>
+/// A rule written for one call class [C], checked against the handler's at
+/// startup.
+sealed class DwCallAccess<C extends DwServerCall<Object?>>
     extends DwAccessRule {
-  const DwCheckAccess._(this._check) : super._();
-
-  final Future<bool> Function(DwCallContext ctx, C call) _check;
+  const DwCallAccess._() : super._();
 
   /// The call class the rule is written for.
   Type get callType => C;
 
   bool _fits<Q>() => <Q>[] is List<C>;
+}
+
+final class DwCheckAccess<C extends DwServerCall<Object?>>
+    extends DwCallAccess<C> {
+  const DwCheckAccess._(this._check) : super._();
+
+  final Future<bool> Function(DwCallContext ctx, C call) _check;
 
   Future<bool> allows(DwCallContext ctx, DwServerCall<Object?> call) =>
       _check(ctx, call as C);
+}
+
+final class DwResourceAccess<C extends DwServerCall<Object?>, R extends Object>
+    extends DwCallAccess<C> {
+  const DwResourceAccess._(this._load, this._allows) : super._();
+
+  final Future<R?> Function(DwCallContext ctx, C call) _load;
+  final FutureOr<bool> Function(DwCallContext ctx, C call, R resource) _allows;
+
+  /// Loads the resource and keeps it for `ctx.accessed`; refuses
+  /// `dw.notFound` when it is absent or not the caller's to reach.
+  @internal
+  Future<void> resolve(DwCallContext ctx, DwServerCall<Object?> call) async {
+    final typed = call as C;
+    final resource = await _load(ctx, typed);
+    if (resource == null || !await _allows(ctx, typed, resource)) {
+      ctx.refuse(DwCoreRefusal.notFound);
+    }
+    ctx.memo(_accessedKey, () => resource);
+  }
+}
+
+const Object _accessedKey = #dwAccessedResource;
+
+/// The resource a handler's `DwAccessRule.resource` loaded.
+extension DwAccessedResource on DwCallContext {
+  /// What the access rule loaded and allowed. Throws [StateError] when the
+  /// handler's rule is not `DwAccessRule.resource` of an [R]: a mismatch
+  /// between the rule and the handler is a bug, not a refusal.
+  R accessed<R extends Object>() {
+    final resource = memo<Object?>(_accessedKey, () => null);
+    if (resource is R) return resource;
+    throw StateError(
+      'ctx.accessed<$R>() in a handler whose access rule loaded '
+      '${resource == null ? 'nothing' : resource.runtimeType}: guard it with '
+      'DwAccessRule.resource<…, $R>',
+    );
+  }
 }
 
 /// The rows a page handler reads: [fetchLimit] rows after [offset], in the
@@ -151,7 +219,7 @@ sealed class DwCallHandler {
   /// Why [access] cannot guard this handler's class, or `null`.
   @internal
   String? get accessProblem => switch (access) {
-    DwCheckAccess(:final callType) when !_accessFits() =>
+    DwCallAccess(:final callType) when !_accessFits() =>
       'the access check of the $this handler is written for $callType',
     _ => null,
   };
@@ -311,7 +379,7 @@ final class DwSingleHandler<
   Type get callType => Q;
 
   @override
-  bool _accessFits() => (access as DwCheckAccess)._fits<Q>();
+  bool _accessFits() => (access as DwCallAccess)._fits<Q>();
 
   @override
   Future<Object?> run(ctx, request, prepared) async {
@@ -336,7 +404,7 @@ final class DwMaybeHandler<Q extends DwMaybeRequest<T>, T extends DwDataObject>
   Type get callType => Q;
 
   @override
-  bool _accessFits() => (access as DwCheckAccess)._fits<Q>();
+  bool _accessFits() => (access as DwCallAccess)._fits<Q>();
 
   @override
   Future<Object?> run(ctx, request, prepared) async {
@@ -359,7 +427,7 @@ final class DwListHandler<Q extends DwListRequest<T>, T extends DwDataObject>
   Type get callType => Q;
 
   @override
-  bool _accessFits() => (access as DwCheckAccess)._fits<Q>();
+  bool _accessFits() => (access as DwCallAccess)._fits<Q>();
 
   @override
   Future<Object?> run(ctx, request, prepared) async {
@@ -383,7 +451,7 @@ final class DwPageHandler<Q extends DwPageRequest<T>, T extends DwDataObject>
   Type get callType => Q;
 
   @override
-  bool _accessFits() => (access as DwCheckAccess)._fits<Q>();
+  bool _accessFits() => (access as DwCallAccess)._fits<Q>();
 
   @override
   DwPageInput prepare(request, query) {
@@ -432,7 +500,7 @@ final class DwTableHandler<Q extends DwTableRequest<T>, T extends DwDataObject>
   Type get callType => Q;
 
   @override
-  bool _accessFits() => (access as DwCheckAccess)._fits<Q>();
+  bool _accessFits() => (access as DwCallAccess)._fits<Q>();
 
   @override
   DwTableInput prepare(request, query) {
@@ -512,7 +580,7 @@ final class DwWindowHandler<
   Type get callType => Q;
 
   @override
-  bool _accessFits() => (access as DwCheckAccess)._fits<Q>();
+  bool _accessFits() => (access as DwCallAccess)._fits<Q>();
 
   /// Reads the position a client cursor names. Throws [FormatException] for a
   /// cursor that is not one of this handler's: the call is malformed.
@@ -669,7 +737,7 @@ final class DwCommandHandler<C extends DwActionCommand<R>, R>
   Type get callType => C;
 
   @override
-  bool _accessFits() => (access as DwCheckAccess)._fits<C>();
+  bool _accessFits() => (access as DwCallAccess)._fits<C>();
 
   /// Runs the handler and encodes its result with the command class.
   Future<Object?> run(
