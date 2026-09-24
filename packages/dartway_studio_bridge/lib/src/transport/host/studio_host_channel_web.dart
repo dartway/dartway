@@ -54,7 +54,7 @@ class _StudioHostWebChannel implements StudioMessageChannel {
     final fromParent =
         parent != null &&
         source != null &&
-        (source as JSObject).strictEquals(parent as JSObject).toDart;
+        source.strictEquals(parent as JSObject).toDart;
     if (_peer.refuse(fromParent: fromParent, origin: event.origin)
         case final refusal?) {
       _dropped(refusal, origin: event.origin);
