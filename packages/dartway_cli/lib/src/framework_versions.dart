@@ -37,10 +37,11 @@ class DwPackageGap {
   /// `dart pub upgrade`, and the two are not the same instruction.
   final bool fromGit;
 
-  bool get isBehind => !isAtLeastVersion(projectVersion, frameworkVersion);
+  bool get isBehind =>
+      !isPackageAtLeastVersion(projectVersion, frameworkVersion);
 
   bool get isAhead =>
-      !isBehind && !isAtLeastVersion(frameworkVersion, projectVersion);
+      !isBehind && !isPackageAtLeastVersion(frameworkVersion, projectVersion);
 }
 
 /// The version of every `dartway_*` package in a monorepo checkout, read from
@@ -101,7 +102,8 @@ Map<String, DwLockedFrameworkPackage> readProjectFrameworkVersions(
     );
     for (final package in locked) {
       final known = lowest[package.name];
-      if (known == null || !isAtLeastVersion(package.version, known.version)) {
+      if (known == null ||
+          !isPackageAtLeastVersion(package.version, known.version)) {
         lowest[package.name] = package;
       }
     }

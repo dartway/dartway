@@ -99,7 +99,7 @@ class UpdateCommand extends Command<int> {
   void _reportCliVersion(Map<String, String> frameworkVersions) {
     final channelVersion = frameworkVersions['dartway_cli'];
     if (channelVersion == null) return;
-    if (isAtLeastVersion(dartwayCliVersion, channelVersion)) return;
+    if (isPackageAtLeastVersion(dartwayCliVersion, channelVersion)) return;
     stdout.writeln(
       '\n⚠️  This CLI is $dartwayCliVersion, the channel has $channelVersion.\n'
       '   Update it first and run this again — an older CLI installs an older '

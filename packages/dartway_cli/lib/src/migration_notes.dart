@@ -47,7 +47,7 @@ class DwMigrationNote {
     for (final entry in affects.entries) {
       final current = projectVersions[entry.key];
       if (current == null) continue;
-      if (!isAtLeastVersion(current, entry.value)) return true;
+      if (!isPackageAtLeastVersion(current, entry.value)) return true;
     }
     return false;
   }
