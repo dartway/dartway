@@ -4,7 +4,8 @@ description: >-
   The server package (__SERVER_PKG__) of a DartWay project: row classes (`<Entity>Row extends
   DwTableRow`, @DwSqlTable, DwTableIndex, @DwForeignKey, @DwUniqueColumn, @DwColumnName,
   @DwDefaultValue) and the generated `db.<plural>` repositories; queries (find/findFirst/findById/
-  findByIds/count/exists, insert/tryInsert with DwOnConflict, update/updateWhere/delete), no joins —
+  findByIds/count/exists, countBy/sumBy/maxBy/findFirstPer, insert/tryInsert with DwOnConflict/upsert,
+  update/updateWhere/updateWhereReturning/delete, jsonb list conditions), no joins —
   related rows by findByIds per relation; row locks (DwRowLock.forUpdate) inside transactional
   commands; mapping rows to data objects in batch; one DwCallHandler per request and command
   (single/maybe/list/page/table/window/command) with its access rule; the DwCallContext (memo for
@@ -148,6 +149,13 @@ final first = await ctx.db.invoices.findFirst(where: (t) => t.note.isNull());
 final some = await ctx.db.invoices.findByIds(ids);        // one statement; index the result by id
 final open = await ctx.db.invoices.count(where: (t) => t.paidAt.isNull());
 final any = await ctx.db.invoices.exists(where: (t) => t.note.ilike('%urgent%'));
+final payers = await ctx.db.invoices.count(distinct: (t) => t.ownerProfileId); // people, not rows
+final byStatus = await ctx.db.invoices.countBy((t) => t.status);    // Map<InvoiceStatus, int>
+final owed = await ctx.db.invoices.sumBy((t) => t.ownerProfileId, (t) => t.amount);
+final latest = await ctx.db.invoices.findFirstPer(                  // Map<int, InvoiceRow>
+  (t) => t.ownerProfileId,
+  orderBy: (t) => [t.createdAt.desc()],
+);
 
 final created = await ctx.db.invoices.insert(InvoiceRow(/* … */));   // returns it with its id
 final saved = await ctx.db.invoices.update(row.copyWith(status: InvoiceStatus.sent));
@@ -159,7 +167,11 @@ await ctx.db.invoices.delete(invoiceId);
 ```
 
 Conditions: `equals`, `notEquals`, `isNull`, `isNotNull`, `inList`, `notInList`, `gt/gte/lt/lte`,
-`between`, `like`, `ilike`, combined with `&`, `|`, `not()`. Values are always bound parameters. Escape
+`between`, `like`, `ilike`, on a list column `isEmptyList`, `isNotEmptyList`, `contains`,
+`containsAny`, combined with `&`, `|`, `not()`. An aggregate or a condition on a list over one table
+is the repository's — raw SQL for it spells enum values as literals that break silently on a
+rename. `upsert(row, conflictOn: (t) => [t.key])` is "insert or overwrite" in one statement, and
+`updateWhereReturning` answers the updated rows to publish. Values are always bound parameters. Escape
 `%`, `_` and `\` in text a user typed before putting it into a `like` pattern. `update` of a missing
 id throws `DwRowNotFound` — an update that changed nothing is a failure.
 

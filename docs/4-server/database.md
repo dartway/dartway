@@ -121,13 +121,20 @@ once per connection and reused.
 | `findFirst({where, orderBy, lock})` | the first row or `null` |
 | `findById(id, {lock})` | the row or `null` |
 | `findByIds(ids)` | the rows with those ids, in one statement whatever their number; missing ids are absent, the order unspecified — index the result by id |
-| `count({where})` | how many |
+| `count({where, distinct})` | how many rows — or, with `distinct: (t) => t.column`, how many distinct non-null values among them (members, not their entries) |
+| `countBy(group, {where, distinct})` | `Map` of the group column's value → count; a group without rows is absent |
+| `sum(of, {where})`, `sumBy(group, of, {where})` | the sum in the column's own type, `0` over no rows |
+| `max(of, {where})`, `min(of, {where})` | the extreme value of a comparable column, `null` over no rows or only null cells |
+| `maxBy(group, of, {where})`, `minBy(group, of, {where})` | `Map` of the group's value → extreme; a group whose cells are all null is absent |
+| `findFirstPer(group, {orderBy, where})` | `Map` of the group's value → its first row in `orderBy` order: the latest plan of each member, in one statement (`DISTINCT ON`) |
 | `exists({where})` | whether any |
 | `insert(row)` | the row as stored, with its id and every value read back |
 | `tryInsert(row, onConflict: …)` | the stored row, or `null` when it conflicted |
+| `upsert(row, conflictOn: (t) => [t.key])` | inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
 | `insertAll(rows)` | the rows as stored, in order, in one statement; either every row has an id or none has |
 | `update(row)` | writes every column by id; throws `DwRowNotFound` when no row has that id — an update that changed nothing is a failure, not a quiet success |
 | `updateWhere({where, set})` | sets columns on every matching row; returns the count |
+| `updateWhereReturning({where, set})` | the same, answering the rows as updated — what to publish, without a second read |
 | `delete(id)` | `1`, or `0` when there was none |
 | `deleteWhere({where})` | the count |
 
@@ -152,6 +159,7 @@ final alreadyBooked = await ctx.db.sessionBookings.exists(
 | `String` | `like(pattern)`, `ilike(pattern)` |
 | non-null `int` or `double` | `increment(n)` for `updateWhere`: `column = column + n`, a negative `n` decrements |
 | nullable | `setIfNull(v)` for `updateWhere`: `column = COALESCE(column, v)` — fills a null cell, keeps a value |
+| a list (`jsonb` array) | `isEmptyList()`, `isNotEmptyList()`, `contains(v)`, `containsAny(values)` — an enum list matches by the names it stores; a null cell is neither empty nor not |
 
 Conditions combine with `&`, `|` and `.not()`. Expressions that make no sense for a type do not
 compile: no `gt` on a `bool`, no `like` on a `DateTime`. Null follows Dart, not SQL's three-valued
@@ -275,18 +283,18 @@ once, for work where "someone else is doing it" is itself the answer.
 
 ## Raw SQL
 
-When a statement is not one table's — an aggregate, a `WITH`, a join the batch loaders cannot
-express — write SQL:
+When a statement is not one table's — a `WITH`, a join the batch loaders cannot express, a
+`UNION` — write SQL. An aggregate over one table is not a reason: `countBy`, `sumBy`, `maxBy` and
+`findFirstPer` keep enum values typed, where a literal like `'accepted'` in SQL breaks silently on a
+rename.
 
 ```dart
 final rows = await db.query(
-  'SELECT status, count(*) AS n FROM invoice '
-  'WHERE created_at > @since GROUP BY status',
-  params: {'since': DateTime.utc(2026, 9, 1)},
+  'SELECT i.status, count(*) AS n FROM invoice i '
+  'JOIN customer c ON c.id = i.customer_id '
+  'WHERE c.region = @region GROUP BY i.status',
+  params: {'region': 'north'},
 );
-final countByStatus = {
-  for (final row in rows) row.get<String>('status'): row.get<int>('n'),
-};
 ```
 
 - `query(sql, params: {…})` returns `List<DwResultRow>`; parameters are `@name`, types inferred by

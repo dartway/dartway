@@ -121,6 +121,58 @@ extension DwStringColumn on DwTableColumn<String?> {
       _DwComparison(this, 'ILIKE', pattern);
 }
 
+/// Conditions on a list column stored as a `jsonb` array (`List<int>` of
+/// file ids, `List<E>` of an enum): what used to need raw SQL over
+/// `jsonb_array_length` and `jsonb_array_elements`.
+extension DwListColumn<E> on DwTableColumn<List<E>?> {
+  /// The list holds no element. A null cell is neither empty nor not.
+  DwWhereCondition isEmptyList() => _DwListLength(this, empty: true);
+
+  /// The list holds at least one element.
+  DwWhereCondition isNotEmptyList() => _DwListLength(this, empty: false);
+
+  /// The list holds [value].
+  DwWhereCondition contains(E value) => containsAny([value]);
+
+  /// The list holds at least one of [values]; never true for no values.
+  DwWhereCondition containsAny(Iterable<E> values) =>
+      _DwListOverlap(this, values.toList(growable: false));
+}
+
+final class _DwListLength extends DwWhereCondition {
+  const _DwListLength(this.column, {required this.empty});
+
+  final DwTableColumn<Object?> column;
+  final bool empty;
+
+  @override
+  void write(DwSqlWriter writer) => writer.write(
+    'jsonb_array_length(${column.sql}) ${empty ? '= 0' : '> 0'}',
+  );
+}
+
+final class _DwListOverlap<E> extends DwWhereCondition {
+  const _DwListOverlap(this.column, this.values);
+
+  final DwTableColumn<List<E>?> column;
+  final List<E> values;
+
+  @override
+  void write(DwSqlWriter writer) {
+    // The values travel as one jsonb array, encoded by the column's own type
+    // (an enum list stores names), and match element by element.
+    final parameter = writer.parameter(
+      column.type.encode(values),
+      pg.Type.jsonb,
+    );
+    writer.write(
+      'EXISTS (SELECT 1 FROM jsonb_array_elements(${column.sql}) AS dw_held '
+      'JOIN jsonb_array_elements($parameter) AS dw_wanted '
+      'ON dw_held.value = dw_wanted.value)',
+    );
+  }
+}
+
 /// A boolean condition over one table's columns.
 ///
 /// Values are always bound parameters; nothing a caller passes is ever spliced
