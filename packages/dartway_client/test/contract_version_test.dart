@@ -34,4 +34,42 @@ void main() {
     expect(server.calls.last.status, 426);
     expect(client.incompatibility, DwCallRefusal(DwCoreRefusal.updateRequired));
   });
+
+  test('a malformed contract version is a malformed call, and a protocol '
+      'error on the socket — as the real server answers it', () async {
+    final server = DwFakeServer(
+      protocol: DwWireProtocol(
+        const [],
+        include: roomsProtocol,
+        contractVersion: '0.3.0',
+      ),
+    );
+    final reply = await server.httpTransport.post(
+      DwHttpPost(
+        url: server.baseUrl.replace(path: DwHttpContract.callPath('ListRooms')),
+        headers: {
+          DwHttpContract.protocolHeader: '$dwProtocolVersion',
+          DwHttpContract.appVersionHeader: '1.0.0+1',
+          DwHttpContract.contractVersionHeader: 'five',
+          DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
+        },
+        body: '{}',
+      ),
+    );
+    expect(reply.status, 400);
+
+    final socket = await server.liveConnector.connect(
+      server.baseUrl.replace(
+        scheme: 'ws',
+        path: DwHttpContract.livePath,
+        queryParameters: {
+          DwHttpContract.liveProtocolParameter: '$dwProtocolVersion',
+          DwHttpContract.liveContractVersionParameter: 'five',
+        },
+      ),
+    );
+    await socket.messages.drain<void>();
+    expect(socket.closeCode, DwCloseCode.protocolError);
+    expect(socket.closeReason, 'dw.protocol');
+  });
 }

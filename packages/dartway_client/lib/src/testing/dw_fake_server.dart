@@ -214,17 +214,15 @@ final class DwFakeServer {
   String? contractVersion;
 
   /// Whether a client sending [sent] is too old for [contractVersion].
+  /// Throws [FormatException] for a malformed [sent]: the server answers
+  /// that as a malformed call, not as an old app.
   bool _outdated(String? sent) {
     final served = contractVersion;
     if (served == null) return false;
     if (sent == null) return true;
-    try {
-      return DwContractVersion.parse(
-        sent,
-      ).isOlderLineThan(DwContractVersion(served));
-    } on FormatException {
-      return true;
-    }
+    return DwContractVersion.parse(
+      sent,
+    ).isOlderLineThan(DwContractVersion(served));
   }
 
   /// The protocol version this server speaks.
@@ -502,9 +500,17 @@ final class DwFakeServer {
     } on FormatException {
       return answer(malformed('no valid ${DwHttpContract.appVersionHeader}'));
     }
-    if (_outdated(
-      headers[DwHttpContract.contractVersionHeader.toLowerCase()],
-    )) {
+    final bool outdated;
+    try {
+      outdated = _outdated(
+        headers[DwHttpContract.contractVersionHeader.toLowerCase()],
+      );
+    } on FormatException {
+      return answer(
+        malformed('no valid ${DwHttpContract.contractVersionHeader}'),
+      );
+    }
+    if (outdated) {
       return answer(
         DwApiResponse.incompatible(DwCallRefusal(DwCoreRefusal.updateRequired)),
       );
@@ -736,26 +742,39 @@ final class DwFakeServer {
         connection.subscriptions.clear();
       },
     );
-    final refusal = _upgradeRefusal(url);
-    if (refusal != null) {
+    final (int, String)? refusal;
+    try {
+      refusal = _upgradeRefusal(url);
+    } on FormatException {
+      // A malformed contract version is a protocol error, as the server
+      // closes it — not an app too old to speak.
+      unawaited(
+        connection.close(
+          code: DwCloseCode.protocolError,
+          reason: 'dw.protocol',
+        ),
+      );
+      return;
+    }
+    if (refusal case (final code, final reason)) {
       // Upgraded and closed at once: a browser cannot read the status of a
       // refused upgrade, so the close code carries the answer.
-      unawaited(
-        connection.close(code: DwCloseCode.incompatible, reason: refusal.code),
-      );
+      unawaited(connection.close(code: code, reason: reason));
       return;
     }
     connection.send(DwHelloMessage(connection.id));
   }
 
-  DwCallRefusal? _upgradeRefusal(Uri url) {
+  /// The close code and reason for an upgrade this server refuses, or
+  /// `null`. Throws [FormatException] for a malformed contract version.
+  (int, String)? _upgradeRefusal(Uri url) {
     final parameters = url.queryParameters;
     if (parameters[DwHttpContract.liveProtocolParameter] !=
         '$protocolVersion') {
-      return DwCallRefusal(DwCoreRefusal.protocolUnsupported);
+      return (DwCloseCode.incompatible, DwCoreRefusal.protocolUnsupported.code);
     }
     if (_outdated(parameters[DwHttpContract.liveContractVersionParameter])) {
-      return DwCallRefusal(DwCoreRefusal.updateRequired);
+      return (DwCloseCode.incompatible, DwCoreRefusal.updateRequired.code);
     }
     return null;
   }
