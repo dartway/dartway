@@ -36,6 +36,7 @@ final class ClubHarness {
         settings: settings,
         push: push,
         auth: DwAuthConfig(
+          accountDeletion: DwAccountDeletion.byMember,
           normalize: ExampleAuth.config.normalize,
           onAccountCreated: ExampleAuth.config.onAccountCreated,
           onIdentifierChanged: ExampleAuth.config.onIdentifierChanged,

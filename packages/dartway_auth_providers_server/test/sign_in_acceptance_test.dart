@@ -296,6 +296,7 @@ final class _ProviderHarness {
           handlers: const [],
           database: database.config,
           auth: DwAuthConfig(
+            accountDeletion: DwAccountDeletion.byMember,
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
             onExternalAccountCreated:

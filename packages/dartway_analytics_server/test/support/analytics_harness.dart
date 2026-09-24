@@ -92,6 +92,7 @@ final class AnalyticsHarness {
           migrations: const [],
           database: database.config,
           auth: DwAuthConfig(
+            accountDeletion: DwAccountDeletion.byMember,
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),

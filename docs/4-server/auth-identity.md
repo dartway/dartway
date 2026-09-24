@@ -30,6 +30,7 @@ DwAuthConfig({
     DwCallContext ctx, DwIdentifierKind kind, String identifier, String code,
     int? accountId,
   ) deliverCode,
+  required DwAccountDeletion accountDeletion,
   Future<String?> Function(
     DwCallContext ctx, DwIdentifierKind kind, String identifier, int? accountId,
   )? generateCode,
@@ -52,6 +53,7 @@ DwAuthConfig({
 |---|---|
 | `normalize` | The canonical form of an identifier (`79991234567`, a lower-cased e-mail), or `null` when `raw` is not a valid one of that kind — answered `dw.invalid` on field `identifier`. Every lookup, lock and rate limit reads the normalized value, so `Ivan@` and `ivan@` cannot become two accounts or two rate-limit buckets. The app should normalize with the same function; the skeleton shares `AuthIdentifier.normalize` from its shared package. |
 | `deliverCode` | Sends `code`. Called **always**, after the ticket's own transaction has committed — whatever `code` is, generated or returned by `generateCode` — so deciding not to send (a store reviewer's or a test account's fixed code, most often) is this hook's own choice, not something withholding the call decides for it. Runs **outside** the transaction that records the ticket, on a fresh pooled `ctx.db`: the ticket is written, and already counted against the limit, before delivery is attempted, so a `deliverCode` that throws (an incident) or refuses no longer undoes it — the caller sees the failure and the next attempt waits out `resendDelay`, the same as any resend. This is deliberate: `deliverCode` is commonly an HTTP call to a provider, and running it under the identifier's advisory lock, inside the ticket's transaction, held a pooled connection (and that lock) for as long as the provider took to answer — a handful of slow sign-ins could exhaust the pool for the whole server. `ctx.memo` is how it avoids a second lookup of whatever `generateCode` already read, since the two no longer share one transaction's cache. `accountId` is the account `identifier` already belongs to, or `null` — the same value `generateCode` was asked with. Never log the code. |
+| `accountDeletion` | Who may delete an account, and required because either default is wrong for somebody: `byMember` answers `DwDeleteMyAccount` (an app store asks it of any app people sign up in); `byOperator` refuses it `dw.forbidden`, and only server code deletes, with `ctx.accounts.deleteAccount`. |
 | `generateCode` | The code this request gets, inside the ticket's transaction. `null` — whether `generateCode` is unset, or returns it for this call — draws `codeLength` random digits (`dwRandomCode`, exported for reuse); a project returns one of its own for a fixed code — a store reviewer, a test account, a default code out of its own settings — and `deliverCode` decides, independently, whether that code goes anywhere (issue #310: the two used to be coupled — a fixed code skipped `deliverCode` outright, so a fixed code that also had to be sent could not be expressed). |
 | `onAccountCreated` | Runs in the transaction that creates an account: the place to insert the profile. Refusing here refuses the sign-in, nothing is created, and the code stays usable. `origin` says who created the account (below). |
 | `onIdentifierChanged` | Runs in the transaction that changes an existing account's identifiers, once per account and identifier affected, after the change: the place to mirror an identifier into project rows, or to publish. Throwing undoes the change. Not called for the identity an account is created with, nor when a sign-in re-verifies an identifier the account already has. |
@@ -128,7 +130,7 @@ Registered by the framework in every server; a project may not register handlers
 | `DwRequestCode(kind, identifier)` | anonymous | `DwCodeTicket` | normalizes, applies the limits, creates a ticket and delivers the code. `DwIdentifierKind.of(identifier)` is the framework's one rule for the kind — an `@` makes it an e-mail, anything else a phone; it sorts and does not validate, `normalize` does |
 | `DwVerifyCode(ticketId, code, registration)` | anonymous | `DwAuthSession` | checks the code; creates the account when the identifier has none; makes an `app` session key |
 | `DwSignOut()` | signed in | none | revokes the caller's session key |
-| `DwDeleteMyAccount()` | signed in | none | deletes the caller's account — see below |
+| `DwDeleteMyAccount()` | signed in | none | deletes the caller's account when `accountDeletion` is `byMember`, refuses `dw.forbidden` otherwise — see below |
 | `DwRequestIdentifierCode(kind, identifier)` | signed in | `DwCodeTicket` | a code to an identifier the caller wants to attach, or change theirs to |
 | `DwConfirmIdentifier(ticketId, code, replace)` | signed in | `DwIdentityInfo` | attaches the identifier or, with `replace`, puts it in place of the caller's identifiers of that kind |
 
@@ -158,8 +160,8 @@ An account may hold several identifiers of one kind. With `replace`, the oldest 
 kind takes the new value (its id stays) and the others of the kind are removed.
 
 **Deleting an account.** App stores require it inside the app from any app that lets people sign
-up (App Store Review Guideline 5.1.1(v)), whatever the sign-in method. `DwDeleteMyAccount` — or
-`ctx.accounts.deleteAccount(accountId)` for an administrator's command — runs in one transaction:
+up (App Store Review Guideline 5.1.1(v)), whatever the sign-in method. `DwDeleteMyAccount` (with `accountDeletion: DwAccountDeletion.byMember`) — or
+`ctx.accounts.deleteAccount(accountId)` for an administrator's command, whichever the setting — runs in one transaction:
 `DwAuthConfig.onAccountDeleting(ctx, accountId)` first, where the project deletes or anonymises its
 own rows (a row referencing `dw_account` without `ON DELETE CASCADE` must go there, or the deletion
 fails; refusing keeps the account); then the code tickets addressed to the account's identifiers (a ticket carries the phone or the
@@ -193,7 +195,9 @@ made them deletable by the person they are about the moment its framework pin mo
 project changed, nothing failed to compile, no test went red, and a stand lost every survey answer
 behind its profiles on the first deletion. The three ways out are the hook itself (delete or
 tombstone), a refusal inside it (`ctx.refuse(...)`) while the project has not decided — honest and
-reversible — or an empty hook with a comment saying those rows are meant to go.
+reversible — or an empty hook with a comment saying those rows are meant to go. A project where
+members do not delete themselves at all says so with `accountDeletion: DwAccountDeletion.byOperator`
+rather than a refusal in the hook: the refusal also stopped the operator's own deletions.
 
 The message names the fact and not the conclusion: these tables go, not "you forgot to tell
 somebody". Who has to be told is the project's own — an admin channel here, a webhook there — and a

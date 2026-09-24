@@ -40,6 +40,7 @@ abstract final class AppAuth {
     CodeDelivery? deliverCode,
     Duration resendDelay = const Duration(seconds: 60),
   }) => DwAuthConfig(
+    accountDeletion: DwAccountDeletion.byMember,
     // One rule on both sides: the app normalizes what it sends with the same
     // function.
     normalize: AuthIdentifier.normalize,

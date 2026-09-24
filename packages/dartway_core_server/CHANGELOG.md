@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.3
+
+- **BREAKING: `DwAuthConfig.accountDeletion` is required — `DwAccountDeletion.byMember` answers `DwDeleteMyAccount`, `byOperator` refuses it `dw.forbidden`** (D-089). The framework used to answer the command in every project, and two of them learned it had gone live only when their pin moved; each switched it off by refusing inside `onAccountDeleting`, which refused the operator's own `ctx.accounts.deleteAccount` as well. Migration note: `docs/migrations/2026-09-24-account-deletion-choice.md`.
+
 ## 0.21.0-dev.2
 
 - **BREAKING: `DwAuthConfig.fixedCode` is gone; `generateCode` and `deliverCode` are independent, and `deliverCode` now runs after the ticket's transaction has committed** (#310, D-087). `generateCode(ctx, kind, identifier, accountId)` decides the code — `null` (the default) draws `codeLength` random digits, exported as `dwRandomCode`; `deliverCode(ctx, kind, identifier, code, accountId)` now runs **always**, whatever the code is, and decides for itself whether to send it. The framework used to infer "do not send" from "the code was not random" — a fixed code that also had to be sent (a default code out of a project's own settings, SMS turned on for it) could not be expressed without working around `deliverCode` entirely. Separately, `deliverCode` no longer runs inside the transaction that writes the ticket: a project's `deliverCode` is commonly an HTTP call to a provider, and running it under the identifier's advisory lock held a pooled connection for as long as the call took — one slow provider could exhaust the pool for the whole server. The ticket is written, and counted against the limit, before delivery runs; a `deliverCode` that throws or refuses no longer undoes it. Migration note: `docs/migrations/2026-09-24-generate-deliver-code-split.md`.

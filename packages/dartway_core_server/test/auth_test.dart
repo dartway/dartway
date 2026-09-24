@@ -474,6 +474,7 @@ void main() {
       build: (app, config) => app.server(
         config,
         auth: DwAuthConfig(
+          accountDeletion: DwAccountDeletion.byMember,
           normalize: (kind, raw) => raw.trim().toLowerCase(),
           deliverCode: (ctx, kind, identifier, code, accountId) async {
             delivered[identifier] = code;

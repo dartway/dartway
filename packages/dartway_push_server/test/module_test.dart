@@ -18,6 +18,7 @@ void main() {
     migrations: const [],
     database: database,
     auth: DwAuthConfig(
+      accountDeletion: DwAccountDeletion.byMember,
       normalize: (kind, raw) => raw,
       deliverCode: (ctx, kind, identifier, code, accountId) async {},
     ),

@@ -15,6 +15,7 @@ import 'handlers/schedule_handlers.dart';
 abstract final class ExampleAuth {
   /// Sign-in by a one-time code to a phone number.
   static final config = DwAuthConfig(
+    accountDeletion: DwAccountDeletion.byMember,
     normalize: (kind, raw) => switch (kind) {
       DwIdentifierKind.phone => ExampleAuth.normalizePhone(raw),
       DwIdentifierKind.email => null, // the club signs in by phone only
