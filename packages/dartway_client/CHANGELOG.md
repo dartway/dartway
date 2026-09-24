@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.20.1-dev.1
+## 0.21.0-dev.1
 
-- **A browser upload no longer stalls and restarts on a large file** (#309). `DwAppClient` picks `XMLHttpRequest` for storage puts on the web by default now — `fetch` (still `DwHttpStorageTransport`'s implementation, still the default off the web) reads the whole request body before sending it, so its progress jumped to the end immediately and the client's stall watchdog, seeing nothing more, aborted a transfer that was still going. `DwStoragePut` gained `reportSent`, the seam a transport uses to report bytes actually reaching the network separately from reading its body; existing custom transports need no change, since it defaults to doing nothing. Once a transport confirms the whole body sent, the watchdog also stops timing the network for a stall and starts timing the wait for storage's reply instead, bounded by what is left of the upload ticket rather than by the stall timeout.
+- **A browser upload no longer stalls and restarts on a large file** (#309). `DwAppClient` picks `XMLHttpRequest` for storage puts on the web by default now — `fetch` (still `DwHttpStorageTransport`'s implementation, still the default off the web) reads the whole request body before sending it, so its progress jumped to the end immediately and the client's stall watchdog, seeing nothing more, aborted a transfer that was still going. `DwStoragePut` gained `reportSent`, the seam a transport uses to report bytes actually reaching the network separately from reading its body; existing custom transports need no change — before the first call, progress still comes from reading the body, exactly as before this existed. See D-088 for the fuller account, including a first version of the fix that made a silent, fully-accepted-but-never-answered connection *worse* on `dart:io`, caught in review before merging.
 
 ## 0.20.0
 

@@ -55,21 +55,21 @@ packages:
       path: "../../dartway_client"
       relative: true
     source: path
-    version: "0.20.1-dev.1"
+    version: "0.21.0-dev.1"
   dartway_core_flutter:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "0.20.1-dev.1"
+    version: "0.21.0-dev.1"
   dartway_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../dartway_core_shared"
       relative: true
     source: path
-    version: "0.20.1-dev.1"
+    version: "0.21.0-dev.1"
   dartway_router:
     dependency: "direct overridden"
     description:

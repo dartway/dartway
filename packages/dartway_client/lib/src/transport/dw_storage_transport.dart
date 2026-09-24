@@ -101,7 +101,10 @@ final class DwStoragePut {
 
   /// Tells the client how many bytes have actually left for the network so
   /// far — cumulative, not a delta, and never decreasing. Call it as often as
-  /// the transport can measure that.
+  /// the transport can measure that; it re-arms the client's stall watchdog
+  /// on every call, same as reading [body] does on its own, and drives the
+  /// client's progress callback instead of a plain read once it has been
+  /// called at all.
   ///
   /// Streaming [body] at the network's pace (the socket's backpressure)
   /// means every chunk read from it qualifies, since reading and sending
@@ -114,17 +117,11 @@ final class DwStoragePut {
   /// does the same thing, silently, which is why it cannot be trusted for
   /// uploads of any size (`DwHttpStorageTransport`'s own doc).
   ///
-  /// Drives the client's progress callback and the attempt's watchdog: once
-  /// the whole body is confirmed sent, the watchdog stops timing the network
-  /// for a stall and starts timing the wait for storage's reply instead,
-  /// bounded by how much longer the upload ticket is valid rather than by
-  /// the network's stall timeout — a reply can legitimately take longer to
-  /// arrive than a byte would take to stall, and discarding a fully-sent
-  /// upload over that is exactly the wasted retransmission this exists to
-  /// avoid. A transport that never calls this loses nothing but the
-  /// precision: [body] being fully read already keeps the watchdog alive
-  /// (above), and the wait for the reply then falls back to the plain stall
-  /// timeout, as if this callback did not exist.
+  /// A transport that never calls this loses nothing but precision: reading
+  /// [body] already keeps the watchdog alive and (until this is called for
+  /// the first time) reports progress on its own — this callback only lets a
+  /// transport speak for the network more exactly than "I am still reading
+  /// the body" can.
   final void Function(int sentBytes) reportSent;
 
   static void _ignoreSent(int sentBytes) {}
@@ -160,17 +157,23 @@ abstract interface class DwStorageTransport {
   void close();
 }
 
-/// Sends uploads with `package:http`: a streamed body on `dart:io`, so
-/// progress follows the socket — each chunk `send` pulls from the body is
-/// reported through [DwStoragePut.reportSent] as it is pulled, which on
-/// `dart:io` is when it is handed to the socket.
+/// Sends uploads with `package:http`: a streamed body on `dart:io`, reported
+/// through [DwStoragePut.reportSent] as each chunk `send` pulls from it is
+/// handed to the socket. That is *a* signal, not a guarantee of delivery —
+/// a body that fits the OS's own send buffer can be handed over in one go
+/// long before the network has taken it anywhere, which is exactly why the
+/// client no longer trusts "the whole body was handed to the socket" as
+/// proof the connection is alive (D-088) — but it is still the best signal
+/// this transport has, and spread over a real transfer of any size it
+/// tracks the socket closely enough.
 ///
 /// In a browser the fetch-based client reads the whole body before sending
 /// it: the upload works, but every chunk is pulled at once, so
 /// [DwStoragePut.reportSent] jumps to the end immediately and the transfer
 /// itself happens without any further progress — use
-/// [DwXhrStorageTransport] there instead (`DwAppClient`'s default on the
-/// web, D-087).
+/// `DwXhrStorageTransport` there instead (`DwAppClient`'s default on the
+/// web, D-088) — not linked: it is deliberately not part of this package's
+/// public library (see its own doc for why).
 final class DwHttpStorageTransport implements DwStorageTransport {
   DwHttpStorageTransport([http.Client? client])
     : _client = client ?? http.Client();

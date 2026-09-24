@@ -218,83 +218,176 @@ void main() {
     expect(storage.puts, 1);
   });
 
-  group('the wait for the reply once the transport reports the body sent '
-      '(#309)', () {
-    test('a transport that reads the whole body at once — the way a browser '
-        "fetch does — but reports the network's real progress is not "
-        'aborted by a reply slower than the stall timeout', () async {
-      final fallback = storage.transport;
-      final bufferingButHonest = DwMemoryStorageTransport((put) async {
-        // Like `fetch`/`XMLHttpRequest`: the body is read into memory in
-        // one go, instantly. Unlike the bug this transport reports the
-        // real send separately, so that read is never mistaken for it.
-        put.reportSent(put.byteSize);
-        // Storage answers slower than the stall timeout — plausible for
-        // a large upload — but well inside the ticket's life.
-        await Future<void>.delayed(const Duration(milliseconds: 150));
-        return fallback.put(put);
-      });
-      final client2 = await connect(
-        transport: bufferingButHonest,
-        options: const DwClientOptions(
-          callTimeout: Duration(milliseconds: 50),
-          retryDelay: Duration(milliseconds: 1),
-          maxRetryDelay: Duration(milliseconds: 5),
-          releaseDelay: Duration.zero,
-          liveIdleDelay: Duration.zero,
-        ),
+  group('progress and the stall watchdog, with and without a transport '
+      'reporting real progress (#309)', () {
+    /// [put] with [reportSent] replaced, so a wrapper can watch or silence
+    /// it without touching anything else — `storage.transport` still reads
+    /// `body` and validates the ticket exactly as normal.
+    DwStoragePut withReportSent(
+      DwStoragePut put,
+      void Function(int sentBytes) reportSent,
+    ) => DwStoragePut(
+      url: put.url,
+      headers: put.headers,
+      byteSize: put.byteSize,
+      body: put.body,
+      abort: put.abort,
+      reportSent: reportSent,
+    );
+
+    test('a transport that never calls reportSent gets progress from reading '
+        'the body, exactly as before this existed', () async {
+      storage.chunkDelay = const Duration(milliseconds: 5);
+      final progress = <(int, int)>[];
+      final neverReports = DwMemoryStorageTransport(
+        (put) => storage.transport.put(withReportSent(put, (_) {})),
       );
+      final client2 = await connect(transport: neverReports);
       final result = await client2.files.upload(
         Upload.avatar,
-        DwUploadSource.bytes(bytes(5)),
+        DwUploadSource.bytes(bytes(300 * 1024)),
         fileName: 'a.png',
         contentType: 'image/png',
+        onProgress: (sent, total) => progress.add((sent, total)),
       );
       expect(result.isOk, isTrue);
+      expect(progress.first, (0, 300 * 1024));
+      expect(progress.last, (300 * 1024, 300 * 1024));
       expect(
-        storage.puts,
-        1,
-        reason: 'no retry: the wait for the reply was not read as a stall',
+        progress.length,
+        greaterThan(2),
+        reason: 'reading the body still reports something in between',
       );
     });
 
-    test('progress reported by the transport, slower than the stall timeout '
-        'but in time, keeps re-arming the watchdog', () async {
-      final fallback = storage.transport;
-      final trickling = DwMemoryStorageTransport((put) async {
-        // Real network progress in two steps, each under the stall
-        // timeout, together well over it — and nothing else touches the
-        // watchdog: `put.body` is read only at the very end, by
-        // `fallback.put`.
-        await Future<void>.delayed(const Duration(milliseconds: 60));
-        put.reportSent(put.byteSize ~/ 2);
-        await Future<void>.delayed(const Duration(milliseconds: 60));
-        put.reportSent(put.byteSize);
-        return fallback.put(put);
-      });
-      final client2 = await connect(
-        transport: trickling,
-        options: const DwClientOptions(
-          callTimeout: Duration(milliseconds: 100),
-          retryDelay: Duration(milliseconds: 1),
-          maxRetryDelay: Duration(milliseconds: 5),
-          releaseDelay: Duration.zero,
-          liveIdleDelay: Duration.zero,
+    test('once a transport reports sent bytes at all, reading the body no '
+        'longer drives progress on its own', () async {
+      storage.chunkDelay = const Duration(milliseconds: 5);
+      final progress = <(int, int)>[];
+      // `DwFakeStorage` itself calls `reportSent` on every chunk it reads
+      // (like `DwHttpStorageTransport`); this wrapper lets through only
+      // the first of those calls, and reports half the body sent — enough
+      // to flip the switch and clear the 1%-of-total throttle
+      // (`_Attempt.reportSent`) with one clean, observable call, without
+      // claiming to track the whole transfer.
+      var reportedOnce = false;
+      final reportsOnceEarly = DwMemoryStorageTransport(
+        (put) => storage.transport.put(
+          withReportSent(put, (_) {
+            if (reportedOnce) return;
+            reportedOnce = true;
+            put.reportSent(put.byteSize ~/ 2);
+          }),
         ),
       );
+      final client2 = await connect(transport: reportsOnceEarly);
       final result = await client2.files.upload(
         Upload.avatar,
-        DwUploadSource.bytes(bytes(5)),
+        DwUploadSource.bytes(bytes(300 * 1024)),
         fileName: 'a.png',
         contentType: 'image/png',
+        onProgress: (sent, total) => progress.add((sent, total)),
       );
       expect(result.isOk, isTrue);
-      expect(storage.puts, 1);
+      // Not the dozens of (n, total) pairs a 300 KB body read in 64 KB
+      // chunks with a 5 ms delay each would otherwise produce: the single
+      // early report silenced them, and only the client's own final
+      // `(total, total)` call (files.dart, on a successful reply) follows.
+      expect(progress, [
+        (0, 300 * 1024),
+        (150 * 1024, 300 * 1024),
+        (300 * 1024, 300 * 1024),
+      ]);
     });
+
+    test(
+      'a source slower than the stall timeout, read by a transport that '
+      'never reports progress, still keeps the watchdog alive on its own',
+      () async {
+        Stream<List<int>> trickle() async* {
+          yield bytes(2);
+          await Future<void>.delayed(const Duration(milliseconds: 40));
+          yield bytes(2);
+          await Future<void>.delayed(const Duration(milliseconds: 40));
+          yield bytes(2);
+        }
+
+        var opens = 0;
+        final source = DwUploadSource.stream(() {
+          opens++;
+          return trickle();
+        }, byteSize: 6);
+        final neverReports = DwMemoryStorageTransport(
+          (put) => storage.transport.put(withReportSent(put, (_) {})),
+        );
+        final client2 = await connect(
+          transport: neverReports,
+          options: const DwClientOptions(
+            callTimeout: Duration(milliseconds: 60),
+            retryDelay: Duration(milliseconds: 1),
+            maxRetryDelay: Duration(milliseconds: 5),
+            releaseDelay: Duration.zero,
+            liveIdleDelay: Duration.zero,
+          ),
+        );
+        final result = await client2.files.upload(
+          Upload.avatar,
+          source,
+          fileName: 'a.png',
+          contentType: 'image/png',
+        );
+        expect(result.isOk, isTrue);
+        expect(
+          opens,
+          1,
+          reason:
+              'no retry: two 40 ms gaps under the 60 ms stall timeout, '
+              'each read re-arming it, are not a stall — only their 80 ms '
+              'sum would be, without the re-arm',
+        );
+      },
+    );
+
+    test(
+      'incremental progress from the transport, each report under the '
+      'stall timeout but together over it, keeps re-arming the watchdog',
+      () async {
+        final fallback = storage.transport;
+        final trickling = DwMemoryStorageTransport((put) async {
+          // Real network progress in two steps, each under the stall
+          // timeout, together well over it — and nothing else touches the
+          // watchdog: `put.body` is read only at the very end, by
+          // `fallback.put`.
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          put.reportSent(put.byteSize ~/ 2);
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          put.reportSent(put.byteSize);
+          return fallback.put(put);
+        });
+        final client2 = await connect(
+          transport: trickling,
+          options: const DwClientOptions(
+            callTimeout: Duration(milliseconds: 100),
+            retryDelay: Duration(milliseconds: 1),
+            maxRetryDelay: Duration(milliseconds: 5),
+            releaseDelay: Duration.zero,
+            liveIdleDelay: Duration.zero,
+          ),
+        );
+        final result = await client2.files.upload(
+          Upload.avatar,
+          DwUploadSource.bytes(bytes(5)),
+          fileName: 'a.png',
+          contentType: 'image/png',
+        );
+        expect(result.isOk, isTrue);
+        expect(storage.puts, 1);
+      },
+    );
 
     test('a transport that reads the whole body but never reports it sent '
-        'still gives up on a genuine stall at the plain stall timeout, not '
-        "the ticket's — a body read is not proof a network took it", () async {
+        'still gives up on a genuine, silent stall at the plain stall '
+        'timeout', () async {
       var stalled = true;
       final fallback = storage.transport;
       final silentlyBuffering = DwMemoryStorageTransport((put) async {
@@ -329,9 +422,6 @@ void main() {
             fileName: 'a.png',
             contentType: 'image/png',
           )
-          // Storage's ticket lasts 15 minutes by default: if reading the
-          // body were mistaken for reporting it sent, this would hang
-          // until then instead of aborting within the stall timeout.
           .timeout(const Duration(seconds: 5));
       expect(result.isOk, isTrue);
       expect(storage.puts, 1);
