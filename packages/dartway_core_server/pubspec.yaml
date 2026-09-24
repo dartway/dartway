@@ -1,9 +1,8 @@
 name: dartway_core_server
 description: The DartWay application server — HTTP calls per DTO, the live update socket, handlers, auth, channels and jobs, on dart:io.
-version: 0.20.0-dev.4
+version: 0.20.0
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
-publish_to: none
 resolution: workspace
 environment:
   sdk: ^3.11.0
@@ -12,9 +11,9 @@ dependencies:
   # For `testing.dart` only: `DwTestServer.connectClient` hands a test the real
   # client over real HTTP and the real socket. Pure Dart, so a server that
   # never runs a test carries nothing platform-bound.
-  dartway_client: ^0.20.0-dev.1
-  dartway_core_shared: ^0.20.0-dev.1
-  dartway_orm: ^0.20.0-dev.1
+  dartway_client: ^0.20.0
+  dartway_core_shared: ^0.20.0
+  dartway_orm: ^0.20.0
   meta: ^1.16.0
   # For `DwLocalEnvironment` only: a project's entry point reads the `local`
   # section of deploy/config.yaml and deploy/secrets.yaml on a developer's
@@ -24,3 +23,10 @@ dependencies:
 dev_dependencies:
   lints: ^6.0.0
   test: ^1.26.0
+
+# Keys pub's leak scanner would otherwise flag are published test vectors
+# (the AWS SigV4 test suite's well-known example key) or a one-off key
+# generated for the test that uses it; nothing here authorizes access to a
+# real account.
+false_secrets:
+  - test/files_signing_test.dart

@@ -1,4 +1,6 @@
-## 0.3.0-dev.1
+## 0.5.0
+
+- This package now targets the rewritten DartWay framework (`dartway_core_shared`/`dartway_core_server`/`dartway_core_flutter` 0.20.0). The previously published `0.4.0` was built on the old, Serverpod-based stack.
 
 - **Push is not on the path of the app opening** (#294). `DwPush.init` checks the protocol and
   returns; choosing the transport, `attach`, the permission, the token and `takeInitialOpen`

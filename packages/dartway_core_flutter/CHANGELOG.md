@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0
+
+- First publication of the rewrite to pub.dev.
+
 ## 0.20.0-dev.4
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#296).

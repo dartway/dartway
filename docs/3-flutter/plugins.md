@@ -196,7 +196,7 @@ not: `maybeOf` throws rather than picking one.
 
 **Plugins ship on pub.dev, versioned independently of the core family.** An app adds a normal caret
 constraint and resolves like any other Dart project. Each plugin states its compatibility with a caret
-on the framework — `dartway_shared_preferences` depends on `dartway_core_flutter: ^0.20.0-dev.1` — so a
+on the framework — `dartway_shared_preferences` depends on `dartway_core_flutter: ^0.20.0` — so a
 breaking release of the family is followed by a release of each plugin, and pub refuses the combinations
 that were never tested instead of failing at runtime.
 

@@ -1,17 +1,26 @@
 name: dartway_push_server
 description: Push notifications for a DartWay server — device tokens, messages queued in the caller's transaction, delivery by the framework's job queue through FCM and RuStore.
-version: 0.3.0-dev.1
+version: 0.5.0
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
-publish_to: none
 resolution: workspace
 environment:
   sdk: ^3.11.0
 dependencies:
   crypto: ^3.0.6
-  dartway_core_server: ^0.20.0-dev.1
-  dartway_push_shared: ^0.3.0-dev.1
+  dartway_core_server: ^0.20.0
+  dartway_push_shared: ^0.5.0
   meta: ^1.16.0
 dev_dependencies:
   lints: ^6.0.0
   test: ^1.26.0
+
+# Keys pub's leak scanner would otherwise flag are one-off keys generated
+# for tests — `dwFakePushPrivateKey` signs assertions only the fake push
+# service's own loopback server accepts (see the file's header comment);
+# `test_key.dart` and `providers_test.dart` reuse the same key and an
+# independent signature to check the signer against.
+false_secrets:
+  - lib/src/testing/dw_fake_push_service.dart
+  - test/support/test_key.dart
+  - test/providers_test.dart

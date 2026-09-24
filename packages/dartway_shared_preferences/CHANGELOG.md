@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.5.0
+## 0.6.0
+
+- This package now targets the rewritten DartWay framework (`dartway_core_flutter` 0.20.0). The previously published `0.5.0` was built on the old framework.
 
 - **Claims the `DwKeyValueStorePlugin` role**, so the signed-in session's key lives here instead of
   in a second copy of the same storage code inside the core. An app declares this plugin — or one of

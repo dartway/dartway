@@ -6,11 +6,11 @@ running in an iframe. [DartWay Studio](https://dartway.dev) is the closed platfo
 a live preview of the running app with its screen map, screen passports, the features on the current
 screen, and a demo-persona switcher.
 
-The package is a satellite (`packages/dartway_studio_bridge`, version `0.9.0`, versioned on its own):
+The package is a satellite (`packages/dartway_studio_bridge`, version `0.10.0`, versioned on its own):
 it depends on Flutter and nothing of the DartWay core, so it is true of any Flutter web app, and its
 README (`packages/dartway_studio_bridge/README.md`) is the full reference of its API.
 
-**The app half is `packages/dartway_studio_binding`** (`0.2.0-dev.1`): one widget, `DwStudioBinding`,
+**The app half is `packages/dartway_studio_binding`** (`0.2.0`): one widget, `DwStudioBinding`,
 mounted in `MaterialApp.builder`. It attaches the bridge, reports the route (path and declared
 name), the features mounted on screen, the session and the language, and executes what Studio asks
 — navigate, switch persona, change language. Who is signed in comes from the project's own provider

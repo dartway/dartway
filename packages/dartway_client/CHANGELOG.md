@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0
+
+- First publication of the rewrite to pub.dev.
+
 ## 0.20.0-dev.4
 
 - `DwFakeServer` answers a malformed `Dw-Contract-Version` as the real server does — a malformed call (`400`), and a `protocolError` close on the socket — rather than as an old app.

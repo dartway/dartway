@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0
+
+- First publication of the rewrite to pub.dev.
+
 ## 0.20.0-dev.4
 
 - **BREAKING: `DwServerSettings.minAppBuild` is gone** (#296, D-084). A server compares the client's contract version with its protocol's, by breaking line; the minimum is raised in the pull request that breaks the contract, never in an environment (`DW_MIN_APP_BUILD`). `DwTestServer` sends its protocol's contract version; `liveEndpointWith(contract:, withoutContract:)` names another. Migration note: `docs/migrations/2026-09-24-contract-version.md`.

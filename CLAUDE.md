@@ -18,7 +18,7 @@ DartWay 1.0 is the framework rebuilt on a stack it owns end to end, on one branc
 
 ## Monorepo map
 
-The core family moves in lockstep (one version, `0.20.0-dev.4`, across all six); every other package is a satellite with a version of its own (D-030, D-032).
+The core family moves in lockstep (one version, `0.20.0`, across all six); every other package is a satellite with a version of its own (D-030, D-032).
 
 | Folder | Role |
 |---|---|
@@ -181,7 +181,7 @@ Each item closes off a way for one session to destroy another's work.
 8. **Clean up your worktree:** `git worktree remove ../dartway-wt/<slug>` once the branch is merged. Abandoned worktrees hold branches checked out.
 9. **Everything that travels to GitHub is written in English:** branch name, commit message, PR title and description, PR comments. Re-read the title before `gh pr create`.
 
-**A release is two acts: moving `stable`, and publishing to pub.dev** — skipping the second breaks the repository for exactly one person, a stranger, because `dartway create` strips the overrides and reads the carets against pub.dev. **`dart run tool/release.dart`** answers what is behind and in what order it may go out (a package cannot be published before one it states a caret on); `--publish` carries it out, and refuses from a branch, a dirty tree, or a commit that is not `origin/master`. The family packages other than `dartway_core_flutter` are `publish_to: none` until the rewrite is released. **A first publication is a different act from an update** — it claims the name permanently — and is agreed package by package.
+**A release is two acts: moving `stable`, and publishing to pub.dev** — skipping the second breaks the repository for exactly one person, a stranger, because `dartway create` strips the overrides and reads the carets against pub.dev. **`dart run tool/release.dart`** answers what is behind and in what order it may go out (a package cannot be published before one it states a caret on); `--publish` carries it out, and refuses from a branch, a dirty tree, or a commit that is not `origin/master`. Every package under `packages/` is published — the rewrite's release removed the last `publish_to: none`. **A first publication is a different act from an update** — it claims the name permanently — and is agreed package by package (only `example/`, `template/` and the fixture packages under `test/` stay `publish_to: none`, since they are not distributed).
 
 **A release is tagged `git tag -a stable-YYYY-MM-DD[.N]` — annotated, on the `master` commit, and applied last**, after publishing: the tag is what the next release measures from, and only an annotated tag records when it was applied. **`dart run tool/release_notes.dart`** writes the notes from the window since the previous tag, breaking changes first.
 

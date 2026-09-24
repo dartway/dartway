@@ -1,4 +1,6 @@
-## 0.3.0-dev.1
+## 0.5.0
+
+- This package now targets the rewritten DartWay framework (`dartway_core_shared`/`dartway_core_server`/`dartway_core_flutter` 0.20.0). The previously published `0.4.0` was built on the old, Serverpod-based stack.
 
 - **RuStore SDK from its new repository** (#263): `nexus-external.rustore.ru/repository/maven-rustore-exposed`. The retired `artifactory-external.vkpartner.ru` (off from 01.10.2026), which `flutter_rustore_push` 7.2.0 still adds to every project, is removed from all projects' repositories once they are evaluated. Verified on a Flutter 3.44 app: the SDK resolves from the new host, and no project keeps the old one.
 

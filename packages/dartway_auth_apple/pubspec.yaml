@@ -1,11 +1,10 @@
 name: dartway_auth_apple
 description: "Sign in with Apple for a DartWay app, reached as dw.signInWithApple(): the nonce Apple's flow needs, the one-time authorization code the server must have to revoke tokens later, and the name Apple tells only once."
-version: 0.1.0-dev.1
+version: 0.1.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
 topics: [dartway, auth, apple, sign-in, flutter]
-publish_to: none
 
 resolution: workspace
 
@@ -18,13 +17,13 @@ dependencies:
     sdk: flutter
 
   crypto: ^3.0.6
-  dartway_auth_providers_shared: ^0.1.0-dev.1
-  dartway_core_flutter: ^0.20.0-dev.1
+  dartway_auth_providers_shared: ^0.1.0
+  dartway_core_flutter: ^0.20.0
   sign_in_with_apple: ^7.0.1
 
 dev_dependencies:
   # `DwFakeServer`: the sign-in runs through a real client against it.
-  dartway_client: ^0.20.0-dev.1
+  dartway_client: ^0.20.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
