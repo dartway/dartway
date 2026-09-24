@@ -28,6 +28,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_repo_tools/dartway_repo_tools.dart';
+import 'package:yaml/yaml.dart';
 
 const _host = 'pub.dev';
 
@@ -241,6 +242,9 @@ Future<void> main(List<String> args) async {
 /// edit or a local commit that has not been through review each publish code
 /// nobody has read, irreversibly.
 String? _refuseToPublishBecause() {
+  final sdk = _refuseUnpinnedSdk();
+  if (sdk != null) return sdk;
+
   String git(List<String> args) =>
       (Process.runSync('git', args).stdout as String).trim();
 
@@ -258,6 +262,37 @@ String? _refuseToPublishBecause() {
   if (head != remote) {
     return 'HEAD ($head) is not origin/master ($remote). Fetch, fast-forward, '
         'and publish what review has seen.';
+  }
+  return null;
+}
+
+/// Why publishing must not run on this SDK, or null when it may — the same
+/// question `tool/checks.sh` asks, for the same reason: a package built
+/// against whatever Flutter happens to be on `PATH` is not what CI proved
+/// green, and the failure surfaces as something unrelated to the SDK, months
+/// later, in a stranger's project. `tool/checks.sh` cannot re-execute itself
+/// under `fvm` because it also runs in CI, where `fvm` is not installed and
+/// the version is pinned by the workflow instead; the same is true here.
+String? _refuseUnpinnedSdk() {
+  final fvmrc = File('.fvmrc');
+  if (!fvmrc.existsSync()) {
+    return 'no .fvmrc here — run this from the repository root.';
+  }
+  final pinned = RegExp(
+    '"flutter"\\s*:\\s*"([^"]+)"',
+  ).firstMatch(fvmrc.readAsStringSync())?.group(1);
+  if (pinned == null) {
+    return 'cannot read the pinned Flutter version out of .fvmrc.';
+  }
+
+  final result = Process.runSync('flutter', ['--version']);
+  final running = result.exitCode == 0
+      ? RegExp(r'^Flutter (\S+)').firstMatch(result.stdout as String)?.group(1)
+      : null;
+  if (running != pinned) {
+    return 'Flutter ${running ?? 'not found'} is on PATH; this repository is '
+        'written against $pinned — publish under the pinned SDK: '
+        'fvm exec dart run tool/release.dart --publish';
   }
   return null;
 }
@@ -281,18 +316,43 @@ List<_RawPubspec> _rawPubspecs() {
     final pubspec = File('${directory.path}/pubspec.yaml');
     if (!pubspec.existsSync()) continue;
 
-    final lines = pubspec.readAsLinesSync();
-    final name = pubspecValue(lines, 'name');
-    final version = pubspecValue(lines, 'version');
+    final YamlMap document;
+    try {
+      document = parsePubspec(pubspec.readAsStringSync());
+    } on FormatException catch (error) {
+      stderr.writeln('${pubspec.path}: $error');
+      exit(1);
+    }
+    final name = pubspecValue(document, 'name');
+    final version = pubspecValue(document, 'version');
     if (name == null || version == null) continue;
+
+    final publishToNone = pubspecValue(document, 'publish_to') != null;
+
+    // A `publish_to: none` package's own dependencies never reach
+    // `unresolvableDependenciesOf`: only a planned (non-`none`) package's
+    // `dependencyConstraints` are ever read, and a `none` package can never
+    // be planned. Reading them anyway would fail this whole script on a
+    // form `dartwayDependencyConstraints` refuses to guess at but that a
+    // `publish_to: none` package is free to have — `dartway_core_flutter`'s
+    // own tour depends on it by `path:`, on purpose, and correctly.
+    final dependencyConstraints = <String, String>{};
+    if (!publishToNone) {
+      try {
+        dependencyConstraints.addAll(dartwayDependencyConstraints(document));
+      } on FormatException catch (error) {
+        stderr.writeln('${pubspec.path}: $error');
+        exit(1);
+      }
+    }
 
     found.add(
       _RawPubspec(
         name: name,
         version: version,
         directory: directory.path,
-        publishToNone: pubspecValue(lines, 'publish_to') != null,
-        dependencyConstraints: dartwayDependencyConstraints(lines),
+        publishToNone: publishToNone,
+        dependencyConstraints: dependencyConstraints,
       ),
     );
   }
@@ -300,32 +360,51 @@ List<_RawPubspec> _rawPubspecs() {
   return found;
 }
 
-/// Commit dates touching [directory]'s `lib/`, `bin/` or `pubspec.yaml` at or
-/// after [since] — what `staleVersionsAmong` judges a published version by.
+/// Paths under [directory] that a commit touched at or after [since] and
+/// that count as shipped contents (`isArchiveRelevantPath`) — what
+/// `staleVersionsAmong` judges a published version by.
+///
+/// The whole package directory, not a named few subpaths: the first version
+/// of this check only watched `lib/`, `bin/` and `pubspec.yaml`, and missed
+/// `dartway_push_firebase`'s `web/` (the service worker template) and
+/// `dartway_push_rustore`'s `android/` (the native service) entirely — both
+/// ship in the pub.dev archive and neither is `lib/`.
 ///
 /// `--name-only` with an empty `--pretty` format prints one path per touched
 /// file and nothing else; a path git does not track (`bin/` on a package with
 /// none) is simply never mentioned, so no existence check is needed first.
+/// `--since-as-filter` keeps the walk going past a commit older than [since]
+/// instead of stopping there — plain `--since` prunes a branch the moment it
+/// meets one such commit, which would hide a later, newer change on the far
+/// side of an old, unrelated one.
 List<String> _changedPathsSince(String directory, DateTime since) {
   final result = Process.runSync('git', [
     'log',
-    '--since=${since.toIso8601String()}',
+    '--since-as-filter=${since.toIso8601String()}',
     '--name-only',
     '--pretty=format:',
     '--',
-    '$directory/lib',
-    '$directory/bin',
-    '$directory/pubspec.yaml',
+    directory,
   ]);
   if (result.exitCode != 0) return const [];
   final paths = (result.stdout as String)
       .split('\n')
       .map((line) => line.trim())
       .where((line) => line.isNotEmpty)
+      .where((line) => isArchiveRelevantPath(_relativeTo(line, directory)))
       .toSet()
       .toList();
   paths.sort();
   return paths;
+}
+
+/// [path] with its [directory] prefix stripped, so `isArchiveRelevantPath`
+/// (which reads segments like `test` or `example`) never sees the workspace
+/// path leading up to the package and mistakes it for one of the package's
+/// own directories.
+String _relativeTo(String path, String directory) {
+  final prefix = '$directory/';
+  return path.startsWith(prefix) ? path.substring(prefix.length) : path;
 }
 
 Future<bool> _becameVisible(_Package package) async {
@@ -439,6 +518,7 @@ class _Package implements ReleaseUnit, PlannedRelease {
 
   @override
   final String name;
+  @override
   final String version;
   final String directory;
 

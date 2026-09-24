@@ -94,4 +94,46 @@ void main() {
       expect(stale, isEmpty);
     },
   );
+
+  group('isArchiveRelevantPath', () {
+    test('lib/, bin/ and every platform folder count', () {
+      expect(isArchiveRelevantPath('lib/src/dw_push.dart'), isTrue);
+      expect(isArchiveRelevantPath('bin/migrate.dart'), isTrue);
+      expect(
+        isArchiveRelevantPath('web/firebase-messaging-sw.js'),
+        isTrue,
+        reason:
+            'dartway_push_firebase ships this; the first version of this '
+            'check only watched lib/, bin/ and pubspec.yaml and missed it',
+      );
+      expect(
+        isArchiveRelevantPath('android/src/main/kotlin/RustorePushPlugin.kt'),
+        isTrue,
+        reason: 'dartway_push_rustore ships this the same way',
+      );
+      expect(isArchiveRelevantPath('pubspec.yaml'), isTrue);
+      expect(isArchiveRelevantPath('analysis_options.yaml'), isTrue);
+    });
+
+    test('test/ and example/ do not count — a test proves behaviour rather '
+        'than being it, and an example is not what a dependent resolves', () {
+      expect(isArchiveRelevantPath('test/dw_push_test.dart'), isFalse);
+      expect(isArchiveRelevantPath('example/lib/main.dart'), isFalse);
+    });
+
+    test('a path that merely contains "test" as part of a longer name still '
+        'counts — only a real test/ segment is excluded', () {
+      expect(isArchiveRelevantPath('lib/src/testing/dw_fake.dart'), isTrue);
+    });
+
+    test('CHANGELOG.md and README.md do not count', () {
+      expect(isArchiveRelevantPath('CHANGELOG.md'), isFalse);
+      expect(isArchiveRelevantPath('README.md'), isFalse);
+      expect(
+        isArchiveRelevantPath('lib/README.md'),
+        isFalse,
+        reason: 'the exclusion is by file name, wherever it sits',
+      );
+    });
+  });
 }

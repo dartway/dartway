@@ -30,6 +30,9 @@ class LocalPackageShape {
 abstract interface class PlannedRelease {
   String get name;
 
+  /// The version this plan publishes [name] at.
+  String get version;
+
   /// `dartway_*` dependency name → the caret text stated for it (`^0.20.0`).
   /// A constraint this script cannot parse as a caret is still checked, by
   /// exact text match against what is published — `dart pub publish` would
@@ -80,6 +83,23 @@ List<UnresolvableDependency> unresolvableDependenciesOf(
               '${package.name} depends on $depName ($constraint), which this '
               'plan publishes at position ${atInPlan + 1} — not before '
               '${package.name} at position ${i + 1}.',
+            ),
+          );
+          continue;
+        }
+        // Being ordered first is not being satisfied: a caret is a version
+        // constraint, and the plan can publish the dependency at any version
+        // it states, not necessarily one the caret allows. `^0.9.0` on a
+        // package this same plan publishes as `0.10.0` would resolve on
+        // pub.dev exactly as badly as a dependency left out of the plan
+        // entirely — the position alone said nothing about that.
+        final planVersion = plan[atInPlan].version;
+        if (!_satisfies(constraint, {planVersion})) {
+          problems.add(
+            UnresolvableDependency(
+              '${package.name} depends on $depName ($constraint), which '
+              'this plan publishes at position ${atInPlan + 1} as '
+              '$planVersion — not satisfying the caret.',
             ),
           );
         }

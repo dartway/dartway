@@ -1,7 +1,7 @@
 /// A package `release.dart` found already published at the exact version this
-/// tree states — so it left it out of the plan — whose `lib/`, `bin/` or
-/// `pubspec.yaml` dependencies moved after that version's own publish. The
-/// version claims nothing changed since release; something did.
+/// tree states — so it left it out of the plan — whose shipped contents
+/// (`isArchiveRelevantPath`, below) moved after that version's own publish.
+/// The version claims nothing changed since release; something did.
 ///
 /// This is exactly how `dartway_shared_preferences` (published `0.5.0`),
 /// `dartway_telegram` (`0.2.0`) and `dartway_studio_bridge` (`0.9.0`) fell a
@@ -18,6 +18,32 @@
 /// always means "this version's code was declared final", whichever tag is or
 /// is not there yet.
 library;
+
+/// Whether a change at [relativePath] (a package-relative path, as `git log
+/// --name-only` prints it) is evidence that what a stranger's `dart pub
+/// publish` archive carries actually moved.
+///
+/// An exclusion list, not an inclusion one: what ships is everything except a
+/// named few, so the next platform folder a plugin adds (`android/`, `ios/`,
+/// `web/`, `windows/`, ...) is covered without an edit here — an inclusion
+/// list would have to be kept in step with pub's own archive rules, and
+/// falling behind it is exactly the silent-drift failure mode this whole
+/// check exists to close (`dartway_push_firebase`'s `web/` and
+/// `dartway_push_rustore`'s `android/` would have gone unwatched under the
+/// first version of this check, which only read `lib/`, `bin/` and
+/// `pubspec.yaml`).
+///
+/// Excluded: `test/` and `example/` prove behaviour rather than being it —
+/// pub does not even ship `example/` inside the archive that resolves as a
+/// dependency — and a `CHANGELOG.md` or `README.md` edit does not change what
+/// ships, only how it reads.
+bool isArchiveRelevantPath(String relativePath) {
+  final segments = relativePath.split(RegExp(r'[\\/]'));
+  if (segments.contains('test') || segments.contains('example')) return false;
+  final base = segments.isEmpty ? '' : segments.last;
+  if (base == 'CHANGELOG.md' || base == 'README.md') return false;
+  return true;
+}
 
 class StaleVersion {
   const StaleVersion(this.package, this.version, this.changedPaths);
@@ -41,8 +67,12 @@ class StaleVersion {
 ///
 /// [publishedAt] and [changedPathsSince] are injected so this reads as a pure
 /// function under test: the real script asks pub.dev for the first and runs
-/// `git log --since=<publishedAt> --name-only -- <dir>/lib <dir>/bin
-/// <dir>/pubspec.yaml` for the second.
+/// `git log --since-as-filter=<publishedAt> --name-only -- <dir>`, filtered
+/// through [isArchiveRelevantPath], for the second.
+/// `--since-as-filter` matters as much as the path filter: without it `git
+/// log --since` stops walking a branch the moment it meets one commit older
+/// than the cutoff, so a change made and then reverted before an unrelated
+/// older commit would hide everything committed after it from this walk.
 List<StaleVersion> staleVersionsAmong(
   Iterable<({String name, String version, String directory})>
   unchangedPackages, {
