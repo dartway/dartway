@@ -306,15 +306,20 @@ enum _Status {
 }
 
 class _Check {
-  _Check(this.status, this.name, this.detail, {this.fix});
+  const _Check._(this.status, this.name, this.detail, this.fix);
 
-  _Check.ok(String name, String detail) : this(_Status.ok, name, detail);
+  // Factories that build the instance directly, rather than redirecting
+  // constructors (`: this(...)`) — the analyzer's unused-parameter check does
+  // not see a redirecting call as a use of the target's parameter, and flagged
+  // `fix` as never given despite `.warn` and `.fail` both passing it on.
+  factory _Check.ok(String name, String detail) =>
+      _Check._(_Status.ok, name, detail, null);
 
-  _Check.warn(String name, String detail, {String? fix})
-    : this(_Status.warn, name, detail, fix: fix);
+  factory _Check.warn(String name, String detail, {String? fix}) =>
+      _Check._(_Status.warn, name, detail, fix);
 
-  _Check.fail(String name, String detail, {required String fix})
-    : this(_Status.fail, name, detail, fix: fix);
+  factory _Check.fail(String name, String detail, {required String fix}) =>
+      _Check._(_Status.fail, name, detail, fix);
 
   final _Status status;
   final String name;
