@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.4
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#296).
+
 ## 0.20.0-dev.3
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.

@@ -76,7 +76,7 @@ bin/server.dart` still works. A deployed server has neither file: `.dockerignore
 of every image, and Compose hands it the environment the deploy rendered.
 
 Your own administrator identifier is the commented `DW_ADMIN_IDENTIFIER` line of that `local`
-section — see step 5. The full list the server reads — `PORT`, `DW_MIN_APP_BUILD`,
+section — see step 5. The full list the server reads — `PORT`,
 `DW_ALLOWED_ORIGINS` and the rest of `DW_STORAGE_*` — is documented at the top of `bin/server.dart`.
 
 A key that must not be committed goes beside them without opening an editor:

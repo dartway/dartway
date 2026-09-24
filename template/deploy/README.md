@@ -145,8 +145,6 @@ are the project's to deliver:
   `dartway secret set DW_ADMIN_IDENTIFIER --env staging`. Whoever
   receives its codes is the admin, so it has no default; unset, the admin panel
   is out of reach and the server says so in its log.
-- `DW_MIN_APP_BUILD` — the oldest app build still served; older builds are shown
-  the "update the app" screen. Raise it with `secret set` and a `run`.
 
 Sign-in codes are written to the server log until a delivery is wired into
 `deliverCode` (`../dartway_starter_server/lib/src/auth.dart`); list the gateway's

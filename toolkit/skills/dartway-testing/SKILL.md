@@ -230,7 +230,7 @@ memory.
 `package:dartway_client/testing.dart` (`dartway_client` is a dev dependency of `__FLUTTER_PKG__`):
 
 - **`DwFakeServer(protocol: appProtocol)`** speaks the real HTTP contract and live socket in memory —
-  statuses, idempotent commands, `426` below `minAppBuild`, hello and authentication on the socket,
+  statuses, idempotent commands, `426` for an older contract line (`server.contractVersion = ...`), hello and authentication on the socket,
   subscriptions — with handlers registered per DTO type:
 
   ```dart

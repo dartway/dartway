@@ -206,7 +206,7 @@ Send only what changed: an edit command's `DwFieldPatch` fields are `keep()` for
 - **Live status:** `ref.watch(dw.liveStatus)` → `DwConnectionStatus` (`idle`, `connecting`,
   `connected`, `disconnected`, `incompatible`). Calls work whatever it says; it only tells whether data
   on screen still follows the server — an "offline" hint, never a reason to block a button.
-- **Incompatibility:** a build below the server's `minAppBuild` (or a protocol mismatch) sets
+- **Incompatibility:** an app compiled with an older breaking line of the contract than the server's (or a protocol mismatch) sets
   `dw.incompatibility`, and `DwAppRunner` shows `DwFlutterConfig.updateRequiredScreen` over the whole app.
 
 ## 8. Chats and logs — `DwWindowListView`

@@ -204,9 +204,10 @@ void main() {
     await app.stop(tester);
   });
 
-  testWidgets('a build below the server minimum is told to update, over the '
-      'whole app', (tester) async {
-    final fake = FakeApp()..server.minAppBuild = 2;
+  testWidgets('an app on an older contract line than the server is told to '
+      'update, over the whole app', (tester) async {
+    // A server whose contract moved to a breaking line this build predates.
+    final fake = FakeApp()..server.contractVersion = '99.0.0';
     // Mounted as the app runner mounts it: the framework's bootstrapper, not a
     // copy of what it does.
     final app = await TestApp.start(tester, fake, bootstrap: true);

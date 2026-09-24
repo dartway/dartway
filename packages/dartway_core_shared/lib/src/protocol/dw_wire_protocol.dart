@@ -89,9 +89,20 @@ final class DwProtocolEntry<T extends DwWireObject> {
 /// name.
 final class DwWireProtocol {
   /// Throws [ArgumentError] for an entry whose type argument is a framework
-  /// base or whose name cannot be a call path, and [StateError] for two
-  /// classes under one name or one class under two names.
-  DwWireProtocol(Iterable<DwProtocolEntry> entries, {DwWireProtocol? include}) {
+  /// base or whose name cannot be a call path, or a [contractVersion] that is
+  /// not a semantic version, and [StateError] for two classes under one name
+  /// or one class under two names.
+  ///
+  /// [contractVersion] is the project's (`DwContractVersion`), written by the
+  /// generator from the shared package's `version:`. A protocol composed over
+  /// another — a module's over the app's — keeps the included one's.
+  DwWireProtocol(
+    Iterable<DwProtocolEntry> entries, {
+    DwWireProtocol? include,
+    String? contractVersion,
+  }) : contractVersion = contractVersion == null
+           ? include?.contractVersion
+           : DwContractVersion(contractVersion) {
     if (include != null) {
       for (final entry in include._byName.values) {
         _add(entry);
@@ -101,6 +112,11 @@ final class DwWireProtocol {
       _add(entry);
     }
   }
+
+  /// The version of the project's contract both sides were compiled with;
+  /// `null` for a protocol that is not a project's — the framework's own, a
+  /// test's — which no client is refused over.
+  final DwContractVersion? contractVersion;
 
   final Map<String, DwProtocolEntry> _byName = {};
   final Map<Type, DwProtocolEntry> _byType = {};

@@ -108,7 +108,7 @@ Call out explicitly:
 - **migrations and existing data**: renames that must not become drop + add, backfills, whether the
   migration applies on a database with rows;
 - **installed apps**: a changed or removed field in a data object meets app builds already on phones —
-  whether they must be forced to update (`DW_MIN_APP_BUILD`) when this goes out;
+  whether they must be forced to update — a raised breaking line of `__SHARED_PKG__`'s `version:` — when this goes out;
 - feature isolation (import only the entry point); real-time and performance (per-row queries, page
   sizes); what may break in adjacent features.
 

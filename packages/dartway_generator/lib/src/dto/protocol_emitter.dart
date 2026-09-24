@@ -12,9 +12,12 @@ final class ProtocolEntry {
 
 /// Writes `lib/generated/dw_protocol.dart` of the shared package.
 abstract final class ProtocolEmitter {
+  /// [contractVersion] is the shared package's `version:`: the contract the
+  /// server and its apps are compiled with (`DwContractVersion`, #296).
   static String emit({
     required String variable,
     required List<ProtocolEntry> entries,
+    required String contractVersion,
   }) {
     final sorted = [...entries]..sort((a, b) => a.name.compareTo(b.name));
     final imports = {for (final entry in sorted) entry.importUri}.toList()
@@ -43,7 +46,10 @@ abstract final class ProtocolEmitter {
           )
           .join(', '),
     );
-    out.writeln('], include: DwWireProtocol.core);');
+    out.writeln(
+      '], include: DwWireProtocol.core, '
+      'contractVersion: ${dartString(contractVersion)});',
+    );
     return out.toString();
   }
 }

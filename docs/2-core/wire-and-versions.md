@@ -102,7 +102,7 @@ answered by the next ping.
 
 ## Versions
 
-Two numbers decide whether a build may talk to a server, and both are checked before anything else
+Two versions decide whether a build may talk to a server, and both are checked before anything else
 about a call — an incompatible client learns that first, whatever else it got wrong.
 
 **`dwProtocolVersion`** is the version of the framework's wire. The client sends it as `Dw-Protocol`
@@ -110,12 +110,19 @@ about a call — an incompatible client learns that first, whatever else it got 
 `426` with `dw.protocolUnsupported`, and the socket closes with 4026. It means a framework version skew
 between app and server, which the operator resolves.
 
-**`Dw-App-Version`** is the app's own build, from `DwFlutterConfig.appVersion`. The server compares its build
-number with `DwServerSettings.minAppBuild` (default 0); a lower build — or no header while the minimum
-is above 0 — is answered `426` with `dw.updateRequired`. `minAppBuild` is read at startup, so raising
-it takes a restart and no release. That is the lever for a project's own incompatible change: a
-renamed field of a project DTO is not a protocol change, and old builds are turned away by raising the
-minimum.
+**`Dw-Contract-Version`** is the version of the project's contract the app was compiled with — the
+shared package's `version:`, written by `dart run dartway_cli:dartway generate` into the protocol both sides are built
+with (`DwWireProtocol.contractVersion`), and sent as `?contract=` on the socket. Semantic versioning
+decides compatibility: a change that removes or renames anything an installed app sends or reads
+raises the **breaking line** — the major version, or the minor one below 1.0 — and anything additive
+does not. A client of an older line than the server's, or one that sends none, is answered `426`
+with `dw.updateRequired`. That is the lever for a project's own incompatible change: a renamed field
+of a project DTO is not a protocol change, and old builds are turned away by the version raised in the
+same pull request — nothing to remember in an environment at deploy time (#296). A client of a newer
+line is not refused; the server is the one behind.
+
+**`Dw-App-Version`** is the app's own build, from `DwFlutterConfig.appVersion`. It labels the session
+key a sign-in makes, and decides nothing.
 
 **On the client an incompatibility is terminal.** The first `426` (or close 4026) sets
 `dw.incompatibility`; from then on every call is answered locally with that refusal, the socket stays

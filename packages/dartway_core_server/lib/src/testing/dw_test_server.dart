@@ -87,15 +87,18 @@ final class DwTestServer {
   /// The base of every HTTP path: calls, `/health` and project routes.
   Uri get httpBase => Uri.parse('http://127.0.0.1:$port');
 
-  /// The live socket, with the protocol and app version a current client
-  /// sends.
+  /// The live socket, with the protocol, app and contract version a current
+  /// client sends.
   Uri get liveEndpoint => liveEndpointWith();
 
   /// The live socket with the given query; a `null` value leaves the
-  /// parameter out.
+  /// parameter out. [contract] is the server's own contract version unless
+  /// named, and [withoutContract] leaves it out.
   Uri liveEndpointWith({
     String? protocol = '$dwProtocolVersion',
     String? app = DwTestCaller.defaultAppVersion,
+    String? contract,
+    bool withoutContract = false,
   }) => Uri(
     scheme: 'ws',
     host: '127.0.0.1',
@@ -104,6 +107,9 @@ final class DwTestServer {
     queryParameters: {
       DwHttpContract.liveProtocolParameter: ?protocol,
       DwHttpContract.liveAppVersionParameter: ?app,
+      DwHttpContract.liveContractVersionParameter: ?(withoutContract
+          ? null
+          : contract ?? server.protocol.contractVersion?.text),
     },
   );
 
@@ -291,6 +297,7 @@ final class DwTestCaller {
     headers: {
       DwHttpContract.protocolHeader: '$dwProtocolVersion',
       DwHttpContract.appVersionHeader: defaultAppVersion,
+      DwHttpContract.contractVersionHeader: ?protocol.contractVersion?.text,
       DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
       if (token != null)
         DwHttpContract.authorizationHeader:

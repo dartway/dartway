@@ -5,24 +5,34 @@ import '../src/admin.dart';
 import '../src/profile.dart';
 import '../src/settings.dart';
 
-final DwWireProtocol dartwayStarterProtocol = DwWireProtocol([
-  DwProtocolEntry<AdminCounters>('AdminCounters', $AdminCountersFromJson),
-  DwProtocolEntry<AppSetting>('AppSetting', $AppSettingFromJson),
-  DwProtocolEntry<ChangeUserRole>('ChangeUserRole', $ChangeUserRoleFromJson),
-  DwProtocolEntry<GetAdminCounters>(
-    'GetAdminCounters',
-    $GetAdminCountersFromJson,
-  ),
-  DwProtocolEntry<GetMyProfile>('GetMyProfile', $GetMyProfileFromJson),
-  DwProtocolEntry<GetUserCard>('GetUserCard', $GetUserCardFromJson),
-  DwProtocolEntry<ListAppSettings>('ListAppSettings', $ListAppSettingsFromJson),
-  DwProtocolEntry<ListUserProfiles>(
-    'ListUserProfiles',
-    $ListUserProfilesFromJson,
-  ),
-  DwProtocolEntry<SaveAppSetting>('SaveAppSetting', $SaveAppSettingFromJson),
-  DwProtocolEntry<UpdateMyProfile>('UpdateMyProfile', $UpdateMyProfileFromJson),
-  DwProtocolEntry<UserCard>('UserCard', $UserCardFromJson),
-  DwProtocolEntry<UserIdentifier>('UserIdentifier', $UserIdentifierFromJson),
-  DwProtocolEntry<UserProfile>('UserProfile', $UserProfileFromJson),
-], include: DwWireProtocol.core);
+final DwWireProtocol dartwayStarterProtocol = DwWireProtocol(
+  [
+    DwProtocolEntry<AdminCounters>('AdminCounters', $AdminCountersFromJson),
+    DwProtocolEntry<AppSetting>('AppSetting', $AppSettingFromJson),
+    DwProtocolEntry<ChangeUserRole>('ChangeUserRole', $ChangeUserRoleFromJson),
+    DwProtocolEntry<GetAdminCounters>(
+      'GetAdminCounters',
+      $GetAdminCountersFromJson,
+    ),
+    DwProtocolEntry<GetMyProfile>('GetMyProfile', $GetMyProfileFromJson),
+    DwProtocolEntry<GetUserCard>('GetUserCard', $GetUserCardFromJson),
+    DwProtocolEntry<ListAppSettings>(
+      'ListAppSettings',
+      $ListAppSettingsFromJson,
+    ),
+    DwProtocolEntry<ListUserProfiles>(
+      'ListUserProfiles',
+      $ListUserProfilesFromJson,
+    ),
+    DwProtocolEntry<SaveAppSetting>('SaveAppSetting', $SaveAppSettingFromJson),
+    DwProtocolEntry<UpdateMyProfile>(
+      'UpdateMyProfile',
+      $UpdateMyProfileFromJson,
+    ),
+    DwProtocolEntry<UserCard>('UserCard', $UserCardFromJson),
+    DwProtocolEntry<UserIdentifier>('UserIdentifier', $UserIdentifierFromJson),
+    DwProtocolEntry<UserProfile>('UserProfile', $UserProfileFromJson),
+  ],
+  include: DwWireProtocol.core,
+  contractVersion: '0.1.0',
+);

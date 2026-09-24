@@ -28,6 +28,6 @@ RUN apk add --no-cache ca-certificates
 COPY --from=build /server /app/server
 
 # Configured by the environment: DW_DATABASE_*, DW_STORAGE_*, PORT,
-# DW_MIN_APP_BUILD, DW_ALLOWED_ORIGINS (see bin/server.dart). It applies its migrations on start.
+# DW_ALLOWED_ORIGINS (see bin/server.dart). It applies its migrations on start.
 EXPOSE 8080
 ENTRYPOINT ["/app/server"]

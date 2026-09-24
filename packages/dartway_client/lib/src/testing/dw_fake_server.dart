@@ -202,13 +202,30 @@ final class DwFakeNetworkException implements Exception {
 /// await client.start();
 /// ```
 final class DwFakeServer {
-  DwFakeServer({required this.protocol, this.minAppBuild = 0});
+  DwFakeServer({required this.protocol, String? contractVersion})
+    : contractVersion = contractVersion ?? protocol.contractVersion?.text;
 
   final DwWireProtocol protocol;
 
-  /// Builds below this answer `426` with `dw.updateRequired`, on calls and on
-  /// the live upgrade.
-  int minAppBuild;
+  /// The contract this server serves (`DwContractVersion`): a client of an
+  /// older breaking line, or one that sends none, is answered `426` with
+  /// `dw.updateRequired`, on calls and on the live upgrade. The protocol's
+  /// own by default; set a newer line to play a server that moved on.
+  String? contractVersion;
+
+  /// Whether a client sending [sent] is too old for [contractVersion].
+  bool _outdated(String? sent) {
+    final served = contractVersion;
+    if (served == null) return false;
+    if (sent == null) return true;
+    try {
+      return DwContractVersion.parse(
+        sent,
+      ).isOlderLineThan(DwContractVersion(served));
+    } on FormatException {
+      return true;
+    }
+  }
 
   /// The protocol version this server speaks.
   int protocolVersion = dwProtocolVersion;
@@ -485,7 +502,9 @@ final class DwFakeServer {
     } on FormatException {
       return answer(malformed('no valid ${DwHttpContract.appVersionHeader}'));
     }
-    if (appVersion.build < minAppBuild) {
+    if (_outdated(
+      headers[DwHttpContract.contractVersionHeader.toLowerCase()],
+    )) {
       return answer(
         DwApiResponse.incompatible(DwCallRefusal(DwCoreRefusal.updateRequired)),
       );
@@ -735,12 +754,7 @@ final class DwFakeServer {
         '$protocolVersion') {
       return DwCallRefusal(DwCoreRefusal.protocolUnsupported);
     }
-    final app = parameters[DwHttpContract.liveAppVersionParameter];
-    try {
-      if (DwAppVersion.parse(app ?? '').build < minAppBuild) {
-        return DwCallRefusal(DwCoreRefusal.updateRequired);
-      }
-    } on FormatException {
+    if (_outdated(parameters[DwHttpContract.liveContractVersionParameter])) {
       return DwCallRefusal(DwCoreRefusal.updateRequired);
     }
     return null;

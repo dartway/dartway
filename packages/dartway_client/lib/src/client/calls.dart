@@ -303,6 +303,7 @@ extension on DwAppClient {
     DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
     DwHttpContract.protocolHeader: '$dwProtocolVersion',
     DwHttpContract.appVersionHeader: '$appVersion',
+    DwHttpContract.contractVersionHeader: ?protocol.contractVersion?.text,
     if (token != null)
       DwHttpContract.authorizationHeader:
           '${DwHttpContract.bearerPrefix}$token',

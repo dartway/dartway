@@ -81,7 +81,7 @@ The values that section holds, and what each is for:
 | `DW_STORAGE_PROVISION` | `true` | Creates both buckets and sets their access before starting — for a storage the project owns, never for one somebody else administers |
 | `DW_ADMIN_IDENTIFIER` | **ask the human** | A commented line in `local`, see below |
 | `PORT` | `8080` (default) | |
-| `DW_MIN_APP_BUILD`, `DW_ALLOWED_ORIGINS` | unset | See the failure table |
+| `DW_ALLOWED_ORIGINS` | unset | See the failure table |
 
 Everything else about storage (`dartway-uploads`) has development defaults in the skeleton.
 
@@ -183,7 +183,7 @@ only one.
 | `SocketException: Failed to create server socket … Address already in use` (port 8080) | A server is already running — another terminal, a background run from earlier | Do not start a second one: `curl …/health`. Otherwise find the process holding the port |
 | `port is already allocated` on `docker compose up` (8090 / 8100 / 8101) | Another project's containers or a leftover | `docker ps`; stop the conflicting container. DartWay projects share these development ports |
 | `Invalid argument (DW_ADMIN_IDENTIFIER): is neither a phone number nor an e-mail address` | A mistyped administrator | Ask the human for the value again |
-| The app shows "update the app" / calls answer `426` | `incompatible`: the build is below `DW_MIN_APP_BUILD` (`dw.updateRequired`), or the app and the server speak different protocol versions (`dw.protocolUnsupported`) — the app and the server resolve `dartway_core_*` versions that speak different protocols | Unset or lower `DW_MIN_APP_BUILD` locally; otherwise `dart pub get` in every package so the family resolves one version (`dartway-update`) |
+| The app shows "update the app" / calls answer `426` | `incompatible`: the app was built against an older breaking line of `__SHARED_PKG__`'s `version:` than the running server (`dw.updateRequired`), or the app and the server speak different protocol versions (`dw.protocolUnsupported`) — they resolve `dartway_core_*` versions that speak different protocols | Rebuild the app after `dart run dartway_cli:dartway generate`, so both carry the same contract; otherwise `dart pub get` in every package so the family resolves one version (`dartway-update`) |
 | The browser app loads, and every call or the live socket fails | Opened on another origin than the proxy's, or `127.0.0.1` instead of `localhost` | `http://localhost:8000` through `dart run dartway_cli:dartway dev web` / `dev proxy`; `DW_ALLOWED_ORIGINS` only for a socket from a genuinely different origin |
 | Uploads work on desktop and fail on an emulator or a phone; photos do not load there | The storage endpoint is `127.0.0.1`, which the device cannot reach, and it is signed into every URL | `DW_STORAGE_ENDPOINT` at an address the device reaches; restart the server |
 | A widget or acceptance test fails to reach a database | Not a bring-up problem | `dartway-testing`: `dart run dartway_cli:dartway test` creates its own |

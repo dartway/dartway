@@ -27,9 +27,6 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 /// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
 ///   before starting (`DwFileStorageSetup.provision`): for a development MinIO
 ///   the project owns, never for a storage somebody else administers;
-/// - `DW_MIN_APP_BUILD` — the oldest app build still served; an older one is
-///   shown the "update the app" screen. Raising it needs a restart, not a
-///   release;
 /// - `DW_ALLOWED_ORIGINS` — browser origins, besides the one the live socket
 ///   is served on, that may open it: comma-separated full origins
 ///   (`https://app.example.com,http://localhost:5000`). A web app served
@@ -49,7 +46,6 @@ Future<void> main() async {
     storage: storage,
     port: int.parse(env['PORT'] ?? '8080'),
     settings: DwServerSettings(
-      minAppBuild: int.parse(env['DW_MIN_APP_BUILD'] ?? '0'),
       allowedOrigins: {
         for (final entry in (env['DW_ALLOWED_ORIGINS'] ?? '').split(','))
           if (entry.trim() case final origin when origin.isNotEmpty) origin,

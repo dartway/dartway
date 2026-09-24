@@ -40,7 +40,7 @@ void main() {
         final connection = h.server.connections.single;
         expect(connection.url.path, '/dw/live');
         expect(connection.url.queryParameters, {
-          'protocol': '1',
+          'protocol': '$dwProtocolVersion',
           'app': '1.0.0+1',
         });
         expect(h.server.received.map((m) => m.runtimeType).toList(), [
@@ -417,7 +417,7 @@ void main() {
   group('incompatibility on the socket', () {
     test('an incompatible close is terminal', () async {
       final h = Harness()..serveRooms();
-      h.server.minAppBuild = 5;
+      h.server.contractVersion = '1.0.0';
       await h.start();
       final statuses = DwStreamRecording(h.client.connectionStatusStream);
       final watch = h.client.watch(const ListRooms());

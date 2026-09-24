@@ -149,6 +149,8 @@ extension on DwAppClient {
     queryParameters: {
       DwHttpContract.liveProtocolParameter: '$dwProtocolVersion',
       DwHttpContract.liveAppVersionParameter: '$appVersion',
+      DwHttpContract.liveContractVersionParameter:
+          ?protocol.contractVersion?.text,
     },
   );
 

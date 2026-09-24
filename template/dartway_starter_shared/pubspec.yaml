@@ -2,6 +2,13 @@ name: dartway_starter_shared
 description: The contract between the server and the app — data objects, requests, commands, channels, refusal codes and the rules both sides apply identically.
 publish_to: none
 
+# The version of the contract (`DwContractVersion`), written into the generated
+# protocol both sides are compiled with. Raise the breaking line — the minor
+# while below 1.0 — in the change that removes or renames anything an installed
+# app sends or reads: the server then shows older apps the update screen.
+# Anything additive raises the patch, or nothing.
+version: 0.1.0
+
 environment:
   sdk: '>=3.11.0 <4.0.0'
 
@@ -9,7 +16,7 @@ environment:
 # declares is compiled into the server and into the app alike, so it cannot
 # reach for Flutter, a database or IO.
 dependencies:
-  dartway_core_shared: ^0.20.0-dev.3
+  dartway_core_shared: ^0.20.0-dev.4
 
 dev_dependencies:
   lints: ^6.0.0

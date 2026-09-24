@@ -11,7 +11,7 @@ remembers it, and the app shows a full-screen "update the app" page over everyth
 
 | Code | Cause | Who fixes it |
 |---|---|---|
-| `dw.updateRequired` (`DwCoreRefusal.updateRequired`) | The app's build number is below the server's `minAppBuild`. | The user: the store has a newer build. |
+| `dw.updateRequired` (`DwCoreRefusal.updateRequired`) | The app was compiled with an older breaking line of the project's contract than the server's. | The user: the store has a newer build. |
 | `dw.protocolUnsupported` (`DwCoreRefusal.protocolUnsupported`) | The client speaks a framework protocol version the server does not. | The operator: a framework version skew between app and server. |
 
 Both are `DwCoreRefusal.incompatibilities` — `refusal.isIncompatibility` is `true` for either. They are
@@ -22,20 +22,22 @@ two codes rather than one because the cause differs, and so do the words on the 
 Every call carries two headers the client sets itself:
 
 - `Dw-Protocol` — the framework's protocol version (`dwProtocolVersion`);
-- `Dw-App-Version` — `DwFlutterConfig.appVersion`, `<semver>+<build>` (`1.4.2+57`). Only the number after `+`
-  is compared.
+- `Dw-Contract-Version` — the version of the project's contract the app was compiled with: the
+  shared package's `version:`, which `dart run dartway_cli:dartway generate` writes into the protocol both sides use.
 
-The server answers `426` with status `incompatible` when the protocol differs, or when the build is
-below `DwServerSettings.minAppBuild` (a call with no version counts as build 0). The live socket's
-upgrade carries the same version and is closed with `DwCloseCode.incompatible` for the same reason.
+The server answers `426` with status `incompatible` when the protocol differs, or when the app's
+contract belongs to an older **breaking line** than the server's — the major version, or the minor one
+below 1.0 (`DwContractVersion`); a call with no contract version counts as the oldest. The live
+socket's upgrade carries the same versions and is closed with `DwCloseCode.incompatible` for the same
+reason. An app on a *newer* line than the server is not refused: the server is behind, and a call it
+does not know is answered as unknown.
 
-In the skeleton the minimum comes from the environment — `DW_MIN_APP_BUILD`, read in
-`bin/server.dart` — so raising it is a restart, not a release. See
-[the app server](../4-server/app-server.md) and [wire and versions](../2-core/wire-and-versions.md).
+**The minimum lives in the code.** Whoever removes or renames anything an installed app sends or
+reads raises the breaking line of the shared package's version in the same pull request; nothing is
+set in an environment at deploy time. See [wire and versions](../2-core/wire-and-versions.md).
 
-The app's own version is written once, in `lib/core/app_version.dart`, and a test keeps it equal to
-`pubspec.yaml` (`test/app_version_test.dart`) — a build that reports the wrong number defeats the
-whole mechanism.
+`Dw-App-Version` (`DwFlutterConfig.appVersion`, `<semver>+<build>`) still travels: it labels the
+session key the app signs in with. It decides nothing.
 
 ## What the client does
 
@@ -132,8 +134,8 @@ page is already the message.
 ## Proven by
 
 - `example/dartway_example_flutter/test/app/update_required_test.dart` and the last test of
-  `template/dartway_starter_flutter/test/auth/sign_in_test.dart`: a fake server with
-  `minAppBuild = 2` answers a build-1 app, which is mounted through `DwAppBootstrapper` exactly as the
+  `template/dartway_starter_flutter/test/auth/sign_in_test.dart`: a fake server whose contract moved
+  to a newer breaking line answers the app, which is mounted through `DwAppBootstrapper` exactly as the
   runner mounts it; the client reports `dw.updateRequired`, "Update the app" is on screen, and nothing
   of the app is.
 - `packages/dartway_core_flutter/test/dw_flutter_core_test.dart` — "a build the server no longer

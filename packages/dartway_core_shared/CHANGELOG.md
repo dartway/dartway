@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0-dev.4
+
+- **BREAKING (wire): the project's contract decides which apps a server serves** (#296, D-084). `DwWireProtocol(contractVersion:)` carries the shared package's `version:`, written by the generator; `DwContractVersion` compares breaking lines — the major version, or the minor below 1.0. `Dw-Contract-Version` (and `?contract=` on the socket) carries it; a client of an older line is answered `426` with `dw.updateRequired`. `dwProtocolVersion` is 2: every installed app is shown the update screen once. `Dw-App-Version` stays, as the label of a session key. Migration note: `docs/migrations/2026-09-24-contract-version.md`.
+
 ## 0.20.0-dev.3
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_flutter`.

@@ -3,7 +3,6 @@
 /// otherwise grow.
 final class DwServerSettings {
   const DwServerSettings({
-    this.minAppBuild = 0,
     this.maxBodyBytes = 1 << 20,
     this.bodyReadTimeout = const Duration(seconds: 30),
     this.pingInterval = const Duration(seconds: 20),
@@ -21,20 +20,11 @@ final class DwServerSettings {
     this.alertsPerSignature = 5,
     this.alertWindow = const Duration(hours: 1),
     this.alertsPerMinute = 10,
-  }) : assert(minAppBuild >= 0),
-       assert(maxBodyBytes > 0),
+  }) : assert(maxBodyBytes > 0),
        assert(outboundLimitBytes > 0),
        assert(maxLiveMessageBytes > 0),
        assert(tokenCacheSize >= 0),
        assert(jobWorkers >= 0);
-
-  /// The oldest app build this server talks to. A call whose `Dw-App-Version`
-  /// build is lower — or that sends none while this is above 0 — is answered
-  /// `426` with `dw.updateRequired`, and the live socket closes with
-  /// `DwCloseCode.incompatible`. Read at startup, so raising it needs a
-  /// restart and no release (a project reads it from its environment or its
-  /// database before constructing the server).
-  final int minAppBuild;
 
   /// The largest call body, in bytes. A handler may declare its own
   /// (`DwCallHandler`'s `maxBodyBytes`); project routes pass theirs to
