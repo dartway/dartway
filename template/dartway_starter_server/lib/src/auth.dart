@@ -9,7 +9,10 @@ import 'entities/people.dart';
 import 'objects.dart';
 import 'publications.dart';
 
-/// Signature of `DwAuthConfig.deliverCode`.
+/// The delivery a deploying project plugs into [AppAuth.config] — narrower
+/// than `DwAuthConfig.deliverCode` itself, because [AppAuth] already answers
+/// the one question every project would otherwise have to ask again (is this
+/// a test account's fixed code, and if so say nothing).
 typedef CodeDelivery =
     Future<void> Function(
       DwCallContext ctx,
@@ -26,7 +29,10 @@ abstract final class AppAuth {
   /// [deliverCode] sends the code. By default it is written to the server log:
   /// the template sends no SMS and no e-mail, which is enough to sign in locally.
   /// **A deployed project delivers it here** — an SMS gateway for phones, a mail
-  /// service for e-mail — and the log line goes.
+  /// service for e-mail — and the log line goes. A store reviewer's or a demo
+  /// persona's fixed code (below) never reaches it: [deliverCode] here wraps
+  /// what is passed in and skips the call for those, so a deploying project's
+  /// delivery does not have to know about test accounts.
   ///
   /// [resendDelay] is the pause before another code may be asked for the same
   /// identifier; the app counts it down from the ticket's `resendAfter`.
@@ -37,16 +43,16 @@ abstract final class AppAuth {
     // One rule on both sides: the app normalizes what it sends with the same
     // function.
     normalize: AuthIdentifier.normalize,
-    deliverCode: deliverCode ?? _logCode,
 
     // Store reviewers, demo personas and end-to-end tests sign in with a fixed
-    // code set on their profile; nobody else has one.
-    fixedCode: (ctx, kind, identifier, accountId) async {
-      if (accountId == null) return null;
-      final profile = await ctx.db.userProfiles.findFirst(
-        where: (t) => t.accountId.equals(accountId),
-      );
-      return profile?.testVerificationCode;
+    // code set on their profile; nobody else has one — `null` for them, the
+    // framework's own default, `codeLength` random digits (6, left unset).
+    generateCode: (ctx, kind, identifier, accountId) =>
+        AppAuth._testCode(ctx, accountId),
+
+    deliverCode: (ctx, kind, identifier, code, accountId) async {
+      if (await AppAuth._testCode(ctx, accountId) != null) return;
+      await (deliverCode ?? _logCode)(ctx, kind, identifier, code);
     },
 
     // The profile is created with the account, in the same transaction: a
@@ -116,6 +122,18 @@ abstract final class AppAuth {
     String identifier,
     String code,
   ) async => stdout.writeln('Sign-in code for $identifier: $code');
+
+  /// [accountId]'s fixed sign-in code, or `null` for an account without one
+  /// or no account at all. Cached on [ctx]: `generateCode` and `deliverCode`
+  /// both ask in the same request, and it is one query either way.
+  static Future<String?> _testCode(DwCallContext ctx, int? accountId) =>
+      ctx.memo(#appAuthTestCode, () async {
+        if (accountId == null) return null;
+        final profile = await ctx.db.userProfiles.findFirst(
+          where: (t) => t.accountId.equals(accountId),
+        );
+        return profile?.testVerificationCode;
+      });
 
   /// The profile a new account starts with, in the account's transaction.
   ///

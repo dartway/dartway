@@ -29,7 +29,7 @@ void main() {
         migrations: [migration],
         auth: DwAuthConfig(
           normalize: (kind, raw) => raw.trim().toLowerCase(),
-          deliverCode: (ctx, kind, identifier, code) async {},
+          deliverCode: (ctx, kind, identifier, code, accountId) async {},
           onAccountDeleting: onAccountDeleting,
         ),
       ),

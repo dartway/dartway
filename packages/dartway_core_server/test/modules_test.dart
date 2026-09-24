@@ -100,7 +100,7 @@ DwAppServer serverWith(
   database: database,
   auth: DwAuthConfig(
     normalize: (kind, raw) => raw,
-    deliverCode: (ctx, kind, identifier, code) async {},
+    deliverCode: (ctx, kind, identifier, code, accountId) async {},
   ),
   handlers: const [],
   modules: modules,
@@ -169,7 +169,7 @@ void main() {
         database: database.config,
         auth: DwAuthConfig(
           normalize: (kind, raw) => raw,
-          deliverCode: (ctx, kind, identifier, code) async {},
+          deliverCode: (ctx, kind, identifier, code, accountId) async {},
         ),
         handlers: [
           DwCallHandler.command<CountVisit, int>(

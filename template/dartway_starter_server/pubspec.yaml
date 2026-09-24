@@ -6,7 +6,7 @@ environment:
   sdk: '>=3.11.0 <4.0.0'
 
 dependencies:
-  dartway_core_server: ^0.21.0-dev.1
+  dartway_core_server: ^0.21.0-dev.2
   # The contract with the app. A path dependency, so the server image copies
   # this directory too — an image that does not is unbuildable, and pub says
   # so three layers from the cause.
@@ -16,7 +16,7 @@ dependencies:
 dev_dependencies:
   # `dartway generate` runs the generator this package resolves, so it always
   # matches the framework the project builds against.
-  dartway_generator: ^0.21.0-dev.1
+  dartway_generator: ^0.21.0-dev.2
   lints: ^6.0.0
   test: ^1.26.0
 

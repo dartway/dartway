@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_core_server/src/context/dw_call_context.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:test/test.dart';
 
@@ -106,12 +107,42 @@ final class TestApp {
   final Map<String, String> delivered = {};
   final List<String> deliveredTo = [];
 
-  /// identifier → `ctx.accountId` of the last `deliverCode` or `fixedCode`
-  /// for it: the caller attaching it, `null` for a sign-in.
+  /// identifier → `ctx.accountId` on the last `deliverCode` for it: the
+  /// caller attaching it, `null` for a sign-in.
   final Map<String, int?> codeCallers = {};
 
   /// Identifiers whose delivery throws.
   final Set<String> failingDelivery = {};
+
+  /// Identifiers whose `deliverCode` waits on [deliveryGate] before doing
+  /// anything else — a slow provider a test holds open and then releases, to
+  /// see what a duplicate send of the same idempotency key meets while the
+  /// ticket's own transaction has already committed but delivery has not
+  /// finished (framework issue: idempotency vs. the post-commit `deliverCode`
+  /// split, #310).
+  final Set<String> gatedDelivery = {};
+
+  /// Completed to let every identifier in [gatedDelivery] through. A test
+  /// replaces it with a fresh one before gating an identifier.
+  Completer<void> deliveryGate = Completer();
+
+  /// Completed to let `CountProvisional`'s handler past the point where it
+  /// has called the internal `recordProvisionalOutcome` hook, still inside
+  /// its own open transaction. A test replaces it with a fresh one before
+  /// sending a `CountProvisional`.
+  Completer<void> provisionalGate = Completer();
+
+  /// Set by `CountProvisional`'s handler right before it awaits
+  /// [provisionalGate] — an in-memory signal a test polls instead of a query
+  /// (which, gated inside an open transaction, is exactly the thing under
+  /// test: whether the provisional row is visible to another connection
+  /// yet).
+  bool provisionalGateReached = false;
+
+  /// Identifiers whose delivery refuses (`dw.invalid` on `identifier`)
+  /// instead of throwing — the way an SMS provider rejecting the number's
+  /// format would, through `ctx.refuse`.
+  final Set<String> refusingDelivery = {};
   final List<int> createdAccounts = [];
 
   /// Account id → the origin `onAccountCreated` was given.
@@ -159,6 +190,21 @@ final class TestApp {
 
   static const reviewer = 'reviewer@example.com';
 
+  /// A fixed code that is, unlike [reviewer]'s, still sent — proves
+  /// `generateCode` and `deliverCode` decide independently (issue #310).
+  static const reviewerSent = 'reviewer-sent@example.com';
+
+  /// How many times `generateCode` has run, across every identifier — so a
+  /// test can prove it is not called at all when a request is refused before
+  /// either hook runs (the rate limit).
+  int generateCodeCalls = 0;
+
+  /// identifier → `ctx.accountId` on the last `generateCode` for it: the
+  /// caller attaching it, `null` for a sign-in — the same thing
+  /// [codeCallers] records for `deliverCode`, so a test can check both hooks
+  /// see the same caller.
+  final Map<String, int?> generateCodeCallers = {};
+
   DwAuthConfig auth({
     Duration resendDelay = const Duration(seconds: 30),
     int maxRequestsPerWindow = 3,
@@ -173,18 +219,36 @@ final class TestApp {
           RegExp(r'^\+\d{6,15}$').hasMatch(value) ? value : null,
       };
     },
-    deliverCode: (ctx, kind, identifier, code) async {
+    deliverCode: (ctx, kind, identifier, code, accountId) async {
+      // The caller attaching the identifier (null for a sign-in) — not
+      // [accountId], which is who the identifier already belongs to.
+      codeCallers[identifier] = ctx.accountId;
+      if (gatedDelivery.contains(identifier)) await deliveryGate.future;
+      // `reviewer`'s fixed code goes nowhere — its own decision, made here
+      // rather than by the framework withholding the call.
+      if (identifier == reviewer) return;
+      if (refusingDelivery.contains(identifier)) {
+        ctx.refuse(DwCoreRefusal.invalid, field: 'identifier');
+      }
       if (failingDelivery.contains(identifier)) {
         throw StateError('delivery provider is down');
       }
       delivered[identifier] = code;
       deliveredTo.add(identifier);
-      codeCallers[identifier] = ctx.accountId;
     },
-    fixedCode: (ctx, kind, identifier, accountId) async {
-      if (identifier != reviewer) return null;
-      codeCallers[identifier] = ctx.accountId;
-      return '000000';
+    generateCode: (ctx, kind, identifier, accountId) async {
+      generateCodeCalls++;
+      // The caller attaching the identifier, the same as `deliverCode` sees
+      // — not [accountId], which is who the identifier already belongs to.
+      generateCodeCallers[identifier] = ctx.accountId;
+      return switch (identifier) {
+        reviewer => '000000',
+        reviewerSent => '111111',
+        // `null` here is the framework's own default (`codeLength` random
+        // digits) — not `dwRandomCode(6)` called by hand, which would drift
+        // from `codeLength` the moment one changed without the other.
+        _ => null,
+      };
     },
     onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
       createdAccounts.add(accountId);
@@ -534,6 +598,29 @@ final class TestApp {
         }
         return n;
       },
+    ),
+    DwCallHandler.command<CountProvisional, int>(
+      access: DwAccessRule.anonymous,
+      transactional: false,
+      handle: (ctx, command) => ctx.transaction((tx) async {
+        final n = await _count(tx, command.label);
+        // The same call `DwAuthService._requestCode` makes, from inside
+        // this handler's own transaction — exactly the internal hook this
+        // test exists to exercise, cast the same way (see its own doc
+        // comment for why the cast is safe).
+        await (ctx as DwRuntimeContext).recordProvisionalOutcome(n);
+        provisionalGateReached = true;
+        await provisionalGate.future;
+        if (command.mode == 'refuse') {
+          // Still inside this transaction: rolls back the counter increment
+          // and (were it not for `dwOverwriteOutcome` being an upsert) the
+          // provisional row along with it.
+          throw DwRefusalException(
+            DwCallRefusal(DwCoreRefusal.conflict, params: {'n': n}),
+          );
+        }
+        return n;
+      }),
     ),
     DwCallHandler.command<Ping, String>(
       access: DwAccessRule.anonymous,

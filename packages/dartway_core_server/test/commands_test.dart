@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:test/test.dart';
@@ -61,6 +62,89 @@ void main() {
       expect(stored.single['status'], 'refused');
       expect(stored.single['type'], 'Count');
     });
+
+    test(
+      'a provisional outcome recorded inside a transaction is invisible to '
+      'another connection while that transaction is still open, and a '
+      'refusal thrown before it commits leaves the outcome refused — not a '
+      'stale "ok" surviving the rollback, and not unrecorded either '
+      '(review round 4: the provisional write must live in the handler\'s '
+      'own transaction, not escape it)',
+      () async {
+        final caller = harness().caller();
+        harness().app.provisionalGate = Completer();
+        harness().app.provisionalGateReached = false;
+        final pending = caller.call(
+          const CountProvisional('provisional-visibility', mode: 'refuse'),
+          key: 'prov1',
+        );
+        for (
+          var i = 0;
+          i < 200 && !harness().app.provisionalGateReached;
+          i++
+        ) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        expect(
+          harness().app.provisionalGateReached,
+          isTrue,
+          reason: 'the handler never reached the gate in time',
+        );
+        // Still inside the handler's own transaction: a query on a separate
+        // connection must see nothing yet. Seeing a row here is exactly what
+        // the provisional write landing outside that transaction (on the
+        // pool, not on it) would look like.
+        final whileOpen = await harness().db.query(
+          "SELECT 1 FROM dw_command_outcome WHERE key = 'prov1'",
+        );
+        expect(
+          whileOpen,
+          isEmpty,
+          reason:
+              'the provisional row must not be visible to another '
+              'connection before the transaction that wrote it commits',
+        );
+        harness().app.provisionalGate.complete();
+        final answer = await pending;
+        expect(answer.status, 409);
+        expect(
+          answer.refusal,
+          DwCallRefusal(DwCoreRefusal.conflict, params: {'n': 1}),
+        );
+        expect(
+          await executions('provisional-visibility'),
+          0,
+          reason: 'the counter increment rolled back with the refusal',
+        );
+        final afterRollback = await harness().db.query(
+          "SELECT status, type FROM dw_command_outcome WHERE key = 'prov1'",
+        );
+        expect(
+          afterRollback,
+          hasLength(1),
+          reason:
+              'exactly one row — the provisional "ok" that rolled back with '
+              'the transaction, then the refused outcome the endpoint wrote '
+              'once the handler threw',
+        );
+        expect(afterRollback.single['status'], 'refused');
+        expect(afterRollback.single['type'], 'CountProvisional');
+        final replay = await caller.call(
+          const CountProvisional('provisional-visibility', mode: 'refuse'),
+          key: 'prov1',
+        );
+        expect(
+          replay.refusal,
+          answer.refusal,
+          reason: 'a later send of the same key replays the refusal',
+        );
+        expect(
+          await executions('provisional-visibility'),
+          0,
+          reason: 'the replay did not run the handler again',
+        );
+      },
+    );
 
     test('a handler refusing with an incompatibility is answered 426, and '
         'so is its replay', () async {

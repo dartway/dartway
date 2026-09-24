@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -34,8 +33,6 @@ final class DwAuthService {
   DwAuthConfig get auth => runtime.auth;
   DwSessionCache get _sessions => runtime.sessions;
 
-  static final Random _random = Random.secure();
-
   /// Tokens longer than this are rejected without hashing or a query.
   static const int maxTokenLength = 256;
 
@@ -51,8 +48,15 @@ final class DwAuthService {
   };
 
   List<DwCallHandler> handlers() => [
+    // Not transactional at the framework level: `deliverCode` runs after the
+    // ticket's own transaction has committed — see `_requestCode` — so an
+    // HTTP call to a provider does not hold that transaction's connection
+    // (and, worse, the identifier's advisory lock) for as long as the
+    // provider takes to answer. The ticket is real, and counted against the
+    // limit, whether or not delivery goes on to succeed.
     DwCallHandler.command<DwRequestCode, DwCodeTicket>(
       access: DwAccessRule.anonymous,
+      transactional: false,
       handle: (ctx, command) => _requestCode(
         ctx,
         command.kind,
@@ -82,8 +86,10 @@ final class DwAuthService {
         await ctx.accounts.deleteAccount(ctx.requireAccountId);
       },
     ),
+    // Not transactional for the same reason `DwRequestCode` is not.
     DwCallHandler.command<DwRequestIdentifierCode, DwCodeTicket>(
       access: DwAccessRule.signedIn,
+      transactional: false,
       handle: (ctx, command) => _requestCode(
         ctx,
         command.kind,
@@ -180,10 +186,26 @@ final class DwAuthService {
   /// Sends a code for [rawIdentifier] and answers its ticket — one path for
   /// signing in and for attaching an identifier, so both are held to the same
   /// normalization, the same limits (counted per identifier across both
-  /// purposes), the same fixed code and the same delivery.
+  /// purposes), the same [DwAuthConfig.generateCode] and the same
+  /// [DwAuthConfig.deliverCode].
   ///
   /// The answer is the same whether the identifier belongs to an account or
   /// not, and whoever it belongs to.
+  ///
+  /// **Two phases, one transaction and then none.** The limit check, picking
+  /// the code and recording the ticket run inside `ctx.transaction` — the
+  /// part that has to be atomic, and the part every earlier version of this
+  /// method ran entirely under. [DwAuthConfig.deliverCode] runs after that
+  /// transaction has committed and given its connection back to the pool:
+  /// a project's `deliverCode` is commonly an HTTP call to a provider, and
+  /// making it wait on that call while holding both a pooled connection and
+  /// the identifier's advisory lock is how one slow provider empties the
+  /// pool for every caller, not only this identifier's. The ticket this
+  /// writes is real, and already counted against the limit, before delivery
+  /// is even attempted — so a provider that times out is answered as an
+  /// incident (or a refusal, if `deliverCode` throws one), not silently
+  /// undone, and the next attempt waits out `resendDelay` like any other
+  /// resend rather than being free to retry at once.
   Future<DwCodeTicket> _requestCode(
     DwCallContext ctx,
     DwIdentifierKind kind,
@@ -195,72 +217,88 @@ final class DwAuthService {
       _CodePurpose.signIn => null,
       _CodePurpose.attach => ctx.requireAccountId,
     };
-    // The limit is read and extended under one lock per identifier, or two
-    // parallel requests would both see room for one more.
-    await ctx.db.advisoryLock(
-      DwLockSpace.identifier,
-      dwLockKey('${kind.name}:$identifier'),
-    );
-    final stats = (await ctx.db.query(
-      'SELECT now() AS now, count(*) AS n, min(created_at) AS first, '
-      'max(created_at) AS last FROM dw_code_ticket '
-      'WHERE kind = @kind AND identifier = @identifier '
-      'AND created_at > now() - @window::int8 * interval \'1 microsecond\'',
-      params: {
-        'kind': kind.name,
-        'identifier': identifier,
-        'window': auth.requestWindow.inMicroseconds,
-      },
-    )).single;
-    final now = stats.get<DateTime>('now');
-    final count = stats.get<int>('n');
-    final first = stats['first'] as DateTime?;
-    final last = stats['last'] as DateTime?;
-    DateTime? retryAt;
-    if (count >= auth.maxRequestsPerWindow && first != null) {
-      retryAt = first.add(auth.requestWindow);
-    }
-    if (last != null && last.add(auth.resendDelay).isAfter(now)) {
-      final resendAt = last.add(auth.resendDelay);
-      if (retryAt == null || resendAt.isAfter(retryAt)) retryAt = resendAt;
-    }
-    if (retryAt != null) {
-      throw DwRefusalException(
-        DwCallRefusal.tooManyRequests(retryAt.difference(now)),
+    final (ticket, code, accountId) = await ctx.transaction((tx) async {
+      // The limit is read and extended under one lock per identifier, or two
+      // parallel requests would both see room for one more.
+      await ctx.db.advisoryLock(
+        DwLockSpace.identifier,
+        dwLockKey('${kind.name}:$identifier'),
       );
-    }
+      final stats = (await ctx.db.query(
+        'SELECT now() AS now, count(*) AS n, min(created_at) AS first, '
+        'max(created_at) AS last FROM dw_code_ticket '
+        'WHERE kind = @kind AND identifier = @identifier '
+        'AND created_at > now() - @window::int8 * interval \'1 microsecond\'',
+        params: {
+          'kind': kind.name,
+          'identifier': identifier,
+          'window': auth.requestWindow.inMicroseconds,
+        },
+      )).single;
+      final now = stats.get<DateTime>('now');
+      final count = stats.get<int>('n');
+      final first = stats['first'] as DateTime?;
+      final last = stats['last'] as DateTime?;
+      DateTime? retryAt;
+      if (count >= auth.maxRequestsPerWindow && first != null) {
+        retryAt = first.add(auth.requestWindow);
+      }
+      if (last != null && last.add(auth.resendDelay).isAfter(now)) {
+        final resendAt = last.add(auth.resendDelay);
+        if (retryAt == null || resendAt.isAfter(retryAt)) retryAt = resendAt;
+      }
+      if (retryAt != null) {
+        throw DwRefusalException(
+          DwCallRefusal.tooManyRequests(retryAt.difference(now)),
+        );
+      }
 
-    final accountId = await dwAccountOf(ctx.db, kind, identifier);
-    final fixed = await auth.fixedCode?.call(ctx, kind, identifier, accountId);
-    final code =
-        fixed ??
-        List.generate(auth.codeLength, (_) => _random.nextInt(10)).join();
-    final ticketId = DwAuthStore.randomToken(16);
-    final ticket = (await ctx.db.query(
-      'INSERT INTO dw_code_ticket '
-      '(id, kind, identifier, code_hash, expires_at, purpose, account_id) '
-      'VALUES (@id, @kind, @identifier, @hash, '
-      'now() + @lifetime::int8 * interval \'1 microsecond\', @purpose, '
-      '@account::int8) '
-      'RETURNING created_at, expires_at',
-      params: {
-        'id': ticketId,
-        'kind': kind.name,
-        'identifier': identifier,
-        'hash': _codeHash(ticketId, code),
-        'lifetime': auth.codeLifetime.inMicroseconds,
-        'purpose': purpose.name,
-        'account': attachingAccount,
-      },
-    )).single;
-    if (fixed == null) {
-      await auth.deliverCode(ctx, kind, identifier, code);
-    }
-    return DwCodeTicket(
-      id: ticketId,
-      expiresAt: ticket.get<DateTime>('expires_at'),
-      resendAfter: ticket.get<DateTime>('created_at').add(auth.resendDelay),
-    );
+      final accountId = await dwAccountOf(ctx.db, kind, identifier);
+      final code =
+          await auth.generateCode?.call(ctx, kind, identifier, accountId) ??
+          dwRandomCode(auth.codeLength);
+      final ticketId = DwAuthStore.randomToken(16);
+      final row = (await ctx.db.query(
+        'INSERT INTO dw_code_ticket '
+        '(id, kind, identifier, code_hash, expires_at, purpose, account_id) '
+        'VALUES (@id, @kind, @identifier, @hash, '
+        'now() + @lifetime::int8 * interval \'1 microsecond\', @purpose, '
+        '@account::int8) '
+        'RETURNING created_at, expires_at',
+        params: {
+          'id': ticketId,
+          'kind': kind.name,
+          'identifier': identifier,
+          'hash': _codeHash(ticketId, code),
+          'lifetime': auth.codeLifetime.inMicroseconds,
+          'purpose': purpose.name,
+          'account': attachingAccount,
+        },
+      )).single;
+      final ticket = DwCodeTicket(
+        id: ticketId,
+        expiresAt: row.get<DateTime>('expires_at'),
+        resendAfter: row.get<DateTime>('created_at').add(auth.resendDelay),
+      );
+      // Recorded now, in this same transaction — not after `deliverCode`
+      // below returns, like a transactional command's outcome would be. A
+      // duplicate send of the same idempotency key arriving once this
+      // commits, while `deliverCode` is still running, replays this ticket
+      // instead of running this method a second time and meeting the
+      // resend-delay refusal above for a ticket that already exists. If
+      // `deliverCode` then throws, `DwCallEndpoint` corrects this row for
+      // us — see `DwRuntimeContext.recordProvisionalOutcome`.
+      //
+      // Not part of `DwCallContext`: the framework only ever hands a command
+      // handler a real `DwRuntimeContext`, so the cast is safe here — it is
+      // not, in general, a promise every `DwCallContext` this file sees is
+      // one, only that this particular handler, wired through
+      // `DwCallHandler.command`, always is.
+      await (ctx as DwRuntimeContext).recordProvisionalOutcome(ticket);
+      return (ticket, code, accountId);
+    });
+    await auth.deliverCode(ctx, kind, identifier, code, accountId);
+    return ticket;
   }
 
   /// Checks [code] against a live ticket of [purpose] — requested by

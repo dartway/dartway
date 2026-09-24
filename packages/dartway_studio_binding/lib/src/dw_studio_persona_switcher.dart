@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 /// Signs the app in and out on Studio's request, through the app's regular
 /// sign-in by code — ask for a code, confirm the one Studio sent.
 ///
-/// The server accepts that code when its `DwAuthConfig.fixedCode` says so (the
-/// reviewer and test-account code), so the app ships no test users and no
-/// special sign-in path: Studio holds the personas, the app holds nothing. No
-/// navigation either — the router guards move the app between the auth zone
-/// and the rest when the session changes.
+/// The server's `DwAuthConfig.generateCode` returns that code for a Studio
+/// account (the reviewer and test-account code), so the app ships no test
+/// users and no special sign-in path: Studio holds the personas, the app
+/// holds nothing. No navigation either — the router guards move the app
+/// between the auth zone and the rest when the session changes.
 class DwStudioPersonaSwitcher {
   DwStudioPersonaSwitcher(this._core);
 

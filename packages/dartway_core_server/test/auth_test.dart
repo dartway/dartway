@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -146,6 +147,28 @@ void main() {
     expect(app().deliveredTo.where((i) => i == id), hasLength(3));
   });
 
+  test('generateCode does not run when the request is refused by the resend '
+      'delay or by the window — the limit is checked first', () async {
+    const id = 'genlimit@example.com';
+    expect((await requestCode(id)).status, 200);
+    final afterFirst = app().generateCodeCalls;
+    // Too soon for a resend.
+    expect((await requestCode(id)).status, 429);
+    expect(app().generateCodeCalls, afterFirst);
+
+    await age(id, const Duration(seconds: 31));
+    expect((await requestCode(id)).status, 200);
+    await age(id, const Duration(seconds: 31));
+    expect((await requestCode(id)).status, 200);
+    final afterThree = app().generateCodeCalls;
+    expect(afterThree, afterFirst + 2);
+
+    // Three in the window: the fourth is refused before generateCode runs.
+    await age(id, const Duration(seconds: 31));
+    expect((await requestCode(id)).status, 429);
+    expect(app().generateCodeCalls, afterThree);
+  });
+
   test(
     'parallel requests for one identifier are limited under a lock',
     () async {
@@ -158,7 +181,8 @@ void main() {
     },
   );
 
-  test('a failed delivery leaves no ticket and fails the call', () async {
+  test('a failed delivery leaves its ticket — real and already counted '
+      'against the limit — and fails the call', () async {
     const id = 'down@example.com';
     app().failingDelivery.add(id);
     expect((await requestCode(id)).status, 500);
@@ -166,9 +190,169 @@ void main() {
       'SELECT count(*) AS n FROM dw_code_ticket WHERE identifier = @id',
       params: {'id': id},
     );
-    expect(tickets.single['n'], 0);
+    expect(
+      tickets.single['n'],
+      1,
+      reason:
+          'the ticket is written before deliverCode runs, so delivery '
+          'throwing does not undo it — deliverCode runs after that '
+          'transaction has committed',
+    );
+    // Too soon for a resend: the failed attempt still counts, the same
+    // as a successful one would.
+    expect((await requestCode(id)).status, 429);
     app().failingDelivery.remove(id);
+    await age(id, const Duration(seconds: 31));
     expect((await requestCode(id)).status, 200);
+  });
+
+  test(
+    'a refusal from deliverCode reaches the client as an ordinary refusal, '
+    'even though deliverCode now runs after the ticket has committed',
+    () async {
+      const id = 'refused-delivery@example.com';
+      app().refusingDelivery.add(id);
+      final answer = await requestCode(id);
+      expect(answer.status, 422);
+      expect(answer.refusal, DwCallRefusal(DwCoreRefusal.invalid, field: 'identifier'));
+    },
+  );
+
+  group('idempotency vs. the post-commit deliverCode split (review round 3, '
+      'framework issue #310/#311)', () {
+    /// Waits until `deliverCode` for [id] has entered — the ticket's own
+    /// transaction has committed by then, and (with [id] in
+    /// `app().gatedDelivery`) delivery is now waiting on `app().deliveryGate`.
+    Future<void> waitForDeliveryToStart(String id) async {
+      for (var i = 0; i < 200 && !app().codeCallers.containsKey(id); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(
+        app().codeCallers.containsKey(id),
+        isTrue,
+        reason: 'deliverCode never reached the gate in time',
+      );
+    }
+
+    test(
+      'a duplicate send of the same key, arriving once the ticket has '
+      'committed but before deliverCode returns, replays that ticket '
+      'instead of running the handler again — which would meet the '
+      'resend-delay refusal for a ticket that already exists',
+      () async {
+        const id = 'gated-dup-ok@example.com';
+        app().gatedDelivery.add(id);
+        app().deliveryGate = Completer();
+        final firstFuture = caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-ok',
+        );
+        await waitForDeliveryToStart(id);
+        final during = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-ok',
+        );
+        expect(during.status, 200);
+        expect(
+          (during.response as DwApiOk).replayed,
+          isTrue,
+          reason: 'replayed — the handler did not run a second time',
+        );
+        final duringTicket = during.value(anyRequest);
+        app().deliveryGate.complete();
+        final first = await firstFuture;
+        expect(first.status, 200);
+        expect(first.value(anyRequest).id, duringTicket.id);
+        final tickets = await harness().db.query(
+          'SELECT count(*) AS n FROM dw_code_ticket WHERE identifier = @id',
+          params: {'id': id},
+        );
+        expect(
+          tickets.single.get<int>('n'),
+          1,
+          reason: 'one ticket — the duplicate never ran the handler at all',
+        );
+        // The provisional row is not a transient thing that only answers
+        // while delivery is still in flight: a send after everything has
+        // settled still replays the same ticket.
+        final after = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-ok',
+        );
+        expect(after.value(anyRequest).id, duringTicket.id);
+        expect((after.response as DwApiOk).replayed, isTrue);
+      },
+    );
+
+    test(
+      'a duplicate send of the same key, arriving after delivery failed, '
+      'meets the resend-delay refusal — never a stale "ok" for a code that '
+      'was never sent',
+      () async {
+        const id = 'gated-dup-fail@example.com';
+        app().gatedDelivery.add(id);
+        app().deliveryGate = Completer();
+        app().failingDelivery.add(id);
+        final firstFuture = caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-fail',
+        );
+        await waitForDeliveryToStart(id);
+        app().deliveryGate.complete();
+        final first = await firstFuture;
+        expect(first.status, 500);
+        final second = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-fail',
+        );
+        expect(
+          second.status,
+          429,
+          reason:
+              'the ticket is real and counted against the limit; a resend '
+              'must wait it out, like any other — an incident is never '
+              'stored under the idempotency key, so this reruns the '
+              'handler rather than replaying anything',
+        );
+      },
+    );
+
+    test(
+      'a duplicate send of the same key, arriving after deliverCode '
+      'refused, gets that refusal too — the provisional success is '
+      'overwritten, not left standing',
+      () async {
+        const id = 'gated-dup-refused@example.com';
+        app().gatedDelivery.add(id);
+        app().deliveryGate = Completer();
+        app().refusingDelivery.add(id);
+        final firstFuture = caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-refused',
+        );
+        await waitForDeliveryToStart(id);
+        app().deliveryGate.complete();
+        final first = await firstFuture;
+        expect(first.status, 422);
+        expect(
+          first.refusal,
+          DwCallRefusal(DwCoreRefusal.invalid, field: 'identifier'),
+        );
+        final replay = await caller.call(
+          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          key: 'dup-key-refused',
+        );
+        expect(
+          replay.status,
+          422,
+          reason:
+              'the provisional "ok" this ticket recorded before delivery '
+              'was attempted must have been overwritten by the refusal — '
+              'not left as a stale success for a code that was refused',
+        );
+        expect(replay.refusal, first.refusal);
+      },
+    );
   });
 
   test(
@@ -225,7 +409,8 @@ void main() {
     },
   );
 
-  test('a fixed code skips delivery and signs in', () async {
+  test('a fixed code can skip delivery — deliverCode decides, not the '
+      'framework', () async {
     final deliveries = app().deliveredTo.length;
     final ticket = (await requestCode(TestApp.reviewer)).value(anyRequest);
     expect(app().deliveredTo.length, deliveries);
@@ -240,6 +425,79 @@ void main() {
       ),
       reason: 'a sign-up that sent nothing is still a sign-in',
     );
+  });
+
+  test('a fixed code can also be delivered — generateCode and deliverCode are '
+      'independent (issue #310)', () async {
+    final ticket = (await requestCode(TestApp.reviewerSent)).value(anyRequest);
+    expect(app().deliveredTo, contains(TestApp.reviewerSent));
+    expect(app().delivered[TestApp.reviewerSent], '111111');
+    final session = (await verify(ticket.id, '111111')).value(anyVerify);
+    expect(session.isNewAccount, isTrue);
+  });
+
+  test('dwRandomCode draws digits-only codes of the requested length', () {
+    // Deterministic: a format check, not a claim about randomness — nothing
+    // here can fail while the generator is correct, whatever it draws.
+    for (final length in [4, 6, 8, 12]) {
+      for (var i = 0; i < 50; i++) {
+        expect(dwRandomCode(length), matches(RegExp('^\\d{$length}\$')));
+      }
+    }
+  });
+
+  test('dwRandomCode is not stuck on one value', () {
+    // Not "no two of N collide" — with a 6-digit code that has a real, if
+    // small, chance of failing on entirely correct code (the birthday bound
+    // on 20 draws over 10^6 outcomes is already worth avoiding). Drawing far
+    // more and asking only for more than one distinct value keeps the same
+    // intent — the generator is not returning a constant — at a false-failure
+    // probability indistinguishable from zero.
+    final codes = {for (var i = 0; i < 300; i++) dwRandomCode(6)};
+    expect(codes.length, greaterThan(1));
+  });
+
+  test('a project that sets no generateCode at all gets a random code of '
+      "codeLength digits, through the real server's default path", () async {
+    // TestApp's own `generateCode` is always set (it needs to answer
+    // `reviewer`/`reviewerSent`, and everyone else gets `null`, which
+    // already exercises the framework's fallback — see the two tests
+    // above). What TestApp cannot exercise is `auth.generateCode` being
+    // unset entirely, so this builds a server with a `DwAuthConfig` of its
+    // own: no `generateCode` field at all, and a `codeLength` (8) that is
+    // not TestApp's default (6) — proving the fallback reads `codeLength`
+    // itself rather than a length baked in somewhere.
+    final testApp = TestApp();
+    final delivered = <String, String>{};
+    final isolated = await Harness.start(
+      app: testApp,
+      build: (app, config) => app.server(
+        config,
+        auth: DwAuthConfig(
+          normalize: (kind, raw) => raw.trim().toLowerCase(),
+          deliverCode: (ctx, kind, identifier, code, accountId) async {
+            delivered[identifier] = code;
+          },
+          codeLength: 8,
+        ),
+      ),
+    );
+    try {
+      final isolatedCaller = isolated.caller();
+      final codes = <String>{};
+      for (var i = 0; i < 5; i++) {
+        final identifier = 'nogenerate$i@example.com';
+        (await isolatedCaller.call(
+          DwRequestCode(kind: DwIdentifierKind.email, identifier: identifier),
+        )).value(anyRequest);
+        final code = delivered[identifier]!;
+        expect(code, matches(RegExp(r'^\d{8}$')));
+        codes.add(code);
+      }
+      expect(codes.length, greaterThan(1));
+    } finally {
+      await isolated.stop();
+    }
   });
 
   test('two tickets of one new identifier verified at once create one '

@@ -543,6 +543,30 @@ final class CountOutside extends DwActionCommand<int> {
       CountOutside(json['label']! as String);
 }
 
+/// A `transactional: false` command whose handler increments [label] in
+/// `counter`, calls the internal `recordProvisionalOutcome` hook from
+/// inside that same transaction, then waits on `TestApp.provisionalGate`
+/// before finishing — so a test can check the provisional row's visibility
+/// while the transaction is still open, and what is left of it once the
+/// transaction either commits or a refusal (`mode: 'refuse'`) rolls it back
+/// before it ever does. Review round 4's own regression: the provisional
+/// write must live in that transaction, not escape it.
+final class CountProvisional extends DwActionCommand<int> {
+  const CountProvisional(this.label, {this.mode = 'ok'});
+
+  final String label;
+  final String mode;
+
+  @override
+  String get dwTypeName => 'CountProvisional';
+
+  @override
+  Map<String, Object?> toJson() => {'label': label, 'mode': mode};
+
+  static CountProvisional fromJson(Map<String, Object?> json) =>
+      CountProvisional(json['label']! as String, mode: json['mode']! as String);
+}
+
 /// Another command type, for key reuse across types.
 final class Ping extends DwActionCommand<String> {
   const Ping();
@@ -824,6 +848,10 @@ final DwWireProtocol testProtocol = DwWireProtocol([
   DwProtocolEntry<PublishAndEnd>('PublishAndEnd', PublishAndEnd.fromJson),
   DwProtocolEntry<Count>('Count', Count.fromJson),
   DwProtocolEntry<CountOutside>('CountOutside', CountOutside.fromJson),
+  DwProtocolEntry<CountProvisional>(
+    'CountProvisional',
+    CountProvisional.fromJson,
+  ),
   DwProtocolEntry<Ping>('Ping', Ping.fromJson),
   DwProtocolEntry<NeedsAccount>('NeedsAccount', NeedsAccount.fromJson),
   DwProtocolEntry<RevokeNotes>('RevokeNotes', RevokeNotes.fromJson),

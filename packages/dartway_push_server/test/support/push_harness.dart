@@ -234,7 +234,7 @@ final class PushHarness {
           database: config,
           auth: DwAuthConfig(
             normalize: (kind, raw) => raw.trim().toLowerCase(),
-            deliverCode: (ctx, kind, identifier, code) async {},
+            deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),
           handlers: [queueAlertHandler],
           modules: [module],

@@ -416,8 +416,14 @@ it. `DwAuthConfig` in `lib/src/`:
 
 - `normalize` — the one form of an identifier, the same function the app applies (it lives in
   `__SHARED_PKG__`);
-- `deliverCode` — sends the code (SMS, e-mail); runs inside the transaction recording the ticket;
-- `fixedCode` — a fixed code for store reviewers and test accounts;
+- `generateCode` — the code this request gets; `null` (the default) draws random digits. A project
+  returns one of its own for a fixed code — store reviewers, test accounts, a default code out of
+  its own settings;
+- `deliverCode` — sends the code (SMS, e-mail); called **always**, after the ticket's own
+  transaction has committed (`ctx.db` here is a fresh pooled connection, not that transaction),
+  whatever the code is — deciding not to send (a fixed code, most often) is this hook's own choice,
+  independent of `generateCode` (issue #310). A throw or a refusal here no longer undoes the
+  ticket — it is already written and counted against the limit;
 - **`onAccountCreated(ctx, accountId, kind, identifier, origin)` creates the project's profile row in
   the same transaction** as the account, so a signed-in account without a profile cannot exist.
   `origin` is `DwSignInOrigin(registration)` — what the app sent with the code, the place to check

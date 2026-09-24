@@ -1,17 +1,39 @@
+import 'dart:math';
+
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import '../context/dw_call_context.dart';
 
+final Random _codeRandom = Random.secure();
+
+/// A random code of [length] digits — what `_requestCode` draws when
+/// `DwAuthConfig.generateCode` is unset, or returns `null` for a call. A
+/// project's own hook does not call this to fall back to the default: it
+/// returns `null` and the framework does, with `codeLength`, so the two
+/// cannot disagree. Exported anyway, for the rarer case of a project drawing
+/// a code of the same shape somewhere `generateCode` is not — a one-off
+/// support tool, say.
+String dwRandomCode(int length) =>
+    List.generate(length, (_) => _codeRandom.nextInt(10)).join();
+
 /// Sign-in by one-time code, configured by the project.
 ///
-/// The framework owns accounts, identities and session keys; the project owns
-/// what an identifier looks like ([normalize]), how a code reaches a person
-/// ([deliverCode]) and what an account means to it ([onAccountCreated]).
+/// The framework owns accounts, identities and session keys, the ticket, its
+/// hash, its lifetime and the request limits; the project owns what an
+/// identifier looks like ([normalize]), what code a request gets
+/// ([generateCode]) and how that code reaches a person ([deliverCode]).
+/// **The two are independent** (issue #310): the framework used to infer "do
+/// not send" from "the code was not random" — a project whose fixed code also
+/// had to be sent (SMS turned on for a default code out of its own settings,
+/// say) had no way to say so without working around [deliverCode] entirely.
+/// Now [generateCode] only picks the code, [deliverCode] always runs, and
+/// "send nowhere" (a test account's fixed code, most often) is a decision
+/// [deliverCode] makes for itself.
 final class DwAuthConfig {
   const DwAuthConfig({
     required this.normalize,
     required this.deliverCode,
-    this.fixedCode,
+    this.generateCode,
     this.onAccountCreated,
     this.onIdentifierChanged,
     this.onAccountDeleting,
@@ -32,37 +54,67 @@ final class DwAuthConfig {
   /// (answered `dw.invalid` on field `identifier`).
   final String? Function(DwIdentifierKind kind, String raw) normalize;
 
-  /// Sends [code] to [identifier]. Runs inside the transaction that records
-  /// the ticket: when delivery throws, no ticket exists and the request does
-  /// not count against the limit. Never log the code.
+  /// Called **always**, whatever [code] is — generated or returned by
+  /// [generateCode]. Never log the code.
   ///
-  /// Called for sign-in codes (`DwRequestCode`, `ctx.accountId` is `null`)
-  /// and for codes confirming an identifier a signed-in account attaches
-  /// (`DwRequestIdentifierCode`, `ctx.accountId` is that account) — the place
-  /// to word the two messages differently.
+  /// Deciding not to send — a store reviewer's or a test account's fixed
+  /// code, most often — is this hook's to make, by simply returning without
+  /// sending anything; the framework no longer makes that decision for it by
+  /// withholding the call.
+  ///
+  /// **Runs after the ticket's own transaction has committed, not inside
+  /// it.** [DwCallContext.db] here is a fresh connection from the pool, not
+  /// the one the ticket was written on — this hook may still use `ctx.db`
+  /// (and `ctx.transaction` for one of its own, if it writes anything), but
+  /// it is not the same transaction, and does not see writes from it that
+  /// have not committed (which is none, since it has committed by the time
+  /// this runs). The point of the split: a project's `deliverCode` is
+  /// typically an HTTP call to a provider, and running it inside the
+  /// ticket's transaction — under the identifier's advisory lock — would
+  /// hold a pooled connection for as long as that call takes, which is how
+  /// one slow provider empties the pool for every caller. **The ticket
+  /// exists, and already counts against the limit, before this runs** — so
+  /// throwing here (a provider timeout, say) does not undo it: the caller
+  /// sees an incident (or a refusal, thrown as [DwRefusalException]) and
+  /// waits out [resendDelay] for another attempt, the same as any resend.
+  ///
+  /// [accountId] is the account [identifier] already belongs to, or `null`
+  /// for one no account has yet — the same value [generateCode] was asked
+  /// with, so a hook that skips sending for an account's own fixed code can
+  /// look that account up again the same way [generateCode] did, without the
+  /// two having to agree through anything but this parameter. Looking it up
+  /// twice is one lookup with `ctx.memo`.
   final Future<void> Function(
     DwCallContext ctx,
     DwIdentifierKind kind,
     String identifier,
     String code,
+    int? accountId,
   )
   deliverCode;
 
-  /// A code that is accepted instead of a delivered one — for store reviewers
-  /// and test accounts. [accountId] is the account the identifier belongs to,
-  /// or `null`. Returning a code skips delivery.
+  /// The code this request gets, or `null` to draw [codeLength] random
+  /// digits ([dwRandomCode]) — the same fallback whether [generateCode]
+  /// itself is unset or is set and returns `null` for this call, so a hook
+  /// that fixes the code for a few identifiers and leaves the rest to the
+  /// framework does not have to call [dwRandomCode] itself, or hard-code a
+  /// length that then disagrees with [codeLength]. A project returns a code
+  /// of its own for a fixed one — a store reviewer, a test account, a
+  /// default code out of its own settings — and [deliverCode] decides,
+  /// independently, whether that code goes anywhere.
   ///
-  /// Asked for sign-in codes and for the codes of `DwRequestIdentifierCode`
-  /// alike; in the second case `ctx.accountId` is the signed-in caller
-  /// attaching the identifier (it is `null` for a sign-in), as it is in
-  /// [deliverCode].
+  /// Asked for sign-in codes (`DwRequestCode`) and for the codes of
+  /// `DwRequestIdentifierCode` alike. [accountId] is the account [identifier]
+  /// already belongs to, or `null` for one no account has yet — not the
+  /// caller attaching it, which is `ctx.accountId` where that matters (an
+  /// attach request only, `null` for a sign-in).
   final Future<String?> Function(
     DwCallContext ctx,
     DwIdentifierKind kind,
     String identifier,
     int? accountId,
   )?
-  fixedCode;
+  generateCode;
 
   /// Runs in the transaction that creates an account for an identifier: the
   /// place to insert the project's profile. [origin] says who created it — a

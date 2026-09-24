@@ -367,25 +367,24 @@ void main() {
       expect((await requestAttach(harness().caller(), id)).status, 401);
     });
 
-    test(
-      'the fixed code hook applies, and sees the attaching caller',
-      () async {
-        final (caller, session) = await harness().signedIn('fixed@example.com');
-        final deliveries = app().deliveredTo.length;
-        final ticket = (await requestAttach(
-          caller,
-          TestApp.reviewer,
-        )).value(anyTicket);
-        expect(app().deliveredTo.length, deliveries, reason: 'not delivered');
-        expect(app().codeCallers[TestApp.reviewer], session.id);
-        final identity = (await confirm(
-          caller,
-          ticket.id,
-          '000000',
-        )).value(anyConfirm);
-        expect(identity.value, TestApp.reviewer);
-      },
-    );
+    test('a fixed code (generateCode) applies, and both it and deliverCode see '
+        'the attaching caller', () async {
+      final (caller, session) = await harness().signedIn('fixed@example.com');
+      final deliveries = app().deliveredTo.length;
+      final ticket = (await requestAttach(
+        caller,
+        TestApp.reviewer,
+      )).value(anyTicket);
+      expect(app().deliveredTo.length, deliveries, reason: 'not delivered');
+      expect(app().generateCodeCallers[TestApp.reviewer], session.id);
+      expect(app().codeCallers[TestApp.reviewer], session.id);
+      final identity = (await confirm(
+        caller,
+        ticket.id,
+        '000000',
+      )).value(anyConfirm);
+      expect(identity.value, TestApp.reviewer);
+    });
 
     test(
       'a hook that throws undoes the change and leaves the ticket usable',

@@ -20,19 +20,18 @@ abstract final class ExampleAuth {
       DwIdentifierKind.email => null, // the club signs in by phone only
     },
 
-    // The example sends no SMS: the code is written to the server log, which is
-    // enough to sign in locally. A real project delivers it here.
-    deliverCode: (ctx, kind, identifier, code) async =>
-        stdout.writeln('Sign-in code for $identifier: $code'),
+    // Demo personas and store reviewers sign in with a fixed code set on
+    // their profile; everyone else gets `null` — the framework's own
+    // default, `codeLength` random digits (6, left unset here).
+    generateCode: (ctx, kind, identifier, accountId) =>
+        ExampleAuth._testCode(ctx, accountId),
 
-    // Demo personas and store reviewers sign in with a fixed code set on their
-    // profile.
-    fixedCode: (ctx, kind, identifier, accountId) async {
-      if (accountId == null) return null;
-      final profile = await ctx.db.userProfiles.findFirst(
-        where: (t) => t.accountId.equals(accountId),
-      );
-      return profile?.testVerificationCode;
+    // The example sends no SMS: the code is written to the server log, which
+    // is enough to sign in locally. A real project delivers it here — except
+    // a demo persona's or a store reviewer's fixed code, which goes nowhere.
+    deliverCode: (ctx, kind, identifier, code, accountId) async {
+      if (await ExampleAuth._testCode(ctx, accountId) != null) return;
+      stdout.writeln('Sign-in code for $identifier: $code');
     },
 
     // The profile is created with the account, in the same transaction: a
@@ -132,6 +131,19 @@ abstract final class ExampleAuth {
         ..publish(adminChannel, profile);
     },
   );
+
+  /// [accountId]'s fixed sign-in code, or `null` for an account without one
+  /// (every ordinary member) or no account at all. Cached on [ctx]: both
+  /// `generateCode` and `deliverCode` ask this in the same request, and it is
+  /// one query either way.
+  static Future<String?> _testCode(DwCallContext ctx, int? accountId) =>
+      ctx.memo(#exampleTestCode, () async {
+        if (accountId == null) return null;
+        final profile = await ctx.db.userProfiles.findFirst(
+          where: (t) => t.accountId.equals(accountId),
+        );
+        return profile?.testVerificationCode;
+      });
 
   /// The profile a new account starts with. Separate from the hook so tools that
   /// create accounts without a running server (the dev seed) create the same row.

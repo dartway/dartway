@@ -501,8 +501,8 @@ Framework tables (framework migrations, namespace `dw`): `dw_account`, `dw_ident
 ```dart
 final exampleAuth = DwAuthConfig(
   normalize: (kind, raw) => …,                       // required: String? (null = invalid identifier → dw.invalid)
-  deliverCode: (ctx, kind, identifier, code) async { … },        // ctx.accountId: null for sign-in, the attaching account otherwise
-  fixedCode: (ctx, kind, identifier, accountId) async => null,   // reviewer/test codes; asked for both purposes
+  generateCode: (ctx, kind, identifier, accountId) async => null,            // null = framework draws codeLength random digits; return your own for a reviewer/test code; accountId = who identifier already belongs to, or null
+  deliverCode: (ctx, kind, identifier, code, accountId) async { … },          // called always, after the ticket's transaction has committed; decide "send nowhere" here (issue #310)
   onAccountCreated: (ctx, accountId, kind, identifier, origin) async { … },   // same transaction; origin: DwSignInOrigin(registration) | DwToolOrigin()
   onIdentifierChanged: (ctx, change) async { … },    // same transaction; DwIdentifierChange(accountId, kind, cause, previous, current)
   codeLength: 6, codeLifetime: Duration(minutes: 10),

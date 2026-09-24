@@ -19,7 +19,7 @@ void main() {
     database: database,
     auth: DwAuthConfig(
       normalize: (kind, raw) => raw,
-      deliverCode: (ctx, kind, identifier, code) async {},
+      deliverCode: (ctx, kind, identifier, code, accountId) async {},
     ),
     handlers: handlers,
     jobs: jobs,
