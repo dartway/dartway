@@ -270,7 +270,7 @@ bool _isAction(DwUpdateMessage message) => message.updates.objects.any(
 DwAuthConfig _announcingNewcomers(DwAuthConfig base) => DwAuthConfig(
   normalize: base.normalize,
   deliverCode: base.deliverCode,
-  fixedCode: base.fixedCode,
+  generateCode: base.generateCode,
   onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
     await base.onAccountCreated!(ctx, accountId, kind, identifier, origin);
     ctx.publish(_staff, NoteView(id: accountId, text: 'newcomer $identifier'));

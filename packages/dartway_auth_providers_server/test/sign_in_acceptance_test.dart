@@ -297,7 +297,7 @@ final class _ProviderHarness {
           database: database.config,
           auth: DwAuthConfig(
             normalize: (kind, raw) => raw.trim().toLowerCase(),
-            deliverCode: (ctx, kind, identifier, code) async {},
+            deliverCode: (ctx, kind, identifier, code, accountId) async {},
             onExternalAccountCreated:
                 (ctx, accountId, provider, subject, registration) async {
                   harness.created.add((

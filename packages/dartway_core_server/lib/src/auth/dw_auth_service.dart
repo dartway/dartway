@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -33,8 +32,6 @@ final class DwAuthService {
 
   DwAuthConfig get auth => runtime.auth;
   DwSessionCache get _sessions => runtime.sessions;
-
-  static final Random _random = Random.secure();
 
   /// Tokens longer than this are rejected without hashing or a query.
   static const int maxTokenLength = 256;
@@ -231,10 +228,9 @@ final class DwAuthService {
     }
 
     final accountId = await dwAccountOf(ctx.db, kind, identifier);
-    final fixed = await auth.fixedCode?.call(ctx, kind, identifier, accountId);
     final code =
-        fixed ??
-        List.generate(auth.codeLength, (_) => _random.nextInt(10)).join();
+        await auth.generateCode?.call(ctx, kind, identifier, accountId) ??
+        dwRandomCode(auth.codeLength);
     final ticketId = DwAuthStore.randomToken(16);
     final ticket = (await ctx.db.query(
       'INSERT INTO dw_code_ticket '
@@ -253,9 +249,7 @@ final class DwAuthService {
         'account': attachingAccount,
       },
     )).single;
-    if (fixed == null) {
-      await auth.deliverCode(ctx, kind, identifier, code);
-    }
+    await auth.deliverCode(ctx, kind, identifier, code, accountId);
     return DwCodeTicket(
       id: ticketId,
       expiresAt: ticket.get<DateTime>('expires_at'),

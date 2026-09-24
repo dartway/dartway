@@ -3,6 +3,7 @@
 ## 0.21.0-dev.1
 
 - Nothing changed here; the family moves in lockstep with `dartway_client`, fixed for #309.
+- **BREAKING: `DwAuthConfig.fixedCode` is gone; `generateCode` and `deliverCode` are independent** (#310, D-087). `generateCode(ctx, kind, identifier, accountId)` decides the code — `null` (the default) draws `codeLength` random digits, exported as `dwRandomCode`; `deliverCode(ctx, kind, identifier, code, accountId)` now runs **always**, after the ticket, whatever the code is, and decides for itself whether to send it. The framework used to infer "do not send" from "the code was not random" — a fixed code that also had to be sent (a default code out of a project's own settings, SMS turned on for it) could not be expressed without working around `deliverCode` entirely. Migration note: `docs/migrations/2026-09-24-auth-generate-deliver-code.md`.
 
 ## 0.20.0
 

@@ -93,7 +93,7 @@ final class AnalyticsHarness {
           database: database.config,
           auth: DwAuthConfig(
             normalize: (kind, raw) => raw.trim().toLowerCase(),
-            deliverCode: (ctx, kind, identifier, code) async {},
+            deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),
           handlers: [placeOrderHandler],
           modules: [DwAnalyticsModule(settings: settings)],

@@ -28,10 +28,11 @@ DwAuthConfig({
   required String? Function(DwIdentifierKind kind, String raw) normalize,
   required Future<void> Function(
     DwCallContext ctx, DwIdentifierKind kind, String identifier, String code,
+    int? accountId,
   ) deliverCode,
-  Future<String?> Function(
+  Future<String> Function(
     DwCallContext ctx, DwIdentifierKind kind, String identifier, int? accountId,
-  )? fixedCode,
+  )? generateCode,
   Future<void> Function(
     DwCallContext ctx, int accountId, DwIdentifierKind kind, String identifier,
     DwAccountOrigin origin,
@@ -50,8 +51,8 @@ DwAuthConfig({
 | Field | What it decides |
 |---|---|
 | `normalize` | The canonical form of an identifier (`79991234567`, a lower-cased e-mail), or `null` when `raw` is not a valid one of that kind — answered `dw.invalid` on field `identifier`. Every lookup, lock and rate limit reads the normalized value, so `Ivan@` and `ivan@` cannot become two accounts or two rate-limit buckets. The app should normalize with the same function; the skeleton shares `AuthIdentifier.normalize` from its shared package. |
-| `deliverCode` | Sends the code. Runs inside the transaction that records the ticket: when it throws, no ticket exists and the request does not count against the limit. `ctx.accountId` is `null` for a sign-in and the caller's account for an identifier being attached — the place to word the two messages differently. Never log the code. |
-| `fixedCode` | A code accepted instead of a delivered one, for store reviewers, demo personas and end-to-end tests; `accountId` is the account the identifier belongs to, or `null`. Returning a code skips delivery. |
+| `deliverCode` | Sends `code`. Called **always**, after the ticket is recorded — whatever `code` is, generated or returned by `generateCode` — so deciding not to send (a store reviewer's or a test account's fixed code, most often) is this hook's own choice, not something withholding the call decides for it. Runs inside the transaction that records the ticket: when it throws, no ticket exists and the request does not count against the limit. `accountId` is the account `identifier` already belongs to, or `null` — the same value `generateCode` was asked with. Never log the code. |
+| `generateCode` | The code this request gets. `null` (the default) draws `codeLength` random digits (`dwRandomCode`, exported for reuse); a project returns one of its own for a fixed code — a store reviewer, a test account, a default code out of its own settings — and `deliverCode` decides, independently, whether that code goes anywhere (issue #310: the two used to be coupled — a fixed code skipped `deliverCode` outright, so a fixed code that also had to be sent could not be expressed). |
 | `onAccountCreated` | Runs in the transaction that creates an account: the place to insert the profile. Refusing here refuses the sign-in, nothing is created, and the code stays usable. `origin` says who created the account (below). |
 | `onIdentifierChanged` | Runs in the transaction that changes an existing account's identifiers, once per account and identifier affected, after the change: the place to mirror an identifier into project rows, or to publish. Throwing undoes the change. Not called for the identity an account is created with, nor when a sign-in re-verifies an identifier the account already has. |
 | `codeLength` | Digits in a delivered code, 4 to 12. |

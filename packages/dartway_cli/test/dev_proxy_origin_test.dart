@@ -34,7 +34,7 @@ void main() {
           database: database.config.copyWith(maxConnections: 2),
           auth: DwAuthConfig(
             normalize: (kind, raw) => raw.trim().toLowerCase(),
-            deliverCode: (ctx, kind, identifier, code) async {},
+            deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),
           handlers: const [],
           logger: const _Silent(),

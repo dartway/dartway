@@ -225,7 +225,8 @@ void main() {
     },
   );
 
-  test('a fixed code skips delivery and signs in', () async {
+  test('a fixed code can skip delivery — deliverCode decides, not the '
+      'framework', () async {
     final deliveries = app().deliveredTo.length;
     final ticket = (await requestCode(TestApp.reviewer)).value(anyRequest);
     expect(app().deliveredTo.length, deliveries);
@@ -241,6 +242,37 @@ void main() {
       reason: 'a sign-up that sent nothing is still a sign-in',
     );
   });
+
+  test(
+    'a fixed code can also be delivered — generateCode and deliverCode are '
+    'independent (issue #310)',
+    () async {
+      final ticket = (await requestCode(
+        TestApp.reviewerSent,
+      )).value(anyRequest);
+      expect(app().deliveredTo, contains(TestApp.reviewerSent));
+      expect(app().delivered[TestApp.reviewerSent], '111111');
+      final session = (await verify(ticket.id, '111111')).value(anyVerify);
+      expect(session.isNewAccount, isTrue);
+    },
+  );
+
+  test(
+    'a project that does not set generateCode gets a random code of '
+    'codeLength digits',
+    () {
+      // The harness's own `generateCode` calls `dwRandomCode` for every
+      // identifier but the two fixed ones — this is that helper, unmediated:
+      // the framework's actual default when a project sets no `generateCode`
+      // at all.
+      final codes = {for (var i = 0; i < 20; i++) dwRandomCode(6)};
+      for (final code in codes) {
+        expect(code, matches(RegExp(r'^\d{6}$')));
+      }
+      // 20 draws of 6 digits colliding would be a broken generator, not luck.
+      expect(codes, hasLength(20));
+    },
+  );
 
   test('two tickets of one new identifier verified at once create one '
       'account', () async {

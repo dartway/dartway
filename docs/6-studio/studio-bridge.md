@@ -15,7 +15,8 @@ mounted in `MaterialApp.builder`. It attaches the bridge, reports the route (pat
 name), the features mounted on screen, the session and the language, and executes what Studio asks
 — navigate, switch persona, change language. Who is signed in comes from the project's own provider
 (`user:`), mapped to `DwStudioUser`; the persona switch runs the app's regular sign-in by code with
-the code Studio holds (`DwAuthConfig.fixedCode` accepts it), so the app ships no test users.
+the code Studio holds (the server's `DwAuthConfig.generateCode` returns it for that account), so
+the app ships no test users.
 
 `deploy run` passes the build the address it answers on as `STUDIO_APP_ORIGIN`, which
 `studioSignedAccessValidator` checks a connecting Studio's token against: a token taken from one

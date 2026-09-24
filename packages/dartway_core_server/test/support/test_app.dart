@@ -106,8 +106,8 @@ final class TestApp {
   final Map<String, String> delivered = {};
   final List<String> deliveredTo = [];
 
-  /// identifier → `ctx.accountId` of the last `deliverCode` or `fixedCode`
-  /// for it: the caller attaching it, `null` for a sign-in.
+  /// identifier → `ctx.accountId` on the last `deliverCode` for it: the
+  /// caller attaching it, `null` for a sign-in.
   final Map<String, int?> codeCallers = {};
 
   /// Identifiers whose delivery throws.
@@ -159,6 +159,10 @@ final class TestApp {
 
   static const reviewer = 'reviewer@example.com';
 
+  /// A fixed code that is, unlike [reviewer]'s, still sent — proves
+  /// `generateCode` and `deliverCode` decide independently (issue #310).
+  static const reviewerSent = 'reviewer-sent@example.com';
+
   DwAuthConfig auth({
     Duration resendDelay = const Duration(seconds: 30),
     int maxRequestsPerWindow = 3,
@@ -173,18 +177,26 @@ final class TestApp {
           RegExp(r'^\+\d{6,15}$').hasMatch(value) ? value : null,
       };
     },
-    deliverCode: (ctx, kind, identifier, code) async {
+    deliverCode: (ctx, kind, identifier, code, accountId) async {
+      // The caller attaching the identifier (null for a sign-in) — not
+      // [accountId], which is who the identifier already belongs to.
+      codeCallers[identifier] = ctx.accountId;
+      // `reviewer`'s fixed code goes nowhere — its own decision, made here
+      // rather than by the framework withholding the call.
+      if (identifier == reviewer) return;
       if (failingDelivery.contains(identifier)) {
         throw StateError('delivery provider is down');
       }
       delivered[identifier] = code;
       deliveredTo.add(identifier);
-      codeCallers[identifier] = ctx.accountId;
     },
-    fixedCode: (ctx, kind, identifier, accountId) async {
-      if (identifier != reviewer) return null;
-      codeCallers[identifier] = ctx.accountId;
-      return '000000';
+    generateCode: (ctx, kind, identifier, accountId) async => switch (identifier) {
+      reviewer => '000000',
+      reviewerSent => '111111',
+      // The framework's own default, called out here so a project that wants
+      // it for most identifiers and something else for a few does not have
+      // to reimplement it.
+      _ => dwRandomCode(6),
     },
     onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
       createdAccounts.add(accountId);
