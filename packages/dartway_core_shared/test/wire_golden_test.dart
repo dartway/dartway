@@ -285,6 +285,7 @@ List<_WireShape> _wireShapes() {
           DwHttpContract.idempotencyKeyHeader,
           DwHttpContract.protocolHeader,
           DwHttpContract.appVersionHeader,
+          DwHttpContract.contractVersionHeader,
           DwHttpContract.liveConnectionHeader,
           DwHttpContract.retryAfterHeader,
           DwHttpContract.contentTypeHeader,
@@ -297,8 +298,14 @@ List<_WireShape> _wireShapes() {
           DwHttpContract.afterParameter,
           DwHttpContract.liveProtocolParameter,
           DwHttpContract.liveAppVersionParameter,
+          DwHttpContract.liveContractVersionParameter,
         ],
       },
+    ),
+    _WireShape(
+      'http.contractVersion',
+      () => DwContractVersion('0.7.2').toString(),
+      readBack: (json) => DwContractVersion.parse(json! as String).toString(),
     ),
     _WireShape(
       'http.appVersion',

@@ -2,6 +2,7 @@
 
 ## 0.20.0-dev.4
 
+- `DwFakeServer` answers a malformed `Dw-Contract-Version` as the real server does — a malformed call (`400`), and a `protocolError` close on the socket — rather than as an old app.
 - **Calls and the live socket carry the contract version** of the protocol the client is built with (#296). **BREAKING (testing):** `DwFakeServer.minAppBuild` is `DwFakeServer.contractVersion` — set a newer breaking line to play a server that moved on. Migration note: `docs/migrations/2026-09-24-contract-version.md`.
 
 ## 0.20.0-dev.3

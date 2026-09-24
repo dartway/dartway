@@ -21,6 +21,7 @@ const String wireGolden = r'''
         "Dw-Idempotency-Key",
         "Dw-Protocol",
         "Dw-App-Version",
+        "Dw-Contract-Version",
         "Dw-Live-Connection",
         "Retry-After",
         "Content-Type"
@@ -32,9 +33,11 @@ const String wireGolden = r'''
         "before",
         "after",
         "protocol",
-        "app"
+        "app",
+        "contract"
       ]
     },
+    "http.contractVersion": "0.7.2",
     "http.appVersion": "1.4.2+87",
     "http.closeCodes": {
       "serverStopping": 1001,
