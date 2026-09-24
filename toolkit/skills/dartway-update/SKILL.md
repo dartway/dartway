@@ -214,3 +214,20 @@ person doing this update on another project reads that as the first data point.
 - protocol version: moved or not, and what that means for installed apps;
 - checks: what is green, and what was already red before this started;
 - anything filed to `__NOTES_TRACKER__`.
+
+## Old shapes: a project that lives by an older version of a law
+
+A law is written for a clean start, and says nothing to a project that already grew under the previous wording. Two rules cover that gap:
+
+- **Legacy moves as you touch it, never as a sweep.** Refactored a feature — bring along what it drags with it. Converting a whole folder at once is a separate task a human asks for.
+- **A gap you left is said out loud.** Decided not to touch the legacy — say so in the report.
+
+An entry below answers three things, in this order: **how to tell** the project still has the old shape (something greppable), **what the target is**, and **what to do with what has already accumulated**. Delete an entry once no project is on the old shape.
+
+- **Blocks inside zones → `lib/shared/` (feature law).** *You have the old shape if:* a zone contains a `common/`, `shared/` or `widgets/` folder, or `dart run dartway_cli:dartway check` reports `featureSpecMissing` for folders whose passport would only restate the class name. *Target:* only features in a zone, building blocks in `lib/shared/`, a block described by a doc comment. *A passport with nothing in it is deleted with the move, not reworded.*
+
+- **State and queries out of zones → `core/` and `shared/` (feature law).** *You have the old shape if:* `dart run dartway_cli:dartway check` reports `notAFeature` — a folder in a zone whose entry point declares no widget. *Target:* state that several features watch is wiring, so `lib/core/`; a helper with no story of its own is a building block, so `lib/shared/`. *What has accumulated:* move it as you touch the feature that reads it — a provider named in tests through `overrideWith` stays a named provider, it just changes address.
+
+- **An unlocalized app → the localization law (the Flutter section of `CLAUDE.md`).** *You have the old shape if:* `dart run dartway_cli:dartway check` reports `l10nNotWired`, or `grep -r 'context\.l10n' __FLUTTER_PKG__/lib` finds nothing while the widgets are full of readable strings. *Target:* the wiring the law lists, and every user-visible string coming from `context.l10n` or `appL10n`. *What has accumulated:* **the wiring goes in one commit, the strings screen by screen.** Every widget test that builds its own `MaterialApp` starts failing at the first lookup — fix it in the shared test harness, not in each test. The first `.arb` is written in whatever language the app's strings are already in, or the migration turns into an unasked-for translation.
+
+- **The two root journals → `docs/dev_notes/` and the tracker.** *You have the old shape if:* `ls dartway_notes.md dev_notes.md` finds either one at the project root. *Target:* a finding about the framework is an issue in the tracker; a finding of this project's own is one tracked file under `docs/dev_notes/`. *What has accumulated:* both journals were git-ignored, so **read them before anything else touches the working copy** — they are the one copy that exists. Every open `dartway_notes.md` entry becomes an issue under the filing rules of `dartway-framework-notes` (entries that already carry an `**Issue:**` line only need their issue's state checked); every open `dev_notes.md` entry becomes a file under `docs/dev_notes/`, and its coverage table moves into `docs/dev_notes/_coverage.md`. Then delete both files and their `.gitignore` lines. `dartway setup-ai` reports the journals while they are still there.

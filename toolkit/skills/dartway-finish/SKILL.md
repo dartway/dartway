@@ -287,7 +287,7 @@ travels out in this pull request like anything else in the diff.
   the code restated so it stands without it, in English, and the `impact:` label proposed with the text
   — what the finding cost this project is known now and not afterwards. Search the tracker first; a gap
   another project has already filed gets a comment, not a second issue. The full rules are in
-  `.claude/CLAUDE.md`, "Notes back to the framework". **This is a proposal like every other one here,
+  `dartway-framework-notes`. **This is a proposal like every other one here,
   never a push that happens on its own** — an issue is public from the moment it exists, so it waits for
   a yes. Where the tracker is `none` the finding goes to `docs/dev_notes/` instead, without an issue line.
 - **A project finding is written down now** as `docs/dev_notes/<slug>.md`: where, what is wrong, what we

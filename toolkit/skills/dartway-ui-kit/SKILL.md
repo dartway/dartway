@@ -209,7 +209,7 @@ AppText.body(post.description)
 AppText.caption('${date.dayLabel} · ${date.timeLabel}')
 ```
 
-**All user-facing text comes from l10n, not from a string literal.** Every DartWay project is localized — a requirement, not a description of how the project started, and if the wiring is missing it is fixed before the strings pile up (see the localization law and its migration entry in `CLAUDE.md`). `AppText.body('Book a spot')` with a hardcoded string desyncs the feature from the rest of the app. Take the text from `context.l10n`:
+**All user-facing text comes from l10n, not from a string literal.** Every DartWay project is localized — a requirement, not a description of how the project started, and if the wiring is missing it is fixed before the strings pile up (see "Localization — the law in full" below, and its old-shape entry in `dartway-update`). `AppText.body('Book a spot')` with a hardcoded string desyncs the feature from the rest of the app. Take the text from `context.l10n`:
 
 ```dart
 final l10n = context.l10n;
@@ -251,6 +251,20 @@ Named constructors give exactly the same call site, but `const` stays legal.
 
 Need a new style — **add a value to `AppTextStyle` and a constructor to `AppText`**, don't write a
 `TextStyle` on the spot.
+
+## Localization — the law in full
+
+**Every project is localized, and user-visible text is never written in code.** This is a requirement on the project, not a report on how it began. What has to be present: `flutter_localizations` and `generate: true` in the Flutter pubspec, `l10n.yaml` and `lib/l10n/*.arb` with its generated output committed beside them, `appLocaleProvider` (the system locale when supported, the first supported one otherwise), `context.l10n` in widgets and `appL10n` for code outside the tree — an error toast, a refusal text. `dart run dartway_cli:dartway check` reports a missing piece as `l10nNotWired`, an error.
+
+**Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Project>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwFlutterConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
+
+**The law reaches as far as the app does, and no further.** Text composed on the *server* — a sign-in code message, an e-mail — is outside it: there is no `appL10n` there. That text has no rule yet, which is a gap named rather than covered; a project sending server-composed text in more than one language decides for itself how, and says so where its next reader will look.
+
+A project with one language keeps one `.arb` and pays nothing. New strings are added to **every** `.arb`, then `flutter gen-l10n` is run and its output committed.
+
+**A widget test mounts three things, not two:** `localizationsDelegates`, `supportedLocales`, **and an explicit `locale:`**. Without the third the test resolves against the locale of the machine it runs on, so an assertion on the skeleton's text passes for the author and fails for whoever else runs the suite. The skeleton's `test/support/` harness does it in one place; the rest is in `dartway-testing`.
+
+**A string the user reads is content, not decoration** — so `ui_kit` may not hold it and a feature may not hardcode it. `AppText.body(context.l10n.issuesTitle)`, never `AppText.body('Issues')`. Outside the kit this is not mechanically enforced (telling `'Issues'` from `'issues/board'` takes reading the meaning); `/dartway-checkup` looks for it. Inside `ui_kit/` `dart run dartway_cli:dartway check` reports it as `uiKitContainsText`; strings in the `fontFamily` and `fontFamilyFallback` positions are exempt.
 
 ## Buttons: `AppButton` + `DwActionBuilder`
 
