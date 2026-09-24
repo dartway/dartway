@@ -48,7 +48,23 @@ Future<void> main(List<String> args) async {
     exit(64);
   }
 
-  final packages = _packages();
+  // Every local package, published or not: `publish_to: none` ones are
+  // excluded from the plan below, but a plan package can still depend on one
+  // — which is exactly the bug this script once had, and `localShapes` is
+  // what lets `unresolvableDependenciesOf` see it.
+  final rawPubspecs = _rawPubspecs();
+
+  final packages = rawPubspecs
+      .where((p) => !p.publishToNone)
+      .map(_Package.new)
+      .toList();
+  final localShapes = {
+    for (final raw in rawPubspecs)
+      raw.name: LocalPackageShape(
+        name: raw.name,
+        publishToNone: raw.publishToNone,
+      ),
+  };
   if (packages.isEmpty) {
     stderr.writeln(
       'No publishable packages found under packages/. '
@@ -58,7 +74,7 @@ Future<void> main(List<String> args) async {
   }
 
   stdout.writeln('Asking $_host about ${packages.length} packages…');
-  final published = <String, Set<String>>{};
+  final published = <String, Map<String, DateTime>>{};
   for (final package in packages) {
     try {
       published[package.name] = await _versionsOf(package.name);
@@ -74,7 +90,9 @@ Future<void> main(List<String> args) async {
   final List<_Package> plan;
   try {
     plan = ReleaseOrder.of(
-      packages.where((p) => !published[p.name]!.contains(p.version)).toList(),
+      packages
+          .where((p) => !published[p.name]!.containsKey(p.version))
+          .toList(),
     );
     ReleaseOrder.verify(plan);
   } on StateError catch (failure) {
@@ -83,6 +101,55 @@ Future<void> main(List<String> args) async {
     // "something is wrong", so it leaves by that door rather than through
     // Dart's uncaught-exception path with a stack trace and code 255.
     stderr.writeln(failure.message);
+    exit(1);
+  }
+
+  // Does every dependency the plan states actually resolve — from the plan
+  // itself, or from what pub.dev already has? Before printing the plan, not
+  // just before publishing it: a plan that cannot work is not a plan to look
+  // at either.
+  final unresolvable = unresolvableDependenciesOf(
+    plan,
+    localPackages: localShapes,
+    pubDevVersions: {
+      for (final MapEntry(key: name, value: versions) in published.entries)
+        name: versions.keys.toSet(),
+    },
+  );
+  if (unresolvable.isNotEmpty) {
+    stderr.writeln(
+      '\nRefusing to plan a release: '
+      '${unresolvable.length} dependency/ies would not resolve.\n',
+    );
+    for (final problem in unresolvable) {
+      stderr.writeln('  - $problem');
+    }
+    exit(1);
+  }
+
+  // A package this run leaves alone because pub.dev already has the version
+  // this tree states — the only place `dartway_shared_preferences`,
+  // `dartway_telegram` and `dartway_studio_bridge` were visible as behind
+  // their own code, before each was found by hand and moved a minor (#307).
+  final unchanged = packages.where(
+    (p) => published[p.name]!.containsKey(p.version),
+  );
+  final stale = staleVersionsAmong(
+    unchanged.map(
+      (p) => (name: p.name, version: p.version, directory: p.directory),
+    ),
+    publishedAt: (name, version) => published[name]?[version],
+    changedPathsSince: _changedPathsSince,
+  );
+  if (stale.isNotEmpty) {
+    stderr.writeln(
+      '\nRefusing to plan a release: '
+      '${stale.length} package(s) changed since the last release without a '
+      'version move.\n',
+    );
+    for (final problem in stale) {
+      stderr.writeln('  - $problem');
+    }
     exit(1);
   }
 
@@ -104,7 +171,7 @@ Future<void> main(List<String> args) async {
     // plan rather than just publishing.
     final was = known.isEmpty
         ? 'NEW — never published'
-        : 'was ${_newest(known)}';
+        : 'was ${_newest(known.keys.toSet())}';
     stdout.writeln(
       '  ${(i + 1).toString().padLeft(2)}. '
       '${p.name.padRight(32)} ${p.version.padRight(9)} ($was)',
@@ -195,14 +262,16 @@ String? _refuseToPublishBecause() {
   return null;
 }
 
-/// Every publishable package in the workspace.
+/// Every `pubspec.yaml` under `packages/`, published or not.
 ///
-/// `publish_to: none` marks the ones that exist to be run rather than depended
-/// on — the `example` apps — and they are skipped by that mark rather than by
-/// name or by count, so the next one needs no edit here. (The comment used to
-/// say "the two", and there were three by the time anyone read it.)
-List<_Package> _packages() {
-  final found = <_Package>[];
+/// `publish_to: none` used to be the filter applied *here*, which is exactly
+/// how a `publish_to: none` package went missing from the whole script rather
+/// than merely from what it publishes: nothing downstream could tell "this
+/// dependency is already out" from "this dependency does not exist in this
+/// tree at all, and never can". Both are now kept, on every raw entry, so
+/// `unresolvableDependenciesOf` can tell them apart.
+List<_RawPubspec> _rawPubspecs() {
+  final found = <_RawPubspec>[];
   for (final directory
       in Directory('packages').existsSync()
           ? Directory(
@@ -213,44 +282,50 @@ List<_Package> _packages() {
     if (!pubspec.existsSync()) continue;
 
     final lines = pubspec.readAsLinesSync();
-    String? valueOf(String key) {
-      for (final line in lines) {
-        final match = RegExp('^$key:\\s*(\\S+)\\s*\$').firstMatch(line);
-        if (match != null) return match.group(1);
-      }
-      return null;
-    }
-
-    if (valueOf('publish_to') != null) continue;
-    final name = valueOf('name');
-    final version = valueOf('version');
+    final name = pubspecValue(lines, 'name');
+    final version = pubspecValue(lines, 'version');
     if (name == null || version == null) continue;
 
-    found.add(_Package(name, version, directory.path, _dependencies(lines)));
+    found.add(
+      _RawPubspec(
+        name: name,
+        version: version,
+        directory: directory.path,
+        publishToNone: pubspecValue(lines, 'publish_to') != null,
+        dependencyConstraints: dartwayDependencyConstraints(lines),
+      ),
+    );
   }
   found.sort((a, b) => a.name.compareTo(b.name));
   return found;
 }
 
-/// The `dartway_*` packages this one depends on for real.
+/// Commit dates touching [directory]'s `lib/`, `bin/` or `pubspec.yaml` at or
+/// after [since] — what `staleVersionsAmong` judges a published version by.
 ///
-/// `dependency_overrides` is skipped on purpose: it is the block that makes the
-/// workspace resolve locally, it never travels to anyone's project, and reading
-/// it here would invent an ordering constraint that does not exist on pub.dev.
-Set<String> _dependencies(List<String> lines) {
-  final deps = <String>{};
-  var section = '';
-  for (final line in lines) {
-    final top = RegExp(r'^([a-z_]+):').firstMatch(line);
-    if (top != null) {
-      section = top.group(1)!;
-      continue;
-    }
-    if (section != 'dependencies') continue;
-    final entry = RegExp(r'^\s+(dartway_[a-z0-9_]+):').firstMatch(line);
-    if (entry != null) deps.add(entry.group(1)!);
-  }
-  return deps;
+/// `--name-only` with an empty `--pretty` format prints one path per touched
+/// file and nothing else; a path git does not track (`bin/` on a package with
+/// none) is simply never mentioned, so no existence check is needed first.
+List<String> _changedPathsSince(String directory, DateTime since) {
+  final result = Process.runSync('git', [
+    'log',
+    '--since=${since.toIso8601String()}',
+    '--name-only',
+    '--pretty=format:',
+    '--',
+    '$directory/lib',
+    '$directory/bin',
+    '$directory/pubspec.yaml',
+  ]);
+  if (result.exitCode != 0) return const [];
+  final paths = (result.stdout as String)
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toSet()
+      .toList();
+  paths.sort();
+  return paths;
 }
 
 Future<bool> _becameVisible(_Package package) async {
@@ -259,7 +334,7 @@ Future<bool> _becameVisible(_Package package) async {
   while (DateTime.now().isBefore(deadline)) {
     await Future<void>.delayed(const Duration(seconds: 5));
     try {
-      if ((await _versionsOf(package.name)).contains(package.version)) {
+      if ((await _versionsOf(package.name)).containsKey(package.version)) {
         stdout.writeln(' — listed');
         return true;
       }
@@ -272,13 +347,13 @@ Future<bool> _becameVisible(_Package package) async {
   return false;
 }
 
-/// Every version of [package] that exists on pub.dev; empty when the package
-/// has never been published.
+/// Every version of [package] that exists on pub.dev, with when it was
+/// published; empty when the package has never been published.
 ///
-/// Versions rather than "the latest": the question this script asks is whether
-/// *this exact* version is already out, and a comparison would have to
-/// re-implement semver ordering to answer it.
-Future<Set<String>> _versionsOf(String package) async {
+/// The publish timestamp travels alongside the version for
+/// `staleVersionsAmong` (see `release_freshness.dart` for why it is the
+/// timestamp this script judges a package's freshness by, not a git tag).
+Future<Map<String, DateTime>> _versionsOf(String package) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
   try {
     final request = await client.getUrl(
@@ -296,7 +371,12 @@ Future<Set<String>> _versionsOf(String package) async {
     final body = await response.transform(utf8.decoder).join();
     final versions = (jsonDecode(body) as Map)['versions'] as List?;
     if (versions == null) throw const _Unreachable('no versions in reply');
-    return {for (final entry in versions) (entry as Map)['version'] as String};
+    return {
+      for (final entry in versions)
+        (entry as Map)['version'] as String: DateTime.parse(
+          entry['published'] as String,
+        ),
+    };
   } on _Unreachable {
     rethrow;
   } catch (error) {
@@ -331,14 +411,42 @@ List<int>? _parts(String version) {
   return [for (var i = 1; i <= 3; i++) int.parse(match.group(i)!)];
 }
 
-class _Package implements ReleaseUnit {
-  const _Package(this.name, this.version, this.directory, this.dependencies);
+/// One `packages/*/pubspec.yaml`, as read off disk — the input both
+/// `_Package` (what a plan publishes) and `LocalPackageShape` (what
+/// `unresolvableDependenciesOf` checks a dependency against) are built from.
+class _RawPubspec {
+  const _RawPubspec({
+    required this.name,
+    required this.version,
+    required this.directory,
+    required this.publishToNone,
+    required this.dependencyConstraints,
+  });
+
+  final String name;
+  final String version;
+  final String directory;
+  final bool publishToNone;
+  final Map<String, String> dependencyConstraints;
+}
+
+class _Package implements ReleaseUnit, PlannedRelease {
+  _Package(_RawPubspec raw)
+    : name = raw.name,
+      version = raw.version,
+      directory = raw.directory,
+      dependencyConstraints = raw.dependencyConstraints;
+
   @override
   final String name;
   final String version;
   final String directory;
+
   @override
-  final Set<String> dependencies;
+  Set<String> get dependencies => dependencyConstraints.keys.toSet();
+
+  @override
+  final Map<String, String> dependencyConstraints;
 }
 
 class _Unreachable implements Exception {
