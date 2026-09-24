@@ -29,7 +29,7 @@ dependencies:
 
   # The DartWay app skeleton: the client, its Riverpod bindings, uploads, the
   # router and the shared contract, re-exported — one framework import.
-  dartway_core_flutter: ^0.20.0
+  dartway_core_flutter: ^0.21.0-dev.1
   # Where the signed-in session is kept: the core asks the plugins for whoever
   # claimed the DwKeyValueStorePlugin role, and without one there is nowhere to
   # put the session.
@@ -62,7 +62,7 @@ dev_dependencies:
 
   # `DwFakeServer` and `DwFakeStorage`: widget tests talk to an in-memory
   # server that speaks the real HTTP contract and live socket.
-  dartway_client: ^0.20.0
+  dartway_client: ^0.21.0-dev.1
 
   # The photo picker's platform seam: widget tests stand a fake picker in, as
   # they stand a fake server.

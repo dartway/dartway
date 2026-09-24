@@ -128,6 +128,7 @@ final class DwFileClient {
             byteSize: total,
             body: attempt.body,
             abort: attempt.aborted,
+            reportSent: attempt.reportSent,
           ),
         );
       } catch (error) {
@@ -207,8 +208,45 @@ final class _Cancellation {
   }
 }
 
-/// One put attempt: its body counted as the transport takes it, a watchdog
-/// for a stalled network, and the ways it can be ended from outside.
+/// One put attempt: its body read and validated, a watchdog for a stalled
+/// network, and the ways it can be ended from outside.
+///
+/// The watchdog is always [stallTimeout] — there is no separate, longer
+/// phase for "the whole body is sent, now wait for the reply": a first
+/// version of this tried one, bounded by the upload ticket's remaining
+/// validity, reasoning that a transport confirming the whole body sent
+/// through [reportSent] had proven the connection alive. It had not: on
+/// `dart:io`, `DwHttpStorageTransport` calls [reportSent] as it *pulls* a
+/// chunk into the socket, which for a body that fits the OS send buffer can
+/// mean the whole body in one go — a live pull, not a delivered byte. A
+/// storage host that accepts the connection and then answers nothing (a
+/// dropped path an OS has not noticed) turned from "retried every
+/// `callTimeout`" into "silently stuck for up to the ticket's lifetime"
+/// (#309, found in review). The watchdog re-arming on every real progress
+/// signal already does the useful part: a transfer that is still moving is
+/// never mistaken for dead, whatever "still moving" means for the transport
+/// in front of it.
+///
+/// Reading [body] and reporting progress through [reportSent] are two
+/// different facts, still. A transport that streams the body at the
+/// network's pace can treat them as the same thing — `DwHttpStorageTransport`
+/// does — but one that reads the whole body into memory before sending it —
+/// a browser's `fetch`, or `XMLHttpRequest`, which cannot stream a request
+/// body at all — cannot, and treating "read" as "sent" is exactly how a
+/// stalled transfer used to stop being noticed (#309): the body was read in
+/// an instant, the watchdog was armed once at the very start, and nothing
+/// armed it again while the real transfer — or its failure — happened in
+/// silence.
+///
+/// So there are two independent sources of "the pipeline is alive": reading
+/// [body] (§[_produced], always) and a transport's own [reportSent]. Before
+/// a transport ever calls [reportSent], reading also drives progress —
+/// exactly the old, pre-#309 behaviour, so a transport that never adopts
+/// [reportSent] loses nothing. The moment a transport calls it once, reading
+/// stops driving progress (it still keeps the watchdog alive on its own,
+/// for a slow *source* — a big file read off disk, say — which is not a
+/// stalled network): from there, only [reportSent] speaks for what the
+/// network is doing.
 final class _Attempt {
   _Attempt({
     required DwUploadSource source,
@@ -216,6 +254,7 @@ final class _Attempt {
     required this.stallTimeout,
     required this.onProgress,
   }) : _source = source {
+    onProgress?.call(0, total);
     // From the start, not from the first byte: a transport that never takes
     // the body is as stalled as one that stops taking it.
     _armWatchdog();
@@ -228,10 +267,23 @@ final class _Attempt {
 
   final Completer<void> _aborted = Completer<void>();
   Timer? _watchdog;
+
+  /// Bytes read from [_source] so far — validates it yields exactly [total],
+  /// nothing more, nothing less; drives progress too, until a transport
+  /// calls [reportSent] for the first time. See the class doc.
+  int _produced = 0;
+
+  /// Bytes a transport has confirmed sent, through [reportSent].
   int _sent = 0;
+
+  /// Set on the first call to [reportSent]: from there, progress comes only
+  /// from it, never again from reading [body].
+  bool _reportedByTransport = false;
+
   bool _failed = false;
 
-  /// Bytes sent when progress was last reported. Reported again after another
+  /// Bytes reported when progress was last reported — whichever of
+  /// [_produced] or [_sent] is driving it. Reported again after another
   /// hundredth of the total, and at the last byte: at most about a hundred
   /// calls per attempt whatever the chunk size, and the same calls whatever
   /// the speed — a fast network would otherwise call back per chunk.
@@ -256,8 +308,8 @@ final class _Attempt {
     if (!_aborted.isCompleted) _aborted.complete();
   }
 
-  /// No byte taken and no answer for [stallTimeout]: the connection is dead
-  /// in a way the socket has not noticed.
+  /// No sign of life for [stallTimeout]: the connection is dead in a way the
+  /// socket has not noticed.
   void _armWatchdog() {
     _watchdog?.cancel();
     _watchdog = Timer(stallTimeout, _abort);
@@ -268,51 +320,77 @@ final class _Attempt {
     _abort();
   }
 
-  late final Stream<List<int>> body = () {
-    onProgress?.call(0, total);
-    return _source.open().transform(
-      StreamTransformer<List<int>, List<int>>.fromHandlers(
-        handleData: (chunk, sink) {
-          if (_failed) return;
-          _sent += chunk.length;
-          if (_sent > total) {
-            _failSource(
-              StateError(
-                'The upload source yielded more than its byteSize of $total',
-              ),
-              sink,
-            );
-            return;
-          }
-          _armWatchdog();
-          if (_sent == total || (_sent - _reported) * 100 >= total) {
-            _reported = _sent;
-            onProgress?.call(_sent, total);
-          }
-          sink.add(chunk);
-        },
-        handleError: (error, stackTrace, sink) {
-          sourceError ??= error;
-          sourceStackTrace ??= stackTrace;
-          sink.addError(error, stackTrace);
-        },
-        handleDone: (sink) {
-          if (_failed) return;
-          if (_sent != total) {
-            _failSource(
-              StateError(
-                'The upload source yielded $_sent bytes, and its byteSize is '
-                '$total',
-              ),
-              sink,
-            );
-            return;
-          }
-          sink.close();
-        },
-      ),
-    );
-  }();
+  /// The transport's report of bytes actually sent so far (`DwStoragePut`'s
+  /// doc has the full contract). Re-arms the watchdog and reports progress;
+  /// from the first call on, reading [body] no longer drives progress on its
+  /// own (the class doc). Never decreasing in what it reports, and ignored
+  /// once the attempt has already ended.
+  void reportSent(int sentBytes) {
+    if (_aborted.isCompleted) return;
+    _reportedByTransport = true;
+    if (sentBytes <= _sent) return;
+    _sent = sentBytes > total ? total : sentBytes;
+    _armWatchdog();
+    if (_sent == total || (_sent - _reported) * 100 >= total) {
+      _reported = _sent;
+      onProgress?.call(_sent, total);
+    }
+  }
+
+  late final Stream<List<int>> body = _source.open().transform(
+    StreamTransformer<List<int>, List<int>>.fromHandlers(
+      handleData: (chunk, sink) {
+        if (_failed) return;
+        _produced += chunk.length;
+        if (_produced > total) {
+          _failSource(
+            StateError(
+              'The upload source yielded more than its byteSize of $total',
+            ),
+            sink,
+          );
+          return;
+        }
+        // A chunk left the source: the pipeline is alive, whatever it turns
+        // out to mean for the network — see the class doc. True regardless
+        // of `_reportedByTransport`: a slow *source* is never mistaken for a
+        // stalled network, whichever of the two is driving progress.
+        _armWatchdog();
+        sink.add(chunk);
+        // After handing the chunk on, not before: `fromHandlers` delivers
+        // synchronously (a `sync` controller underneath), so a transport
+        // that calls `reportSent` for this same chunk — from inside its own
+        // `onData`, listening downstream of `sink.add` above — has already
+        // done so by the time control returns here. `_reportedByTransport`
+        // is therefore never stale: a transport reporting for the first
+        // time never leaves a stray, out-of-order progress call behind it.
+        if (_aborted.isCompleted || _failed || _reportedByTransport) return;
+        if (_produced == total || (_produced - _reported) * 100 >= total) {
+          _reported = _produced;
+          onProgress?.call(_produced, total);
+        }
+      },
+      handleError: (error, stackTrace, sink) {
+        sourceError ??= error;
+        sourceStackTrace ??= stackTrace;
+        sink.addError(error, stackTrace);
+      },
+      handleDone: (sink) {
+        if (_failed) return;
+        if (_produced != total) {
+          _failSource(
+            StateError(
+              'The upload source yielded $_produced bytes, and its byteSize '
+              'is $total',
+            ),
+            sink,
+          );
+          return;
+        }
+        sink.close();
+      },
+    ),
+  );
 
   void _failSource(StateError error, EventSink<List<int>> sink) {
     final stackTrace = StackTrace.current;
