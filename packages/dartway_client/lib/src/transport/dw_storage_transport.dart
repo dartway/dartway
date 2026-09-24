@@ -122,6 +122,12 @@ final class DwStoragePut {
   /// the first time) reports progress on its own — this callback only lets a
   /// transport speak for the network more exactly than "I am still reading
   /// the body" can.
+  ///
+  /// A transport that has to read all of [body] before it can send any of
+  /// it — `DwXhrStorageTransport`, for the reason above — calls this with
+  /// `0` *before* that read starts, to switch off the read's own fallback
+  /// reporting from the first byte: otherwise the read itself is read as
+  /// progress, up to 100%, before a single real one arrives.
   final void Function(int sentBytes) reportSent;
 
   static void _ignoreSent(int sentBytes) {}

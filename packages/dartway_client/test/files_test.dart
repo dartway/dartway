@@ -300,6 +300,54 @@ void main() {
       ]);
     });
 
+    test('a transport that reads the whole body before calling reportSent at '
+        'all, the way XMLHttpRequest has to, still reports its own real '
+        'progress in between — not the read, jumped to 100%, then silence '
+        'until the end', () async {
+      final progress = <(int, int)>[];
+      final readsFirstLikeXhr = DwMemoryStorageTransport((put) async {
+        // The XHR pattern (`DwXhrStorageTransport.put`): `reportSent(0)`
+        // before reading anything, so the read that follows never counts
+        // as progress on its own; then the whole body is read into
+        // memory (`_readAll`) before anything is reported for real.
+        put.reportSent(0);
+        final builder = BytesBuilder(copy: false);
+        await for (final chunk in put.body) {
+          builder.add(chunk);
+        }
+        final read = builder.takeBytes();
+        // Real progress, in a few steps — `upload.onprogress` events.
+        // Not 100%: the client's own final `(total, total)` call, on a
+        // successful reply, already covers that (files.dart).
+        for (final fraction in [0.25, 0.5, 0.75]) {
+          put.reportSent((put.byteSize * fraction).round());
+        }
+        // Storage's own bookkeeping, bypassed here since this transport
+        // does not delegate to `DwFakeStorage`'s own body-reading `_put`
+        // (which would try to read `put.body` a second time).
+        final id = int.parse(put.url.pathSegments.last);
+        storage.objects[id] = DwFakeObject(read, put.headers['content-type']!);
+        return const DwStorageReply(status: 200);
+      });
+      final client2 = await connect(transport: readsFirstLikeXhr);
+      const total = 400 * 1024;
+      final result = await client2.files.upload(
+        Upload.avatar,
+        DwUploadSource.bytes(bytes(total)),
+        fileName: 'a.png',
+        contentType: 'image/png',
+        onProgress: (sent, total) => progress.add((sent, total)),
+      );
+      expect(result.isOk, isTrue);
+      expect(progress, [
+        (0, total),
+        (total ~/ 4, total),
+        (total ~/ 2, total),
+        (total * 3 ~/ 4, total),
+        (total, total),
+      ]);
+    });
+
     test(
       'a source slower than the stall timeout, read by a transport that '
       'never reports progress, still keeps the watchdog alive on its own',

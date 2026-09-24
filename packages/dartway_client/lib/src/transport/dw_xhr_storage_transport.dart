@@ -16,10 +16,14 @@ import 'dw_storage_transport.dart';
 ///
 /// A browser cannot stream a request body into `XMLHttpRequest` either, so
 /// [put]'s body is read into memory before `send()` — the same limitation
-/// `fetch` has. The difference is honesty about it: that read is never
-/// reported through [DwStoragePut.reportSent], only `upload.onprogress` is,
-/// so the client's progress and its stall watchdog reflect the network, not
-/// how fast this transport happened to finish reading.
+/// `fetch` has. The difference is honesty about it: [put.reportSent] is
+/// called with `0` before that read starts (never with anything from the
+/// read itself), so the client's progress and its stall watchdog stop
+/// treating a plain read as progress — from that first call on, only
+/// `upload.onprogress` speaks for the network. Skipping the zero call was
+/// the bug the first version of this class shipped with review: the read
+/// itself fell back to driving progress, right up to 100%, before `send()`
+/// was even reached.
 ///
 /// Not exported from `dartway_client.dart`: `dartway_core_flutter.dart`
 /// re-exports this package wholesale, so anything public here reaches every
@@ -33,9 +37,16 @@ final class DwXhrStorageTransport implements DwStorageTransport {
 
   @override
   Future<DwStorageReply> put(DwStoragePut put) async {
-    // Before reading a byte: an upload cancelled while its (possibly huge)
-    // body is still being assembled in memory must stop reading it there,
-    // not after the last byte of something it will never send.
+    // Before reading a byte: tells the client this transport speaks for its
+    // own progress from here on, so the read that follows — which can only
+    // happen in memory, not on the wire — is never mistaken for it. Without
+    // this, `_Attempt`'s own fallback (reading counts as progress, until a
+    // transport says otherwise) fires for the whole read, and `send()`'s
+    // real `upload.onprogress` events arrive too late to be seen as new.
+    put.reportSent(0);
+    // An upload cancelled while its (possibly huge) body is still being
+    // assembled in memory must stop reading it there, not after the last
+    // byte of something it will never send.
     final bytes = await _readAll(put.body, put.abort);
 
     final xhr = web.XMLHttpRequest();

@@ -356,23 +356,19 @@ final class _Attempt {
         // of `_reportedByTransport`: a slow *source* is never mistaken for a
         // stalled network, whichever of the two is driving progress.
         _armWatchdog();
-        final produced = _produced;
         sink.add(chunk);
-        // Deferred, and after handing the chunk on: a transport that calls
-        // `reportSent` does so once it has this same chunk, which — because
-        // `sink.add` above already queued its delivery — happens in an
-        // earlier microtask than this one. By the time this runs,
-        // `_reportedByTransport` reflects whether that happened, so a
-        // transport reporting for the first time never leaves a stray,
-        // out-of-order progress call behind it (produced-so-far can only
-        // grow; `reportSent`'s own numbers are not bound the same way).
-        scheduleMicrotask(() {
-          if (_reportedByTransport || _failed) return;
-          if (produced == total || (produced - _reported) * 100 >= total) {
-            _reported = produced;
-            onProgress?.call(produced, total);
-          }
-        });
+        // After handing the chunk on, not before: `fromHandlers` delivers
+        // synchronously (a `sync` controller underneath), so a transport
+        // that calls `reportSent` for this same chunk — from inside its own
+        // `onData`, listening downstream of `sink.add` above — has already
+        // done so by the time control returns here. `_reportedByTransport`
+        // is therefore never stale: a transport reporting for the first
+        // time never leaves a stray, out-of-order progress call behind it.
+        if (_aborted.isCompleted || _failed || _reportedByTransport) return;
+        if (_produced == total || (_produced - _reported) * 100 >= total) {
+          _reported = _produced;
+          onProgress?.call(_produced, total);
+        }
       },
       handleError: (error, stackTrace, sink) {
         sourceError ??= error;
