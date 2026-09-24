@@ -1,6 +1,6 @@
 ## 0.5.0
 
-- This package now targets the rewritten DartWay framework (`dartway_core_shared`/`dartway_core_server`/`dartway_core_flutter` 0.20.0). The previously published `0.4.0` was built on the old, Serverpod-based stack.
+- This package now targets the rewritten DartWay framework (`dartway_core_server` 0.20.0). The previously published `0.4.0` was built on the old, Serverpod-based stack.
 
 - **An `http` image no longer fails the send.** `DwPushMessage.imageUrl` over `http` is accepted,
   logged as a warning when queued, and left out of the notification providers receive; only a

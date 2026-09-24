@@ -1,6 +1,6 @@
 ## 0.5.0
 
-- This package now targets the rewritten DartWay framework (`dartway_core_shared`/`dartway_core_server`/`dartway_core_flutter` 0.20.0). The previously published `0.4.0` was built on the old, Serverpod-based stack.
+- This package now targets `dartway_push_flutter` 0.5.0, on the rewritten DartWay framework. The previously published `0.1.1` was built on the old, Serverpod-based stack.
 
 - Ported to DartWay 1.0 as a `DwPushTransportClient`. The web service worker
   template registers its click handler before the Firebase SDK is loaded

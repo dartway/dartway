@@ -2,7 +2,9 @@
 
 ## 0.3.0
 
-- This package now targets the rewritten DartWay framework (`dartway_core_flutter` 0.20.0). The previously published `0.2.0` was built on the old framework.
+- This package now targets the rewritten DartWay framework: `dartway_flutter` is now `dartway_core_flutter` `^0.20.0`, and the two-word renames that came with it (`DwFlutter` → `DwFlutterToolbox`, `DwConfig` → `DwFlutterConfig`, `DwPlugin` → `DwFlutterPlugin`, `DwPlugins` → `DwPluginRegistry`). Nothing else changed — the previously published `0.2.0` (on `dartway_flutter` `^0.5.0`) is otherwise identical.
+
+## 0.2.0
 
 Follows `dartway_flutter` 0.5.0, where `DwFlutterPlugin.init()` gained the core as an argument:
 `DwTelegramWebApp.init(DwFlutterToolbox core)`. The bridge asks Telegram for everything it knows and needs
