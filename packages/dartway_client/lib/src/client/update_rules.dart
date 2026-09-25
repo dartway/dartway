@@ -22,7 +22,8 @@ final class _Refetch extends _Outcome {
 const _unchanged = _Unchanged();
 const _refetch = _Refetch();
 
-/// The update actions of `DwUpdateAction`, applied to values (CONTRACTS R2.3).
+/// The update actions of `DwUpdateAction`, applied to values
+/// (`docs/2-core/requests-and-updates.md`).
 ///
 /// Every object reaching here was accepted by the request (`acceptsItem` or
 /// `acceptsDeletion`), so an item is of the request's item type and a

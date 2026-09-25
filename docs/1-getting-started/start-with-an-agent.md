@@ -72,42 +72,18 @@ or an app setting in the admin panel, and watch the other window follow without 
 
 `dartway create` installs the agent toolkit into `.claude/`; `dartway setup-ai` installs it into a
 project that has none. From then on you keep working in prompts, and the assistant works inside the
-project's conventions rather than guessing them.
-
-- **`.claude/CLAUDE.md`** — the always-loaded constitution: DartWay's laws, which no project
-  overrides, and its defaults, which a project may replace in the root `CLAUDE.md` with a reason.
-- **`.claude/skills/dartway-*`** — step-by-step playbooks with the checks that prove each step:
-  `dartway-run` brings the project up, `dartway-contract` writes the shared DTOs, `dartway-server`
-  the handlers, `dartway-data-layer` the Flutter side, `dartway-realtime` channels and publishing,
-  `dartway-access` access and channel rules, `dartway-migrations`, `dartway-uploads`,
-  `dartway-testing`, `dartway-ui-kit`, `dartway-navigation`, and the process skills
-  `dartway-requirements`, `dartway-plan` and `dartway-finish`. Claude Code loads them by relevance;
-  any other assistant reads them as the plain markdown they are — point yours at the folder.
-- **`.claude/commands/`** — `/commit` and `/dartway-checkup`.
-- **`.claude/settings.json`** — pre-approves this stack's everyday build and test commands, so the
-  first run is not a queue of permission prompts. Nothing destructive is on the list: stopping
-  containers, commits and pushes still ask.
-- **`.claude/dartway-toolkit.json`** — where the installed toolkit came from: the source and channel,
-  the commit, the CLI version, and the install settings `setup-ai` and `update` were given (the
-  project's language, base branch and where framework findings are filed). The next install reads
-  it, so a plain re-run keeps them instead of resetting them to the defaults.
-
-The managed files — `CLAUDE.md`, the `dartway-*` skills and the two commands — are overwritten on every
-install. A skill or command of your own, under another name, is never touched, and `settings.json` is
-merged: what the toolkit added is printed, and what you added stays. **Commit `.claude/`**, so the
-repository is self-contained and its history says which skills the code was written with.
+project's conventions rather than guessing them — the constitution in `CLAUDE.md`, a `dartway-*`
+skill per step of the work, `/commit` and `/dartway-checkup`. What is installed, what is managed and
+overwritten versus yours to keep, and how `.claude/settings.json` merges: [What is the `.claude/`
+folder in a DartWay project?](../5-tooling/agent-toolkit.md) **Commit `.claude/`**, so the repository
+is self-contained and its history says which skills the code was written with.
 
 ## Keeping it current: `dartway update`
 
 A toolkit is a committed artifact, and a month-old one looks exactly like a fresh one. `dartway update`
-is the command that says a project has fallen behind:
-
-1. it reinstalls the toolkit from the channel the project is already on;
-2. it warns when the CLI running it is older than the channel's — an old CLI installs an old idea of
-   what a project needs — and says to update the CLI first;
-3. it lists the framework packages the project's lock files are behind on, and how to move each;
-4. it lists the migration notes (`docs/migrations/` in the framework) the project still owes an
-   edit to, oldest first.
+is the command that says a project has fallen behind — reinstalls the toolkit, warns when the CLI
+itself is older than the channel, and lists the framework packages and the migration notes the
+project still owes an edit to. Same page, ["Keeping it current"](../5-tooling/agent-toolkit.md#keeping-it-current).
 
 **It edits no code of the project, deliberately.** Raising a caret is one line; answering a changed
 API is not, and a command that half-did it would leave a tree nobody can tell from a finished one. The

@@ -72,7 +72,7 @@ example.com       →  the site directory, static            (optional)
 files.example.com →  MinIO                                  (with storage: minio)
 ```
 
-**The app calls its own origin** (R2.7). On the app host the front Nginx serves the web image and
+**The app calls its own origin.** On the app host the front Nginx serves the web image and
 sends `/dw/`, `/dw/live` and `/health` to the server, so a browser makes same-origin calls: no CORS,
 no preflight, and the server answers none. The web build is given that origin as
 `DW_BACKEND_URL`. The api host proxies everything to the server — calls, the live socket, and the

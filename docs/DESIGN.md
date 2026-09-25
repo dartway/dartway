@@ -127,6 +127,6 @@ too: `<Entity>Row` for table rows, data objects as nouns of two or more words, r
 `List…`, changes as a verb and its object, `<Project>Channel` and `<Project>Refusal`.
 
 The rule holds everywhere as of 2026-09-16. The last seven names that predated it — five in the
-Flutter core, one in the server, one in the router — were renamed under principle 4, and the
-migration note `docs/migrations/2026-09-16-two-word-names-the-last-seven.md` says which became
-what. A one-word name is now a defect rather than a debt: there is no list left to add it to.
+Flutter core, one in the server, one in the router — were renamed under principle 4; D-058 in
+`docs/1.0/DECISIONS.md` names which became what. A one-word name is now a defect rather than a
+debt: there is no list left to add it to.

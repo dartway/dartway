@@ -255,7 +255,7 @@ final class DwTestAnswer {
 }
 
 /// Sends calls to a server as a DartWay client would — the path, the headers
-/// and the body of R2.2 — and reads what comes back, without a client
+/// and the body of `docs/2-core/wire-and-versions.md` — and reads what comes back, without a client
 /// library: the tests check the wire itself.
 final class DwTestCaller {
   DwTestCaller(this.base, this.protocol, {this.token, this.liveConnection});

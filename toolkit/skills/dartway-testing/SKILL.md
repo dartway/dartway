@@ -17,9 +17,13 @@ description: >-
 
 # DartWay — how a project tests itself
 
-`dartway-clean-code` Part 3 decides **what** deserves a test: the threshold is the complexity of
-the behaviour, never the fact that a line changed. This skill decides **where** the test goes and
-how to write it.
+**What** deserves a test is a question of the behaviour's complexity, never the fact that a line
+changed: complex logic, non-trivial rules, edge cases and rollback/degradation paths, and every
+bugfix of non-trivial behaviour — starting with a test that reproduces it, red, before the fix. Not
+cosmetics: a recoloured button or a renamed identifier needs no test of its own. Assert the
+outcome, not that the code ran — for anything that accumulates (growth, decay, a streak), the claim
+is about where it ends up after N steps, not that it moved. This skill decides **where** the test
+goes and how to write it.
 
 **The level follows where the behaviour lives.** A DartWay project has three places where a rule
 can live, and each has its own kind of test:

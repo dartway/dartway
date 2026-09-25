@@ -9,7 +9,6 @@ class DwFlutterConfig {
     this.onErrorReport,
     this.appVersion,
     this.confirmDialogBuilder,
-    this.defaultModelGetter,
     this.refusalText,
     this.updateRequiredScreen,
   });
@@ -39,9 +38,8 @@ class DwFlutterConfig {
 
   /// Called for every reported error with its full [DwErrorReport] — the error
   /// itself plus the app-state context snapshot (route, mounted features,
-  /// action, platform, version, user). When set, it replaces the default
-  /// (which logs the error via `debugPrint`) and disables the `DwFlutterCore`
-  /// out-of-the-box alerting.
+  /// action, platform, version, user). When unset, the error is logged via
+  /// `debugPrint` and nothing else happens — set this to alert on it.
   final void Function(DwErrorReport report)? onErrorReport;
 
   /// The app build, `<semver>+<build>` (`1.4.2+57`): shown in error reports
@@ -56,9 +54,4 @@ class DwFlutterConfig {
     DwUiConfirmation confirmation,
   )?
   confirmDialogBuilder;
-
-  /// Returns a placeholder instance of any model `T` for skeleton loading
-  /// states — the data layer wires this to its mock-model registry. When unset,
-  /// skeletons fall back to a generic shimmer.
-  final T Function<T>()? defaultModelGetter;
 }

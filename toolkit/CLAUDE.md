@@ -83,9 +83,9 @@ Everything else is written by hand: providers (`Provider` / `NotifierProvider`, 
 
 ## Cleanliness and finishing
 
-For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/dartway-clean-code/SKILL.md`. This is a style contract — check against it while writing, refactoring and reviewing.
+For **any** Dart/Flutter code the cleanliness contract applies: naming, single responsibility, no `BuildContext`/`WidgetRef` in services, no `_buildXxx()`, a re-read only as a user command, `copyWith` over field-by-field rebuilds, no environment default for a deployment credential, and the rest — spelled out in full, with the detectors that check it, in `dartway-finish` and `/dartway-checkup`. This is a style contract — check against it while writing, refactoring and reviewing.
 
-**Clean-code decides what deserves a test; `dartway-testing` decides where it goes and how to write it** — a rule of the contract is a test in `__SHARED_PKG__`, a handler's rule is an acceptance test on a real database (`dart run dartway_cli:dartway test`), a feature is a widget test on the in-memory server. The skeleton ships a worked example of each.
+**`dartway-testing` decides what deserves a test and where it goes** — a rule of the contract is a test in `__SHARED_PKG__`, a handler's rule is an acceptance test on a real database (`dart run dartway_cli:dartway test`), a feature is a widget test on the in-memory server. The skeleton ships a worked example of each.
 
 **Finishing a task (law 7):** when a feature/task is done, run `dartway-finish` before the commit/PR. It runs the checks, audits the diff against the contract, checks the descriptions for drift and the test coverage, and **shows suggestions and applies only what was confirmed**.
 
@@ -99,7 +99,7 @@ For **any** Dart/Flutter code the clean-code contract applies: `.claude/skills/d
 
 ## Skills and commands
 
-- Skills (`.claude/skills/`): `dartway-requirements`, `dartway-plan`, `dartway-run`, `dartway-feature-scaffold`, `dartway-contract`, `dartway-server`, `dartway-data-layer`, `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads`, `dartway-testing`, `dartway-navigation`, `dartway-ui-kit`, `dartway-clean-code`, `dartway-on-device`, `dartway-push-delivery`, `dartway-analytics`, `dartway-documentation`, `dartway-framework-notes`, `dartway-finish`, `dartway-update` — loaded by relevance to the task.
+- Skills (`.claude/skills/`): `dartway-requirements`, `dartway-plan`, `dartway-run`, `dartway-feature-scaffold`, `dartway-contract`, `dartway-server`, `dartway-data-layer`, `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads`, `dartway-testing`, `dartway-navigation`, `dartway-ui-kit`, `dartway-on-device`, `dartway-push-delivery`, `dartway-analytics`, `dartway-documentation`, `dartway-framework-notes`, `dartway-finish`, `dartway-update` — loaded by relevance to the task.
 - Commands (`.claude/commands/`): `/dartway-checkup` — the state of the project and what to take into work next (whole project by default, a path narrows it); `/commit` — a commit in the project's format.
 
 **Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (`dartway-feature-scaffold`, and the layer skills: `dartway-contract` → `dartway-server` → `dartway-data-layer`, with `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads` where the feature reaches them) → `dartway-finish` (checks, audit, descriptions reconciled with the code, tests) before the PR.

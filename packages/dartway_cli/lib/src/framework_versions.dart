@@ -73,13 +73,11 @@ Map<String, String> readFrameworkVersions(Directory monorepoDir) {
     versions[name] = version;
   }
 
-  // Two levels, because the multi-package modules (the core, push, offline)
-  // keep their packages one directory deeper than the single ones.
+  // One level: packages/ is flat. Descending further used to pick up a
+  // package's own example/ (dartway_core_flutter_example,
+  // dartway_lints_example) and record it as a framework package.
   for (final child in packagesDir.listSync().whereType<Directory>()) {
     take(child);
-    for (final grandchild in child.listSync().whereType<Directory>()) {
-      take(grandchild);
-    }
   }
 
   return versions;

@@ -183,9 +183,7 @@ resolve() {
 
 analyze() {
   echo "══ analyze"
-  # Errors only. The warnings that stand are in generated code
-  # (`dw_updates_transport.dart`), which nobody reviews and the generator
-  # rewrites — gating on it would make red mean "the generator again" — and in
+  # Errors only. The warnings that stand are in
   # `packages/dartway_lints/example`, a fixture written to break the lint rules,
   # whose warnings its own test counts.
   # `tool` is in here so the scripts this repository runs on itself are held

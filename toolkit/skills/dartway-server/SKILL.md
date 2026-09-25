@@ -519,7 +519,7 @@ protocol: DwWireProtocol(dwAuthProvidersProtocolEntries, include: appProtocol),
 modules: [
   DwSignInProvidersModule([
     DwGoogleSignIn(clientIds: [android, ios, web]),   // a list: each platform has its own
-    DwAppleSignIn(clientIds: ['com.club.app']),
+    DwAppleSignIn(clientIds: [bundleId]),
   ]),
 ],
 ```
@@ -575,6 +575,17 @@ Rows the operators own once they exist (the first settings) are a migration. Row
 agreeing with the code (notification templates, a lookup a `switch` reads) are a **startup step**:
 an applied migration cannot be edited, and a `down` for data deletes what somebody has since
 corrected.
+
+**A setting whose value belongs to this deployment has no default.** `DW_ADMIN_IDENTIFIER` above,
+a sender address, a provider key, a webhook URL, a bucket name — each is a credential of this
+environment, not a preference with a sensible starting point. A default turns an unfilled key into
+quiet work with somebody else's identity: mail sent from an address the project does not own, a
+webhook posted to a stranger's endpoint. Read it and fail loud, at the point of use or on boot —
+`Platform.environment['APP_SENDER_ADDRESS'] ?? (throw StateError('APP_SENDER_ADDRESS is not
+set'))` — never a plausible-looking fallback. A value the server cannot start without also belongs
+under `requires.secrets` in `deploy/config.yaml`, so a deployment missing it refuses to begin
+rather than failing on first use. This does not cover a preference with a genuine neutral value —
+a page size, a timeout — only a value that would point the system at somebody else if guessed wrong.
 
 ## 10. Checks
 

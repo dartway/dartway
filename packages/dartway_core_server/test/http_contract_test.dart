@@ -5,7 +5,8 @@ import 'package:test/test.dart';
 
 import 'support/test_app.dart';
 
-/// The HTTP contract of a call (R2.2): paths, headers, bodies and the status
+/// The HTTP contract of a call (`docs/2-core/wire-and-versions.md`,
+/// `docs/2-core/refusals-and-statuses.md`): paths, headers, bodies and the status
 /// of every outcome.
 void main() {
   final harness = useHarness();

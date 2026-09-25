@@ -1,16 +1,15 @@
 {
   // Run the example backend and frontend separately.
-  // Backend reads config/ relative to its cwd, so cwd must be the server package.
+  // Backend reads deploy/config.yaml and deploy/secrets.yaml relative to its
+  // cwd (DwLocalEnvironment.overlay), so cwd must be the server package.
   "version": "0.2.0",
   "configurations": [
     {
       "name": "Example: Server",
       "type": "dart",
       "request": "launch",
-      "program": "${workspaceFolder}/example/dartway_example_server/bin/main.dart",
-      "cwd": "${workspaceFolder}/example/dartway_example_server",
-      // Drop "--apply-migrations" once the schema is applied and unchanged.
-      "args": ["--apply-migrations"]
+      "program": "${workspaceFolder}/example/dartway_example_server/bin/server.dart",
+      "cwd": "${workspaceFolder}/example/dartway_example_server"
     },
     {
       "name": "Example: App (Chrome)",

@@ -10,8 +10,6 @@ const dwIgnoredFolders = {
   'generated',
   'gen',
   'l10n',
-  'zarchive',
-  'zarchiv',
   '.dart_tool',
 };
 

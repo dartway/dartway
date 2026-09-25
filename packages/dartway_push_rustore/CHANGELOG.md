@@ -7,15 +7,3 @@
 - Ported to DartWay 1.0 as a `DwPushTransportClient`. The native service,
   tap handling and renderer are unchanged; the renderer reads the shared
   `DwPushData` keys (`dw_title`, `dw_body`, `dw_image`).
-
-## 0.1.0
-
-First release: RuStore behind the `DwPushClientProvider` contract, with the Android side an app
-used to have to write itself.
-
-- A messaging service that persists each message's payload on arrival and renders data-only
-  messages — including the picture ones, which RuStore shows as nothing at all otherwise.
-- Notification taps through `ActivityAware`/`onNewIntent`: no `MainActivity` override, and no list
-  of payload keys duplicated in Kotlin.
-- The Android 13 notification permission, requested natively rather than through an extra package.
-- Appearance (icon, colour, channel) read from the app's manifest meta-data.

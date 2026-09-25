@@ -2,7 +2,7 @@
 name: dartway-finish
 description: >-
   Finishing a dartway task before a commit/PR (DartWay projects): the "definition of done".
-  Audits the diff against the base branch using the dartway-clean-code contract (contract, server,
+  Audits the diff against the base branch using its own cleanliness contract (contract, server,
   app), runs the checks (`dart run dartway_cli:dartway generate --check`, `dart run bin/migrate.dart check` when row
   classes or migrations changed, the analyzers with the `dartway_lints` plugin, the shared package's `dart test`,
   `dart run dartway_cli:dartway test`, `flutter test`, `dart run dartway_cli:dartway check`), reconciles the descriptions that live in the
@@ -26,7 +26,7 @@ confirmation**. Phases A (audit) and B (suggestions) are read-only. Phase C (app
 what the author confirmed. Anything debatable or architectural the skill **does not touch** — it
 leaves it to the author with a note.
 
-The rules come from `dartway-clean-code` (the cleanliness contract), plus the layer skills:
+The rules are below (the cleanliness contract), plus the layer skills:
 `dartway-contract`, `dartway-server`, `dartway-access`, `dartway-realtime`, `dartway-data-layer`,
 `dartway-migrations`, `dartway-uploads`, `dartway-navigation`, `dartway-ui-kit`,
 `dartway-feature-scaffold`. It is the same body of rules `/dartway-checkup` uses; the difference:
@@ -80,7 +80,7 @@ Run the detectors **over the changed files only** (not over the whole repo). For
   `DwLiveChannel.forAccount(kind, accountId)`.
 - Read-modify-write of a counter, a balance or a status without `lock: DwRowLock.forUpdate` — two
   concurrent commands both read the old value.
-- A row rebuilt by listing its fields in the constructor instead of `copyWith` (`dartway-clean-code`).
+- A row rebuilt by listing its fields in the constructor instead of `copyWith`.
 - Related data loaded per row inside a loop — one query per relation for the whole batch; file URLs
   through one `ctx.files.publicUrls` call per batch.
 - A file id from a command written onto a row without `ctx.files.requireOwned` (`dartway-uploads`); a
@@ -92,7 +92,7 @@ Run the detectors **over the changed files only** (not over the whole repo). For
   from `lib/`; a migration file that existed on the base branch and is **modified** in the diff
   (`dartway-migrations` — a stop, see A.5).
 
-**The app (`__FLUTTER_PKG__`, `dartway-clean-code` Part 1 + specials):**
+**The app (`__FLUTTER_PKG__`):**
 - Several responsibilities in one file (length is the weakest signal: >200 lines — take a look, >350 —
   a warning; a meaningful 300-line file beats a pointless split).
 - `BuildContext`/`WidgetRef` in the parameters of services/functions (outside `build`).
@@ -203,8 +203,8 @@ behaviour is verified through the public kit widget.
 
 ### A.4 Checking the tests
 
-- Non-trivial logic, money, a rule, a bugfix **without a test** → flag it (`dartway-clean-code` Part 3).
-  We do not demand tests for cosmetics.
+- Non-trivial logic, money, a rule, a bugfix **without a test** → flag it. We do not demand tests
+  for cosmetics.
 - **Ask whether the test sits where the behaviour lives** (`dartway-testing`). The common miss is not an
   absent test but a misplaced one: an access rule "covered" by a widget test that only proves the
   button is hidden — the hidden button is not the rule, and the rule is what breaks. That belongs in a
@@ -389,5 +389,5 @@ For every item give a **concrete proposed edit**, ready to apply. Mark anything 
 | Output | report + edits on confirmation | report in the chat + findings placed in `knownIssues` / `docs/dev_notes/` / the tracker |
 | When | finishing a task, before a PR | on demand, and periodically — its findings change without a commit here |
 
-The detectors are shared (their source is `dartway-clean-code` and the layer skills). Do not duplicate
-the logic — reference the contract.
+The detectors are shared with the layer skills above. Do not duplicate the logic — reference this
+skill.

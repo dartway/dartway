@@ -5,7 +5,7 @@ import 'support/protocol.dart';
 
 void main() {
   group('client → server', () {
-    test('auth, sub and unsub round-trip in the R2.2 shape', () {
+    test('auth, sub and unsub round-trip in the docs/2-core/wire-and-versions.md shape', () {
       final messages = <DwClientMessage, Map<String, Object?>>{
         const DwAuthenticateMessage('token'): {'k': 'auth', 'token': 'token'},
         const DwAuthenticateMessage(null): {'k': 'auth'},

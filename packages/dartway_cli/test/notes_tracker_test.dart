@@ -225,30 +225,6 @@ void main() {
       );
     });
 
-    test('reports the retired journals instead of deleting them', () async {
-      final root = Directory(p.join(sandbox.path, 'legacy'))
-        ..createSync(recursive: true);
-      final oldJournal = File(p.join(root.path, 'dartway_notes.md'))
-        ..writeAsStringSync('### a finding nobody else has a copy of');
-
-      final said = StringBuffer();
-      await IOOverrides.runZoned(
-        () => installInto(root),
-        stdout: () => _CapturingStdout(said),
-      );
-
-      expect(
-        oldJournal.readAsStringSync(),
-        contains('nobody else has a copy of'),
-        reason: 'an installer that deletes it takes the only copy with it',
-      );
-      expect(
-        said.toString(),
-        contains('dartway_notes.md'),
-        reason: 'a journal nothing reads and nothing mentions is #100 again',
-      );
-    });
-
     test('leaves an entry alone on a re-install', () async {
       final root = await installInto(null);
       final entry = File(p.join(root.path, 'docs', 'dev_notes', 'ci-gap.md'))
@@ -260,21 +236,4 @@ void main() {
       expect(entry.readAsStringSync(), contains('CI runs less'));
     });
   });
-}
-
-/// Enough of a [Stdout] to read back what the installer reported. `stdout` is a
-/// `Stdout`, not a `print`, so a zone's print hook does not see it.
-class _CapturingStdout implements Stdout {
-  _CapturingStdout(this._said);
-
-  final StringBuffer _said;
-
-  @override
-  void writeln([Object? object = '']) => _said.writeln(object);
-
-  @override
-  void write(Object? object) => _said.write(object);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

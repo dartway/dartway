@@ -239,14 +239,16 @@ the provider's own SDK, sends it with `DwSignInWithProvider`, and the server sig
 the subject that token proves.
 
 ```dart
-// Both sides build the protocol with the providers' DTOs in it:
-final appProtocol = DwWireProtocol(
-  [...dwAuthProvidersProtocolEntries, ...appEntries],
-  include: DwWireProtocol.core,
+// appProtocol is the project's own (generated entries, include: DwWireProtocol.core,
+// contractVersion from the generator) — the providers' DTOs go on top of it, keeping
+// its contract version:
+final protocol = DwWireProtocol(
+  dwAuthProvidersProtocolEntries,
+  include: appProtocol,
 );
 
 DwAppServer(
-  protocol: appProtocol,
+  protocol: protocol,
   modules: [
     DwSignInProvidersModule([
       DwGoogleSignIn(clientIds: [androidClientId, iosClientId, webClientId]),

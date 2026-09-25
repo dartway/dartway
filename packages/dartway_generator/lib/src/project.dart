@@ -47,7 +47,7 @@ final class DwProjectPackage {
 /// An unresolved `*_flutter` package is added to [skipped] instead of being
 /// an error when [skipped] is given: generation of the contract and the
 /// server does not depend on the app, and an app not yet moved to the
-/// framework's current version — mid-port — must not stop it.
+/// framework's current version must not stop it.
 List<DwProjectPackage> detectPackages(
   String root,
   List<DwGenerationDiagnostic> diagnostics, {

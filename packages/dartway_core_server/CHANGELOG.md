@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0-dev.6
+
+- **BREAKING: `DwRouteContext` is gone — a route handler's `ctx` is typed `DwCallContext`
+  directly.** Same type, same members, no signature or behaviour change; one way to name it, not
+  two. Migration note: `docs/migrations/2026-09-25-route-context-typedef-removed.md`.
+
 ## 0.21.0-dev.5
 
 - **BREAKING: a server is its features. `DwAppServer(features: [...])` replaces `handlers:`, `channels:`, `jobs:` and `routes:`; each `DwServerFeature(name, handlers:, channels:, jobs:, routes:)` declares one area of the project** (D-093). `server.handlers`, `channels`, `jobs` and `routes` read them all together. A feature's name is its folder under `lib/src/` — lower-case, declared once, or the server does not start. Projects spread an area's pieces over the server's lists by hand, each in its own way; the dartway CLI now holds the layout this names. Migration note: `docs/migrations/2026-09-25-server-features.md`.
@@ -46,7 +52,7 @@
 
 ## 0.20.0-dev.1
 
-The rewrite (see docs/1.0).
+The rewrite (see docs/1.0/DECISIONS.md).
 
 - **A call that takes the `unknown` of an open enum to a write is answered `dw.updateRequired`** (D-071, #274). It used to leave the guard's throw to the generic catch: a 500 with an incident id for the caller and an alert for the operator, on an input the framework refuses on purpose. The build sending `unknown` back is older than the data it is writing and cannot correct its input, only update. Outside a call — a job, a module, a subscription — the same throw is still a failure.
 - **The seam for external sign-in** (D-073, in progress): `DwAccountService.signInWithExternalIdentity(provider:, subject:)` signs in — or creates — the account of an identity a provider proved, with `DwAuthConfig.onExternalAccountCreated` for the project's row, and `accountOfExternalIdentity` to look one up. The verification of a provider's token lives in `dartway_auth_providers_server`.

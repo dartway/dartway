@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.6
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
+
 ## 0.21.0-dev.5
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server`.
@@ -39,7 +43,7 @@
 
 ## 0.20.0-dev.1
 
-The rewrite (see docs/1.0).
+The rewrite (see docs/1.0/DECISIONS.md).
 
 - **`DwAppClient.deleteAccount()`**: sends `DwDeleteMyAccount` and ends the session once the server confirms (D-072).
 

@@ -25,7 +25,7 @@ dependencies:
 
   # The DartWay app skeleton: the client, its Riverpod bindings, the router
   # and the shared contract, re-exported — one framework import.
-  dartway_core_flutter: ^0.21.0-dev.5
+  dartway_core_flutter: ^0.21.0-dev.6
   # Where the signed-in session is kept: the core asks the plugins for whoever
   # claimed the DwKeyValueStorePlugin role, and without one there is nowhere
   # to put the session.
@@ -43,7 +43,6 @@ dependencies:
   # UI-kit dependencies: the kit lives in this app's `lib/ui_kit/`, so its
   # packages belong to the app, not to the framework.
   device_frame: ^1.4.0
-  cupertino_icons: ^1.0.5
   flutter_svg: ^2.0.10+1
   gap: ^3.0.1
   pin_code_fields: ^8.0.1
@@ -64,7 +63,7 @@ dev_dependencies:
 
   # `DwFakeServer`: widget tests talk to an in-memory server that speaks the
   # real HTTP contract and live socket.
-  dartway_client: ^0.21.0-dev.5
+  dartway_client: ^0.21.0-dev.6
 
   dartway_cli: ^0.12.0
 

@@ -1,6 +1,7 @@
 services:
-  # Development database. The `DW_DATABASE_*` values in ../README.md point at it
-  # (127.0.0.1:8090, database "dartway_starter", user "postgres").
+  # Development database. The `DW_DATABASE_*` values in ../deploy/config.yaml's
+  # `local` section point at it (127.0.0.1:8090, database "dartway_starter",
+  # user "postgres").
   #
   # No test database here, on purpose: `dartway test` starts one for the run on
   # a port Docker picks, and each test file creates and drops its own database
@@ -18,7 +19,7 @@ services:
 
   # Object storage for uploads: the app uploads straight to it by a presigned
   # URL the server issues, so a local MinIO is the same path production runs.
-  # The `DW_STORAGE_*` values in ../README.md point at it.
+  # The `DW_STORAGE_*` values in ../deploy/config.yaml's `local` section point at it.
   minio:
     image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":8101"

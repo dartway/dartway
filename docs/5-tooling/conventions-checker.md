@@ -153,8 +153,7 @@ closed list:
 | `<project>_flutter/lib` | zones `admin/ app/ auth/ common/` · layers `core/ l10n/ shared/ ui_kit/` · `main.dart` · `<project>_app.dart` | `main.dart`, `<project>_app.dart` |
 | `<project>_server/lib` | `<project>_server.dart` · `generated/` · `src/` | `<project>_server.dart`, `src/`, and `src/migrations/migrations.dart` |
 
-Dot entries and the folders `generated/`, `gen/`, `l10n/`, `zarchive/`, `zarchiv/` and `.dart_tool/`
-are passed over. Inside `src/` the server is the project's to arrange, except `migrations/`, which
+Dot entries and the folders `generated/`, `gen/`, `l10n/` and `.dart_tool/` are passed over. Inside `src/` the server is the project's to arrange, except `migrations/`, which
 `bin/migrate.dart` writes and reads by that path.
 
 A zone name or a layer name one level down — `app/admin/` — is an error too, and it is the reason the

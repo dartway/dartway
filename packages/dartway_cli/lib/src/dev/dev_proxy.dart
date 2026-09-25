@@ -4,7 +4,8 @@ import 'dart:io';
 
 import 'web_directory.dart';
 
-/// One origin on the developer's machine in the shape production has (R2.7):
+/// One origin on the developer's machine in the shape production has
+/// (`docs/5-tooling/deploy.md`):
 /// `/dw/*` — the `/dw/live` socket included — and `/health` go to the API,
 /// everything else to the Flutter web app.
 ///

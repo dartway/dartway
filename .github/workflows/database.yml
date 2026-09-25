@@ -5,10 +5,10 @@ name: Database
 #
 # `checks.yml` runs the framework's own suites, the service ones included
 # (`tool/checks.sh services`), and leaves these two to this workflow by name. What they assert is what the framework is trusted for and what nothing
-# else can prove: the auth attempt limit holding under a lock, two parallel
-# redemptions signing in exactly once, a legacy password hash rewritten during a
-# login. Until this workflow they were proved by nobody but a person running
-# them by hand.
+# else can prove against a project's own real schema and migrations: the auth
+# attempt limit holding under a lock, a wrong code refused without revealing why.
+# Until this workflow they were proved by nobody but a person running them by
+# hand.
 #
 # `dartway test` is the whole job: it starts a Postgres for the run on a port
 # Docker picks, applies the migrations, runs the suite and removes the container
@@ -97,5 +97,6 @@ jobs:
 
       - name: Run the database suite
         # From the project root: the command finds the `*_server` sibling and
-        # reads its `config/test.yaml` for the shape of the connection.
+        # starts a Postgres and a MinIO of its own for the run — DW_DATABASE_*
+        # and DW_STORAGE_* are set for it, not read from a file.
         run: cd "${{ matrix.directory }}" && dartway test

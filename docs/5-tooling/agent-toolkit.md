@@ -74,7 +74,6 @@ skills → `dartway-finish`.
 | `dartway-testing` | Where a test goes and how to write it, tier by tier |
 | `dartway-navigation` | The router: zones, route descriptors, guards |
 | `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
-| `dartway-clean-code` | The cleanliness contract for all Dart and Flutter work |
 | `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
 | `dartway-finish` | The definition of done before a commit or PR: audit the diff, apply only what is confirmed |
 | `dartway-update` | Moving onto a newer framework: `dartway update`, the migration notes, then the versions |
@@ -144,11 +143,6 @@ toolkit's and is refreshed on every install; `_coverage.md` is the project's rec
 `.claude/dartway-toolkit.json` records where the install came from — the repository or local path,
 the channel, the commit, the CLI version — and the settings. It records **provenance, not content**:
 a list of installed files or their hashes would be a second copy of the files, and copies drift.
-
-Two things are **reported and never changed**: root journals from an older setup (`dartway_notes.md`,
-`dev_notes.md`), which hold findings nobody else has a copy of, and leftovers of an older shell
-installer in `tools/dw_claude_setup/`, whose removal means editing the git index. The installer names
-them and the commands to clear them.
 
 Commit `.claude/` and `docs/dev_notes/` after every install: a clone comes with the skills in place,
 and the history records which version of the methodology a piece of code was written under.

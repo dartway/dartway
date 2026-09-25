@@ -27,8 +27,7 @@ DwFlutterCore dw;` and the function that builds it with the protocol, the base U
 the plugins). Everything below reaches it as `dw`.
 
 Related skills: `dartway-contract` (the DTOs), `dartway-realtime` (why screens update by themselves),
-`dartway-feature-scaffold` (where this code lives), `dartway-ui-kit`, `dartway-clean-code`,
-`dartway-testing`.
+`dartway-feature-scaffold` (where this code lives), `dartway-ui-kit`, `dartway-testing`.
 
 ## 1. Reads
 

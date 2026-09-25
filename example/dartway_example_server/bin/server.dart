@@ -16,7 +16,8 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 /// - `DW_ALLOWED_ORIGINS` — the browser origins that may open the live socket
 ///   besides the one it is served on, comma-separated full origins
 ///   (`https://app.example.com,http://localhost:5000`): scheme, host and port
-///   all count. A web app served through the same host, as R2.7 deploys it,
+///   all count. A web app served through the same host (`docs/4-server/app-server.md`
+///   "Same origin"), as the deploy does it,
 ///   needs none; the server refuses to start on an entry that is not an
 ///   origin;
 /// - `DW_STORAGE_*` — file storage (see `ExampleFiles.storageConfig`): without

@@ -236,11 +236,9 @@ explains the stack; [deploy](../5-tooling/deploy.md) explains the command.
 Three kinds of file, and the difference is who may change them:
 
 - **`.claude/`** is installed by `create` and refreshed by `dartway update` (or `dartway setup-ai`):
-  the toolkit's constitution `.claude/CLAUDE.md`, the `dartway-*` skills, the `/commit` and
-  `/dartway-checkup` commands, and `settings.json`. The managed files are overwritten on every update —
-  commit the result, so the history says which skills the code was written with. Skills and commands
-  of your own, under other names, are never touched; `settings.json` is merged, keeping what you added.
-  See [the agent toolkit](../5-tooling/agent-toolkit.md).
+  the toolkit's constitution, the `dartway-*` skills, the `/commit` and `/dartway-checkup` commands,
+  and `settings.json`. What is managed versus yours to keep, and how it all works: [the agent
+  toolkit](../5-tooling/agent-toolkit.md).
 - **`CLAUDE.md` at the root** is the project's own rules for agents: a DartWay default the project
   replaces, conventions the framework says nothing about, with the reason beside each. `create` writes
   it once, nearly empty; `setup-ai` and `update` never touch it.
@@ -270,7 +268,7 @@ as long as the block is there, and the first tree to find out is one without it 
 - [Quick start](quick-start.md) — bring it up, sign in, run the checks.
 - [Data objects and generation](../2-core/data-objects-and-generation.md) — what goes in the shared
   package and what generation produces.
-- [Handlers and context](../4-server/handlers-and-context.md) — the files in `handlers/`.
+- [Handlers and context](../4-server/handlers-and-context.md) — one handler per request and command, and the caller's context.
 - [Database](../4-server/database.md) and [migrations](../4-server/migrations.md) — rows, queries and
   the migration CLI.
 - [Flutter core](../3-flutter/flutter-core.md) — what `core/dw_core.dart` builds.

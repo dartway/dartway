@@ -111,7 +111,7 @@ abstract final class ExampleAccess {
 
 `memo` runs its function at most once per call: the access check, the handler and every helper ask
 `ctx.profile`, and one query answers them all. The skeleton `dartway create` gives a project has the
-same shape in its server package's `lib/src/call_context.dart`, with an `admin` rule.
+same shape in its server package's `lib/src/core/call_context.dart`, with an `admin` rule.
 
 The framework ships no roles because every project's are different — a club has coaches, a shop has
 sellers — and a role enum in the framework would be a second one beside the project's. What it

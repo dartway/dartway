@@ -56,9 +56,9 @@ DartWay monorepo — `template/` and `toolkit/` — from the first of these that
 4. otherwise the channel `stable`.
 
 So a CLI that has the framework beside it hands out the template and the toolkit of its own
-revision: activated from the rewrite's branch, `dartway create` makes a project of the rewrite
-rather than of whatever `stable` holds. A CLI with nothing beside it — installed from pub.dev —
-takes the channel. The install prints which source it used and records it in
+revision: activated from a checkout ahead of `stable`, `dartway create` makes a project of that
+checkout rather than of whatever `stable` holds. A CLI with nothing beside it — installed from
+pub.dev — takes the channel. The install prints which source it used and records it in
 `.claude/dartway-toolkit.json`.
 
 | Variable | Meaning |

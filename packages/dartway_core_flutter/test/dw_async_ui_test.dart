@@ -4,27 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
-/// A model the app's placeholder registry knows about.
-class _Known {
-  const _Known(this.title);
-  final String title;
-}
-
-/// A model it does not — the shape of every model a widget test never
-/// registered, which is all of them until the test says otherwise.
+/// A model with no placeholder configured — the shape of every model a
+/// widget test does not pass a `loadingItem`/`loadingValue` for.
 class _Unknown {
   const _Unknown(this.title);
   final String title;
-}
-
-/// Stands in for an app's `DefaultModels` repository: it answers for the models
-/// it was told about and throws for the rest, message and all.
-T _defaultModelGetter<T>() {
-  if (T == _Known) return const _Known('placeholder') as T;
-
-  throw UnimplementedError(
-    "Default Objects Repository doesn't contain a model of type $T",
-  );
 }
 
 Widget _host(Widget child) => ProviderScope(
@@ -34,15 +18,10 @@ Widget _host(Widget child) => ProviderScope(
 void main() {
   // One DwFlutterToolbox per test process — the singleton forbids re-creation.
   final errorReports = <DwErrorReport>[];
-  DwFlutterToolbox(
-    config: DwFlutterConfig(
-      defaultModelGetter: _defaultModelGetter,
-      onErrorReport: errorReports.add,
-    ),
-  );
+  DwFlutterToolbox(config: DwFlutterConfig(onErrorReport: errorReports.add));
 
   group('dwBuildListAsync builds its placeholder lazily', () {
-    testWidgets('data renders without reaching the placeholder registry', (
+    testWidgets('data renders without building a placeholder', (
       tester,
     ) async {
       const data = AsyncValue<List<_Unknown>>.data([_Unknown('real')]);
@@ -74,9 +53,7 @@ void main() {
       expect(find.text('0 items'), findsOneWidget);
     });
 
-    testWidgets('error renders the error widget, registry untouched', (
-      tester,
-    ) async {
+    testWidgets('error renders the error widget', (tester) async {
       final failed = AsyncValue<List<_Unknown>>.error(
         StateError('boom'),
         StackTrace.empty,
@@ -95,14 +72,15 @@ void main() {
       expect(find.text('unreachable'), findsNothing);
     });
 
-    testWidgets('loading does reach the registry, and skeletonizes', (
+    testWidgets('loadingItem builds and skeletonizes the placeholder', (
       tester,
     ) async {
-      const loading = AsyncValue<List<_Known>>.loading();
+      const loading = AsyncValue<List<_Unknown>>.loading();
 
       await tester.pumpWidget(
         _host(
           loading.dwBuildListAsync(
+            loadingItem: const _Unknown('placeholder'),
             loadingItemsCount: 2,
             childBuilder: (items) =>
                 Column(children: [for (final i in items) Text(i.title)]),
@@ -114,8 +92,8 @@ void main() {
       expect(find.byType(SkeletonizerScope), findsOneWidget);
     });
 
-    testWidgets('a model the registry does not know loads as nothing, as a '
-        'single value does — never an error block', (tester) async {
+    testWidgets('with no loadingItem, loading renders nothing, as a single '
+        'value does — never an error block', (tester) async {
       errorReports.clear();
       const loading = AsyncValue<List<_Unknown>>.loading();
 
@@ -132,29 +110,10 @@ void main() {
       expect(find.byType(SkeletonizerScope), findsNothing);
       expect(errorReports, isEmpty);
     });
-
-    testWidgets('loadingItem keeps the registry out of it entirely', (
-      tester,
-    ) async {
-      const loading = AsyncValue<List<_Unknown>>.loading();
-
-      await tester.pumpWidget(
-        _host(
-          loading.dwBuildListAsync(
-            loadingItem: const _Unknown('mine'),
-            loadingItemsCount: 1,
-            childBuilder: (items) =>
-                Column(children: [for (final i in items) Text(i.title)]),
-          ),
-        ),
-      );
-
-      expect(find.text('mine'), findsOneWidget);
-    });
   });
 
   group('dwBuildAsync', () {
-    testWidgets('data renders without reaching the placeholder registry', (
+    testWidgets('data renders without building a placeholder', (
       tester,
     ) async {
       const data = AsyncValue<_Unknown>.data(_Unknown('real'));
@@ -166,7 +125,7 @@ void main() {
       expect(find.text('real'), findsOneWidget);
     });
 
-    testWidgets('a model the registry does not know loads as nothing', (
+    testWidgets('with no loadingValue, loading renders nothing', (
       tester,
     ) async {
       const loading = AsyncValue<_Unknown>.loading();

@@ -110,8 +110,9 @@ catalog, so open questions are visible without reading every passport.
 
 Report after the new screen has built — a route change fires before its widgets
 mount, so reporting in the same turn describes the screen you just left. The
-reference app-side binding is not ported to DartWay 1.0 yet; until it is, an app
-wires the host itself.
+app-side binding is `dartway_studio_binding` — one widget that attaches the
+host and does this wiring; an app that needs something it does not offer wires
+the host itself.
 
 ## Inspecting a point (the "pencil" flow)
 

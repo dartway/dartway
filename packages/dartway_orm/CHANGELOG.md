@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.6
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
+
 ## 0.21.0-dev.5
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server`.
@@ -41,7 +45,7 @@
 
 ## 0.20.0-dev.1
 
-The rewrite (see docs/1.0).
+The rewrite (see docs/1.0/DECISIONS.md).
 
 - **`DwEnumType` and `DwEnumListType` refuse to write `unknown` with `DwUnknownEnumWrite`** instead of a bare `StateError` (D-071). Catch the new type; on a call the framework now turns it into `dw.updateRequired` rather than an incident.
 - **Open enum columns** (D-071): `DwEnumType` and `DwEnumListType` of a `DwOpenEnum` read an unknown name as `unknown` and refuse to write `unknown`; strict enums still fail the read.

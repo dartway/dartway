@@ -63,19 +63,14 @@ class DwFlutterToolbox {
     ),
   );
 
-  /// Dispatch point for every reported error. The base implementation runs the
-  /// configured [DwFlutterConfig.onErrorReport] hook, or logs via `debugPrint` when
-  /// none is set; `DwFlutterCore` overrides it to alert out of the box when the app
-  /// has not installed its own policy.
+  /// Dispatch point for every reported error: runs the configured
+  /// [DwFlutterConfig.onErrorReport] hook, or logs via `debugPrint` when none
+  /// is set.
   void dispatchReport(DwErrorReport report) {
     final onReport = _config.onErrorReport;
     if (onReport != null) return onReport(report);
     debugPrint('${report.error}\n${report.stackTrace}');
   }
-
-  /// True when the app supplied its own error handling in [DwFlutterConfig] — the
-  /// out-of-the-box alerting then steps aside.
-  bool get hasCustomErrorHandling => _config.onErrorReport != null;
 
   /// Shows a confirmation for [confirmation]: the app-supplied
   /// [DwFlutterConfig.confirmDialogBuilder] when set, the built-in [DwConfirmDialog]
@@ -85,23 +80,4 @@ class DwFlutterToolbox {
         context,
         confirmation,
       );
-
-  /// Whether [DwFlutterConfig.defaultModelGetter] is configured — drives whether
-  /// skeleton loading states use a real placeholder model or a generic shimmer.
-  bool get isDefaultModelsGetterSetUp => _config.defaultModelGetter != null;
-
-  /// Returns a placeholder instance of model [T] for skeleton loading, via
-  /// [DwFlutterConfig.defaultModelGetter]. Throws if the getter is not configured.
-  T getDefaultModel<T>() {
-    final getter = _config.defaultModelGetter;
-
-    if (getter == null) {
-      throw StateError(
-        'DwFlutterConfig.defaultModelGetter is not set. '
-        'Provide it in the DwFlutterConfig passed to DwFlutterToolbox/DwFlutterCore.',
-      );
-    }
-
-    return getter<T>();
-  }
 }

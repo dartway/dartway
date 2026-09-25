@@ -104,7 +104,7 @@ a project keeps its copy of what `dartway create` gave it, so such a note is the
 
 Apply what the notes ask for, one note at a time, and keep them separable in the diff. Use the project's
 own conventions — the note says *what* has to change, not how this project writes code;
-`dartway-clean-code` and the layer skills still decide that.
+the layer skills still decide that.
 
 **Where a note and this project disagree, stop and ask.** A note is written for the general case, and a
 project that has done something deliberately different is exactly the case its author could not see. Do
@@ -229,5 +229,3 @@ An entry below answers three things, in this order: **how to tell** the project 
 - **State and queries out of zones → `core/` and `shared/` (feature law).** *You have the old shape if:* `dart run dartway_cli:dartway check` reports `notAFeature` — a folder in a zone whose entry point declares no widget. *Target:* state that several features watch is wiring, so `lib/core/`; a helper with no story of its own is a building block, so `lib/shared/`. *What has accumulated:* move it as you touch the feature that reads it — a provider named in tests through `overrideWith` stays a named provider, it just changes address.
 
 - **An unlocalized app → the localization law (`dartway-ui-kit`, "Localization — the law in full").** *You have the old shape if:* `dart run dartway_cli:dartway check` reports `l10nNotWired`, or `grep -r 'context\.l10n' __FLUTTER_PKG__/lib` finds nothing while the widgets are full of readable strings. *Target:* the wiring the law lists, and every user-visible string coming from `context.l10n` or `appL10n`. *What has accumulated:* **the wiring goes in one commit, the strings screen by screen.** Every widget test that builds its own `MaterialApp` starts failing at the first lookup — fix it in the shared test harness, not in each test. The first `.arb` is written in whatever language the app's strings are already in, or the migration turns into an unasked-for translation.
-
-- **The two root journals → `docs/dev_notes/` and the tracker.** *You have the old shape if:* `ls dartway_notes.md dev_notes.md` finds either one at the project root. *Target:* a finding about the framework is an issue in the tracker; a finding of this project's own is one tracked file under `docs/dev_notes/`. *What has accumulated:* both journals were git-ignored, so **read them before anything else touches the working copy** — they are the one copy that exists. Every open `dartway_notes.md` entry becomes an issue under the filing rules of `dartway-framework-notes` (entries that already carry an `**Issue:**` line only need their issue's state checked); every open `dev_notes.md` entry becomes a file under `docs/dev_notes/`, and its coverage table moves into `docs/dev_notes/_coverage.md`. Then delete both files and their `.gitignore` lines. `dartway setup-ai` reports the journals while they are still there.
