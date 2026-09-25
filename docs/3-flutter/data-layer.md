@@ -300,9 +300,9 @@ ref.watch(dw.request(const ListNews())).dwBuildListAsync(
 ```
 
 - **loading** is a skeleton of your real widget, built over placeholder data — `loadingValue` /
-  `loadingItem`, or `DwFlutterConfig.defaultModelGetter` when neither is passed — and wrapped in
-  `Skeletonizer` (`SliverSkeletonizer` when the builder returned a sliver). `loadingWidget` replaces
-  the skeleton where a skeleton over stand-in data would itself mislead;
+  `loadingItem` — and wrapped in `Skeletonizer` (`SliverSkeletonizer` when the builder returned a
+  sliver); pass neither and the loading branch renders nothing, never an error block.
+  `loadingWidget` replaces the skeleton where a skeleton over stand-in data would itself mislead;
 - **error** goes to the error pipeline with `DwErrorSource.asyncBuild`, and is replaced by
   `errorBuilder`'s widget, or by `errorWidget` (default `SizedBox.shrink()`);
 - **data** is `childBuilder`. `skipLoadingOnRefresh` is on by default.

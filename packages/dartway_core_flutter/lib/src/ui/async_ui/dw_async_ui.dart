@@ -6,7 +6,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 /// The async-UI contract: render an `AsyncValue`'s loading / error / data
 /// branches uniformly. The loading branch is a skeleton derived from your real
-/// widget (built against a placeholder value), not a spinner; an error is
+/// widget (built against a placeholder value) when one is given; an error is
 /// routed into the dw error pipeline and replaced by [errorWidget].
 extension DwAsyncValueX<T> on AsyncValue<T> {
   Widget dwBuildAsync({
@@ -26,8 +26,6 @@ extension DwAsyncValueX<T> on AsyncValue<T> {
       errorWidget: errorWidget,
       errorBuilder: errorBuilder,
       loadingValueBuilder: placeholder == null ? null : () => placeholder,
-      registryValueBuilder: () =>
-          null is T ? null as T : dw.getDefaultModel<T>(),
       loadingWidget: loadingWidget,
       skipLoadingOnReload: skipLoadingOnReload,
       skipLoadingOnRefresh: skipLoadingOnRefresh,
@@ -53,17 +51,12 @@ extension DwAsyncValueListX<T> on AsyncValue<List<T>> {
       childBuilder: childBuilder,
       errorWidget: errorWidget,
       errorBuilder: errorBuilder,
-      // Factories, not values: the placeholder list — and the registry it may
-      // need — must not be touched on the data and error branches. A widget
-      // test of a list screen would otherwise need the app's model registry
-      // standing up to render an AsyncData it already holds.
+      // A factory, not a value: the placeholder list must not be built on the
+      // data and error branches. A widget test of a list screen would
+      // otherwise pay for a placeholder it never renders.
       loadingValueBuilder: loadingItem == null
           ? null
           : () => List.filled(loadingItemsCount, loadingItem),
-      registryValueBuilder: () => List.generate(
-        loadingItemsCount,
-        (_) => null is T ? null as T : dw.getDefaultModel<T>(),
-      ),
       loadingWidget: loadingWidget,
       skipLoadingOnReload: skipLoadingOnReload,
       skipLoadingOnRefresh: skipLoadingOnRefresh,
@@ -71,22 +64,16 @@ extension DwAsyncValueListX<T> on AsyncValue<List<T>> {
   }
 }
 
-/// The single implementation both public builders delegate to. The loading
-/// placeholder arrives as a factory so that nothing it needs — the default-model
-/// registry above all — is touched unless the loading branch actually renders.
-/// A null [loadingValueBuilder] means the caller supplied no placeholder; the
-/// app's registry ([registryValueBuilder]) is asked then. When it has no
-/// placeholder for the type — no getter configured, or a getter that does not
-/// know the model — the loading branch is empty, as it is for a single value:
-/// a skeleton is an improvement on nothing, never a reason for an error block
-/// where a list is about to appear.
+/// The single implementation both public builders delegate to. A null
+/// [loadingValueBuilder] means the caller supplied no placeholder value — the
+/// loading branch then renders nothing ([SizedBox.shrink]), never an error
+/// block, while data is on its way.
 Widget _dwBuildAsync<T>(
   AsyncValue<T> value, {
   required Widget Function(T value) childBuilder,
   required Widget errorWidget,
   required Widget Function(Object error, StackTrace stackTrace)? errorBuilder,
   required T Function()? loadingValueBuilder,
-  required T Function() registryValueBuilder,
   required Widget? loadingWidget,
   required bool skipLoadingOnReload,
   required bool skipLoadingOnRefresh,
@@ -101,20 +88,9 @@ Widget _dwBuildAsync<T>(
     },
     loading: () {
       if (loadingWidget != null) return loadingWidget;
+      if (loadingValueBuilder == null) return const SizedBox.shrink();
 
-      final T fakeData;
-      if (loadingValueBuilder != null) {
-        fakeData = loadingValueBuilder();
-      } else {
-        if (!dw.isDefaultModelsGetterSetUp) return const SizedBox.shrink();
-        try {
-          fakeData = registryValueBuilder();
-        } catch (_) {
-          // The registry does not know this model: no skeleton, not an error.
-          return const SizedBox.shrink();
-        }
-      }
-
+      final fakeData = loadingValueBuilder();
       final built = childBuilder(fakeData);
 
       // A sliver child needs the sliver-flavoured skeletonizer: the box one

@@ -1,6 +1,6 @@
 name: dartway_core_server
 description: The DartWay application server — HTTP calls per DTO, the live update socket, handlers, auth, channels and jobs, on dart:io.
-version: 0.21.0-dev.5
+version: 0.21.0-dev.6
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 resolution: workspace

@@ -31,7 +31,7 @@ route of the same path with a specific method wins over it. The handler is a `Dw
 
 ```dart
 typedef DwRouteHandler =
-    FutureOr<DwHttpResponse> Function(DwRouteContext ctx, DwHttpRequest request);
+    FutureOr<DwHttpResponse> Function(DwCallContext ctx, DwHttpRequest request);
 ```
 
 **Paths match exactly** — a map lookup, no patterns and no path parameters; an id goes in the query
@@ -40,9 +40,9 @@ or the body. An unknown path is `404`; a known path with another method is `405`
 The server refuses to start on a route at `/dw`, under `/dw/` or at `/health` (the framework's), on
 a path that does not start with `/`, or on the same method and path declared twice.
 
-## `DwRouteContext`
+## `ctx`: a `DwCallContext`
 
-`DwRouteContext` is a `DwCallContext` ([handlers](handlers-and-context.md#dwcallcontext)):
+A route's `ctx` is a `DwCallContext` ([handlers](handlers-and-context.md#dwcallcontext)):
 `ctx.db`, `ctx.transaction`, `ctx.publish`, `ctx.jobs`, `ctx.accounts`, `ctx.files`, `ctx.log`. A
 route may publish and enqueue jobs. It does **not** run in a transaction: `ctx.db` is the pool, so a
 route that writes more than one row opens `ctx.transaction`. Publications are delivered when the

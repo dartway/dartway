@@ -55,9 +55,10 @@ class DwFeatureSpec {
   /// reason survives ("the list is not cached: it changes more often than it is
   /// read"); a trap survives ("the server sends the date in UTC, the screen
   /// shows it local"). A map of the code does not — "the list comes from
-  /// `dw.repo.modelList` and is drawn by a `ListView`" is what the file already
-  /// says, and unlike the file it starts lying the moment someone moves the
-  /// widget. Nothing checks it: not the compiler, not `dartway check`.
+  /// `dw.request(const ListInvoices())` and is drawn by a `ListView`" is what
+  /// the file already says, and unlike the file it starts lying the moment
+  /// someone moves the widget. Nothing checks it: not the compiler, not
+  /// `dartway check`.
   final List<String> implementationNotes;
 
   /// What is wrong here and worth taking into work: a setting nothing reads,

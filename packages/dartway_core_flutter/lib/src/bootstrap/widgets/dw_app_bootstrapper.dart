@@ -110,10 +110,11 @@ class _DwAppBootstrapperState extends ConsumerState<DwAppBootstrapper> {
     } catch (error, stack) {
       // Reporting is attempted, and it is not allowed to decide whether the
       // app gets a first frame. The handler runs against a core that has just
-      // failed to initialize — DwFlutterCore's own alerting talks to the server the
-      // start could not reach — and a throw in here used to leave `_failed`
-      // unset, so the app sat on the loading screen, which under a native
-      // splash is a `SizedBox.shrink()`: nothing at all, for good.
+      // failed to initialize — its configured `onErrorReport` may itself talk
+      // to the server the start could not reach — and a throw in here used to
+      // leave `_failed` unset, so the app sat on the loading screen, which
+      // under a native splash is a `SizedBox.shrink()`: nothing at all, for
+      // good.
       try {
         widget.onError(error, stack);
       } catch (reportingError, reportingStack) {

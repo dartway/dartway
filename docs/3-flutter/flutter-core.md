@@ -65,7 +65,6 @@ dw = DwFlutterCore(
 | `updateRequiredScreen` | no | The page put over the whole app once this build can no longer talk to its server. See [update required](update-required.md). |
 | `onErrorReport` | no | Receives every `DwErrorReport`. Without it a report is only `debugPrint`ed. See [error reporting](error-reporting.md). |
 | `confirmDialogBuilder` | no | Replaces the built-in `DwConfirmDialog` for `dw.action(confirmation: ...)`. |
-| `defaultModelGetter` | no | Placeholder values for skeletons in `dwBuildAsync` / `dwBuildListAsync` when the caller passes none. See [the data layer](data-layer.md#rendering-an-asyncvalue). |
 
 **Why two fields are required.** A server answers "no" with a code, and an app that cannot render
 the code shows the user nothing at all. A server that stops supporting old builds needs to know

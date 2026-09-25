@@ -39,8 +39,10 @@ class DwAppRunner {
   final List<Locale> supportedLocales;
 
   /// Optional custom global error handler. When omitted, uncaught errors go
-  /// through the dw error pipeline (`dw.handleError` with zone source) — with
-  /// DwFlutterCore that means out-of-the-box alerting with app context.
+  /// through the dw error pipeline (`dw.handleError` with zone source): the
+  /// app-state context is captured and passed to the configured
+  /// `DwFlutterConfig.onErrorReport`, or logged via `debugPrint` when none is
+  /// set.
   final void Function(Object error, StackTrace stackTrace)? onError;
 
   /// The actual app widget.
@@ -55,8 +57,9 @@ class DwAppRunner {
   });
 
   /// The default error handler: routes uncaught errors into the dw error
-  /// pipeline (context capture + configured hook / out-of-the-box alerting).
-  /// Falls back to debugPrint while dw is not created yet (early bootstrap).
+  /// pipeline (context capture + the configured `onErrorReport` hook, or
+  /// `debugPrint` when none is set). Falls back to `debugPrint` while dw is
+  /// not created yet (early bootstrap).
   static void _routeErrorToDw(Object error, StackTrace stackTrace) {
     final instance = dwOrNull;
     if (instance != null) {

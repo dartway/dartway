@@ -4,16 +4,13 @@ import '../context/dw_call_context.dart';
 import '../http/dw_http_request.dart';
 import '../http/dw_http_response.dart';
 
-/// The context of a project route: a [DwCallContext], with the caller's
-/// account and session key when the route authenticates ([DwRouteAuth]), and
-/// without them otherwise. Publications and jobs are allowed; they are
-/// delivered when the route answers.
-typedef DwRouteContext = DwCallContext;
-
-/// Handles one external HTTP door.
+/// Handles one external HTTP door. `ctx` is a [DwCallContext], with the
+/// caller's account and session key when the route authenticates
+/// ([DwRouteAuth]), and without them otherwise. Publications and jobs are
+/// allowed; they are delivered when the route answers.
 typedef DwRouteHandler =
     FutureOr<DwHttpResponse> Function(
-      DwRouteContext ctx,
+      DwCallContext ctx,
       DwHttpRequest request,
     );
 

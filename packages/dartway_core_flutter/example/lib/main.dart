@@ -170,9 +170,8 @@ class _TourScreen extends ConsumerWidget {
 
           // -------------------------------------------------------------------
           //    A list variant: `dwBuildListAsync` renders skeleton rows while
-          //    loading. Standalone we pass an explicit `loadingItem`; with the
-          //    data layer, `DwFlutterConfig.defaultModelGetter` supplies it and the
-          //    skeleton is built from your real row widget.
+          //    loading, built from an explicit `loadingItem`. Pass none and the
+          //    loading branch renders nothing, never an error block.
           // -------------------------------------------------------------------
           _Section('Async list', [
             SizedBox(

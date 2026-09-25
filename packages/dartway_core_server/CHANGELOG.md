@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0-dev.6
+
+- **BREAKING: `DwRouteContext` is gone — a route handler's `ctx` is typed `DwCallContext`
+  directly.** Same type, same members, no signature or behaviour change; one way to name it, not
+  two. Migration note: `docs/migrations/2026-09-25-route-context-typedef-removed.md`.
+
 ## 0.21.0-dev.5
 
 - **BREAKING: a server is its features. `DwAppServer(features: [...])` replaces `handlers:`, `channels:`, `jobs:` and `routes:`; each `DwServerFeature(name, handlers:, channels:, jobs:, routes:)` declares one area of the project** (D-093). `server.handlers`, `channels`, `jobs` and `routes` read them all together. A feature's name is its folder under `lib/src/` — lower-case, declared once, or the server does not start. Projects spread an area's pieces over the server's lists by hand, each in its own way; the dartway CLI now holds the layout this names. Migration note: `docs/migrations/2026-09-25-server-features.md`.
