@@ -33,6 +33,7 @@ void main() {
           migrations: const [],
           database: database.config.copyWith(maxConnections: 2),
           auth: DwAuthConfig(
+            accountDeletion: DwAccountDeletion.byMember,
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),

@@ -16,7 +16,7 @@ environment:
 # declares is compiled into the server and into the app alike, so it cannot
 # reach for Flutter, a database or IO.
 dependencies:
-  dartway_core_shared: ^0.21.0-dev.2
+  dartway_core_shared: ^0.21.0-dev.3
 
 dev_dependencies:
   lints: ^6.0.0

@@ -83,6 +83,9 @@ final class DwAuthService {
       // a repeat finds no account and does nothing, which is the same answer.
       recordsSuccess: false,
       handle: (ctx, command) async {
+        if (auth.accountDeletion != DwAccountDeletion.byMember) {
+          ctx.refuse(DwCoreRefusal.forbidden);
+        }
         await ctx.accounts.deleteAccount(ctx.requireAccountId);
       },
     ),

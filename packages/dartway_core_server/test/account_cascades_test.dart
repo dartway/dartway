@@ -28,6 +28,7 @@ void main() {
         database.config,
         migrations: [migration],
         auth: DwAuthConfig(
+          accountDeletion: DwAccountDeletion.byMember,
           normalize: (kind, raw) => raw.trim().toLowerCase(),
           deliverCode: (ctx, kind, identifier, code, accountId) async {},
           onAccountDeleting: onAccountDeleting,

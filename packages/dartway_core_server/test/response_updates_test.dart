@@ -268,6 +268,7 @@ bool _isAction(DwUpdateMessage message) => message.updates.objects.any(
 /// The fixture's auth, with an account-creation hook that — like the
 /// example's — tells staff of the newcomer.
 DwAuthConfig _announcingNewcomers(DwAuthConfig base) => DwAuthConfig(
+  accountDeletion: base.accountDeletion,
   normalize: base.normalize,
   deliverCode: base.deliverCode,
   generateCode: base.generateCode,

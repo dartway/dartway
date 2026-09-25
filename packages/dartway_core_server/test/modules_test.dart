@@ -99,6 +99,7 @@ DwAppServer serverWith(
   migrations: const [],
   database: database,
   auth: DwAuthConfig(
+    accountDeletion: DwAccountDeletion.byMember,
     normalize: (kind, raw) => raw,
     deliverCode: (ctx, kind, identifier, code, accountId) async {},
   ),
@@ -168,6 +169,7 @@ void main() {
         migrations: const [],
         database: database.config,
         auth: DwAuthConfig(
+          accountDeletion: DwAccountDeletion.byMember,
           normalize: (kind, raw) => raw,
           deliverCode: (ctx, kind, identifier, code, accountId) async {},
         ),

@@ -33,6 +33,7 @@ final class DwAuthConfig {
   const DwAuthConfig({
     required this.normalize,
     required this.deliverCode,
+    required this.accountDeletion,
     this.generateCode,
     this.onAccountCreated,
     this.onIdentifierChanged,
@@ -174,6 +175,13 @@ final class DwAuthConfig {
   final Future<void> Function(DwCallContext ctx, int accountId)?
   onAccountDeleting;
 
+  /// Who may delete an account — required, because either default was wrong
+  /// for someone. The framework used to answer `DwDeleteMyAccount` for every
+  /// project, and two of them learned it had become live only when a pin
+  /// moved; each then refused it from [onAccountDeleting], which also refused
+  /// the operator's own deletions.
+  final DwAccountDeletion accountDeletion;
+
   /// Digits in a delivered code.
   final int codeLength;
   final Duration codeLifetime;
@@ -265,4 +273,15 @@ final class DwIdentifierChange {
   @override
   String toString() =>
       'DwIdentifierChange(account $accountId, ${kind.name}, ${cause.name})';
+}
+
+/// Who may delete an account ([DwAuthConfig.accountDeletion]).
+enum DwAccountDeletion {
+  /// A signed-in member deletes their own account with `DwDeleteMyAccount` —
+  /// what an app store asks of an app people sign up in.
+  byMember,
+
+  /// Only server code deletes accounts (`ctx.accounts.deleteAccount`);
+  /// `DwDeleteMyAccount` is refused `dw.forbidden`.
+  byOperator,
 }

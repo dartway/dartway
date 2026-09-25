@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.3
+
+- **BREAKING: `DwAuthConfig.accountDeletion` is required — `DwAccountDeletion.byMember` answers `DwDeleteMyAccount`, `byOperator` refuses it `dw.forbidden`** (D-089). The framework used to answer the command in every project, and two of them learned it had gone live only when their pin moved; each switched it off by refusing inside `onAccountDeleting`, which refused the operator's own `ctx.accounts.deleteAccount` as well. Migration note: `docs/migrations/2026-09-24-account-deletion-choice.md`.
+
 ## 0.21.0-dev.2
 
 - **`testing.dart` carries what every project's harness copied from the skeleton**: `DwCountingTransport` (real HTTP, posts counted per wire name, the last answer kept), `DwRecordingConnector` (the real live socket, every frame kept — `updatesOn`, `refusalsOf`, `closuresOf` a channel) and `dwWaitUntil(condition, reason:)`, the polling wait that throws a `TimeoutException` naming its reason. u90, Molodey and Studio each carried a copy, and the copies drifted.

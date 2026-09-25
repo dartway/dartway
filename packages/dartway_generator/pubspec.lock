@@ -111,28 +111,28 @@ packages:
       path: "../dartway_client"
       relative: true
     source: path
-    version: "0.21.0-dev.2"
+    version: "0.21.0-dev.3"
   dartway_core_server:
     dependency: "direct dev"
     description:
       path: "../dartway_core_server"
       relative: true
     source: path
-    version: "0.21.0-dev.2"
+    version: "0.21.0-dev.3"
   dartway_core_shared:
     dependency: "direct dev"
     description:
       path: "../dartway_core_shared"
       relative: true
     source: path
-    version: "0.21.0-dev.2"
+    version: "0.21.0-dev.3"
   dartway_orm:
     dependency: "direct dev"
     description:
       path: "../dartway_orm"
       relative: true
     source: path
-    version: "0.21.0-dev.2"
+    version: "0.21.0-dev.3"
   dartway_push_server:
     dependency: "direct dev"
     description:

@@ -162,6 +162,43 @@ void main() {
       },
     );
 
+    test('byOperator refuses DwDeleteMyAccount, and server code still '
+        'deletes', () async {
+      final testApp = TestApp();
+      final operated = await Harness.start(
+        app: testApp,
+        build: (app, config) => app.server(
+          config,
+          auth: app.auth(accountDeletion: DwAccountDeletion.byOperator),
+        ),
+      );
+      try {
+        const email = 'kept@example.com';
+        final session = await testApp.signIn(operated.caller(), email);
+        final member = operated.caller(token: session.token);
+
+        final answer = await member.call(const DwDeleteMyAccount());
+        expect(answer.status, 403, reason: answer.text);
+        expect(answer.refusal.code, DwCoreRefusal.forbidden.code);
+        expect(
+          (await member.call(const DwSignOut())).status,
+          200,
+          reason: 'the account and its session are intact',
+        );
+
+        await operated.server.server.accounts.deleteAccount(session.id);
+        expect(
+          await operated.db.query(
+            'SELECT 1 FROM dw_account WHERE id = @id',
+            params: {'id': session.id},
+          ),
+          isEmpty,
+        );
+      } finally {
+        await operated.stop();
+      }
+    });
+
     test('signed out, there is nothing to delete', () async {
       expect(
         (await harness().caller().call(const DwDeleteMyAccount())).status,
@@ -314,6 +351,7 @@ void main() {
         'account is not created', () async {
       final base = harness().app.auth();
       final auth = DwAuthConfig(
+        accountDeletion: DwAccountDeletion.byMember,
         normalize: base.normalize,
         deliverCode: base.deliverCode,
         onAccountCreated: (ctx, accountId, kind, identifier, origin) async =>

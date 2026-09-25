@@ -210,7 +210,9 @@ final class TestApp {
     int maxRequestsPerWindow = 3,
     int maxAttempts = 3,
     Duration keyTouchInterval = const Duration(minutes: 10),
+    DwAccountDeletion accountDeletion = DwAccountDeletion.byMember,
   }) => DwAuthConfig(
+    accountDeletion: accountDeletion,
     normalize: (kind, raw) {
       final value = raw.trim().toLowerCase();
       return switch (kind) {

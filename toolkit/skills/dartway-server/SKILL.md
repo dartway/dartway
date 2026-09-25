@@ -430,8 +430,12 @@ it. `DwAuthConfig` in `lib/src/`:
   consents — or `DwToolOrigin()` for `DwAccountService.ensure` (a seed, an admin bootstrap), which
   accepted nothing on anyone's behalf. **Refusing here refuses the sign-in** and creates nothing;
   the code stays usable;
+- **`accountDeletion` says who may delete an account**, and it is required: `byMember` answers
+  `DwDeleteMyAccount` (required by app stores for an app people sign up in), `byOperator` refuses it
+  and leaves deletion to server code (`ctx.accounts.deleteAccount`). Never refuse the command from
+  `onAccountDeleting` to switch it off — that refuses the operator too;
 - **`onAccountDeleting(ctx, accountId)` deletes or anonymises the project's rows** when the account is
-  deleted (`DwDeleteMyAccount`, required by app stores). A row that references `dw_account` without a
+  deleted (`DwDeleteMyAccount`, `ctx.accounts.deleteAccount`). A row that references `dw_account` without a
   cascade must go here. The framework removes its own part — files, keys, identities — after the
   hook. Decide per kind of row, by one question: **is this about that person alone, or does someone
   else hold on to it?**
