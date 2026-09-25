@@ -104,7 +104,7 @@ final class DwPushService {
       // Every pending delivery is covered by a job due no later than it.
       await _ctx.jobs.enqueue(
         DwPushModule.deliverJob,
-        const {},
+        null,
         runAt: scheduledAt,
       );
       return rows.length;

@@ -26,7 +26,13 @@ export 'src/files/dw_storage_buckets.dart' show DwFileStorageSetup;
 export 'src/context/dw_call_context.dart'
     show DwCallContext, DwNotAuthenticatedException;
 export 'src/handlers/dw_call_handler.dart'
-    show DwAccessRule, DwCallHandler, DwPageInput, DwTableInput, DwWindowInput;
+    show
+        DwAccessRule,
+        DwAccessedResource,
+        DwCallHandler,
+        DwPageInput,
+        DwTableInput,
+        DwWindowInput;
 export 'src/http/dw_http_request.dart';
 export 'src/http/dw_http_response.dart';
 export 'src/http/dw_request_body.dart' show DwRequestBodyException;
@@ -34,6 +40,7 @@ export 'src/jobs/dw_job_queue.dart'
     show
         DwJobAttempt,
         DwJobDefinition,
+        DwJobKind,
         DwJobQueue,
         DwQueuedJob,
         DwRecurringJob,

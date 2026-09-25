@@ -214,6 +214,23 @@ final class GetNote extends DwSingleRequest<NoteView> {
       GetNote(json['noteId']! as int);
 }
 
+/// The caller's own note: `DwAccessRule.resource` loads it, the handler
+/// reads it with `ctx.accessed`.
+final class GetMyNote extends DwSingleRequest<NoteView> {
+  const GetMyNote(this.noteId);
+
+  final int noteId;
+
+  @override
+  String get dwTypeName => 'GetMyNote';
+
+  @override
+  Map<String, Object?> toJson() => {'noteId': noteId};
+
+  static GetMyNote fromJson(Map<String, Object?> json) =>
+      GetMyNote(json['noteId']! as int);
+}
+
 final class FindNote extends DwMaybeRequest<NoteView> {
   const FindNote(this.noteId);
 
@@ -827,6 +844,7 @@ final DwWireProtocol testProtocol = DwWireProtocol([
   DwProtocolEntry<SendToInbox>('SendToInbox', SendToInbox.fromJson),
   DwProtocolEntry<NotesOfOwner>('NotesOfOwner', NotesOfOwner.fromJson),
   DwProtocolEntry<GetNote>('GetNote', GetNote.fromJson),
+  DwProtocolEntry<GetMyNote>('GetMyNote', GetMyNote.fromJson),
   DwProtocolEntry<FindNote>('FindNote', FindNote.fromJson),
   DwProtocolEntry<FeedNotes>('FeedNotes', FeedNotes.fromJson),
   DwProtocolEntry<GreedyFeed>('GreedyFeed', GreedyFeed.fromJson),

@@ -52,6 +52,29 @@ void main() {
       expect(harness().app.ownerChecks, checks);
     });
 
+    test('resource loads once and hands the row to the handler; absent and '
+        "someone else's are the same notFound", () async {
+      final note = await TestApp.insertNote(
+        harness().db,
+        'mine',
+        session.id,
+      );
+      final loads = harness().app.noteLoads;
+      expect(
+        (await signed.call(GetMyNote(note.id))).value(GetMyNote(note.id)),
+        note,
+      );
+      expect(harness().app.noteLoads, loads + 1, reason: 'read once');
+
+      final (other, _) = await harness().signedIn('calls-peer@example.com');
+      final theirs = await other.call(GetMyNote(note.id));
+      final absent = await other.call(const GetMyNote(-7));
+      expect(theirs.status, 404);
+      expect(theirs.refusal, absent.refusal);
+
+      expect((await anonymous.call(GetMyNote(note.id))).status, 401);
+    });
+
     test('requireAccountId in a handler answers unauthenticated', () async {
       expect((await anonymous.call(const NeedsAccount())).status, 401);
       expect(
@@ -535,9 +558,9 @@ void main() {
 
 final class _NoJobs implements DwJobQueue {
   @override
-  Future<bool> enqueue(
-    String name,
-    Map<String, Object?> payload, {
+  Future<bool> enqueue<P>(
+    DwJobKind<P> job,
+    P payload, {
     DateTime? runAt,
     String? key,
   }) => throw UnimplementedError();

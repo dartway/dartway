@@ -42,7 +42,9 @@ final class DwPushModule extends DwServerModule {
   }) : _providers = List.unmodifiable(providers);
 
   /// The delivery job: drains due deliveries within a run budget.
-  static const String deliverJob = 'dw.push.deliver';
+  static final DwJobKind<void> deliverJob = DwJobKind.withoutPayload(
+    'dw.push.deliver',
+  );
 
   /// The recurring cleanup job.
   static const String cleanupJob = 'dw.push.cleanup';
@@ -74,12 +76,12 @@ final class DwPushModule extends DwServerModule {
 
   @override
   late final List<DwJobDefinition> jobs = [
-    DwJobDefinition(
+    DwQueuedJob(
       deliverJob,
       // Provider calls happen here: never inside the claiming transaction.
       transactional: false,
       lease: settings.lease,
-      handle: (ctx, payload) => _worker.run(ctx),
+      handle: (ctx, _) => _worker.run(ctx),
     ),
     DwRecurringJob(
       cleanupJob,

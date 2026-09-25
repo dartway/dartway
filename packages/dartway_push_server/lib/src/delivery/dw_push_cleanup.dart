@@ -49,7 +49,7 @@ final class DwPushCleanup {
       );
       await ctx.jobs.enqueue(
         DwPushModule.deliverJob,
-        const {},
+        null,
         key: 'dw.push.recover',
       );
     }

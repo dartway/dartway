@@ -73,6 +73,13 @@ void main() {
               ),
               handle: (ctx, request) async => const [],
             ),
+            DwCallHandler.list<ListNotes, NoteView>(
+              access: DwAccessRule.resource<GetMyNote, NoteView>(
+                load: (ctx, request) async => null,
+                allows: (ctx, request, note) => true,
+              ),
+              handle: (ctx, request) async => const [],
+            ),
           ],
           channels: [
             ...app.channels(),
@@ -82,9 +89,9 @@ void main() {
             ),
           ],
           jobs: [
-            DwJobDefinition('dw.mine', handle: (ctx, payload) async {}),
-            DwJobDefinition('twin', handle: (ctx, payload) async {}),
-            DwJobDefinition('twin', handle: (ctx, payload) async {}),
+            DwQueuedJob(DwJobKind.withoutPayload('dw.mine'), handle: (ctx, _) async {}),
+            DwQueuedJob(DwJobKind.withoutPayload('twin'), handle: (ctx, _) async {}),
+            DwQueuedJob(DwJobKind.withoutPayload('twin'), handle: (ctx, _) async {}),
             DwRecurringJob(
               'never',
               every: Duration.zero,
@@ -118,6 +125,9 @@ void main() {
         'ListNotes has more than one handler',
         'the access check of the list(ListNotes) handler is written for '
             'NotesOfOwner',
+        'ListNotes has more than one handler',
+        'the access check of the list(ListNotes) handler is written for '
+            'GetMyNote',
         'OrphanRequest is a registered request without a handler',
         'OrphanCommand is a registered command without a handler',
         'channel kind "notes" has more than one rule',

@@ -4,15 +4,19 @@ import '../context/dw_call_context.dart';
 
 /// Enqueues background jobs.
 abstract interface class DwJobQueue {
-  /// Schedules the job named [name] with [payload] (a JSON object) at [runAt]
-  /// (now when omitted). The row is written through the caller's database —
-  /// inside a transaction it appears only if the transaction commits.
+  /// Schedules [job] with [payload] at [runAt] (now when omitted). The row is
+  /// written through the caller's database — inside a transaction it appears
+  /// only if the transaction commits.
+  ///
+  /// The payload is encoded here, by the kind's codec, so a payload that is
+  /// not JSON fails at the call site; the server must declare a job of this
+  /// kind (`DwAppServer(jobs: …)` or a module's), or this throws.
   ///
   /// A [key] deduplicates: while a job with the same key is pending, another
   /// enqueue with it does nothing and returns `false`.
-  Future<bool> enqueue(
-    String name,
-    Map<String, Object?> payload, {
+  Future<bool> enqueue<P>(
+    DwJobKind<P> job,
+    P payload, {
     DateTime? runAt,
     String? key,
   });
@@ -25,10 +29,6 @@ Duration dwDefaultJobBackoff(int attempt) {
   return Duration(seconds: seconds.clamp(10, 3600));
 }
 
-/// A background job the server knows how to run.
-///
-/// Enqueued jobs are declared with the unnamed constructor, recurring ones
-/// with [DwRecurringJob]; both go into `DwAppServer(jobs: …)`. Names starting
 /// Which run of a job a context belongs to: `ctx.job` in a job's handler.
 final class DwJobAttempt {
   const DwJobAttempt({
@@ -53,45 +53,73 @@ final class DwJobAttempt {
   String toString() => 'DwJobAttempt($name, $attempt of $maxAttempts)';
 }
 
-/// with `dw.` belong to the framework.
+/// A background job the server knows how to run: [DwQueuedJob], run once per
+/// enqueue, or [DwRecurringJob]; both go into `DwAppServer(jobs: …)`. Names
+/// starting with `dw.` belong to the framework.
 sealed class DwJobDefinition {
   const DwJobDefinition._(this.name);
-
-  /// A job run once per enqueue.
-  ///
-  /// [transactional] (the default) runs the handler in the transaction that
-  /// claimed the row, so the job disappears exactly when its work commits and
-  /// a crash leaves it pending. Set it to `false` for handlers that call
-  /// external services; they are then claimed with a [lease] instead and may
-  /// run again if the process dies mid-job.
-  factory DwJobDefinition(
-    String name, {
-    required Future<void> Function(
-      DwCallContext ctx,
-      Map<String, Object?> payload,
-    )
-    handle,
-    bool transactional,
-    int maxAttempts,
-    Duration Function(int attempt) backoff,
-    Duration lease,
-  }) = DwQueuedJob;
 
   final String name;
 }
 
-final class DwQueuedJob extends DwJobDefinition {
-  const DwQueuedJob(
-    super.name, {
-    required this.handle,
+/// What a job is: its name and how its payload of type [P] travels as JSON.
+///
+/// Enqueued by this constant (`ctx.jobs.enqueue(kind, payload)`) and run by
+/// the [DwQueuedJob] declared for it — the two are apart because the handler
+/// is often built from a service instance, while the places that enqueue are
+/// not. The one place a payload is spelled as a map is here: [encode] runs at
+/// the enqueue, [decode] before the handler, and both sides see [P]. A record
+/// works as well as a class:
+///
+/// ```dart
+/// static const reply = DwJobKind<({int messageId})>(
+///   'coach.reply',
+///   encode: _encodeReply,
+///   decode: _decodeReply,
+/// );
+/// static Map<String, Object?> _encodeReply(({int messageId}) p) =>
+///     {'messageId': p.messageId};
+/// static ({int messageId}) _decodeReply(Map<String, Object?> json) =>
+///     (messageId: json['messageId']! as int);
+///
+/// await ctx.jobs.enqueue(CoachReplies.reply, (messageId: message.id!));
+/// ```
+final class DwJobKind<P> {
+  const DwJobKind(this.name, {required this.encode, required this.decode});
+
+  /// A job that needs nothing but to run: enqueued with `null`.
+  static DwJobKind<void> withoutPayload(String name) =>
+      DwJobKind<void>(name, encode: (_) => const {}, decode: (_) {});
+
+  final String name;
+  final Map<String, Object?> Function(P payload) encode;
+  final P Function(Map<String, Object?> json) decode;
+
+  @override
+  String toString() => 'DwJobKind($name)';
+}
+
+/// A job run once per enqueue of its [kind].
+///
+/// [transactional] (the default) runs the handler in the transaction that
+/// claimed the row, so the job disappears exactly when its work commits and a
+/// crash leaves it pending. Set it to `false` for handlers that call external
+/// services; they are then claimed with a [lease] instead and may run again if
+/// the process dies mid-job.
+final class DwQueuedJob<P> extends DwJobDefinition {
+  DwQueuedJob(
+    this.kind, {
+    required Future<void> Function(DwCallContext ctx, P payload) handle,
     this.transactional = true,
     this.maxAttempts = 5,
     this.backoff = dwDefaultJobBackoff,
     this.lease = const Duration(minutes: 5),
-  }) : super._();
+  }) : _handle = handle,
+       super._(kind.name);
 
-  final Future<void> Function(DwCallContext ctx, Map<String, Object?> payload)
-  handle;
+  final DwJobKind<P> kind;
+  final Future<void> Function(DwCallContext ctx, P payload) _handle;
+
   final bool transactional;
 
   /// Attempts before the job is marked failed (kept for the operator, alerted).
@@ -100,6 +128,11 @@ final class DwQueuedJob extends DwJobDefinition {
 
   /// How long a non-transactional job is reserved for its runner.
   final Duration lease;
+
+  /// Decodes the stored [json] and runs the handler on it.
+  @internal
+  Future<void> run(DwCallContext ctx, Map<String, Object?> json) =>
+      _handle(ctx, kind.decode(json));
 }
 
 /// A job that runs every [every], across restarts: its next run time lives in

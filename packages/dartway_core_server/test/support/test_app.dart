@@ -164,6 +164,9 @@ final class TestApp {
   /// Accounts that may read anyone's notes (`NotesOfOwner`).
   final Set<int> staff = {};
 
+  /// How many times the access rule of `GetMyNote` loaded its note.
+  int noteLoads = 0;
+
   /// How many times the access check of `NotesOfOwner` ran.
   int ownerChecks = 0;
 
@@ -382,6 +385,18 @@ final class TestApp {
         'SELECT * FROM note WHERE owner_id = @owner ORDER BY id',
         {'owner': request.ownerId},
       ),
+    ),
+    DwCallHandler.single<GetMyNote, NoteView>(
+      access: DwAccessRule.resource<GetMyNote, NoteView>(
+        load: (ctx, request) async {
+          noteLoads++;
+          return (await _notes(ctx.db, 'SELECT * FROM note WHERE id = @id', {
+            'id': request.noteId,
+          })).firstOrNull;
+        },
+        allows: (ctx, request, note) => note.ownerId == ctx.accountId,
+      ),
+      handle: (ctx, request) async => ctx.accessed<NoteView>(),
     ),
     DwCallHandler.single<GetNote, NoteView>(
       access: DwAccessRule.anonymous,
@@ -685,8 +700,8 @@ final class TestApp {
       access: DwAccessRule.anonymous,
       handle: (ctx, command) async {
         final enqueued = await ctx.jobs.enqueue(
-          command.name,
-          {'tag': command.tag},
+          tagged(command.name),
+          command.tag,
           key: command.key,
           runAt: command.delayMillis == null
               ? null
@@ -761,62 +776,69 @@ final class TestApp {
     );
   }
 
+  /// A test job's kind: its payload is one tag.
+  static DwJobKind<Object?> tagged(String name) => DwJobKind<Object?>(
+    name,
+    encode: (tag) => {'tag': tag},
+    decode: (json) => json['tag'],
+  );
+
   List<DwJobDefinition> jobs({bool withTick = false}) => [
-    DwJobDefinition(
-      'record',
-      handle: (ctx, payload) async {
-        await _logJob(ctx, 'record', payload['tag']);
-        jobRuns.add('record:${payload['tag']}');
-        jobEvents.add('record:${payload['tag']}');
+    DwQueuedJob(
+      tagged('record'),
+      handle: (ctx, tag) async {
+        await _logJob(ctx, 'record', tag);
+        jobRuns.add('record:$tag');
+        jobEvents.add('record:$tag');
       },
     ),
-    DwJobDefinition(
-      'flaky',
+    DwQueuedJob(
+      tagged('flaky'),
       maxAttempts: 3,
       backoff: (attempt) => const Duration(milliseconds: 50),
-      handle: (ctx, payload) async {
+      handle: (ctx, tag) async {
         final run = ctx.job!;
         jobAttempts.add(
           '${run.attempt}/${run.maxAttempts}:${run.isLastAttempt}',
         );
-        await _logJob(ctx, 'flaky-attempt', payload['tag']);
-        final left = jobFailures['flaky:${payload['tag']}'] ?? 0;
+        await _logJob(ctx, 'flaky-attempt', tag);
+        final left = jobFailures['flaky:$tag'] ?? 0;
         if (left > 0) {
-          jobFailures['flaky:${payload['tag']}'] = left - 1;
+          jobFailures['flaky:$tag'] = left - 1;
           throw StateError('flaky failure, $left left');
         }
-        jobEvents.add('flaky:${payload['tag']}');
+        jobEvents.add('flaky:$tag');
       },
     ),
-    DwJobDefinition(
-      'outside',
+    DwQueuedJob(
+      tagged('outside'),
       transactional: false,
       maxAttempts: 2,
       backoff: (attempt) => const Duration(milliseconds: 50),
-      handle: (ctx, payload) async {
+      handle: (ctx, tag) async {
         if (ctx.db.inTransaction) throw StateError('expected no transaction');
-        final left = jobFailures['outside:${payload['tag']}'] ?? 0;
+        final left = jobFailures['outside:$tag'] ?? 0;
         if (left > 0) {
-          jobFailures['outside:${payload['tag']}'] = left - 1;
+          jobFailures['outside:$tag'] = left - 1;
           throw StateError('outside failure');
         }
-        await _logJob(ctx, 'outside', payload['tag']);
-        jobEvents.add('outside:${payload['tag']}');
+        await _logJob(ctx, 'outside', tag);
+        jobEvents.add('outside:$tag');
       },
     ),
-    DwJobDefinition(
-      'announced',
+    DwQueuedJob(
+      tagged('announced'),
       transactional: false,
-      handle: (ctx, payload) async {
+      handle: (ctx, tag) async {
         await ctx.transaction((_) async {
           ctx.publish(
             const DwLiveChannel(TestChannel.notes),
-            NoteView(id: 990, text: '${payload['tag']}'),
+            NoteView(id: 990, text: '$tag'),
           );
         });
         // The long call to another service a status is announced before.
         await jobGate.future;
-        jobEvents.add('announced:${payload['tag']}');
+        jobEvents.add('announced:$tag');
       },
     ),
     if (withTick)
