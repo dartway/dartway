@@ -86,10 +86,7 @@ void main() {
     return (types: types, members: members, links: links);
   }
 
-  final checked = [
-    for (final file in prose)
-      if (!_portInFlight.contains(_relative(root, file))) findingsIn(file),
-  ];
+  final checked = [for (final file in prose) findingsIn(file)];
 
   test('every Dw type named in the prose is declared and public', () {
     expect(
@@ -119,36 +116,7 @@ void main() {
     );
   });
 
-  test('the pages excused while their subsystem is ported still need it', () {
-    final stale = <String>[];
-    for (final path in _portInFlight) {
-      final file = File(p.join(root.path, path));
-      if (!file.existsSync()) {
-        stale.add('$path — gone');
-        continue;
-      }
-      final findings = findingsIn(file);
-      if (findings.types.isEmpty &&
-          findings.members.isEmpty &&
-          findings.links.isEmpty) {
-        stale.add('$path — passes every check');
-      }
-    }
-    expect(
-      stale,
-      isEmpty,
-      reason:
-          'take these off `_portInFlight` in this test: an excuse that is no '
-          'longer needed hides the next drift on that page',
-    );
-  });
 }
-
-/// Pages of a subsystem being ported to the rewrite in its own change, named
-/// one by one so the exception is visible, and checked to still be needed — a
-/// page that passes, or is gone, fails the suite until it is taken off. Push
-/// (D-010, D-033) is ported, its pages with it: none is excused now.
-const _portInFlight = <String>{};
 
 final _typeName = RegExp(r'\bDw[A-Z][A-Za-z0-9]*\b');
 

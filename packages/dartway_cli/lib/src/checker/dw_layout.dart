@@ -63,9 +63,9 @@ const dwServerForbiddenFolders = {
 /// drifted apart, which is how the admin panel came to live inside `app/`.
 /// A structure nothing verifies is a structure that is already wrong.
 ///
-/// Legacy folders (`zarchive/` and friends) and dot-folders are passed over:
-/// they are declared elsewhere as awaiting removal, and a rule that fires on
-/// them teaches people to turn the rule off.
+/// Generated and tooling folders (`generated/`, `gen/`, `l10n/`, `.dart_tool/`)
+/// and dot-folders are passed over: a rule that fires on them teaches people
+/// to turn the rule off.
 class DwLayoutInspector {
   DwLayoutInspector({
     required this.flutterPackageDir,

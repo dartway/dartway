@@ -144,11 +144,6 @@ toolkit's and is refreshed on every install; `_coverage.md` is the project's rec
 the channel, the commit, the CLI version — and the settings. It records **provenance, not content**:
 a list of installed files or their hashes would be a second copy of the files, and copies drift.
 
-Two things are **reported and never changed**: root journals from an older setup (`dartway_notes.md`,
-`dev_notes.md`), which hold findings nobody else has a copy of, and leftovers of an older shell
-installer in `tools/dw_claude_setup/`, whose removal means editing the git index. The installer names
-them and the commands to clear them.
-
 Commit `.claude/` and `docs/dev_notes/` after every install: a clone comes with the skills in place,
 and the history records which version of the methodology a piece of code was written under.
 

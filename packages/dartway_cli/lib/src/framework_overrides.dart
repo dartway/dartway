@@ -21,8 +21,8 @@ import 'vendor_framework.dart';
 /// The framework packages of [monorepo], by name → absolute directory.
 ///
 /// Every `pubspec.yaml` under `packages/` whose name starts with `dartway_`,
-/// two levels deep at most; a package's own `example/` is not a package of
-/// the framework.
+/// one level deep; a package's own `example/` is not a package of the
+/// framework.
 Map<String, String> frameworkPackageDirectories(Directory monorepo) {
   final packagesDir = Directory(p.join(monorepo.path, 'packages'));
   if (!packagesDir.existsSync()) {
@@ -45,10 +45,6 @@ Map<String, String> frameworkPackageDirectories(Directory monorepo) {
 
   for (final child in packagesDir.listSync().whereType<Directory>()) {
     take(child);
-    for (final grandchild in child.listSync().whereType<Directory>()) {
-      if (p.basename(grandchild.path) == 'example') continue;
-      take(grandchild);
-    }
   }
   return found;
 }

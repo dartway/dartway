@@ -60,16 +60,9 @@ void main() {
   Directory monorepo() => Directory(p.join(sandbox.path, 'monorepo'));
 
   group('readFrameworkVersions', () {
-    test('reads packages one and two levels deep', () {
-      // A multi-package module sits a directory deeper than a single
-      // package, and a walk that stopped at the first level would silently
-      // report it as absent.
+    test('reads packages one level deep', () {
       writePackage('dartway_core_flutter', 'dartway_core_flutter', '0.8.0');
-      writePackage(
-        p.join('dartway_push', 'dartway_push_server'),
-        'dartway_push_server',
-        '0.12.1',
-      );
+      writePackage('dartway_push_server', 'dartway_push_server', '0.12.1');
 
       expect(readFrameworkVersions(monorepo()), {
         'dartway_core_flutter': '0.8.0',
@@ -80,6 +73,23 @@ void main() {
     test('ignores anything that is not a framework package', () {
       writePackage('something', 'some_helper', '1.0.0');
       expect(readFrameworkVersions(monorepo()), isEmpty);
+    });
+
+    test("does not descend into a package's own example/", () {
+      // packages/ is flat: a name starting with dartway_ one level down is a
+      // real package, but a package's own example/ (dartway_core_flutter's,
+      // dartway_lints') is not a framework package, and a walk that
+      // descended into it used to report a fictitious one.
+      writePackage('dartway_core_flutter', 'dartway_core_flutter', '0.8.0');
+      writePackage(
+        p.join('dartway_core_flutter', 'example'),
+        'dartway_core_flutter_example',
+        '1.0.0',
+      );
+
+      expect(readFrameworkVersions(monorepo()), {
+        'dartway_core_flutter': '0.8.0',
+      });
     });
   });
 

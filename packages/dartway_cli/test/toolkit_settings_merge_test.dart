@@ -77,7 +77,7 @@ void main() {
   const seed = {
     'permissions': {
       'allow': ['Bash(dart test:*)'],
-      'deny': ['Read(./**/config/passwords.yaml)'],
+      'deny': ['Read(./**/deploy/secrets.yaml)'],
     },
   };
 
@@ -92,7 +92,7 @@ void main() {
     await installInto(root, {
       'permissions': {
         'allow': ['Bash(dart test:*)', 'Bash(flutter test:*)'],
-        'deny': ['Read(./**/config/passwords.yaml)'],
+        'deny': ['Read(./**/deploy/secrets.yaml)'],
       },
     });
 
@@ -106,7 +106,7 @@ void main() {
     await installInto(root, {
       'permissions': {
         'allow': ['Bash(dart test:*)'],
-        'deny': ['Read(./**/config/passwords.yaml)', 'Read(./**/*.pem)'],
+        'deny': ['Read(./**/deploy/secrets.yaml)', 'Read(./**/*.pem)'],
       },
     });
 
@@ -124,7 +124,7 @@ void main() {
       jsonEncode({
         'permissions': {
           'allow': ['Bash(dart test:*)', 'Bash(make deploy:*)'],
-          'deny': ['Read(./**/config/passwords.yaml)'],
+          'deny': ['Read(./**/deploy/secrets.yaml)'],
         },
         'model': 'opus',
       }),
@@ -133,7 +133,7 @@ void main() {
     await installInto(root, {
       'permissions': {
         'allow': ['Bash(dart test:*)', 'Bash(flutter test:*)'],
-        'deny': ['Read(./**/config/passwords.yaml)'],
+        'deny': ['Read(./**/deploy/secrets.yaml)'],
       },
     });
 
@@ -150,7 +150,7 @@ void main() {
       jsonEncode({
         'permissions': {
           'allow': ['Bash(dart test:*)'],
-          'deny': ['Read(./**/config/passwords.yaml)'],
+          'deny': ['Read(./**/deploy/secrets.yaml)'],
         },
         'model': 'opus',
       }),

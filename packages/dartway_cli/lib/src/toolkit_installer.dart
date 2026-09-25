@@ -7,25 +7,19 @@ import 'toolkit_manifest.dart';
 
 /// Installs the DartWay AI toolkit into a project's `.claude/` directory.
 ///
-/// `.claude/` is a generated-but-committed artifact (like the Serverpod
-/// client). Only MANAGED files are overwritten: `CLAUDE.md`, skills named
-/// `dartway-*` and the `commit` / `dartway-checkup` commands. Project-own
-/// skills and commands are never touched. `settings.json` is a third kind —
-/// a toolkit default the project extends — and is merged rather than
-/// overwritten or skipped; see [_installSettings].
+/// `.claude/` is a generated-but-committed artifact, like generated code
+/// elsewhere in this framework. Only MANAGED files are overwritten:
+/// `CLAUDE.md`, skills named `dartway-*` and the `commit` / `dartway-checkup`
+/// commands. Project-own skills and commands are never touched.
+/// `settings.json` is a third kind — a toolkit default the project extends —
+/// and is merged rather than overwritten or skipped; see [_installSettings].
 class ToolkitInstaller {
   /// Removed before every install, then re-copied from the toolkit — so a
   /// command that has been retired disappears from a project instead of
   /// lingering as a stale `/slash` nobody maintains.
-  ///
-  /// `dartway-audit.md` stays on the list for exactly that reason: the toolkit
-  /// no longer contains it, and this entry is what clears it out of the
-  /// projects that still have it. A retired name is removed from here only once
-  /// no project can still be carrying it.
   static const managedCommandFiles = [
     'commit.md',
     'dartway-checkup.md',
-    'dartway-audit.md',
   ];
 
   /// Copies the toolkit from [toolkitDir] into `<projectRoot>/.claude/`,
@@ -94,8 +88,6 @@ class ToolkitInstaller {
 
     _installSettings(toolkitDir, claudeDir);
     _installDevNotes(toolkitDir, projectRoot, tokens);
-    _reportRetiredJournals(projectRoot);
-    _reportLegacyInstallerTraces(projectRoot);
 
     if (provenance != null) {
       provenance.write(projectRoot);
@@ -107,9 +99,9 @@ class ToolkitInstaller {
   /// added to it.
   ///
   /// It pre-approves the build commands of this stack — `dart pub get`,
-  /// `docker compose up`, `serverpod generate`, the test runners — so that
+  /// `docker compose up`, `dartway generate`, the test runners — so that
   /// bringing a fresh project up is not a queue of permission prompts, and it
-  /// denies reading `config/passwords.yaml`, turning a rule the skills merely
+  /// denies reading `deploy/secrets.yaml`, turning a rule the skills merely
   /// state into one the harness enforces. Nothing destructive is on the list:
   /// `docker compose down`, commits and pushes still ask.
   ///
@@ -287,54 +279,6 @@ class ToolkitInstaller {
         stdout.writeln('Created docs/dev_notes/$fileName');
       }
     }
-  }
-
-  /// Reports the two journals the `docs/dev_notes/` directory replaced.
-  ///
-  /// Reported, never removed, and for the same reason as the journals were
-  /// worth replacing: they hold findings nobody else has a copy of. Deleting
-  /// them would take that content with it, and leaving them unmentioned is the
-  /// failure this change ends — a file that looks like the project's journal,
-  /// which nothing reads any more.
-  static void _reportRetiredJournals(Directory projectRoot) {
-    final retired = ['dartway_notes.md', 'dev_notes.md']
-        .where((name) => File(p.join(projectRoot.path, name)).existsSync())
-        .toList();
-    if (retired.isEmpty) return;
-
-    stdout.writeln(
-      '\nRetired root journals are still in this project:\n'
-      '  ${retired.join('\n  ')}\n'
-      'Nothing reads them any more. Framework findings are filed as issues in '
-      'the notes tracker;\nthe project\'s own findings are one file each under '
-      'docs/dev_notes/. Carry the open\nentries over, then delete the files and '
-      'their .gitignore lines — the migration entry\nin .claude/CLAUDE.md says '
-      'how.',
-    );
-  }
-
-  /// The toolkit used to be installed by a shell script from a private
-  /// repository, which left `tools/dw_claude_setup/` behind — usually as a
-  /// gitlink with no `.gitmodules` entry, so `git submodule update` does not see
-  /// it and `git status` says nothing while the folder sits there empty.
-  ///
-  /// Reported, never removed: taking it out means `git rm --cached` in somebody
-  /// else's repository, and an installer that edits the git index is a
-  /// different kind of tool than one that copies files.
-  static void _reportLegacyInstallerTraces(Directory projectRoot) {
-    final legacyDir = Directory(
-      p.join(projectRoot.path, 'tools', 'dw_claude_setup'),
-    );
-    if (!legacyDir.existsSync()) return;
-
-    stdout.writeln(
-      '\nLeftovers from the old shell installer are still in this project:\n'
-      '  tools/dw_claude_setup/\n'
-      'Nothing here needs it any more. To remove it:\n'
-      '  git rm -r --cached tools/dw_claude_setup\n'
-      '  rm -rf tools/dw_claude_setup\n'
-      'and drop any .gitignore comment pointing at that path.',
-    );
   }
 
   static void _removeManagedFiles(
