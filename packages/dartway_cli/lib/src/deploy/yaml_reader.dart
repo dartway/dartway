@@ -29,38 +29,6 @@ class DwYamlReader {
     return text.isEmpty ? null : text;
   }
 
-  int? optionalInt(String key) {
-    final value = map[key];
-    if (value == null) {
-      return null;
-    }
-    if (value is int) {
-      return value;
-    }
-    final parsed = int.tryParse(value.toString());
-    if (parsed == null) {
-      throw StateError('$source: "$key" must be an integer, got "$value".');
-    }
-    return parsed;
-  }
-
-  bool? optionalBool(String key) {
-    final value = map[key];
-    if (value == null) {
-      return null;
-    }
-    if (value is bool) {
-      return value;
-    }
-    switch (value.toString().toLowerCase()) {
-      case 'true':
-        return true;
-      case 'false':
-        return false;
-    }
-    throw StateError('$source: "$key" must be true or false, got "$value".');
-  }
-
   YamlMap? optionalMap(String key) {
     final value = map[key];
     if (value == null) {

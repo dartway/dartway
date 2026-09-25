@@ -23,8 +23,6 @@ class DwDeployProgress {
   /// The sink for failures a person must read.
   IOSink get problems => _events == null ? stderr : human;
 
-  bool get emitsEvents => _events != null;
-
   /// Writes one event, `{"event": name, ...fields}`, when events are on.
   void event(String name, [Map<String, Object?> fields = const {}]) {
     _events?.writeln(jsonEncode({'event': name, ...fields}));

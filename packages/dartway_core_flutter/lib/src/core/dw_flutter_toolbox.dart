@@ -73,10 +73,6 @@ class DwFlutterToolbox {
     debugPrint('${report.error}\n${report.stackTrace}');
   }
 
-  /// True when the app supplied its own error handling in [DwFlutterConfig] — the
-  /// out-of-the-box alerting then steps aside.
-  bool get hasCustomErrorHandling => _config.onErrorReport != null;
-
   /// Shows a confirmation for [confirmation]: the app-supplied
   /// [DwFlutterConfig.confirmDialogBuilder] when set, the built-in [DwConfirmDialog]
   /// otherwise. Used by `DwUiAction(confirmation: ...)`.

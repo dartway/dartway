@@ -42,8 +42,6 @@ final class DwRequestBody {
   final Duration timeout;
   Future<Uint8List>? _read;
 
-  bool get isConsumed => _read != null;
-
   /// The whole body. Throws [DwRequestBodyException] when it is over [limit]
   /// bytes or does not arrive within [timeout]; a second call answers the
   /// first read (with its own limit).

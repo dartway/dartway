@@ -77,8 +77,6 @@ final class DwPooledConnection {
 
   bool get isOpen => _connection.isOpen;
 
-  int get cachedStatements => _statements.length;
-
   /// Runs a statement whose parameter types are known.
   Future<pg.Result> run(
     String sql,

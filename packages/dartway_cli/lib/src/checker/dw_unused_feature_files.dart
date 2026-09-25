@@ -316,7 +316,3 @@ Iterable<DwFeatureNode> featuresIn(List<DwFeatureNode> nodes) sync* {
     }
   }
 }
-
-/// lib-relative path with forward slashes, for reporting.
-String relativeToLib(String libPath, String filePath) =>
-    p.relative(filePath, from: libPath).replaceAll(r'\', '/');
