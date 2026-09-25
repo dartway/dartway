@@ -2,6 +2,7 @@
 
 ## 0.21.0-dev.3
 
+- **`DwAppServer.callAs(call, token:, idempotencyKey:, page:)`** (D-091): a contract call answered inside the process as the session of `token`, through everything an HTTP call goes through after decoding — access, validation, idempotency, the transaction, publications — answering `DwCallResult<R>`. Studio's MCP door posted to its own port over loopback, carried the wire's headers by hand, and claimed a build number to pass the app-version gate.
 - **BREAKING: `DwAuthConfig.accountDeletion` is required — `DwAccountDeletion.byMember` answers `DwDeleteMyAccount`, `byOperator` refuses it `dw.forbidden`** (D-089). The framework used to answer the command in every project, and two of them learned it had gone live only when their pin moved; each switched it off by refusing inside `onAccountDeleting`, which refused the operator's own `ctx.accounts.deleteAccount` as well. Migration note: `docs/migrations/2026-09-24-account-deletion-choice.md`.
 
 ## 0.21.0-dev.2

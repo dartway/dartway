@@ -421,6 +421,11 @@ framework's. `auth:` is `DwRouteAuth.none` by default (the sender proves itself 
 `optional`/`required` read `Authorization: Bearer` like a call. A refusal thrown in a route is
 answered as JSON with its status; anything else as `500` with an incident id.
 
+A door that acts **for a signed-in person** (an MCP endpoint holding their key) does not reimplement
+calls and never posts to its own port: `server.callAs(call, token: …, idempotencyKey: …)` runs the
+contract call in process — access, validation, idempotency, transaction, publications — and answers
+`DwCallResult<R>`.
+
 ## 9. Sign-in hooks and accounts
 
 The framework owns accounts, identifiers and session keys; the project owns what an account means to
