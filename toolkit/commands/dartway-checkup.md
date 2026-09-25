@@ -14,7 +14,7 @@ The owner is himself the author of the DartWay framework and of most of the code
 
 ## The contract of principles
 
-Before analyzing, **read the full body of rules**: the laws in `.claude/CLAUDE.md` and the layer skills: `dartway-contract` (`__SHARED_PKG__`), `dartway-server` / `dartway-access` / `dartway-realtime` / `dartway-migrations` / `dartway-uploads` (`__SERVER_PKG__`), `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit` (`__FLUTTER_PKG__`). Plain SOLID/KISS/DRY/YAGNI, Law of Demeter, tell-don't-ask and single-source-of-truth apply throughout and need no citation.
+Before analyzing, **read the full body of rules**: the laws in `.claude/CLAUDE.md` and the layer skills: `dartway-contract` (`__SHARED_PKG__`), `dartway-server` / `dartway-access` / `dartway-realtime` / `dartway-migrations` / `dartway-uploads` (`__SERVER_PKG__`), `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit` (`__FLUTTER_PKG__`), and the detector lists in `dartway-finish` — they carry the code-shape rules no layer skill holds (no top-level functions, no `_buildXxx()`, no data computed in widget methods). Plain SOLID/KISS/DRY/YAGNI, Law of Demeter, tell-don't-ask and single-source-of-truth apply throughout and need no citation.
 
 **`docs/adr/`, if the project has it, is context — read it.** Those are decisions with the alternatives they ruled out, and an ADR is authoritative about *why* a shape was chosen; do not report the folder as drift. Two things are worth a remark: an ADR that describes **how something works now** (that part rots silently and belongs in the code), and code contradicting an accepted ADR with no superseding one.
 

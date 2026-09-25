@@ -166,11 +166,7 @@ void main() {
     });
     tearDown(() => sandbox.deleteSync(recursive: true));
 
-    void writeNote(
-      String fileName,
-      String package,
-      String affectsVersion,
-    ) {
+    void writeNote(String fileName, String package, String affectsVersion) {
       final dir = Directory(p.join(sandbox.path, migrationNotesDir))
         ..createSync(recursive: true);
       File(p.join(dir.path, fileName)).writeAsStringSync(
@@ -263,6 +259,36 @@ void main() {
         '2026-09-24-a-cli.md',
         '2026-09-24-b-lints.md',
       ]);
+    });
+    test('within a day the family is one version line, and a satellite-only '
+        'note follows the family notes — the order stays total', () {
+      // A (core_server dev.3), B (lints), C (core_flutter dev.2): comparing
+      // pair by pair on a package both name gave A < B, B < C by name and
+      // C < A by version — no order at all.
+      writeNote('2026-09-24-a.md', 'dartway_core_server', '0.21.0-dev.3');
+      writeNote('2026-09-24-b.md', 'dartway_lints', '0.4.0');
+      writeNote('2026-09-24-c.md', 'dartway_core_flutter', '0.21.0-dev.2');
+
+      final read = readMigrationNotes(sandbox);
+
+      expect(read.notes.map((note) => p.basename(note.path)), [
+        '2026-09-24-c.md',
+        '2026-09-24-a.md',
+        '2026-09-24-b.md',
+      ]);
+    });
+
+    test('a file whose name does not start with a date is a problem, '
+        'not a crash', () {
+      writeNote('x.md', 'dartway_core_server', '0.21.0-dev.3');
+      writeNote('2026-09-24-a.md', 'dartway_core_server', '0.21.0-dev.3');
+
+      final read = readMigrationNotes(sandbox);
+
+      expect(read.notes.map((note) => p.basename(note.path)), [
+        '2026-09-24-a.md',
+      ]);
+      expect(read.problems.single.path, endsWith('x.md'));
     });
   });
 

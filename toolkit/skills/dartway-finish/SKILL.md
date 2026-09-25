@@ -97,12 +97,13 @@ Run the detectors **over the changed files only** (not over the whole repo). For
   a warning; a meaningful 300-line file beats a pointless split).
 - A top-level function instead of a factory constructor (creates a value of its own type), a method
   or getter (answers a question about an existing value), or an extension (the type is someone
-  else's — a `__SHARED_PKG__` DTO, a framework type). Exceptions: `@riverpod` codegen entry points
-  (must be top-level), `main()` and helpers local to it, test helpers in `test/`/`test/support/`.
+  else's — a `__SHARED_PKG__` DTO, a framework type); a shared utility with no type of its own is a
+  static method on an owner class, not a free function. Exceptions: `main()` and helpers local to it, test helpers in `test/`/`test/support/`.
 - `BuildContext`/`WidgetRef` in the parameters of services/functions (outside `build`).
 - A `_buildXxx()` returning a `Widget` (instead of a widget class); a private widget method that
   transforms the domain instead (filters a list, maps a model into kit parameters) — the same
-  problem for data, fixed the same way: an extension in the feature's `logic/`. A widget assigned to
+  problem for data, fixed the same way: an extension in the feature's `logic/` (a getter that only
+  reads the widget's own fields and computes nothing is not a finding). A widget assigned to
   a local variable and used exactly once, instead of inlined where it belongs, is the same break
   again — fine when the variable is used twice or more, or saves a repeated computation.
 - `ref.invalidate(...)` used to **propagate** data — after a command, in a listener, to move data
