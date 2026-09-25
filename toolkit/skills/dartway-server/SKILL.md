@@ -10,7 +10,7 @@ description: >-
   commands; mapping rows to data objects in batch; one DwCallHandler per request and command
   (single/maybe/list/page/table/window/command) with its access rule; the DwCallContext (memo for
   the caller's profile and role, ctx.refuse, ctx.publish after commit, ctx.transaction, jobs,
-  accounts, files); background jobs (DwJobDefinition, DwRecurringJob); DwHttpRoute for external doors
+  accounts, files); background jobs (DwJobKind, DwQueuedJob, DwRecurringJob); DwHttpRoute for external doors
   only; auth hooks in DwAuthConfig (onAccountCreated creates the profile in the same transaction,
   onIdentifierChanged); DwAccountService instead of SQL on dw_* tables; the fixed lib/ layout.
   Use when writing or changing a handler, a row class, a query, a job, a route or sign-in hooks.
@@ -377,11 +377,24 @@ again in every handler. Access rules built on it — `dartway-access`.
 Work that runs later or on a timer is a job, declared in `DwAppServer(jobs: [...])`:
 
 ```dart
-final appJobs = <DwJobDefinition>[
-  DwJobDefinition(
+/// What a job is — name and payload codec — imported by whatever enqueues it.
+abstract final class InvoiceJobs {
+  static const remind = DwJobKind<({int invoiceId})>(
     'invoice.remind',
-    handle: (ctx, payload) async {
-      final invoice = await ctx.db.invoices.findById(payload['invoiceId']! as int);
+    encode: _encode,
+    decode: _decode,
+  );
+
+  static Map<String, Object?> _encode(({int invoiceId}) p) => {'invoiceId': p.invoiceId};
+  static ({int invoiceId}) _decode(Map<String, Object?> json) =>
+      (invoiceId: json['invoiceId']! as int);
+}
+
+final appJobs = <DwJobDefinition>[
+  DwQueuedJob(
+    InvoiceJobs.remind,
+    handle: (ctx, p) async {
+      final invoice = await ctx.db.invoices.findById(p.invoiceId);
       if (invoice == null || invoice.status == InvoiceStatus.paid) return;
       // … send the reminder, publish what changed
     },
@@ -394,7 +407,9 @@ final appJobs = <DwJobDefinition>[
 ];
 ```
 
-Enqueue from a command: `await ctx.jobs.enqueue('invoice.remind', {'invoiceId': id}, runAt: …, key: …)`.
+Enqueue from a command by the kind, never by a string:
+`await ctx.jobs.enqueue(InvoiceJobs.remind, (invoiceId: id), runAt: …, key: …)`. The payload is
+spelled as a map once, in the kind's codec — never `payload['x']! as int` in a handler.
 The enqueue joins the command's transaction (no row if it rolls back); a `key` deduplicates pending
 jobs. A queued job is transactional by default (the job row disappears exactly when its work commits);
 `transactional: false` for jobs that call external services, which may then run twice after a crash.

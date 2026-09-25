@@ -53,7 +53,7 @@ build it on a free port against their own database.
 | `auth` | yes | a `DwAuthConfig` — [auth and identity](auth-identity.md) |
 | `handlers` | yes | one `DwCallHandler` per request and command class — [handlers](handlers-and-context.md) |
 | `channels` | no | one `DwChannelRule` per channel kind — [channels](../2-core/channels-and-realtime.md) |
-| `jobs` | no | `DwJobDefinition` and `DwRecurringJob` — [jobs](jobs.md) |
+| `jobs` | no | `DwQueuedJob` and `DwRecurringJob` — [jobs](jobs.md) |
 | `routes` | no | `DwHttpRoute` doors for callers that are not the app — [routes](routes.md) |
 | `files` | no | a `DwFileStorage`; without it file calls fail — [uploads](uploads.md) |
 | `port` | no | `8080`; `0` binds a free port (`server.boundPort` tells which) |

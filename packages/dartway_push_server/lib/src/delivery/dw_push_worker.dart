@@ -73,7 +73,7 @@ final class DwPushWorker {
       }
     }
     // Out of budget with a full batch just taken: more may be due.
-    await ctx.jobs.enqueue(DwPushModule.deliverJob, const {});
+    await ctx.jobs.enqueue(DwPushModule.deliverJob, null);
     _summary(ctx, claimed, sends, budget, continued: true);
   }
 
@@ -463,7 +463,7 @@ final class DwPushWorker {
       }
       await _cover(ctx, retryTimes);
       if (released) {
-        await ctx.jobs.enqueue(DwPushModule.deliverJob, const {});
+        await ctx.jobs.enqueue(DwPushModule.deliverJob, null);
       }
     });
     return released;
@@ -479,7 +479,7 @@ final class DwPushWorker {
       if (earliest == null || time.isBefore(earliest)) earliest = time;
     }
     if (earliest == null) return;
-    await ctx.jobs.enqueue(DwPushModule.deliverJob, const {}, runAt: earliest);
+    await ctx.jobs.enqueue(DwPushModule.deliverJob, null, runAt: earliest);
   }
 
   static String _bounded(String text) => text.length <= _maxErrorLength

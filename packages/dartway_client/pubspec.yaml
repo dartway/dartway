@@ -1,13 +1,13 @@
 name: dartway_client
 description: The DartWay client — HTTP calls, the live update socket, request state and sessions. Pure Dart.
-version: 0.21.0-dev.3
+version: 0.21.0-dev.4
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 resolution: workspace
 environment:
   sdk: ^3.11.0
 dependencies:
-  dartway_core_shared: ^0.21.0-dev.3
+  dartway_core_shared: ^0.21.0-dev.4
   http: ^1.6.0
   meta: ^1.16.0
   web: ^1.1.1

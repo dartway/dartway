@@ -558,9 +558,9 @@ void main() {
 
 final class _NoJobs implements DwJobQueue {
   @override
-  Future<bool> enqueue(
-    String name,
-    Map<String, Object?> payload, {
+  Future<bool> enqueue<P>(
+    DwJobKind<P> job,
+    P payload, {
     DateTime? runAt,
     String? key,
   }) => throw UnimplementedError();

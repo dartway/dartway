@@ -89,9 +89,9 @@ void main() {
             ),
           ],
           jobs: [
-            DwJobDefinition('dw.mine', handle: (ctx, payload) async {}),
-            DwJobDefinition('twin', handle: (ctx, payload) async {}),
-            DwJobDefinition('twin', handle: (ctx, payload) async {}),
+            DwQueuedJob(DwJobKind.withoutPayload('dw.mine'), handle: (ctx, _) async {}),
+            DwQueuedJob(DwJobKind.withoutPayload('twin'), handle: (ctx, _) async {}),
+            DwQueuedJob(DwJobKind.withoutPayload('twin'), handle: (ctx, _) async {}),
             DwRecurringJob(
               'never',
               every: Duration.zero,

@@ -130,7 +130,16 @@ final class DwFileStore {
     DwGetFileLink,
   };
 
-  static const String deleteObjectJob = 'dw.files.deleteObject';
+  /// Deletes one stored object once the row that named it is gone.
+  static const DwJobKind<({String bucket, String key})> deleteObjectJob =
+      DwJobKind('dw.files.deleteObject', encode: _encodeObject, decode: _decodeObject);
+
+  static Map<String, Object?> _encodeObject(({String bucket, String key}) o) =>
+      {'bucket': o.bucket, 'key': o.key};
+
+  static ({String bucket, String key}) _decodeObject(
+    Map<String, Object?> json,
+  ) => (bucket: json['bucket']! as String, key: json['key']! as String);
   static const String cleanupJob = 'dw.files.cleanup';
 
   /// Rows removed per cleanup transaction, and transactions per run: a
@@ -488,15 +497,12 @@ final class DwFileStore {
   // --- jobs -------------------------------------------------------------------
 
   List<DwJobDefinition> jobs() => [
-    DwJobDefinition(
+    DwQueuedJob(
       deleteObjectJob,
       // Storage is outside the database: a lease, not a transaction.
       transactional: false,
       maxAttempts: 10,
-      handle: (ctx, payload) => objects.delete(
-        payload['bucket']! as String,
-        payload['key']! as String,
-      ),
+      handle: (ctx, object) => objects.delete(object.bucket, object.key),
     ),
     DwRecurringJob(
       cleanupJob,
@@ -686,10 +692,10 @@ final class _DwContextFiles implements DwFileService {
       if (rows.isEmpty) return false;
       // Enqueued in the same transaction: the object goes exactly when the
       // row's deletion commits.
-      await _ctx.jobs.enqueue(DwFileStore.deleteObjectJob, {
-        'bucket': rows.single.get<String>('bucket'),
-        'key': rows.single.get<String>('object_key'),
-      });
+      await _ctx.jobs.enqueue(DwFileStore.deleteObjectJob, (
+        bucket: rows.single.get<String>('bucket'),
+        key: rows.single.get<String>('object_key'),
+      ));
       return true;
     });
   }
