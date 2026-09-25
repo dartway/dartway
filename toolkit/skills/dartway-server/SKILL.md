@@ -451,6 +451,19 @@ calls and never posts to its own port: `server.callAs(call, token: …, idempote
 contract call in process — access, validation, idempotency, transaction, publications — and answers
 `DwCallResult<R>`.
 
+**A silent rejection at a boundary like this one leaves a trace naming its own step.** A webhook
+signature that does not verify, a payload shaped for another version, a sender this route does not
+recognise — reject it, but as a value from an enum naming *which* check turned it away, not a
+boolean or a sentence listing every possibility: `notAMessageEvent`, `foreignOrigin`,
+`versionMismatch`, `unknownType`, each carrying what it means (`unknownType` reads as "the other
+side is newer", not as a fault) rather than restating its own name. No secrets and no payloads in
+it — a trace that carries the body is a log nobody can be shown. `dartway_studio_bridge`'s
+`StudioMessageDropReason` is the shape to copy, tested member by member: a drop reason is written
+when something goes wrong and read months later, the worst combination for a value nobody exercises.
+This is a default, not a law — `dart run dartway_cli:dartway check` cannot see it, and a route with
+a better answer for its own boundary may use one — but a rejection indistinguishable from every
+other reason nothing arrived is a cost worth naming when you review one.
+
 ## 9. Sign-in hooks and accounts
 
 The framework owns accounts, identifiers and session keys; the project owns what an account means to
