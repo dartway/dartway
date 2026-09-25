@@ -78,6 +78,73 @@ final class DwCallEndpoint {
     }
   }
 
+  /// Answers [call] inside this process, as the session of [token] — every
+  /// step an HTTP call takes after decoding: the session, sign-in,
+  /// validation, the access rule, the handler, a command's idempotency and
+  /// transaction, and the updates it publishes, which reach live connections
+  /// as after any call. Never throws: every outcome is a result.
+  ///
+  /// [idempotencyKey] makes a command's retry answer the stored outcome;
+  /// without it every call is a new intent. [page] positions a page or window
+  /// request; without it the first page.
+  Future<DwCallResult<R>> callInProcess<R>(
+    DwServerCall<R> call, {
+    required String token,
+    String? idempotencyKey,
+    DwPageQuery? page,
+  }) async {
+    final name = call.dwTypeName;
+    DwApiResponse response;
+    try {
+      response = await _callInProcess(call, token, idempotencyKey, page, name);
+    } catch (error, stackTrace) {
+      response = DwApiResponse.failed(
+        runtime.alerts.report(
+          where: 'in-process call $name',
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      );
+    }
+    return response.toResult(call, _protocol);
+  }
+
+  Future<DwApiResponse> _callInProcess(
+    DwServerCall<Object?> call,
+    String token,
+    String? idempotencyKey,
+    DwPageQuery? page,
+    String name,
+  ) async {
+    final handler = handlers[call.runtimeType];
+    if (handler == null) {
+      throw ArgumentError.value(call, 'call', 'this server has no handler for');
+    }
+    final session = await authService.resolve(token);
+    if (session == null) return const DwApiResponse.unauthenticated();
+    return switch ((call, handler)) {
+      (DwDataRequest<Object?> request, DwRequestHandler handler) =>
+        await _runRequest(
+          handler,
+          request,
+          handler.prepare(request, page ?? DwPageQuery.parse(request, const {})),
+          session,
+          name,
+        ),
+      (DwActionCommand<Object?> command, DwCommandHandler handler) =>
+        await _runCommand(
+          handler,
+          command,
+          idempotencyKey ?? 'in-process:${DwServerIncident.newId()}',
+          session,
+          null,
+          name,
+          (null, null),
+        ),
+      _ => throw StateError('$name is handled by $handler'),
+    };
+  }
+
   Future<DwApiResponse> _answer(HttpRequest http, DwRequestBody body) async {
     final path = http.uri.path;
 

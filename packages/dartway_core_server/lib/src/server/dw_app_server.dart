@@ -151,6 +151,29 @@ final class DwAppServer {
   /// at once.
   DwAccountService get accounts => DwAccountService.ofRuntime(_require.runtime);
 
+  /// Answers [call] inside this process as the session of [token], through
+  /// everything an HTTP call goes through after decoding — access,
+  /// validation, idempotency, the transaction, the updates it publishes —
+  /// without a request over the network: for a door of the server's own (an
+  /// MCP endpoint, an import) that acts for a signed-in person. A door that
+  /// posted to its own port over loopback carried the wire's headers by hand,
+  /// and broke the day the protocol version moved.
+  ///
+  /// [idempotencyKey] makes a command's retry answer its stored outcome;
+  /// [page] positions a page or window request. Never throws for the call's
+  /// own outcome; throws [StateError] when the server is not running.
+  Future<DwCallResult<R>> callAs<R>(
+    DwServerCall<R> call, {
+    required String token,
+    String? idempotencyKey,
+    DwPageQuery? page,
+  }) => _require.front.calls.callInProcess(
+    call,
+    token: token,
+    idempotencyKey: idempotencyKey,
+    page: page,
+  );
+
   _DwRunning get _require =>
       _running ?? (throw StateError('The server is not running'));
 

@@ -290,6 +290,31 @@ It runs the way a job does: a background context with no caller, in one transact
 and revocations are delivered once it commits, and nothing of it is if `work` throws. The value
 `work` returns is the answer. A test server exposes the same as `DwTestServer.runInContext`.
 
+### `server.callAs`
+
+A door of the server's own that acts for a signed-in person — an MCP endpoint, an importer holding
+a person's key — calls the contract, not the database, so that the rules a call has are the rules
+it keeps:
+
+```dart
+final result = await server.callAs(
+  const ListMyInvoices(),
+  token: bearerToken,
+);
+final created = await server.callAs(
+  PayInvoice(invoiceId: id),
+  token: bearerToken,
+  idempotencyKey: toolCallId, // a retried tool call answers its first outcome
+);
+```
+
+Everything an HTTP call goes through after decoding runs: the session of `token`, sign-in, validation,
+the access rule, the handler, a command's idempotency and transaction, and the updates it publishes,
+which reach live connections as after any call. The answer is the typed `DwCallResult<R>` a client
+gets. `page` positions a page or window request. There is no request over the network, so no
+protocol or contract header to keep in step: a door that posted to its own port over loopback carried
+them by hand, and broke the day the protocol version moved.
+
 ## Related
 
 - [Handlers and the call context](handlers-and-context.md) — what runs for each call.
