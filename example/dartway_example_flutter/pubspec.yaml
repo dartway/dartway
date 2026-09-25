@@ -43,7 +43,6 @@ dependencies:
   # UI-kit dependencies: the kit lives in this app's `lib/ui_kit/`, so its
   # packages belong to the app, not to the framework.
   device_frame: ^1.4.0
-  cupertino_icons: ^1.0.5
   flutter_svg: ^2.0.10+1
   gap: ^3.0.1
   pin_code_fields: ^8.0.1

@@ -1,5 +1,8 @@
 .dart_tool/
 
+# macOS Finder metadata
+.DS_Store
+
 # FVM Version Cache
 .fvm/
 
