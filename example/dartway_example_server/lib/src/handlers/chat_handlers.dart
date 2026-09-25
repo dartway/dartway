@@ -70,7 +70,7 @@ final chatHandlers = <DwCallHandler>[
       if (rows.isEmpty && position == null) {
         await ctx._requireChannel(request.channelId);
       }
-      return ChatObjects.messages(ctx.db, rows);
+      return ChatObjects.messages(ctx, rows);
     },
   ),
 
@@ -85,7 +85,7 @@ final chatHandlers = <DwCallHandler>[
         orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
       );
       if (rows.isEmpty) await ctx._requireChannel(request.channelId);
-      return ChatObjects.messages(ctx.db, rows);
+      return ChatObjects.messages(ctx, rows);
     },
   ),
 
@@ -115,7 +115,7 @@ final chatHandlers = <DwCallHandler>[
         orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
         limit: ListChatMessagesMatching.maxResults,
       );
-      return ChatObjects.messages(ctx.db, rows);
+      return ChatObjects.messages(ctx, rows);
     },
   ),
 
@@ -180,7 +180,7 @@ final chatHandlers = <DwCallHandler>[
       // Sending is having read up to one's own message.
       await ChatReads.moveForward(ctx.db, me.id!, row);
 
-      final message = (await ChatObjects.messages(ctx.db, [
+      final message = (await ChatObjects.messages(ctx, [
         row,
       ], author: me)).single;
       ctx.publish(ExampleChannels.chatOf(row.channelId), message);
@@ -208,7 +208,7 @@ final chatHandlers = <DwCallHandler>[
       final edited = await ctx.db.chatMessages.update(
         row.copyWith(text: text, editedAt: DwFieldPatch.set(DateTime.now())),
       );
-      final message = (await ChatObjects.messages(ctx.db, [
+      final message = (await ChatObjects.messages(ctx, [
         edited,
       ], author: me)).single;
       ctx.publish(ExampleChannels.chatOf(edited.channelId), message);
@@ -257,7 +257,7 @@ final chatHandlers = <DwCallHandler>[
                       pinnedByProfileId: const DwFieldPatch.clear(),
                     ),
             );
-      final message = (await ChatObjects.messages(ctx.db, [saved])).single;
+      final message = (await ChatObjects.messages(ctx, [saved])).single;
       ctx.publish(ExampleChannels.chatOf(saved.channelId), message);
       return message;
     },
@@ -285,7 +285,7 @@ final chatHandlers = <DwCallHandler>[
           ),
         );
       }
-      final message = (await ChatObjects.messages(ctx.db, [row])).single;
+      final message = (await ChatObjects.messages(ctx, [row])).single;
       ctx.publish(ExampleChannels.chatOf(row.channelId), message);
       return message;
     },
@@ -343,7 +343,7 @@ extension on DwCallContext {
     final replies = await db.chatMessages.find(
       where: (t) => t.replyToMessageId.equals(quoted.id) & t.deletedAt.isNull(),
     );
-    for (final reply in await ChatObjects.messages(db, replies)) {
+    for (final reply in await ChatObjects.messages(this, replies)) {
       publish(ExampleChannels.chatOf(reply.channelId), reply);
     }
   }

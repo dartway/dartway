@@ -17,11 +17,12 @@ abstract final class ChatObjects {
   /// list, and is announced as `DwDeletedObject` instead. [author] is the
   /// author of every row, when the caller holds it.
   static Future<List<ChatMessage>> messages(
-    DwDatabaseHandle db,
+    DwCallContext ctx,
     List<ChatMessageRow> rows, {
     UserProfileRow? author,
   }) async {
     if (rows.isEmpty) return const [];
+    final db = ctx.db;
     final ids = [for (final row in rows) row.id!];
 
     final quoted = {
@@ -50,7 +51,8 @@ abstract final class ChatObjects {
       orderBy: (t) => [t.messageId.asc(), t.position.asc()],
     );
     final ownIds = ids.toSet();
-    final files = await storedFiles(db, [
+    // Name, type and size of every attached file, in one query.
+    final files = await ctx.files.describe([
       for (final a in attachmentRows)
         if (ownIds.contains(a.messageId)) a.fileId,
     ]);
@@ -115,37 +117,8 @@ abstract final class ChatObjects {
     ];
   }
 
-  /// Name, content type and size of the confirmed stored files among
-  /// [fileIds], in one query.
-  ///
-  /// Read from the framework's `dw_stored_file` directly: `ctx.files` answers
-  /// for one file at a time (`requireOwned`), and a page of messages needs
-  /// the files of all its attachments at once.
-  static Future<Map<int, StoredFileFacts>> storedFiles(
-    DwDatabaseHandle db,
-    Iterable<int> fileIds,
-  ) async {
-    final ids = fileIds.toSet().toList();
-    if (ids.isEmpty) return const {};
-    return {
-      for (final row in await db.query(
-        'SELECT id, file_name, content_type, byte_size FROM dw_stored_file '
-        'WHERE id = ANY(@ids::int8[]) AND confirmed_at IS NOT NULL',
-        params: {'ids': ids},
-      ))
-        row.get<int>('id'): (
-          fileName: row.get<String>('file_name'),
-          contentType: row.get<String>('content_type'),
-          byteSize: row.get<int>('byte_size'),
-        ),
-    };
-  }
-
   static String _nameOf(UserProfileRow profile) => switch (profile.lastName) {
     final last? when last.isNotEmpty => '${profile.firstName} $last',
     _ => profile.firstName,
   };
 }
-
-/// What a message shows of a stored file.
-typedef StoredFileFacts = ({String fileName, String contentType, int byteSize});
