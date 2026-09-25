@@ -48,6 +48,12 @@ final class VisitsModule extends DwServerModule {
 
   final String name;
   final String jobName;
+
+  late final DwJobKind<int> visitJob = DwJobKind(
+    jobName,
+    encode: (n) => {'n': n},
+    decode: (json) => json['n']! as int,
+  );
   bool closed = false;
   final List<int> counted = [];
 
@@ -68,7 +74,7 @@ final class VisitsModule extends DwServerModule {
           'INSERT INTO visit_count (n) VALUES (1) RETURNING '
           '(SELECT count(*) FROM visit_count) + 1 AS n',
         );
-        await ctx.jobs.enqueue(module.jobName, {'n': rows.single['n']});
+        await ctx.jobs.enqueue(module.visitJob, rows.single.get<int>('n'));
         return rows.single.get<int>('n');
       },
     ),
@@ -76,10 +82,7 @@ final class VisitsModule extends DwServerModule {
 
   @override
   List<DwJobDefinition> get jobs => [
-    DwJobDefinition(
-      jobName,
-      handle: (ctx, payload) async => counted.add(payload['n']! as int),
-    ),
+    DwQueuedJob(visitJob, handle: (ctx, n) async => counted.add(n)),
   ];
 
   @override

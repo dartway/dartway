@@ -62,14 +62,32 @@ final class DwSignInProvidersModule extends DwServerModule {
   /// outside the deleting transaction on purpose: the account goes whether or
   /// not Apple is answering right now, and the revocation retries until it
   /// does.
-  static const String revokeJob = 'dw.auth_providers.revoke';
+  /// Revokes an Apple refresh token after its account is deleted.
+  static const DwJobKind<({String provider, String clientId, String refreshToken})>
+  revokeJob = DwJobKind(
+    'dw.auth_providers.revoke',
+    encode: _encodeRevocation,
+    decode: _decodeRevocation,
+  );
+
+  static Map<String, Object?> _encodeRevocation(_Revocation r) => {
+    'provider': r.provider,
+    'clientId': r.clientId,
+    'refreshToken': r.refreshToken,
+  };
+
+  static _Revocation _decodeRevocation(Map<String, Object?> json) => (
+    provider: json['provider']! as String,
+    clientId: json['clientId']! as String,
+    refreshToken: json['refreshToken']! as String,
+  );
 
   @override
   List<DwDatabaseMigration> get migrations => dwAuthProvidersMigrations;
 
   @override
   late final List<DwJobDefinition> jobs = [
-    DwJobDefinition(
+    DwQueuedJob(
       revokeJob,
       // It calls Apple: never from inside the transaction that claimed it.
       transactional: false,
@@ -216,11 +234,11 @@ final class DwSignInProvidersModule extends DwServerModule {
       params: {'id': accountId},
     );
     for (final row in rows) {
-      await ctx.jobs.enqueue(revokeJob, {
-        'provider': row.get<String>('provider'),
-        'clientId': row.get<String>('client_id'),
-        'refreshToken': row.get<String>('refresh_token'),
-      });
+      await ctx.jobs.enqueue(revokeJob, (
+        provider: row.get<String>('provider'),
+        clientId: row.get<String>('client_id'),
+        refreshToken: row.get<String>('refresh_token'),
+      ));
     }
     await ctx.db.execute(
       'DELETE FROM dw_provider_token WHERE account_id = @id',
@@ -228,14 +246,13 @@ final class DwSignInProvidersModule extends DwServerModule {
     );
   }
 
-  Future<void> _revoke(DwCallContext ctx, Map<String, Object?> payload) async {
+  Future<void> _revoke(DwCallContext ctx, _Revocation revocation) async {
     final setup = providers[DwAuthProvider.values.firstWhere(
-      (p) => p.name == payload['provider'],
+      (p) => p.name == revocation.provider,
       orElse: () => DwAuthProvider.apple,
     )];
-    final clientId = payload['clientId'] as String?;
-    final refreshToken = payload['refreshToken'] as String?;
-    if (setup is! DwAppleSignIn || clientId == null || refreshToken == null) {
+    final (:clientId, :refreshToken, provider: _) = revocation;
+    if (setup is! DwAppleSignIn) {
       // The provider was reconfigured away between the deletion and this run;
       // there is nobody to tell, and retrying will not change that.
       ctx.log.warning('$revokeJob: no Apple provider configured any more');
@@ -261,3 +278,6 @@ final class DwSignInProvidersModule extends DwServerModule {
           'DwWireProtocol(dwAuthProvidersProtocolEntries, include: appProtocol)',
   ];
 }
+
+/// What `revokeJob` carries: the refresh token to revoke, and where.
+typedef _Revocation = ({String provider, String clientId, String refreshToken});

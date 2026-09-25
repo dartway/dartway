@@ -22,7 +22,7 @@ void main() {
         ),
         DwHttpRoute.post('/echo', (ctx, request) async {
           final body = await request.json() as Map<String, Object?>;
-          await ctx.jobs.enqueue('record', {'tag': body['tag']});
+          await ctx.jobs.enqueue(TestApp.tagged('record'), body['tag']);
           return DwHttpResponse.json(body, status: 201);
         }),
         DwHttpRoute.post('/limited', (ctx, request) async {

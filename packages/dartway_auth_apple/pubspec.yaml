@@ -18,12 +18,12 @@ dependencies:
 
   crypto: ^3.0.6
   dartway_auth_providers_shared: ^0.1.0
-  dartway_core_flutter: ^0.21.0-dev.3
+  dartway_core_flutter: ^0.21.0-dev.4
   sign_in_with_apple: ^7.0.1
 
 dev_dependencies:
   # `DwFakeServer`: the sign-in runs through a real client against it.
-  dartway_client: ^0.21.0-dev.3
+  dartway_client: ^0.21.0-dev.4
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

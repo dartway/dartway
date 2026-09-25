@@ -1,6 +1,6 @@
 name: dartway_generator
 description: Code generation for DartWay projects — DTO codecs, registries, entity tables and schema.
-version: 0.21.0-dev.3
+version: 0.21.0-dev.4
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 environment:

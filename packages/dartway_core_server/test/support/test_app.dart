@@ -685,8 +685,8 @@ final class TestApp {
       access: DwAccessRule.anonymous,
       handle: (ctx, command) async {
         final enqueued = await ctx.jobs.enqueue(
-          command.name,
-          {'tag': command.tag},
+          tagged(command.name),
+          command.tag,
           key: command.key,
           runAt: command.delayMillis == null
               ? null
@@ -761,62 +761,69 @@ final class TestApp {
     );
   }
 
+  /// A test job's kind: its payload is one tag.
+  static DwJobKind<Object?> tagged(String name) => DwJobKind<Object?>(
+    name,
+    encode: (tag) => {'tag': tag},
+    decode: (json) => json['tag'],
+  );
+
   List<DwJobDefinition> jobs({bool withTick = false}) => [
-    DwJobDefinition(
-      'record',
-      handle: (ctx, payload) async {
-        await _logJob(ctx, 'record', payload['tag']);
-        jobRuns.add('record:${payload['tag']}');
-        jobEvents.add('record:${payload['tag']}');
+    DwQueuedJob(
+      tagged('record'),
+      handle: (ctx, tag) async {
+        await _logJob(ctx, 'record', tag);
+        jobRuns.add('record:$tag');
+        jobEvents.add('record:$tag');
       },
     ),
-    DwJobDefinition(
-      'flaky',
+    DwQueuedJob(
+      tagged('flaky'),
       maxAttempts: 3,
       backoff: (attempt) => const Duration(milliseconds: 50),
-      handle: (ctx, payload) async {
+      handle: (ctx, tag) async {
         final run = ctx.job!;
         jobAttempts.add(
           '${run.attempt}/${run.maxAttempts}:${run.isLastAttempt}',
         );
-        await _logJob(ctx, 'flaky-attempt', payload['tag']);
-        final left = jobFailures['flaky:${payload['tag']}'] ?? 0;
+        await _logJob(ctx, 'flaky-attempt', tag);
+        final left = jobFailures['flaky:$tag'] ?? 0;
         if (left > 0) {
-          jobFailures['flaky:${payload['tag']}'] = left - 1;
+          jobFailures['flaky:$tag'] = left - 1;
           throw StateError('flaky failure, $left left');
         }
-        jobEvents.add('flaky:${payload['tag']}');
+        jobEvents.add('flaky:$tag');
       },
     ),
-    DwJobDefinition(
-      'outside',
+    DwQueuedJob(
+      tagged('outside'),
       transactional: false,
       maxAttempts: 2,
       backoff: (attempt) => const Duration(milliseconds: 50),
-      handle: (ctx, payload) async {
+      handle: (ctx, tag) async {
         if (ctx.db.inTransaction) throw StateError('expected no transaction');
-        final left = jobFailures['outside:${payload['tag']}'] ?? 0;
+        final left = jobFailures['outside:$tag'] ?? 0;
         if (left > 0) {
-          jobFailures['outside:${payload['tag']}'] = left - 1;
+          jobFailures['outside:$tag'] = left - 1;
           throw StateError('outside failure');
         }
-        await _logJob(ctx, 'outside', payload['tag']);
-        jobEvents.add('outside:${payload['tag']}');
+        await _logJob(ctx, 'outside', tag);
+        jobEvents.add('outside:$tag');
       },
     ),
-    DwJobDefinition(
-      'announced',
+    DwQueuedJob(
+      tagged('announced'),
       transactional: false,
-      handle: (ctx, payload) async {
+      handle: (ctx, tag) async {
         await ctx.transaction((_) async {
           ctx.publish(
             const DwLiveChannel(TestChannel.notes),
-            NoteView(id: 990, text: '${payload['tag']}'),
+            NoteView(id: 990, text: '$tag'),
           );
         });
         // The long call to another service a status is announced before.
         await jobGate.future;
-        jobEvents.add('announced:${payload['tag']}');
+        jobEvents.add('announced:$tag');
       },
     ),
     if (withTick)

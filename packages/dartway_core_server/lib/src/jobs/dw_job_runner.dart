@@ -19,21 +19,22 @@ final class DwContextJobQueue implements DwJobQueue {
   final Map<String, Object> _known;
 
   @override
-  Future<bool> enqueue(
-    String name,
-    Map<String, Object?> payload, {
+  Future<bool> enqueue<P>(
+    DwJobKind<P> job,
+    P payload, {
     DateTime? runAt,
     String? key,
   }) async {
+    final name = job.name;
     if (!_known.containsKey(name)) {
       throw ArgumentError.value(
         name,
-        'name',
-        'No enqueueable job has this name',
+        'job',
+        'The server declares no job with this name',
       );
     }
     // Encoded here so a payload that is not JSON fails at the call site.
-    final encoded = jsonEncode(payload);
+    final encoded = jsonEncode(job.encode(payload));
     // Insert and wake the executors in one statement; NOTIFY inside a
     // transaction is delivered at its commit, and not at all on rollback.
     final rows = await _ctx.db.query(
@@ -85,14 +86,14 @@ final class DwJobRunner {
     required this.workers,
     required this.pollInterval,
   }) : queued = {
-         for (final d in definitions.whereType<DwQueuedJob>()) d.name: d,
+         for (final d in definitions.whereType<DwQueuedJob<Object?>>()) d.name: d,
        },
        recurring = {
          for (final d in definitions.whereType<DwRecurringJob>()) d.name: d,
        };
 
   final DwRuntime runtime;
-  final Map<String, DwQueuedJob> queued;
+  final Map<String, DwQueuedJob<Object?>> queued;
   final Map<String, DwRecurringJob> recurring;
 
   /// Opens a notification stream on a dedicated connection (the database's
@@ -332,7 +333,7 @@ final class DwJobRunner {
       try {
         // A savepoint: a failing handler leaves the claim transaction usable
         // for recording the failure under the same row lock.
-        await ctx.transaction((_) => job.handle(ctx, payload));
+        await ctx.transaction((_) => job.run(ctx, payload));
         await tx.execute(
           'DELETE FROM dw_job WHERE id = @id',
           params: {'id': id},
@@ -364,7 +365,7 @@ final class DwJobRunner {
       deliverOnCommit: runtime.deliver,
     );
     try {
-      await job.handle(ctx, lease.payload);
+      await job.run(ctx, lease.payload);
       await _db.execute(
         'DELETE FROM dw_job WHERE id = @id',
         params: {'id': lease.id},

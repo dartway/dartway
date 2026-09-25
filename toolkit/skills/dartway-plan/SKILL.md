@@ -74,7 +74,7 @@ layers that are not relevant.
    request that shows the changed data follows it; channel rules for new channel kinds; row locks for
    read-modify-write. Doc comments above handlers and rules state the rule. A request or command without
    a handler stops the server from starting. `dartway-server`, `dartway-access`, `dartway-realtime`.
-5. **Background and doors, only if the option needs them** — jobs (`DwJobDefinition`, `DwRecurringJob`)
+5. **Background and doors, only if the option needs them** — jobs (`DwJobKind` + `DwQueuedJob`, `DwRecurringJob`)
    for work outside a call, a `DwHttpRoute` for an external caller (a webhook), upload rules and `canRead`
    for files. `dartway-server`, `dartway-uploads`.
 6. **App** (`__FLUTTER_PKG__`) — the route (`dartway-navigation`) → the feature's entry point and its

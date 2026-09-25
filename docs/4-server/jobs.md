@@ -7,14 +7,27 @@ and are claimed by exactly one worker even when several processes run.
 
 ## Declaring jobs
 
+A job has two halves. **What it is** — its name and how its payload travels as JSON — is a
+`DwJobKind<P>`, a constant the places that enqueue it import. **How it runs** is a `DwQueuedJob<P>`
+in the server's job list, often built from a service instance the enqueuing code never sees:
+
 ```dart
-final invoiceJobs = <DwJobDefinition>[
-  DwJobDefinition(
+abstract final class InvoiceJobs {
+  static const send = DwJobKind<({int invoiceId})>(
     'invoice.send',
-    handle: (ctx, payload) async {
-      final invoiceId = payload['invoiceId']! as int;
-      ctx.log.info('sending invoice $invoiceId');
-    },
+    encode: _encode,
+    decode: _decode,
+  );
+
+  static Map<String, Object?> _encode(({int invoiceId}) p) => {'invoiceId': p.invoiceId};
+  static ({int invoiceId}) _decode(Map<String, Object?> json) =>
+      (invoiceId: json['invoiceId']! as int);
+}
+
+final invoiceJobs = <DwJobDefinition>[
+  DwQueuedJob(
+    InvoiceJobs.send,
+    handle: (ctx, p) async => ctx.log.info('sending invoice ${p.invoiceId}'),
   ),
   DwRecurringJob(
     'invoice.markOverdue',
@@ -29,12 +42,16 @@ final invoiceJobs = <DwJobDefinition>[
 
 passed as `DwAppServer(jobs: invoiceJobs)`.
 
-**`DwJobDefinition(name, {handle, transactional, maxAttempts, backoff, lease})`** — a job that runs
+**`DwJobKind<P>(name, {encode, decode})`** — the one place a payload is spelled as a map: `encode`
+runs at the enqueue, `decode` before the handler, and both sides see `P` (a record, a class, `int`).
+`DwJobKind.withoutPayload(name)` is a `DwJobKind<void>`, enqueued with `null`.
+
+**`DwQueuedJob<P>(kind, {handle, transactional, maxAttempts, backoff, lease})`** — a job that runs
 once per enqueue:
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `handle` | required | `Future<void> Function(DwCallContext ctx, Map<String, Object?> payload)` |
+| `handle` | required | `Future<void> Function(DwCallContext ctx, P payload)` |
 | `transactional` | `true` | run the handler in the transaction that claimed the row (below) |
 | `maxAttempts` | `5` | attempts before the job is marked failed |
 | `backoff` | `dwDefaultJobBackoff` | the delay before the next attempt, by attempt number: 10 s, 20 s, 40 s … capped at one hour |
@@ -44,18 +61,20 @@ once per enqueue:
 `handle: Future<void> Function(DwCallContext ctx)`.
 
 The server refuses to start on a name starting with `dw.` (the framework's), a name declared twice,
-a non-positive interval or fewer than one attempt. Payloads are JSON maps (D-016): a job is
-server-to-server and needs no DTO.
+a non-positive interval or fewer than one attempt. A payload is not a DTO of the protocol (D-016):
+a job is server-to-server, and its type never reaches the app's registry (D-092).
 
 ## `ctx.jobs.enqueue`
 
 ```dart
-Future<bool> enqueue(
-  String name,
-  Map<String, Object?> payload, {
+Future<bool> enqueue<P>(
+  DwJobKind<P> job,
+  P payload, {
   DateTime? runAt,
   String? key,
 });
+
+await ctx.jobs.enqueue(InvoiceJobs.send, (invoiceId: invoice.id!));
 ```
 
 - The row is written through `ctx.db`, so **an enqueue joins the enclosing transaction**: inside a
@@ -66,7 +85,7 @@ Future<bool> enqueue(
   does nothing and answers `false`. A job that ran out of attempts no longer blocks its key. Once a
   job has **succeeded** its row is gone, so the key is free again — idempotence for work that must
   happen once ever belongs in the project's own rows.
-- An unknown name throws `ArgumentError`, and a payload that is not JSON fails `jsonEncode`, both
+- A kind the server declares no job for throws `ArgumentError`, and a payload that is not JSON fails `jsonEncode`, both
   at the call site rather than in a worker later. Recurring jobs cannot be enqueued.
 
 ## How jobs run

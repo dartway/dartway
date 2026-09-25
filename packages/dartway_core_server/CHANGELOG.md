@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.4
+
+- **BREAKING: jobs are typed. `DwJobKind<P>(name, encode:, decode:)` is what a job is; `DwQueuedJob<P>(kind, handle: (ctx, P payload) …)` is how it runs; `ctx.jobs.enqueue(kind, payload)` replaces `enqueue(String name, Map payload)`** (D-092). The `DwJobDefinition(...)` constructor is gone; `DwJobKind.withoutPayload(name)` is a `DwJobKind<void>` enqueued with `null`. Every project spelled each payload as a map at every enqueue and cast it back in every handler (`payload['runId']! as int`), and named jobs by string constants in three conventions. Migration note: `docs/migrations/2026-09-25-typed-jobs.md`.
+
 ## 0.21.0-dev.3
 
 - **BREAKING: `DwAuthConfig.accountDeletion` is required — `DwAccountDeletion.byMember` answers `DwDeleteMyAccount`, `byOperator` refuses it `dw.forbidden`** (D-089). The framework used to answer the command in every project, and two of them learned it had gone live only when their pin moved; each switched it off by refusing inside `onAccountDeleting`, which refused the operator's own `ctx.accounts.deleteAccount` as well. Migration note: `docs/migrations/2026-09-24-account-deletion-choice.md`.

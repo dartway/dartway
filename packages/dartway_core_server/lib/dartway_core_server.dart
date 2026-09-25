@@ -34,6 +34,7 @@ export 'src/jobs/dw_job_queue.dart'
     show
         DwJobAttempt,
         DwJobDefinition,
+        DwJobKind,
         DwJobQueue,
         DwQueuedJob,
         DwRecurringJob,
