@@ -158,7 +158,7 @@ void main() {
     });
   });
 
-  group('readMigrationNotes orders by version, then by name', () {
+  group('readMigrationNotes orders by date, then version, then name', () {
     late Directory sandbox;
 
     setUp(() {
@@ -166,14 +166,18 @@ void main() {
     });
     tearDown(() => sandbox.deleteSync(recursive: true));
 
-    void writeNote(String fileName, String affectsVersion) {
+    void writeNote(
+      String fileName,
+      String package,
+      String affectsVersion,
+    ) {
       final dir = Directory(p.join(sandbox.path, migrationNotesDir))
         ..createSync(recursive: true);
       File(p.join(dir.path, fileName)).writeAsStringSync(
         '---\n'
         'title: "$fileName"\n'
         'affects:\n'
-        '  dartway_core_server: "$affectsVersion"\n'
+        '  $package: "$affectsVersion"\n'
         '---\n',
       );
     }
@@ -181,10 +185,23 @@ void main() {
     test('a same-day pair out of name order is put back in version order', () {
       // "account-…" sorts before "contract-…" by name, but its version is the
       // later one — exactly the shape of the real 2026-09-24 notes this fix
-      // is for.
-      writeNote('2026-09-24-account-deletion-choice.md', '0.21.0-dev.3');
-      writeNote('2026-09-24-contract-version.md', '0.20.0-dev.4');
-      writeNote('2026-09-24-generate-deliver-code-split.md', '0.21.0-dev.2');
+      // is for. All three name dartway_core_server, so the version comparison
+      // applies.
+      writeNote(
+        '2026-09-24-account-deletion-choice.md',
+        'dartway_core_server',
+        '0.21.0-dev.3',
+      );
+      writeNote(
+        '2026-09-24-contract-version.md',
+        'dartway_core_server',
+        '0.20.0-dev.4',
+      );
+      writeNote(
+        '2026-09-24-generate-deliver-code-split.md',
+        'dartway_core_server',
+        '0.21.0-dev.2',
+      );
 
       final read = readMigrationNotes(sandbox);
 
@@ -197,14 +214,54 @@ void main() {
     });
 
     test('two notes at the same version fall back to file name', () {
-      writeNote('2026-09-24-b.md', '0.21.0-dev.3');
-      writeNote('2026-09-24-a.md', '0.21.0-dev.3');
+      writeNote('2026-09-24-b.md', 'dartway_core_server', '0.21.0-dev.3');
+      writeNote('2026-09-24-a.md', 'dartway_core_server', '0.21.0-dev.3');
 
       final read = readMigrationNotes(sandbox);
 
       expect(read.notes.map((note) => p.basename(note.path)), [
         '2026-09-24-a.md',
         '2026-09-24-b.md',
+      ]);
+    });
+
+    test('the date wins over the version when the notes name different '
+        'packages — a satellite\'s small version is not "behind" the '
+        'family\'s', () {
+      // Comparing raw semver across packages put a satellite note ahead of
+      // an earlier family note purely because 0.4.0 < 0.20.0-dev.2 as
+      // numbers — a comparison neither package's version has any business
+      // being put through. This is the shape of the real
+      // 2026-09-22 (family) / 2026-09-23 (dartway_lints) notes.
+      writeNote(
+        '2026-09-22-local-environment.md',
+        'dartway_core_server',
+        '0.20.0-dev.2',
+      );
+      writeNote(
+        '2026-09-23-lints-analyzer-plugin.md',
+        'dartway_lints',
+        '0.4.0',
+      );
+
+      final read = readMigrationNotes(sandbox);
+
+      expect(read.notes.map((note) => p.basename(note.path)), [
+        '2026-09-22-local-environment.md',
+        '2026-09-23-lints-analyzer-plugin.md',
+      ]);
+    });
+
+    test('two notes on the same day naming unrelated packages fall back to '
+        'file name — their versions cannot be compared at all', () {
+      writeNote('2026-09-24-b-lints.md', 'dartway_lints', '0.4.0');
+      writeNote('2026-09-24-a-cli.md', 'dartway_cli', '0.11.0');
+
+      final read = readMigrationNotes(sandbox);
+
+      expect(read.notes.map((note) => p.basename(note.path)), [
+        '2026-09-24-a-cli.md',
+        '2026-09-24-b-lints.md',
       ]);
     });
   });
