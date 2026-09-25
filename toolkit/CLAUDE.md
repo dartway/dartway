@@ -83,7 +83,7 @@ Everything else is written by hand: providers (`Provider` / `NotifierProvider`, 
 
 ## Cleanliness and finishing
 
-For **any** Dart/Flutter code the cleanliness contract applies: naming, single responsibility, no `BuildContext`/`WidgetRef` in services, no `_buildXxx()`, a re-read only as a user command, `copyWith` over field-by-field rebuilds, no environment default for a deployment credential, and the rest — spelled out in full, with the detectors that check it, in `dartway-finish` and `/dartway-checkup`. This is a style contract — check against it while writing, refactoring and reviewing.
+For **any** Dart/Flutter code the cleanliness contract applies: naming, single responsibility, no `BuildContext`/`WidgetRef` in services, no `_buildXxx()` (widget or data), a re-read only as a user command, `copyWith` over field-by-field rebuilds, no environment default for a deployment credential, and the rest — spelled out in full, with the detectors that check it, in `dartway-finish` and `/dartway-checkup`, plus a boundary's own silent-rejection rule in `dartway-server`. This is a style contract — check against it while writing, refactoring and reviewing.
 
 **`dartway-testing` decides what deserves a test and where it goes** — a rule of the contract is a test in `__SHARED_PKG__`, a handler's rule is an acceptance test on a real database (`dart run dartway_cli:dartway test`), a feature is a widget test on the in-memory server. The skeleton ships a worked example of each.
 

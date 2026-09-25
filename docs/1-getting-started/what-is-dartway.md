@@ -227,6 +227,13 @@ model owns your domain, and the first field it lacks becomes a fork you carry th
 
 A rule that lives only in a document holds until the first person — or agent — who did not read it.
 
+Two more principles run underneath all of this. **Engineering perfection**: no redundant operation,
+no redundant update, no byte on the wire the receiver did not ask for — a design that sends or
+computes more than necessary because it is simpler to write that way is not the default here.
+**One source per fact**: a derived artefact is generated from its one source, never kept in sync by
+a test that compares two copies — the generated protocol registry and schema (above) are exactly
+this, not a convenience.
+
 ## What DartWay deliberately does not give you
 
 - **A design system.** There is no framework button, text widget or theme. `dartway create` puts a UI

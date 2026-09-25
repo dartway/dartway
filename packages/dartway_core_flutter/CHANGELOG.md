@@ -2,10 +2,11 @@
 
 ## 0.21.0-dev.6
 
-- **BREAKING: `DwFlutterConfig.defaultModelGetter`, `isDefaultModelsGetterSetUp` and
-  `getDefaultModel` are gone.** `dwBuildAsync`/`dwBuildListAsync` with no `loadingValue`/
-  `loadingItem` render nothing while loading (`SizedBox.shrink()`) instead of asking a project-wide
-  model registry that no live project configured. Migration note:
+- **BREAKING: `DwFlutterConfig.defaultModelGetter`, `isDefaultModelsGetterSetUp`,
+  `getDefaultModel` and `DwFlutterToolbox.hasCustomErrorHandling` are gone.**
+  `dwBuildAsync`/`dwBuildListAsync` with no `loadingValue`/`loadingItem` render nothing while
+  loading (`SizedBox.shrink()`) instead of asking a project-wide model registry that no live
+  project configured; `hasCustomErrorHandling` had no caller either. Migration note:
   `docs/migrations/2026-09-25-default-model-getter-removed.md`.
 
 ## 0.21.0-dev.5

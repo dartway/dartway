@@ -53,22 +53,22 @@ class DwMigrationNote {
     return false;
   }
 
-  /// The version this note is ordered by: the first one named in `affects`,
-  /// as written — `null` when it does not parse as semver (a problem the
-  /// frontmatter check above already reports on).
+  /// [affects], parsed as semver where it parses at all — a problem the
+  /// frontmatter check above already reports on a version that does not.
   ///
-  /// Not every `affects` version is on the same package's number line — a
-  /// note can name a satellite alongside the family — but the first one
-  /// written is the one its author reached for first, and in every note this
-  /// repository ships that is the family's, whose `-dev.N` already grows
-  /// monotonically with the day the note was added.
-  Version? get sortVersion {
-    if (affects.isEmpty) return null;
-    try {
-      return Version.parse(affects.values.first);
-    } on FormatException {
-      return null;
-    }
+  /// Used to rank two notes of the same day by the family version they land
+  /// at — see [compareMigrationNotes].
+  Map<String, Version> get parsedAffects => {
+    for (final entry in affects.entries)
+      if (_tryParseVersion(entry.value) case final version?) entry.key: version,
+  };
+}
+
+Version? _tryParseVersion(String value) {
+  try {
+    return Version.parse(value);
+  } on FormatException {
+    return null;
   }
 }
 
@@ -97,11 +97,9 @@ class DwMigrationNotes {
 
 /// Reads `docs/migrations/` out of a monorepo checkout.
 ///
-/// Notes come back sorted by [DwMigrationNote.sortVersion], then by file
-/// name — chronological, which is the order they are applied in when a
-/// project has fallen several releases behind. The file name alone is not
-/// enough: it starts with a date, but two notes opened the same day sort by
-/// the words after it, not by which shipped first.
+/// Notes come back ordered by [compareMigrationNotes] — chronological, which
+/// is the order they are applied in when a project has fallen several
+/// releases behind.
 DwMigrationNotes readMigrationNotes(Directory monorepoDir) {
   final dir = Directory(p.join(monorepoDir.path, migrationNotesDir));
   if (!dir.existsSync()) {
@@ -122,6 +120,17 @@ DwMigrationNotes readMigrationNotes(Directory monorepoDir) {
 
   for (final file in files) {
     final relative = p.join(migrationNotesDir, p.basename(file.path));
+    if (!_datedName.hasMatch(p.basename(file.path))) {
+      problems.add(
+        DwMigrationNoteProblem(
+          path: relative,
+          problem:
+              'the file name must start with the date the note opened, '
+              'YYYY-MM-DD-: notes are applied in that order',
+        ),
+      );
+      continue;
+    }
     final parsed = parseMigrationNote(
       contents: file.readAsStringSync(),
       path: relative,
@@ -133,20 +142,71 @@ DwMigrationNotes readMigrationNotes(Directory monorepoDir) {
     }
   }
 
-  notes.sort((a, b) {
-    final versionA = a.sortVersion;
-    final versionB = b.sortVersion;
-    final byVersion = switch ((versionA, versionB)) {
-      (null, null) => 0,
-      (null, _) => -1,
-      (_, null) => 1,
-      (final va?, final vb?) => va.compareTo(vb),
-    };
-    if (byVersion != 0) return byVersion;
-    return p.basename(a.path).compareTo(p.basename(b.path));
-  });
+  notes.sort(compareMigrationNotes);
 
   return DwMigrationNotes(notes: notes, problems: problems);
+}
+
+/// Orders two notes the way they are applied: by the date their file name
+/// starts with; within one day, notes naming the family come first, in the
+/// order of the family version they land at; then by file name.
+///
+/// **The date decides first, on purpose.** A note's `affects` can name a
+/// satellite alone (`dartway_lints: "0.4.0"`) beside a note naming only the
+/// family (`dartway_core_server: "0.20.0-dev.2"`) — the two numbers are not on
+/// the same line, and comparing them as semver put the `0.4.0` note ahead of
+/// every family note dated before it.
+///
+/// **Within a day only the family's version is compared.** The six family
+/// packages move in lockstep, so any of them names the same line; a
+/// satellite's version is on a line of its own and never ranks against
+/// another note. Reducing each note to one sort key keeps the order total —
+/// comparing "a package both notes name" pair by pair does not: A < B and
+/// B < C by name while C < A by version.
+int compareMigrationNotes(DwMigrationNote a, DwMigrationNote b) {
+  final byDate = _datePrefix(a.path).compareTo(_datePrefix(b.path));
+  if (byDate != 0) return byDate;
+
+  final familyA = _familyVersion(a);
+  final familyB = _familyVersion(b);
+  if (familyA != null && familyB == null) return -1;
+  if (familyA == null && familyB != null) return 1;
+  if (familyA != null && familyB != null) {
+    final byVersion = familyA.compareTo(familyB);
+    if (byVersion != 0) return byVersion;
+  }
+
+  return p.basename(a.path).compareTo(p.basename(b.path));
+}
+
+/// The packages that carry one version between them.
+const _family = {
+  'dartway_core_shared',
+  'dartway_core_server',
+  'dartway_core_flutter',
+  'dartway_orm',
+  'dartway_client',
+  'dartway_generator',
+};
+
+/// The highest family version a note names, or null when it names none.
+Version? _familyVersion(DwMigrationNote note) {
+  Version? highest;
+  for (final MapEntry(key: package, value: version)
+      in note.parsedAffects.entries) {
+    if (!_family.contains(package)) continue;
+    if (highest == null || version > highest) highest = version;
+  }
+  return highest;
+}
+
+final _datedName = RegExp(r'^\d{4}-\d{2}-\d{2}-');
+
+/// The `YYYY-MM-DD` a migration note's file name starts with — guaranteed by
+/// [readMigrationNotes], which reports any other name as a problem.
+String _datePrefix(String path) {
+  final name = p.basename(path);
+  return _datedName.hasMatch(name) ? name.substring(0, 10) : name;
 }
 
 /// Parses one note. Returns a [DwMigrationNote] or a [DwMigrationNoteProblem]
