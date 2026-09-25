@@ -5,7 +5,7 @@ description: >-
   — the skill studies in depth what the project already has on the topic (data objects, requests and
   commands in the contract, row classes, handlers with their access and channel rules, features and
   their specs), identifies refactoring and code-quality opportunities in the affected feature per the
-  dartway-clean-code contract (blocking debt vs adjacent debt), assembles a pool of clarifying
+  layer skills' rules (blocking debt vs adjacent debt), assembles a pool of clarifying
   questions and proposes 2–3 implementation options along the DartWay ladder (reuse what the contract
   already has → extend the contract with a request or a command and its handler → a job or a door,
   only where a call cannot express it) with constraints, tradeoffs, risks and a rough time estimate.
@@ -55,7 +55,7 @@ Reduce it to three lists: **what already exists → what is missing → what get
 the current contract, schema, access rules, architecture).
 
 Along the way, while reading the code of **the entire affected feature** (not just the lines of the future
-diff), record quality signals — violations of the `dartway-clean-code` contract and layer antipatterns.
+diff), record quality signals — violations of the layer skills' rules and layer antipatterns.
 This is material for Phase C; do not draw conclusions here.
 
 ## Phase C — Refactoring and quality opportunities
@@ -65,10 +65,10 @@ project's methodology, while the work has not started yet.
 
 - **Coverage** — the whole affected feature/module (including the parts the task does not edit directly),
   not just the future diff.
-- **Source of rules** — the `dartway-clean-code` contract (Part 1 — the team's hard rules; Part 2 —
-  SOLID/KISS/DRY/YAGNI and the rest) and the layer skills (`dartway-contract`, `dartway-server`,
-  `dartway-access`, `dartway-realtime`, `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`). Do
-  **not** duplicate the detectors — check against the contract.
+- **Source of rules** — `.claude/CLAUDE.md`'s law table, plain SOLID/KISS/DRY/YAGNI, and the layer
+  skills (`dartway-contract`, `dartway-server`, `dartway-access`, `dartway-realtime`,
+  `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`). Do
+  **not** duplicate the detectors — check against those.
 
 Split the findings into two groups:
 

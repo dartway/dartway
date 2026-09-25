@@ -104,7 +104,7 @@ a project keeps its copy of what `dartway create` gave it, so such a note is the
 
 Apply what the notes ask for, one note at a time, and keep them separable in the diff. Use the project's
 own conventions — the note says *what* has to change, not how this project writes code;
-`dartway-clean-code` and the layer skills still decide that.
+the layer skills still decide that.
 
 **Where a note and this project disagree, stop and ask.** A note is written for the general case, and a
 project that has done something deliberately different is exactly the case its author could not see. Do

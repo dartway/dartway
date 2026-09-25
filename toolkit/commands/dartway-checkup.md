@@ -14,7 +14,7 @@ The owner is himself the author of the DartWay framework and of most of the code
 
 ## The contract of principles
 
-Before analyzing, **read the full body of rules**: [.claude/skills/dartway-clean-code/SKILL.md](.claude/skills/dartway-clean-code/SKILL.md). That is the source of truth. In addition — the laws in `.claude/CLAUDE.md` and the layer specifics: `dartway-contract` (`__SHARED_PKG__`), `dartway-server` / `dartway-access` / `dartway-realtime` / `dartway-migrations` / `dartway-uploads` (`__SERVER_PKG__`), `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit` (`__FLUTTER_PKG__`).
+Before analyzing, **read the full body of rules**: the laws in `.claude/CLAUDE.md` and the layer skills: `dartway-contract` (`__SHARED_PKG__`), `dartway-server` / `dartway-access` / `dartway-realtime` / `dartway-migrations` / `dartway-uploads` (`__SERVER_PKG__`), `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit` (`__FLUTTER_PKG__`). Plain SOLID/KISS/DRY/YAGNI, Law of Demeter, tell-don't-ask and single-source-of-truth apply throughout and need no citation.
 
 **`docs/adr/`, if the project has it, is context — read it.** Those are decisions with the alternatives they ruled out, and an ADR is authoritative about *why* a shape was chosen; do not report the folder as drift. Two things are worth a remark: an ADR that describes **how something works now** (that part rots silently and belongs in the code), and code contradicting an accepted ADR with no superseding one.
 
@@ -48,9 +48,9 @@ Grep-level detectors across the scope, `file:line` for each. Do not read whole f
 - **Long files** — >350 lines is a warning (a likely dump of responsibilities), 200–350 worth noting. Judge responsibilities, not the counter: a meaningful 300-line file beats a pointless chop.
 - **`BuildContext`/`WidgetRef` in parameters** outside `build(...)`.
 - **`_buildXxx()` returning a widget** — `Widget\s+_\w+\s*\(`.
-- **`.refetch()` and `ref.invalidate(`** — any occurrence, **as a Phase 2 read rather than a verdict.** The rule (`dartway-clean-code` §1.5) permits a re-read as a user command — a retry button, pull-to-refresh — and forbids it as a way to propagate data. Grep cannot tell a gesture handler from a listener, so every hit is opened: in an `onPressed`/`onRefresh`/`dw.action` it is correct and reported as nothing; anywhere else it is the finding. A re-read right after a `dw.command` is the one worth chasing — it means the command's handler does not publish what it changed, or the request does not declare the channel. A `ref.invalidate` on a `dw.request`/`dw.table`/`dw.pages`/`dw.window` provider is a finding wherever it stands: it does not ask again.
-- **`asData?.value` / `.value ??`** — combining several `AsyncValue`s by hand. Both answer `null` for loading *and* for error, so a failure renders as an endless spinner (§1.5a). Read the hit: a deliberate degradation is stated in the feature's `implementationNotes`, and an unstated one is the finding.
-- **`dwBuildAsync`/`dwBuildListAsync` with no `errorWidget`/`errorBuilder`** — a count, not yet a verdict. The default is `SizedBox.shrink()`, which is right for a decoration and wrong for the list its screen exists for; nothing mechanical separates the two, so the load-bearing ones are judged in Phase 2 (§1.5a).
+- **`.refetch()` and `ref.invalidate(`** — any occurrence, **as a Phase 2 read rather than a verdict.** The rule (`dartway-data-layer`) permits a re-read as a user command — a retry button, pull-to-refresh — and forbids it as a way to propagate data. Grep cannot tell a gesture handler from a listener, so every hit is opened: in an `onPressed`/`onRefresh`/`dw.action` it is correct and reported as nothing; anywhere else it is the finding. A re-read right after a `dw.command` is the one worth chasing — it means the command's handler does not publish what it changed, or the request does not declare the channel. A `ref.invalidate` on a `dw.request`/`dw.table`/`dw.pages`/`dw.window` provider is a finding wherever it stands: it does not ask again.
+- **`asData?.value` / `.value ??`** — combining several `AsyncValue`s by hand. Both answer `null` for loading *and* for error, so a failure renders as an endless spinner (`dartway-data-layer`). Read the hit: a deliberate degradation is stated in the feature's `implementationNotes`, and an unstated one is the finding.
+- **`dwBuildAsync`/`dwBuildListAsync` with no `errorWidget`/`errorBuilder`** — a count, not yet a verdict. The default is `SizedBox.shrink()`, which is right for a decoration and wrong for the list its screen exists for; nothing mechanical separates the two, so the load-bearing ones are judged in Phase 2 (`dartway-data-layer`).
 - **`GlobalKey`** with `.currentState` / `.currentContext`.
 - **Private widget classes in feature files.**
 - **Outer padding inside a widget** — a `Padding`/`margin:` at the top level of `build` (verify by reading in Phase 2).
@@ -58,7 +58,7 @@ Grep-level detectors across the scope, `file:line` for each. Do not read whole f
 - **Magic strings and numbers** in comparisons (`== '`).
 - **Contract** (`__SHARED_PKG__`): a hand edit in a generated file (`*.dw.dart`, `lib/generated/`) — `dart run dartway_cli:dartway generate --check` answers it; a public class named with one word; a refusal code nobody on the server raises.
 - **Server** (`__SERVER_PKG__`): every `DwAccessRule.anonymous` — each one is a decision and should say why in the handler's doc comment; a `DwAccessRule.check` that reads a request field without checking it belongs to the caller; a caller's mistake answered with `throw` — a failure, reported as an incident — instead of `ctx.refuse` with a code of the project's refusal enum; a data object that copies a field of its row the caller must not see (a row cannot leave the server by type, so this is where a leak happens); a command whose handler changes rows and publishes nothing; a migration edited after it was applied (`migrationsDrift` says so).
-- **Configuration**: pins that drift (a `dartway_*` package in one of the three packages behind the others), `deploy/secrets.yaml` tracked by Git, a setting with a default where the value belongs to the environment (`dartway-clean-code` §1.11), a deploy config naming a domain that is written down elsewhere too.
+- **Configuration**: pins that drift (a `dartway_*` package in one of the three packages behind the others), `deploy/secrets.yaml` tracked by Git, a setting with a default where the value belongs to the environment — a sender address, a provider key, an admin identifier: an unset one must fail loud, never fall back to a plausible foreign value (`dartway-server` §9a) — a deploy config naming a domain that is written down elsewhere too.
 
 Summarize Phase 1 as a table: rule → count.
 
@@ -75,7 +75,7 @@ Choose them in this order:
 
 Plus, always: **the top offenders from Phase 1** — the longest files and the ones with the most flags, because that is where hacks concentrate.
 
-For each chosen feature apply the **whole** clean-code contract, not a skim of it. Focus on what grep cannot see:
+For each chosen feature apply the **whole** set of rules above, not a skim of it. Focus on what grep cannot see:
 
 - SRP / God objects / logic in the UI / DIP nailed down hard;
 - KISS and YAGNI: over-engineering, an abstraction with one implementation, dead code;

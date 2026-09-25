@@ -23,7 +23,7 @@ before its request exists is built against a guess.
 
 Related skills, one per layer: `dartway-contract`, `dartway-server`, `dartway-access`,
 `dartway-realtime`, `dartway-migrations`, `dartway-uploads`, `dartway-data-layer`,
-`dartway-navigation`, `dartway-ui-kit`, `dartway-clean-code`, `dartway-testing`, `dartway-finish`.
+`dartway-navigation`, `dartway-ui-kit`, `dartway-testing`, `dartway-finish`.
 
 > **If the feature already exists, read its public file first.** Its `DwFeatureSpec` is the current
 > description of the behaviour, and `knownIssues` says what is already known to be wrong. The server's
@@ -108,8 +108,8 @@ lib/app/<feature>/
 - **`widgets/`** holds blocks only — what lays out what it was handed.
 - **`logic/`** holds what only this feature uses.
 - Cross-feature helpers (an extension on a data object, a formatter) → `lib/shared/`. Styles →
-  `ui_kit.dart` only. Imports: relative inside the feature and to a sibling feature, `package:` for
-  everything further away (`dartway-clean-code`).
+  `ui_kit.dart` only. Imports: relative inside the feature and to a sibling feature (at most two
+  `../`, `deep_relative_import` warns past that), `package:` for everything further away.
 
 ### Feature, group, building block
 

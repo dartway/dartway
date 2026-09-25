@@ -74,7 +74,6 @@ skills → `dartway-finish`.
 | `dartway-testing` | Where a test goes and how to write it, tier by tier |
 | `dartway-navigation` | The router: zones, route descriptors, guards |
 | `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
-| `dartway-clean-code` | The cleanliness contract for all Dart and Flutter work |
 | `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
 | `dartway-finish` | The definition of done before a commit or PR: audit the diff, apply only what is confirmed |
 | `dartway-update` | Moving onto a newer framework: `dartway update`, the migration notes, then the versions |

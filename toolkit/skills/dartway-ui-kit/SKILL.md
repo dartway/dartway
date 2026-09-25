@@ -408,7 +408,7 @@ The numbered prefixes keep the kit sorted by usage frequency — the most needed
 ## Best practices
 
 - Props are minimal and semantic, not visual details.
-- Don't breed variants by copy-paste — composition and extensions (see `dartway-clean-code`).
+- Don't breed variants by copy-paste — composition and extensions.
 - Don't put outer `padding`/`margin` inside a component — the parent sets the spacing.
 - Consistency beats visual hacks.
 - **Anything that depends on the keyboard is computed from the smoothed inset** (`AppKeyboardInset`
@@ -418,3 +418,10 @@ The numbered prefixes keep the kit sorted by usage frequency — the most needed
   `grep -rn 'viewInsetsOf' lib/ui_kit` — any hit outside the smoother is one.
 - Tempted by a "client-specific hack" inside a framework widget — that's a signal that an extension
   point is missing. Introduce it in the kit, don't fork `dartway_core_flutter`.
+- **No pass-through widgets in a feature** — a class that only re-assembles its own parameters into
+  a single kit widget, adding at most a padding constant. It costs a reader an extra file to learn
+  there is nothing in it. Inline the kit widget at the call site instead; if the same wrapper is
+  really needed in several places, that is a reason to add a named constructor to the kit widget
+  itself, not to keep a copy of it in every feature that wants it. The line: a **mapper** that turns
+  a model or a domain enum into kit parameters is work and belongs in the feature; a widget whose
+  only import is `ui_kit.dart` has nothing to decide and should not exist.
