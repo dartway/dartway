@@ -40,7 +40,7 @@ final invoiceJobs = <DwJobDefinition>[
 ];
 ```
 
-passed as `DwAppServer(jobs: invoiceJobs)`.
+passed as a feature's `DwServerFeature(jobs: invoiceJobs)`.
 
 **`DwJobKind<P>(name, {encode, decode})`** — the one place a payload is spelled as a map: `encode`
 runs at the enqueue, `decode` before the handler, and both sides see `P` (a record, a class, `int`).

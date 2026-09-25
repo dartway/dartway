@@ -1,8 +1,8 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_server/dartway_starter_server.dart';
-import 'package:dartway_starter_server/src/entities/people.dart';
-import 'package:dartway_starter_server/src/entities/settings.dart';
+import 'package:dartway_starter_server/src/profile/profile_rows.dart';
+import 'package:dartway_starter_server/src/settings/settings_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 

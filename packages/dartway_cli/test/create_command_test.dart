@@ -89,7 +89,7 @@ void main() {
       ),
     );
     expect(
-      read(project, 'shop_floor_server/lib/src/files.dart'),
+      read(project, 'shop_floor_server/lib/src/core/files.dart'),
       allOf(
         contains("defaultPublicBucket = 'shop-floor-public'"),
         contains("defaultPrivateBucket = 'shop-floor-private'"),

@@ -147,5 +147,5 @@ are the project's to deliver:
   is out of reach and the server says so in its log.
 
 Sign-in codes are written to the server log until a delivery is wired into
-`deliverCode` (`../dartway_starter_server/lib/src/auth.dart`); list the gateway's
+`deliverCode` (`../dartway_starter_server/lib/src/core/auth.dart`); list the gateway's
 keys under `requires.secrets` in `config.yaml` when it is.

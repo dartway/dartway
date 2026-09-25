@@ -112,7 +112,7 @@ void main() {
           migrations: appMigrations,
           database: club.database.config,
           auth: ExampleAuth.config,
-          handlers: const [],
+          features: const [],
           files: DwFileStorage(
             storage.config,
             // The club's own rules hold a private purpose (chat

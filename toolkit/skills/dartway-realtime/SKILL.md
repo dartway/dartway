@@ -86,11 +86,15 @@ A keyed channel built from a field is not `const`:
 
 ## 3. Declare who may subscribe (server)
 
-One rule per kind, in `DwAppServer(channels: [...])`:
+One rule per kind, declared by the feature that owns the kind — `DwServerFeature(channels: [...])` in
+`__SERVER_PKG__/lib/src/<feature>/<feature>_feature.dart`:
 
 ```dart
-// AppChannels — lib/src/channels.dart
-static final rules = <DwChannelRule>[
+// lib/src/invoices/invoices_feature.dart
+final invoicesFeature = DwServerFeature(
+  'invoices',
+  handlers: invoiceHandlers,
+  channels: [
   // "My" channel: a member subscribes to their own account's key only.
   DwChannelRule.ofCaller(AppChannel.invoices),
   DwChannelRule.single(
@@ -107,8 +111,10 @@ static final rules = <DwChannelRule>[
           await ctx.isManager;
     },
   ),
-];
+  ],
+);
 
+// lib/src/core/channels.dart — the addresses handlers publish to.
 /// Where [accountId]'s own invoices hear a change, whoever made it.
 DwLiveChannel invoicesOf(int accountId) =>
     DwLiveChannel.forAccount(AppChannel.invoices, accountId);
@@ -164,7 +170,7 @@ Future<CustomerInvoice> publishInvoice(DwCallContext ctx, InvoiceRow row) async 
   booking) may publish a managers-only figure: managers hear it, the member's response never carries
   it. No "side effect" API: the boundary is the channel rule, so write every rule to be true for any
   caller, not only for the screen that subscribes.
-- **A channel kind needs a rule** in `DwAppServer(channels:)` before anything is published to it:
+- **A channel kind needs a rule** in its feature's `DwServerFeature(channels:)` before anything is published to it:
   publishing to a kind without one throws.
 
 Within one call, one object published twice to a channel travels once, as it ended.

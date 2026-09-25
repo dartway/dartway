@@ -33,7 +33,7 @@ caller's own screens up to date, the publication everyone else's
 The owner, timestamps, status, storage keys — a handler derives those from its context, never from a
 field the client filled in. `BookSession` carries the session id; who books is `ctx.profile`, and
 the booking's status and time are set by the handler
-(`example/dartway_example_server/lib/src/handlers/booking_handlers.dart`). A command with an
+(`example/dartway_example_server/lib/src/club/booking_handlers.dart`). A command with an
 `accountId` field is a command any signed-in user can send with someone else's.
 
 ## Validation runs on both sides
@@ -126,7 +126,7 @@ DwCallHandler.command<PublishNews, NewsPost>(
 ),
 ```
 
-(`example/dartway_example_server/lib/src/handlers/content_handlers.dart`)
+(`example/dartway_example_server/lib/src/content/content_handlers.dart`)
 
 By default the access check, the handler and the idempotency record run in **one database
 transaction**. Two sends of one key racing each other queue on the key's lock, and the second finds

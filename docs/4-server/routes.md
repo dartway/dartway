@@ -21,7 +21,7 @@ final routes = <DwHttpRoute>[
 ];
 ```
 
-Passed as `DwAppServer(routes: routes)`; both are from
+Passed as a feature's `DwServerFeature(routes: routes)`; both are from
 `packages/dartway_core_server/test/routes_test.dart`.
 
 ## Declaring a route

@@ -6,24 +6,22 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
 import 'generated/dw_schema.dart';
-import 'src/example_auth.dart';
-import 'src/example_bootstrap.dart';
-import 'src/example_channels.dart';
-import 'src/example_files.dart';
-import 'src/example_push.dart';
-import 'src/handlers/admin_handlers.dart';
-import 'src/handlers/booking_handlers.dart';
-import 'src/handlers/chat_handlers.dart';
-import 'src/handlers/content_handlers.dart';
-import 'src/handlers/profile_handlers.dart';
-import 'src/handlers/schedule_handlers.dart';
+import 'src/core/example_auth.dart';
+import 'src/core/example_bootstrap.dart';
+import 'src/core/example_files.dart';
+import 'src/core/example_push.dart';
+import 'src/admin/admin_feature.dart';
+import 'src/chat/chat_feature.dart';
+import 'src/club/club_feature.dart';
+import 'src/content/content_feature.dart';
 import 'src/migrations/migrations.dart';
+import 'src/profile/profile_feature.dart';
 
 export 'generated/dw_schema.dart';
-export 'src/example_auth.dart' show ExampleAuth;
-export 'src/example_bootstrap.dart' show ExampleBootstrap;
-export 'src/example_files.dart' show ExampleFiles;
-export 'src/example_push.dart' show ExamplePush;
+export 'src/core/example_auth.dart' show ExampleAuth;
+export 'src/core/example_bootstrap.dart' show ExampleBootstrap;
+export 'src/core/example_files.dart' show ExampleFiles;
+export 'src/core/example_push.dart' show ExamplePush;
 export 'src/migrations/migrations.dart' show appMigrations;
 
 /// The club's server, as `bin/server.dart` and the tests build it.
@@ -51,15 +49,13 @@ abstract final class ExampleServer {
     migrationsDirectory: 'lib/src/migrations',
     database: database,
     auth: auth ?? ExampleAuth.config,
-    handlers: [
-      ...profileHandlers,
-      ...scheduleHandlers,
-      ...bookingHandlers,
-      ...contentHandlers,
-      ...chatHandlers,
-      ...adminHandlers,
+    features: [
+      profileFeature,
+      clubFeature,
+      contentFeature,
+      chatFeature,
+      adminFeature,
     ],
-    channels: ExampleChannels.rules,
     startup: [DwFirstAdministrator(grant: ExampleBootstrap.grantAdmin)],
     files: storage == null ? null : ExampleFiles.storage(storage),
     modules: [push ?? ExamplePush.module()],

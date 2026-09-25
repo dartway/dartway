@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
-import 'package:dartway_example_server/src/entities/people.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 import 'package:test/test.dart';

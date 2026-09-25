@@ -237,7 +237,9 @@ final class PushHarness {
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),
-          handlers: [queueAlertHandler],
+          features: [
+            DwServerFeature('alerts', handlers: [queueAlertHandler]),
+          ],
           modules: [module],
           logger: RecordingLogger(harness.logs),
           alerts: harness.alerts,

@@ -56,9 +56,12 @@ Decide what the screen shows and what the user changes, then declare it (`dartwa
 If the change alters a DTO that installed app builds already use, check the table in
 `dartway-contract` ("a DTO change is a contract change between app builds") before going on.
 
-## Step 2 — the server (`__SERVER_PKG__/lib/src/`)
+## Step 2 — the server (`__SERVER_PKG__/lib/src/<feature>/`)
 
-Details in `dartway-server`; the order:
+Everything of the feature goes into its own folder under `lib/src/` — rows, handlers, objects,
+publications, jobs — in files named after it (`invoices_rows.dart`, `invoices_handlers.dart`, …), and
+it declares itself in `<feature>_feature.dart`. Never a file at the top of `src/`, never a layer folder
+(`handlers/`, `rows/`, `domain/`); `dart run dartway_cli:dartway check` refuses both. Details in `dartway-server`; the order:
 
 1. **Row class** (`InvoiceRow extends DwTableRow`, `@DwSqlTable`, foreign keys, indexes for the
    queries the handlers will make). Nullable only when the domain allows absence.
@@ -76,7 +79,8 @@ Details in `dartway-server`; the order:
 6. **Publish what a command changed** to every channel that shows it, after commit
    (`ctx.publish`); deletions as `DwDeletedObject.of<T>(id, ctx.protocol)`; add the channel rule when
    the kind is new (`dartway-realtime`).
-7. Register the handler list, channel rules and jobs in the server library.
+7. **Declare the feature** in `<feature>_feature.dart` — `DwServerFeature('<feature>', handlers:,
+   channels:, jobs:)` — and add it to `DwAppServer(features: [...])` in the server library.
 
 ## Step 3 — the Flutter feature (`__FLUTTER_PKG__`)
 

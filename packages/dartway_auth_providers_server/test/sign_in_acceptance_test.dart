@@ -293,7 +293,7 @@ final class _ProviderHarness {
             include: DwWireProtocol.core,
           ),
           migrations: const [],
-          handlers: const [],
+          features: const [],
           database: database.config,
           auth: DwAuthConfig(
             accountDeletion: DwAccountDeletion.byMember,

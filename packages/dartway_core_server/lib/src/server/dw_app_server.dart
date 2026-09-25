@@ -27,6 +27,7 @@ import '../live/dw_live_hub.dart';
 import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
 import '../routes/dw_http_route.dart';
+import 'dw_server_feature.dart';
 import 'dw_runtime.dart';
 import 'dw_server_module.dart';
 import 'dw_startup_step.dart';
@@ -67,10 +68,7 @@ final class DwAppServer {
     this.migrationsDirectory,
     required this.database,
     required this.auth,
-    required this.handlers,
-    this.channels = const [],
-    this.jobs = const [],
-    this.routes = const [],
+    required this.features,
     this.startup = const [],
     this.files,
     this.modules = const [],
@@ -112,10 +110,29 @@ final class DwAppServer {
   final String? migrationsDirectory;
   final DwDatabaseConfig database;
   final DwAuthConfig auth;
-  final List<DwCallHandler> handlers;
-  final List<DwChannelRule> channels;
-  final List<DwJobDefinition> jobs;
-  final List<DwHttpRoute> routes;
+  /// The project's areas: every call, channel rule, job and route it has
+  /// comes from one of them. See [DwServerFeature].
+  final List<DwServerFeature> features;
+
+  /// Every feature's handlers.
+  List<DwCallHandler> get handlers => [
+    for (final feature in features) ...feature.handlers,
+  ];
+
+  /// Every feature's channel rules.
+  List<DwChannelRule> get channels => [
+    for (final feature in features) ...feature.channels,
+  ];
+
+  /// Every feature's jobs.
+  List<DwJobDefinition> get jobs => [
+    for (final feature in features) ...feature.jobs,
+  ];
+
+  /// Every feature's routes.
+  List<DwHttpRoute> get routes => [
+    for (final feature in features) ...feature.routes,
+  ];
 
   /// Work done at every start, after the migrations and before the port
   /// opens: the first administrator, rows that must agree with the code.
@@ -476,6 +493,18 @@ final class DwAppServer {
     final problems = <String>[];
     for (final step in startup) {
       problems.addAll(step.problems(auth));
+    }
+    final featureNames = <String>{};
+    for (final feature in features) {
+      if (!DwServerFeature.isValidName(feature.name)) {
+        problems.add(
+          'feature "${feature.name}": a name is its folder under lib/src/ — '
+          'lower-case letters, digits and _, starting with a letter',
+        );
+      }
+      if (!featureNames.add(feature.name)) {
+        problems.add('feature "${feature.name}" is declared more than once');
+      }
     }
     // Each handler factory bounds its call class by kind (`single` takes a
     // `DwSingleRequest`, `command` a `DwActionCommand`), so a handler of the

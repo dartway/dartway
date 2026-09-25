@@ -2,7 +2,7 @@
 
 A handler answers one request or command class of the protocol. It is a function, built by one of
 seven factories on `DwCallHandler` — one per request kind and one for commands — and registered in
-`DwAppServer(handlers: …)`. The server refuses to start when a registered class has no handler or
+its feature, `DwServerFeature(handlers: …)`. The server refuses to start when a registered class has no handler or
 two, so a missing handler is a deploy error rather than the first user's.
 
 The factories bound the call class by kind: `single` takes a `DwSingleRequest`, `command` a
@@ -106,7 +106,7 @@ request matches. The framework calls `count` only when the rows cannot tell the 
 `offset + rows`. The common small table costs one query, and the total never disagrees with the
 rows: a count that comes back lower than the rows already seen is raised to them.
 
-From `example/dartway_example_server/lib/src/handlers/admin_handlers.dart`:
+From `example/dartway_example_server/lib/src/admin/admin_handlers.dart`:
 
 ```dart
 DwCallHandler.table<ListUserProfiles, UserProfile>(
@@ -152,7 +152,7 @@ The handler reads **one direction** at a time. `DwWindowInput` carries:
 The framework composes the rest: around an anchor it reads newer rows for half the page, then the
 anchor and older rows, and a third read only when older rows run short. It sets the cursors. A
 cursor from the client that does not decode to `S` and `I` is a malformed call. The example's chat
-(`ListChatMessages` in `example/dartway_example_server/lib/src/handlers/chat_handlers.dart`)
+(`ListChatMessages` in `example/dartway_example_server/lib/src/chat/chat_handlers.dart`)
 compares `(sentAt, id)` as a pair in both directions. See
 [requests and updates](../2-core/requests-and-updates.md) and
 [the window list view](../3-flutter/window-list-view.md).
@@ -225,7 +225,7 @@ even when that transaction rolls back.
 
 The framework knows an account. What the account is to the project — a profile, a role — is the
 project's, added by extension and cached per call with `memo`. From the skeleton
-(`template/dartway_starter_server/lib/src/call_context.dart`):
+(`template/dartway_starter_server/lib/src/core/call_context.dart`):
 
 ```dart
 extension AppCallContext on DwCallContext {
@@ -260,7 +260,7 @@ A row never leaves the server; handlers map rows to the data objects clients see
 for a list at a time, with one query per relation — never one per row. The ORM has no joins by
 design (D-011); `findByIds` is the join.
 
-`example/dartway_example_server/lib/src/club_objects.dart` maps sessions with their services and
+`example/dartway_example_server/lib/src/club/club_objects.dart` maps sessions with their services and
 coaches:
 
 ```dart
@@ -295,7 +295,7 @@ static Future<List<ClubSession>> sessions(
 
 Its `bookings` also takes the related objects the caller already holds (`client:`, `session:`), so
 a command that has just loaded the session does not load it again. The skeleton's
-`template/dartway_starter_server/lib/src/objects.dart` does the same with framework data: the
+`template/dartway_starter_server/lib/src/profile/profile_objects.dart` does the same with framework data: the
 identifiers of every profile in one `ctx.accounts.listIdentitiesOf` call, and avatar URLs in one
 `ctx.files.publicUrls` call.
 
@@ -304,7 +304,7 @@ handler that answers one object and a handler that answers a hundred build it th
 
 **Publishing is mapping too.** A changed row often goes to several channels, as several objects;
 the skeleton keeps that in one function per change
-(`template/dartway_starter_server/lib/src/publications.dart`, `AppPublications.profile`), so every command
+(`template/dartway_starter_server/lib/src/profile/profile_publications.dart`, `AppPublications.profile`), so every command
 that changes a profile publishes the same set.
 
 ## Related

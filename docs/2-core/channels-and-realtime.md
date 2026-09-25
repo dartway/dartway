@@ -37,25 +37,30 @@ else's visit is exactly where that reading goes wrong.
 
 ## Who may subscribe
 
-The server declares one rule per kind and passes the list to `DwAppServer(channels: …)`
-(`example/dartway_example_server/lib/src/example_channels.dart`):
+The server declares one rule per kind, each with the feature that owns the kind —
+`DwServerFeature(channels: …)` (`example/dartway_example_server/lib/src/club/club_feature.dart` and
+`chat/chat_feature.dart`):
 
 ```dart
-// ExampleChannels
-static final rules = <DwChannelRule>[
-  DwChannelRule.single(ExampleChannel.schedule, canSubscribe: _anyMember),
-  DwChannelRule.keyed<int>(
-    ExampleChannel.staffChat,
-    parseKey: int.parse,
-    canSubscribe: (ctx, channelId) => ctx.isStaff,
-  ),
-  // "My" channels: a member subscribes to their own account's only.
-  DwChannelRule.ofCaller(ExampleChannel.bookings),
-  DwChannelRule.single(
-    ExampleChannel.admin,
-    canSubscribe: (ctx) => ctx.isAdmin,
-  ),
-];
+final clubFeature = DwServerFeature(
+  'club',
+  handlers: [...scheduleHandlers, ...bookingHandlers],
+  channels: [
+    DwChannelRule.single(
+      ExampleChannel.schedule,
+      canSubscribe: (ctx) async => true,
+    ),
+    // "My" channel: a member subscribes to their own account's only.
+    DwChannelRule.ofCaller(ExampleChannel.bookings),
+  ],
+);
+
+// in chatFeature
+DwChannelRule.keyed<int>(
+  ExampleChannel.staffChat,
+  parseKey: int.parse,
+  canSubscribe: (ctx, channelId) => ctx.isStaff,
+),
 ```
 
 - `single` — a kind with one instance; `canSubscribe(ctx)`.
@@ -79,7 +84,7 @@ own bookings channel. Publish a member's booking to `schedule` and every member'
 ## Publishing
 
 A command publishes with `ctx.publish(channel, object)`; the object is a data object of the protocol
-or a deletion notice (`example/dartway_example_server/lib/src/handlers/schedule_handlers.dart`):
+or a deletion notice (`example/dartway_example_server/lib/src/club/schedule_handlers.dart`):
 
 ```dart
 await ctx.db.clubSessions.delete(command.sessionId);
@@ -127,7 +132,7 @@ the same call, an object travels as it ended — its last version, with that pub
 ## Revoking
 
 Because access is checked once, a command that takes access away closes what it opened
-(`example/dartway_example_server/lib/src/handlers/admin_handlers.dart`):
+(`example/dartway_example_server/lib/src/admin/admin_handlers.dart`):
 
 ```dart
 if (row.role == UserRole.admin && command.role != UserRole.admin) {

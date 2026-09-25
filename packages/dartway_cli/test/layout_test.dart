@@ -134,7 +134,11 @@ void main() {
       } else {
         File(path)
           ..parent.createSync(recursive: true)
-          ..writeAsStringSync('');
+          ..writeAsStringSync(
+            entry.endsWith('_feature.dart')
+                ? "const feature = DwServerFeature('x');"
+                : '',
+          );
       }
     }
     return serverDir;
@@ -157,15 +161,15 @@ void main() {
   const serverLayout = [
     'my_server.dart',
     'generated/dw_schema.dart',
-    'src/entities/people.dart',
-    'src/handlers/profile_handlers.dart',
-    'src/chat/chat_files.dart',
-    'src/auth.dart',
+    'src/core/auth.dart',
+    'src/chat/chat_feature.dart',
+    'src/chat/chat_rows.dart',
+    'src/chat/reads/chat_reads.dart',
     'src/migrations/migrations.dart',
   ];
 
-  test('the server package: its library, generated/ and src/, whatever src/ '
-      'holds besides its migrations', () {
+  test('the server package: its library, generated/ and src/ of core/, '
+      'migrations/ and features', () {
     expect(serverFindings(serverWith(serverLayout)), isEmpty);
   });
 
@@ -184,16 +188,42 @@ void main() {
     );
   });
 
-  test('the server package: its library and the migrations registry are '
-      'fixed names', () {
-    final findings = serverFindings(serverWith(['src/handlers/']));
-    expect(findings, hasLength(2));
+  test('the server package: its library, core/ and the migrations registry '
+      'are fixed names', () {
+    final findings = serverFindings(serverWith(['src/chat/chat_feature.dart']));
+    expect(findings, hasLength(3));
     expect(
       findings.join('\n'),
       allOf(
         contains('my_server/lib/my_server.dart is missing'),
+        contains('lib/src/core/ is missing'),
         contains('lib/src/migrations/migrations.dart is missing'),
       ),
+    );
+  });
+
+  test('the server package: src/ holds folders — core/, migrations/ and one '
+      'per feature, each declaring itself; never a layer', () {
+    final findings = serverFindings(
+      serverWith([
+        ...serverLayout,
+        'src/objects.dart',
+        'src/handlers/chat_handlers.dart',
+        'src/domain/',
+        'src/plan/plan_rows.dart',
+        'src/Coach/coach_feature.dart',
+      ]),
+    );
+    expect(findings, hasLength(5));
+    expect(
+      findings.join('\n'),
+      allOf([
+        contains('lib/src/objects.dart is a file at the top of src/'),
+        contains('lib/src/handlers/ is a layer'),
+        contains('lib/src/domain/ is a layer'),
+        contains("plan/ is a feature without plan_feature.dart declaring its DwServerFeature('plan')"),
+        contains('lib/src/Coach/ is not a feature name'),
+      ]),
     );
   });
 }

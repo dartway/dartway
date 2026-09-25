@@ -2,7 +2,7 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../../generated/dw_schema.dart';
-import '../example_context.dart';
+import '../core/example_context.dart';
 
 /// Files attached to chat messages: who may upload them, and who may read one.
 abstract final class ChatAttachments {

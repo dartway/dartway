@@ -3,10 +3,10 @@ import 'dart:math';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
-import 'package:dartway_example_server/src/entities/chat.dart';
-import 'package:dartway_example_server/src/entities/club.dart';
-import 'package:dartway_example_server/src/entities/content.dart';
-import 'package:dartway_example_server/src/entities/people.dart';
+import 'package:dartway_example_server/src/chat/chat_rows.dart';
+import 'package:dartway_example_server/src/club/club_rows.dart';
+import 'package:dartway_example_server/src/content/content_rows.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 /// Development data: three personas who sign in with the code `111111`, a
