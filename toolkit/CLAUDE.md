@@ -15,7 +15,7 @@ Three Dart packages; the role is determined by the name suffix:
 | Package | Role | What it holds |
 |---|---|---|
 | `__SHARED_PKG__` | the contract | Pure Dart. Data objects, requests, commands, live channel kinds, refusal codes, upload purposes, and the rules both sides apply identically. Generated codecs and the protocol registry |
-| `__SERVER_PKG__` | the server | Row classes, one handler per request and command with its access rule, channel rules, the auth configuration, upload rules, migrations, `bin/server.dart`, `bin/migrate.dart`, `bin/seed_dev.dart` |
+| `__SERVER_PKG__` | the server | One folder per feature (its `DwServerFeature`, row classes, one handler per request and command with its access rule, channel rules), the auth configuration, upload rules, migrations, `bin/server.dart`, `bin/migrate.dart`, `bin/seed_dev.dart` |
 | `__FLUTTER_PKG__` | the app | Features in zones, navigation, the UI kit, localization; reads with `dw.request`, changes with `dw.command` |
 
 There is no client package: the shared package *is* the client contract, and both the app and the server import it.
@@ -127,7 +127,7 @@ PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commi
 
 ## Server (`__SERVER_PKG__`)
 
-**The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/` — arranged as the domain asks, except `src/migrations/` (`invalidTopLevelLayout`).
+**The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/`. **`src/` is folders only: `core/` (auth, the caller and access rules, channel addresses, upload rules, startup), `migrations/`, and one folder per feature** declaring its `DwServerFeature` in `<feature>_feature.dart` — its rows, handlers, objects and publications beside it. No layer folders (`handlers/`, `rows/`, `domain/`) (`invalidTopLevelLayout`).
 
 - **Handlers:** one per request and command, each with an explicit `DwAccessRule`; commands are transactional — lock the rows a decision depends on before deciding; refuse with `ctx.refuse(<Project>Refusal.…)`; someone else's row does not exist for the caller. Playbook — `dartway-server`.
 - **Rows → data objects in batch**: one query per relation for the whole batch (`findByIds`), never per row; one mapping for reads and publications.

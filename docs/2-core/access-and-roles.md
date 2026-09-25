@@ -14,7 +14,7 @@ DwCallHandler.single<GetAdminCounters, AdminCounters>(
 ),
 ```
 
-(`example/dartway_example_server/lib/src/handlers/admin_handlers.dart`)
+(`example/dartway_example_server/lib/src/admin/admin_handlers.dart`)
 
 `access` has no default, so a handler cannot be open by omission. There are four rules:
 
@@ -77,7 +77,7 @@ problem. A missing handler is found at deploy, not by the first user to press th
 ## Roles are the project's
 
 A role is a column of the project's profile row, and the project names it in its own words with an
-extension on the context (`example/dartway_example_server/lib/src/example_context.dart`):
+extension on the context (`example/dartway_example_server/lib/src/core/example_context.dart`):
 
 ```dart
 extension ExampleCallContext on DwCallContext {

@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 /// executable has no reliable way back to its own pubspec. It is a checked
 /// copy: `toolkit_manifest_test.dart` compares the two and goes red when they
 /// part.
-const dartwayCliVersion = '0.11.1';
+const dartwayCliVersion = '0.12.0';
 
 /// Where an installed harness came from.
 ///

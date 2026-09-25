@@ -77,7 +77,7 @@ How long a resolved token is trusted without a query is a server setting, not an
 - `DwToolOrigin()` — `DwAccountService.ensure`: a seed, an admin bootstrap, an import. It has
   accepted nothing on anyone's behalf.
 
-The skeleton's `AppAuth.createProfile` (`template/dartway_starter_server/lib/src/auth.dart`) shows why the
+The skeleton's `AppAuth.createProfile` (`template/dartway_starter_server/lib/src/core/auth.dart`) shows why the
 difference matters:
 
 ```dart
@@ -119,7 +119,7 @@ attached to the one it joined.
 
 The framework publishes nothing about identifiers. The skeleton republishes the profile, which
 shows identifiers read from the framework; the example mirrors the phone into its profile row in
-the same transaction (`example/dartway_example_server/lib/src/example_auth.dart`).
+the same transaction (`example/dartway_example_server/lib/src/core/example_auth.dart`).
 
 ## Built-in commands
 

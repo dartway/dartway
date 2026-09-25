@@ -63,7 +63,7 @@ final class PublishNews extends DwActionCommand<NewsPost>
 
 `dart run dartway_cli:dartway generate` writes the `_$…` mixins — the JSON codec and value equality — and the protocol
 registry both sides share. The server answers each call with one handler. Abridged from
-`example/dartway_example_server/lib/src/handlers/content_handlers.dart`:
+`example/dartway_example_server/lib/src/content/content_handlers.dart`:
 
 ```dart
 DwCallHandler.command<PublishNews, NewsPost>(

@@ -23,15 +23,13 @@ abstract final class ExampleServer {
     migrationsDirectory: 'lib/src/migrations',
     database: database,
     auth: auth ?? ExampleAuth.config,
-    handlers: [
-      ...profileHandlers,
-      ...scheduleHandlers,
-      ...bookingHandlers,
-      ...contentHandlers,
-      ...chatHandlers,
-      ...adminHandlers,
+    features: [
+      profileFeature,
+      clubFeature,
+      contentFeature,
+      chatFeature,
+      adminFeature,
     ],
-    channels: ExampleChannels.rules,
     files: storage == null ? null : ExampleFiles.storage(storage),
     modules: [push ?? ExamplePush.module()],
     port: port,
@@ -51,10 +49,7 @@ build it on a free port against their own database.
 | `migrations` | yes | the project's migrations (namespace `app`) — [migrations](migrations.md) |
 | `database` | yes | a `DwDatabaseConfig` — [database](database.md) |
 | `auth` | yes | a `DwAuthConfig` — [auth and identity](auth-identity.md) |
-| `handlers` | yes | one `DwCallHandler` per request and command class — [handlers](handlers-and-context.md) |
-| `channels` | no | one `DwChannelRule` per channel kind — [channels](../2-core/channels-and-realtime.md) |
-| `jobs` | no | `DwQueuedJob` and `DwRecurringJob` — [jobs](jobs.md) |
-| `routes` | no | `DwHttpRoute` doors for callers that are not the app — [routes](routes.md) |
+| `features` | yes | the project's areas, each a `DwServerFeature(name, handlers:, channels:, jobs:, routes:)` declared in its own folder: one `DwCallHandler` per request and command ([handlers](handlers-and-context.md)), a `DwChannelRule` per channel kind it owns ([channels](../2-core/channels-and-realtime.md)), its jobs ([jobs](jobs.md)) and its doors for callers that are not the app ([routes](routes.md)). `server.handlers`, `channels`, `jobs` and `routes` read them all together. A feature's name is its folder under `lib/src/`: lower-case, and once |
 | `files` | no | a `DwFileStorage`; without it file calls fail — [uploads](uploads.md) |
 | `port` | no | `8080`; `0` binds a free port (`server.boundPort` tells which) |
 | `address` | no | `InternetAddress.anyIPv4` |

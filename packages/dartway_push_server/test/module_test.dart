@@ -22,8 +22,7 @@ void main() {
       normalize: (kind, raw) => raw,
       deliverCode: (ctx, kind, identifier, code, accountId) async {},
     ),
-    handlers: handlers,
-    jobs: jobs,
+    features: [DwServerFeature('test', handlers: handlers, jobs: jobs)],
     modules: modules,
     logger: RecordingLogger([]),
   );

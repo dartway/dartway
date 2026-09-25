@@ -199,7 +199,7 @@ compiles, starts and travels without that field.
 
 Row classes (`DwTableRow`) live in the server package, and the generator refuses one declared
 anywhere else; a DTO field cannot be a row. A handler reads rows and maps them to data objects
-(`example/dartway_example_server/lib/src/club_objects.dart`):
+(`example/dartway_example_server/lib/src/club/club_objects.dart`):
 
 ```dart
 static PersonCard person(UserProfileRow row) => PersonCard(

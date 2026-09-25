@@ -52,7 +52,7 @@ enum DartwayStarterUpload with DwUploadPurpose {
 app's picker read the same limits.)
 
 The server declares one `DwUploadRule` per purpose. From
-`template/dartway_starter_server/lib/src/files.dart`:
+`template/dartway_starter_server/lib/src/core/files.dart`:
 
 ```dart
 // AppFiles
@@ -98,7 +98,7 @@ prefix's.
 Who reads a private file is `DwFileStorage.canRead(ctx, DwFileRecord file)`. Without it, only the
 uploader. A `false` answers `dw.forbidden` to a signed-in caller and `401` to an anonymous one, who
 may be allowed after signing in. The example lets chat members read chat attachments
-(`example/dartway_example_server/lib/src/example_files.dart`):
+(`example/dartway_example_server/lib/src/core/example_files.dart`):
 
 ```dart
 // ExampleFiles
@@ -146,7 +146,7 @@ static DwFileStorage storage(DwFileStorageConfig config) =>
     DwFileStorage(config, rules: uploadRules);
 ```
 
-passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/src/files.dart`).
+passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/src/core/files.dart`).
 
 `DwFileStorageConfig`:
 
@@ -197,7 +197,7 @@ A row references a file by id (`avatarFileId`). `ctx.files` is the `DwFileServic
 
 **Check every file id a client sends.** A file id is a number anyone can type; without
 `requireOwned`, a member could put someone else's private document on their own profile. From the
-skeleton's `UpdateMyProfile` (`template/dartway_starter_server/lib/src/handlers/profile_handlers.dart`):
+skeleton's `UpdateMyProfile` (`template/dartway_starter_server/lib/src/profile/profile_handlers.dart`):
 
 ```dart
 DwCallHandler.command<UpdateMyProfile, UserProfile>(
@@ -242,7 +242,7 @@ DwCallHandler.command<UpdateMyProfile, UserProfile>(
 ```
 
 Turn ids into URLs when rows become data objects, for the whole list at once
-(`template/dartway_starter_server/lib/src/objects.dart`) — never store a URL on a row: the storage
+(`template/dartway_starter_server/lib/src/profile/profile_objects.dart`) — never store a URL on a row: the storage
 configuration decides it, and a private file has none.
 
 ### The server's own access — `read`, `readLink`, `store`

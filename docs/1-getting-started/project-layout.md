@@ -67,33 +67,42 @@ my_app_server/
   bin/migrate.dart         apply | rollback | status | create <name> | check | rehash
   bin/seed_dev.dart        development accounts and data; refuses to run twice
   lib/my_app_server.dart   builds the DwAppServer: protocol, schema, migrations, auth,
-                           handlers, channels, files
+                           the features, files
   lib/generated/
     dw_schema.dart         the schema and the db.<table> getters — generated
   lib/src/
-    entities/              row classes (@DwSqlTable) with their generated *.dw.dart tables
-    handlers/              one DwCallHandler per request and command, grouped by area
+    core/                  the server-wide wiring
+      auth.dart            DwAuthConfig: code delivery, the profile made with each account
+      call_context.dart    what "the caller" means to this app: ctx.profile, the access rules
+      channels.dart        the channels handlers publish to
+      files.dart           one DwUploadRule per upload purpose
+      bootstrap.dart       the admin role granted to the first administrator (DwFirstAdministrator)
     migrations/            migrations.dart and one file per migration — written by
                            migrate.dart create, then yours
-    auth.dart              DwAuthConfig: code delivery, the profile made with each account
-    call_context.dart      what "the caller" means to this app: ctx.profile, the access rules
-    channels.dart          one DwChannelRule per channel kind
-    files.dart             one DwUploadRule per upload purpose
-    objects.dart           rows → the data objects clients see, related data in batches
-    publications.dart      what a change publishes, and to whom
-    bootstrap.dart         the admin role granted to the first administrator (DwFirstAdministrator)
+    profile/               a feature: everything of one area of the app, in one folder
+      profile_feature.dart the DwServerFeature: its handlers, channel rules, jobs, routes
+      profile_rows.dart    row classes (@DwSqlTable) with their generated *.dw.dart
+      profile_handlers.dart one DwCallHandler per request and command
+      profile_objects.dart rows → the data objects clients see, related data in batches
+      profile_publications.dart what a change publishes, and to whom
+    admin/, settings/      the skeleton's other features, the same shape
   test/                    acceptance tests on a real server, database and storage
   docker-compose.yaml      development Postgres and MinIO
   Dockerfile               the server image the deploy builds
 ```
 
-**The top of `lib/` is fixed; `lib/src/` is yours.** The checker allows exactly the package's library,
-`generated/` and `src/` there, and requires `src/migrations/migrations.dart` — `bin/migrate.dart`
-writes and reads migrations by that path. Everything else under `src/` is arranged as your domain
-asks: the skeleton's files are one reasonable shape, not a law.
+**`lib/src/` is folders: `core/`, `migrations/`, and one per feature** — a law, held by `dartway
+check` as the Flutter package's top level is. A feature's folder holds everything of its area — its
+rows, handlers, objects, publications, jobs and rules, in files named after it, and in subfolders
+when it grows — and declares itself in `<feature>_feature.dart` as a `DwServerFeature` the server
+lists. No file sits at the top of `src/`, and no folder there is named for a layer (`handlers/`,
+`rows/`, `entities/`, `domain/`, `objects/`, `services/`): a feature split across layers lives in
+four places, and a project that grew that way ended with a `chat/` beside a `domain/chat/` and two
+rules for who is in a chat. `src/migrations/migrations.dart` is a fixed name — `bin/migrate.dart`
+writes and reads migrations by that path.
 
 **A row is not a data object.** `UserProfileRow` is a table; `UserProfile` is what a client receives.
-The server builds one from the other in `objects.dart` — the profile's phone and e-mail come from
+The server builds one from the other in `profile_objects.dart` — the profile's phone and e-mail come from
 the framework's identities, its photo URL from the file store — so a column added for the server's
 own use never reaches a client by accident.
 
@@ -197,7 +206,7 @@ someone.
 |---|---|---|
 | `*_shared/lib/src/**/*.dw.dart` | `dart run dartway_cli:dartway generate` | data objects, requests, commands: codecs and equality |
 | `*_shared/lib/generated/dw_protocol.dart` | `dart run dartway_cli:dartway generate` | every DTO of the contract: the protocol registry |
-| `*_server/lib/src/entities/*.dw.dart` | `dart run dartway_cli:dartway generate` | row classes: the typed table definitions |
+| `*_server/lib/src/<feature>/*_rows.dw.dart` | `dart run dartway_cli:dartway generate` | row classes: the typed table definitions |
 | `*_server/lib/generated/dw_schema.dart` | `dart run dartway_cli:dartway generate` | row classes: the schema and the `db.<table>` getters |
 | `*_server/lib/src/migrations/m<timestamp>_<name>.dart` | `dart run bin/migrate.dart create <name>` | the difference between the schema and the migrations — a draft you review, then yours |
 | `*_flutter/lib/l10n/gen/` | Flutter's `gen-l10n` | the ARB files |

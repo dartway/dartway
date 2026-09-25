@@ -19,7 +19,7 @@ description: >-
 # DartWay — the server (`__SERVER_PKG__`)
 
 The server is a `DwAppServer`: the protocol from `__SHARED_PKG__`, the schema and migrations, one
-handler per request and command, channel rules, auth hooks, jobs, routes, file storage. There are no
+handler per request and command, channel rules, jobs and routes grouped by feature, auth hooks, file storage. There are no
 endpoints to write and no generic create-read-update layer: every call the app can make is a DTO in the contract with a
 handler here that says who may make it and what it does.
 
@@ -38,16 +38,28 @@ __SERVER_PKG__/
                            creates the accounts
   lib/__SERVER_PKG__.dart  the library: builds the DwAppServer
   lib/generated/           written by `dart run dartway_cli:dartway generate` — never edited
-  lib/src/                 everything else
+  lib/src/core/            fixed: auth hooks, the caller and access rules, channel
+                           addresses, upload rules, startup steps
   lib/src/migrations/      fixed: migration files and migrations.dart
+  lib/src/<feature>/       one folder per area of the app:
+    <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes
+    <feature>_rows.dart        its row classes
+    <feature>_handlers.dart    one handler per request and command
+    <feature>_objects.dart     rows → data objects, in batch
+    <feature>_publications.dart  what a change publishes, and to whom
+    …                          anything else the area needs, subfolders when it grows
   test/
 ```
 
-The top level of `lib/` is closed: the package library, `generated/`, `src/`. Anything else there —
-and a missing `lib/src/migrations/migrations.dart` — is `invalidTopLevelLayout`, an error of
-`dart run dartway_cli:dartway check`. Inside `src/` arrange by the domain; the skeleton keeps row classes in `entities/`,
-handlers in `handlers/` (a list per area), and one file each for the auth config, the context
-extension, the channel rules, the upload rules, rows → data objects, and publications.
+The top level of `lib/` is closed: the package library, `generated/`, `src/`. **So is `src/`: folders
+only — `core/`, `migrations/` and one per feature**, each declaring its `DwServerFeature` in
+`<feature>_feature.dart`, and the server lists the features: `DwAppServer(features: [...])`. A file at
+the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`, `objects/`,
+`services/`) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
+`dart run dartway_cli:dartway check`. A feature split across layers ends up in four places, with a
+`chat/` beside a `domain/chat/` and two rules for who is in a chat: the whole area lives in its
+folder, and what two features share lives in the one that owns it (the profile's objects in
+`profile/`) or in `core/`.
 
 ## 2. Row classes
 
@@ -197,7 +209,7 @@ the framework's `dw_*` tables: accounts, identities and keys go through `DwAccou
 
 ## 4. Handlers — one per call
 
-A handler list per area, registered in `DwAppServer(handlers: [...])`. The server refuses to start
+A handler list per feature, registered in its `DwServerFeature(handlers: [...])`. The server refuses to start
 when a registered request or command has no handler, has two, or when an access check is written
 for another call class.
 
@@ -374,7 +386,7 @@ again in every handler. Access rules built on it — `dartway-access`.
 
 ## 7. Jobs
 
-Work that runs later or on a timer is a job, declared in `DwAppServer(jobs: [...])`:
+Work that runs later or on a timer is a job, declared in its feature's `DwServerFeature(jobs: [...])`:
 
 ```dart
 /// What a job is — name and payload codec — imported by whatever enqueues it.
@@ -429,7 +441,7 @@ DwHttpRoute.post('/webhooks/payments', (ctx, request) async {
 });
 ```
 
-Registered in `DwAppServer(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
+Registered in a feature's `DwServerFeature(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
 framework's. `auth:` is `DwRouteAuth.none` by default (the sender proves itself otherwise);
 `optional`/`required` read `Authorization: Bearer` like a call. A refusal thrown in a route is
 answered as JSON with its status; anything else as `500` with an incident id.

@@ -5,19 +5,18 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 import 'generated/dw_schema.dart';
-import 'src/auth.dart';
-import 'src/bootstrap.dart';
-import 'src/channels.dart';
-import 'src/files.dart';
-import 'src/handlers/admin_handlers.dart';
-import 'src/handlers/profile_handlers.dart';
-import 'src/handlers/settings_handlers.dart';
+import 'src/core/auth.dart';
+import 'src/core/bootstrap.dart';
+import 'src/admin/admin_feature.dart';
+import 'src/core/files.dart';
+import 'src/profile/profile_feature.dart';
+import 'src/settings/settings_feature.dart';
 import 'src/migrations/migrations.dart';
 
 export 'generated/dw_schema.dart';
-export 'src/auth.dart' show AppAuth, CodeDelivery;
-export 'src/bootstrap.dart';
-export 'src/files.dart' show AppFiles;
+export 'src/core/auth.dart' show AppAuth, CodeDelivery;
+export 'src/core/bootstrap.dart';
+export 'src/core/files.dart' show AppFiles;
 export 'src/migrations/migrations.dart' show appMigrations;
 
 /// The app's server, as `bin/server.dart` and the tests build it.
@@ -40,8 +39,7 @@ abstract final class DartwayStarterServer {
     migrationsDirectory: 'lib/src/migrations',
     database: database,
     auth: auth ?? AppAuth.config(),
-    handlers: [...profileHandlers, ...adminHandlers, ...settingsHandlers],
-    channels: AppChannels.rules,
+    features: [profileFeature, adminFeature, settingsFeature],
     startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
     files: storage == null ? null : AppFiles.storage(storage),
     port: port,

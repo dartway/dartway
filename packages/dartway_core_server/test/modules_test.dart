@@ -106,7 +106,7 @@ DwAppServer serverWith(
     normalize: (kind, raw) => raw,
     deliverCode: (ctx, kind, identifier, code, accountId) async {},
   ),
-  handlers: const [],
+  features: const [],
   modules: modules,
   logger: RecordingLogger(),
 );
@@ -176,11 +176,16 @@ void main() {
           normalize: (kind, raw) => raw,
           deliverCode: (ctx, kind, identifier, code, accountId) async {},
         ),
-        handlers: [
-          DwCallHandler.command<CountVisit, int>(
-            access: DwAccessRule.anonymous,
-            handle: (ctx, command) async =>
-                ctx.module<VisitsModule>().counted.length,
+        features: [
+          DwServerFeature(
+            'visits',
+            handlers: [
+              DwCallHandler.command<CountVisit, int>(
+                access: DwAccessRule.anonymous,
+                handle: (ctx, command) async =>
+                    ctx.module<VisitsModule>().counted.length,
+              ),
+            ],
           ),
         ],
         logger: logger,

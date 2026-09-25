@@ -37,7 +37,7 @@ void main() {
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),
-          handlers: const [],
+          features: const [],
           logger: const _Silent(),
         ),
       );

@@ -49,7 +49,7 @@ DwAppServer(
 `dw.push.deliver` and the recurring job `dw.push.cleanup`. The server refuses to start when the
 protocol does not register the push calls, when a project answers them itself, or when a setting
 cannot work. The example reads its providers from the environment
-(`example/dartway_example_server/lib/src/example_push.dart`). A project's migration CLI replays the
+(`example/dartway_example_server/lib/src/core/example_push.dart`). A project's migration CLI replays the
 namespace beside the framework's:
 
 ```dart

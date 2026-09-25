@@ -28,11 +28,31 @@ const dwFlutterLayers = {'core', 'l10n', 'shared', 'ui_kit'};
 
 /// The top level of the server package's `lib/`: the library a package is
 /// named for, what the generator writes, and everything else under `src/`.
-///
-/// `src/` itself stays open — a project arranges its handlers, rows and domain
-/// areas as its domain asks — except for `migrations/`, which `bin/migrate.dart`
-/// writes and reads by that path, so it is a fixed name.
 const dwServerLibFolders = {'generated', 'src'};
+
+/// The fixed folders of a server's `lib/src/`; every other folder there is a
+/// feature.
+///
+/// `core/` is the server-wide wiring — sign-in hooks, what the caller is and
+/// the access rules, channel and upload rules, the startup steps.
+/// `migrations/` is written and read by `bin/migrate.dart` by that path.
+const dwServerSrcLayers = {'core', 'migrations'};
+
+/// Folders a server's `lib/src/` may not have: layers named for what a file
+/// is rather than which area it serves. A feature split over `handlers/`,
+/// `rows/` and `domain/` lives in four places, and in one project it did —
+/// with two folders called `chat/` and `domain/chat/` and two different
+/// rules for who is in a chat.
+const dwServerForbiddenFolders = {
+  'domain',
+  'entities',
+  'handlers',
+  'models',
+  'objects',
+  'publications',
+  'rows',
+  'services',
+};
 
 /// Validates the declared top level of a DartWay project: the folders that may
 /// exist, and the files that must.
@@ -165,6 +185,44 @@ class DwLayoutInspector {
 
     final srcDir = Directory(p.join(libDir.path, 'src'));
     if (!srcDir.existsSync()) return;
+    final srcLabel = '${p.basename(serverDir.path)}/lib/src';
+    for (final entity in srcDir.listSync()) {
+      final name = p.basename(entity.path);
+      if (name.startsWith('.')) continue;
+      if (entity is! Directory) {
+        _findings.add(
+          '$srcLabel/$name is a file at the top of src/ — a file belongs to '
+          'core/ or to the feature it serves',
+        );
+        continue;
+      }
+      if (dwServerSrcLayers.contains(name)) continue;
+      if (dwServerForbiddenFolders.contains(name)) {
+        _findings.add(
+          '$srcLabel/$name/ is a layer, not a feature — rows, handlers and '
+          'rules live in the folder of the feature they serve',
+        );
+        continue;
+      }
+      if (!RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(name)) {
+        _findings.add(
+          '$srcLabel/$name/ is not a feature name — lower-case letters, '
+          'digits and _',
+        );
+        continue;
+      }
+      final declaration = File(p.join(entity.path, '${name}_feature.dart'));
+      if (!declaration.existsSync() ||
+          !declaration.readAsStringSync().contains('DwServerFeature(')) {
+        _findings.add(
+          '$srcLabel/$name/ is a feature without ${name}_feature.dart '
+          "declaring its DwServerFeature('$name')",
+        );
+      }
+    }
+    if (!Directory(p.join(srcDir.path, 'core')).existsSync()) {
+      _findings.add('$srcLabel/core/ is missing — it is a fixed name');
+    }
     if (!File(
       p.join(srcDir.path, 'migrations', 'migrations.dart'),
     ).existsSync()) {

@@ -39,6 +39,28 @@ void main() {
       fail('the server started');
     }
 
+    test('a feature is named as its folder, once', () async {
+      final found = await problems(
+        DwAppServer(
+          protocol: testProtocol,
+          migrations: const [],
+          database: unused,
+          auth: app.auth(),
+          features: [
+            ...app.server(unused).features,
+            const DwServerFeature('Daily-Plan'),
+            const DwServerFeature('twin'),
+            const DwServerFeature('twin'),
+          ],
+        ),
+      );
+      expect(found, [
+        'feature "Daily-Plan": a name is its folder under lib/src/ — '
+            'lower-case letters, digits and _, starting with a letter',
+        'feature "twin" is declared more than once',
+      ]);
+    });
+
     test('every problem is reported at once', () async {
       final found = await problems(
         app.server(

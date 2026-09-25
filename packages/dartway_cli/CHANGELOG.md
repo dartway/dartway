@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0
+
+- **BREAKING: `dartway check` holds the server's `lib/src/` to a layout** (D-093, `invalidTopLevelLayout`): folders only — `core/`, `migrations/`, and one per feature declaring its `DwServerFeature` in `<feature>_feature.dart`. A file at the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`, `objects/`, `publications/`, `services/`, `models/`) or a feature folder without its declaration is an error. `src/` used to be "the project's": three projects on the framework arranged it three ways, and the largest arranged it two ways at once, with one area in four folders. The skeleton `dartway create` hands out has the layout. Migration note: `docs/migrations/2026-09-25-server-features.md`.
+
 ## 0.11.1
 
 - **The toolkit's resident `CLAUDE.md` is half its size** (#281): 7 400 words paid in every session of every project become 3 450. The laws stay resident; what only one kind of task needs moves to skills loaded on demand — `dartway-documentation` (specs, ADRs, dev notes), `dartway-framework-notes` (filing a finding upstream), the old shapes into `dartway-update`, localization in full into `dartway-ui-kit` — each with a resident line saying when to load it.

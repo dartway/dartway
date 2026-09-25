@@ -26,7 +26,7 @@ final class PublishNews extends DwActionCommand<NewsPost> with _$PublishNews {
 ```
 
 The server — who may call it, what it does, who hears about it
-(`example/dartway_example_server/lib/src/handlers/content_handlers.dart`, abridged):
+(`example/dartway_example_server/lib/src/content/content_handlers.dart`, abridged):
 
 ```dart
 DwCallHandler.command<PublishNews, NewsPost>(

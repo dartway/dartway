@@ -96,7 +96,9 @@ final class AnalyticsHarness {
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
           ),
-          handlers: [placeOrderHandler],
+          features: [
+            DwServerFeature('orders', handlers: [placeOrderHandler]),
+          ],
           modules: [DwAnalyticsModule(settings: settings)],
           logger: const _SilentLogger(),
           settings: const DwServerSettings(

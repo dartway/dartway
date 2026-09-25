@@ -2,7 +2,7 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../../generated/dw_schema.dart';
-import '../entities/chat.dart';
+import 'chat_rows.dart';
 
 /// Read positions and unread counts of the staff chat.
 abstract final class ChatReads {

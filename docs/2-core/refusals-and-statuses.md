@@ -84,7 +84,7 @@ Two more enums share the `dw.` namespace, kept separate so a project switching e
 ## Refusing on the server
 
 A handler refuses with `ctx.refuse`, which never returns
-(`example/dartway_example_server/lib/src/handlers/booking_handlers.dart`):
+(`example/dartway_example_server/lib/src/club/booking_handlers.dart`):
 
 ```dart
 if (session.bookedCount >= session.capacity) {

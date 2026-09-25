@@ -8,8 +8,9 @@ into and nothing an ORM hides behind a getter.
 
 ## Row classes
 
-A table is declared by a row class in the server package, `lib/src/entities/`. From
-`example/dartway_example_server/lib/src/entities/club.dart`:
+A table is declared by a row class in the server package, in the rows file of the feature that owns
+it (`lib/src/<feature>/<feature>_rows.dart`). From
+`example/dartway_example_server/lib/src/club/club_rows.dart`:
 
 ```dart
 import 'package:dartway_core_server/dartway_core_server.dart';

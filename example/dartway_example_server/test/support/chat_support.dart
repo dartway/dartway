@@ -1,6 +1,6 @@
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
-import 'package:dartway_example_server/src/entities/chat.dart';
+import 'package:dartway_example_server/src/chat/chat_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 

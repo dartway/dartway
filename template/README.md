@@ -76,7 +76,7 @@ with the code **111111**: the admin **79990000001**, the members
 **79990000002** and **boris@example.com**. `DW_ADMIN_IDENTIFIER` makes the
 phone or e-mail it names an administrator on every start — whoever receives
 its codes is the admin, so there is no default. A real delivery goes into
-`deliverCode` in `dartway_starter_server/lib/src/auth.dart`.
+`deliverCode` in `dartway_starter_server/lib/src/core/auth.dart`.
 
 ## Build a feature
 
@@ -85,9 +85,10 @@ its codes is the admin, so there is no default. A real delivery goes into
    `DwListRequest`, `DwTableRequest`, …) with the channels they live on, and
    the commands that change it (`DwActionCommand`, `DwSelfValidating` for
    field rules both sides check).
-2. **Server** — a row class in `lib/src/entities/` (`@DwSqlTable`), a handler
-   per request and command in `lib/src/handlers/` with its access rule,
-   publishing what a command changed to the channels that show it.
+2. **Server** — a folder `lib/src/<feature>/`: a row class (`@DwSqlTable`), a
+   handler per request and command with its access rule, publishing what a
+   command changed to the channels that show it, and `<feature>_feature.dart`
+   declaring it — added to `features:` in the server library.
 3. `dart run dartway_cli:dartway generate` — codecs, the protocol registry, tables and the schema.
 4. `dart run bin/migrate.dart create <name>` (with `DW_DATABASE_*` set) — a
    migration from the row classes; review it, it is yours.

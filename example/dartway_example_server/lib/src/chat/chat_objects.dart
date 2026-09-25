@@ -2,9 +2,9 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../../generated/dw_schema.dart';
-import '../club_objects.dart';
-import '../entities/chat.dart';
-import '../entities/people.dart';
+import '../club/club_objects.dart';
+import 'chat_rows.dart';
+import '../profile/profile_rows.dart';
 
 /// Chat rows → the data objects staff see. Like `ClubObjects`: every relation
 /// of a batch is one query — authors, quoted messages, attachments, their

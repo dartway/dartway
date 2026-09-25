@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.5
+
+- **BREAKING: a server is its features. `DwAppServer(features: [...])` replaces `handlers:`, `channels:`, `jobs:` and `routes:`; each `DwServerFeature(name, handlers:, channels:, jobs:, routes:)` declares one area of the project** (D-093). `server.handlers`, `channels`, `jobs` and `routes` read them all together. A feature's name is its folder under `lib/src/` — lower-case, declared once, or the server does not start. Projects spread an area's pieces over the server's lists by hand, each in its own way; the dartway CLI now holds the layout this names. Migration note: `docs/migrations/2026-09-25-server-features.md`.
+
 ## 0.21.0-dev.4
 
 - **BREAKING: jobs are typed. `DwJobKind<P>(name, encode:, decode:)` is what a job is; `DwQueuedJob<P>(kind, handle: (ctx, P payload) …)` is how it runs; `ctx.jobs.enqueue(kind, payload)` replaces `enqueue(String name, Map payload)`** (D-092). The `DwJobDefinition(...)` constructor is gone; `DwJobKind.withoutPayload(name)` is a `DwJobKind<void>` enqueued with `null`. Every project spelled each payload as a map at every enqueue and cast it back in every handler (`payload['runId']! as int`), and named jobs by string constants in three conventions. Migration note: `docs/migrations/2026-09-25-typed-jobs.md`.
