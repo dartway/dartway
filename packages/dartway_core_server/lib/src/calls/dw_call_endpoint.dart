@@ -443,8 +443,12 @@ final class DwCallEndpoint {
     DwCallContext ctx,
     DwServerCall<Object?> call,
   ) async {
-    if (access is DwCheckAccess && !await access.allows(ctx, call)) {
-      ctx.refuse(DwCoreRefusal.forbidden);
+    switch (access) {
+      case DwCheckAccess() when !await access.allows(ctx, call):
+        ctx.refuse(DwCoreRefusal.forbidden);
+      case DwResourceAccess():
+        await access.resolve(ctx, call);
+      default:
     }
   }
 
