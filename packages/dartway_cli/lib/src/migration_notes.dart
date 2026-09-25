@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:pub_semver/pub_semver.dart';
 import 'package:yaml/yaml.dart';
 
 import 'version_check.dart';
@@ -51,6 +52,24 @@ class DwMigrationNote {
     }
     return false;
   }
+
+  /// The version this note is ordered by: the first one named in `affects`,
+  /// as written — `null` when it does not parse as semver (a problem the
+  /// frontmatter check above already reports on).
+  ///
+  /// Not every `affects` version is on the same package's number line — a
+  /// note can name a satellite alongside the family — but the first one
+  /// written is the one its author reached for first, and in every note this
+  /// repository ships that is the family's, whose `-dev.N` already grows
+  /// monotonically with the day the note was added.
+  Version? get sortVersion {
+    if (affects.isEmpty) return null;
+    try {
+      return Version.parse(affects.values.first);
+    } on FormatException {
+      return null;
+    }
+  }
 }
 
 /// A note that could not be read, and why.
@@ -78,9 +97,11 @@ class DwMigrationNotes {
 
 /// Reads `docs/migrations/` out of a monorepo checkout.
 ///
-/// Notes come back sorted by file name, which is chronological because the
-/// names start with a date — and chronological is the order they are applied
-/// in when a project has fallen several releases behind.
+/// Notes come back sorted by [DwMigrationNote.sortVersion], then by file
+/// name — chronological, which is the order they are applied in when a
+/// project has fallen several releases behind. The file name alone is not
+/// enough: it starts with a date, but two notes opened the same day sort by
+/// the words after it, not by which shipped first.
 DwMigrationNotes readMigrationNotes(Directory monorepoDir) {
   final dir = Directory(p.join(monorepoDir.path, migrationNotesDir));
   if (!dir.existsSync()) {
@@ -111,6 +132,19 @@ DwMigrationNotes readMigrationNotes(Directory monorepoDir) {
       problems.add(parsed);
     }
   }
+
+  notes.sort((a, b) {
+    final versionA = a.sortVersion;
+    final versionB = b.sortVersion;
+    final byVersion = switch ((versionA, versionB)) {
+      (null, null) => 0,
+      (null, _) => -1,
+      (_, null) => 1,
+      (final va?, final vb?) => va.compareTo(vb),
+    };
+    if (byVersion != 0) return byVersion;
+    return p.basename(a.path).compareTo(p.basename(b.path));
+  });
 
   return DwMigrationNotes(notes: notes, problems: problems);
 }

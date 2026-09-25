@@ -158,6 +158,57 @@ void main() {
     });
   });
 
+  group('readMigrationNotes orders by version, then by name', () {
+    late Directory sandbox;
+
+    setUp(() {
+      sandbox = Directory.systemTemp.createTempSync('dw_migration_notes');
+    });
+    tearDown(() => sandbox.deleteSync(recursive: true));
+
+    void writeNote(String fileName, String affectsVersion) {
+      final dir = Directory(p.join(sandbox.path, migrationNotesDir))
+        ..createSync(recursive: true);
+      File(p.join(dir.path, fileName)).writeAsStringSync(
+        '---\n'
+        'title: "$fileName"\n'
+        'affects:\n'
+        '  dartway_core_server: "$affectsVersion"\n'
+        '---\n',
+      );
+    }
+
+    test('a same-day pair out of name order is put back in version order', () {
+      // "account-…" sorts before "contract-…" by name, but its version is the
+      // later one — exactly the shape of the real 2026-09-24 notes this fix
+      // is for.
+      writeNote('2026-09-24-account-deletion-choice.md', '0.21.0-dev.3');
+      writeNote('2026-09-24-contract-version.md', '0.20.0-dev.4');
+      writeNote('2026-09-24-generate-deliver-code-split.md', '0.21.0-dev.2');
+
+      final read = readMigrationNotes(sandbox);
+
+      expect(read.problems, isEmpty);
+      expect(read.notes.map((note) => p.basename(note.path)), [
+        '2026-09-24-contract-version.md',
+        '2026-09-24-generate-deliver-code-split.md',
+        '2026-09-24-account-deletion-choice.md',
+      ]);
+    });
+
+    test('two notes at the same version fall back to file name', () {
+      writeNote('2026-09-24-b.md', '0.21.0-dev.3');
+      writeNote('2026-09-24-a.md', '0.21.0-dev.3');
+
+      final read = readMigrationNotes(sandbox);
+
+      expect(read.notes.map((note) => p.basename(note.path)), [
+        '2026-09-24-a.md',
+        '2026-09-24-b.md',
+      ]);
+    });
+  });
+
   group('the notes this repository ships', () {
     test('all parse, and name packages at versions that exist', () {
       final root = monorepoRoot();

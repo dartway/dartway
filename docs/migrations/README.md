@@ -100,9 +100,11 @@ nobody, and the note is the whole delivery. `dartway_cli` is the right key becau
 package declares it as a dev dependency, which puts it in the lock of every project `dartway create`
 produces; name the version being released with the fix.
 
-**File name: `YYYY-MM-DD-slug.md`.** The notes are listed in file-name order, which is the order
-they are applied in by a project that has fallen several releases behind. Two notes landing on one
-day are ordered by their slug — so when one has to come after another, the slugs have to say so.
+**File name: `YYYY-MM-DD-slug.md`.** The notes are listed in the order they are applied in by a
+project that has fallen several releases behind: by the first version named in `affects`, then
+by file name. The date in the name is for a person scanning the folder — two notes opened the
+same day do not always land in that order, and a slug that happens to sort earlier must not be
+read as "applied first".
 
 **Write the edit, not the news.** "The auth flow was reworked" is a changelog entry; this file is
 read by someone who has to change a line and wants to know which one. The changelog says what
