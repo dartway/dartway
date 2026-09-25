@@ -4,9 +4,11 @@ name: Checks
 # those that need a Postgres and an S3-compatible storage.
 #
 # It exists because neither was run anywhere. Twenty-one suites, a thousand
-# tests, and the three workflows beside this one read a diff, forward a verdict
-# and build two web targets — so a change to one package could break a suite in
-# another and reach master green. That is not hypothetical: #165 made
+# tests, and the five workflows beside this one read a diff, forward a verdict,
+# build two web targets, run the project suites and build the deploy images —
+# none of them analyzes or runs the framework's own suites, so a change to one
+# package could break a suite in another and reach master green. That is not
+# hypothetical: #165 made
 # `DwAuthConfig.normalizeIdentifier` required, updated the two application call
 # sites, and missed a third in a test that builds its own config. The author ran
 # what they touched; the suite that broke belonged to a package they had no

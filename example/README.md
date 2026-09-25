@@ -18,7 +18,7 @@ writing yours — `dartway create` exists for that.
 ## How it talks
 
 Every request and command is `POST /dw/<Name>` with the DTO's JSON as the
-body; the answer is an `ApiResponse` whose `updates` carry what the command
+body; the answer is a `DwApiResponse` whose `updates` carry what the command
 changed that this client listens to. A WebSocket (`/dw/live`) is opened only
 while something on screen is live, and brings other people's changes. Booking
 a spot therefore updates your own schedule and bookings from the answer, and
