@@ -6,6 +6,7 @@
 
 ## 0.21.0-dev.2
 
+- **Aggregates, per-group firsts, upsert and list conditions on the repository**, from the raw SQL three projects wrote around their absence: `count(distinct:)`, `countBy`, `sum`/`sumBy`, `max`/`maxBy`, `min`/`minBy` (typed by the columns, grouped by any column, enum keys decoded), `findFirstPer(group, orderBy:)` (`DISTINCT ON`), `updateWhereReturning`, `upsert(row, conflictOn:)` (`ON CONFLICT … DO UPDATE`), and on a `jsonb` list column `isEmptyList`, `isNotEmptyList`, `contains`, `containsAny`. Raw SQL for these spelled enum values as literals that broke silently on a rename.
 - Nothing changed here; the family moves in lockstep with `dartway_core_server` (#310, D-087).
 
 ## 0.21.0-dev.1
