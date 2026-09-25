@@ -42,7 +42,7 @@
 
 ## 0.20.0-dev.1
 
-The rewrite (see docs/1.0).
+The rewrite (see docs/1.0/DECISIONS.md).
 
 - **A `DwOpenEnum` without an `unknown` value is refused** (D-071).
 

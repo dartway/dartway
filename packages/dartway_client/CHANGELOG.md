@@ -43,7 +43,7 @@
 
 ## 0.20.0-dev.1
 
-The rewrite (see docs/1.0).
+The rewrite (see docs/1.0/DECISIONS.md).
 
 - **`DwAppClient.deleteAccount()`**: sends `DwDeleteMyAccount` and ends the session once the server confirms (D-072).
 

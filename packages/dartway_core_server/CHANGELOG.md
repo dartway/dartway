@@ -52,7 +52,7 @@
 
 ## 0.20.0-dev.1
 
-The rewrite (see docs/1.0).
+The rewrite (see docs/1.0/DECISIONS.md).
 
 - **A call that takes the `unknown` of an open enum to a write is answered `dw.updateRequired`** (D-071, #274). It used to leave the guard's throw to the generic catch: a 500 with an incident id for the caller and an alert for the operator, on an input the framework refuses on purpose. The build sending `unknown` back is older than the data it is writing and cannot correct its input, only update. Outside a call — a job, a module, a subscription — the same throw is still a failure.
 - **The seam for external sign-in** (D-073, in progress): `DwAccountService.signInWithExternalIdentity(provider:, subject:)` signs in — or creates — the account of an identity a provider proved, with `DwAuthConfig.onExternalAccountCreated` for the project's row, and `accountOfExternalIdentity` to look one up. The verification of a provider's token lives in `dartway_auth_providers_server`.

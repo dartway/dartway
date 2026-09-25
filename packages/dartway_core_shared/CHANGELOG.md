@@ -42,7 +42,7 @@
 
 ## 0.20.0-dev.1
 
-The rewrite (see docs/1.0).
+The rewrite (see docs/1.0/DECISIONS.md).
 
 - **Writing the `unknown` of an open enum throws `DwUnknownEnumWrite`**, not a bare `StateError` (D-071). The guarantee is unchanged — no build overwrites a value it did not know — but a type the call layer can catch is what lets the server answer it as `dw.updateRequired` instead of reporting an incident.
 - **`DwDeleteMyAccount`** — the built-in command that deletes the caller's account (D-072).
