@@ -4,7 +4,7 @@ This is the repository of **the DartWay framework itself** (fullstack Dart: a `d
 
 ## The rewrite
 
-DartWay 1.0 is the framework rebuilt on a stack it owns end to end, on one branch (`dartway-1.0`), all at once: packages, `example/` and `template/` together; active projects move onto it in their own branches, and the release is global. "1.0" names the rewrite, not a version — the packages stay `0.x` (D-031).
+DartWay 1.0 is the framework rebuilt on a stack it owns end to end. The rewrite branch was merged on 2026-09-19: `master` **is** 1.0, and the active projects run on it. "1.0" names the rewrite, not a version — the packages stay `0.x` (D-031). The one project left on 0.x is pinned to the protected `tvaity-0.x` branch.
 
 `docs/1.0/` is the rewrite's own record and is not user documentation:
 
@@ -12,13 +12,14 @@ DartWay 1.0 is the framework rebuilt on a stack it owns end to end, on one branc
 |---|---|---|
 | `SPEC.md` | the original specification, sections marked Decided / Proposal / Open | intent; several proposals were never built |
 | `CONTRACTS.md` | the seams between packages; "Revision 2" and its "As built" notes on top | only the top section is current — the sections below it use pre-rename names |
-| `DECISIONS.md` | every decision taken while building, D-001 onwards | **the latest entry wins**: many early ones were reversed |
+| `DECISIONS.md` | every decision taken while building, D-001 onwards — still the live log | **the latest entry wins**: many early ones were reversed |
+| `MORNING.md` | questions put to the owner during the build, each naming the decision taken meanwhile | history; the answers live in `DECISIONS.md` |
 
 **When the code and these documents disagree, the code is what is true, and the document is what gets fixed.** A decision taken while building is appended to `DECISIONS.md` in the same commit that implements it — never rewritten into an earlier entry.
 
 ## Monorepo map
 
-The core family moves in lockstep (one version, `0.20.0`, across all six); every other package is a satellite with a version of its own (D-030, D-032).
+The core family moves in lockstep (one version across all six); every other package is a satellite with a version of its own (D-030, D-032).
 
 | Folder | Role |
 |---|---|
@@ -32,9 +33,12 @@ The core family moves in lockstep (one version, `0.20.0`, across all six); every
 | `packages/dartway_shared_preferences` | Satellite. Local storage under `dw.plugins.prefs`, and the plugin that claims the key-value store role the core keeps the session in |
 | `packages/dartway_telegram` | Satellite. Telegram Mini App integration (`dw.plugins.telegram`) |
 | `packages/dartway_lints` | Satellite. Convention rules as an analyzer plugin (`plugins:` in a project's `analysis_options.yaml`). Not a workspace member — it pins the analyzer the plugin API is written against; its `example/` is the fixture its tests analyze |
-| `packages/dartway_studio_bridge` | Satellite. The open bridge between an app and DartWay Studio: screen-spec models and the runtime `postMessage` protocol. The app-side binding is not ported to the rewrite yet (D-010, D-033) |
-| `packages/dartway_cli` | Satellite. `dartway quickstart` · `doctor` · `create` · `setup-ai` · `update` · `generate` · `check` · `dev` · `test` · `deploy` · `stats` |
-| `packages/dartway_push_*` | Push notifications, being ported to the rewrite (D-010, D-033) |
+| `packages/dartway_studio_bridge` | Satellite. The open bridge between an app and DartWay Studio: screen-spec models and the runtime `postMessage` protocol |
+| `packages/dartway_studio_binding` | Satellite. The app half of the Studio wiring: one widget that attaches the bridge and executes what Studio asks |
+| `packages/dartway_cli` | Satellite. `dartway quickstart` · `doctor` · `create` · `setup-ai` · `update` · `generate` · `check` · `dev` · `test` · `deploy` · `secret` · `stats` |
+| `packages/dartway_push_*` | Satellites. Push notifications: `_shared` contract, `_server` (tokens, messages queued in the caller's transaction, delivery by the job queue), `_flutter` (`dw.plugins.push`), vendor SDKs in `_firebase` and `_rustore` |
+| `packages/dartway_auth_*` | Satellites. Sign-in with Google and Apple: `_providers_shared` contract, `_providers_server` (tokens checked against the providers' keys), app wrappers `_google` and `_apple` |
+| `packages/dartway_analytics_*` | Satellites. Product analytics in the project's own Postgres: `_shared` contract, `_server` (batches, sessions, retention), `_flutter` (`dw.plugins.analytics`) |
 | `template/` | **The skeleton** — the only thing `dartway create` copies. Sign-in by code with consents, a profile with a photo and identifiers, roles, an admin panel, settings, a UI kit, tests on both sides, zero domain models. Packages named `dartway_starter_*` (the CLI renames them) |
 | `example/` | The reference project (a fitness club: schedule, bookings, a staff chat on `DwWindowListView`, news, admin). **The CLI does not hand it out**: read it, do not inherit from it |
 | `toolkit/` | The Claude harness for application projects: `CLAUDE.md` (the project constitution), `dartway-*` skills, commands, `__*__` tokens |
@@ -133,7 +137,7 @@ A new shape is recorded without a bump; a framework DTO without a recorded shape
   - The rule covers docs, package READMEs, error strings, comments in package code, **commit messages, PR titles and descriptions, PR and issue comments, branch names** — and **`toolkit/`**, which ships into the `.claude/` of every project on the framework.
   - **This file too.** It is the repository's constitution, and outside contributors are held to it by the automated review. Rules that judge a contributor have to be readable by that contributor.
   - **A conversation held in Russian does not make the artefact born from it Russian.** A PR description addresses Evgenii, yet it sits in a public repository — that is publication, not a continuation of the conversation.
-  - Russian remains only where an outsider never reaches: the private project-management repository and our chat.
+  - Russian remains only where an outsider never reaches: the owner's private workspace and our chat.
   - Which language a project uses for **its own** texts is that project's setting (`dartway setup-ai --language`), not ours.
 - **Commits:** conventional commits — `feat:` / `fix:` / `chore:` / `docs:`, an optional scope (`feat(server): …`), and `!` before the colon for a breaking change (`feat(server)!: …`). The release notes list breaking changes first by that marker, so a breaking change without it is invisible there.
 - **The toolkit invariant:** `toolkit/` carries no project literals, only `__*__` tokens — it ships into every project on the framework, so a name borrowed from whichever project you were looking at arrives in all of them. Held by reading the diff, not by a grep: a pattern listing the projects we remember today passes the leak that comes from the next one.
@@ -150,7 +154,7 @@ The rules are the same for everyone — for Evgenii, for Claude, for outside con
 |---|---|
 | `master` | The development trunk. May be in pieces at any moment |
 | `stable` | The last verified state. **Fast-forward from master only**, a history of its own is forbidden. The CLI's default channel follows it, as do the git dependencies of external projects |
-| `dartway-1.0` | The rewrite, until its global release (above). Work on the rewrite branches from it |
+| `tvaity-0.x` | Protected. The 0.x line one project still pins; fixes for it only, never merged back |
 | `feat/*`, `fix/*`, `chore/*`, `docs/*` | Working branches. They live until merged, then they go |
 
 No gitflow — no develop branch, no release branches.
@@ -175,7 +179,7 @@ Each item closes off a way for one session to destroy another's work.
 2. **In a shared tree holding someone else's changes, these are forbidden:** `git switch`, `git checkout <branch>`, `git stash`, `git reset`, `git restore`, `git clean`. Every one of them swaps files out from under a running session. The single exception is a switch where `git diff --name-only <from> <to>` is empty or lists only your own files — verified **before** the switch.
 3. **Stage your own files, by name:** `git add <path> <path>`. **`git add -A`, `git add .` and `git commit -a` are forbidden, always** — in a shared tree they drag someone else's unfinished work into your commit.
 4. **Create the branch at the start of the task, not at the end.** While a branch has no commits, a collision between sessions is resolved by splitting files; after the first foreign commit lands on your branch, only `cherry-pick` and manual surgery remain.
-5. **Never branch from someone else's HEAD.** Branch from an explicit point: `git switch -c <name> master` (or `dartway-1.0` for the rewrite).
+5. **Never branch from someone else's HEAD.** Branch from an explicit point: `git switch -c <name> master`.
 6. **Push and open PRs only when asked directly.** Never merge a PR, never push to `master` directly, never touch `stable` without an explicit instruction.
 7. **Before offering a PR** — `framework-finish`, then the testing tiers the change reaches (above), all green. `tool/checks.sh` is what CI runs, so running it here is the gate itself, answered earlier.
 8. **Clean up your worktree:** `git worktree remove ../dartway-wt/<slug>` once the branch is merged. Abandoned worktrees hold branches checked out.
@@ -206,7 +210,7 @@ Six workflows in `.github/workflows/`:
 | `checks.yml` | A PR is opened, updated or taken out of draft; push to `master` | `tool/checks.sh analyze`, `tool/checks.sh test`, and `tool/checks.sh services` with a Postgres service container and a MinIO |
 | `database.yml` | Nightly, by hand, and when this workflow's file changes | `dartway test` in `example/` and `template/`, with the CLI activated from the commit. Not on every PR: these suites test races, and a flaky red is how a gate stops being read |
 | `images.yml` | `template/` or the CLI changes, nightly, by hand | Builds the two images of a project **as `dartway create` produces it**, with this tree's packages vendored in (`tool/vendor_framework.dart`) |
-| `web-compile.yml` | A PR is opened or updated; push to `master` | `flutter build web --release` for the targets in its matrix: dart2js rejects code the VM accepts. Its matrix still names the removed offline harness beside `example/` |
+| `web-compile.yml` | A PR is opened or updated; push to `master` | `flutter build web --release` of `example/` on the pinned Flutter, and of `template/` on the oldest Flutter the framework claims: dart2js rejects code the VM accepts |
 | `claude-review.yml` | A PR is opened, updated or taken out of draft | Reviews the diff; beyond ordinary bugs it holds the synchronisation law, generated code being up to date, a wire change bumping the protocol, and the toolkit invariant |
 | `telegram-notify.yml` | A review finishes | Sends the verdict and a link to the PR to Telegram |
 
@@ -214,6 +218,6 @@ The review does not run on PRs from forks: repository secrets are unavailable to
 
 ## Workflow
 
-A task arrives from outside — from the tracker or in conversation. What remains here is the work on the code: a branch for the task, the change, `framework-finish` before committing, the commit, and a PR when asked.
+A task arrives from outside — an issue in this repository or a conversation — and its brief carries what the work needs. What remains here is the work on the code: a branch for the task, the change, `framework-finish` before committing, the commit, and a PR when asked. A defect found on the way that the task does not cover goes to this repository's issues, not into the branch.
 
-Project management — strategy, roadmap, the task queue — lives **in a separate repository** (`dartway/dartway_manager`), not in this monorepo.
+Priorities, roadmap and who does what are not kept in this repository.
