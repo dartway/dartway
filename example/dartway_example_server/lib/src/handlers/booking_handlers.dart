@@ -116,13 +116,16 @@ final bookingHandlers = <DwCallHandler>[
   ),
 
   DwCallHandler.command<ReviewVisit, SessionBooking>(
-    access: DwAccessRule.signedIn,
+    // Only the member who booked reviews; anyone else's booking, like one that
+    // does not exist, is `dw.notFound`.
+    access: DwAccessRule.resource<ReviewVisit, SessionBookingRow>(
+      load: (ctx, command) => ctx.db.sessionBookings.findById(command.bookingId),
+      allows: (ctx, command, booking) async =>
+          booking.clientProfileId == (await ctx.profile).id,
+    ),
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      final booking = await ctx.db.sessionBookings.findById(command.bookingId);
-      if (booking == null || booking.clientProfileId != me.id) {
-        ctx.refuse(DwCoreRefusal.notFound);
-      }
+      final booking = ctx.accessed<SessionBookingRow>();
       if (booking.status != BookingStatus.attended) {
         ctx.refuse(ExampleRefusal.reviewNeedsAttendance);
       }

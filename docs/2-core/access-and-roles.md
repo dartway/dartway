@@ -16,13 +16,14 @@ DwCallHandler.single<GetAdminCounters, AdminCounters>(
 
 (`example/dartway_example_server/lib/src/handlers/admin_handlers.dart`)
 
-`access` has no default, so a handler cannot be open by omission. There are three rules:
+`access` has no default, so a handler cannot be open by omission. There are four rules:
 
 | Rule | Who passes |
 |---|---|
 | `DwAccessRule.anonymous` | Anyone, including a caller without a session |
 | `DwAccessRule.signedIn` | Any signed-in account |
 | `DwAccessRule.check<C>((ctx, call) async => …)` | A signed-in account for which the check answers `true`; otherwise `dw.forbidden` |
+| `DwAccessRule.resource<C, R>(load: …, allows: …)` | A signed-in account that may reach the row the call names: `load` reads it, `allows` decides on it, and the handler gets it as `ctx.accessed<R>()`. Absent and not theirs are the same `dw.notFound` |
 
 **A `check` rule requires sign-in first.** An anonymous caller never reaches the check: the call is
 answered `unauthenticated` (401), and the app goes to sign-in instead of showing "forbidden".
@@ -33,13 +34,36 @@ handler of another fails the server's startup; a rule meant for any call is type
 `DwServerCall<Object?>`. The check runs in the handler's context — inside the transaction of a
 transactional command — so a row it reads is the row the handler sees.
 
+**A `resource` rule is "is this mine" said once.** A handler that names a row by id used to be
+`signedIn` with the ownership check written inline — and three such checks of one membership, in
+one project, gave three different answers. The rule reads the row once, and the handler receives it
+rather than reading it again:
+
+```dart
+DwCallHandler.command<ReviewVisit, SessionBooking>(
+  access: DwAccessRule.resource<ReviewVisit, SessionBookingRow>(
+    load: (ctx, command) => ctx.db.sessionBookings.findById(command.bookingId),
+    allows: (ctx, command, booking) async =>
+        booking.clientProfileId == (await ctx.profile).id,
+  ),
+  handle: (ctx, command) async {
+    final booking = ctx.accessed<SessionBookingRow>();
+    // …
+  },
+),
+```
+
+A command that writes the row locks it in `load` (`lock: DwRowLock.forUpdate`): the rule runs inside
+the command's transaction. `ctx.accessed<R>()` in a handler whose rule loaded something else throws —
+that is a bug in the declaration, not a refusal.
+
 A call runs its steps in this order:
 
 1. a token that is unknown or revoked — `unauthenticated` (401), whatever the rule: a client holding a
    dead token must learn it on any call;
 2. a rule other than `anonymous` and no account — `unauthenticated` (401);
 3. validation — `DwSelfValidating.validate()`, and `checkPage()` of a table request — refused (422);
-4. the `check` — `dw.forbidden` (403) when it answers `false`; an exception in it is a failure (500);
+4. the `check` — `dw.forbidden` (403) when it answers `false`, or the `resource` — `dw.notFound` (404) when it is absent or not allowed; an exception in either is a failure (500);
 5. the handler.
 
 Sign-in comes before validation, so an anonymous caller is told to sign in rather than which field is

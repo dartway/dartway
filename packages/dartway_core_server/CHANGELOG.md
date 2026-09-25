@@ -6,6 +6,7 @@
 
 ## 0.21.0-dev.3
 
+- **`DwAccessRule.resource<C, R>(load:, allows:)` and `ctx.accessed<R>()`** (D-090): the access rule that reads the row a call names, decides whether the caller may reach it, and hands it to the handler. Absent and not the caller's are both `dw.notFound`. It replaces `signedIn` with the ownership check written inline — 132 handlers of one project, and three diverging answers there to "is this person in this chat". A rule written for another call class fails the startup, as `check` does.
 - **BREAKING: `DwAuthConfig.accountDeletion` is required — `DwAccountDeletion.byMember` answers `DwDeleteMyAccount`, `byOperator` refuses it `dw.forbidden`** (D-089). The framework used to answer the command in every project, and two of them learned it had gone live only when their pin moved; each switched it off by refusing inside `onAccountDeleting`, which refused the operator's own `ctx.accounts.deleteAccount` as well. Migration note: `docs/migrations/2026-09-24-account-deletion-choice.md`.
 
 ## 0.21.0-dev.2

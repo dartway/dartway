@@ -164,6 +164,9 @@ final class TestApp {
   /// Accounts that may read anyone's notes (`NotesOfOwner`).
   final Set<int> staff = {};
 
+  /// How many times the access rule of `GetMyNote` loaded its note.
+  int noteLoads = 0;
+
   /// How many times the access check of `NotesOfOwner` ran.
   int ownerChecks = 0;
 
@@ -382,6 +385,18 @@ final class TestApp {
         'SELECT * FROM note WHERE owner_id = @owner ORDER BY id',
         {'owner': request.ownerId},
       ),
+    ),
+    DwCallHandler.single<GetMyNote, NoteView>(
+      access: DwAccessRule.resource<GetMyNote, NoteView>(
+        load: (ctx, request) async {
+          noteLoads++;
+          return (await _notes(ctx.db, 'SELECT * FROM note WHERE id = @id', {
+            'id': request.noteId,
+          })).firstOrNull;
+        },
+        allows: (ctx, request, note) => note.ownerId == ctx.accountId,
+      ),
+      handle: (ctx, request) async => ctx.accessed<NoteView>(),
     ),
     DwCallHandler.single<GetNote, NoteView>(
       access: DwAccessRule.anonymous,

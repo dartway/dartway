@@ -236,28 +236,26 @@ final invoiceHandlers = <DwCallHandler>[
   ),
 
   DwCallHandler.single<GetInvoice, CustomerInvoice>(
-    access: DwAccessRule.signedIn,
-    handle: (ctx, request) async {
-      final row = await ctx.db.invoices.findById(request.invoiceId);
-      // Someone else's invoice does not exist for the caller.
-      if (row == null || row.ownerProfileId != (await ctx.callerProfile).id) {
-        return null;
-      }
-      return InvoiceObjects.invoice(ctx, row);
-    },
+    // Someone else's invoice does not exist for the caller: `dw.notFound`.
+    access: DwAccessRule.resource<GetInvoice, InvoiceRow>(
+      load: (ctx, request) => ctx.db.invoices.findById(request.invoiceId),
+      allows: (ctx, request, row) async =>
+          row.ownerProfileId == (await ctx.callerProfile).id,
+    ),
+    handle: (ctx, request) =>
+        InvoiceObjects.invoice(ctx, ctx.accessed<InvoiceRow>()),
   ),
 
   DwCallHandler.command<PayInvoice, CustomerInvoice>(
-    access: DwAccessRule.signedIn,
+    access: DwAccessRule.resource<PayInvoice, InvoiceRow>(
+      // Locked: the rule runs inside the command's transaction.
+      load: (ctx, command) =>
+          ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate),
+      allows: (ctx, command, row) async =>
+          row.ownerProfileId == (await ctx.callerProfile).id,
+    ),
     handle: (ctx, command) async {
-      final me = await ctx.callerProfile;
-      final row = await ctx.db.invoices.findById(
-        command.invoiceId,
-        lock: DwRowLock.forUpdate,
-      );
-      if (row == null || row.ownerProfileId != me.id) {
-        ctx.refuse(DwCoreRefusal.notFound);
-      }
+      final row = ctx.accessed<InvoiceRow>();
       if (row.status == InvoiceStatus.paid) {
         ctx.refuse(AppRefusal.invoiceAlreadyPaid);
       }
