@@ -101,10 +101,14 @@ package declares it as a dev dependency, which puts it in the lock of every proj
 produces; name the version being released with the fix.
 
 **File name: `YYYY-MM-DD-slug.md`.** The notes are listed in the order they are applied in by a
-project that has fallen several releases behind: by the first version named in `affects`, then
-by file name. The date in the name is for a person scanning the folder — two notes opened the
-same day do not always land in that order, and a slug that happens to sort earlier must not be
-read as "applied first".
+project that has fallen several releases behind: by the date in the name first, then — for two
+notes of the same day that name a package in common — by the version that package lands at, then
+by file name. The date decides first because two notes can name versions on entirely unrelated
+number lines (a satellite's `0.4.0` beside the family's `0.20.0-dev.2`), where neither is "behind"
+the other in any sense worth sorting by; only same-day notes sharing a package are close enough in
+time for the version to answer "which shipped first". A slug that happens to sort earlier than
+another note from a different day must not be read as "applied first" — the date already settled
+that.
 
 **Write the edit, not the news.** "The auth flow was reworked" is a changelog entry; this file is
 read by someone who has to change a line and wants to know which one. The changelog says what
