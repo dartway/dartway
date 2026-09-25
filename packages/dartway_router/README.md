@@ -2,7 +2,7 @@
 
 A powerful, type-safe navigation package for Flutter that wraps Go Router with an intuitive enum-based API. Build navigation systems with compile-time safety, route guards, and flexible page transitions.
 
-**Two full example projects** are available in the package repository in the [`examples/`](https://github.com/dartway/dartway/tree/master/packages/dartway_router/examples) folder: **change_notifier_example** (state via `ChangeNotifier`) and **riverpod_example** (state via Riverpod).
+A full example — two navigation zones with a guard — is [`example/main.dart`](https://github.com/dartway/dartway/tree/master/packages/dartway_router/example/main.dart) in the package repository.
 
 ## Features
 
@@ -702,33 +702,6 @@ Extension on `DwNavigationRoute` providing:
 - `isActive(context)` - Check if route is currently active. Path parameters
   are resolved against the current location, and a route stays active while
   one of its child routes is open
-
-## Examples
-
-Complete working examples are available in the `/examples` directory:
-
-- **change_notifier_example** - Example using ChangeNotifier for state management
-- **riverpod_example** - Example using Riverpod for state management
-
-## Project Structure
-
-Recommended project structure:
-
-```
-lib/
-├── main.dart
-├── router/
-│   ├── app_router.dart          # Router configuration
-│   └── zones/
-│       ├── app_routes.dart      # App routes enum
-│       └── auth_routes.dart     # Auth routes enum
-├── pages/
-│   ├── home_page.dart
-│   ├── profile_page.dart
-│   └── user_detail_page.dart
-└── core/
-    └── app_session.dart         # Router state (ChangeNotifier, etc.)
-```
 
 ## Best Practices
 
