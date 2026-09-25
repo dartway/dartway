@@ -48,7 +48,7 @@ The rewrite (see docs/1.0).
 
 - **No run-time dependency on `flutter_native_splash`** (#268). The splash is held with the binding's `deferFirstFrame` and released after bootstrap; on the web a shell's `removeSplashFromWeb()` is still called when it defines one. The generator's `image`, `archive`, `xml`, `html` and their dependencies leave every app's graph. An app that runs `dart run flutter_native_splash:create` lists the package in its own `dev_dependencies`, as the template now does.
 
-- **BREAKING: `DwErrorReport.actionLabel` is `label`**, and `dw.handleError(label:)` takes it for any source (#126). Migration note: `docs/migrations/2026-09-17-error-report-label.md`.
+- **BREAKING: `DwErrorReport.actionLabel` is `label`**, and `dw.handleError(label:)` takes it for any source (#126).
 
 - **`dw.listen(channels)`** forwards `DwAppClient.listen`: hear a channel without reading a page (D-067).
 
@@ -90,7 +90,7 @@ The rewrite (see docs/1.0).
 - **`DwAppLoadingOptions.errorScreen` becomes `errorScreenBuilder`.** The screen is built from the
   error that failed the start, and the default one puts that text on it. A start can fail for
   reasons only the failure names, and the person looking at the screen is usually the one who will
-  be asked what happened. **Breaking:** see `docs/migrations/2026-09-09-app-error-screen-builder.md`.
+  be asked what happened. **Breaking.**
 
 - **`DwNotAuthenticated`** — the answer "there is no session", as a type. Raised by
   `DwRepository.processApiResponse` for a response the server marked `isNotAuthenticated`, and

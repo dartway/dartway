@@ -6,16 +6,15 @@ This is the repository of **the DartWay framework itself** (fullstack Dart: a `d
 
 DartWay 1.0 is the framework rebuilt on a stack it owns end to end. The rewrite branch was merged on 2026-09-19: `master` **is** 1.0, and the active projects run on it. "1.0" names the rewrite, not a version — the packages stay `0.x` (D-031). The one project left on 0.x is pinned to the protected `tvaity-0.x` branch.
 
-`docs/1.0/` is the rewrite's own record and is not user documentation:
+`docs/1.0/DECISIONS.md` is the rewrite's own record and is not user documentation: every decision
+taken while building, D-001 onwards, newest wins — many early ones were reversed. The original
+specification (`SPEC.md`), the package seams (`CONTRACTS.md`) and the questions put to the owner
+during the build (`MORNING.md`) were removed once the framework itself and `docs/` said everything
+in them that still holds.
 
-| File | What it is | How to read it |
-|---|---|---|
-| `SPEC.md` | the original specification, sections marked Decided / Proposal / Open | intent; several proposals were never built |
-| `CONTRACTS.md` | the seams between packages; "Revision 2" and its "As built" notes on top | only the top section is current — the sections below it use pre-rename names |
-| `DECISIONS.md` | every decision taken while building, D-001 onwards — still the live log | **the latest entry wins**: many early ones were reversed |
-| `MORNING.md` | questions put to the owner during the build, each naming the decision taken meanwhile | history; the answers live in `DECISIONS.md` |
-
-**When the code and these documents disagree, the code is what is true, and the document is what gets fixed.** A decision taken while building is appended to `DECISIONS.md` in the same commit that implements it — never rewritten into an earlier entry.
+**When the code and this document disagree, the code is what is true, and the document is what gets
+fixed.** A decision taken while building is appended to `DECISIONS.md` in the same commit that
+implements it — never rewritten into an earlier entry.
 
 ## Monorepo map
 
@@ -42,7 +41,7 @@ The core family moves in lockstep (one version across all six); every other pack
 | `template/` | **The skeleton** — the only thing `dartway create` copies. Sign-in by code with consents, a profile with a photo and identifiers, roles, an admin panel, settings, a UI kit, tests on both sides, zero domain models. Packages named `dartway_starter_*` (the CLI renames them) |
 | `example/` | The reference project (a fitness club: schedule, bookings, a staff chat on `DwWindowListView`, news, admin). **The CLI does not hand it out**: read it, do not inherit from it |
 | `toolkit/` | The Claude harness for application projects: `CLAUDE.md` (the project constitution), `dartway-*` skills, commands, `__*__` tokens |
-| `docs/` | The public documentation, the source of dartway.dev; `docs/1.0/` is the rewrite's record (above); `docs/migrations/` is addressed to projects that are behind |
+| `docs/` | The public documentation, the source of dartway.dev; `docs/1.0/DECISIONS.md` is the rewrite's record (above); `docs/migrations/` is addressed to projects that are behind |
 | `tool/` | Scripts this repository runs on itself: `checks.sh` (the CI gate), `self_check.dart`, `caret_check.dart`, `lock_check.dart`, `git_config_check.dart`, `release.dart`, `release_notes.dart`, `vendor_framework.dart` |
 | `js/studio-bridge` | The bridge's application half for JavaScript apps (`@dartway/studio-bridge` on npm). Outside `packages/`, which is the pub workspace; held to the Dart side by golden wire strings in its tests |
 | `.claude/skills/framework-finish` | The synchronisation audit for changes to this repository |
@@ -128,8 +127,8 @@ A new shape is recorded without a bump; a framework DTO without a recorded shape
   - **A version is the number of the next release, not a count of pull requests.** It moves once per release cycle per package. Whether *this* PR moves it has a mechanical answer — compare the package's `version:` with the same line on `stable`, where releases are cut from: equal → this change moves it; already ahead → leave the version and the carets alone and add to that version's `CHANGELOG` section. What is pending sets the floor: a pending patch in front of a breaking change becomes a minor — under a zero major a minor is what a major is elsewhere.
   - **The trap of a `0.x` caret**: `^0.6.0` is `>=0.6.0 <0.7.0`. Inside this repository `dependency_overrides` hide every constraint (pub does not check an overridden package's), `dartway create` strips them, and the caret is read for the first time in a stranger's tree. `dart run tool/caret_check.dart` asks pub.dev whether the skeleton's carets resolve; a finding is closed by publishing, not by lowering the caret.
 - **Zero major: we promise nothing, so we preserve nothing.** No released shape is guaranteed to survive the next minor. A change fixes the shape going forward and stops there: no deprecated aliases kept "for a while", no second branch for the way it used to be, no code that recognises state written by an older version and heals it, no default chosen to spare an existing installation. What exists catches up by re-running the current procedure. For the rewrite this is total: nothing of 0.x is preserved, in the framework or in the projects moving onto it — their databases are recreated (D-031). Owner's decision, 2026-09-09.
-- **Naming: no public name shorter than two words** — the `Dw` prefix is not a word (CONTRACTS R2.1). `DwTableRow`, `DwCallContext`, `DwLiveChannel`. The rule covers what the framework asks of projects too: `<Entity>Row`, data objects as two-word nouns, reads `Get…`/`List…`, changes verb + object, `<Project>Channel`, `<Project>Refusal`.
-- **Rules live in types and checks, not in prose** (SPEC §0.1). A rule that can be a type, a required parameter, a startup failure or a failing check is expressed that way; a rule that is only written down is expected to be broken. **Silence is a bug**: a refusal reaches the user, a failure reaches the operator, a failed migration stops the process, a failed check fails the build.
+- **Naming: no public name shorter than two words** — the `Dw` prefix is not a word (`docs/DESIGN.md` §8). `DwTableRow`, `DwCallContext`, `DwLiveChannel`. The rule covers what the framework asks of projects too: `<Entity>Row`, data objects as two-word nouns, reads `Get…`/`List…`, changes verb + object, `<Project>Channel`, `<Project>Refusal`.
+- **Rules live in types and checks, not in prose** (`docs/1-getting-started/what-is-dartway.md` "Rules held by types and checks, not by memory"). A rule that can be a type, a required parameter, a startup failure or a failing check is expressed that way; a rule that is only written down is expected to be broken. **Silence is a bug**: a refusal reaches the user, a failure reaches the operator, a failed migration stops the process, a failed check fails the build.
 - **The framework knows no domain.** It knows that someone signed in, not who they are to the project: accounts, identities and keys are the framework's; profiles, roles, texts, languages and channels are the project's, declared in its shared package.
 - **Secure by default.** A registered request or command without a handler stops the server from starting; every handler declares its access rule, and there is no default; a channel kind without a rule refuses every subscription, and every subscription needs a signed-in connection; an upload purpose without a rule refuses every upload. New code must not introduce "open to everyone" as a default.
 - **Workspace hygiene.** Inside the monorepo, packages resolve through the workspace (the root `pubspec.yaml`), never through git references to `dartway.git`. Not members, on purpose: `dartway_generator` and `dartway_lints` (each pins the analyzer it is written against, which the workspace cannot hold) and `dartway_lints/example` (the fixture enables the plugin by path); `example/` and `template/` resolve the framework by `dependency_overrides` onto `packages/`.

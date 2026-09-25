@@ -65,7 +65,8 @@ final class DwServerSettings {
   /// port and scheme of it).
   ///
   /// Upgrades without `Origin` (native apps) are always allowed. Calls need no
-  /// such list: they are same-origin by deployment (R2.7), and a cross-origin
+  /// such list: they are same-origin by deployment (`docs/4-server/app-server.md`
+  /// "Same origin"), and a cross-origin
   /// browser call cannot pass the JSON content-type preflight, which the
   /// server never answers.
   final Set<String> allowedOrigins;

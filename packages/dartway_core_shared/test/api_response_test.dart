@@ -7,7 +7,7 @@ void main() {
   DwApiResponse back(DwApiResponse response) =>
       DwApiResponse.fromJson(roundTrip(response.toJson()), protocol);
 
-  group('JSON (R2.2)', () {
+  group('JSON (docs/2-core/wire-and-versions.md)', () {
     test('ok: the result untagged, updates grouped by channel then type', () {
       final updates = DwUpdateTransport([
         ('myBookings:3', booking),
@@ -179,7 +179,7 @@ void main() {
     });
   });
 
-  group('HTTP status (R2.2 honest statuses)', () {
+  group('HTTP status (docs/2-core/refusals-and-statuses.md honest statuses)', () {
     int status(DwApiResponse response) => dwHttpStatusFor(response);
     DwApiResponse refused(DwRefusalCode code) =>
         DwApiResponse.refused(DwCallRefusal(code));

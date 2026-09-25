@@ -14,7 +14,8 @@ import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
 import 'dw_idempotency_ledger.dart';
 
-/// Answers `POST /dw/<WireName>`: the call contract of R2.2, from the headers
+/// Answers `POST /dw/<WireName>`: the call contract of
+/// `docs/2-core/wire-and-versions.md`, from the headers
 /// to the `DwApiResponse`.
 ///
 /// Checks run cheapest first, and nothing touches the database until the

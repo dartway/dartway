@@ -92,7 +92,7 @@ final class DwRuntime {
 
   /// Delivers the committed effects of a successful command of [ctx] and
   /// returns the updates its response carries: the publications to channels
-  /// the caller may read (R2.2).
+  /// the caller may read (`docs/2-core/wire-and-versions.md`).
   ///
   /// Revocations go first, so nothing published by the same call reaches a
   /// subscriber whose access it removed. The broadcast follows at once, before

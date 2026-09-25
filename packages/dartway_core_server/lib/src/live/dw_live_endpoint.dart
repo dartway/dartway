@@ -151,7 +151,8 @@ final class DwLiveEndpoint {
   }
 
   /// Whether a browser page of [origin] may open the live socket: when it is
-  /// the origin the request was sent to (the proxied `/dw/` of R2.7 serves the
+  /// the origin the request was sent to (the proxied `/dw/` of
+  /// `docs/4-server/app-server.md` "Same origin" serves the
   /// web app and the socket from one host), or one of
   /// `DwServerSettings.allowedOrigins`. Scheme, host and port are all
   /// compared: another port on the same host is another site. An origin that

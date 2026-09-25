@@ -99,7 +99,7 @@ final class WireTypeReader {
 
   final LibraryNames names;
 
-  /// Reads column types (CONTRACTS §2.2) instead of DTO field types.
+  /// Reads column types (`docs/4-server/database.md`) instead of DTO field types.
   final bool forEntity;
 
   String get supportedList => forEntity

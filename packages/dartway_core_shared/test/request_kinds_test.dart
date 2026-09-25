@@ -17,7 +17,7 @@ void main() {
     'foreign': request.onUpdate(note),
   };
 
-  group('default update actions per kind (R2.3)', () {
+  group('default update actions per kind (docs/2-core/requests-and-updates.md)', () {
     test('single: update; a deletion removes', () {
       expect(actions(const GetBooking()), {
         'matching': DwUpdateAction.update,

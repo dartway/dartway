@@ -13,7 +13,8 @@ import '../diagnostic.dart';
 import '../emit/source_text.dart';
 import 'entity_model.dart';
 
-/// Reads one concrete row class (CONTRACTS §2.2, R2.1) into an [EntityClass].
+/// Reads one concrete row class (`docs/4-server/database.md`, naming per
+/// `docs/DESIGN.md` §8) into an [EntityClass].
 final class EntityReader {
   EntityReader(this.names, this.diagnostics)
     : types = WireTypeReader(names, forEntity: true);

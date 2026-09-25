@@ -20,7 +20,8 @@ abstract class DwDatabaseMigration {
 
   /// A hash of the migration's source, written by `create` and refreshed by
   /// `rehash`. The ledger stores it on apply; an applied migration whose
-  /// checksum no longer matches refuses the next run (SPEC §6.3).
+  /// checksum no longer matches refuses the next run (see
+  /// `docs/4-server/migrations.md`).
   ///
   /// It is a declared member rather than something computed at runtime
   /// because a compiled server has no sources to hash.

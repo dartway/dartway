@@ -12,7 +12,7 @@ import 'dw_migration_errors.dart';
 
 /// Applies and rolls back migrations of several namespaces against one
 /// database, keeping the set of applied migrations in `dw_migrations`
-/// (SPEC §6).
+/// (see `docs/4-server/migrations.md`).
 ///
 /// The migrator owns only the namespaces it is given: ledger rows of other
 /// namespaces are neither validated nor touched, so a module's migrations and
