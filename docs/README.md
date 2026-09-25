@@ -11,7 +11,7 @@ page and the code it describes travel in the same PR — the synchronisation law
 | `1-getting-started/` | What DartWay is, how to bring a project up by hand or with an agent, what `dartway create` gives you |
 | `2-core/` | The contract both sides speak: data objects and generation, requests and updates, commands and idempotency, refusals and statuses, channels, access, the wire and its versions |
 | `3-flutter/` | The app side: the Flutter core, the data layer, the window list, actions and refusal texts, the update-required screen, uploads, error reporting, features, the UI kit, plugins, push |
-| `4-server/` | The server: the app server, handlers and their context, the database, migrations, accounts and identities, uploads, jobs, routes, alerts, push delivery |
+| `4-server/` | The server: the app server, handlers and their context, the database, migrations, accounts and identities, uploads, jobs, routes, alerts, push delivery, analytics |
 | `5-tooling/` | The CLI, testing, deploy, the conventions checker, the agent toolkit |
 | `6-studio/` | DartWay Studio and the bridge an app opens to it |
 | `migrations/` | Notes on what a project has to change when it moves to a newer framework — read by `dartway update` |

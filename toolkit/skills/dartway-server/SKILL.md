@@ -519,7 +519,7 @@ protocol: DwWireProtocol(dwAuthProvidersProtocolEntries, include: appProtocol),
 modules: [
   DwSignInProvidersModule([
     DwGoogleSignIn(clientIds: [android, ios, web]),   // a list: each platform has its own
-    DwAppleSignIn(clientIds: ['com.club.app']),
+    DwAppleSignIn(clientIds: [bundleId]),
   ]),
 ],
 ```

@@ -6,12 +6,6 @@ a record of every outcome in the provider's own words. A rolled-back command sen
 retried one sends once; two workers never send one device the same message; a token of one
 transport is never judged by another.
 
-Every rule here closes a failure of the 0.x module: a self-rescheduling worker of ~1000 lines of
-raw SQL that nothing tested on a database, a 20 s run budget that took 111 s and 13k queries, a
-pool connection held through every provider call, an attempt counted twice, failures recorded as
-an exception's type name, an FCM `UNREGISTERED` answer deleting a live RuStore registration,
-autovacuum settings applied by `ALTER TABLE` at runtime.
-
 Packages: `dartway_push_server` (this page), `dartway_push_shared` (the calls and the payload both
 sides read), and the app half — [Push notifications](../3-flutter/push-notifications.md).
 
