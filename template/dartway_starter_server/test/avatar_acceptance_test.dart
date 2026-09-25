@@ -117,7 +117,7 @@ void main() {
         )).valueOrThrow;
         expect(updated.avatarUrl, file.url);
         expect(dataOf(profile.state)!.avatarUrl, file.url);
-        await eventually(
+        await dwWaitUntil(
           () => dataOf(card.state)!.profile.avatarUrl == file.url,
         );
         final read = await getAnonymously(updated.avatarUrl!);
@@ -155,7 +155,7 @@ void main() {
         );
         expect(dataOf(profile.state)!.avatarUrl, second.url);
         app.server.wakeJobs();
-        await eventually(
+        await dwWaitUntil(
           () async => (await getAnonymously(file.url!)).status == 404,
           reason: 'the replaced photo is deleted once the change commits',
         );
@@ -167,7 +167,7 @@ void main() {
         expect(cleared.avatarUrl, isNull);
         expect(dataOf(profile.state)!.avatarUrl, isNull);
         app.server.wakeJobs();
-        await eventually(
+        await dwWaitUntil(
           () async => (await getAnonymously(second.url!)).status != 200,
         );
       },
@@ -196,7 +196,7 @@ void main() {
         isEmpty,
       );
       app.server.wakeJobs();
-      await eventually(
+      await dwWaitUntil(
         () async => (await getAnonymously(file.url!)).status != 200,
         reason: 'the photo leaves the storage with the account',
       );

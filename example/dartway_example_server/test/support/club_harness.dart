@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
@@ -62,8 +61,8 @@ final class ClubHarness {
     String name, {
     bool marketing = false,
   }) async {
-    final http = CountingTransport(DwHttpClientTransport());
-    final live = RecordingConnector();
+    final http = DwCountingTransport();
+    final live = DwRecordingConnector();
     final client = await server.connectClient(
       httpTransport: http,
       liveConnector: live,
@@ -105,25 +104,10 @@ final class ClubMember {
 
   final DwAppClient client;
   final DwAuthSession session;
-  final CountingTransport http;
-  final RecordingConnector live;
+  final DwCountingTransport http;
+  final DwRecordingConnector live;
 
   int get accountId => session.id;
-}
-
-/// Waits until [condition] holds.
-Future<void> eventually(
-  FutureOr<bool> Function() condition, {
-  Duration timeout = const Duration(seconds: 10),
-  String? reason,
-}) async {
-  final deadline = DateTime.now().add(timeout);
-  while (!await condition()) {
-    if (DateTime.now().isAfter(deadline)) {
-      fail('not met within $timeout${reason == null ? '' : ': $reason'}');
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 20));
-  }
 }
 
 /// The data of a watched request, when it has data.
@@ -131,70 +115,3 @@ R? dataOf<R>(DwRequestState<R> state) => switch (state) {
   DwRequestData(:final value) => value,
   _ => null,
 };
-
-/// Real HTTP, counting the calls per wire name.
-final class CountingTransport implements DwHttpTransport {
-  CountingTransport(this._inner);
-
-  final DwHttpTransport _inner;
-  final Map<String, int> _posts = {};
-
-  int posts(String wireName) => _posts[wireName] ?? 0;
-
-  @override
-  Future<DwHttpReply> post(DwHttpPost post) {
-    final wireName = post.url.pathSegments.last;
-    _posts.update(wireName, (n) => n + 1, ifAbsent: () => 1);
-    return _inner.post(post);
-  }
-
-  @override
-  void close() => _inner.close();
-}
-
-/// The real live socket, with every frame the server sent recorded.
-final class RecordingConnector implements DwLiveConnector {
-  final DwLiveConnector _inner = const DwWebSocketConnector();
-  final List<Map<String, Object?>> received = [];
-
-  /// The `upd` frames received on [channel].
-  List<Map<String, Object?>> updatesOn(DwLiveChannel channel) => [
-    for (final frame in received)
-      if (frame['k'] == 'upd' && frame['ch'] == channel.wireName) frame,
-  ];
-
-  /// The refusals of subscriptions to [channel].
-  List<Map<String, Object?>> refusalsOf(DwLiveChannel channel) => [
-    for (final frame in received)
-      if (frame['k'] == 'subno' && frame['ch'] == channel.wireName) frame,
-  ];
-
-  @override
-  Future<DwLiveConnection> connect(Uri url) async =>
-      _RecordingConnection(await _inner.connect(url), received);
-}
-
-final class _RecordingConnection implements DwLiveConnection {
-  _RecordingConnection(this._inner, this._received);
-
-  final DwLiveConnection _inner;
-  final List<Map<String, Object?>> _received;
-
-  @override
-  late final Stream<String> messages = _inner.messages.map((frame) {
-    _received.add(jsonDecode(frame) as Map<String, Object?>);
-    return frame;
-  });
-
-  @override
-  void send(String frame) => _inner.send(frame);
-
-  @override
-  int? get closeCode => _inner.closeCode;
-
-  @override
-  String? get closeReason => _inner.closeReason;
-
-  @override
-  Future<void> close([int? code, String? reason]) => _inner.close(code, reason);
-}

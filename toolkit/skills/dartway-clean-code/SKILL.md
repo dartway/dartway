@@ -201,7 +201,7 @@ extension UserCourseAccess on UserCourse {
 
 - **codegen provider entry points** — if the project does use `riverpod_generator` after all (by default a DartWay project writes its providers by hand): a `@riverpod` function must be top-level, the generator requires it;
 - **`main()`** and similar runtime entry points — a helper only `main` uses is a local function inside it, not a top-level one;
-- **test helpers** — in a test file or under `test/support/` (`eventually`, a fixture builder): a test suite is not a library anyone navigates by type, and the framework's own suites are written this way.
+- **test helpers** — in a test file or under `test/support/` (a fixture builder, a signed-up member): a test suite is not a library anyone navigates by type, and the framework's own suites are written this way.
 
 The template and the example follow this rule and are the pattern to copy: a server's pieces are static
 members of a class named for what they are (`AppChannels.profileOf`, `AppPublications.profile`,

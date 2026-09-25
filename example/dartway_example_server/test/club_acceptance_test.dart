@@ -46,7 +46,7 @@ void main() {
     final nina = await club.member('79990000070', 'Nina');
     final profile = nina.client.watch(const GetMyProfile());
     addTearDown(profile.close);
-    await eventually(() => profile.isLive);
+    await dwWaitUntil(() => profile.isLive);
 
     final ticket = await nina.client.command(
       const DwRequestIdentifierCode(
@@ -88,7 +88,7 @@ void main() {
       veraBookings.close();
       veraSchedule.close();
     });
-    await eventually(
+    await dwWaitUntil(
       () => olegSchedule.isLive && veraBookings.isLive && veraSchedule.isLive,
     );
     int spotsLeft(DwRequestWatch<List<ClubSession>> watch) =>
@@ -107,7 +107,7 @@ void main() {
     ]);
     expect(spotsLeft(veraSchedule), 0);
 
-    await eventually(() => spotsLeft(olegSchedule) == 0);
+    await dwWaitUntil(() => spotsLeft(olegSchedule) == 0);
     expect(
       oleg.live.updatesOn(const DwLiveChannel(ExampleChannel.schedule)),
       isNotEmpty,
@@ -131,7 +131,7 @@ void main() {
     );
     expect(cancelled.valueOrThrow.status, BookingStatus.cancelled);
     expect(dataOf(veraBookings.state)!.single.status, BookingStatus.cancelled);
-    await eventually(() => spotsLeft(olegSchedule) == 1);
+    await dwWaitUntil(() => spotsLeft(olegSchedule) == 1);
 
     // Nothing was read twice, and nothing of Vera's own came back to her over
     // the socket.
@@ -233,7 +233,7 @@ void main() {
       adminProfile.close();
       memberProfile.close();
     });
-    await eventually(() => adminProfile.isLive && memberProfile.isLive);
+    await dwWaitUntil(() => adminProfile.isLive && memberProfile.isLive);
     final before = dataOf(adminProfile.state)!;
     expect(before.role, UserRole.admin);
 
@@ -244,7 +244,7 @@ void main() {
       ),
     );
     expect(changed.valueOrThrow.accountId, member.accountId);
-    await eventually(() => dataOf(memberProfile.state)?.role == UserRole.staff);
+    await dwWaitUntil(() => dataOf(memberProfile.state)?.role == UserRole.staff);
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(
       dataOf(adminProfile.state),
@@ -304,12 +304,12 @@ void main() {
     const request = ListUserProfiles(search: 'newcomer');
     final table = admin.client.watchTable(request);
     addTearDown(table.close);
-    await eventually(() => table.isLive);
+    await dwWaitUntil(() => table.isLive);
     expect(dataOf(table.state)!.total, 1);
     expect(admin.http.posts('ListUserProfiles'), 1);
 
     await club.member('79990000020', 'Newcomer B');
-    await eventually(() => dataOf(table.state)?.total == 2);
+    await dwWaitUntil(() => dataOf(table.state)?.total == 2);
     expect(dataOf(table.state)!.items.map((p) => p.firstName), [
       'Newcomer A',
       'Newcomer B',

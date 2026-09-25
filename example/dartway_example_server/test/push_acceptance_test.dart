@@ -66,7 +66,7 @@ void main() {
       ))
         row['account_id']! as int: row['outcome'] as String?,
     };
-    await eventually(
+    await dwWaitUntil(
       () async => (await outcomes()).values.every((o) => o != null),
     );
     expect(await outcomes(), {
