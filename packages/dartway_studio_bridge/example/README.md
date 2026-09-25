@@ -66,16 +66,16 @@ final host = StudioBridgeHost.attach(
 );
 ```
 
-The channel pins the origin of the first valid Studio message and replies only there. An origin
-allowlist existed in 0.1.0 and was removed for now: zero-config local work first; an embedding page
-can only drive what the bridge exposes (navigation, test sign-in), and an explicit opt-in policy
-can return later.
+The channel pins the origin of the first valid Studio message and replies only there — an
+embedding page can only drive what the bridge exposes (navigation, test sign-in), and
+`validateAccessToken` decides who may.
 
 Studio receives the manifest over the runtime channel on connect, so it can never go stale against
 the build it is previewing. Persona sign-in is `onSignInRequest(identifier, secret)`:
 Studio sends the credentials from its config, and the app runs its **regular** auth flow with them
-— exactly as if the user typed the code (DartWay server side: per-user rotatable
+— exactly as if the user typed the code (the project's own server decides what a persona's
+code looks like; the example and template projects give theirs a per-user rotatable
 `testVerificationCode`). No special sign-in path ships in the app.
 
-The canonical wiring is `example/dartway_example_flutter/lib/core/studio/` in the
+The canonical wiring is `dartway_studio_binding` — one widget that does all of this — in the
 [DartWay monorepo](https://github.com/dartway/dartway).

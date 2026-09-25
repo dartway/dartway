@@ -13,7 +13,7 @@ The DartWay monorepo lives by the synchronisation law (see the root `CLAUDE.md`)
 git diff <base>...HEAD --stat        # plus anything uncommitted: git status, git diff
 ```
 
-The base is `master` unless told otherwise (`dartway-1.0` for work on the rewrite). What matters is what changed under `packages/`.
+The base is `master` unless told otherwise. What matters is what changed under `packages/`.
 
 ## Step 2. Decide what counts as a public API change
 

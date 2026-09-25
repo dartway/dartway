@@ -183,7 +183,7 @@ default in a public template would hand every project that forgot to change it t
 the server starts anyway and warns that the admin panel is out of reach; a value that is neither a
 phone nor an e-mail stops it from starting.
 
-A real delivery replaces the log line in `deliverCode`, in `my_app_server/lib/src/auth.dart`.
+A real delivery replaces the log line in `deliverCode`, in `my_app_server/lib/src/core/auth.dart`.
 
 A good first thing to try: sign in as the administrator in two browser windows, change a member's role
 or an app setting in the admin panel, and watch the other window follow without a reload. That is the

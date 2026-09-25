@@ -270,7 +270,7 @@ as long as the block is there, and the first tree to find out is one without it 
 - [Quick start](quick-start.md) — bring it up, sign in, run the checks.
 - [Data objects and generation](../2-core/data-objects-and-generation.md) — what goes in the shared
   package and what generation produces.
-- [Handlers and context](../4-server/handlers-and-context.md) — the files in `handlers/`.
+- [Handlers and context](../4-server/handlers-and-context.md) — one handler per request and command, and the caller's context.
 - [Database](../4-server/database.md) and [migrations](../4-server/migrations.md) — rows, queries and
   the migration CLI.
 - [Flutter core](../3-flutter/flutter-core.md) — what `core/dw_core.dart` builds.
