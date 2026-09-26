@@ -7,15 +7,20 @@ final class DwDatabaseConfig {
     required this.user,
     required this.password,
     this.ssl = true,
+    this.caFile,
     this.maxConnections = 10,
     this.applicationName = 'dartway',
     this.connectTimeout = const Duration(seconds: 15),
     this.queryTimeout = const Duration(minutes: 5),
     this.statementCacheSize = 256,
   }) : assert(maxConnections > 0),
-       assert(statementCacheSize > 0);
+       assert(statementCacheSize > 0),
+       assert(
+         caFile == null || ssl,
+         'caFile needs ssl: true — a CA has nothing to verify without TLS',
+       );
 
-  /// Reads `HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SSL` and
+  /// Reads `HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SSL`, `CA_FILE` and
   /// `MAX_CONNECTIONS` under [prefix].
   ///
   /// Every missing required key and every malformed value is reported at
@@ -33,6 +38,11 @@ final class DwDatabaseConfig {
         problems.add('$prefix$key is not set');
       }
       return value;
+    }
+
+    String? optional(String key) {
+      final value = environment['$prefix$key'];
+      return value == null || value.isEmpty ? null : value;
     }
 
     int? integer(String key) {
@@ -64,7 +74,15 @@ final class DwDatabaseConfig {
     final password = required('PASSWORD');
     final port = integer('PORT');
     final ssl = flag('SSL');
+    final caFile = optional('CA_FILE');
     final maxConnections = integer('MAX_CONNECTIONS');
+    if (caFile != null && ssl == false) {
+      problems.add(
+        '${prefix}CA_FILE is set but ${prefix}SSL is "false": a CA file only '
+        'means something over an encrypted connection. Drop ${prefix}CA_FILE '
+        'or remove ${prefix}SSL=false.',
+      );
+    }
     if (problems.isNotEmpty) {
       throw ArgumentError('database configuration: ${problems.join('; ')}');
     }
@@ -75,6 +93,7 @@ final class DwDatabaseConfig {
       user: user!,
       password: password!,
       ssl: ssl ?? true,
+      caFile: caFile,
       maxConnections: maxConnections ?? 10,
     );
   }
@@ -86,8 +105,20 @@ final class DwDatabaseConfig {
   final String password;
 
   /// Encrypted unless disabled. The driver's `require` mode: the channel is
-  /// encrypted, the certificate is not verified.
+  /// encrypted, the certificate is not verified — unless [caFile] is set, in
+  /// which case the connection verifies the server's certificate against that
+  /// CA instead (the driver's `verify-full`).
   final bool ssl;
+
+  /// A CA certificate file the server's certificate is verified against
+  /// (`SslMode.verifyFull`), instead of the encrypted-but-unverified default.
+  /// A path, not the certificate text — the driver reads it from disk. Unset
+  /// unless `DW_DATABASE_CA_FILE` names one; the contradiction with
+  /// `ssl: false` is rejected both by [fromEnvironment] (a proper
+  /// `ArgumentError`, naming both keys) and by an assertion on the
+  /// constructor itself, so a value built by hand — `copyWith`, a test,
+  /// the migration CLI — cannot silently combine them either.
+  final String? caFile;
 
   /// The driver's own pool defaults to a single connection; this is the real
   /// ceiling of concurrent statements.
@@ -109,6 +140,7 @@ final class DwDatabaseConfig {
         user: user,
         password: password,
         ssl: ssl,
+        caFile: caFile,
         maxConnections: maxConnections ?? this.maxConnections,
         applicationName: applicationName,
         connectTimeout: connectTimeout,
@@ -119,5 +151,7 @@ final class DwDatabaseConfig {
   /// The password is never part of the text.
   @override
   String toString() =>
-      'DwDatabaseConfig($user@$host:$port/$name, ssl: $ssl, maxConnections: $maxConnections)';
+      'DwDatabaseConfig($user@$host:$port/$name, ssl: $ssl, '
+      '${caFile == null ? 'unverified' : 'verify-full: $caFile'}, '
+      'maxConnections: $maxConnections)';
 }

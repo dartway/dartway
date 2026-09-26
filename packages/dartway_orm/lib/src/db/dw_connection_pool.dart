@@ -10,6 +10,37 @@ import 'package:stream_channel/stream_channel.dart';
 import 'dw_database_config.dart';
 import 'dw_errors.dart';
 
+/// `disable` without SSL, `verify-full` with a CA file, `require` otherwise —
+/// encrypted, but the certificate is not checked against anything.
+///
+/// The one place this decision is made: every direct opener of a
+/// `pg.Connection` — the pool below and `_DwListener` in
+/// `dw_postgres_database.dart`, which cannot use a pooled connection because
+/// `LISTEN` belongs to one session — calls this and [dwSecurityContext]
+/// rather than repeating the `config.ssl ? require : disable` choice, which
+/// is exactly the copy that once left the listener's own connection
+/// unverified while the pool's had already moved to `verify-full`.
+@internal
+pg.SslMode dwSslMode(DwDatabaseConfig config) {
+  if (!config.ssl) return pg.SslMode.disable;
+  return config.caFile == null ? pg.SslMode.require : pg.SslMode.verifyFull;
+}
+
+/// A context trusting only [DwDatabaseConfig.caFile], or null to fall back to
+/// the driver's own default.
+///
+/// `SecurityContext()` starts empty — it does not load the platform's own
+/// trusted roots unless asked to — so this trusts exactly the one CA named,
+/// nothing else: a server whose certificate is signed by any other
+/// authority, including a public one, is refused, which is the point of
+/// naming a specific provider's CA rather than any valid certificate.
+@internal
+SecurityContext? dwSecurityContext(DwDatabaseConfig config) {
+  final caFile = config.caFile;
+  if (caFile == null) return null;
+  return SecurityContext()..setTrustedCertificates(caFile);
+}
+
 /// One server connection with its own cache of prepared statements.
 ///
 /// The driver re-parses every parameterised `execute` and closes the
@@ -35,7 +66,8 @@ final class DwPooledConnection {
           password: config.password,
         ),
         settings: pg.ConnectionSettings(
-          sslMode: config.ssl ? pg.SslMode.require : pg.SslMode.disable,
+          sslMode: dwSslMode(config),
+          securityContext: dwSecurityContext(config),
           applicationName: config.applicationName,
           timeZone: 'UTC',
           connectTimeout: config.connectTimeout,

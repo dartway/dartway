@@ -161,20 +161,45 @@ set --env <environment>`:
 | `DW_DATABASE_PASSWORD` | yes | Its password — never generated here; it is the provider's credential |
 | `DW_DATABASE_SSL` | no, default `true` | `false` only for a database that genuinely speaks no TLS |
 | `DW_DATABASE_MAX_CONNECTIONS` | no, default 10 | The pool ceiling — managed plans often cap total connections in the tens, so raising this without checking the plan's limit starves every other client of the same database |
+| `DW_DATABASE_CA_FILE` | no | The provider's CA certificate verifies the server's own — `verify-full` instead of `require` (dartway/dartway#342). Set to where the file is mounted, e.g. `/run/secrets/db-ca.pem`; the name after the last `/` must be declared under `requires.files` (below) |
 
 `deploy check` gains `database-reachable` (below): on the deployment host over SSH, because a
 managed provider's firewall usually trusts that host's address and not the maintainer's — a
 throwaway, pinned Postgres client (never built or run otherwise with `database: external`) attempts a
-real connection with the same `sslmode` the server itself will use (`require` unless `DW_DATABASE_SSL`
-is explicitly `false`, which asks for `disable`), and reports why when it fails (a malformed stored
-value, DNS, refused, a timeout, authentication, or the server not offering TLS). A bare TCP probe
-would pass while the password or the certificate is still wrong. `DW_DATABASE_PORT`, `_SSL` and
-`_MAX_CONNECTIONS` are validated exactly as the server parses them — a positive integer, and `true`
-or `false` — before anything connects, so a value that would crash the server at startup is a check
-failure naming it, not a pass.
+real connection with the same `sslmode` the server itself will use (`require`, `verify-full` with a
+CA file, or `disable` when `DW_DATABASE_SSL` is explicitly `false`), and reports why when it fails (a
+malformed stored value, DNS, refused, a timeout, authentication, the server not offering TLS, or its
+certificate not verifying against the configured CA). A bare TCP probe would pass while the password
+or the certificate is still wrong. `DW_DATABASE_PORT`, `_SSL`, `_MAX_CONNECTIONS` and `_CA_FILE` are
+validated exactly as the server parses them — a positive integer, `true` or `false`, and (for the CA
+file) a name declared under `requires.files` and actually delivered there — before anything connects,
+so a value that would crash the server at startup is a check failure naming it, not a pass.
+`DW_DATABASE_CA_FILE` set together with `DW_DATABASE_SSL=false` is refused as a contradiction, by the
+server itself (`DwDatabaseConfig.fromEnvironment`) and by this check.
 
-`sslmode=verify-full` with the provider's CA file — closing the one gap `require` leaves, a network
-position presenting its own certificate unchallenged — is not built yet: dartway/dartway#342.
+**Delivering the CA file**: declare its name under `requires.files` (e.g. `db-ca.pem`), upload it with
+`dart run dartway_cli:dartway deploy secret put-file <path/to/ca.pem> --name db-ca.pem --env <environment>`
+— it is then mounted read-only at `/run/secrets/db-ca.pem` exactly like any other declared file — and
+set `DW_DATABASE_CA_FILE` to that same mounted path. DigitalOcean Managed Postgres offers the cluster's CA
+certificate as a download next to the connection details in its control panel, or on the command line:
+`doctl databases get-ca <cluster-id> -o json | jq -r .certificate | base64 --decode > db-ca.pem` (confirmed
+against `doctl`'s own `--help`; there is no `doctl databases connection --format CA`). RDS publishes a
+combined regional bundle (`rds-ca-*-bundle.pem`) on its own documentation pages. Cloud SQL's instance page
+has a "Server CA certificate" download under its connections tab — **unconfirmed here** whether its
+default per-instance certificate carries the connecting address in `subjectAltName` (see the warning
+below); check before relying on `verify-full` against it.
+
+**The server certificate must carry a `subjectAltName` for the address `DW_DATABASE_HOST` names** —
+`dart:io` (BoringSSL) has no fallback to the deprecated Subject `CN` field the way `libpq`/OpenSSL still
+does, and separately requires the leaf to declare `extendedKeyUsage: serverAuth`; a certificate with
+neither is refused outright, chain and all, with an error that does not name either omission (see the
+[database page](../4-server/database.md)). Every provider named above issues certificates with a proper
+SAN, and this is exactly what a certificate authority is expected to include — but a self-hosted or
+lesser-known provider's own CA is worth checking (`openssl x509 -in cert.pem -noout -text | grep -A1
+'Subject Alternative Name'`) before depending on `verify-full` against it. `database-reachable` connects
+through `libpq`, which is more permissive here, so a config it passes can still be one the server itself
+refuses at startup for exactly this reason — the check does not (and, without `openssl` in the pinned
+Postgres client image it runs, cannot cheaply) verify the SAN itself.
 
 An existing config with no `database` key keeps deploying `bundled`, exactly as before.
 
@@ -419,7 +444,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `docker-available` | error | Docker Compose is usable by the deployment user |
 | `runtime-secrets` | error | Every required secret is in the server store with a value, and nothing reserved is |
 | `secret-files` | error | Every `requires.files` entry is delivered **and** mounted into the server container, read from the configuration Compose will actually run |
-| `database-reachable` | error | With `database: external`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS` are validated exactly as the server parses them, then a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with the same `sslmode` the server will use and runs a query — a real authenticated connection (encrypted unless `DW_DATABASE_SSL=false`), not a bare TCP probe. A failure names why: a malformed stored value, DNS, refused, a timeout, authentication, or the server not offering TLS. Skipped with `database: bundled` |
+| `database-reachable` | error | With `database: external`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS`/`_CA_FILE` are validated exactly as the server parses them, then a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with the same `sslmode` the server will use (`require`, `verify-full` with a CA file, or `disable`) and runs a query — a real authenticated connection, not a bare TCP probe. A failure names why: a malformed stored value, DNS, refused, a timeout, authentication, the server not offering TLS, or its certificate not verifying against the configured CA. Skipped with `database: bundled` |
 | `secrets-match-local` | warning | The server store and `deploy/secrets.yaml` hold the same key names |
 | `outside` | error | The same outside probes `run` ends with, against whatever is deployed now; runs even when SSH fails |
 
