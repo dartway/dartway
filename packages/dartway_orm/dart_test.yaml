@@ -1,0 +1,7 @@
+tags:
+  # Starts its own Postgres containers (a throwaway CA-signed certificate) —
+  # not part of `tool/checks.sh`, which needs no Docker; run it by name:
+  #   dart test -t docker --run-skipped test/tls_verify_full_docker_test.dart
+  docker:
+    skip: "needs Docker; run with -t docker --run-skipped"
+    timeout: 5m

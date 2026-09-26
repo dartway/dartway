@@ -27,14 +27,11 @@ void main() {
       expect(verdict.ok, isTrue);
     });
 
-    test(
-      'exit 0 with no recognisable answer is not silently a pass — a check '
-      'that only reads the exit code must fail this',
-      () {
-        expect(dwJudgeDatabaseReachable(_ok('')).ok, isFalse);
-        expect(dwJudgeDatabaseReachable(_ok('something else')).ok, isFalse);
-      },
-    );
+    test('exit 0 with no recognisable answer is not silently a pass — a check '
+        'that only reads the exit code must fail this', () {
+      expect(dwJudgeDatabaseReachable(_ok('')).ok, isFalse);
+      expect(dwJudgeDatabaseReachable(_ok('something else')).ok, isFalse);
+    });
 
     test('DNS: the configured host does not resolve', () {
       final verdict = dwJudgeDatabaseReachable(
@@ -85,21 +82,18 @@ void main() {
       expect(verdict.detail, contains('auth'));
     });
 
-    test(
-      'timeout: no answer at all — a firewall not admitting this host',
-      () {
-        final verdict = dwJudgeDatabaseReachable(
-          _fail(
-            'psql: error: connection to server at "10.0.0.5", port 25060 '
-            'failed: Connection timed out\n'
-            '\tIs the server running on that host and accepting\n'
-            '\tTCP/IP connections?',
-          ),
-        );
-        expect(verdict.ok, isFalse);
-        expect(verdict.detail, contains('timeout'));
-      },
-    );
+    test('timeout: no answer at all — a firewall not admitting this host', () {
+      final verdict = dwJudgeDatabaseReachable(
+        _fail(
+          'psql: error: connection to server at "10.0.0.5", port 25060 '
+          'failed: Connection timed out\n'
+          '\tIs the server running on that host and accepting\n'
+          '\tTCP/IP connections?',
+        ),
+      );
+      expect(verdict.ok, isFalse);
+      expect(verdict.detail, contains('timeout'));
+    });
 
     test(
       'TLS: the server did not offer it though sslmode=require asked for it',
@@ -123,19 +117,16 @@ void main() {
       expect(verdict.detail, contains('not configured'));
     });
 
-    test(
-      'config: a stored value the server itself would refuse to parse',
-      () {
-        final verdict = dwJudgeDatabaseReachable(
-          _fail(
-            'ERROR: invalid in the secret store: '
-            'DW_DATABASE_PORT=[abc]-must-be-a-positive-integer',
-          ),
-        );
-        expect(verdict.ok, isFalse);
-        expect(verdict.detail, contains('config'));
-      },
-    );
+    test('config: a stored value the server itself would refuse to parse', () {
+      final verdict = dwJudgeDatabaseReachable(
+        _fail(
+          'ERROR: invalid in the secret store: '
+          'DW_DATABASE_PORT=[abc]-must-be-a-positive-integer',
+        ),
+      );
+      expect(verdict.ok, isFalse);
+      expect(verdict.detail, contains('config'));
+    });
 
     test('a message matching nothing known is reported, not swallowed', () {
       final verdict = dwJudgeDatabaseReachable(
@@ -151,16 +142,13 @@ void main() {
       (c) => c.id == 'database-reachable',
     );
 
-    test(
-      'needs SSH, is an error, and runs at the remote stage — a managed '
-      'database that refuses the deploy\'s own credentials is worse '
-      'discovered at run than at check',
-      () {
-        expect(check.requiresSsh, isTrue);
-        expect(check.severity, DwCheckSeverity.error);
-        expect(check.stage, DwDeployCheckStage.remote);
-      },
-    );
+    test('needs SSH, is an error, and runs at the remote stage — a managed '
+        'database that refuses the deploy\'s own credentials is worse '
+        'discovered at run than at check', () {
+      expect(check.requiresSsh, isTrue);
+      expect(check.severity, DwCheckSeverity.error);
+      expect(check.stage, DwDeployCheckStage.remote);
+    });
 
     test('a bundled database is skipped, not judged — there is nothing '
         'external to reach', () async {
@@ -182,24 +170,21 @@ void main() {
     // through a real shell (no Docker needed — there is no store at all, so
     // it exits before ever reaching `docker run`), and the one thing that
     // must never be true is `skipped`.
-    test(
-      'an external database is judged, never skipped, even when nothing is '
-      'configured yet',
-      () async {
-        final stack = stackFrom(extra: '  database: external\n');
-        expect(stack.target.database, DwDatabaseMode.external);
-        final verdict = await check.evaluate(
-          DwDeployContext(
-            projectRoot: Directory.systemTemp,
-            stack: stack,
-            ssh: LocalShell(),
-          ),
-        );
-        expect(verdict.skipped, isFalse);
-        expect(verdict.passed, isFalse);
-        expect(verdict.detail, contains('not configured'));
-      },
-    );
+    test('an external database is judged, never skipped, even when nothing is '
+        'configured yet', () async {
+      final stack = stackFrom(extra: '  database: external\n');
+      expect(stack.target.database, DwDatabaseMode.external);
+      final verdict = await check.evaluate(
+        DwDeployContext(
+          projectRoot: Directory.systemTemp,
+          stack: stack,
+          ssh: LocalShell(),
+        ),
+      );
+      expect(verdict.skipped, isFalse);
+      expect(verdict.passed, isFalse);
+      expect(verdict.detail, contains('not configured'));
+    });
   });
 
   // The validation half of the script itself, run through a real shell —
@@ -234,11 +219,14 @@ void main() {
       ),
     );
 
-    test('a non-numeric port fails before any connection is attempted', () async {
-      final result = await run({...valid, 'DW_DATABASE_PORT': 'abc'});
-      expect(result.ok, isFalse);
-      expect(result.stderr, contains('DW_DATABASE_PORT'));
-    });
+    test(
+      'a non-numeric port fails before any connection is attempted',
+      () async {
+        final result = await run({...valid, 'DW_DATABASE_PORT': 'abc'});
+        expect(result.ok, isFalse);
+        expect(result.stderr, contains('DW_DATABASE_PORT'));
+      },
+    );
 
     test('a port of zero fails — positive, not merely numeric', () async {
       final result = await run({...valid, 'DW_DATABASE_PORT': '0'});
@@ -255,25 +243,22 @@ void main() {
       },
     );
 
-    test('DW_DATABASE_SSL is accepted case-insensitively, like the server', () async {
-      // TRUE/FALSE in any case must clear validation — the failure that
-      // follows (no real host) proves it got past validation, not that it
-      // silently short-circuited.
-      final result = await run({...valid, 'DW_DATABASE_SSL': 'TRUE'});
-      expect(result.stderr, isNot(contains('DW_DATABASE_SSL')));
-    });
-
     test(
-      'a non-positive DW_DATABASE_MAX_CONNECTIONS fails, named',
+      'DW_DATABASE_SSL is accepted case-insensitively, like the server',
       () async {
-        final result = await run({
-          ...valid,
-          'DW_DATABASE_MAX_CONNECTIONS': '0',
-        });
-        expect(result.ok, isFalse);
-        expect(result.stderr, contains('DW_DATABASE_MAX_CONNECTIONS'));
+        // TRUE/FALSE in any case must clear validation — the failure that
+        // follows (no real host) proves it got past validation, not that it
+        // silently short-circuited.
+        final result = await run({...valid, 'DW_DATABASE_SSL': 'TRUE'});
+        expect(result.stderr, isNot(contains('DW_DATABASE_SSL')));
       },
     );
+
+    test('a non-positive DW_DATABASE_MAX_CONNECTIONS fails, named', () async {
+      final result = await run({...valid, 'DW_DATABASE_MAX_CONNECTIONS': '0'});
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('DW_DATABASE_MAX_CONNECTIONS'));
+    });
 
     test('every invalid value is named at once, not one at a time', () async {
       final result = await run({
@@ -285,6 +270,94 @@ void main() {
       expect(result.stderr, contains('DW_DATABASE_PORT'));
       expect(result.stderr, contains('DW_DATABASE_SSL'));
       expect(result.stderr, contains('DW_DATABASE_MAX_CONNECTIONS'));
+    });
+  });
+
+  // DW_DATABASE_CA_FILE — additive, and validated exactly as
+  // DwDatabaseConfig.fromEnvironment validates it, before anything connects.
+  group('dwDatabaseReachabilityScript — DW_DATABASE_CA_FILE', () {
+    late Directory dir;
+
+    setUp(() => dir = Directory.systemTemp.createTempSync('dw_db_ca_script_'));
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    File storeFile(Map<String, String> values) {
+      final file = File(p.join(dir.path, 'store.env'));
+      final buffer = StringBuffer();
+      values.forEach((key, value) => buffer.writeln("$key='$value'"));
+      file.writeAsStringSync(buffer.toString());
+      return file;
+    }
+
+    const valid = {
+      'DW_DATABASE_HOST': 'db.example.com',
+      'DW_DATABASE_PORT': '25060',
+      'DW_DATABASE_NAME': 'defaultdb',
+      'DW_DATABASE_USER': 'doadmin',
+      'DW_DATABASE_PASSWORD': 'x',
+    };
+
+    Future<DwSshResult> run(
+      Map<String, String> values, {
+      List<String> requiredFiles = const [],
+    }) => LocalShell().run(
+      dwDatabaseReachabilityScript(
+        storeFile: storeFile(values).path,
+        image: 'postgres:17-alpine',
+        requiredFiles: requiredFiles,
+      ),
+    );
+
+    test(
+      'set together with DW_DATABASE_SSL=false is refused as a contradiction '
+      '— a CA has nothing to verify without TLS',
+      () async {
+        final result = await run(
+          {
+            ...valid,
+            'DW_DATABASE_SSL': 'false',
+            'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem',
+          },
+          requiredFiles: ['db-ca.pem'],
+        );
+        expect(result.ok, isFalse);
+        expect(result.stderr, contains('DW_DATABASE_CA_FILE'));
+        expect(result.stderr, contains('DW_DATABASE_SSL'));
+      },
+    );
+
+    test('naming a file not declared under requires.files fails, named — never '
+        'silently mounted from wherever it happens to be', () async {
+      final result = await run({
+        ...valid,
+        'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem',
+      }, requiredFiles: const []);
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('DW_DATABASE_CA_FILE'));
+      expect(result.stderr, contains('requires.files'));
+    });
+
+    test('declared but never delivered (secret put-file was never run) fails, '
+        'named', () async {
+      final result = await run(
+        {...valid, 'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem'},
+        requiredFiles: ['db-ca.pem'],
+      );
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('DW_DATABASE_CA_FILE'));
+      expect(result.stderr, contains('not-delivered'));
+    });
+
+    test('declared and delivered clears validation — the failure that follows '
+        '(no real host) proves it, not a validation error', () async {
+      File(
+        p.join(dir.path, 'db-ca.pem'),
+      ).writeAsStringSync('-----BEGIN CERTIFICATE-----\ndummy\n');
+      final result = await run(
+        {...valid, 'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem'},
+        requiredFiles: ['db-ca.pem'],
+      );
+      expect(result.stderr, isNot(contains('DW_DATABASE_CA_FILE')));
     });
   });
 }

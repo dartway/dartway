@@ -148,6 +148,15 @@ class DwStack {
   /// `true` (`SslMode.require`) and the pool to 10 connections.
   static const String databaseSslKey = 'DW_DATABASE_SSL';
   static const String databaseMaxConnectionsKey = 'DW_DATABASE_MAX_CONNECTIONS';
+
+  /// Optional: a CA certificate the server verifies the database's own
+  /// certificate against (`SslMode.verifyFull` instead of `require`) —
+  /// dartway/dartway#342. The value is the path the file is mounted at, e.g.
+  /// `${secretFilesDir}/db-ca.pem`, and the name after the last `/` must be
+  /// declared under `requires.files` — the one source for this key name,
+  /// read by [DwDatabaseConfig.fromEnvironment] in `dartway_orm` under the
+  /// same suffix and by [dwDatabaseReachabilityScript]'s validation.
+  static const String databaseCaFileKey = 'DW_DATABASE_CA_FILE';
   static const String storageEndpointKey = 'DW_STORAGE_ENDPOINT';
   static const String storagePublicBucketKey = 'DW_STORAGE_PUBLIC_BUCKET';
   static const String storagePublicBaseUrlKey = 'DW_STORAGE_PUBLIC_BASE_URL';

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
 import '../checker/dw_check_type.dart';
@@ -190,7 +191,8 @@ Future<DwDeployVerdict> evaluateImagesResolve(
     return DwDeployVerdict.fail(
       [
         ...failed,
-        if (unchecked.isNotEmpty) 'also could not ask: ${unchecked.join(' | ')}',
+        if (unchecked.isNotEmpty)
+          'also could not ask: ${unchecked.join(' | ')}',
       ].join(' | '),
       fix:
           'A pinned tag that no longer resolves has to be repinned in the '
@@ -200,9 +202,7 @@ Future<DwDeployVerdict> evaluateImagesResolve(
     );
   }
   if (unchecked.isNotEmpty) {
-    return DwDeployVerdict.skip(
-      'could not ask: ${unchecked.join(' | ')}',
-    );
+    return DwDeployVerdict.skip('could not ask: ${unchecked.join(' | ')}');
   }
   return DwDeployVerdict.pass(
     '${images.length} pinned image(s): ${images.map((e) => e.$2).join(', ')}',
@@ -431,8 +431,10 @@ Future<DwDeployVerdict> _checkDatabaseReachable(DwDeployContext context) async {
     context.target.deployUser,
     dwDatabaseReachabilityScript(
       storeFile: store.file,
+      storeDir: store.directory,
       image: image,
       environment: context.target.environment,
+      requiredFiles: context.target.requiredSecretFiles,
     ),
   );
   final verdict = dwJudgeDatabaseReachable(result);
@@ -449,10 +451,14 @@ Future<DwDeployVerdict> _checkDatabaseReachable(DwDeployContext context) async {
         'integer, the same as the server itself requires. Then check the '
         "provider's firewall admits this host (trusted sources / the "
         "droplet's address) and that it offers TLS unless DW_DATABASE_SSL is "
-        "explicitly false — this check connects with the sslmode the server "
-        "itself will use, and does not yet verify the server's certificate "
-        '(dartway/dartway#342, "verify-full with a CA file", is a separate '
-        'issue).',
+        'explicitly false. For `verify-full` instead of the default '
+        '`require`: deliver the provider\'s CA certificate with "dartway '
+        'deploy secret put-file <ca.pem> --env ${context.target.environment}" '
+        '(declared under requires.files in deploy/config.yaml), then set '
+        '${DwStack.databaseCaFileKey} to '
+        '${DwStack.secretFilesDir}/<the same name> — a name '
+        'not declared under requires.files, or set together with '
+        'DW_DATABASE_SSL=false, is refused here rather than tried.',
   );
 }
 
@@ -467,12 +473,21 @@ Future<DwDeployVerdict> _checkDatabaseReachable(DwDeployContext context) async {
 ///
 /// Every value the server itself would parse is validated exactly as
 /// `DwDatabaseConfig.fromEnvironment` parses it, before anything connects: a
-/// malformed `DW_DATABASE_PORT`, `_SSL` or `_MAX_CONNECTIONS` is a check
-/// failure naming the bad value, not a connection attempt that fails for an
-/// unrelated reason, or — worse — a pass on a config that would crash the
-/// server at startup. `DW_DATABASE_SSL` (default `true`) picks the `sslmode`
-/// this check itself connects with, `require` or `disable`, so what is tested
-/// is the connection the server will actually make.
+/// malformed `DW_DATABASE_PORT`, `_SSL`, `_MAX_CONNECTIONS` or
+/// `_CA_FILE` is a check failure naming the bad value, not a connection
+/// attempt that fails for an unrelated reason, or — worse — a pass on a
+/// config that would crash the server at startup. `DW_DATABASE_SSL` (default
+/// `true`) and `DW_DATABASE_CA_FILE` (unset by default) together pick the
+/// `sslmode` this check itself connects with — `disable`, `require` or
+/// `verify-full` — exactly the choice `DwDatabaseConfig.fromEnvironment`
+/// makes, so what is tested is the connection the server will actually make.
+///
+/// A CA file must name one of [requiredFiles] (`requires.files` in
+/// `deploy/config.yaml`) — the file itself, delivered with `secret
+/// put-file`, is expected at `<storeDir>/<name>`, bind-mounted into the
+/// throwaway client exactly as the compose file mounts it into the server
+/// (`DwStack.secretFilesDir`) — never a name the deploy never agreed to mount
+/// anywhere.
 ///
 /// [network] is read by nothing this ships — it exists so a test can attach
 /// the throwaway client to the same Docker network as a fake database instead
@@ -482,12 +497,17 @@ String dwDatabaseReachabilityScript({
   required String image,
   String environment = '<env>',
   String? network,
+  String? storeDir,
+  List<String> requiredFiles = const [],
 }) {
   final networkFlag = network == null ? '' : "--network '$network' ";
+  final resolvedStoreDir = storeDir ?? p.dirname(storeFile);
+  final requiredFilesList = requiredFiles.join(' ');
   return '''
 set -e
 umask 077
 store='$storeFile'
+store_dir='$resolvedStoreDir'
 if [ ! -s "\$store" ]; then
   echo "ERROR: no secret store at \$store. Run: dartway secret init --env $environment" >&2
   exit 1
@@ -513,6 +533,7 @@ dw_user=\$(dw_read DW_DATABASE_USER)
 dw_password=\$(dw_read DW_DATABASE_PASSWORD)
 dw_ssl=\$(dw_read DW_DATABASE_SSL)
 dw_max_connections=\$(dw_read DW_DATABASE_MAX_CONNECTIONS)
+dw_ca_file=\$(dw_read DW_DATABASE_CA_FILE)
 
 dw_missing=""
 if [ -z "\$dw_host" ]; then dw_missing="\$dw_missing DW_DATABASE_HOST"; fi
@@ -545,14 +566,43 @@ if [ -n "\$dw_max_connections" ]; then
     dw_invalid="\$dw_invalid DW_DATABASE_MAX_CONNECTIONS=[\$dw_max_connections]-must-be-a-positive-integer"
   fi
 fi
+
+# DW_DATABASE_CA_FILE: additive — absent, nothing below changes. Present, it
+# must (a) not contradict DW_DATABASE_SSL=false, (b) name a file under
+# requires.files, exactly as declared in deploy/config.yaml, and (c) actually
+# be delivered where that declaration puts it — the same three facts
+# `DwDatabaseConfig.fromEnvironment` and the deploy's own secret-files check
+# each verify on their own side.
+dw_required_files='$requiredFilesList'
+dw_ca_mount=""
+if [ -n "\$dw_ca_file" ]; then
+  if [ "\$dw_ssl_lower" = "false" ]; then
+    dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=set-but-DW_DATABASE_SSL=false-is-a-contradiction"
+  else
+    dw_ca_name=\$(basename "\$dw_ca_file")
+    case " \$dw_required_files " in
+      *" \$dw_ca_name "*) ;;
+      *) dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=[\$dw_ca_file]-names-a-file-not-declared-under-requires.files" ;;
+    esac
+    if [ -z "\$dw_invalid" ] && [ ! -f "\$store_dir/\$dw_ca_name" ]; then
+      dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=[\$dw_ca_file]-not-delivered-run-dartway-secret-put-file"
+    fi
+    dw_ca_mount="\$store_dir/\$dw_ca_name:/dw-database-ca.pem:ro"
+  fi
+fi
 if [ -n "\$dw_invalid" ]; then
   echo "ERROR: invalid in the secret store:\$dw_invalid" >&2
   exit 1
 fi
 
-# absent or true -> require (the server's own default); false -> disable.
+# absent/true without a CA -> require; with a verified CA -> verify-full
+# (dartway/dartway#342); false -> disable — exactly the server's own choice.
 dw_sslmode=require
-if [ "\$dw_ssl_lower" = "false" ]; then dw_sslmode=disable; fi
+if [ "\$dw_ssl_lower" = "false" ]; then
+  dw_sslmode=disable
+elif [ -n "\$dw_ca_mount" ]; then
+  dw_sslmode=verify-full
+fi
 
 dw_env=\$(mktemp)
 trap 'rm -f "\$dw_env"' EXIT
@@ -564,9 +614,16 @@ trap 'rm -f "\$dw_env"' EXIT
   printf 'PGPASSWORD=%s\\n' "\$dw_password"
   printf 'PGSSLMODE=%s\\n' "\$dw_sslmode"
   printf 'PGCONNECT_TIMEOUT=10\\n'
+  if [ -n "\$dw_ca_mount" ]; then
+    printf 'PGSSLROOTCERT=%s\\n' "/dw-database-ca.pem"
+  fi
 } > "\$dw_env"
 chmod 600 "\$dw_env"
-docker run --rm ${networkFlag}--env-file "\$dw_env" '$image' psql -tAc 'select 1' 2>&1
+if [ -n "\$dw_ca_mount" ]; then
+  docker run --rm ${networkFlag}-v "\$dw_ca_mount" --env-file "\$dw_env" '$image' psql -tAc 'select 1' 2>&1
+else
+  docker run --rm ${networkFlag}--env-file "\$dw_env" '$image' psql -tAc 'select 1' 2>&1
+fi
 ''';
 }
 
@@ -583,10 +640,11 @@ class DwDatabaseReachability {
 
 /// Classifies [result] of running [dwDatabaseReachabilityScript]: connected
 /// and queried, or one of the reasons a managed database is unreachable — a
-/// malformed stored value, DNS, refused, a timeout, authentication, or TLS
-/// not being offered though required. Falls back to the raw output rather
-/// than guessing when the message does not match a known shape, so a failure
-/// is never silently reported as one it is not.
+/// malformed stored value, DNS, refused, a timeout, authentication, TLS not
+/// being offered though required, or a certificate that does not verify
+/// against a configured `DW_DATABASE_CA_FILE`. Falls back to the raw output
+/// rather than guessing when the message does not match a known shape, so a
+/// failure is never silently reported as one it is not.
 DwDatabaseReachability dwJudgeDatabaseReachable(DwSshResult result) {
   final output = '${result.stdout}\n${result.stderr}';
   final lastLine = output
@@ -603,7 +661,8 @@ DwDatabaseReachability dwJudgeDatabaseReachable(DwSshResult result) {
   final lower = output.toLowerCase();
   final String reason;
   if (lower.contains('invalid in the secret store')) {
-    reason = 'config — a stored value the server itself would refuse to '
+    reason =
+        'config — a stored value the server itself would refuse to '
         'parse';
   } else if (lower.contains('missing in the secret store') ||
       lower.contains('no secret store at')) {
@@ -625,6 +684,14 @@ DwDatabaseReachability dwJudgeDatabaseReachable(DwSshResult result) {
       lower.contains('no pg_hba.conf entry') ||
       (lower.contains('role') && lower.contains('does not exist'))) {
     reason = 'auth — the server rejected the credentials';
+  } else if (lower.contains('certificate verify failed') ||
+      lower.contains('root certificate file') ||
+      lower.contains('certificate signature failure') ||
+      lower.contains('unable to get local issuer certificate')) {
+    reason =
+        'TLS — the server certificate does not verify against '
+        'DW_DATABASE_CA_FILE (wrong CA, or the provider reissued its '
+        'certificate under a different one)';
   } else if (lower.contains('server does not support ssl') ||
       lower.contains('ssl is not enabled') ||
       lower.contains('ssl connection has been closed unexpectedly') ||

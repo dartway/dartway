@@ -2,7 +2,12 @@
 
 ## 0.21.0-dev.6
 
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
+- `DwDatabaseConfig` gains an optional `caFile` (`DW_DATABASE_CA_FILE` in
+  `fromEnvironment`): when set, the connection verifies the server's
+  certificate against that CA (`SslMode.verifyFull`) instead of only
+  encrypting the channel (`SslMode.require`, unchanged when absent).
+  `DW_DATABASE_CA_FILE` set together with `DW_DATABASE_SSL=false` is refused
+  at parse time — a CA has nothing to verify without TLS (dartway/dartway#342).
 
 ## 0.21.0-dev.5
 

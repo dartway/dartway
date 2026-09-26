@@ -35,7 +35,8 @@ final class DwPooledConnection {
           password: config.password,
         ),
         settings: pg.ConnectionSettings(
-          sslMode: config.ssl ? pg.SslMode.require : pg.SslMode.disable,
+          sslMode: _sslMode(config),
+          securityContext: _securityContext(config),
           applicationName: config.applicationName,
           timeZone: 'UTC',
           connectTimeout: config.connectTimeout,
@@ -57,6 +58,27 @@ final class DwPooledConnection {
         stackTrace,
       );
     }
+  }
+
+  /// `disable` without SSL, `verify-full` with a CA file, `require` otherwise
+  /// — encrypted, but the certificate is not checked against anything.
+  static pg.SslMode _sslMode(DwDatabaseConfig config) {
+    if (!config.ssl) return pg.SslMode.disable;
+    return config.caFile == null ? pg.SslMode.require : pg.SslMode.verifyFull;
+  }
+
+  /// A context trusting only [DwDatabaseConfig.caFile], or null to fall back
+  /// to the driver's own default.
+  ///
+  /// `SecurityContext()` starts empty — it does not load the platform's own
+  /// trusted roots unless asked to — so this trusts exactly the one CA named,
+  /// nothing else: a server whose certificate is signed by any other
+  /// authority, including a public one, is refused, which is the point of
+  /// naming a specific provider's CA rather than any valid certificate.
+  static SecurityContext? _securityContext(DwDatabaseConfig config) {
+    final caFile = config.caFile;
+    if (caFile == null) return null;
+    return SecurityContext()..setTrustedCertificates(caFile);
   }
 
   /// Whether [error] means a cached statement no longer fits the schema — a

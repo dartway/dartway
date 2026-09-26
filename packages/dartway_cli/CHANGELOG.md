@@ -66,6 +66,14 @@
   lock. Additive: an existing config with no `database` key keeps deploying exactly as before, so
   there is no migration note. `sslmode=verify-full` with a CA file is tracked separately
   (dartway/dartway#342).
+- **`database-reachable` verifies the server's certificate when `DW_DATABASE_CA_FILE` names one**
+  (dartway/dartway#342, D-102), instead of only encrypting the channel: the same `verify-full` the
+  server itself connects with once `dartway_orm`'s `DwDatabaseConfig.caFile` is set. The value is
+  where the file is mounted (`${DwStack.secretFilesDir}/<name>`, e.g. `/run/secrets/db-ca.pem`); the
+  name after the last `/` must be declared under `requires.files` and actually delivered with
+  `dartway deploy secret put-file` — a CA naming an undeclared or undelivered file is refused before
+  anything connects, and so is one set together with `DW_DATABASE_SSL=false`, a contradiction the
+  server itself also refuses. Additive: no `DW_DATABASE_CA_FILE` keeps today's `require`.
 - **BREAKING: `secret push` no longer replaces a server value that differs from the local one — it
   refuses the whole push, naming every differing key, and sends nothing** (#330, D-097). Its default
   is now additive: it sends a key the server lacks or holds empty, leaves a key whose server value

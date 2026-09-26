@@ -173,7 +173,7 @@ void main() {
       expect(config.toString(), isNot(contains('secret')));
     });
 
-    test('defaults port, SSL and pool size', () {
+    test('defaults port, SSL, CA file and pool size', () {
       final config = DwDatabaseConfig.fromEnvironment({
         'DW_DATABASE_HOST': 'db',
         'DW_DATABASE_NAME': 'app',
@@ -182,7 +182,54 @@ void main() {
       });
       expect(config.port, 5432);
       expect(config.ssl, isTrue);
+      expect(config.caFile, isNull);
       expect(config.maxConnections, 10);
+    });
+
+    test('a CA file is read, additively, next to a plain SSL setup', () {
+      final config = DwDatabaseConfig.fromEnvironment({
+        'DW_DATABASE_HOST': 'db',
+        'DW_DATABASE_NAME': 'app',
+        'DW_DATABASE_USER': 'u',
+        'DW_DATABASE_PASSWORD': 'p',
+        'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem',
+      });
+      expect(config.ssl, isTrue);
+      expect(config.caFile, '/run/secrets/db-ca.pem');
+    });
+
+    test('DW_DATABASE_CA_FILE with DW_DATABASE_SSL=false is a contradiction, '
+        'refused at parse time', () {
+      expect(
+        () => DwDatabaseConfig.fromEnvironment({
+          'DW_DATABASE_HOST': 'db',
+          'DW_DATABASE_NAME': 'app',
+          'DW_DATABASE_USER': 'u',
+          'DW_DATABASE_PASSWORD': 'p',
+          'DW_DATABASE_SSL': 'false',
+          'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem',
+        }),
+        throwsA(
+          isA<ArgumentError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('DW_DATABASE_CA_FILE'), contains('DW_DATABASE_SSL')),
+          ),
+        ),
+      );
+    });
+
+    test('DW_DATABASE_SSL explicitly "true" alongside a CA file is not a '
+        'contradiction', () {
+      final config = DwDatabaseConfig.fromEnvironment({
+        'DW_DATABASE_HOST': 'db',
+        'DW_DATABASE_NAME': 'app',
+        'DW_DATABASE_USER': 'u',
+        'DW_DATABASE_PASSWORD': 'p',
+        'DW_DATABASE_SSL': 'true',
+        'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem',
+      });
+      expect(config.caFile, '/run/secrets/db-ca.pem');
     });
 
     test('reports every problem at once', () {

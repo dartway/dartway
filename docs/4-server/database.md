@@ -338,6 +338,7 @@ real connection. `DwDatabaseConfig`:
 |---|---|---|
 | `host`, `port`, `name`, `user`, `password` | port `5432` | |
 | `ssl` | `true` | encrypted, certificate not verified |
+| `caFile` | unset | verifies the server's certificate against this CA instead (`verify-full`); refused together with `ssl: false` |
 | `maxConnections` | 10 | the ceiling of concurrent statements |
 | `applicationName` | `dartway` | |
 | `connectTimeout` | 15 s | also how long a caller waits for a free connection |
