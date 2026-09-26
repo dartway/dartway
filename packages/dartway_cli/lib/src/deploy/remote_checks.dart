@@ -178,7 +178,10 @@ Future<DwDeployVerdict> evaluateImagesResolve(
   }
   if (failed.isNotEmpty) {
     return DwDeployVerdict.fail(
-      failed.join(' | '),
+      [
+        ...failed,
+        if (unchecked.isNotEmpty) 'also could not ask: ${unchecked.join(' | ')}',
+      ].join(' | '),
       fix:
           'A pinned tag that no longer resolves has to be repinned in the '
           'framework itself (packages/dartway_cli/lib/src/deploy/stack.dart) — '

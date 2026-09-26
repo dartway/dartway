@@ -73,6 +73,13 @@ class DwStack {
   static const String nginxService = 'nginx';
   static const String certbotService = 'certbot';
 
+  /// The volume Compose names in the rendered `volumes:` key — read here and
+  /// nowhere else, so the renderer's compose file and [dataVolumeNames] (what
+  /// `checkDataVolumes` looks for on the server) can never name it two
+  /// different ways.
+  static const String postgresDataVolume = 'postgres_data';
+  static const String storageDataVolume = 'storage_data';
+
   /// Data-bearing images are pinned: a moved tag under a volume is a data
   /// directory the new binary may refuse, and that is not a failure a deploy
   /// should be able to cause by running on a later day. Postgres 17 is pinned
@@ -242,9 +249,9 @@ class DwStack {
   /// `docker volume ls` answers in and the form [checkDataVolumes] compares
   /// against.
   Set<String> get dataVolumeNames => {
-    '${target.projectName}_postgres_data',
+    '${target.projectName}_$postgresDataVolume',
     if (target.storage == DwStorageMode.bundled)
-      '${target.projectName}_storage_data',
+      '${target.projectName}_$storageDataVolume',
   };
 
   /// Names the store must not hold, because the compose file sets them.

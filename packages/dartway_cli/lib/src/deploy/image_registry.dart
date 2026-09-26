@@ -78,6 +78,18 @@ class DwImageRegistry {
       }
       switch (response.statusCode) {
         case 200:
+          // A genuine manifest answer names its own digest; a 200 without
+          // one is not a manifest — some page a misconfigured mirror or a
+          // captive portal served instead, which a followed redirect would
+          // otherwise have handed back indistinguishably from the real
+          // thing (redirects are not followed here for exactly this reason).
+          final digest = response.headers.value('docker-content-digest');
+          if (digest == null) {
+            return DwImageResolution.fail(
+              '${ref.registryHost} answered 200 with no Docker-Content-Digest '
+              '— not a manifest, so not treated as one',
+            );
+          }
           return DwImageResolution.ok('resolves at ${ref.registryHost}');
         case 404:
           return DwImageResolution.fail(
@@ -113,6 +125,28 @@ class DwImageRegistry {
       return DwImageResolution.transient(
         '${ref.registryHost} did not answer within $timeout',
       );
+    } on HandshakeException catch (error) {
+      return DwImageResolution.transient(
+        'TLS handshake with ${ref.registryHost} failed: ${error.message}',
+      );
+    } on TlsException catch (error) {
+      return DwImageResolution.transient(
+        'TLS with ${ref.registryHost} failed: ${error.message}',
+      );
+    } on HttpException catch (error) {
+      return DwImageResolution.transient(
+        '${ref.registryHost} sent a malformed HTTP response: '
+        '${error.message}',
+      );
+    } on FormatException catch (error) {
+      // Only reachable from decoding the token endpoint's body in [_token] —
+      // a registry that answers its own token realm with something that is
+      // not JSON is this machine's bad luck right now, not proof the image
+      // is gone.
+      return DwImageResolution.transient(
+        '${ref.registryHost}\'s token endpoint answered something this '
+        'check could not parse: ${error.message}',
+      );
     } finally {
       client.close(force: true);
     }
@@ -124,6 +158,11 @@ class DwImageRegistry {
     String? token,
   ) async {
     final request = await client.headUrl(url).timeout(timeout);
+    // Not followed: a redirect to whatever a misconfigured mirror or a
+    // captive portal serves at the far end would otherwise come back
+    // indistinguishable from a genuine 200 — the Docker-Content-Digest check
+    // in [resolve] is the second half of the same guard.
+    request.followRedirects = false;
     request.headers.set(
       'accept',
       'application/vnd.docker.distribution.manifest.v2+json, '
@@ -195,12 +234,14 @@ class DwImageResolution {
 /// `[registry-host/]repository:tag`, split the way `docker pull` reads it.
 ///
 /// `library/<name>` for a bare repository name is a rule of Docker Hub's own
-/// naming, not of the reference syntax: it applies only when there is no
-/// explicit registry host, because that is the one case a bare name means
-/// "the default registry's official image". A bare name after an explicit
-/// host — `mirror.gcr.io/postgres`, mirroring the exact reference the
-/// renderer put in the compose file (see [DwStack.pinnedImages]) — names a
-/// repository called `postgres` on that host, not `library/postgres`: no
+/// naming, not of the reference syntax: it applies when there is no explicit
+/// registry host, and equally when the host explicitly names Docker Hub
+/// itself (`docker.io`, `index.docker.io` — both normalised to the API's own
+/// `registry-1.docker.io`), because those are the cases a bare name means
+/// "the default registry's official image". A bare name after any *other*
+/// explicit host — `mirror.gcr.io/postgres`, mirroring the exact reference
+/// the renderer put in the compose file (see [DwStack.pinnedImages]) — names
+/// a repository called `postgres` on that host, not `library/postgres`: no
 /// other registry recognises the rewrite, and neither does Docker's own
 /// reference parser.
 class DwImageRef {
@@ -213,6 +254,12 @@ class DwImageRef {
   final String registryHost;
   final String repository;
   final String tag;
+
+    /// Hosts that name Docker Hub explicitly rather than by leaving the host
+  /// out — `docker pull docker.io/postgres` and `docker pull postgres` name
+  /// the same image, and both take the `library/` rule; only a *different*
+  /// registry does not.
+  static const _dockerHubHosts = {'docker.io', 'index.docker.io'};
 
   static DwImageRef parse(String image) {
     final firstSlash = image.indexOf('/');
@@ -227,14 +274,15 @@ class DwImageRef {
         rest = image.substring(firstSlash + 1);
       }
     }
+    final isDockerHub = explicitHost == null || _dockerHubHosts.contains(explicitHost);
     final tagColon = rest.lastIndexOf(':');
     final repoNoTag = tagColon == -1 ? rest : rest.substring(0, tagColon);
     final tag = tagColon == -1 ? 'latest' : rest.substring(tagColon + 1);
-    final repository = repoNoTag.contains('/') || explicitHost != null
+    final repository = repoNoTag.contains('/') || !isDockerHub
         ? repoNoTag
         : 'library/$repoNoTag';
     return DwImageRef(
-      registryHost: explicitHost ?? 'registry-1.docker.io',
+      registryHost: isDockerHub ? 'registry-1.docker.io' : explicitHost,
       repository: repository,
       tag: tag,
     );

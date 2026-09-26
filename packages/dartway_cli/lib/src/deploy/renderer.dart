@@ -95,7 +95,9 @@ class DwStackRenderer {
         '      POSTGRES_PASSWORD: ${_q(_secret(DwStack.databasePasswordKey))}',
       )
       ..writeln('    volumes:')
-      ..writeln('      - ${_q('postgres_data:/var/lib/postgresql/data')}')
+      ..writeln(
+        '      - ${_q('${DwStack.postgresDataVolume}:/var/lib/postgresql/data')}',
+      )
       ..writeln('    healthcheck:')
       ..writeln(
         '      test: ["CMD-SHELL", '
@@ -256,7 +258,7 @@ class DwStackRenderer {
         )
         ..writeln('      RUSTFS_CONSOLE_ENABLE: "false"')
         ..writeln('    volumes:')
-        ..writeln('      - "storage_data:/data"')
+        ..writeln('      - ${_q('${DwStack.storageDataVolume}:/data')}')
         ..writeln('    expose:')
         ..writeln('      - "9000"')
         ..writeln('    healthcheck:')
@@ -383,8 +385,8 @@ class DwStackRenderer {
 
     buffer
       ..writeln('volumes:')
-      ..writeln('  postgres_data:');
-    if (storage) buffer.writeln('  storage_data:');
+      ..writeln('  ${DwStack.postgresDataVolume}:');
+    if (storage) buffer.writeln('  ${DwStack.storageDataVolume}:');
     if (_tls) {
       buffer
         ..writeln('  certbot_data:')

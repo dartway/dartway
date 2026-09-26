@@ -65,13 +65,14 @@ local:
     expect(inspect()..run(), _reports(DwCheckType.devComposeDrifted, isEmpty));
   });
 
-  // The state the RustFS migration (#331) leaves a project in until it edits
-  // its own docker-compose.yaml by hand: nothing regenerates that file, so a
-  // service still named "minio" is a real, silent gap otherwise — the drift
-  // check would simply find no "storage" service to compare and say nothing.
+  // Generic, deliberately: this must catch a compose file with no "storage"
+  // service whatever it calls the service it has instead — the check holds
+  // no name of any storage product, past or present (zero-major: no code
+  // recognises the vendor a project used to run).
   test(
-    'a local compose still calling the service "minio" is named, not silently '
-    'skipped for having nothing to compare',
+    'the local environment expects storage credentials but the compose file '
+    'has no "storage" service — named, not silently skipped for having '
+    'nothing to compare',
     () {
       writeConfig(matchingLocal);
       writeCompose('''
@@ -84,27 +85,33 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_DB: shop
       POSTGRES_PASSWORD: 'dev_pw'
-  minio:
+  objectstore:
     ports:
       - '127.0.0.1:8100:9000'
     environment:
-      MINIO_ROOT_USER: dev
-      MINIO_ROOT_PASSWORD: 'dev_storage_pw'
+      SOME_OTHER_PRODUCTS_ACCESS_KEY: dev
+      SOME_OTHER_PRODUCTS_SECRET_KEY: 'dev_storage_pw'
 ''');
 
       final inspector = inspect()..run();
       expect(
         inspector.findingsOf(DwCheckType.devComposeDrifted).single,
-        allOf(contains('"minio"'), contains('storage')),
+        allOf(contains('"storage"'), contains('storage credentials')),
       );
     },
   );
 
   test(
-    'a project with neither "storage" nor "minio" locally has nothing to '
-    'report — it simply does not run file storage on this machine',
+    'a project whose local environment sets no storage credentials at all '
+    'has nothing to report, whatever the compose file does or does not have',
     () {
-      writeConfig(matchingLocal);
+      writeConfig('''
+local:
+  DW_DATABASE_PORT: 8090
+  DW_DATABASE_NAME: shop
+  DW_DATABASE_USER: postgres
+  DW_DATABASE_PASSWORD: dev_pw
+''');
       writeCompose('''
 services:
   postgres:

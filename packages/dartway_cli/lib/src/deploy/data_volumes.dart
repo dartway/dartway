@@ -49,11 +49,14 @@ class DwDataVolumeVerdict {
 /// run before it.
 ///
 /// **Fails** exactly when a missing expected volume and a stranger coexist —
-/// the exact shape of `storage: minio` becoming `storage: bundled` on a
-/// server that already has `<project>_minio_data`: the rendered stack would
-/// start `<project>_storage_data` empty, `storage-init` would write its
-/// probes into nothing, the outside checks would read those probes and pass,
-/// and every real object would 404 from then on, silently.
+/// the shape of any config change that renames a data-bearing service on a
+/// server that already ran the old name: the rendered stack would start the
+/// newly expected volume empty, its own init step would write its probes
+/// into nothing, the outside checks would read those probes and pass, and
+/// every real object would 404 from then on, silently. (The change that
+/// motivated this guard, dartway/dartway#331/D-094, is the framework's own
+/// data point — read there for the concrete example — not something this
+/// code knows by name.)
 DwDataVolumeVerdict judgeDataVolumes({
   required String volumeListing,
   required String projectPrefix,

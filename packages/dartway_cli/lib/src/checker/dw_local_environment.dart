@@ -138,20 +138,27 @@ class DwLocalEnvironmentInspector {
       portKey: 'DW_DATABASE_PORT',
     );
     final storage = services['storage'];
-    if (storage == null && services['minio'] != null) {
-      // Not silence: a project whose local compose still calls the service
-      // `minio` is exactly the state the RustFS migration (#331) leaves a
-      // project in until it edits this file by hand — nothing regenerates
-      // it. Reported once, by name, rather than the drift check simply
-      // finding nothing to compare and saying nothing about why.
-      _add(
-        DwCheckType.devComposeDrifted,
-        '$name still declares a service named "minio" — rename it to '
-        '"storage" and its environment to RUSTFS_ACCESS_KEY / '
-        'RUSTFS_SECRET_KEY (docs/migrations/2026-09-26-storage-minio-to-rustfs.md '
-        'covers the local docker-compose.yaml too), or this check has '
-        'nothing to compare it against.',
-      );
+    if (storage == null) {
+      // Not silence: a project whose `local` environment sets storage
+      // credentials but whose compose file has no `storage` service to
+      // create them for is a config a developer cannot actually run,
+      // whatever the compose file calls the service it used to have
+      // instead — this holds no name of any storage product, past or
+      // present, on purpose (a check naming one would need updating every
+      // time the framework's own bundled choice does).
+      final expectsStorage =
+          committed.containsKey('DW_STORAGE_ACCESS_KEY') ||
+          committed.containsKey('DW_STORAGE_SECRET_KEY');
+      if (expectsStorage) {
+        _add(
+          DwCheckType.devComposeDrifted,
+          '$name has no "storage" service, but ${DwLocalEnvironment.configPath} '
+          '> ${DwLocalEnvironment.section} sets storage credentials — nothing '
+          'creates them locally. If this project ran a differently named '
+          'storage service before, docs/migrations/ has the note for renaming '
+          'it.',
+        );
+      }
     } else {
       _compareService(
         storage,

@@ -321,6 +321,62 @@ esac
     });
   });
 
+  group('checkDataVolumes', () {
+    DwDeployRunner runnerWith(RecordingSsh ssh) => DwDeployRunner(
+      ssh: ssh,
+      stack: stackVariants()['bundled storage and a site']!,
+    );
+
+    test('exits 0 and says so when nothing is missing', () async {
+      final ssh = RecordingSsh([
+        (
+          'docker volume ls',
+          const DwSshResult(
+            exitCode: 0,
+            stdout: 'shop_postgres_data\nshop_storage_data\n',
+            stderr: '',
+          ),
+        ),
+      ]);
+      final result = await runnerWith(ssh).checkDataVolumes();
+      expect(result.ok, isTrue);
+      expect(result.stdout, contains('shop_storage_data'));
+    });
+
+    // The regression this exists for: `run` used to have no volume guard at
+    // all, so a server carrying the old `shop_minio_data` (a stranger to the
+    // renamed stack) with no `shop_storage_data` yet would start the latter
+    // empty. This must exit non-zero, and say why, or every check above it
+    // could be quietly removed without a test noticing.
+    test('exits non-zero and names both volumes when a rename is unsafe', () async {
+      final ssh = RecordingSsh([
+        (
+          'docker volume ls',
+          const DwSshResult(
+            exitCode: 0,
+            stdout: 'shop_postgres_data\nshop_minio_data\n',
+            stderr: '',
+          ),
+        ),
+      ]);
+      final result = await runnerWith(ssh).checkDataVolumes();
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('shop_minio_data'));
+      expect(result.stderr, contains('shop_storage_data'));
+    });
+
+    test('exits non-zero when the server cannot even be asked', () async {
+      final ssh = RecordingSsh([
+        (
+          'docker volume ls',
+          const DwSshResult(exitCode: 1, stdout: '', stderr: 'permission denied'),
+        ),
+      ]);
+      final result = await runnerWith(ssh).checkDataVolumes();
+      expect(result.ok, isFalse);
+    });
+  });
+
   group('the upstream guard before the proxy restart', () {
     test(
       'asks the server for the applied stack and the rendered config',

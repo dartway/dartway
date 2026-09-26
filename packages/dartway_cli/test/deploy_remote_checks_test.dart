@@ -25,7 +25,15 @@ class _PerRepoRegistry {
       final repository = segments
           .sublist(1, segments.length - 2)
           .join('/');
-      request.response.statusCode = statusByRepository[repository] ?? 200;
+      final status = statusByRepository[repository] ?? 200;
+      if (status == 200) {
+        // A real registry names its own digest; resolve() requires it.
+        request.response.headers.set(
+          'docker-content-digest',
+          'sha256:${'0' * 64}',
+        );
+      }
+      request.response.statusCode = status;
       await request.response.close();
     });
   }
@@ -90,7 +98,8 @@ void main() {
     test(
       'a real failure on one image outweighs a transient one on another — '
       'the deploy is refused, not merely skipped, when anything is '
-      'definitely wrong',
+      'definitely wrong, and both are named (L1: a transient result beside '
+      'a definite one must not go unmentioned)',
       () async {
         fake.statusByRepository = {
           'library/postgres': 404,
@@ -100,6 +109,14 @@ void main() {
         expect(verdict.passed, isFalse);
         expect(verdict.skipped, isFalse);
         expect(verdict.detail, contains('404'));
+        expect(verdict.detail, contains('Postgres'));
+        expect(
+          verdict.detail,
+          contains('nginx'),
+          reason: 'the transient nginx result must still be visible, not '
+              'silently dropped because a definite failure took priority',
+        );
+        expect(verdict.detail, contains('503'));
       },
     );
   });

@@ -110,10 +110,11 @@ local:
 #   #              — a presigned upload is already the whole authorization,
 #   #              so a header allow-list guards nothing an unsigned request
 #   #              could not already be refused for). Every deploy creates
-#   #              <project>-public (anonymous
-#   #              s3:GetObject, no listing) and <project>-private (nothing
-#   #              unsigned), and the server gets both names and
-#   #              DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<project>-public.
+#   #              two buckets named after the server package, not this
+#   #              checkout — <server_package>-public (anonymous
+#   #              s3:GetObject, no listing) and <server_package>-private
+#   #              (nothing unsigned) — and the server gets both names and
+#   #              DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<server_package>-public.
 #   #              The outside check reads a probe object from both without
 #   #              credentials: public 200, private refused, neither listed.
 #   #   external — an S3-compatible storage somebody else runs. Deliver

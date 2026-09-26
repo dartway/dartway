@@ -37,6 +37,49 @@ String _location(String block, String spec) {
 }
 
 void main() {
+  group('dataVolumeNames (what the data-volume guard looks for)', () {
+    test('always postgres, prefixed with the project', () {
+      expect(stackFrom().dataVolumeNames, {'shop_postgres_data'});
+    });
+
+    test('bundled storage adds the storage volume, same prefix', () {
+      final stack = stackVariants()['bundled storage and a site']!;
+      expect(stack.dataVolumeNames, {'shop_postgres_data', 'shop_storage_data'});
+    });
+
+    test('external storage adds no volume of its own', () {
+      final stack =
+          stackVariants()['external storage, external site, files']!;
+      expect(stack.dataVolumeNames, {'shop_postgres_data'});
+    });
+
+    // The regression this guards: the renderer's compose file and this list
+    // must name the exact same volume, or the data-volume guard could pass
+    // while looking for a name the rendered stack never creates.
+    test('exactly the volume names the rendered compose file declares', () {
+      final stack = stackVariants()['bundled storage and a site']!;
+      final compose = loadYaml(
+        DwStackRenderer(stack: stack).composeFile,
+      ) as YamlMap;
+      final declaredVolumes = (compose['volumes'] as YamlMap).keys
+          .map((key) => '$key')
+          .toSet();
+      // Certbot's own volumes are declared too (this variant is TLS), and
+      // deliberately absent from dataVolumeNames — a certificate lineage
+      // reissues itself, so it is not "data" the guard protects.
+      expect(
+        declaredVolumes,
+        containsAll([DwStack.postgresDataVolume, DwStack.storageDataVolume]),
+      );
+      expect(
+        stack.dataVolumeNames,
+        {DwStack.postgresDataVolume, DwStack.storageDataVolume}.map(
+          (v) => '${stack.target.projectName}_$v',
+        ),
+      );
+    });
+  });
+
   group('pinned images (what deploy check resolves against a registry)', () {
     test('no storage: Postgres, nginx and certbot, nothing storage-shaped', () {
       final images = stackFrom().pinnedImages;

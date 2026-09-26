@@ -14,16 +14,26 @@ import '../deploy/stack.dart';
 /// Idempotent throughout: every step either finds what it needs or creates it,
 /// and none replaces a value that already exists. Running it against a live
 /// server is the supported way to pick up a change to the rendered files.
-Future<int> runSetup(DwStack stack, ArgResults results) async {
+///
+/// [connection] is a real connection to [stack.target.host] unless given —
+/// tests pass a fake so the whole function runs against recorded answers,
+/// never a real `ssh` binary.
+Future<int> runSetup(
+  DwStack stack,
+  ArgResults results, {
+  DwSshRunner? connection,
+}) async {
   final projectRoot = Directory.current;
   final target = stack.target;
   final environment = target.environment;
 
-  final ssh = DwSshRunner(
-    host: target.host,
-    user: results.option('as') ?? target.sshUser,
-    identityFile: results.option('identity'),
-  );
+  final ssh =
+      connection ??
+      DwSshRunner(
+        host: target.host,
+        user: results.option('as') ?? target.sshUser,
+        identityFile: results.option('identity'),
+      );
   final store = DwSecretStore(ssh: ssh, target: target);
   final renderer = DwStackRenderer(stack: stack, projectRoot: projectRoot);
 
