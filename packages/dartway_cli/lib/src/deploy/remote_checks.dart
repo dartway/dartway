@@ -417,7 +417,8 @@ Map<String, String> dwServiceMounts(String configuration, String service) {
 /// database: wrong credentials and a server that does not actually speak TLS,
 /// so this asks a real one-off Postgres client (the pinned [DwStack
 /// .postgresImage], never built or run otherwise in `database: external`) to
-/// authenticate and run a query with `sslmode=require`.
+/// authenticate and run a query — with the same `sslmode` the server itself
+/// will connect with (see [dwDatabaseReachabilityScript]).
 Future<DwDeployVerdict> _checkDatabaseReachable(DwDeployContext context) async {
   if (context.target.database != DwDatabaseMode.external) {
     return const DwDeployVerdict.skip(
@@ -443,11 +444,15 @@ Future<DwDeployVerdict> _checkDatabaseReachable(DwDeployContext context) async {
     fix:
         'Deliver DW_DATABASE_HOST, _PORT, _NAME, _USER and _PASSWORD with '
         '"dartway secret set <KEY> --env ${context.target.environment}" — the '
-        'exact values a managed provider hands out. Then check its firewall '
-        "admits this host (trusted sources / the droplet's address) and that "
-        'it requires TLS: this check always connects with sslmode=require, '
-        'and does not yet verify the server\'s certificate '
-        '(dartway/dartway, "verify-full with a CA file" is a separate issue).',
+        'exact values a managed provider hands out; DW_DATABASE_SSL and '
+        '_MAX_CONNECTIONS, if set, must be exactly true/false and a positive '
+        'integer, the same as the server itself requires. Then check the '
+        "provider's firewall admits this host (trusted sources / the "
+        "droplet's address) and that it offers TLS unless DW_DATABASE_SSL is "
+        "explicitly false — this check connects with the sslmode the server "
+        "itself will use, and does not yet verify the server's certificate "
+        '(dartway/dartway#342, "verify-full with a CA file", is a separate '
+        'issue).',
   );
 }
 
@@ -459,6 +464,16 @@ Future<DwDeployVerdict> _checkDatabaseReachable(DwDeployContext context) async {
 /// `ps` could show: they are read out of the store *there*, written to a
 /// `chmod 600` temporary file in Docker's `--env-file` form (`PG*`, which
 /// `psql` reads on its own), handed to `docker run --env-file`, and removed.
+///
+/// Every value the server itself would parse is validated exactly as
+/// `DwDatabaseConfig.fromEnvironment` parses it, before anything connects: a
+/// malformed `DW_DATABASE_PORT`, `_SSL` or `_MAX_CONNECTIONS` is a check
+/// failure naming the bad value, not a connection attempt that fails for an
+/// unrelated reason, or — worse — a pass on a config that would crash the
+/// server at startup. `DW_DATABASE_SSL` (default `true`) picks the `sslmode`
+/// this check itself connects with, `require` or `disable`, so what is tested
+/// is the connection the server will actually make.
+///
 /// [network] is read by nothing this ships — it exists so a test can attach
 /// the throwaway client to the same Docker network as a fake database instead
 /// of reaching across the loopback interface, which a container cannot do.
@@ -468,16 +483,6 @@ String dwDatabaseReachabilityScript({
   String environment = '<env>',
   String? network,
 }) {
-  const pgNameOf = {
-    'HOST': 'PGHOST',
-    'PORT': 'PGPORT',
-    'NAME': 'PGDATABASE',
-    'USER': 'PGUSER',
-    'PASSWORD': 'PGPASSWORD',
-  };
-  final gets = pgNameOf.entries
-      .map((entry) => 'dw_get DW_DATABASE_${entry.key} ${entry.value}')
-      .join('\n');
   final networkFlag = network == null ? '' : "--network '$network' ";
   return '''
 set -e
@@ -487,26 +492,79 @@ if [ ! -s "\$store" ]; then
   echo "ERROR: no secret store at \$store. Run: dartway secret init --env $environment" >&2
   exit 1
 fi
-dw_env=\$(mktemp)
-trap 'rm -f "\$dw_env"' EXIT
-dw_missing=""
-dw_get() {
-  key=\$1
-  target=\$2
-  line=\$(grep -E "^\${key}='" "\$store" || true)
-  if [ -z "\$line" ]; then dw_missing="\$dw_missing \$key"; return; fi
-  value=\$(printf '%s' "\$line" | sed -e "s/^\${key}='//" -e "s/'\\\$//")
-  printf '%s\\n' "\$target=\$value" >> "\$dw_env"
+
+dw_read() {
+  dw_line=\$(grep -E "^\$1='" "\$store" || true)
+  if [ -z "\$dw_line" ]; then return; fi
+  printf '%s' "\$dw_line" | sed -e "s/^\$1='//" -e "s/'\\\$//"
 }
-$gets
+
+dw_is_positive_int() {
+  case "\$1" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "\$1" -gt 0 ]
+}
+
+dw_host=\$(dw_read DW_DATABASE_HOST)
+dw_port=\$(dw_read DW_DATABASE_PORT)
+dw_name=\$(dw_read DW_DATABASE_NAME)
+dw_user=\$(dw_read DW_DATABASE_USER)
+dw_password=\$(dw_read DW_DATABASE_PASSWORD)
+dw_ssl=\$(dw_read DW_DATABASE_SSL)
+dw_max_connections=\$(dw_read DW_DATABASE_MAX_CONNECTIONS)
+
+dw_missing=""
+if [ -z "\$dw_host" ]; then dw_missing="\$dw_missing DW_DATABASE_HOST"; fi
+if [ -z "\$dw_port" ]; then dw_missing="\$dw_missing DW_DATABASE_PORT"; fi
+if [ -z "\$dw_name" ]; then dw_missing="\$dw_missing DW_DATABASE_NAME"; fi
+if [ -z "\$dw_user" ]; then dw_missing="\$dw_missing DW_DATABASE_USER"; fi
+if [ -z "\$dw_password" ]; then dw_missing="\$dw_missing DW_DATABASE_PASSWORD"; fi
 if [ -n "\$dw_missing" ]; then
   echo "ERROR: missing in the secret store:\$dw_missing" >&2
   exit 1
 fi
+
+# The same validation `DwDatabaseConfig.fromEnvironment` applies on the
+# server: a positive integer for PORT and MAX_CONNECTIONS, true/false
+# (case-insensitively — the server lower-cases before comparing) for SSL.
+dw_invalid=""
+if ! dw_is_positive_int "\$dw_port"; then
+  dw_invalid="\$dw_invalid DW_DATABASE_PORT=[\$dw_port]-must-be-a-positive-integer"
+fi
+dw_ssl_lower=""
+if [ -n "\$dw_ssl" ]; then
+  dw_ssl_lower=\$(printf '%s' "\$dw_ssl" | tr 'A-Z' 'a-z')
+  case "\$dw_ssl_lower" in
+    true|false) ;;
+    *) dw_invalid="\$dw_invalid DW_DATABASE_SSL=[\$dw_ssl]-must-be-true-or-false" ;;
+  esac
+fi
+if [ -n "\$dw_max_connections" ]; then
+  if ! dw_is_positive_int "\$dw_max_connections"; then
+    dw_invalid="\$dw_invalid DW_DATABASE_MAX_CONNECTIONS=[\$dw_max_connections]-must-be-a-positive-integer"
+  fi
+fi
+if [ -n "\$dw_invalid" ]; then
+  echo "ERROR: invalid in the secret store:\$dw_invalid" >&2
+  exit 1
+fi
+
+# absent or true -> require (the server's own default); false -> disable.
+dw_sslmode=require
+if [ "\$dw_ssl_lower" = "false" ]; then dw_sslmode=disable; fi
+
+dw_env=\$(mktemp)
+trap 'rm -f "\$dw_env"' EXIT
 {
-  echo "PGSSLMODE=require"
-  echo "PGCONNECT_TIMEOUT=10"
-} >> "\$dw_env"
+  printf 'PGHOST=%s\\n' "\$dw_host"
+  printf 'PGPORT=%s\\n' "\$dw_port"
+  printf 'PGDATABASE=%s\\n' "\$dw_name"
+  printf 'PGUSER=%s\\n' "\$dw_user"
+  printf 'PGPASSWORD=%s\\n' "\$dw_password"
+  printf 'PGSSLMODE=%s\\n' "\$dw_sslmode"
+  printf 'PGCONNECT_TIMEOUT=10\\n'
+} > "\$dw_env"
 chmod 600 "\$dw_env"
 docker run --rm ${networkFlag}--env-file "\$dw_env" '$image' psql -tAc 'select 1' 2>&1
 ''';
@@ -524,11 +582,11 @@ class DwDatabaseReachability {
 }
 
 /// Classifies [result] of running [dwDatabaseReachabilityScript]: connected
-/// and queried, or one of the reasons a managed database is unreachable —
-/// DNS, refused, authentication, or TLS not being offered though required.
-/// Falls back to the raw output rather than guessing when the message does
-/// not match a known shape, so a failure is never silently reported as one it
-/// is not.
+/// and queried, or one of the reasons a managed database is unreachable — a
+/// malformed stored value, DNS, refused, a timeout, authentication, or TLS
+/// not being offered though required. Falls back to the raw output rather
+/// than guessing when the message does not match a known shape, so a failure
+/// is never silently reported as one it is not.
 DwDatabaseReachability dwJudgeDatabaseReachable(DwSshResult result) {
   final output = '${result.stdout}\n${result.stderr}';
   final lastLine = output
@@ -539,12 +597,15 @@ DwDatabaseReachability dwJudgeDatabaseReachable(DwSshResult result) {
       .lastOrNull;
   if (result.ok && lastLine == '1') {
     return const DwDatabaseReachability.ok(
-      'connected and authenticated with sslmode=require',
+      'connected and authenticated with the configured sslmode',
     );
   }
   final lower = output.toLowerCase();
   final String reason;
-  if (lower.contains('missing in the secret store') ||
+  if (lower.contains('invalid in the secret store')) {
+    reason = 'config — a stored value the server itself would refuse to '
+        'parse';
+  } else if (lower.contains('missing in the secret store') ||
       lower.contains('no secret store at')) {
     reason = 'not configured';
   } else if (lower.contains('could not translate host name') ||

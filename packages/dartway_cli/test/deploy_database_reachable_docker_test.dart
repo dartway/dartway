@@ -220,4 +220,26 @@ void main() {
       expect(verdict.detail.toLowerCase(), contains('tls'));
     },
   );
+
+  test(
+    'DW_DATABASE_SSL=false against a database with no TLS at all connects — '
+    'the check honours it exactly as the server does, disable not require',
+    () async {
+      final store = storeFile('ssl-false', {
+        'DW_DATABASE_HOST': plainAlias,
+        'DW_DATABASE_PORT': '5432',
+        'DW_DATABASE_NAME': dbName,
+        'DW_DATABASE_USER': dbUser,
+        'DW_DATABASE_PASSWORD': plain.password,
+        'DW_DATABASE_SSL': 'false',
+      });
+      final result = await probe(store);
+      final verdict = dwJudgeDatabaseReachable(result);
+      expect(
+        verdict.ok,
+        isTrue,
+        reason: '${result.stdout}\n${result.stderr}\n${verdict.detail}',
+      );
+    },
+  );
 }

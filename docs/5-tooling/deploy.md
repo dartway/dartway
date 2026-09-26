@@ -154,14 +154,53 @@ set --env <environment>`:
 `deploy check` gains `database-reachable` (below): on the deployment host over SSH, because a
 managed provider's firewall usually trusts that host's address and not the maintainer's — a
 throwaway, pinned Postgres client (never built or run otherwise with `database: external`) attempts a
-real connection with `sslmode=require` and the stored credentials, and reports why when it fails
-(DNS, refused, authentication, or the server not offering TLS). A bare TCP probe would pass while the
-password or the certificate is still wrong.
+real connection with the same `sslmode` the server itself will use (`require` unless `DW_DATABASE_SSL`
+is explicitly `false`, which asks for `disable`), and reports why when it fails (a malformed stored
+value, DNS, refused, a timeout, authentication, or the server not offering TLS). A bare TCP probe
+would pass while the password or the certificate is still wrong. `DW_DATABASE_PORT`, `_SSL` and
+`_MAX_CONNECTIONS` are validated exactly as the server parses them — a positive integer, and `true`
+or `false` — before anything connects, so a value that would crash the server at startup is a check
+failure naming it, not a pass.
 
 `sslmode=verify-full` with the provider's CA file — closing the one gap `require` leaves, a network
 position presenting its own certificate unchallenged — is not built yet: dartway/dartway#342.
 
 An existing config with no `database` key keeps deploying `bundled`, exactly as before.
+
+### DigitalOcean Managed Postgres
+
+- **Connect on the direct port, not the connection pooler.** DigitalOcean publishes two ports: the
+  direct one (usually `25060`) and PgBouncer in transaction mode (usually `25061`). **Use the direct
+  port** — `DW_DATABASE_PORT: 25060`. The framework needs a session, not a transaction: the server
+  holds a session-scoped `LISTEN` for live updates (`DwPostgresDatabase`), takes a session
+  `pg_advisory_lock` while migrating (`DwMigrationRunner`) so two servers never migrate at once, and
+  caches prepared statements per connection. Behind a transaction-mode pooler `LISTEN` silently
+  delivers nothing (no error, no update — a class of bug that surfaces as "the app doesn't refresh"
+  weeks later), the migration lock does not hold across the pool's own transactions, and prepared
+  statements are meaningless once a "connection" is a new backend on every transaction.
+- The database name is usually `defaultdb` (`DW_DATABASE_NAME`), the default user `doadmin` or a role
+  created for this project (`DW_DATABASE_USER`).
+- Add the droplet's address as a **trusted source** in the database's firewall — that is what
+  `database-reachable` needs already admitted before it can report anything but a timeout.
+
+### Sizing connections
+
+One server process holds `DW_DATABASE_MAX_CONNECTIONS` (default 10) plus one more for the session
+`LISTEN` above — so a plan's usable connection count has to clear `MAX_CONNECTIONS + 1`, not just
+`MAX_CONNECTIONS`. DigitalOcean's smallest Managed Postgres plan allows on the order of 22 usable
+connections in total (the rest are the provider's own); size `DW_DATABASE_MAX_CONNECTIONS` to what the
+plan actually grants this one server, with room for a second server during a deploy's brief overlap
+and anything else that connects (a migration run, `psql` by hand).
+
+### Switching an existing environment from bundled to external
+
+Moves no data. The server that starts against the newly declared external database starts on an
+empty one — its migrations create the schema, not the rows a bundled Postgres was holding. Move the
+data yourself first (a `pg_dump`/`pg_restore` between the two, out of scope here) before pointing
+`deploy/config.yaml` at the external one. A deploy's own rollback — starting the previous server image
+again after a failure — uses whatever `.env` the store renders at the time, which after the switch is
+the external database's, not the bundled one's: there is no bundled Postgres left running to fall back
+to once the config has moved.
 
 ## Storage: bundled or someone else's
 
@@ -368,7 +407,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `docker-available` | error | Docker Compose is usable by the deployment user |
 | `runtime-secrets` | error | Every required secret is in the server store with a value, and nothing reserved is |
 | `secret-files` | error | Every `requires.files` entry is delivered **and** mounted into the server container, read from the configuration Compose will actually run |
-| `database-reachable` | error | With `database: external`: a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with `sslmode=require` and runs a query — a real authenticated, encrypted connection, not a bare TCP probe. A failure names why: DNS, refused, authentication, or the server not offering TLS. Skipped with `database: bundled` |
+| `database-reachable` | error | With `database: external`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS` are validated exactly as the server parses them, then a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with the same `sslmode` the server will use and runs a query — a real authenticated, encrypted connection, not a bare TCP probe. A failure names why: a malformed stored value, DNS, refused, a timeout, authentication, or the server not offering TLS. Skipped with `database: bundled` |
 | `secrets-match-local` | warning | The server store and `deploy/secrets.yaml` hold the same key names |
 | `outside` | error | The same outside probes `run` ends with, against whatever is deployed now; runs even when SSH fails |
 

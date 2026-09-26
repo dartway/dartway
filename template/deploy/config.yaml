@@ -106,11 +106,19 @@ local:
 #   # and _PASSWORD (all required — a managed provider names its own, none of
 #   # them derivable the way the bundled container's are), DW_DATABASE_SSL
 #   # (optional, default true) and DW_DATABASE_MAX_CONNECTIONS (optional,
-#   # default 10 — the pool ceiling; managed plans often cap total
-#   # connections in the tens, so raise it only after checking the plan's
-#   # limit). `deploy check` attempts a real connection with
-#   # sslmode=require from the deployment host, and names why when it fails
-#   # (DNS, refused, authentication, or the server not offering TLS).
+#   # default 10 — the pool ceiling; one server holds this many plus one more
+#   # for its session LISTEN, so size it to what the plan actually grants).
+#   # `deploy check` validates these the same way the server parses them,
+#   # then attempts a real connection with the same sslmode the server will
+#   # use, and names why when it fails (a bad stored value, DNS, refused, a
+#   # timeout, authentication, or the server not offering TLS).
+#   #
+#   # DigitalOcean Managed Postgres: use the DIRECT port (usually 25060), not
+#   # the PgBouncer connection pooler (25061, transaction mode) — the server
+#   # holds a session LISTEN and a session advisory lock while migrating,
+#   # both of which a transaction pool silently breaks. Database usually
+#   # `defaultdb`, user `doadmin` or one created for this project. Add the
+#   # droplet's address as a trusted source in the database's firewall.
 #   database: bundled
 #
 #   # Optional. File storage for uploads (presigned direct uploads, D-034), in

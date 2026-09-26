@@ -455,6 +455,25 @@ void main() {
       );
     });
 
+    // A managed provider's password is its own credential, delivered with
+    // `dartway secret set` — inventing one here would never be the value
+    // that actually opens the database.
+    test(
+      'external database: the password is delivered, never generated',
+      () {
+        final stack = stackFrom(extra: '  database: external\n');
+        expect(
+          stack.generatedSecrets.keys,
+          isNot(contains(DwStack.databasePasswordKey)),
+        );
+        expect(
+          stackFrom().generatedSecrets.keys,
+          contains(DwStack.databasePasswordKey),
+          reason: 'bundled must keep generating it, as before',
+        );
+      },
+    );
+
     test('a fully external stack (database and storage both external, plain '
         'HTTP) renders no volumes at all', () {
       final stack = stackFrom(
