@@ -151,12 +151,30 @@ docker compose version >/dev/null
     return 1;
   }
 
+  // A cloud image can already ship a system group named like the deploy
+  // user — DigitalOcean's Ubuntu 24.04 image has an empty `admin` group —
+  // and plain `adduser` refuses to create a same-named group over it (#328).
+  // Reusing the group with `--ingroup` fixes the ordinary case, but not
+  // blindly: Debian's stock `/etc/sudoers` grants `%admin` (and `%sudo`)
+  // full root, so joining a colliding group that a sudoers rule names would
+  // silently hand the "unprivileged" deploy user a path to root. Refuse
+  // instead and let the operator pick a name that does not collide.
   if (!await step(
     'Deployment user',
     () => ssh.runPrivileged('''
 set -e
-id -u '${target.deployUser}' >/dev/null 2>&1 || \\
+if id -u '${target.deployUser}' >/dev/null 2>&1; then
+  : # already provisioned — idempotent re-run
+elif getent group '${target.deployUser}' >/dev/null 2>&1; then
+  if grep -Eq '^[[:space:]]*%${target.deployUser}[[:space:]]' \\
+      /etc/sudoers /etc/sudoers.d/* 2>/dev/null; then
+    echo "fatal: group '${target.deployUser}' already exists and is granted sudo by /etc/sudoers (%${target.deployUser}) - pick a deploy_user in deploy/config.yaml that does not collide with it" >&2
+    exit 1
+  fi
+  adduser --disabled-password --gecos "" --ingroup '${target.deployUser}' '${target.deployUser}'
+else
   adduser --disabled-password --gecos "" '${target.deployUser}'
+fi
 usermod -aG docker '${target.deployUser}'
 '''),
   )) {

@@ -33,6 +33,13 @@
   serve every real file as a 404 from then on. Passes once the expected volume exists, whatever else
   is still on the server beside it: an old volume from before the change is the rollback copy, and
   neither command asks for it to be removed before passing.
+- **`deploy setup` no longer fails the "Deployment user" step when a group named like `deploy_user`
+  already exists** (#328). DigitalOcean's Ubuntu 24.04 image ships an empty system group `admin`
+  (no user); the plain `adduser` setup ran refuses to create a same-named group over it. Setup now
+  reuses the existing group with `--ingroup`, unless the group is one Debian and Ubuntu's stock
+  `/etc/sudoers` already grants sudo to (`%admin`, `%sudo`) — joining one of those would hand the
+  "unprivileged" deploy user a path to root, so setup refuses instead and asks for a `deploy_user`
+  that does not collide with it.
 
 ## 0.12.0
 

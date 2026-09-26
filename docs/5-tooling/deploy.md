@@ -63,6 +63,12 @@ Names are derived, not configured. The project name is the last segment of `repo
 the checkout is `/home/<deploy_user>/<project>`. The database and its role are named after the
 server package without `_server`, and the storage buckets after the same prefix with dashes.
 
+A cloud image can already carry a system group named like `deploy_user` — DigitalOcean's Ubuntu
+24.04 image ships an empty `admin` group, for instance (#328). Setup reuses that group when the
+user does not exist yet, unless the group is one Debian and Ubuntu's stock `/etc/sudoers` grants
+sudo to (`%admin`, `%sudo`): joining one of those would hand the "unprivileged" deploy user a path
+to root, so setup refuses instead and asks for a `deploy_user` that does not collide with it.
+
 ## Three hosts, one server process
 
 ```
