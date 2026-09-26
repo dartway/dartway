@@ -324,7 +324,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `local-secrets-untracked` | error | `deploy/secrets.yaml` is not tracked by Git |
 | `local-secrets-cover-environment` | warning | `deploy/secrets.yaml` holds every required secret for the environment (reported by `check` only; `run` does not evaluate it) |
 | `dns-public-hosts` | error | Every served host resolves to the deployment host — a mismatch otherwise burns the Let's Encrypt rate limit |
-| `images-resolve` | error | Every pinned base image (Postgres, nginx, certbot, and with `storage: bundled` the storage and its init image) resolves against its own registry — a manifest HEAD with the anonymous token the registry's challenge asks for, so a vanished tag is caught here rather than mid-`run`, at the step that starts it |
+| `images-resolve` | error | Every pinned base image (Postgres, nginx, certbot, and with `storage: bundled` the storage and its init image), resolved through `registry_mirror` exactly as the renderer resolves them into the compose file — against its own registry, a manifest HEAD with the anonymous token the registry's challenge asks for, so a vanished tag is caught here rather than mid-`run`, at the step that starts it. A transient answer (no route, a timeout, a rate limit, a registry's own 5xx) is a skip, not a failure: this machine's network is not a fact about the image |
 | `ssh-reachable` | error | Key-based SSH works; when it fails the other server checks are skipped |
 | `deploy-user` | error | The deployment user exists |
 | `docker-available` | error | Docker Compose is usable by the deployment user |
