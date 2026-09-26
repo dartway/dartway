@@ -68,6 +68,7 @@ class DwStackRenderer {
       'dartway deploy renders it from the secret store}';
 
   String get composeFile {
+    final database = _target.database == DwDatabaseMode.bundled;
     final storage = _target.storage == DwStorageMode.bundled;
     final site = _target.site;
     final buffer = StringBuffer()
@@ -84,29 +85,31 @@ class DwStackRenderer {
       ..writeln('services:');
 
     // --- postgres
-    buffer
-      ..writeln('  ${DwStack.postgresService}:')
-      ..writeln('    image: ${_q(_image(DwStack.postgresImage))}')
-      ..writeln('    restart: unless-stopped')
-      ..writeln('    environment:')
-      ..writeln('      POSTGRES_DB: ${_q(stack.databaseName)}')
-      ..writeln('      POSTGRES_USER: ${_q(stack.databaseName)}')
-      ..writeln(
-        '      POSTGRES_PASSWORD: ${_q(_secret(DwStack.databasePasswordKey))}',
-      )
-      ..writeln('    volumes:')
-      ..writeln(
-        '      - ${_q('${DwStack.postgresDataVolume}:/var/lib/postgresql/data')}',
-      )
-      ..writeln('    healthcheck:')
-      ..writeln(
-        '      test: ["CMD-SHELL", '
-        '${_q('pg_isready -U ${stack.databaseName} -d ${stack.databaseName}')}]',
-      )
-      ..writeln('      interval: 5s')
-      ..writeln('      timeout: 5s')
-      ..writeln('      retries: 30')
-      ..writeln();
+    if (database) {
+      buffer
+        ..writeln('  ${DwStack.postgresService}:')
+        ..writeln('    image: ${_q(_image(DwStack.postgresImage))}')
+        ..writeln('    restart: unless-stopped')
+        ..writeln('    environment:')
+        ..writeln('      POSTGRES_DB: ${_q(stack.databaseName)}')
+        ..writeln('      POSTGRES_USER: ${_q(stack.databaseName)}')
+        ..writeln(
+          '      POSTGRES_PASSWORD: ${_q(_secret(DwStack.databasePasswordKey))}',
+        )
+        ..writeln('    volumes:')
+        ..writeln(
+          '      - ${_q('${DwStack.postgresDataVolume}:/var/lib/postgresql/data')}',
+        )
+        ..writeln('    healthcheck:')
+        ..writeln(
+          '      test: ["CMD-SHELL", '
+          '${_q('pg_isready -U ${stack.databaseName} -d ${stack.databaseName}')}]',
+        )
+        ..writeln('      interval: 5s')
+        ..writeln('      timeout: 5s')
+        ..writeln('      retries: 30')
+        ..writeln();
+    }
 
     // --- server
     buffer
@@ -185,10 +188,13 @@ class DwStackRenderer {
         );
       }
     }
-    buffer
-      ..writeln('    depends_on:')
-      ..writeln('      ${DwStack.postgresService}:')
-      ..writeln('        condition: service_healthy');
+    final dependsOnAny = database || storage;
+    if (dependsOnAny) buffer.writeln('    depends_on:');
+    if (database) {
+      buffer
+        ..writeln('      ${DwStack.postgresService}:')
+        ..writeln('        condition: service_healthy');
+    }
     if (storage) {
       buffer
         ..writeln('      ${DwStack.storageInitService}:')
@@ -383,9 +389,9 @@ class DwStackRenderer {
         ..writeln();
     }
 
-    buffer
-      ..writeln('volumes:')
-      ..writeln('  ${DwStack.postgresDataVolume}:');
+    final anyVolume = database || storage || _tls;
+    if (anyVolume) buffer.writeln('volumes:');
+    if (database) buffer.writeln('  ${DwStack.postgresDataVolume}:');
     if (storage) buffer.writeln('  ${DwStack.storageDataVolume}:');
     if (_tls) {
       buffer
