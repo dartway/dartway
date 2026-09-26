@@ -21,7 +21,8 @@ void main() {
     final socket = await Socket.connect('127.0.0.1', harness().server.port);
     addTearDown(socket.destroy);
     socket.write(
-      'GET ${harness().server.liveEndpoint.path}?protocol=1 HTTP/1.1\r\n'
+      'GET ${harness().server.liveEndpoint.path}?protocol=$dwProtocolVersion '
+      'HTTP/1.1\r\n'
       'Host: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
       'Sec-WebSocket-Version: 13\r\n'
       'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n',
