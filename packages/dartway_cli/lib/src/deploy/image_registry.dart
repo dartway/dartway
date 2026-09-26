@@ -48,7 +48,14 @@ class DwImageRegistry {
   }
 
   /// Resolves [image] against the Docker Registry HTTP API v2.
-  Future<({bool ok, String detail})> resolve(String image) async {
+  ///
+  /// [DwImageResolution.transient] separates "the registry could not be
+  /// asked right now" (no route, a timeout, a rate limit, a 5xx of its own)
+  /// from "the registry answered, and the answer is no" (401 it cannot
+  /// satisfy, 404) — the first is a network hiccup this machine had, not a
+  /// fact about the image, and `deploy check` reports it as a note rather
+  /// than failing the deploy over its own flaky connection.
+  Future<DwImageResolution> resolve(String image) async {
     final ref = DwImageRef.parse(image);
     final client = _client();
     try {
@@ -62,33 +69,50 @@ class DwImageRegistry {
         final challenge = response.headers.value('www-authenticate');
         final token = challenge == null ? null : await _token(client, challenge);
         if (token == null) {
-          return (
-            ok: false,
-            detail:
-                '${ref.registryHost} demands authentication this check '
-                'cannot satisfy${challenge == null ? '' : ': $challenge'}',
+          return DwImageResolution.fail(
+            '${ref.registryHost} demands authentication this check cannot '
+            'satisfy${challenge == null ? '' : ': $challenge'}',
           );
         }
         response = await _head(client, manifestUrl, token);
       }
       switch (response.statusCode) {
         case 200:
-          return (ok: true, detail: 'resolves at ${ref.registryHost}');
+          return DwImageResolution.ok('resolves at ${ref.registryHost}');
         case 404:
-          return (
-            ok: false,
-            detail:
-                '${ref.repository}:${ref.tag} not found at '
-                '${ref.registryHost} (404) — the tag was removed or the '
-                'repository is gone',
+          return DwImageResolution.fail(
+            '${ref.repository}:${ref.tag} not found at ${ref.registryHost} '
+            '(404) — the tag was removed or the repository is gone',
+          );
+        case 401:
+          // The second HEAD, with a token the registry's own challenge
+          // handed out, still refused: a real wall, not a missing token.
+          return DwImageResolution.fail(
+            '${ref.registryHost} refused the anonymous token it issued '
+            'itself (401) — the image needs credentials this check does not '
+            'have',
+          );
+        case 429:
+          return DwImageResolution.transient(
+            '${ref.registryHost} is rate-limiting anonymous pulls right now '
+            '(429)',
+          );
+        case final status when status >= 500:
+          return DwImageResolution.transient(
+            '${ref.registryHost} answered $status — its own trouble, not '
+            "the image's",
           );
         case final status:
-          return (ok: false, detail: '${ref.registryHost} answered $status');
+          return DwImageResolution.fail('${ref.registryHost} answered $status');
       }
     } on SocketException catch (error) {
-      return (ok: false, detail: 'could not reach ${ref.registryHost}: ${error.message}');
+      return DwImageResolution.transient(
+        'could not reach ${ref.registryHost}: ${error.message}',
+      );
     } on TimeoutException {
-      return (ok: false, detail: '${ref.registryHost} did not answer within $timeout');
+      return DwImageResolution.transient(
+        '${ref.registryHost} did not answer within $timeout',
+      );
     } finally {
       client.close(force: true);
     }
@@ -150,9 +174,35 @@ class DwImageRegistry {
   }
 }
 
-/// `[registry-host/]repository:tag`, split the way `docker pull` reads it: no
-/// host segment defaults to Docker Hub, and a bare repository name is
-/// `library/<name>` there.
+/// Whether [DwImageRegistry.resolve] answered a real question about the
+/// image, or could not ask it right now.
+///
+/// [ok] true is the only "the tag is there" answer; [ok] false with
+/// [transient] false is a definite "it is not" (or "it demands credentials
+/// this check will never have"); [transient] true is neither — the registry
+/// was not reachable, or answered with its own trouble, and asking again
+/// later might answer differently.
+class DwImageResolution {
+  const DwImageResolution.ok(this.detail) : ok = true, transient = false;
+  const DwImageResolution.fail(this.detail) : ok = false, transient = false;
+  const DwImageResolution.transient(this.detail) : ok = false, transient = true;
+
+  final bool ok;
+  final bool transient;
+  final String detail;
+}
+
+/// `[registry-host/]repository:tag`, split the way `docker pull` reads it.
+///
+/// `library/<name>` for a bare repository name is a rule of Docker Hub's own
+/// naming, not of the reference syntax: it applies only when there is no
+/// explicit registry host, because that is the one case a bare name means
+/// "the default registry's official image". A bare name after an explicit
+/// host — `mirror.gcr.io/postgres`, mirroring the exact reference the
+/// renderer put in the compose file (see [DwStack.pinnedImages]) — names a
+/// repository called `postgres` on that host, not `library/postgres`: no
+/// other registry recognises the rewrite, and neither does Docker's own
+/// reference parser.
 class DwImageRef {
   const DwImageRef({
     required this.registryHost,
@@ -180,7 +230,9 @@ class DwImageRef {
     final tagColon = rest.lastIndexOf(':');
     final repoNoTag = tagColon == -1 ? rest : rest.substring(0, tagColon);
     final tag = tagColon == -1 ? 'latest' : rest.substring(tagColon + 1);
-    final repository = repoNoTag.contains('/') ? repoNoTag : 'library/$repoNoTag';
+    final repository = repoNoTag.contains('/') || explicitHost != null
+        ? repoNoTag
+        : 'library/$repoNoTag';
     return DwImageRef(
       registryHost: explicitHost ?? 'registry-1.docker.io',
       repository: repository,

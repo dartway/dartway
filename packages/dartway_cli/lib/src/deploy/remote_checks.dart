@@ -146,26 +146,53 @@ Future<DwDeployVerdict> _checkDnsPublicHosts(DwDeployContext context) async {
 /// bundled storage and its init image), resolved against its own registry
 /// before `deploy run` builds anything — the failure this used to be found at
 /// only once the run reached the step that starts that image (#331).
-Future<DwDeployVerdict> _checkImagesResolve(DwDeployContext context) async {
-  final images = context.stack.pinnedImages;
-  final registry = DwImageRegistry();
-  final problems = <String>[];
+Future<DwDeployVerdict> _checkImagesResolve(DwDeployContext context) =>
+    evaluateImagesResolve(context.stack.pinnedImages, DwImageRegistry());
+
+/// The logic of the `images-resolve` check, apart from where its inputs come
+/// from: [DwDeployContext.stack] and a real [DwImageRegistry] in production,
+/// a fixed image list and a [DwImageRegistry] pointed at a fake server in
+/// `deploy_remote_checks_test.dart` — a check that always answered pass
+/// regardless of what [registry] says would be invisible to a test that only
+/// ever went through [DwDeployContext], since building one needs no registry
+/// at all.
+///
+/// A transient answer ([DwImageResolution.transient]) never fails the
+/// deploy on its own — the network hiccup was this machine's, not a fact
+/// about the image — but it is never silent either: it turns pass into skip,
+/// naming what could not be checked.
+Future<DwDeployVerdict> evaluateImagesResolve(
+  List<(String, String)> images,
+  DwImageRegistry registry,
+) async {
+  final failed = <String>[];
+  final unchecked = <String>[];
   for (final (label, image) in images) {
     final result = await registry.resolve(image);
-    if (!result.ok) problems.add('$label ($image): ${result.detail}');
+    if (result.ok) continue;
+    if (result.transient) {
+      unchecked.add('$label ($image): ${result.detail}');
+    } else {
+      failed.add('$label ($image): ${result.detail}');
+    }
   }
-  if (problems.isEmpty) {
-    return DwDeployVerdict.pass(
-      '${images.length} pinned image(s): ${images.map((e) => e.$2).join(', ')}',
+  if (failed.isNotEmpty) {
+    return DwDeployVerdict.fail(
+      failed.join(' | '),
+      fix:
+          'A pinned tag that no longer resolves has to be repinned in the '
+          'framework itself (packages/dartway_cli/lib/src/deploy/stack.dart) — '
+          'file it there. This is exactly the failure #331 fixed once already, '
+          'for a different image whose registries had all stopped serving it.',
     );
   }
-  return DwDeployVerdict.fail(
-    problems.join(' | '),
-    fix:
-        'A pinned tag that no longer resolves has to be repinned in the '
-        'framework itself (packages/dartway_cli/lib/src/deploy/stack.dart) — '
-        'file it there. This is exactly the failure #331 fixed once already, '
-        'for a different image whose registries had all stopped serving it.',
+  if (unchecked.isNotEmpty) {
+    return DwDeployVerdict.skip(
+      'could not ask: ${unchecked.join(' | ')}',
+    );
+  }
+  return DwDeployVerdict.pass(
+    '${images.length} pinned image(s): ${images.map((e) => e.$2).join(', ')}',
   );
 }
 

@@ -84,6 +84,24 @@ void main() {
     test('no tag defaults to latest', () {
       expect(DwImageRef.parse('nginx').tag, 'latest');
     });
+
+    // The bug this guards: `library/` is Docker Hub's own rule for a bare
+    // name with no registry stated at all — not something any other registry
+    // recognises, and not something Docker's own reference parser adds once
+    // a host is explicit. `mirror.gcr.io/postgres:17-alpine` is exactly what
+    // the renderer puts in the compose file for `registry_mirror:
+    // mirror.gcr.io` (DwStack.pinnedImages) — checking `library/postgres`
+    // there would ask the mirror about a repository the deploy never pulls.
+    test(
+      'a bare name behind an explicit host is that host\'s own repository, '
+      'not library/ — an explicit host is never Docker Hub\'s default',
+      () {
+        final ref = DwImageRef.parse('mirror.gcr.io/postgres:17-alpine');
+        expect(ref.registryHost, 'mirror.gcr.io');
+        expect(ref.repository, 'postgres');
+        expect(ref.tag, '17-alpine');
+      },
+    );
   });
 
   group('DwImageRegistry.resolve', () {
@@ -129,23 +147,57 @@ void main() {
     });
 
     test(
-      'a 401 the registry never actually lifts (no token satisfies it) fails, not loops',
+      'a 401 the registry never actually lifts (no token satisfies it) fails '
+      'definitely, not loops, and is never treated as transient',
       () async {
         fake.manifestStatus = ({required authenticated}) => 401;
         final result = await fake.registry.resolve('postgres:17-alpine');
         expect(result.ok, isFalse);
+        expect(result.transient, isFalse);
         expect(result.detail, contains('401'));
       },
     );
 
-    test('an unreachable host fails with a clear reason, not an exception', () async {
-      final registry = DwImageRegistry(
-        connectTo: (host: '127.0.0.1', port: 1), // nothing listens on port 1
-        scheme: 'http',
-        timeout: const Duration(milliseconds: 300),
-      );
-      final result = await registry.resolve('postgres:17-alpine');
+    test('a 404 is definite, not transient', () async {
+      fake.manifestStatus = ({required authenticated}) => 404;
+      final result = await fake.registry.resolve('postgres:17-alpine');
       expect(result.ok, isFalse);
+      expect(result.transient, isFalse);
     });
+
+    test(
+      'a 429 (rate-limited) is transient — this machine\'s trouble, not a '
+      'fact about the image',
+      () async {
+        fake.manifestStatus = ({required authenticated}) => 429;
+        final result = await fake.registry.resolve('postgres:17-alpine');
+        expect(result.ok, isFalse);
+        expect(result.transient, isTrue);
+        expect(result.detail, contains('429'));
+      },
+    );
+
+    test('a 5xx from the registry itself is transient', () async {
+      fake.manifestStatus = ({required authenticated}) => 503;
+      final result = await fake.registry.resolve('postgres:17-alpine');
+      expect(result.ok, isFalse);
+      expect(result.transient, isTrue);
+      expect(result.detail, contains('503'));
+    });
+
+    test(
+      'an unreachable host fails as transient, with a clear reason, not an '
+      'exception',
+      () async {
+        final registry = DwImageRegistry(
+          connectTo: (host: '127.0.0.1', port: 1), // nothing listens here
+          scheme: 'http',
+          timeout: const Duration(milliseconds: 300),
+        );
+        final result = await registry.resolve('postgres:17-alpine');
+        expect(result.ok, isFalse);
+        expect(result.transient, isTrue);
+      },
+    );
   });
 }

@@ -137,16 +137,33 @@ class DwLocalEnvironmentInspector {
       },
       portKey: 'DW_DATABASE_PORT',
     );
-    _compareService(
-      services['storage'],
-      source: '$name > storage',
-      committed: committed,
-      pairs: const {
-        'RUSTFS_ACCESS_KEY': 'DW_STORAGE_ACCESS_KEY',
-        'RUSTFS_SECRET_KEY': 'DW_STORAGE_SECRET_KEY',
-      },
-      portKey: null,
-    );
+    final storage = services['storage'];
+    if (storage == null && services['minio'] != null) {
+      // Not silence: a project whose local compose still calls the service
+      // `minio` is exactly the state the RustFS migration (#331) leaves a
+      // project in until it edits this file by hand — nothing regenerates
+      // it. Reported once, by name, rather than the drift check simply
+      // finding nothing to compare and saying nothing about why.
+      _add(
+        DwCheckType.devComposeDrifted,
+        '$name still declares a service named "minio" — rename it to '
+        '"storage" and its environment to RUSTFS_ACCESS_KEY / '
+        'RUSTFS_SECRET_KEY (docs/migrations/2026-09-26-storage-minio-to-rustfs.md '
+        'covers the local docker-compose.yaml too), or this check has '
+        'nothing to compare it against.',
+      );
+    } else {
+      _compareService(
+        storage,
+        source: '$name > storage',
+        committed: committed,
+        pairs: const {
+          'RUSTFS_ACCESS_KEY': 'DW_STORAGE_ACCESS_KEY',
+          'RUSTFS_SECRET_KEY': 'DW_STORAGE_SECRET_KEY',
+        },
+        portKey: null,
+      );
+    }
   }
 
   void _compareService(

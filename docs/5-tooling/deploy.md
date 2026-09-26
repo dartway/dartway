@@ -170,9 +170,11 @@ bucket anyone can read, or a public one nobody can.
    fetches, and a writable key turns access to the box into access to the repository.
 6. **The checkout** of `branch`.
 7. **`.env`** with the generated secrets — what the compose file itself interpolates.
-8. **A data volume guard**: if the server carries a `<project>_…data` volume under another name than
-   the rendered stack uses, setup refuses. Compose would otherwise create an empty database beside
-   the real one and serve it.
+8. **A data volume guard**: if the server already has a data volume of this project and an expected
+   one is missing — a config change renamed or replaced what a volume held — setup refuses. Compose
+   would otherwise create that volume empty and serve it beside the real data, silently. `run` runs
+   the same guard (below) right before it starts anything, because a server is not always `setup`
+   again after a config change.
 9. **`docker-compose.yml`, `nginx.conf`**, the `nginx.d` directories, the override bridge and the
    project's Nginx snippets, then `docker compose config --quiet` over the result.
 10. **The firewall**: `ufw` (installed when absent), OpenSSH, 80, 443 and `firewall_ports`.
@@ -201,9 +203,14 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
 4. renders `.env` from the secret store, refusing — by key name and line number, never by value —
    when the store is absent, a line is malformed, a key is declared twice, a key is one the compose
    file sets, or a required secret is missing or empty;
-5. checks the merged Compose configuration, then builds the images;
-6. with the bundled storage, starts it and runs `storage-init`, printing what it did; starts Postgres;
-7. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
+5. checks the merged Compose configuration;
+6. **the same data volume guard `setup` runs** (above): refuses when an expected data volume of the
+   rendered stack does not exist while another data volume of this project does — the shape of a
+   config change (a rename, a different storage backend) about to serve fresh data next to the real
+   one. One implementation, run from both commands;
+7. builds the images;
+8. with the bundled storage, starts it and runs `storage-init`, printing what it did; starts Postgres;
+9. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
    flight are answered, live sockets close with "server stopping" — and from then on the proxy
    answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
    idempotency key, so a retry never runs it twice). The new image applies the migrations in a
@@ -214,16 +221,16 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    declares. When the migrations fail (they roll back) or the new server does not become healthy,
    the image that was serving is started again and the step fails with the server's own log; after
    a failure past the migrations the previous code runs on the new schema, and the message says so;
-8. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
-9. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
+10. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
+11. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
    the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
    stops the deploy before that restart;
-10. issues the certificate for every served host under one name — only when certbot does not already
+12. issues the certificate for every served host under one name — only when certbot does not already
    manage it, or when a host was added to the configuration since (a storage domain, a site): then
    the lineage is extended with `--expand`. A routine deploy stays off the rate limit. A host added
    to a live server needs `setup` first, so that nginx answers the ACME challenge for it;
-11. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
+13. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
     a second later on its configuration.
 
 What keeps a push routine is not that the rendering is skipped but that it is idempotent and

@@ -209,17 +209,43 @@ class DwStack {
   };
 
   /// Every base image this stack pulls rather than builds, labelled for a
-  /// report: what `deploy check` asks a registry to resolve before `deploy
-  /// run` gets anywhere near pulling them for real (#331).
-  List<(String, String)> get pinnedImages => [
-    ('Postgres', postgresImage),
-    ('nginx', nginxImage),
-    if (front is DwTlsFront) ('certbot', certbotImage),
-    if (target.storage == DwStorageMode.bundled) ...[
-      ('storage', storageImage),
-      ('storage-init', storageInitImage),
-    ],
-  ];
+  /// report and resolved through [target]'s `registry_mirror` exactly as the
+  /// renderer resolves them into the compose file (see [mirrorServes]): what
+  /// `deploy check` asks a registry to resolve is what `deploy run` actually
+  /// pulls, not the upstream name behind a mirror that serves it instead
+  /// (#331).
+  List<(String, String)> get pinnedImages {
+    String resolved(String image) => switch (target.registryMirror) {
+      final mirror? when mirrorServes(image) => '$mirror/$image',
+      _ => image,
+    };
+    return [
+      ('Postgres', resolved(postgresImage)),
+      ('nginx', resolved(nginxImage)),
+      if (front is DwTlsFront) ('certbot', resolved(certbotImage)),
+      if (target.storage == DwStorageMode.bundled) ...[
+        ('storage', resolved(storageImage)),
+        ('storage-init', resolved(storageInitImage)),
+      ],
+    ];
+  }
+
+  /// The data volumes this stack's compose file declares — the ones a
+  /// restart must never start empty, because Postgres and the bundled
+  /// storage keep their whole state on them and nowhere else. Certbot's own
+  /// volumes are deliberately not here: a lineage reissues itself, so losing
+  /// it costs a certificate request, not data.
+  ///
+  /// Named with the compose project's prefix already applied
+  /// ([DwDeployTarget.projectName] — the checkout directory's name, which is
+  /// what Compose derives its volume names from), because that is the form
+  /// `docker volume ls` answers in and the form [checkDataVolumes] compares
+  /// against.
+  Set<String> get dataVolumeNames => {
+    '${target.projectName}_postgres_data',
+    if (target.storage == DwStorageMode.bundled)
+      '${target.projectName}_storage_data',
+  };
 
   /// Names the store must not hold, because the compose file sets them.
   Set<String> get reservedSecretKeys => serverEnvironment.keys.toSet();

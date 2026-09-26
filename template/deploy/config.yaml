@@ -106,8 +106,11 @@ local:
 #   #   bundled  — RustFS in the stack, for staging. Browsers upload
 #   #              to it directly, so it needs a host of its own. Its keys are
 #   #              generated into the secret store; its CORS rule admits PUT
-#   #              from app_domain with the headers a presigned upload is bound
-#   #              to. Every deploy creates <project>-public (anonymous
+#   #              from app_domain, any request header (AllowedHeaders: ["*"]
+#   #              — a presigned upload is already the whole authorization,
+#   #              so a header allow-list guards nothing an unsigned request
+#   #              could not already be refused for). Every deploy creates
+#   #              <project>-public (anonymous
 #   #              s3:GetObject, no listing) and <project>-private (nothing
 #   #              unsigned), and the server gets both names and
 #   #              DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<project>-public.
@@ -122,8 +125,10 @@ local:
 #   #              with `dartway secret set`. Make the public bucket readable
 #   #              anonymously (objects, not listing) and the private one not at
 #   #              all, and give both a CORS rule allowing PUT from
-#   #              https://<app_domain> with the headers content-type,
-#   #              content-length and if-none-match. The server checks both
+#   #              https://<app_domain> with the headers content-type and
+#   #              if-none-match (never content-length: a browser sets it
+#   #              itself and refuses to let JavaScript name it, so it never
+#   #              reaches a CORS preflight to admit). The server checks both
 #   #              buckets as it starts and refuses to start on a bucket more or
 #   #              less public than declared.
 #   storage: bundled

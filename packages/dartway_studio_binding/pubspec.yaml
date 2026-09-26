@@ -18,7 +18,7 @@ dependencies:
 
   # The passports the binding reports come from mounted DwFeatureWidget
   # widgets, and the persona switch runs the core's own sign-in by code.
-  dartway_core_flutter: ^0.21.0-dev.7
+  dartway_core_flutter: ^0.21.0-dev.6
   # The screen identity Studio binds to is the route's declared name, which is
   # a DwAppRouter concept — the reason this is a package of its own rather than
   # a corner of core_flutter, where the dependency would reach apps that never
@@ -31,7 +31,7 @@ dependencies:
 
 dev_dependencies:
   # DwFakeServer: the persona switch signs in through a real client.
-  dartway_client: ^0.21.0-dev.7
+  dartway_client: ^0.21.0-dev.6
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

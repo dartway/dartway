@@ -65,6 +65,62 @@ local:
     expect(inspect()..run(), _reports(DwCheckType.devComposeDrifted, isEmpty));
   });
 
+  // The state the RustFS migration (#331) leaves a project in until it edits
+  // its own docker-compose.yaml by hand: nothing regenerates that file, so a
+  // service still named "minio" is a real, silent gap otherwise — the drift
+  // check would simply find no "storage" service to compare and say nothing.
+  test(
+    'a local compose still calling the service "minio" is named, not silently '
+    'skipped for having nothing to compare',
+    () {
+      writeConfig(matchingLocal);
+      writeCompose('''
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - '127.0.0.1:8090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: shop
+      POSTGRES_PASSWORD: 'dev_pw'
+  minio:
+    ports:
+      - '127.0.0.1:8100:9000'
+    environment:
+      MINIO_ROOT_USER: dev
+      MINIO_ROOT_PASSWORD: 'dev_storage_pw'
+''');
+
+      final inspector = inspect()..run();
+      expect(
+        inspector.findingsOf(DwCheckType.devComposeDrifted).single,
+        allOf(contains('"minio"'), contains('storage')),
+      );
+    },
+  );
+
+  test(
+    'a project with neither "storage" nor "minio" locally has nothing to '
+    'report — it simply does not run file storage on this machine',
+    () {
+      writeConfig(matchingLocal);
+      writeCompose('''
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - '127.0.0.1:8090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: shop
+      POSTGRES_PASSWORD: 'dev_pw'
+''');
+
+      expect(inspect()..run(), _reports(DwCheckType.devComposeDrifted, isEmpty));
+    },
+  );
+
   test('a password changed in one file only is named with both', () {
     writeConfig(matchingLocal.replaceAll('dev_pw', 'changed_pw'));
     writeCompose(compose);

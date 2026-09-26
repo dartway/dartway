@@ -74,6 +74,43 @@ void main() {
       ).pinnedImages;
       expect(images.map((e) => e.$1), ['Postgres', 'nginx']);
     });
+
+    // `deploy check` has to ask the registry about exactly what `deploy run`
+    // pulls (#331 M4) — a mirror serving Postgres and nginx just fine says
+    // nothing about whether rustfs/rustfs or amazon/aws-cli, neither of
+    // which the mirror serves (DwStack.mirrorServes), still resolve upstream.
+    test(
+      'a registry mirror is applied the same way the renderer applies it: '
+      'the official images, and nothing that already names an organisation',
+      () {
+        final unmirrored = stackVariants()['bundled storage and a site']!.pinnedImages;
+        final mirrored = stackFrom(
+          extra:
+              '  site:\n    domain: example.com\n    source: app_site/build\n'
+              '  storage: bundled\n  storage_domain: files.example.com\n'
+              '  registry_mirror: mirror.gcr.io\n',
+        ).pinnedImages;
+        expect(
+          mirrored,
+          containsAll([
+            ('Postgres', 'mirror.gcr.io/${DwStack.postgresImage}'),
+            ('nginx', 'mirror.gcr.io/${DwStack.nginxImage}'),
+          ]),
+        );
+        expect(
+          mirrored.where((e) => e.$1 == 'certbot').single.$2,
+          unmirrored.where((e) => e.$1 == 'certbot').single.$2,
+        );
+        expect(
+          mirrored.where((e) => e.$1 == 'storage').single.$2,
+          DwStack.storageImage,
+        );
+        expect(
+          mirrored.where((e) => e.$1 == 'storage-init').single.$2,
+          DwStack.storageInitImage,
+        );
+      },
+    );
   });
 
   group('the rendered compose file', () {
@@ -187,6 +224,16 @@ void main() {
       expect(
         ((nginx['networks'] as YamlMap)['default'] as YamlMap)['aliases'],
         ['files.example.com'],
+      );
+    });
+
+    test('storage: no console on a deployment — parity with the old '
+        'MINIO_BROWSER: off', () {
+      final stack = stackVariants()['bundled storage and a site']!;
+      final storage = _service(stack, 'storage');
+      expect(
+        (storage['environment'] as YamlMap)['RUSTFS_CONSOLE_ENABLE'],
+        'false',
       );
     });
 

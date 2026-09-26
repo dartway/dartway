@@ -9,7 +9,7 @@ environment:
 dependencies:
   crypto: ^3.0.6
   dartway_auth_providers_shared: ^0.1.0
-  dartway_core_server: ^0.21.0-dev.7
+  dartway_core_server: ^0.21.0-dev.6
   meta: ^1.16.0
 dev_dependencies:
   lints: ^6.0.0

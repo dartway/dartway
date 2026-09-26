@@ -33,6 +33,7 @@ void main() {
         'render-stack',
         'render-env',
         'compose-config',
+        'data-volumes',
         'build',
         'storage',
         'database',
@@ -59,6 +60,15 @@ void main() {
       before('render-stack', 'render-env');
       before('render-stack', 'compose-config');
       before('render-stack', 'build');
+    });
+
+    // Catches an expected volume missing beside real data before the build,
+    // not after the stack is already up and the outside checks are green on
+    // an empty one (#331: storage: minio → storage: bundled).
+    test('the data volumes are checked before anything is built or started', () {
+      before('compose-config', 'data-volumes');
+      before('data-volumes', 'build');
+      before('data-volumes', 'database');
     });
 
     // Migrations need the database, and the proxy is pointed at the server

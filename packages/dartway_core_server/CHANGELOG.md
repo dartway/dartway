@@ -1,12 +1,5 @@
 # Changelog
 
-## 0.21.0-dev.7
-
-- The development and test storage is RustFS, not MinIO — MinIO's community edition stopped
-  publishing images (dartway/dartway#331). No public API changed: `DwFileStorageConfig`,
-  `DwFileStorageSetup`, `DwObjectStore` and `DwSigV4Signer` are plain S3, unaffected either way.
-  Doc comments and `test/support/files.dart`'s `docker run` line now name RustFS.
-
 ## 0.21.0-dev.6
 
 - **BREAKING: `DwRouteContext` is gone — a route handler's `ctx` is typed `DwCallContext`

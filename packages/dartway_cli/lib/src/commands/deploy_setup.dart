@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 
 import '../deploy/compose_files.dart';
-import '../deploy/deploy_target.dart';
+import '../deploy/data_volumes.dart';
 import '../deploy/renderer.dart';
 import '../deploy/secret_store.dart';
 import '../deploy/ssh_runner.dart';
@@ -257,9 +257,11 @@ git checkout -B '${target.branch}' 'origin/${target.branch}'
     return 1;
   }
 
-  // A rendered compose file names its data volumes. If the server already
-  // carries a differently named one, starting the stack would silently create
-  // an empty database beside the real data and serve it. Refuse instead.
+  // A rendered compose file names its data volumes. If an expected one does
+  // not exist while another data volume of this project does, starting the
+  // stack would silently create it empty beside the real data and serve it —
+  // the same guard `deploy run` runs again right before it starts anything,
+  // because a server is not always `setup` again after a config change.
   final volumes = await ssh.runAs(
     target.deployUser,
     "docker volume ls --format '{{.Name}}'",
@@ -271,28 +273,13 @@ git checkout -B '${target.branch}' 'origin/${target.branch}'
     );
     return 1;
   }
-  final project = target.projectName;
-  final existing = volumes.stdout
-      .split('\n')
-      .map((line) => line.trim())
-      .where((line) => line.startsWith('${project}_'))
-      .toList();
-  final expected = {
-    '${project}_postgres_data',
-    if (target.storage == DwStorageMode.bundled) '${project}_storage_data',
-  };
-  final strangers = existing
-      .where((name) => !expected.contains(name) && name.contains('data'))
-      .where((name) => !name.contains('certbot'))
-      .toList();
-  if (strangers.isNotEmpty) {
-    stderr.writeln(
-      '\nRefusing to continue: this server already has the volume(s) '
-      '${strangers.join(', ')}, and the rendered configuration uses '
-      '${expected.join(', ')} instead — fresh, empty data.\n'
-      'Mount the existing volume in deploy/compose.override.yml, or remove it '
-      'deliberately (docker volume rm), then run setup again.',
-    );
+  final volumeVerdict = judgeDataVolumes(
+    volumeListing: volumes.stdout,
+    projectPrefix: target.projectName,
+    expectedDataVolumes: stack.dataVolumeNames,
+  );
+  if (!volumeVerdict.ok) {
+    stderr.writeln('\nRefusing to continue: ${volumeVerdict.detail}');
     return 1;
   }
 

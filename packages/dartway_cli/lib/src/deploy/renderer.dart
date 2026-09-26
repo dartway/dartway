@@ -246,6 +246,15 @@ class DwStackRenderer {
         ..writeln(
           '      RUSTFS_SECRET_KEY: ${_q(_secret(DwStack.storageSecretKey))}',
         )
+        ..writeln(
+          '      # No console on a deployment: nothing here is ever meant to '
+          'be browsed by',
+        )
+        ..writeln(
+          '      # a person, and the port is not published even with it on '
+          '— belt and braces.',
+        )
+        ..writeln('      RUSTFS_CONSOLE_ENABLE: "false"')
         ..writeln('    volumes:')
         ..writeln('      - "storage_data:/data"')
         ..writeln('    expose:')

@@ -19,7 +19,20 @@
   a layer. Catches a vanished tag (Postgres, nginx, certbot, and with `storage: bundled` the storage
   and its init image) before `deploy run` reaches the step that actually pulls it, which is where
   this exact failure used to surface for MinIO, well after the images that build locally had already
-  succeeded.
+  succeeded. Resolved through `registry_mirror` exactly as the renderer resolves them into the
+  compose file, so the check asks about what `run` actually pulls, not the upstream name behind a
+  mirror that serves it instead; a transient answer (no route, a timeout, a rate limit, a 5xx of the
+  registry's own) is reported as a note rather than failing the deploy over this machine's own
+  network.
+- **`deploy run` refuses to start a stack that would create an expected data volume empty beside a
+  data volume of the same project that already holds real state** (`data-volumes`, new step, right
+  after the compose configuration is checked and before anything is built). `deploy setup` has run
+  this guard since the volume rename above; `run` did not, so a server only ever `run` again after a
+  config change — never `setup` again — could start `storage: bundled`'s volume empty, have
+  `storage-init` write its probes into it, watch the outside checks read those probes and pass, and
+  serve every real file as a 404 from then on. Passes once the expected volume exists, whatever else
+  is still on the server beside it: an old volume from before the change is the rollback copy, and
+  neither command asks for it to be removed before passing.
 
 ## 0.12.0
 
