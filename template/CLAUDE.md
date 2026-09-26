@@ -12,6 +12,6 @@ Nothing here yet, and the emptiness is the point — this is the stated place fo
 
 **What does not:** a **law** — the numbered cross-stack rules in `.claude/CLAUDE.md`. Those are not a project's to override; a project that has to break one has outgrown the framework rather than configured it.
 
-**Nor where a task comes from.** A tracker moves faster than the code behind it — one project's queue moved three times in three weeks, GitHub issues to Studio to the client's own — and a rule here would keep sending the next session to an address that already changed. Where tasks come from and how they are handed over is not a repository rule: the task's own brief carries what the work needs.
+**Nor where tasks come from.** A tracker moves faster than the code, and a rule here keeps sending the next session to an address that has already changed. The task's own brief carries what the work needs.
 
 **Write the reason beside the rule.** An override with no reason ages into nobody remembering whether it was a decision or a habit, and the next reader cannot tell whether it still holds. One or two sentences are enough: what was tried, what it cost, what replaced it.
