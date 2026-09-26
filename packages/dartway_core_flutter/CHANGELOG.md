@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.21.0-dev.7
+
+- **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`
+  replaces its name in the URL instead of doubling it, and every descendant of such a route
+  moves with it. No code change here: this package only re-exports `dartway_router`, but it
+  now resolves a router that builds different URLs for any project using `extraPathSegment`
+  on a `.simple()` route — the family moves in lockstep for the same reason it did for the
+  router's previous breaking change (#302).
+
 ## 0.21.0-dev.6
 
 - **BREAKING: `DwFlutterConfig.defaultModelGetter`, `isDefaultModelsGetterSetUp`,
@@ -8,9 +17,6 @@
   loading (`SizedBox.shrink()`) instead of asking a project-wide model registry that no live
   project configured; `hasCustomErrorHandling` had no caller either. Migration note:
   `docs/migrations/2026-09-25-default-model-getter-removed.md`.
-- **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`
-  replaces its name in the URL instead of doubling it. No behaviour change here: this
-  package only re-exports `dartway_router`.
 
 ## 0.21.0-dev.5
 

@@ -44,7 +44,13 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
     required this.pageWidget,
     this.parent,
     this.extraPathSegment,
-  });
+  }) : assert(
+          extraPathSegment == null || extraPathSegment != '',
+          'extraPathSegment must not be the empty string — omit it (leave it '
+          'null) instead. An empty segment used to build a path segment that '
+          'silently disappears (e.g. "/profile/" instead of "/profile/x"), '
+          'invisible to the duplicate-path check.',
+        );
 
   /// The page widget to display when this route is active.
   ///
@@ -77,6 +83,7 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
   ///   `/profile/edit`.
   ///
   /// Not allowed for zone root routes (they always have an empty path).
+  /// Must not be the empty string when set — asserted in debug mode.
   ///
   /// Example:
   /// ```dart

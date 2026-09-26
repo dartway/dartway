@@ -150,21 +150,21 @@ packages:
       path: "../../packages/dartway_client"
       relative: true
     source: path
-    version: "0.21.0-dev.6"
+    version: "0.21.0-dev.7"
   dartway_core_flutter:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_core_flutter"
       relative: true
     source: path
-    version: "0.21.0-dev.6"
+    version: "0.21.0-dev.7"
   dartway_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_core_shared"
       relative: true
     source: path
-    version: "0.21.0-dev.6"
+    version: "0.21.0-dev.7"
   dartway_example_shared:
     dependency: "direct main"
     description:

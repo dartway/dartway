@@ -16,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_core_flutter: ^0.21.0-dev.6
+  dartway_core_flutter: ^0.21.0-dev.7
   telegram_web_app: ^0.3.3
 
 dev_dependencies:

@@ -101,6 +101,18 @@ void main() {
         // extraPathSegment is set (issue #314 — it used to double up).
         expect(descriptor.pathSegment('profile'), 'users');
       });
+
+      test(
+          'an empty extraPathSegment is refused rather than silently '
+          'building a vanishing path segment', () {
+        expect(
+          () => DwNavigationRouteDescriptor.simple(
+            pageWidget: const ProfilePage(),
+            extraPathSegment: '',
+          ),
+          throwsA(isA<AssertionError>()),
+        );
+      });
     });
 
     group('parameterized', () {
@@ -128,6 +140,19 @@ void main() {
 
         expect(descriptor.extraPathSegment, 'users');
         expect(descriptor.pathSegment('detail'), 'users/:userId');
+      });
+
+      test('an empty extraPathSegment is refused here too', () {
+        final parent = TestRoutes.home;
+        expect(
+          () => DwNavigationRouteDescriptor.parameterized(
+            pageWidget: const ProfilePage(),
+            parameter: TestParams.userId,
+            parent: parent,
+            extraPathSegment: '',
+          ),
+          throwsA(isA<AssertionError>()),
+        );
       });
     });
 
