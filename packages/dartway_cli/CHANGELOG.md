@@ -90,6 +90,12 @@
   per-key plan (`add` / `keep (same)` / `overwrite` / `differs — refused` / `drop`) — the same shape
   `--dry-run` prints, only followed by the actual send. This is a CLI command's own default changing,
   not a change to generated project code, so there is no migration note.
+- **`template/CLAUDE.md` no longer lists the tracker and how work is filed among a project's own
+  conventions** (dartway/dartway#324). A project's queue moves faster than its code — one moved three
+  times in three weeks — and the rule kept sending the next session to whichever address had already
+  changed. Where a task comes from and how it is handed over is not a repository rule: the task's own
+  brief carries what the work needs, the same stance this repository's own root `CLAUDE.md` already
+  takes for itself.
 
 ## 0.12.0
 
