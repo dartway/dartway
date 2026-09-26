@@ -410,13 +410,28 @@ running server keeps the environment it started with**: a changed secret takes e
 | `secret set <KEY>` | Stores one value read from **stdin**, so it appears in neither shell history nor a process list. Refuses an empty value and the names the compose file sets |
 | `secret list` | Names only — which are required, generated, empty or refused — plus the stored files. Values are never read |
 | `secret put-file <path>` | Uploads a document (a service-account JSON) into the store with mode 600; `--name` stores it under another name. It reaches the server only when declared under `requires.files`, mounted read-only at `/run/secrets/<name>` — re-run `setup` after declaring one |
-| `secret push` | Replaces the server store with the environment's section of `deploy/secrets.yaml` |
+| `secret push` | Adds to the server store what it lacks from the environment's section of `deploy/secrets.yaml`; a key whose server value differs is refused by name, never replaced silently |
 | `secret pull` | Copies keys the server has and the local file lacks into it; differing values are reported, never rewritten |
 
 **`deploy/secrets.yaml`** is optional: the maintainer's copy of every environment's secrets, one
 section per environment and no shared section, git-ignored by the skeleton's `deploy/.gitignore`.
-Secrets can live on the servers alone. `push` refuses before sending anything when a value cannot be
-stored, and has two guards against losing information, each with its flag: `--prune` allows dropping
-keys the server has and the file does not (usually the file is behind, not the server holding junk),
-and `--allow-emptying` allows blanking a value the server has. `push` and `pull` both take
-`--dry-run`.
+Secrets can live on the servers alone.
+
+**`push`'s default is additive, not a replace.** It sends a key the server lacks or holds empty,
+leaves a key whose server value already matches alone, and — for a key whose server value differs —
+refuses the whole push, sending nothing, naming every such key. That is what keeps it from being the
+easy way to move an environment to a new host: `setup` generates a fresh `DW_DATABASE_PASSWORD` and
+storage keys there, bound to that host's own data volume, and a `push` that quietly overwrote them
+with an old host's values (still sitting in `deploy/secrets.yaml`) would lock the server out of its
+own database on the next `run`.
+
+`--overwrite KEY[,KEY…]` replaces exactly those named keys on purpose — there is no
+`--overwrite-all`, since naming the key is the point. A key `dartway secret list` marks `generated`
+is refused the same way even under a general intent to overwrite; it must be named in `--overwrite`
+too, precisely because it is the kind of value a swap breaks the server over. `push` refuses before
+sending anything when a value cannot be stored at all, and keeps its two older guards against losing
+information, each behind its own flag: `--prune` allows dropping keys the server has and the file
+does not (usually the file is behind, not the server holding junk), and `--allow-emptying` allows
+blanking a value the server has — unaffected by `--overwrite`. Before sending anything, `push` prints
+a per-key plan — `add`, `keep (same)`, `overwrite`, `differs — refused`,
+`drop` — the same shape `--dry-run` prints, which sends nothing. `pull` takes `--dry-run` too.

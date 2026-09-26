@@ -481,6 +481,14 @@ class SecretPushCommand extends _SecretCommandBase {
         negatable: false,
         help: 'Allow replacing a value the server has with an empty one.',
       )
+      ..addMultiOption(
+        'overwrite',
+        help:
+            'Replace these keys even though the server already holds a '
+            'different value. Comma-separated or repeatable. A generated key '
+            '(the database password, the storage keys) has to be named here '
+            'too — it is bound to the data already on the server.',
+      )
       ..addFlag(
         'dry-run',
         negatable: false,
@@ -493,12 +501,14 @@ class SecretPushCommand extends _SecretCommandBase {
 
   @override
   String get description =>
-      'Replace the server store with this environment from '
-      '${DwLocalSecretsFile.relativePath}.';
+      'Add to the server store what it lacks from this environment\'s '
+      'section of ${DwLocalSecretsFile.relativePath}. A key whose server '
+      'value differs is refused by name, never replaced silently.';
 
   @override
   String get invocation =>
-      'dartway secret push --env <environment> [--dry-run] [--prune]';
+      'dartway secret push --env <environment> [--dry-run] [--prune] '
+      '[--overwrite KEY,…]';
 
   @override
   Future<int> run() async {
@@ -528,112 +538,194 @@ class SecretPushCommand extends _SecretCommandBase {
       return 1;
     }
 
-    // Everything that cannot be stored is refused before anything is sent: a
-    // push that fails half-way through the list is a store nobody can
-    // describe.
-    final problems = <String>[];
-    for (final entry in section.entries) {
-      if (stack.reservedSecretKeys.contains(entry.key)) {
-        problems.add(
-          '${entry.key} is set by the compose file and cannot be stored',
-        );
-        continue;
+    return runSecretPush(
+      stack: stack,
+      store: store,
+      section: section,
+      prune: results.flag('prune'),
+      allowEmptying: results.flag('allow-emptying'),
+      overwrite: results.multiOption('overwrite').toSet(),
+      dryRun: results.flag('dry-run'),
+    );
+  }
+}
+
+/// The body of `secret push`, apart from resolving the stack and reading
+/// `deploy/secrets.yaml` — so a test drives it against a real store under a
+/// local shell (`LocalShell`), the way `runSetup` does for `deploy setup`.
+///
+/// Default: add what the server lacks or holds empty, keep what already
+/// matches, refuse the whole push — nothing sent — when a value differs from
+/// what the server holds, naming every such key. [overwrite] names the keys
+/// that refusal should not apply to; a key generated on the server
+/// ([DwStack.generatedSecrets]) is bound to the data already there and is
+/// refused just the same unless named. [allowEmptying] is the older, separate
+/// guard against replacing a value the server has with an empty one — it is
+/// unaffected by [overwrite].
+Future<int> runSecretPush({
+  required DwStack stack,
+  required DwSecretStore store,
+  required Map<String, String> section,
+  required bool prune,
+  required bool allowEmptying,
+  required Set<String> overwrite,
+  required bool dryRun,
+}) async {
+  // Everything that cannot be stored is refused before anything is sent: a
+  // push that fails half-way through the list is a store nobody can
+  // describe.
+  final problems = <String>[];
+  for (final entry in section.entries) {
+    if (stack.reservedSecretKeys.contains(entry.key)) {
+      problems.add(
+        '${entry.key} is set by the compose file and cannot be stored',
+      );
+      continue;
+    }
+    try {
+      DwSecretStore.encodeLine(entry.key, entry.value);
+    } on DwSecretFormatException catch (error) {
+      problems.add(error.message);
+    }
+  }
+  if (problems.isNotEmpty) {
+    stderr.writeln('Refusing to push:');
+    for (final problem in problems) {
+      stderr.writeln('  - $problem');
+    }
+    return 1;
+  }
+
+  final remote = await store.readKeyNames();
+  final plan = await store.plan(section);
+  if (!plan.ok) {
+    stderr.writeln(
+      'Refusing to push: the server store could not be compared against '
+      '(${plan.error}).',
+    );
+    return 1;
+  }
+
+  final orphaned = remote.ok
+      ? (remote.names.difference(section.keys.toSet()).toList()..sort())
+      : const <String>[];
+
+  // Sorted once so every list below reads the same way run to run.
+  final keys = section.keys.toList()..sort();
+  final added = <String>[];
+  final kept = <String>[];
+  final overwritten = <String>[];
+  final refused = <String>[];
+  final refusalNotes = <String>[];
+
+  for (final key in keys) {
+    final localValue = section[key] ?? '';
+    if (plan.add.contains(key)) {
+      added.add(key);
+    } else if (plan.same.contains(key)) {
+      kept.add(key);
+    } else if (plan.differ.contains(key)) {
+      // The server holds a different, non-empty value. Blanking it (the
+      // local value is empty) stays behind the older --allow-emptying flag;
+      // replacing it with another non-empty value needs the key named in
+      // --overwrite — that is the gap this function exists to close.
+      final wouldEmpty = localValue.isEmpty;
+      final generated = stack.generatedSecrets.containsKey(key);
+      final unlocked = wouldEmpty ? allowEmptying : overwrite.contains(key);
+      if (unlocked) {
+        overwritten.add(key);
+      } else {
+        refused.add(key);
+        if (wouldEmpty) {
+          refusalNotes.add('$key would be blanked — pass --allow-emptying.');
+        } else if (generated) {
+          refusalNotes.add(
+            '$key is generated and bound to the data already on the '
+            'server — pass --overwrite $key to replace it anyway.',
+          );
+        } else {
+          refusalNotes.add(
+            '$key differs from the server — pass --overwrite $key to '
+            'replace it.',
+          );
+        }
       }
-      try {
-        DwSecretStore.encodeLine(entry.key, entry.value);
-      } on DwSecretFormatException catch (error) {
-        problems.add(error.message);
-      }
     }
-    if (problems.isNotEmpty) {
-      stderr.writeln('Refusing to push:');
-      for (final problem in problems) {
-        stderr.writeln('  - $problem');
-      }
-      return 1;
-    }
+  }
 
-    final remote = await store.readKeyNames();
-    final remoteFilled = await store.readNonEmptyKeyNames();
-    // A guard that reads the server is useless if the read silently failed.
-    if (remote.ok && !remoteFilled.ok) {
-      stderr.writeln(
-        'Refusing to push: the server has a store but its contents could not '
-        'be read (${remoteFilled.error}).',
-      );
-      return 1;
-    }
-    final orphaned = remote.ok
-        ? (remote.names.difference(section.keys.toSet()).toList()..sort())
-        : const <String>[];
-    final wouldEmpty =
-        remoteFilled.names
-            .where((key) => (section[key] ?? '').isEmpty)
-            .where((key) => section.containsKey(key))
-            .toList()
-          ..sort();
+  // The plan, printed before anything is sent — dry-run or not.
+  stdout.writeln('Push to ${store.file}:');
+  if (added.isNotEmpty) stdout.writeln('  add: ${added.join(', ')}');
+  if (kept.isNotEmpty) stdout.writeln('  keep (same): ${kept.join(', ')}');
+  if (overwritten.isNotEmpty) {
+    stdout.writeln('  overwrite: ${overwritten.join(', ')}');
+  }
+  if (refused.isNotEmpty) {
+    stdout.writeln('  differs — refused: ${refused.join(', ')}');
+  }
+  if (orphaned.isNotEmpty) stdout.writeln('  drop: ${orphaned.join(', ')}');
 
-    final keys = section.keys.toList()..sort();
-    stdout.writeln('Push to ${store.file}: ${keys.join(', ')}');
+  if (orphaned.isNotEmpty && !prune) {
+    stderr.writeln(
+      'Refusing to push: the server holds keys this file does not — '
+      '${orphaned.join(', ')}.\n'
+      'Add them locally ("dartway secret pull"), or pass --prune to '
+      'drop them.',
+    );
+    return 1;
+  }
 
-    if (orphaned.isNotEmpty && !results.flag('prune')) {
-      stderr.writeln(
-        'Refusing to push: the server holds keys this file does not — '
-        '${orphaned.join(', ')}.\n'
-        'Add them locally ("dartway secret pull"), or pass --prune to '
-        'drop them.',
-      );
-      return 1;
+  if (refused.isNotEmpty) {
+    stderr.writeln(
+      'Refusing to push: ${refused.length} value(s) differ from the server. '
+      'Nothing was sent.',
+    );
+    for (final note in refusalNotes) {
+      stderr.writeln('  - $note');
     }
-    if (orphaned.isNotEmpty) {
-      stdout.writeln('  dropping: ${orphaned.join(', ')}');
-    }
-    if (wouldEmpty.isNotEmpty && !results.flag('allow-emptying')) {
-      stderr.writeln(
-        'Refusing to push: this would blank values the server has — '
-        '${wouldEmpty.join(', ')}.\n'
-        'Fill them locally, take the server values with "dartway secret pull", or pass --allow-emptying.',
-      );
-      return 1;
-    }
+    return 1;
+  }
 
-    final missing = stack.requiredSecretKeys
-        .where((key) => (section[key] ?? '').isEmpty)
-        .toList();
-    if (missing.isNotEmpty) {
-      stdout.writeln(
-        '  note: required and not set here — ${missing.join(', ')}; the next '
-        'deploy will refuse until they are',
-      );
-    }
+  final missing = stack.requiredSecretKeys
+      .where((key) => (section[key] ?? '').isEmpty)
+      .toList();
+  if (missing.isNotEmpty) {
+    stdout.writeln(
+      '  note: required and not set here — ${missing.join(', ')}; the next '
+      'deploy will refuse until they are',
+    );
+  }
 
-    if (results.flag('dry-run')) {
-      stdout.writeln('Dry run — nothing sent.');
-      return 0;
-    }
-
-    final written = await store.writeAll(section);
-    if (!written.ok) {
-      stderr.writeln('Push failed: ${written.firstLine}');
-      return 1;
-    }
-    final after = await store.readKeyNames();
-    final absent = section.keys.where((key) => !after.names.contains(key));
-    if (absent.isNotEmpty) {
-      stderr.writeln(
-        'The push reported success and the store lacks ${absent.join(', ')}.',
-      );
-      return 1;
-    }
-
-    stdout
-      ..writeln('Pushed ${section.length} key(s).')
-      ..writeln(
-        'A running server keeps the environment it started with; the values '
-        'take effect on the next deploy.',
-      );
+  if (dryRun) {
+    stdout.writeln('Dry run — nothing sent.');
     return 0;
   }
+
+  final written = await store.writeAll(section);
+  if (!written.ok) {
+    stderr.writeln('Push failed: ${written.firstLine}');
+    return 1;
+  }
+  final after = await store.readKeyNames();
+  final absent = section.keys.where((key) => !after.names.contains(key));
+  if (absent.isNotEmpty) {
+    stderr.writeln(
+      'The push reported success and the store lacks ${absent.join(', ')}.',
+    );
+    return 1;
+  }
+
+  stdout
+    ..writeln(
+      'Pushed ${section.length} key(s)'
+      '${overwritten.isEmpty ? '' : ' (${overwritten.length} overwritten by request)'}'
+      '.',
+    )
+    ..writeln(
+      'A running server keeps the environment it started with; the values '
+      'take effect on the next deploy.',
+    );
+  return 0;
 }
 
 /// Brings the server's keys into `deploy/secrets.yaml`.

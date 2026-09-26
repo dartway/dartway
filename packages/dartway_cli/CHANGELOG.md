@@ -46,6 +46,19 @@
   ships (the `admin` case above); a fixed default under the `dw_` prefix does not, on any stock
   image or package, so an operator who leaves `deploy_user` unset never meets the collision. Additive:
   a config that already names `deploy_user` is unaffected.
+- **BREAKING: `secret push` no longer replaces a server value that differs from the local one — it
+  refuses the whole push, naming every differing key, and sends nothing** (#330, D-097). Its default
+  is now additive: it sends a key the server lacks or holds empty, leaves a key whose server value
+  already matches alone, and — this is the behaviour change — stops rather than silently overwriting
+  a key whose server value differs. `--overwrite KEY[,KEY…]` replaces exactly those named keys on
+  purpose; there is no `--overwrite-all`. A generated key (`DW_DATABASE_PASSWORD`, and with
+  `storage: bundled` the storage keys) is refused the same way and needs naming in `--overwrite` just
+  as any other key does — it is bound to the data already on the server, and replacing it can lock the
+  server out of its own database on the next `run`. Before sending anything, `push` now prints a
+  per-key plan (`add` / `keep (same)` / `overwrite` / `differs — refused` / `drop`) — the same shape
+  `--dry-run` prints, only followed by the actual send. `--prune` and `--allow-emptying` are
+  unchanged. This is a CLI command's own default changing, not a change to generated project code, so
+  there is no migration note.
 
 ## 0.12.0
 

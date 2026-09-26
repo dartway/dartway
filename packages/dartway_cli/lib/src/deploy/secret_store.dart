@@ -273,6 +273,79 @@ chmod 600 '$file'
 ''', buffer.toString());
   }
 
+  /// Compares [candidate] to what the store already holds, key by key,
+  /// without moving a value off the server: the comparison itself runs
+  /// there, over the candidate's own encoded lines sent on stdin, and only
+  /// three sets of names come back.
+  ///
+  /// What `secret push` plans its default from: [DwSecretPushPlan.add] is
+  /// what the server lacks or holds empty, [DwSecretPushPlan.same] already
+  /// matches, and [DwSecretPushPlan.differ] is what a caller must decide
+  /// about (`--overwrite`) rather than have replaced silently.
+  Future<DwSecretPushPlan> plan(Map<String, String> candidate) async {
+    final buffer = StringBuffer();
+    for (final entry in candidate.entries) {
+      buffer.writeln(encodeLine(entry.key, entry.value));
+    }
+    final result = await ssh.runAsWithInput(target.deployUser, '''
+set -e
+file='$file'
+staged=\$(mktemp)
+trap 'rm -f "\$staged"' EXIT
+cat > "\$staged"
+while IFS= read -r line || [ -n "\$line" ]; do
+  key=\${line%%=*}
+  [ -n "\$key" ] || continue
+  if [ -f "\$file" ]; then
+    existing=\$(grep "^\$key=" "\$file" || true)
+  else
+    existing=''
+  fi
+  case "\$existing" in
+    '' | "\$key=''") echo "ADD \$key" ;;
+    "\$line") echo "SAME \$key" ;;
+    *) echo "DIFFER \$key" ;;
+  esac
+done < "\$staged"
+''', buffer.toString());
+
+    if (!result.ok) {
+      return DwSecretPushPlan(
+        ok: false,
+        add: const {},
+        same: const {},
+        differ: const {},
+        error: result.firstLine,
+      );
+    }
+    final add = <String>{};
+    final same = <String>{};
+    final differ = <String>{};
+    for (final raw in result.stdout.split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty) continue;
+      final space = line.indexOf(' ');
+      if (space < 0) continue;
+      final tag = line.substring(0, space);
+      final key = line.substring(space + 1);
+      switch (tag) {
+        case 'ADD':
+          add.add(key);
+        case 'SAME':
+          same.add(key);
+        case 'DIFFER':
+          differ.add(key);
+      }
+    }
+    return DwSecretPushPlan(
+      ok: true,
+      add: add,
+      same: same,
+      differ: differ,
+      error: '',
+    );
+  }
+
   /// Reads the whole store. Only `pull` uses this: routine checks compare key
   /// names, which never requires moving a value.
   Future<DwSshResult> readFile() => _run("cat '$file'");
@@ -412,6 +485,31 @@ class DwSecretKeyNames {
 
   final bool ok;
   final Set<String> names;
+  final String error;
+}
+
+/// The result of [DwSecretStore.plan]: every candidate key sorted into what
+/// pushing it would do, by name only — never a value, from either side.
+class DwSecretPushPlan {
+  const DwSecretPushPlan({
+    required this.ok,
+    required this.add,
+    required this.same,
+    required this.differ,
+    required this.error,
+  });
+
+  final bool ok;
+
+  /// The server lacks the key, or holds it empty.
+  final Set<String> add;
+
+  /// The server already holds exactly this value.
+  final Set<String> same;
+
+  /// The server holds a different, non-empty value.
+  final Set<String> differ;
+
   final String error;
 }
 
