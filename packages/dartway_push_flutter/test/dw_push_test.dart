@@ -386,6 +386,65 @@ void main() {
     });
   });
 
+  group('requestPermission and permission answer on a deadline (#338)', () {
+    // Bounded at 500 ms, well over reportUnansweredAfter (50 ms): without the
+    // deadline in DwPush.requestPermission/permission, a transport whose
+    // attach never completes hangs `_attached.future` forever, and this
+    // .timeout throws instead of the test ever seeing an answer — the
+    // mutation this acceptance test is meant to catch.
+    const testBound = Duration(milliseconds: 500);
+
+    test(
+      'requestPermission answers notDetermined and reports the silence',
+      () async {
+        final push = DwPush(
+          transports: [
+            SilentTransport({'attach'}),
+          ],
+          reportUnansweredAfter: const Duration(milliseconds: 50),
+        );
+        await world.start(push);
+
+        final answer = await push.requestPermission().timeout(testBound);
+
+        expect(answer, DwPushPermission.notDetermined);
+        expect(
+          world.reports.map((r) => '${r.error}'),
+          contains(contains('attach did not answer')),
+        );
+      },
+    );
+
+    test('permission answers notDetermined the same way', () async {
+      final push = DwPush(
+        transports: [
+          SilentTransport({'attach'}),
+        ],
+        reportUnansweredAfter: const Duration(milliseconds: 50),
+      );
+      await world.start(push);
+
+      final answer = await push.permission().timeout(testBound);
+
+      expect(answer, DwPushPermission.notDetermined);
+    });
+
+    test('a transport that attaches normally is unaffected', () async {
+      final transport = DwFakePushTransport(issuedToken: 'device-13');
+      final push = DwPush(
+        transports: [transport],
+        reportUnansweredAfter: const Duration(milliseconds: 50),
+      );
+      await world.start(push, session: alice);
+
+      final answer = await push.requestPermission().timeout(testBound);
+
+      expect(answer, DwPushPermission.granted);
+      await settle();
+      expect(world.registrations.single.$2.token, 'device-13');
+    });
+  });
+
   group('opened notifications', () {
     Map<Object?, Object?> data({int id = 12, String? link = '/news/12'}) => {
       ...DwPushData(

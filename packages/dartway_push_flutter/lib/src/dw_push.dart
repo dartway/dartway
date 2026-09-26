@@ -32,7 +32,11 @@ import 'dw_push_transport_client.dart';
 /// delivers), and one of them awaited in `init` kept an app on its splash for
 /// good (#294). A push that arrives a second late costs nothing; an app that
 /// does not open costs everything. A call still unanswered after
-/// [reportUnansweredAfter] is reported, and still waited for.
+/// [reportUnansweredAfter] is reported and, within the background start
+/// itself, still waited for — a late answer there costs nothing either. The
+/// two calls the app makes on the user's behalf, [requestPermission] and
+/// [permission], cannot afford the same patience: they answer honestly by
+/// that same deadline rather than leave a button waiting forever (#338).
 ///
 /// From then on it keeps the server's registration in
 /// step with two facts that arrive independently: the device token and the
@@ -67,7 +71,10 @@ class DwPush extends DwFlutterPlugin {
 
   /// How long a platform call of the background start may stay unanswered
   /// before it is reported through the error pipeline, naming the call. The
-  /// report does not cancel it: the answer is still taken whenever it comes.
+  /// report does not cancel it: the answer is still taken whenever it comes —
+  /// except for [requestPermission] and [permission], which are asked by the
+  /// app on the user's behalf and answer honestly rather than hang past this
+  /// same duration (#338).
   final Duration reportUnansweredAfter;
 
   /// A failing transport costs push, not the app.
@@ -218,18 +225,46 @@ class DwPush extends DwFlutterPlugin {
 
   /// Asks the user for permission — at a moment they understand why — and
   /// registers the token when the answer is yes.
+  ///
+  /// Answers within [reportUnansweredAfter] even if the background start
+  /// never attaches a transport — on iOS `attach` awaits an APNs
+  /// registration that a wrong bundle id, or no signal, never delivers
+  /// (#338), and a caller asking on the user's behalf cannot be left waiting
+  /// forever the way the background start itself is. The answer is
+  /// `notDetermined`: nobody has been asked, which is the truth of it — the
+  /// silence itself is already reported by [_answer], for whichever call is
+  /// still in flight.
   Future<DwPushPermission> requestPermission() async {
-    final transport = await _attached.future;
-    if (transport == null) return DwPushPermission.unsupported;
+    final transport = await _attachedOrTimeout();
+    if (transport == null) return _noTransportPermission;
     final answer = await transport.requestPermission();
     if (answer == DwPushPermission.granted) await _fetchToken();
     return answer;
   }
 
-  /// The permission as it stands, without asking.
-  Future<DwPushPermission> permission() async =>
-      await (await _attached.future)?.permission() ??
-      DwPushPermission.unsupported;
+  /// The permission as it stands, without asking. Bounded by
+  /// [reportUnansweredAfter] the same way [requestPermission] is.
+  Future<DwPushPermission> permission() async {
+    final transport = await _attachedOrTimeout();
+    return transport == null
+        ? _noTransportPermission
+        : await transport.permission();
+  }
+
+  /// The attached transport — `null` either because the background start
+  /// decided none can run here, or because [reportUnansweredAfter] passed
+  /// before it decided anything. [_noTransportPermission] tells the two
+  /// apart through [_attached] itself, which this leaves untouched.
+  Future<DwPushTransportClient?> _attachedOrTimeout() =>
+      _attached.future.timeout(reportUnansweredAfter, onTimeout: () => null);
+
+  /// The status for [requestPermission] and [permission] when
+  /// [_attachedOrTimeout] returned no transport: `unsupported` once the
+  /// background start has actually decided so, `notDetermined` while it is
+  /// still deciding and the wait was merely given up on.
+  DwPushPermission get _noTransportPermission => _attached.isCompleted
+      ? DwPushPermission.unsupported
+      : DwPushPermission.notDetermined;
 
   /// The user turned notifications off in the app: removes this device's
   /// registration for the signed-in account and registers nothing until

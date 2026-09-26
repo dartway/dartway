@@ -1,3 +1,15 @@
+## 0.5.1
+
+- **`requestPermission()` and `permission()` now answer within `reportUnansweredAfter` even when
+  the transport never attaches (#338).** Both awaited the background start's `_attached` future
+  with no bound of their own: on iOS `attach` awaits an APNs registration a wrong bundle id, or no
+  signal at all, never delivers, so a build like that left the app's push toggle waiting forever —
+  busy, with the setting never saved. Past that same deadline they answer
+  `DwPushPermission.notDetermined` (nobody has been asked, which is the truth of it) instead of
+  hanging; the silence is still reported, exactly as every other unanswered platform call already
+  is. The background start itself is unaffected — a late `attach` there still completes and is
+  still used.
+
 ## 0.5.0
 
 - This package now targets the rewritten DartWay framework (`dartway_core_flutter` 0.20.0). The previously published `0.1.0` was built on the old, Serverpod-based stack.
