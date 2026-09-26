@@ -12,7 +12,8 @@
 #
 #   tool/checks.sh             analyze + test: needs no Docker
 #   tool/checks.sh analyze     dart analyze over every resolution root
-#   tool/checks.sh test        every suite that needs no services
+#   tool/checks.sh test        every suite that needs no services, plus every
+#                              `js/*` npm package (typecheck, node --test, build)
 #   tool/checks.sh services    the suites of the packages named in SERVICES,
 #                              against DW_DATABASE_* and DW_STORAGE_*
 #
@@ -215,6 +216,73 @@ test_suites() {
   done
 }
 
+# The JavaScript half of the monorepo: each `js/*` package is its own npm
+# project (no workspace, no shared `resolve`), checked by its own `npm run
+# check` — typecheck, `node --test`, and the build that would ship to npm.
+# There is exactly one today, `js/studio-bridge`; a second one under `js/`
+# with a `package.json` is picked up the same way a new Dart package with a
+# `pubspec.yaml` is by `packages()`.
+js_packages() {
+  find js -mindepth 2 -maxdepth 2 -name package.json \
+    | sed 's|/package.json$||' | sort
+}
+
+# `node --test`'s own type stripping is what runs this repo's `.ts` test
+# files at all — no build step in between. Below the version it became
+# unflagged (22.18.0), the default file discovery silently matches nothing:
+# `node --test` prints `# tests 0` and exits 0, which is indistinguishable
+# from a suite that ran and passed. Read here from the package's own
+# `engines.node` rather than repeated as a second constant, so the two cannot
+# drift the way the pinned and floor Flutter versions are read from `.fvmrc`
+# and each pubspec rather than written twice.
+js_node_floor() {
+  node -e "
+    const pkg = JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8'));
+    process.stdout.write((pkg.engines && pkg.engines.node || '').replace(/^>=\s*/, ''));
+  " "$1/package.json"
+}
+
+require_node_floor() {
+  local package="$1"
+  if ! command -v node >/dev/null 2>&1; then
+    echo "js: node not found on PATH; $package needs it (see engines.node in its package.json)" >&2
+    exit 1
+  fi
+  local floor have lowest
+  floor="$(js_node_floor "$package")"
+  [ -n "$floor" ] || return 0
+  have="$(node --version)"; have="${have#v}"
+  lowest="$(printf '%s\n%s\n' "$floor" "$have" | sort -t. -k1,1n -k2,2n -k3,3n | head -1)"
+  if [ "$lowest" != "$floor" ]; then
+    echo "js: node $have is on PATH; $package is written against >= $floor" >&2
+    echo "  (Node's unflagged .ts type stripping landed in 22.18.0 — node --test finds nothing below it, silently)" >&2
+    exit 1
+  fi
+}
+
+js_checks() {
+  echo "══ js"
+  for package in $(js_packages); do
+    require_node_floor "$package"
+    echo "── $package (npm)"
+    local out status
+    out="$(mktemp)"
+    (cd "$package" && npm ci && npm run check) 2>&1 | tee "$out"
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ]; then
+      FAILED+=("$package (npm)")
+    elif ! grep -qE '^# tests [1-9][0-9]*$' "$out"; then
+      # A version below the floor is refused above; this is the second net —
+      # a glob that stopped matching (a renamed test/ directory, say) must
+      # not read as green either. Same reasoning as `analyze_root`'s UNRUN:
+      # a suite nobody ran is not a suite that passed.
+      echo "$package: npm run check exited 0 but ran no tests" >&2
+      FAILED+=("$package (npm) — ran 0 tests")
+    fi
+    rm -f "$out"
+  done
+}
+
 # Stops the run, before anything is resolved or run, unless every variable the
 # suites read is set and both services answer on their ports. Forty suites each
 # failing in `setUpAll` say the same thing less clearly.
@@ -258,6 +326,7 @@ service_suites() {
 resolve
 [ "$MODE" = all ] || [ "$MODE" = analyze ] && analyze
 [ "$MODE" = all ] || [ "$MODE" = test ] && test_suites
+[ "$MODE" = all ] || [ "$MODE" = test ] && js_checks
 [ "$MODE" = services ] && service_suites
 
 echo

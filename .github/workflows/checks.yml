@@ -56,6 +56,19 @@ jobs:
           flutter-version: 3.47.2
           channel: stable
 
+      # Only the `test` mode reaches `js_checks` in tool/checks.sh (the `js/*`
+      # npm packages, currently js/studio-bridge) — Node stays out of the
+      # `analyze` job, which never needs it. 22.18.0, not the 22.6 the
+      # package.json floor used to say: below 22.18.0 Node's `.ts` type
+      # stripping is not on by default, `node --test`'s file discovery
+      # matches nothing, and it prints `# tests 0` and exits 0 — a run that
+      # skipped every test looked exactly like one that passed them (caught in
+      # review of the PR that added this job, 36243686357).
+      - if: matrix.mode == 'test'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+
       - run: tool/checks.sh ${{ matrix.mode }}
 
   services:
