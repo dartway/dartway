@@ -3,11 +3,15 @@
 ## 0.21.0-dev.6
 
 - `DwDatabaseConfig` gains an optional `caFile` (`DW_DATABASE_CA_FILE` in
-  `fromEnvironment`): when set, the connection verifies the server's
-  certificate against that CA (`SslMode.verifyFull`) instead of only
-  encrypting the channel (`SslMode.require`, unchanged when absent).
-  `DW_DATABASE_CA_FILE` set together with `DW_DATABASE_SSL=false` is refused
-  at parse time — a CA has nothing to verify without TLS (dartway/dartway#342).
+  `fromEnvironment`): when set, every connection — pooled and `listen()`'s own
+  — verifies the server's certificate against that CA (`SslMode.verifyFull`)
+  instead of only encrypting the channel (`SslMode.require`, unchanged when
+  absent). `DW_DATABASE_CA_FILE` set together with `DW_DATABASE_SSL=false` is
+  refused as a contradiction — a CA has nothing to verify without TLS — both
+  by `fromEnvironment` and by the constructor itself (dartway/dartway#342).
+  The server certificate needs a `subjectAltName` for the connecting host (no
+  fallback to `CN`, unlike `libpq`) and `extendedKeyUsage: serverAuth`; every
+  managed provider's own CA issues one.
 
 ## 0.21.0-dev.5
 

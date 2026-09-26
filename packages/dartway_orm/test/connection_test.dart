@@ -256,6 +256,39 @@ void main() {
     });
   });
 
+  test('copyWith carries caFile through untouched — the migration CLI opens '
+      'every scratch and server connection via copyWith, and a dropped caFile '
+      'there would silently downgrade them to require', () {
+    const config = DwDatabaseConfig(
+      host: 'db',
+      name: 'app',
+      user: 'u',
+      password: 'p',
+      caFile: '/run/secrets/db-ca.pem',
+    );
+    expect(config.copyWith().caFile, '/run/secrets/db-ca.pem');
+    expect(config.copyWith(name: 'scratch').caFile, '/run/secrets/db-ca.pem');
+    expect(config.copyWith(maxConnections: 2).caFile, '/run/secrets/db-ca.pem');
+  });
+
+  test(
+    'the constructor itself refuses ssl: false with a caFile set — not only '
+    'fromEnvironment — so a value built by hand cannot silently combine them',
+    () {
+      expect(
+        () => DwDatabaseConfig(
+          host: 'db',
+          name: 'app',
+          user: 'u',
+          password: 'p',
+          ssl: false,
+          caFile: '/run/secrets/db-ca.pem',
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    },
+  );
+
   test('raw query binds untyped values of every common type', () async {
     final local = DateTime(2026, 9, 13, 23, 30, 0, 0, 7);
     final rows = await database().db.query(

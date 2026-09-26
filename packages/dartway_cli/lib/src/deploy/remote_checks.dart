@@ -482,12 +482,15 @@ Future<DwDeployVerdict> _checkDatabaseReachable(DwDeployContext context) async {
 /// `verify-full` — exactly the choice `DwDatabaseConfig.fromEnvironment`
 /// makes, so what is tested is the connection the server will actually make.
 ///
-/// A CA file must name one of [requiredFiles] (`requires.files` in
-/// `deploy/config.yaml`) — the file itself, delivered with `secret
-/// put-file`, is expected at `<storeDir>/<name>`, bind-mounted into the
-/// throwaway client exactly as the compose file mounts it into the server
-/// (`DwStack.secretFilesDir`) — never a name the deploy never agreed to mount
-/// anywhere.
+/// A CA file's value must be exactly `${DwStack.secretFilesDir}/<name>` —
+/// the server opens the literal path, so this checks the directory as well
+/// as the name; `<name>` alone, or under a different directory, does not
+/// read as that file even when it matches — with `<name>` one of
+/// [requiredFiles] (`requires.files` in `deploy/config.yaml`). The file
+/// itself, delivered with `secret put-file`, is expected at
+/// `<storeDir>/<name>`, bind-mounted into the throwaway client exactly as
+/// the compose file mounts it into the server — never a name the deploy
+/// never agreed to mount anywhere.
 ///
 /// [network] is read by nothing this ships — it exists so a test can attach
 /// the throwaway client to the same Docker network as a fake database instead
@@ -580,12 +583,21 @@ if [ -n "\$dw_ca_file" ]; then
     dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=set-but-DW_DATABASE_SSL=false-is-a-contradiction"
   else
     dw_ca_name=\$(basename "\$dw_ca_file")
-    case " \$dw_required_files " in
-      *" \$dw_ca_name "*) ;;
-      *) dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=[\$dw_ca_file]-names-a-file-not-declared-under-requires.files" ;;
-    esac
-    if [ -z "\$dw_invalid" ] && [ ! -f "\$store_dir/\$dw_ca_name" ]; then
-      dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=[\$dw_ca_file]-not-delivered-run-dartway-secret-put-file"
+    dw_ca_dir=\$(dirname "\$dw_ca_file")
+    # The server opens the literal path, not its basename: a value naming a
+    # declared file's name but mounted (or not mounted at all) somewhere else
+    # — /etc/ssl/x.pem, a bare x.pem, a subdirectory under the mount — must
+    # not read as that file just because the last path segment matches.
+    if [ "\$dw_ca_dir" != '${DwStack.secretFilesDir}' ]; then
+      dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=[\$dw_ca_file]-must-be-mounted-directly-under-${DwStack.secretFilesDir}"
+    else
+      case " \$dw_required_files " in
+        *" \$dw_ca_name "*) ;;
+        *) dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=[\$dw_ca_file]-names-a-file-not-declared-under-requires.files" ;;
+      esac
+      if [ -z "\$dw_invalid" ] && [ ! -f "\$store_dir/\$dw_ca_name" ]; then
+        dw_invalid="\$dw_invalid DW_DATABASE_CA_FILE=[\$dw_ca_file]-not-delivered-run-dartway-secret-put-file"
+      fi
     fi
     dw_ca_mount="\$store_dir/\$dw_ca_name:/dw-database-ca.pem:ro"
   fi

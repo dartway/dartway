@@ -14,7 +14,11 @@ final class DwDatabaseConfig {
     this.queryTimeout = const Duration(minutes: 5),
     this.statementCacheSize = 256,
   }) : assert(maxConnections > 0),
-       assert(statementCacheSize > 0);
+       assert(statementCacheSize > 0),
+       assert(
+         caFile == null || ssl,
+         'caFile needs ssl: true — a CA has nothing to verify without TLS',
+       );
 
   /// Reads `HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SSL`, `CA_FILE` and
   /// `MAX_CONNECTIONS` under [prefix].
@@ -109,8 +113,11 @@ final class DwDatabaseConfig {
   /// A CA certificate file the server's certificate is verified against
   /// (`SslMode.verifyFull`), instead of the encrypted-but-unverified default.
   /// A path, not the certificate text — the driver reads it from disk. Unset
-  /// unless `DW_DATABASE_CA_FILE` names one; a contradiction with `ssl: false`
-  /// is rejected by [fromEnvironment] rather than silently ignored here.
+  /// unless `DW_DATABASE_CA_FILE` names one; the contradiction with
+  /// `ssl: false` is rejected both by [fromEnvironment] (a proper
+  /// `ArgumentError`, naming both keys) and by an assertion on the
+  /// constructor itself, so a value built by hand — `copyWith`, a test,
+  /// the migration CLI — cannot silently combine them either.
   final String? caFile;
 
   /// The driver's own pool defaults to a single connection; this is the real

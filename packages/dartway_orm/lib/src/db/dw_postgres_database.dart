@@ -111,7 +111,14 @@ final class _DwListener {
         password: _config.password,
       ),
       settings: pg.ConnectionSettings(
-        sslMode: _config.ssl ? pg.SslMode.require : pg.SslMode.disable,
+        // The same choice the pool makes (`dwSslMode`/`dwSecurityContext` in
+        // dw_connection_pool.dart) — not a second copy of it. A `LISTEN`
+        // session cannot be pooled, but it must still verify a configured CA
+        // exactly as every pooled connection does; a session that skipped it
+        // would authenticate unverified while the rest of the database did
+        // not.
+        sslMode: dwSslMode(_config),
+        securityContext: dwSecurityContext(_config),
         applicationName: '${_config.applicationName}-listen',
         connectTimeout: _config.connectTimeout,
       ),

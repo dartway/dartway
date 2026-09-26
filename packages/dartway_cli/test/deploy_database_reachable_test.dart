@@ -337,6 +337,29 @@ void main() {
       expect(result.stderr, contains('requires.files'));
     });
 
+    // The server opens the literal path DW_DATABASE_CA_FILE names, never just
+    // its basename — so the value has to be exactly `/run/secrets/<name>`,
+    // not merely end in a declared name. Each of these matches a declared
+    // file by basename and is refused anyway, for three different reasons a
+    // basename-only check would have missed.
+    for (final MapEntry(key: path, value: why) in {
+      '/etc/ssl/x.pem': 'a directory nothing declares, not the mounted one',
+      'x.pem': 'no directory at all — a bare file name',
+      '/run/secrets/a/x.pem':
+          'a subdirectory of the mount, not the mount itself',
+    }.entries) {
+      test('"$path" ($why) names a declared file but is refused for the '
+          'directory, not mounted directly under /run/secrets', () async {
+        final result = await run(
+          {...valid, 'DW_DATABASE_CA_FILE': path},
+          requiredFiles: ['x.pem'],
+        );
+        expect(result.ok, isFalse);
+        expect(result.stderr, contains('DW_DATABASE_CA_FILE'));
+        expect(result.stderr, contains('must-be-mounted-directly-under'));
+      });
+    }
+
     test('declared but never delivered (secret put-file was never run) fails, '
         'named', () async {
       final result = await run(
@@ -348,16 +371,62 @@ void main() {
       expect(result.stderr, contains('not-delivered'));
     });
 
-    test('declared and delivered clears validation — the failure that follows '
-        '(no real host) proves it, not a validation error', () async {
-      File(
-        p.join(dir.path, 'db-ca.pem'),
-      ).writeAsStringSync('-----BEGIN CERTIFICATE-----\ndummy\n');
-      final result = await run(
-        {...valid, 'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem'},
-        requiredFiles: ['db-ca.pem'],
-      );
-      expect(result.stderr, isNot(contains('DW_DATABASE_CA_FILE')));
-    });
+    // Runs with no real `docker` on PATH — a fake one recording exactly how it
+    // was invoked, so this proves what the script *decided* (verify-full, the
+    // root cert mounted and referenced) without needing a Docker daemon in
+    // the tier that promises it needs no services, and without the earlier,
+    // weaker version of this test's assumption that "no error mentions
+    // DW_DATABASE_CA_FILE" meant validation passed — it could just as well
+    // have meant the check silently fell back to `require`.
+    test(
+      'declared and delivered: verify-full is chosen, the root cert is '
+      'mounted and PGSSLROOTCERT points at it — not merely "no error"',
+      () async {
+        File(
+          p.join(dir.path, 'db-ca.pem'),
+        ).writeAsStringSync('-----BEGIN CERTIFICATE-----\ndummy\n');
+        final fakeDockerDir = Directory(p.join(dir.path, 'fake-bin'))
+          ..createSync();
+        final fakeDocker = File(p.join(fakeDockerDir.path, 'docker'))
+          ..writeAsStringSync('''
+#!/bin/sh
+prev=""
+for arg in "\$@"; do
+  if [ "\$prev" = "--env-file" ]; then
+    echo "===ENVFILE==="
+    cat "\$arg"
+    echo "===END==="
+  fi
+  if [ "\$prev" = "-v" ]; then
+    echo "MOUNT:\$arg"
+  fi
+  prev="\$arg"
+done
+echo 1
+''');
+        Process.runSync('chmod', ['+x', fakeDocker.path]);
+        final path = Platform.environment['PATH'] ?? '/usr/bin:/bin';
+        final result =
+            await LocalShell(
+              environment: {'PATH': '${fakeDockerDir.path}:$path'},
+            ).run(
+              dwDatabaseReachabilityScript(
+                storeFile: storeFile({
+                  ...valid,
+                  'DW_DATABASE_CA_FILE': '/run/secrets/db-ca.pem',
+                }).path,
+                image: 'postgres:17-alpine',
+                requiredFiles: ['db-ca.pem'],
+              ),
+            );
+        expect(result.stderr, isNot(contains('DW_DATABASE_CA_FILE')));
+        expect(result.stdout, contains('PGSSLMODE=verify-full'));
+        expect(result.stdout, contains('PGSSLROOTCERT=/dw-database-ca.pem'));
+        expect(
+          result.stdout,
+          contains('MOUNT:${dir.path}/db-ca.pem:/dw-database-ca.pem:ro'),
+        );
+      },
+    );
   });
 }

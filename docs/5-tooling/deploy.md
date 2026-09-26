@@ -181,10 +181,25 @@ server itself (`DwDatabaseConfig.fromEnvironment`) and by this check.
 `dart run dartway_cli:dartway deploy secret put-file <path/to/ca.pem> --name db-ca.pem --env <environment>`
 — it is then mounted read-only at `/run/secrets/db-ca.pem` exactly like any other declared file — and
 set `DW_DATABASE_CA_FILE` to that same mounted path. DigitalOcean Managed Postgres offers the cluster's CA
-certificate as a download next to the connection details in its control panel (also reachable through
-`doctl databases connection <cluster> --format CA`); RDS publishes a combined regional bundle
-(`rds-ca-*-bundle.pem`) on its own documentation pages; Cloud SQL's instance page has a "Server CA
-certificate" download under its connections tab.
+certificate as a download next to the connection details in its control panel, or on the command line:
+`doctl databases get-ca <cluster-id> -o json | jq -r .certificate | base64 --decode > db-ca.pem` (confirmed
+against `doctl`'s own `--help`; there is no `doctl databases connection --format CA`). RDS publishes a
+combined regional bundle (`rds-ca-*-bundle.pem`) on its own documentation pages. Cloud SQL's instance page
+has a "Server CA certificate" download under its connections tab — **unconfirmed here** whether its
+default per-instance certificate carries the connecting address in `subjectAltName` (see the warning
+below); check before relying on `verify-full` against it.
+
+**The server certificate must carry a `subjectAltName` for the address `DW_DATABASE_HOST` names** —
+`dart:io` (BoringSSL) has no fallback to the deprecated Subject `CN` field the way `libpq`/OpenSSL still
+does, and separately requires the leaf to declare `extendedKeyUsage: serverAuth`; a certificate with
+neither is refused outright, chain and all, with an error that does not name either omission (see the
+[database page](../4-server/database.md)). Every provider named above issues certificates with a proper
+SAN, and this is exactly what a certificate authority is expected to include — but a self-hosted or
+lesser-known provider's own CA is worth checking (`openssl x509 -in cert.pem -noout -text | grep -A1
+'Subject Alternative Name'`) before depending on `verify-full` against it. `database-reachable` connects
+through `libpq`, which is more permissive here, so a config it passes can still be one the server itself
+refuses at startup for exactly this reason — the check does not (and, without `openssl` in the pinned
+Postgres client image it runs, cannot cheaply) verify the SAN itself.
 
 An existing config with no `database` key keeps deploying `bundled`, exactly as before.
 

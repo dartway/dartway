@@ -338,7 +338,7 @@ real connection. `DwDatabaseConfig`:
 |---|---|---|
 | `host`, `port`, `name`, `user`, `password` | port `5432` | |
 | `ssl` | `true` | encrypted, certificate not verified |
-| `caFile` | unset | verifies the server's certificate against this CA instead (`verify-full`); refused together with `ssl: false` |
+| `caFile` | unset | verifies the server's certificate against this CA instead (`verify-full`); refused together with `ssl: false`. The certificate needs a `subjectAltName` for the connecting host — no fallback to the deprecated `CN` field, unlike `libpq` — and `extendedKeyUsage: serverAuth`; see [deploy](../5-tooling/deploy.md#database-bundled-or-someone-elses) |
 | `maxConnections` | 10 | the ceiling of concurrent statements |
 | `applicationName` | `dartway` | |
 | `connectTimeout` | 15 s | also how long a caller waits for a free connection |
