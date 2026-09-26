@@ -18,6 +18,16 @@ enum DwStorageMode {
   external,
 }
 
+/// Where Postgres runs for an environment.
+enum DwDatabaseMode {
+  /// A Postgres container in the stack, on the compose project's own volume.
+  bundled,
+
+  /// A Postgres somebody else runs — a managed provider; its coordinates are
+  /// secrets.
+  external,
+}
+
 /// The optional marketing or landing site of an environment.
 class DwSiteConfig {
   const DwSiteConfig({required this.domain, required this.source});
@@ -51,6 +61,7 @@ class DwDeployTarget {
     required this.apiDomain,
     required this.appDomain,
     this.site,
+    this.database = DwDatabaseMode.bundled,
     this.storage = DwStorageMode.none,
     this.storageDomain,
     this.registryMirror,
@@ -82,6 +93,10 @@ class DwDeployTarget {
   final String appDomain;
 
   final DwSiteConfig? site;
+
+  /// Where Postgres runs. `bundled` unless declared otherwise, so an existing
+  /// config keeps deploying exactly as it did before this existed.
+  final DwDatabaseMode database;
 
   final DwStorageMode storage;
 
@@ -241,6 +256,21 @@ class DwDeployTarget {
       }
     }
 
+    var database = DwDatabaseMode.bundled;
+    final databaseText = guarded(() => reader.optionalString('database'));
+    if (databaseText != null) {
+      final mode = DwDatabaseMode.values
+          .where((mode) => mode.name == databaseText)
+          .firstOrNull;
+      if (mode == null) {
+        problems.add(
+          '$source: "database" is bundled or external, got "$databaseText"',
+        );
+      } else {
+        database = mode;
+      }
+    }
+
     var storage = DwStorageMode.none;
     final storageText = guarded(() => reader.optionalString('storage'));
     if (storageText != null) {
@@ -319,6 +349,7 @@ class DwDeployTarget {
         apiDomain: apiDomain!,
         appDomain: appDomain!,
         site: site,
+        database: database,
         storage: storage,
         storageDomain: storageDomain,
         registryMirror: registryMirror,
@@ -426,6 +457,7 @@ class DwDeployTarget {
     'api_domain',
     'app_domain',
     'site',
+    'database',
     'storage',
     'storage_domain',
     'registry_mirror',

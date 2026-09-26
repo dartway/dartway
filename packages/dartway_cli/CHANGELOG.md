@@ -46,6 +46,26 @@
   ships (the `admin` case above); a fixed default under the `dw_` prefix does not, on any stock
   image or package, so an operator who leaves `deploy_user` unset never meets the collision. Additive:
   a config that already names `deploy_user` is unaffected.
+- **`database: bundled | external` in `deploy/config.yaml`** (dartway/dartway#325, D-096), the same
+  vocabulary `storage` uses. `external` renders no `postgres` service, volume or `depends_on`;
+  `DW_DATABASE_HOST`, `_PORT`, `_NAME`, `_USER` and `_PASSWORD` become required secrets — a managed
+  provider (DigitalOcean Managed Postgres, RDS, Cloud SQL, …) names its own, none of them derivable
+  the way the bundled container's are — and the secret store accepts these names precisely because
+  the compose file no longer sets them (it still refuses them for `bundled`). `DW_DATABASE_SSL`
+  (default `true`) and `_MAX_CONNECTIONS` (default 10, the pool ceiling — one server holds this many
+  plus one more for its session `LISTEN`, and a managed plan's usable total is often in the tens)
+  stay optional; the server already defaults both. `dartway deploy check` gained
+  `database-reachable`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS` are validated exactly as the
+  server parses them, then on the deployment host over SSH — a managed provider's firewall usually
+  trusts that address, not the maintainer's machine — a throwaway, pinned Postgres client attempts a
+  real connection with the same `sslmode` the server itself will use (`require` unless
+  `DW_DATABASE_SSL` is explicitly `false`) and reports why it failed (a bad stored value, DNS,
+  refused, a timeout, authentication, or TLS not offered), never a bare TCP probe, which would miss
+  the last two. Documents DigitalOcean Managed Postgres specifically: the direct port, not its
+  PgBouncer transaction-mode pooler, which silently breaks the session `LISTEN` and the migration
+  lock. Additive: an existing config with no `database` key keeps deploying exactly as before, so
+  there is no migration note. `sslmode=verify-full` with a CA file is tracked separately
+  (dartway/dartway#342).
 
 ## 0.12.0
 
