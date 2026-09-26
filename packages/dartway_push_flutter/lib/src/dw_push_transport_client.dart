@@ -28,10 +28,10 @@ enum DwPushPermission {
   /// The platform has no such permission.
   unsupported,
 
-  /// The push service did not answer in time — the real state is unknown;
-  /// ask again later. Never means "nobody has asked" ([notDetermined]) and
-  /// never a guess at what the answer would have been: `DwPush.requestPermission`
-  /// and `.permission` return this once their own deadline passes without an
+  /// Did not answer in time — the real state is unknown; ask again later.
+  /// Never means "nobody has asked" ([notDetermined]) and never a guess at
+  /// what the answer would have been: `DwPush.requestPermission` and
+  /// `.permission` return this once their own deadline passes without an
   /// answer, and neither registers a token nor should a caller act as if
   /// permission were granted or refused.
   unanswered,

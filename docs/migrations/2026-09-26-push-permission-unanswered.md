@@ -1,14 +1,25 @@
 ---
-title: "DwPushPermission gained unanswered — an exhaustive switch over it needs a case"
+title: "DwPushPermission gained unanswered — code reading requestPermission()/permission() needs a case for it"
 affects:
   dartway_push_flutter: "0.6.0"
 ---
 
 ## Who is affected
 
-A project with an exhaustive `switch` over `DwPushPermission` — most likely around what
-`requestPermission()` or `permission()` returns, to decide what to save or show. The compiler
-refuses it without a case for the new value.
+Any code that reads, or ignores, what `requestPermission()` or `permission()` returns:
+
+- **An exhaustive `switch` over `DwPushPermission`.** The compiler refuses it without a case for
+  the new value.
+- **Code that persists a settings toggle regardless of the result** — a call that used to always
+  either grant or refuse now has a third outcome that is neither, and saving the toggle as on
+  because of it records a permission that was never actually asked for.
+- **Code that compares the result to `granted` and treats anything else as denied** (an `if`/`else`
+  instead of a switch, or a check like `== DwPushPermission.denied`). `unanswered` would fall into
+  the `else` or fail that check the same way a real refusal does, which can send a user to their
+  system settings to "turn notifications back on" when nobody has actually asked them yet.
+- **A home-made timeout wrapped around either call**, to work around the wait that used to have no
+  bound of its own. It is no longer needed and would now hide the honest `unanswered` behind
+  whatever fallback the wrapper answers instead.
 
 ## What changed
 
@@ -24,6 +35,9 @@ the user a system dialog, and their own time answering it is not silence.
 ## What to change
 
 Add a case for `DwPushPermission.unanswered` wherever `requestPermission()` or `permission()` is
-switched on exhaustively. Treat it as "try again", not as an answer: the registration that
+switched, compared or persisted. Treat it as "try again", not as an answer: the registration that
 normally follows `granted` did not happen and will not until asked again, so do not persist a
-settings toggle as on because of it — save nothing, or offer the user a retry action instead.
+settings toggle as on because of it, and do not treat it as `denied` — save nothing, or offer the
+user a retry action instead. Remove any timeout wrapped around either call to work around the
+former unbounded wait: the framework now gives up on its own, honestly, and a wrapper on top of it
+only hides that behind whatever it falls back to.
