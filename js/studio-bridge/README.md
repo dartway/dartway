@@ -12,9 +12,24 @@ check live in the core, so the bindings cannot drift apart from each other — o
 from the Dart implementation of the same protocol that DartWay's Flutter apps
 use.
 
+**Not yet on npm** ([#329](https://github.com/dartway/dartway/issues/329)) —
+`npm install @dartway/studio-bridge` will not resolve until this package is
+published, which is the owner's call to make. Until then, build it from this
+repository and reference it locally:
+
 ```bash
-npm install @dartway/studio-bridge
+git clone https://github.com/dartway/dartway.git
+cd dartway/js/studio-bridge && npm ci && npm run build
 ```
+
+then point your app at it, e.g. in its `package.json`:
+
+```json
+"@dartway/studio-bridge": "file:../dartway/js/studio-bridge"
+```
+
+(adjust the path to wherever you cloned it). Once it is published, `npm
+install @dartway/studio-bridge` replaces this.
 
 ## Connect
 
