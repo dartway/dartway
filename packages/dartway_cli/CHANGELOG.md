@@ -33,7 +33,7 @@
   serve every real file as a 404 from then on. Passes once the expected volume exists, whatever else
   is still on the server beside it: an old volume from before the change is the rollback copy, and
   neither command asks for it to be removed before passing.
-- **`database: bundled | external` in `deploy/config.yaml`** (dartway/dartway#325, D-095), the same
+- **`database: bundled | external` in `deploy/config.yaml`** (dartway/dartway#325, D-096), the same
   vocabulary `storage` uses. `external` renders no `postgres` service, volume or `depends_on`;
   `DW_DATABASE_HOST`, `_PORT`, `_NAME`, `_USER` and `_PASSWORD` become required secrets — a managed
   provider (DigitalOcean Managed Postgres, RDS, Cloud SQL, …) names its own, none of them derivable
