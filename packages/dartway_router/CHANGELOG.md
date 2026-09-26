@@ -1,3 +1,13 @@
+## 3.0.0 - 2026-09-26
+
+### Breaking
+
+**A simple route's `extraPathSegment` replaces its name in the URL instead of prefixing it** (#314). `buildPathSegment` returned `'$extraPathSegment/$coreSegment'` for every descriptor, and a `.simple()` route's core segment is always its enum name — so `editProfile(DwNavigationRouteDescriptor.simple(parent: profile, extraPathSegment: 'edit'))` built `/profile/edit/editProfile`, not the `/profile/edit` every caller actually wanted. Checked against the framework's own rule that route names are one namespace shared by every zone: `extraPathSegment` on a simple route exists precisely to give a page a URL word of its own without forcing every zone to fight over (or copy) the enum name, so a prefix that still appended the name back on could never have been the intent — U90's eleven simple routes using it (`editProfile` → `edit`, `following` → `following`, `notificationSettings` → `notifications`, …) all read as the segment replacing the name, never as a second word next to it.
+
+The parameterized descriptor is unchanged: there `extraPathSegment` prefixes the parameter pattern (`:userId`), which is not a name and cannot double up — `userDetail(extraPathSegment: 'users')` still builds `/users/:userId`.
+
+Any project relying on the old, doubled URL of a simple route with `extraPathSegment` set (a deep link, a bookmark, a stored path) breaks: see `docs/migrations/2026-09-26-simple-extra-path-segment-replaces-name.md`.
+
 ## 2.0.0 - 2026-09-23
 
 ### Breaking

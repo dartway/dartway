@@ -18,7 +18,7 @@ dependencies:
 
   dartway_client: ^0.21.0-dev.6
   dartway_core_shared: ^0.21.0-dev.6
-  dartway_router: ^2.0.0
+  dartway_router: ^3.0.0
   flutter_riverpod: ^3.0.0
   intl: ^0.20.2
   skeletonizer: ^2.1.0

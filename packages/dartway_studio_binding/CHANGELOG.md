@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`
+  replaces its name in the URL instead of doubling it. No behaviour change here: this
+  package only reads `route.fullPath` and `descriptor.parent`, neither of which changed
+  shape — the bump is the caret catching up with the workspace.
+
 ## 0.2.0
 
 - **Requires `dartway_router` 2.0.0** (#288), where a zone guard takes the navigation target.

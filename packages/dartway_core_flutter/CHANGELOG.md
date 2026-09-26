@@ -8,6 +8,9 @@
   loading (`SizedBox.shrink()`) instead of asking a project-wide model registry that no live
   project configured; `hasCustomErrorHandling` had no caller either. Migration note:
   `docs/migrations/2026-09-25-default-model-getter-removed.md`.
+- **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`
+  replaces its name in the URL instead of doubling it. No behaviour change here: this
+  package only re-exports `dartway_router`.
 
 ## 0.21.0-dev.5
 
