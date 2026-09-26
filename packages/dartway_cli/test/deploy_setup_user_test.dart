@@ -40,7 +40,10 @@ void main() {
       // never silently joined.
       expect(userStep, contains('grep -Eq'));
       expect(userStep, contains('/etc/sudoers'));
-      expect(userStep, contains('already exists and is granted sudo'));
+      expect(
+        userStep,
+        contains('already exists and is granted privileges by sudoers'),
+      );
       // The no-collision path is unchanged.
       expect(
         userStep,

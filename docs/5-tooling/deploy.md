@@ -65,11 +65,14 @@ server package without `_server`, and the storage buckets after the same prefix 
 
 A cloud image can already carry a system group named like `deploy_user` — DigitalOcean's Ubuntu
 24.04 image ships an empty `admin` group, for instance (#328). Setup reuses that group when the
-user does not exist yet, unless the group is one Debian and Ubuntu's stock `/etc/sudoers` grants
-sudo to (`%admin`, `%sudo`): joining one of those would hand the "unprivileged" deploy user a path
-to root, so setup refuses instead and asks for a `deploy_user` that does not collide with it. The
-default, `dw_admin`, is fixed rather than derived from the project for exactly this reason — no
-stock image or package ships a group under the `dw_` prefix.
+user does not exist yet, unless the group is one a sudoers rule already grants privileges to
+(`%admin` on Ubuntu's stock sudoers; `%sudo` on both Debian's and Ubuntu's): joining one of those
+would hand the "unprivileged" deploy user a path to root, so setup refuses instead and asks for a
+`deploy_user` that does not collide with it. Setting `deploy_user: admin` explicitly still hits
+this refusal on a host whose stock `admin` group exists — that guard is not what fixes #328. What
+does is the default: `dw_admin` is fixed rather than derived from the project, because no stock
+image or package ships a group under the `dw_` prefix, so an operator who does not set
+`deploy_user` never meets this collision at all.
 
 ## Three hosts, one server process
 
