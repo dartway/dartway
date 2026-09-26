@@ -15,11 +15,24 @@
 //
 // Usage:
 //   dart run tool/release.dart              the plan, and nothing else
-//   dart run tool/release.dart --publish    publish it
+//   dart run tool/release.dart --cut        cut the family off its
+//                                            between-releases prerelease,
+//                                            then print the plan (#337)
+//   dart run tool/release.dart --publish    publish the plan
+//
+// Between releases the family lives on a prerelease (D-086); pub.dev receives
+// the plain version. `--cut` does the mechanical part: the family's own
+// version and every caret on it move together, workspace-wide, then the plan
+// runs so the stale check (`release_freshness.dart`) names whichever
+// satellites still need their own bump — a judgement call on their own
+// `CHANGELOG.md`, so `--cut` does not make it. On an uncut tree the plan says
+// so in one line instead of listing caret errors (`release_cut.dart`).
 //
 // Exit codes, the same three the other tools use:
-//   0  nothing to publish, or the plan printed / everything published
-//   1  something is wrong, or a publication failed
+//   0  nothing to publish, the plan printed, the family needs cutting first,
+//      or everything published
+//   1  something is wrong, a cut was refused, or publishing is partial or
+//      failed
 //   2  the question could not be put at all — pub.dev unreachable, or this was
 //      not run from the repository root. Not an answer, an unknown; the same
 //      third code the other tools here use, and for the same reason.
@@ -42,17 +55,36 @@ const _visibilityTimeout = Duration(minutes: 3);
 
 Future<void> main(List<String> args) async {
   final publish = args.contains('--publish');
-  final unknown = args.where((a) => a != '--publish');
+  final cut = args.contains('--cut');
+  final unknown = args.where((a) => a != '--publish' && a != '--cut');
   if (unknown.isNotEmpty) {
     stderr.writeln('unknown argument: ${unknown.first}');
-    stderr.writeln('usage: dart run tool/release.dart [--publish]');
+    stderr.writeln('usage: dart run tool/release.dart [--cut | --publish]');
     exit(64);
+  }
+  if (cut && publish) {
+    stderr.writeln(
+      '--cut and --publish do not combine: cut writes the plain versions, '
+      'let the plan (and a person) look at what it produced, then publish '
+      'in a separate run.',
+    );
+    exit(64);
+  }
+
+  if (cut) {
+    final refusal = _refuseToCutBecause();
+    if (refusal != null) {
+      stderr.writeln('Refusing to cut: $refusal');
+      exit(1);
+    }
+    _cutFamilyPrerelease();
   }
 
   // Every local package, published or not: `publish_to: none` ones are
   // excluded from the plan below, but a plan package can still depend on one
   // — which is exactly the bug this script once had, and `localShapes` is
-  // what lets `unresolvableDependenciesOf` see it.
+  // what lets `unresolvableDependenciesOf` see it. Read fresh, after a `--cut`
+  // above may have just rewritten some of these files on disk.
   final rawPubspecs = _rawPubspecs();
 
   final packages = rawPubspecs
@@ -72,6 +104,25 @@ Future<void> main(List<String> args) async {
       'Run this from the repository root.',
     );
     exit(2);
+  }
+
+  // Between releases the family sits on a prerelease (D-086); pub.dev only
+  // ever receives the plain version, so every caret on the family would read
+  // as unsatisfied — not because anything is broken, but because the release
+  // has not been cut yet. Said in one line, before anything else, rather than
+  // as a wall of caret errors that sends the reader looking for a dependency
+  // problem that is not there (#337). A family that disagrees with itself is
+  // left to the ordinary caret-by-caret checks below to describe.
+  final familyVersions = {
+    for (final p in packages)
+      if (familyPackageNames.contains(p.name)) p.name: p.version,
+  };
+  if (familyLockstepProblem(familyVersions) == null) {
+    final version = familyVersion(familyVersions);
+    if (plainOf(version) != null) {
+      stdout.writeln(cutFirstMessage(version));
+      return;
+    }
   }
 
   stdout.writeln('Asking $_host about ${packages.length} packages…');
@@ -179,6 +230,21 @@ Future<void> main(List<String> args) async {
     );
   }
 
+  // pub.dev's `package-created` operation — a first publication — is limited
+  // to 12 a day (#313); said up front, since a plan with more than that
+  // cannot go out in one calendar day whatever `--publish` does about the
+  // rest of the order.
+  final firstPublications = plan
+      .where((p) => published[p.name]!.isEmpty)
+      .length;
+  if (firstPublications > 0) {
+    stdout.writeln(
+      '\n$firstPublications of these are first publications. pub.dev allows '
+      'at most 12 in a day'
+      '${firstPublications > 12 ? ' — this plan has more than that and cannot all go out today' : ''}.',
+    );
+  }
+
   if (!publish) {
     stdout.writeln('\nThis was the plan only. Add --publish to carry it out.');
     stdout.writeln(
@@ -194,45 +260,67 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
-  for (var i = 0; i < plan.length; i++) {
-    final p = plan[i];
-    stdout.writeln('\n── ${i + 1}/${plan.length} ${p.name} ${p.version}');
+  final byName = {for (final p in plan) p.name: p};
+  final report = await publishRelease(
+    plan,
+    attempt: (unit) => _attemptPublish(byName[unit.name]!),
+    confirmVisible: (unit) => _becameVisible(byName[unit.name]!),
+    wait: (duration) => Future<void>.delayed(duration),
+    log: stdout.writeln,
+  );
 
-    final result = Process.runSync('dart', [
-      'pub',
-      'publish',
-      '--force',
-    ], workingDirectory: p.directory);
-    stdout.write(result.stdout);
-    if (result.exitCode != 0) {
-      stderr.write(result.stderr);
-      stderr.writeln(
-        '\n✗ ${p.name} failed to publish. Stopping here: the '
-        'packages after it in the order state carets on what did not go out.',
-      );
-      stderr.writeln(
-        'Published in this run: '
-        '${plan.take(i).map((e) => e.name).join(', ')}',
-      );
-      exit(1);
+  if (report.stopped case final stopped?) {
+    stderr.writeln('\n✗ ${stopped.name}: ${stopped.reason}');
+    stderr.writeln(
+      'Published in this run: '
+      '${report.published.isEmpty ? '(nothing)' : report.published.join(', ')}',
+    );
+    if (report.deferred.isNotEmpty) {
+      stderr.writeln('Deferred before the stop: ${report.deferred.keys.join(', ')}');
     }
-
-    if (i + 1 == plan.length) continue;
-    if (!await _becameVisible(p)) {
-      stderr.writeln(
-        '\n✗ ${p.name} ${p.version} published, but $_host still '
-        'does not list it after ${_visibilityTimeout.inMinutes} minutes. '
-        'Stopping rather than failing the next package on version solving.',
-      );
-      exit(1);
-    }
+    exit(1);
   }
 
-  stdout.writeln('\n✓ published ${plan.length} package(s).');
+  if (report.deferred.isNotEmpty) {
+    stdout.writeln(
+      '\n${report.deferred.length} package(s) deferred by pub.dev\'s '
+      'package-created rate limit:\n',
+    );
+    for (final MapEntry(key: name, value: reason) in report.deferred.entries) {
+      stdout.writeln('  - $name: $reason');
+    }
+    stdout.writeln(
+      '\n✓ published ${report.published.length} of ${plan.length} '
+      'package(s) — the release is PARTIAL.',
+    );
+    exit(1);
+  }
+
+  stdout.writeln('\n✓ published ${report.published.length} package(s).');
   stdout.writeln(
     'The release is not finished: `stable` is moved by the '
     'promotion ritual in CLAUDE.md, not by this script.',
   );
+}
+
+/// Makes one `dart pub publish` attempt for [p] and classifies the result for
+/// `publishRelease` — the only place this script actually shells out to
+/// publish.
+Future<PublishAttempt> _attemptPublish(_Package p) async {
+  final result = Process.runSync('dart', [
+    'pub',
+    'publish',
+    '--force',
+  ], workingDirectory: p.directory);
+  stdout.write(result.stdout);
+  if (result.exitCode == 0) return const PublishOk();
+
+  final combined = '${result.stdout}\n${result.stderr}';
+  final rateLimit = PackageCreatedRateLimit.parse(combined);
+  if (rateLimit != null) return PublishRateLimited(rateLimit);
+
+  stderr.write(result.stderr);
+  return PublishFailed(combined);
 }
 
 /// Why publishing must not start, or null when it may.
@@ -242,7 +330,7 @@ Future<void> main(List<String> args) async {
 /// edit or a local commit that has not been through review each publish code
 /// nobody has read, irreversibly.
 String? _refuseToPublishBecause() {
-  final sdk = _refuseUnpinnedSdk();
+  final sdk = _refuseUnpinnedSdk('--publish');
   if (sdk != null) return sdk;
 
   String git(List<String> args) =>
@@ -273,7 +361,7 @@ String? _refuseToPublishBecause() {
 /// later, in a stranger's project. `tool/checks.sh` cannot re-execute itself
 /// under `fvm` because it also runs in CI, where `fvm` is not installed and
 /// the version is pinned by the workflow instead; the same is true here.
-String? _refuseUnpinnedSdk() {
+String? _refuseUnpinnedSdk(String flag) {
   final fvmrc = File('.fvmrc');
   if (!fvmrc.existsSync()) {
     return 'no .fvmrc here — run this from the repository root.';
@@ -291,10 +379,158 @@ String? _refuseUnpinnedSdk() {
       : null;
   if (running != pinned) {
     return 'Flutter ${running ?? 'not found'} is on PATH; this repository is '
-        'written against $pinned — publish under the pinned SDK: '
-        'fvm exec dart run tool/release.dart --publish';
+        'written against $pinned — run under the pinned SDK: '
+        'fvm exec dart run tool/release.dart $flag';
   }
   return null;
+}
+
+/// Why `--cut` must not run, or null when it may.
+///
+/// Deliberately simpler than [_refuseToPublishBecause]: a cut does not need
+/// `master`, and does not need `HEAD` to be `origin/master` — it is meant to
+/// be looked at (and re-run) before anything is committed. What it must not
+/// do is start from a tree already holding someone else's unfinished edits,
+/// or run `pub get` under the wrong SDK afterwards.
+String? _refuseToCutBecause() {
+  final sdk = _refuseUnpinnedSdk('--cut');
+  if (sdk != null) return sdk;
+
+  final status =
+      (Process.runSync('git', [
+                'status',
+                '--porcelain',
+              ]).stdout
+              as String)
+          .trim();
+  if (status.isNotEmpty) {
+    return 'the working tree has uncommitted changes — commit or discard '
+        'them before cutting, so the cut itself is the only thing in the '
+        'diff.';
+  }
+  return null;
+}
+
+/// Cuts the family off its between-releases prerelease (#337): its own
+/// version and every caret on it, workspace-wide, then `dart pub get`
+/// wherever a lockfile lives. Prints what it touched; refuses (without
+/// writing anything) when the family is not in lockstep, and says so calmly,
+/// without writing anything, when there is nothing to cut.
+///
+/// This does not commit anything — `--cut` hands back a working tree for a
+/// person (or the rest of this run) to look at before either commits to it.
+void _cutFamilyPrerelease() {
+  final rawPubspecs = _rawPubspecs();
+  final familyVersions = {
+    for (final raw in rawPubspecs)
+      if (familyPackageNames.contains(raw.name)) raw.name: raw.version,
+  };
+
+  final lockstepProblem = familyLockstepProblem(familyVersions);
+  if (lockstepProblem != null) {
+    stderr.writeln('Refusing to cut: $lockstepProblem');
+    exit(1);
+  }
+
+  final from = familyVersion(familyVersions);
+  final to = plainOf(from);
+  if (to == null) {
+    stdout.writeln(
+      'The family is already at a plain version ($from) — nothing to cut.',
+    );
+    return;
+  }
+
+  stdout.writeln('Cutting the family from $from to $to:\n');
+  final touched = <String>[];
+  for (final file in _allPubspecFiles()) {
+    final original = file.readAsStringSync();
+    final rewritten = cutPubspecContents(original, from: from, to: to);
+    if (rewritten == null) continue;
+    file.writeAsStringSync(rewritten);
+    touched.add(file.path);
+  }
+  touched.sort();
+  for (final path in touched) {
+    stdout.writeln('  cut $path');
+  }
+  if (touched.isEmpty) {
+    // The lockstep check above already guarantees at least the family's own
+    // six pubspecs carry `from` — reaching here would mean `cutPubspecContents`
+    // and `familyVersion` disagree about what this tree holds, a bug in this
+    // script rather than a state a tree can actually be in.
+    stderr.writeln(
+      'Refusing to cut: found nothing to rewrite for $from, which the '
+      'family pubspecs themselves report carrying. This is a bug in '
+      'release_cut.dart, not a state to publish from.',
+    );
+    exit(1);
+  }
+
+  stdout.writeln('\nResolving:\n');
+  for (final directory in _pubGetDirectories()) {
+    stdout.writeln('  pub get in $directory');
+    final result = Process.runSync(
+      'flutter',
+      ['pub', 'get'],
+      workingDirectory: directory,
+    );
+    if (result.exitCode != 0) {
+      stdout.write(result.stdout);
+      stderr.write(result.stderr);
+      stderr.writeln('\npub get failed in $directory after the cut.');
+      exit(1);
+    }
+  }
+  stdout.writeln();
+}
+
+/// Every `pubspec.yaml` this repository ships or resolves against —
+/// `packages/`, `template/`, `example/` and `tool/` itself, plus the
+/// workspace root — not only `packages/`: `template/` and `example/` state
+/// carets on the family too, and `--cut` has to reach every one of them.
+Iterable<File> _allPubspecFiles() sync* {
+  final root = File('pubspec.yaml');
+  if (root.existsSync()) yield root;
+
+  for (final directory in ['packages', 'template', 'example', 'tool']) {
+    final dir = Directory(directory);
+    if (!dir.existsSync()) continue;
+    for (final entry in dir.listSync(recursive: true)) {
+      if (entry is! File || !entry.path.endsWith('pubspec.yaml')) continue;
+      if (entry.path.contains('/.dart_tool/') ||
+          entry.path.contains('/build/')) {
+        continue;
+      }
+      yield entry;
+    }
+  }
+}
+
+/// Every directory holding a `pubspec.lock` — where a version or caret change
+/// needs `pub get` to re-resolve, after `--cut` rewrites the files above.
+///
+/// Walks the same directories `_allPubspecFiles` does, rather than the whole
+/// repository tree: `js/*` resolves through `package.json`, not a
+/// `pubspec.lock`, and a full recursive walk would also cross `.git`.
+List<String> _pubGetDirectories() {
+  final found = <String>[];
+  if (File('pubspec.lock').existsSync()) found.add('.');
+
+  for (final directory in ['packages', 'template', 'example', 'tool']) {
+    final dir = Directory(directory);
+    if (!dir.existsSync()) continue;
+    for (final entry in dir.listSync(recursive: true)) {
+      if (entry is! File || !entry.path.endsWith('pubspec.lock')) continue;
+      if (entry.path.contains('/.dart_tool/') ||
+          entry.path.contains('/build/')) {
+        continue;
+      }
+      found.add(entry.parent.path);
+    }
+  }
+  found.sort();
+  return found;
 }
 
 /// Every `pubspec.yaml` under `packages/`, published or not.
