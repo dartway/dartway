@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+- **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`
+  replaces its name in the URL instead of doubling it, and every descendant of such a route
+  moves with it. The shape this package reads is unchanged (`route.fullPath` and
+  `descriptor.parent`), but the *value* is not: the screen path this binding reports to
+  Studio for any affected route, or a route nested under one, is the new, shorter path —
+  a project using `extraPathSegment` on a `.simple()` route sees Studio's screen identity
+  for it change the moment it upgrades.
+
 ## 0.2.0
 
 - **Requires `dartway_router` 2.0.0** (#288), where a zone guard takes the navigation target.

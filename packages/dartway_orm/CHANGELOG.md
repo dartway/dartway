@@ -1,7 +1,8 @@
 # Changelog
 
-## 0.21.0-dev.6
+## 0.21.0-dev.7
 
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).
 - `DwDatabaseConfig` gains an optional `caFile` (`DW_DATABASE_CA_FILE` in
   `fromEnvironment`): when set, every connection — pooled and `listen()`'s own
   — verifies the server's certificate against that CA (`SslMode.verifyFull`)
@@ -12,6 +13,10 @@
   The server certificate needs a `subjectAltName` for the connecting host (no
   fallback to `CN`, unlike `libpq`) and `extendedKeyUsage: serverAuth`; every
   managed provider's own CA issues one.
+
+## 0.21.0-dev.6
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
 
 ## 0.21.0-dev.5
 

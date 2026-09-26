@@ -1,6 +1,6 @@
 name: dartway_studio_binding
 description: "The app half of the DartWay Studio wiring: one widget that attaches the bridge, reports route, features, session and language, and executes what Studio asks."
-version: 0.2.0
+version: 0.2.1
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -18,12 +18,12 @@ dependencies:
 
   # The passports the binding reports come from mounted DwFeatureWidget
   # widgets, and the persona switch runs the core's own sign-in by code.
-  dartway_core_flutter: ^0.21.0-dev.6
+  dartway_core_flutter: ^0.21.0-dev.7
   # The screen identity Studio binds to is the route's declared name, which is
   # a DwAppRouter concept — the reason this is a package of its own rather than
   # a corner of core_flutter, where the dependency would reach apps that never
   # open Studio.
-  dartway_router: ^2.0.0
+  dartway_router: ^3.0.0
   # The wire. Both this package and Studio depend on it; its version means the
   # protocol, which is why host-side changes do not belong there.
   dartway_studio_bridge: ^0.10.0
@@ -31,7 +31,7 @@ dependencies:
 
 dev_dependencies:
   # DwFakeServer: the persona switch signs in through a real client.
-  dartway_client: ^0.21.0-dev.6
+  dartway_client: ^0.21.0-dev.7
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

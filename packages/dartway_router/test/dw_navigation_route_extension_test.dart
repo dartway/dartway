@@ -187,10 +187,12 @@ void main() {
         expect(TestRoutes.userDetail.routePath, ':userId');
       });
 
-      test('should return relative path with extra segment for nested route',
-          () {
-        // Child route (with parent) returns only its path segment including extraPathSegment
-        expect(TestRoutes.nested.routePath, 'extra/nested');
+      test(
+          'should return the extraPathSegment for a nested route, in place '
+          'of its enum name (issue #314)', () {
+        // Child route (with parent) returns only its path segment; the enum
+        // name ('nested') never appears when extraPathSegment is set.
+        expect(TestRoutes.nested.routePath, 'extra');
       });
     });
 
@@ -207,10 +209,12 @@ void main() {
         expect(TestRoutes.userDetail.fullPath, '/:userId');
       });
 
-      test('should include full hierarchy for nested route', () {
+      test(
+          'should include full hierarchy for nested route, without doubling '
+          'the enum name (issue #314)', () {
         // fullPath includes parent's fullPath + current path segment
-        // home.fullPath = '/' + nested._path = 'extra/nested'
-        expect(TestRoutes.nested.fullPath, '/extra/nested');
+        // home.fullPath = '/' + nested._path = 'extra'
+        expect(TestRoutes.nested.fullPath, '/extra');
       });
     });
 
@@ -278,7 +282,7 @@ void main() {
         final navigatorKey = GlobalKey<NavigatorState>();
         final router = GoRouter(
           navigatorKey: navigatorKey,
-          initialLocation: '/extra/nested',
+          initialLocation: '/extra',
           routes: [
             GoRoute(
               path: '/',
@@ -286,7 +290,7 @@ void main() {
               builder: (context, state) => const HomePage(),
               routes: [
                 GoRoute(
-                  path: 'extra/nested',
+                  path: 'extra',
                   name: 'nested',
                   builder: (context, state) => const NestedPage(),
                 ),
@@ -301,8 +305,9 @@ void main() {
         await tester.pumpAndSettle();
 
         final context = tester.element(find.byType(NestedPage));
-        // fullPath should be '/extra/nested' which matches the actual route
-        expect(TestRoutes.nested.fullPath, '/extra/nested');
+        // fullPath should be '/extra' — the enum name ('nested') does not
+        // appear once extraPathSegment is set (issue #314).
+        expect(TestRoutes.nested.fullPath, '/extra');
         expect(TestRoutes.nested.isActive(context), isTrue);
       });
     });

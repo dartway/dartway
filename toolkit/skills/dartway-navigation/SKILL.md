@@ -191,12 +191,15 @@ The router is usually built inside a provider, so the throw lands wherever that
 provider is first read — typically the first screen, or a widget test that has
 nothing to do with navigation. Read the message, not the stack.
 
-For a `.simple` route the name is also its URL segment, so renaming one moves
-its path with it: there is no way to keep `/admin/projects` while calling the
-value something else (`extraPathSegment` prefixes the segment, it does not
-replace it). Pick the word that describes *that* screen —
-`AdminNavigationZone.projectAdmin` — rather than a syllable bolted on to dodge
-the collision.
+For a `.simple` route the name is also its URL segment by default, so renaming
+one moves its path with it — unless the descriptor sets `extraPathSegment`,
+which **replaces** the enum name in the URL rather than prefixing it: keep
+`/admin/projects` while calling the value `projectAdmin` with
+`DwNavigationRouteDescriptor.simple(extraPathSegment: 'projects')`. Reach for
+this when the collision is real (two zones need the same word in the URL);
+otherwise pick the word that describes *that* screen —
+`AdminNavigationZone.projectAdmin` at `/admin/projectAdmin` — rather than
+adding a segment just to dodge the collision.
 
 ## Transitions
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.7
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).
+
 ## 0.21.0-dev.6
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server`.

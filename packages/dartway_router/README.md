@@ -259,6 +259,22 @@ profile(
 
 Accessible at `/profile`.
 
+With `extraPathSegment`, replacing the enum name (route names are one global
+namespace across every zone, so this gives a page its own URL word without
+forcing every zone to agree on the enum name):
+
+```dart
+editProfile(
+  DwNavigationRouteDescriptor.simple(
+    pageWidget: EditProfilePage(),
+    parent: profile,
+    extraPathSegment: 'edit',
+  ),
+)
+```
+
+Accessible at `/profile/edit` — not `/profile/edit/editProfile`.
+
 #### Parameterized Route
 
 A route with path parameters. Must have a parent route.
