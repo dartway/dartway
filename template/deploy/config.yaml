@@ -98,6 +98,21 @@ local:
 #     domain: example.com
 #     source: app_site/build
 #
+#   # Optional. Postgres for this environment: `bundled` (default) runs it in
+#   # the stack, on its own volume; `external` points at a managed provider
+#   # instead (DigitalOcean Managed Postgres, RDS, Cloud SQL, …) — no service,
+#   # no volume, nothing rendered. Deliver its coordinates with `dartway
+#   # secret set --env <environment>`: DW_DATABASE_HOST, _PORT, _NAME, _USER
+#   # and _PASSWORD (all required — a managed provider names its own, none of
+#   # them derivable the way the bundled container's are), DW_DATABASE_SSL
+#   # (optional, default true) and DW_DATABASE_MAX_CONNECTIONS (optional,
+#   # default 10 — the pool ceiling; managed plans often cap total
+#   # connections in the tens, so raise it only after checking the plan's
+#   # limit). `deploy check` attempts a real connection with
+#   # sslmode=require from the deployment host, and names why when it fails
+#   # (DNS, refused, authentication, or the server not offering TLS).
+#   database: bundled
+#
 #   # Optional. File storage for uploads (presigned direct uploads, D-034), in
 #   # two buckets: public files (a rule with visibility public — avatars) are
 #   # read by anyone at DW_STORAGE_PUBLIC_BASE_URL/<key>; private ones only

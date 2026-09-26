@@ -42,6 +42,7 @@ reads it.
 | `api_domain` | yes | The server, for mobile apps and webhooks |
 | `app_domain` | yes | The Flutter web app |
 | `site` | no | `domain` and `source`: a directory of the repository served as static files, or `none` for a site that lives elsewhere |
+| `database` | no | `bundled` or `external`; absent means `bundled` — a Postgres container in the stack |
 | `storage` | no | `bundled` or `external`; absent means no file storage |
 | `storage_domain` | with `bundled` | The public host of the bundled storage; refused without `storage: bundled` |
 | `registry_mirror` | no | Pull the official Docker Hub images of the stack (`postgres`, `nginx`) through a mirror such as `mirror.gcr.io`; the bundled storage and certbot come from where they live |
@@ -60,8 +61,10 @@ name, and each role needs a host of its own — Nginx routes by `server_name`, s
 means one of them is never reached.
 
 Names are derived, not configured. The project name is the last segment of `repo` without `.git`;
-the checkout is `/home/<deploy_user>/<project>`. The database and its role are named after the
-server package without `_server`, and the storage buckets after the same prefix with dashes.
+the checkout is `/home/<deploy_user>/<project>`. With `database: bundled`, the database and its role
+are named after the server package without `_server`; with `database: external` they are a managed
+provider's own, delivered as `DW_DATABASE_NAME`/`DW_DATABASE_USER` — there is nothing to derive them
+from. The storage buckets are named after the same prefix with dashes.
 
 ## Three hosts, one server process
 
@@ -106,8 +109,8 @@ The rendered Nginx:
 
 | Service | What it is |
 |---|---|
-| `postgres` | `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck |
-| `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080`, `DW_DATABASE_*` (and, with the bundled storage, `DW_STORAGE_*`) in the compose file. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
+| `postgres` | With `database: bundled`: `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck. Absent with `database: external` — no service, no volume, no `depends_on` on it |
+| `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080` always, and with `database: bundled` (and, with the bundled storage, `DW_STORAGE_*`) `DW_DATABASE_*` in the compose file too — with `database: external` none of `DW_DATABASE_*` is rendered at all, all five (`HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`) come from `.env` like any other secret. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
 | `web` | Built from `<project>_flutter/Dockerfile` with the build argument `DW_BACKEND_URL` = the app origin |
 | `storage`, `storage-init` | With `storage: bundled`: RustFS, and a one-shot job (a generic S3 client) that creates and configures both buckets on every deploy |
 | `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443 |
@@ -116,7 +119,8 @@ The rendered Nginx:
 **Data-bearing images are pinned** — Postgres to its major, the storage to an exact release — so a
 deploy on a later day cannot move a data directory under a binary that refuses it. The stateless
 proxy and certbot follow upstream. Values in the compose file that the deploy derives win over the
-same names in `.env`, which is why the secret store refuses those names.
+same names in `.env`, which is why the secret store refuses those names — and why it accepts
+`DW_DATABASE_*` only with `database: external`, where the compose file no longer sets them.
 
 `deploy/compose.override.yml` is where a project adds what a standard deployment does not have. It is
 **never copied**: every Compose call the CLI issues names it from the checkout
@@ -127,6 +131,37 @@ deploy refreshes it. For the command a person types by hand on the server, the d
 0. A file under that name without the marker is moved to `docker-compose.override.yml.retired`; with
 no override in the checkout and a foreign file in its place, the deploy refuses, because that file
 may be the only place its services are declared.
+
+## Database: bundled or someone else's
+
+**`database: bundled`** (the default) is the `postgres` service above — a container on the stack's own
+volume, reached over the private network, no TLS. **`database: external`** points at a managed
+Postgres instead: DigitalOcean Managed Postgres, RDS, Cloud SQL, or any Postgres somebody else runs.
+Nothing about it is rendered — no service, no volume, no `depends_on` — and the server reaches it
+exactly as it would reach any database named by its own environment. Deliver with `dartway secret
+set --env <environment>`:
+
+| Secret | Required | Meaning |
+|---|---|---|
+| `DW_DATABASE_HOST` | yes | The provider's host |
+| `DW_DATABASE_PORT` | yes | Its port — a managed provider rarely uses 5432 |
+| `DW_DATABASE_NAME` | yes | The database name it assigned |
+| `DW_DATABASE_USER` | yes | The role it assigned |
+| `DW_DATABASE_PASSWORD` | yes | Its password — never generated here; it is the provider's credential |
+| `DW_DATABASE_SSL` | no, default `true` | `false` only for a database that genuinely speaks no TLS |
+| `DW_DATABASE_MAX_CONNECTIONS` | no, default 10 | The pool ceiling — managed plans often cap total connections in the tens, so raising this without checking the plan's limit starves every other client of the same database |
+
+`deploy check` gains `database-reachable` (below): on the deployment host over SSH, because a
+managed provider's firewall usually trusts that host's address and not the maintainer's — a
+throwaway, pinned Postgres client (never built or run otherwise with `database: external`) attempts a
+real connection with `sslmode=require` and the stored credentials, and reports why when it fails
+(DNS, refused, authentication, or the server not offering TLS). A bare TCP probe would pass while the
+password or the certificate is still wrong.
+
+`sslmode=verify-full` with the provider's CA file — closing the one gap `require` leaves, a network
+position presenting its own certificate unchallenged — is not built yet: dartway/dartway#342.
+
+An existing config with no `database` key keeps deploying `bundled`, exactly as before.
 
 ## Storage: bundled or someone else's
 
@@ -160,10 +195,11 @@ bucket anyone can read, or a public one nobody can.
    privilege problem.
 2. **Base packages and Docker**, installed only where Docker is missing.
 3. **The deployment user**, created if absent and added to the `docker` group.
-4. **The secret store**, with the secrets that are only random strings generated in place:
-   `DW_DATABASE_PASSWORD`, and with the bundled storage the storage keys. Existing values are never replaced —
-   regenerating the database password would lock the server out of a database initialised with the
-   old one.
+4. **The secret store**, with the secrets that are only random strings generated in place: with
+   `database: bundled`, `DW_DATABASE_PASSWORD`; and with the bundled storage, the storage keys. An
+   external database's `DW_DATABASE_*` are never generated — they are the provider's own credentials,
+   delivered with `secret set`. Existing values are never replaced — regenerating the database
+   password would lock the server out of a database initialised with the old one.
 5. **A repository key**, for a `git@` repository: generated **on** the server, so the private half
    exists nowhere else. When the server cannot yet reach the repository, setup stops and prints the
    public key, asking for it to be registered as a **read-only** deploy key — the server only ever
@@ -209,7 +245,9 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    config change (a rename, a different storage backend) about to serve fresh data next to the real
    one. One implementation, run from both commands;
 7. builds the images;
-8. with the bundled storage, starts it and runs `storage-init`, printing what it did; starts Postgres;
+8. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
+   bundled`, starts Postgres — with `database: external` there is nothing of the database's to start,
+   the server reaches it directly;
 9. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
    flight are answered, live sockets close with "server stopping" — and from then on the proxy
    answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
@@ -324,12 +362,13 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `local-secrets-untracked` | error | `deploy/secrets.yaml` is not tracked by Git |
 | `local-secrets-cover-environment` | warning | `deploy/secrets.yaml` holds every required secret for the environment (reported by `check` only; `run` does not evaluate it) |
 | `dns-public-hosts` | error | Every served host resolves to the deployment host — a mismatch otherwise burns the Let's Encrypt rate limit |
-| `images-resolve` | error | Every pinned base image (Postgres, nginx, certbot, and with `storage: bundled` the storage and its init image), resolved through `registry_mirror` exactly as the renderer resolves them into the compose file — against its own registry, a manifest HEAD with the anonymous token the registry's challenge asks for, so a vanished tag is caught here rather than mid-`run`, at the step that starts it. A transient answer (no route, a timeout, a rate limit, a registry's own 5xx) is a skip, not a failure: this machine's network is not a fact about the image |
+| `images-resolve` | error | Every pinned base image (nginx, certbot, Postgres with `database: bundled`, and with `storage: bundled` the storage and its init image), resolved through `registry_mirror` exactly as the renderer resolves them into the compose file — against its own registry, a manifest HEAD with the anonymous token the registry's challenge asks for, so a vanished tag is caught here rather than mid-`run`, at the step that starts it. A transient answer (no route, a timeout, a rate limit, a registry's own 5xx) is a skip, not a failure: this machine's network is not a fact about the image |
 | `ssh-reachable` | error | Key-based SSH works; when it fails the other server checks are skipped |
 | `deploy-user` | error | The deployment user exists |
 | `docker-available` | error | Docker Compose is usable by the deployment user |
 | `runtime-secrets` | error | Every required secret is in the server store with a value, and nothing reserved is |
 | `secret-files` | error | Every `requires.files` entry is delivered **and** mounted into the server container, read from the configuration Compose will actually run |
+| `database-reachable` | error | With `database: external`: a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with `sslmode=require` and runs a query — a real authenticated, encrypted connection, not a bare TCP probe. A failure names why: DNS, refused, authentication, or the server not offering TLS. Skipped with `database: bundled` |
 | `secrets-match-local` | warning | The server store and `deploy/secrets.yaml` hold the same key names |
 | `outside` | error | The same outside probes `run` ends with, against whatever is deployed now; runs even when SSH fails |
 

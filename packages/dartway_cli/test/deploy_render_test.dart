@@ -47,6 +47,12 @@ void main() {
       expect(stack.dataVolumeNames, {'shop_postgres_data', 'shop_storage_data'});
     });
 
+    test('external database drops the postgres volume — nothing here for the '
+        'guard to expect', () {
+      final stack = stackFrom(extra: '  database: external\n');
+      expect(stack.dataVolumeNames, isEmpty);
+    });
+
     test('external storage adds no volume of its own', () {
       final stack =
           stackVariants()['external storage, external site, files']!;
@@ -108,6 +114,11 @@ void main() {
       final images =
           stackVariants()['external storage, external site, files']!.pinnedImages;
       expect(images.map((e) => e.$1), ['Postgres', 'nginx', 'certbot']);
+    });
+
+    test('external database pulls no Postgres image at all', () {
+      final images = stackFrom(extra: '  database: external\n').pinnedImages;
+      expect(images.map((e) => e.$1), ['nginx', 'certbot']);
     });
 
     test('plain HTTP (the local proof) never resolves certbot — nothing '
@@ -382,6 +393,104 @@ void main() {
           _service(stack, 'server')['environment'] as YamlMap,
         ).keys.where((key) => '$key'.startsWith('DW_STORAGE_')),
         isEmpty,
+      );
+    });
+
+    test('external database: no postgres service, volume or dependency', () {
+      final stack = stackFrom(extra: '  database: external\n');
+      final compose = _compose(stack);
+      final services = (compose['services'] as YamlMap).keys
+          .map((key) => '$key')
+          .toSet();
+      expect(services, isNot(contains(DwStack.postgresService)));
+
+      final volumes = compose['volumes'] as YamlMap?;
+      expect(
+        volumes == null ||
+            !volumes.keys.map((key) => '$key').contains(
+              DwStack.postgresDataVolume,
+            ),
+        isTrue,
+        reason: 'no rendered volume names the bundled Postgres data volume',
+      );
+
+      final server = _service(stack, 'server');
+      // Nothing else depends on being started here either, so the key is
+      // absent altogether rather than an empty mapping.
+      expect(server.containsKey('depends_on'), isFalse);
+    });
+
+    test('external database: the server takes DW_DATABASE_* from the secret '
+        'store, never from the compose file', () {
+      final stack = stackFrom(extra: '  database: external\n');
+      final environment = Map.of(
+        _service(stack, 'server')['environment'] as YamlMap,
+      );
+      expect(
+        environment.keys.where((key) => '$key'.startsWith('DW_DATABASE_')),
+        isEmpty,
+      );
+      expect(
+        stack.requiredSecretKeys,
+        containsAll([
+          'DW_DATABASE_HOST',
+          'DW_DATABASE_PORT',
+          'DW_DATABASE_NAME',
+          'DW_DATABASE_USER',
+          'DW_DATABASE_PASSWORD',
+        ]),
+      );
+      // Optional, and the server already defaults both sensibly.
+      expect(stack.requiredSecretKeys, isNot(contains('DW_DATABASE_SSL')));
+      expect(
+        stack.requiredSecretKeys,
+        isNot(contains('DW_DATABASE_MAX_CONNECTIONS')),
+      );
+      // Accepted by the store precisely because the compose file no longer
+      // sets any of them — see deploy_secret_store_test.dart for the refusal
+      // this is the other side of.
+      expect(
+        stack.reservedSecretKeys,
+        isNot(anyElement(startsWith('DW_DATABASE_'))),
+      );
+    });
+
+    test('a fully external stack (database and storage both external, plain '
+        'HTTP) renders no volumes at all', () {
+      final stack = stackFrom(
+        front: const DwPlainHttpFront(18080),
+        extra: '  database: external\n',
+      );
+      expect(_compose(stack).containsKey('volumes'), isFalse);
+    });
+
+    test('bundled database: unchanged — the service, its volume and the '
+        "server's dependency on it are all still rendered", () {
+      final stack = stackFrom();
+      final compose = _compose(stack);
+      expect(
+        (compose['services'] as YamlMap).keys.map((key) => '$key'),
+        contains(DwStack.postgresService),
+      );
+      expect(
+        (compose['volumes'] as YamlMap).keys.map((key) => '$key'),
+        contains(DwStack.postgresDataVolume),
+      );
+      final server = _service(stack, 'server');
+      expect(
+        ((server['depends_on'] as YamlMap)[DwStack.postgresService]
+            as YamlMap)['condition'],
+        'service_healthy',
+      );
+      expect(
+        stack.reservedSecretKeys,
+        containsAll([
+          'DW_DATABASE_HOST',
+          'DW_DATABASE_PORT',
+          'DW_DATABASE_NAME',
+          'DW_DATABASE_USER',
+          'DW_DATABASE_SSL',
+        ]),
       );
     });
 

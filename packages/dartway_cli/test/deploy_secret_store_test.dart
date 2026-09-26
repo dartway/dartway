@@ -211,6 +211,52 @@ void main() {
     });
 
     test(
+      'accepts DW_DATABASE_* for an external database — the compose file no '
+      'longer sets them, unlike the refusal above for the bundled one',
+      () async {
+        final external = stackFrom(extra: '  database: external\n');
+        final externalRoot = Directory.systemTemp.createTempSync(
+          'dw_store_external_db_',
+        );
+        addTearDown(() => externalRoot.deleteSync(recursive: true));
+        final externalAppDir = p.join(externalRoot.path, 'checkout');
+        Directory(externalAppDir).createSync();
+        final externalStore = DwSecretStore(
+          ssh: LocalShell(),
+          target: external.target,
+          directory: p.join(externalRoot.path, 'store'),
+        );
+        await externalStore.ensureDirectory();
+        const delivered = {
+          'DW_DATABASE_HOST': 'db-postgresql-example.b.db.ondigitalocean.com',
+          'DW_DATABASE_PORT': '25060',
+          'DW_DATABASE_NAME': 'defaultdb',
+          'DW_DATABASE_USER': 'dartway',
+          'DW_DATABASE_PASSWORD': 'a-managed-providers-own-password',
+        };
+        for (final MapEntry(:key, :value) in delivered.entries) {
+          final set = await externalStore.setSecret(key: key, value: value);
+          expect(set.ok, isTrue, reason: '$key: ${set.stderr}');
+        }
+        final rendered = await externalStore.renderEnvironment(
+          appDir: externalAppDir,
+          required: external.requiredSecretKeys,
+          reserved: external.reservedSecretKeys,
+        );
+        expect(rendered.ok, isTrue, reason: rendered.stderr);
+        expect(
+          DwSecretStore.parse(
+            File(p.join(externalAppDir, '.env')).readAsStringSync(),
+          ),
+          containsPair(
+            'DW_DATABASE_HOST',
+            'db-postgresql-example.b.db.ondigitalocean.com',
+          ),
+        );
+      },
+    );
+
+    test(
       'push writes the whole store; the file list excludes the key file',
       () async {
         final written = await store.writeAll({'A': '1', 'B': r'$2'});

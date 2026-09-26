@@ -185,6 +185,23 @@ staging:
       );
     });
 
+    test('database defaults to bundled — an existing config keeps deploying '
+        'exactly as before', () {
+      expect(targetFrom().database, DwDatabaseMode.bundled);
+    });
+
+    test('database: external is read', () {
+      final target = targetFrom(extra: '  database: external\n');
+      expect(target.database, DwDatabaseMode.external);
+    });
+
+    test('an invalid database value is refused, naming both options', () {
+      expect(
+        () => targetFrom(extra: '  database: managed\n'),
+        _refusal(['"database" is bundled or external, got "managed"']),
+      );
+    });
+
     test('a site outside the repository is refused', () {
       expect(
         () => targetFrom(

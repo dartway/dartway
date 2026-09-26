@@ -115,6 +115,16 @@ class DwStack {
   static bool mirrorServes(String image) =>
       !image.split(':').first.contains('/');
 
+  /// [image] as the renderer and every check that pulls it resolve it:
+  /// through `registry_mirror` when the mirror can serve it (see
+  /// [mirrorServes]). One function, so a diagnostic pull (the
+  /// `database-reachable` check's one-off Postgres client) asks the same
+  /// registry `deploy run` would.
+  String resolvedImage(String image) => switch (target.registryMirror) {
+    final mirror? when mirrorServes(image) => '$mirror/$image',
+    _ => image,
+  };
+
   /// Turns a server start into a one-off migration that serves nothing — the
   /// name `DwAppServer.migrateOnlyVariable` reads in `dartway_core_server`.
   static const String migrateOnlyVariable = 'DW_MIGRATE_ONLY';
@@ -125,8 +135,19 @@ class DwStack {
   /// The rendered environment file, beside the compose file in the checkout.
   static const String envFile = '.env';
 
-  /// The one generated database secret.
+  /// `DW_DATABASE_*` — generated for the bundled Postgres, delivered for an
+  /// external one (`database: external`); see [serverEnvironment] and
+  /// [requiredSecretKeys].
+  static const String databaseHostKey = 'DW_DATABASE_HOST';
+  static const String databasePortKey = 'DW_DATABASE_PORT';
+  static const String databaseNameKey = 'DW_DATABASE_NAME';
+  static const String databaseUserKey = 'DW_DATABASE_USER';
   static const String databasePasswordKey = 'DW_DATABASE_PASSWORD';
+
+  /// Optional even with `database: external` — the server defaults SSL to
+  /// `true` (`SslMode.require`) and the pool to 10 connections.
+  static const String databaseSslKey = 'DW_DATABASE_SSL';
+  static const String databaseMaxConnectionsKey = 'DW_DATABASE_MAX_CONNECTIONS';
   static const String storageEndpointKey = 'DW_STORAGE_ENDPOINT';
   static const String storagePublicBucketKey = 'DW_STORAGE_PUBLIC_BUCKET';
   static const String storagePublicBaseUrlKey = 'DW_STORAGE_PUBLIC_BASE_URL';
@@ -140,8 +161,11 @@ class DwStack {
       ? serverPackage.substring(0, serverPackage.length - '_server'.length)
       : serverPackage;
 
-  /// Database and role name. The package prefix is already a Dart identifier,
-  /// which is what Postgres wants of an unquoted one.
+  /// Database and role name of the bundled Postgres. The package prefix is
+  /// already a Dart identifier, which is what Postgres wants of an unquoted
+  /// one. An external database names both through `DW_DATABASE_NAME` and
+  /// `DW_DATABASE_USER` in the secret store instead — a managed provider
+  /// assigns its own.
   String get databaseName => projectPrefix;
 
   /// The public bucket — objects readable by anyone, listing by no one: the
@@ -189,15 +213,23 @@ class DwStack {
   /// The server's environment that is derived rather than secret. Rendered
   /// into the compose file, where it is readable and overrides anything of the
   /// same name in `.env` — which is why the secret store refuses these names.
+  ///
+  /// With `database: external` nothing about the database is derived at all:
+  /// `DW_DATABASE_HOST/PORT/NAME/USER/PASSWORD` are delivered secrets, read
+  /// from `.env` exactly as the server would read them from any other
+  /// environment — a managed provider names its own host, port, database and
+  /// role, so there is nothing here to derive them from.
   Map<String, String> get serverEnvironment => {
     'PORT': '$serverPort',
-    'DW_DATABASE_HOST': postgresService,
-    'DW_DATABASE_PORT': '5432',
-    'DW_DATABASE_NAME': databaseName,
-    'DW_DATABASE_USER': databaseName,
-    // The database is a container on the stack's private network, and the
-    // image serves no TLS; the driver requires it unless told otherwise.
-    'DW_DATABASE_SSL': 'false',
+    if (target.database == DwDatabaseMode.bundled) ...{
+      databaseHostKey: postgresService,
+      databasePortKey: '5432',
+      databaseNameKey: databaseName,
+      databaseUserKey: databaseName,
+      // The database is a container on the stack's private network, and the
+      // image serves no TLS; the driver requires it unless told otherwise.
+      databaseSslKey: 'false',
+    },
     if (target.storage == DwStorageMode.bundled) ...{
       storageEndpointKey: storageOrigin!,
       storagePublicBucketKey: publicBucketName,
@@ -221,21 +253,16 @@ class DwStack {
   /// `deploy check` asks a registry to resolve is what `deploy run` actually
   /// pulls, not the upstream name behind a mirror that serves it instead
   /// (#331).
-  List<(String, String)> get pinnedImages {
-    String resolved(String image) => switch (target.registryMirror) {
-      final mirror? when mirrorServes(image) => '$mirror/$image',
-      _ => image,
-    };
-    return [
-      ('Postgres', resolved(postgresImage)),
-      ('nginx', resolved(nginxImage)),
-      if (front is DwTlsFront) ('certbot', resolved(certbotImage)),
-      if (target.storage == DwStorageMode.bundled) ...[
-        ('storage', resolved(storageImage)),
-        ('storage-init', resolved(storageInitImage)),
-      ],
-    ];
-  }
+  List<(String, String)> get pinnedImages => [
+    if (target.database == DwDatabaseMode.bundled)
+      ('Postgres', resolvedImage(postgresImage)),
+    ('nginx', resolvedImage(nginxImage)),
+    if (front is DwTlsFront) ('certbot', resolvedImage(certbotImage)),
+    if (target.storage == DwStorageMode.bundled) ...[
+      ('storage', resolvedImage(storageImage)),
+      ('storage-init', resolvedImage(storageInitImage)),
+    ],
+  ];
 
   /// The data volumes this stack's compose file declares — the ones a
   /// restart must never start empty, because Postgres and the bundled
@@ -249,7 +276,8 @@ class DwStack {
   /// `docker volume ls` answers in and the form [checkDataVolumes] compares
   /// against.
   Set<String> get dataVolumeNames => {
-    '${target.projectName}_$postgresDataVolume',
+    if (target.database == DwDatabaseMode.bundled)
+      '${target.projectName}_$postgresDataVolume',
     if (target.storage == DwStorageMode.bundled)
       '${target.projectName}_$storageDataVolume',
   };
@@ -260,9 +288,11 @@ class DwStack {
   /// Secrets generated on the server, with their length in random bytes.
   ///
   /// Random strings nobody issues: generating them in place means the value
-  /// never exists anywhere but the server that uses it.
+  /// never exists anywhere but the server that uses it. An external
+  /// database's password is not among them — it is a managed provider's
+  /// credential, delivered with `dartway secret set`, never invented here.
   Map<String, int> get generatedSecrets => {
-    databasePasswordKey: 32,
+    if (target.database == DwDatabaseMode.bundled) databasePasswordKey: 32,
     if (target.storage == DwStorageMode.bundled) ...{
       // Hex keeps the generated key within the characters every S3 client
       // accepts, and within what RustFS takes as an access key.
@@ -274,6 +304,18 @@ class DwStack {
   /// Every secret the stack cannot start without, generated or delivered.
   List<String> get requiredSecretKeys => {
     ...generatedSecrets.keys,
+    // An external database's coordinates are a managed provider's own — host,
+    // port, database and role name all differ from what the bundled
+    // container would derive — so every one of them is delivered rather than
+    // rendered. DW_DATABASE_SSL (default true) and _MAX_CONNECTIONS (default
+    // 10) stay optional: the server already defaults both sensibly.
+    if (target.database == DwDatabaseMode.external) ...[
+      databaseHostKey,
+      databasePortKey,
+      databaseNameKey,
+      databaseUserKey,
+      databasePasswordKey,
+    ],
     // Which buckets an external storage needs is the project's rules'
     // business — DW_STORAGE_PUBLIC_BUCKET with _PUBLIC_BASE_URL for public
     // purposes, DW_STORAGE_PRIVATE_BUCKET for private ones — and the server
