@@ -35,8 +35,9 @@ import 'dw_push_transport_client.dart';
 /// [reportUnansweredAfter] is reported and, within the background start
 /// itself, still waited for — a late answer there costs nothing either. The
 /// two calls the app makes on the user's behalf, [requestPermission] and
-/// [permission], cannot afford the same patience: they answer honestly by
-/// that same deadline rather than leave a button waiting forever (#338).
+/// [permission], cannot afford the same patience: past [permissionDeadline]
+/// they answer [DwPushPermission.unanswered] — honestly unknown, never a
+/// guess — rather than leave a button waiting forever (#338).
 ///
 /// From then on it keeps the server's registration in
 /// step with two facts that arrive independently: the device token and the
@@ -55,6 +56,7 @@ class DwPush extends DwFlutterPlugin {
     this.platform,
     this.isEnabled,
     this.reportUnansweredAfter = const Duration(seconds: 10),
+    this.permissionDeadline = const Duration(seconds: 10),
   }) : transports = List.unmodifiable(transports);
 
   /// The transports this app ships, most preferred first: the first that
@@ -71,11 +73,23 @@ class DwPush extends DwFlutterPlugin {
 
   /// How long a platform call of the background start may stay unanswered
   /// before it is reported through the error pipeline, naming the call. The
-  /// report does not cancel it: the answer is still taken whenever it comes —
-  /// except for [requestPermission] and [permission], which are asked by the
-  /// app on the user's behalf and answer honestly rather than hang past this
-  /// same duration (#338).
+  /// report does not cancel it: the answer is still taken whenever it comes.
   final Duration reportUnansweredAfter;
+
+  /// How long [requestPermission] and [permission] wait for the transport to
+  /// attach, and how long [permission] then waits for the platform's own
+  /// answer, before giving up with [DwPushPermission.unanswered] (#338).
+  /// Separate from [reportUnansweredAfter] on purpose: that one only decides
+  /// when a *background* call is reported, and a project lowering it to see
+  /// trouble sooner must not, as a side effect, also make these two give up
+  /// sooner on the user's behalf. Ten seconds by default — the same figure
+  /// [reportUnansweredAfter] already used for this before the two were split
+  /// apart, and this wait is a technical one (the transport attaching, or the
+  /// platform answering with no dialog involved), not a human one, so there
+  /// is no reason to be more generous. [requestPermission]'s own call to the
+  /// platform is never bounded by this: it may be showing the user a system
+  /// dialog, and their time answering it is not silence.
+  final Duration permissionDeadline;
 
   /// A failing transport costs push, not the app.
   @override
@@ -226,16 +240,18 @@ class DwPush extends DwFlutterPlugin {
   /// Asks the user for permission — at a moment they understand why — and
   /// registers the token when the answer is yes.
   ///
-  /// Answers within [reportUnansweredAfter] even if the background start
-  /// never attaches a transport — on iOS `attach` awaits an APNs
-  /// registration that a wrong bundle id, or no signal, never delivers
-  /// (#338), and a caller asking on the user's behalf cannot be left waiting
-  /// forever the way the background start itself is. The answer is
-  /// `notDetermined`: nobody has been asked, which is the truth of it — the
-  /// silence itself is already reported by [_answer], for whichever call is
-  /// still in flight.
+  /// Waits for the transport to attach only up to [permissionDeadline] — on
+  /// iOS `attach` awaits an APNs registration that a wrong bundle id, or no
+  /// signal, never delivers (#338), and a caller asking on the user's behalf
+  /// cannot be left waiting forever the way the background start itself is.
+  /// Past that point the answer is [DwPushPermission.unanswered]: the real
+  /// state is unknown, not "nobody has asked" ([DwPushPermission.notDetermined])
+  /// and not a guess at what the platform would have said — the silence
+  /// itself is already reported by [_answer], for whichever call is still in
+  /// flight. Once attached, the platform's own answer is not bounded by
+  /// this: it may be showing the user a system dialog.
   Future<DwPushPermission> requestPermission() async {
-    final transport = await _attachedOrTimeout();
+    final transport = await _attachedTransport();
     if (transport == null) return _noTransportPermission;
     final answer = await transport.requestPermission();
     if (answer == DwPushPermission.granted) await _fetchToken();
@@ -243,28 +259,34 @@ class DwPush extends DwFlutterPlugin {
   }
 
   /// The permission as it stands, without asking. Bounded by
-  /// [reportUnansweredAfter] the same way [requestPermission] is.
+  /// [permissionDeadline] both for the transport to attach and, once it has,
+  /// for its own answer — nobody is waiting on a dialog here, so neither
+  /// wait can be excused the way [requestPermission]'s platform call is.
   Future<DwPushPermission> permission() async {
-    final transport = await _attachedOrTimeout();
-    return transport == null
-        ? _noTransportPermission
-        : await transport.permission();
+    final transport = await _attachedTransport();
+    if (transport == null) return _noTransportPermission;
+    return transport.permission().timeout(
+      permissionDeadline,
+      onTimeout: () => DwPushPermission.unanswered,
+    );
   }
 
   /// The attached transport — `null` either because the background start
-  /// decided none can run here, or because [reportUnansweredAfter] passed
+  /// decided none can run here, or because [permissionDeadline] passed
   /// before it decided anything. [_noTransportPermission] tells the two
   /// apart through [_attached] itself, which this leaves untouched.
-  Future<DwPushTransportClient?> _attachedOrTimeout() =>
-      _attached.future.timeout(reportUnansweredAfter, onTimeout: () => null);
+  Future<DwPushTransportClient?> _attachedTransport() =>
+      _attached.future.timeout(permissionDeadline, onTimeout: () => null);
 
   /// The status for [requestPermission] and [permission] when
-  /// [_attachedOrTimeout] returned no transport: `unsupported` once the
-  /// background start has actually decided so, `notDetermined` while it is
-  /// still deciding and the wait was merely given up on.
+  /// [_attachedTransport] returned no transport: [DwPushPermission.unsupported]
+  /// once the background start has actually decided so — including a
+  /// transport whose `attach` threw, which completes [_attached] with `null`
+  /// right away — [DwPushPermission.unanswered] while it is still deciding
+  /// and [permissionDeadline] was merely given up on.
   DwPushPermission get _noTransportPermission => _attached.isCompleted
       ? DwPushPermission.unsupported
-      : DwPushPermission.notDetermined;
+      : DwPushPermission.unanswered;
 
   /// The user turned notifications off in the app: removes this device's
   /// registration for the signed-in account and registers nothing until

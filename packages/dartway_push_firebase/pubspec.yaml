@@ -16,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_push_flutter: ^0.5.0
+  dartway_push_flutter: ^0.6.0
 
   # Both majors that active projects run: U90 is on firebase_core 3.
   firebase_core: ">=3.13.1 <5.0.0"

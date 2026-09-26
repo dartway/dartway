@@ -185,7 +185,7 @@ packages:
       path: "../../packages/dartway_push_flutter"
       relative: true
     source: path
-    version: "0.5.1"
+    version: "0.6.0"
   dartway_push_shared:
     dependency: "direct overridden"
     description:

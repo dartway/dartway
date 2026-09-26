@@ -1,6 +1,6 @@
 name: dartway_push_flutter
 description: "Push notifications for a DartWay app, reached as dw.plugins.push: token registration that follows the session, permission on demand, and opened notifications with their typed payload. Carries no vendor SDK — add dartway_push_firebase or dartway_push_rustore."
-version: 0.5.1
+version: 0.6.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

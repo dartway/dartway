@@ -126,6 +126,108 @@ final class SilentTransport extends DwPushTransportClient {
       _call('takeInitialOpen', null);
 }
 
+/// A transport whose `attach` completes only when the test releases it —
+/// proving that an attach which finishes *after* `permissionDeadline` has
+/// already been given up on is still used once it does.
+final class LateAttachTransport extends DwPushTransportClient {
+  LateAttachTransport({this.issuedToken, this.granted = true});
+
+  final String? issuedToken;
+  bool granted;
+
+  final Completer<void> _gate = Completer<void>();
+
+  @override
+  DwPushTransport get transport => DwPushTransport.fcm;
+
+  @override
+  bool get isSupportedPlatform => true;
+
+  @override
+  Future<void> attach(DwPushTransportEvents events) => _gate.future;
+
+  @override
+  Future<void> detach() async {}
+
+  @override
+  Future<DwPushPermission> permission() async =>
+      granted ? DwPushPermission.granted : DwPushPermission.notDetermined;
+
+  @override
+  Future<DwPushPermission> requestPermission() async {
+    granted = true;
+    return DwPushPermission.granted;
+  }
+
+  @override
+  Future<String?> token() async => granted ? issuedToken : null;
+
+  /// Lets the gated `attach` complete.
+  void releaseAttach() => _gate.complete();
+}
+
+/// A transport whose `attach` fails outright — proving that the framework
+/// tells "the background start decided no transport can run here" apart
+/// from "it has not decided anything yet".
+final class ThrowingAttachTransport extends DwPushTransportClient {
+  @override
+  DwPushTransport get transport => DwPushTransport.fcm;
+
+  @override
+  bool get isSupportedPlatform => true;
+
+  @override
+  Future<void> attach(DwPushTransportEvents events) async =>
+      throw StateError('attach failed for good');
+
+  @override
+  Future<void> detach() async {}
+
+  @override
+  Future<DwPushPermission> permission() async => DwPushPermission.notDetermined;
+
+  @override
+  Future<DwPushPermission> requestPermission() async =>
+      DwPushPermission.notDetermined;
+
+  @override
+  Future<String?> token() async => null;
+}
+
+/// A transport that attaches at once but whose `requestPermission` answers
+/// only when the test says so — the system permission dialog, which may
+/// take the user far longer than any technical deadline.
+final class SlowDialogTransport extends DwPushTransportClient {
+  SlowDialogTransport({this.issuedToken});
+
+  final String? issuedToken;
+  final Completer<DwPushPermission> _dialog = Completer();
+
+  @override
+  DwPushTransport get transport => DwPushTransport.fcm;
+
+  @override
+  bool get isSupportedPlatform => true;
+
+  @override
+  Future<void> attach(DwPushTransportEvents events) async {}
+
+  @override
+  Future<void> detach() async {}
+
+  @override
+  Future<DwPushPermission> permission() async => DwPushPermission.notDetermined;
+
+  @override
+  Future<DwPushPermission> requestPermission() => _dialog.future;
+
+  @override
+  Future<String?> token() async => issuedToken;
+
+  /// The user answered the system dialog.
+  void answerDialog(DwPushPermission answer) => _dialog.complete(answer);
+}
+
 Future<void> settle() async {
   for (var i = 0; i < 20; i++) {
     await Future<void>.delayed(Duration.zero);
@@ -387,27 +489,28 @@ void main() {
   });
 
   group('requestPermission and permission answer on a deadline (#338)', () {
-    // Bounded at 500 ms, well over reportUnansweredAfter (50 ms): without the
-    // deadline in DwPush.requestPermission/permission, a transport whose
-    // attach never completes hangs `_attached.future` forever, and this
-    // .timeout throws instead of the test ever seeing an answer — the
-    // mutation this acceptance test is meant to catch.
+    // Bounded at 500 ms, well over permissionDeadline (50 ms) in most cases
+    // below: without the deadline in DwPush.requestPermission/permission, a
+    // transport whose attach never completes hangs `_attached.future`
+    // forever, and this .timeout throws instead of the test ever seeing an
+    // answer — the mutation this acceptance test is meant to catch.
     const testBound = Duration(milliseconds: 500);
 
     test(
-      'requestPermission answers notDetermined and reports the silence',
+      'requestPermission answers unanswered and reports the silence',
       () async {
         final push = DwPush(
           transports: [
             SilentTransport({'attach'}),
           ],
           reportUnansweredAfter: const Duration(milliseconds: 50),
+          permissionDeadline: const Duration(milliseconds: 50),
         );
         await world.start(push);
 
         final answer = await push.requestPermission().timeout(testBound);
 
-        expect(answer, DwPushPermission.notDetermined);
+        expect(answer, DwPushPermission.unanswered);
         expect(
           world.reports.map((r) => '${r.error}'),
           contains(contains('attach did not answer')),
@@ -415,34 +518,161 @@ void main() {
       },
     );
 
-    test('permission answers notDetermined the same way', () async {
+    test(
+      'permission answers unanswered the same way, on the same silence',
+      () async {
+        final push = DwPush(
+          transports: [
+            SilentTransport({'attach'}),
+          ],
+          permissionDeadline: const Duration(milliseconds: 50),
+        );
+        await world.start(push);
+
+        final answer = await push.permission().timeout(testBound);
+
+        expect(answer, DwPushPermission.unanswered);
+      },
+    );
+
+    test('permission answers unanswered when the platform itself stays silent, '
+        'even once attached', () async {
       final push = DwPush(
         transports: [
-          SilentTransport({'attach'}),
+          SilentTransport({'permission'}),
         ],
-        reportUnansweredAfter: const Duration(milliseconds: 50),
+        permissionDeadline: const Duration(milliseconds: 50),
       );
       await world.start(push);
 
       final answer = await push.permission().timeout(testBound);
 
-      expect(answer, DwPushPermission.notDetermined);
+      expect(answer, DwPushPermission.unanswered);
     });
 
-    test('a transport that attaches normally is unaffected', () async {
-      final transport = DwFakePushTransport(issuedToken: 'device-13');
+    test(
+      'a transport that attaches and answers normally is unaffected',
+      () async {
+        final transport = DwFakePushTransport(issuedToken: 'device-13');
+        final push = DwPush(
+          transports: [transport],
+          permissionDeadline: const Duration(milliseconds: 50),
+        );
+        await world.start(push, session: alice);
+
+        final answer = await push.requestPermission().timeout(testBound);
+
+        expect(answer, DwPushPermission.granted);
+        await settle();
+        expect(world.registrations.single.$2.token, 'device-13');
+      },
+    );
+
+    test('permissionDeadline is separate from reportUnansweredAfter: lowering '
+        'the report threshold does not shorten the wait', () async {
+      final push = DwPush(
+        transports: [
+          SilentTransport({'attach'}),
+        ],
+        reportUnansweredAfter: const Duration(milliseconds: 20),
+        permissionDeadline: const Duration(milliseconds: 300),
+      );
+      await world.start(push);
+
+      // The silence is reported well before permissionDeadline elapses…
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(
+        world.reports.map((r) => '${r.error}'),
+        contains(contains('attach did not answer')),
+      );
+
+      // …but requestPermission has not given up yet at that point.
+      var settled = false;
+      final answer = push.requestPermission().then((v) {
+        settled = true;
+        return v;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(
+        settled,
+        isFalse,
+        reason: 'permissionDeadline (300 ms) has not passed yet',
+      );
+
+      expect(
+        await answer.timeout(const Duration(seconds: 1)),
+        DwPushPermission.unanswered,
+      );
+    });
+
+    test('a late attach past permissionDeadline is still used: the token '
+        'registers once permission is already granted, and a later '
+        'requestPermission answers for real', () async {
+      final transport = LateAttachTransport(issuedToken: 'device-late');
       final push = DwPush(
         transports: [transport],
-        reportUnansweredAfter: const Duration(milliseconds: 50),
+        permissionDeadline: const Duration(milliseconds: 50),
       );
       await world.start(push, session: alice);
 
-      final answer = await push.requestPermission().timeout(testBound);
+      final first = await push.requestPermission().timeout(testBound);
+      expect(first, DwPushPermission.unanswered);
+      expect(world.registrations, isEmpty);
 
-      expect(answer, DwPushPermission.granted);
+      transport.releaseAttach();
       await settle();
-      expect(world.registrations.single.$2.token, 'device-13');
+      expect(world.registrations.single.$2.token, 'device-late');
+
+      final second = await push.requestPermission().timeout(testBound);
+      expect(second, DwPushPermission.granted);
     });
+
+    test('a transport whose attach throws answers unsupported promptly, never '
+        'unanswered', () async {
+      final push = DwPush(
+        transports: [ThrowingAttachTransport()],
+        // Long on purpose: proves the answer does not wait for it — a
+        // background start that has already decided "no transport here"
+        // is not "still deciding".
+        permissionDeadline: const Duration(seconds: 5),
+      );
+      await world.start(push);
+
+      expect(
+        await push.requestPermission().timeout(testBound),
+        DwPushPermission.unsupported,
+      );
+      expect(
+        await push.permission().timeout(testBound),
+        DwPushPermission.unsupported,
+      );
+    });
+
+    test(
+      "requestPermission's own call to the platform is never bounded by "
+      'permissionDeadline: a slow system dialog still answers for real',
+      () async {
+        final transport = SlowDialogTransport(issuedToken: 'device-dialog');
+        final push = DwPush(
+          transports: [transport],
+          permissionDeadline: const Duration(milliseconds: 50),
+        );
+        await world.start(push, session: alice);
+        await settle(); // attach is immediate here; let it complete first.
+
+        final answer = push.requestPermission();
+        // Outlive permissionDeadline with the dialog still open.
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        transport.answerDialog(DwPushPermission.granted);
+
+        expect(
+          await answer.timeout(const Duration(seconds: 2)),
+          DwPushPermission.granted,
+        );
+        await settle();
+        expect(world.registrations.single.$2.token, 'device-dialog');
+      },
+    );
   });
 
   group('opened notifications', () {
