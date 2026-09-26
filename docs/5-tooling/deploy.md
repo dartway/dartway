@@ -200,8 +200,9 @@ One server process holds `DW_DATABASE_MAX_CONNECTIONS` (default 10) plus one mor
 `LISTEN` above — so a plan's usable connection count has to clear `MAX_CONNECTIONS + 1`, not just
 `MAX_CONNECTIONS`. DigitalOcean's smallest Managed Postgres plan allows on the order of 22 usable
 connections in total (the rest are the provider's own); size `DW_DATABASE_MAX_CONNECTIONS` to what the
-plan actually grants this one server, with room for a second server during a deploy's brief overlap
-and anything else that connects (a migration run, `psql` by hand).
+plan actually grants this one server, leaving room for anything else that connects (`psql` by hand,
+a reporting tool). A deploy never runs two servers at once: the old one stops before the migration run
+and the new server start, so no headroom is needed for an overlap.
 
 ### Switching an existing environment from bundled to external
 
@@ -418,7 +419,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `docker-available` | error | Docker Compose is usable by the deployment user |
 | `runtime-secrets` | error | Every required secret is in the server store with a value, and nothing reserved is |
 | `secret-files` | error | Every `requires.files` entry is delivered **and** mounted into the server container, read from the configuration Compose will actually run |
-| `database-reachable` | error | With `database: external`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS` are validated exactly as the server parses them, then a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with the same `sslmode` the server will use and runs a query — a real authenticated, encrypted connection, not a bare TCP probe. A failure names why: a malformed stored value, DNS, refused, a timeout, authentication, or the server not offering TLS. Skipped with `database: bundled` |
+| `database-reachable` | error | With `database: external`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS` are validated exactly as the server parses them, then a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with the same `sslmode` the server will use and runs a query — a real authenticated connection (encrypted unless `DW_DATABASE_SSL=false`), not a bare TCP probe. A failure names why: a malformed stored value, DNS, refused, a timeout, authentication, or the server not offering TLS. Skipped with `database: bundled` |
 | `secrets-match-local` | warning | The server store and `deploy/secrets.yaml` hold the same key names |
 | `outside` | error | The same outside probes `run` ends with, against whatever is deployed now; runs even when SSH fails |
 
