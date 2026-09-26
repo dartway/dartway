@@ -10,18 +10,23 @@ import 'package:test/test.dart';
 void main() {
   group('familyLockstepProblem', () {
     test('six matching versions agree', () {
-      final versions = {for (final name in familyPackageNames) name: '0.21.0-dev.6'};
+      final versions = {
+        for (final name in familyPackageNames) name: '0.21.0-dev.6',
+      };
       expect(familyLockstepProblem(versions), isNull);
     });
 
     test('a missing family member is named', () {
-      final versions = {for (final name in familyPackageNames) name: '0.21.0-dev.6'}
-        ..remove('dartway_orm');
+      final versions = {
+        for (final name in familyPackageNames) name: '0.21.0-dev.6',
+      }..remove('dartway_orm');
       expect(familyLockstepProblem(versions), contains('dartway_orm'));
     });
 
     test('a family member out of step with the rest is refused', () {
-      final versions = {for (final name in familyPackageNames) name: '0.21.0-dev.6'};
+      final versions = {
+        for (final name in familyPackageNames) name: '0.21.0-dev.6',
+      };
       versions['dartway_client'] = '0.21.0-dev.5';
       final problem = familyLockstepProblem(versions);
       expect(problem, isNotNull);
@@ -57,36 +62,66 @@ void main() {
     });
 
     test('leaves a trailing comment on the version line untouched', () {
-      const pubspec = 'version: 0.21.0-dev.6 # cut by release.dart\n';
+      const pubspec =
+          'name: dartway_core_shared\nversion: 0.21.0-dev.6 # cut by release.dart\n';
       expect(
         cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
-        'version: 0.21.0 # cut by release.dart\n',
+        'name: dartway_core_shared\nversion: 0.21.0 # cut by release.dart\n',
       );
     });
 
     test('null when the file states a different version', () {
       const pubspec = 'name: dartway_router\nversion: 2.0.0\n';
-      expect(cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'), isNull);
+      expect(
+        cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
+        isNull,
+      );
     });
 
-    test(
-      'never touches an indented version: under dependency_overrides — only '
-      'a top-level version: is a package\'s own',
-      () {
-        const pubspec =
-            'name: dartway_client\n'
-            'dependency_overrides:\n'
-            '  dartway_core_shared:\n'
-            '    version: 0.21.0-dev.6\n';
-        expect(cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'), isNull);
-      },
-    );
+    test('a satellite is never rewritten, even when its own version text '
+        'happens to match the family\'s (review of PR #358, N4)', () {
+      const pubspec = 'name: dartway_router\nversion: 0.21.0-dev.6\n';
+      expect(
+        cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
+        isNull,
+      );
+    });
+
+    test('no name: field at all means no package identity to check — null, '
+        'not a crash', () {
+      const pubspec = 'version: 0.21.0-dev.6\n';
+      expect(
+        cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
+        isNull,
+      );
+    });
+
+    test('a longer prerelease that merely starts with the same text is left '
+        'alone — the \\b boundary (review of PR #358, N6)', () {
+      const pubspec = 'name: dartway_core_shared\nversion: 0.21.0-dev.60\n';
+      expect(
+        cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
+        isNull,
+      );
+    });
+
+    test('never touches an indented version: under dependency_overrides — only '
+        'a top-level version: is a package\'s own', () {
+      const pubspec =
+          'name: dartway_client\n'
+          'dependency_overrides:\n'
+          '  dartway_core_shared:\n'
+          '    version: 0.21.0-dev.6\n';
+      expect(
+        cutOwnVersion(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
+        isNull,
+      );
+    });
   });
 
   group('cutDependencyCarets', () {
     test('cuts a bare caret dependency on a family package', () {
-      const pubspec =
-          'dependencies:\n  dartway_core_flutter: ^0.21.0-dev.6\n';
+      const pubspec = 'dependencies:\n  dartway_core_flutter: ^0.21.0-dev.6\n';
       expect(
         cutDependencyCarets(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
         'dependencies:\n  dartway_core_flutter: ^0.21.0\n',
@@ -105,6 +140,15 @@ void main() {
         '  dartway_core_server: ^0.21.0\n'
         '  dartway_generator: ^0.21.0\n'
         '  dartway_shared_preferences: ^0.6.0\n',
+      );
+    });
+
+    test('a longer prerelease caret that merely starts with the same text is '
+        'left alone — the \\b boundary (review of PR #358, N6)', () {
+      const pubspec = 'dependencies:\n  dartway_core_flutter: ^0.21.0-dev.60\n';
+      expect(
+        cutDependencyCarets(pubspec, from: '0.21.0-dev.6', to: '0.21.0'),
+        isNull,
       );
     });
 

@@ -37,6 +37,22 @@ class PublishFailed extends PublishAttempt {
   final String output;
 }
 
+/// Classifies one already-run `dart pub publish` attempt from its raw exit
+/// code, stdout and stderr — pulled out of `release.dart`'s `_attemptPublish`
+/// so the parsing is exercised by a test without shelling out to `dart pub
+/// publish` for real (review of PR #358).
+PublishAttempt classifyPublishResult({
+  required int exitCode,
+  required String stdout,
+  required String stderr,
+}) {
+  if (exitCode == 0) return const PublishOk();
+  final combined = '$stdout\n$stderr';
+  final rateLimit = PackageCreatedRateLimit.parse(combined);
+  if (rateLimit != null) return PublishRateLimited(rateLimit);
+  return PublishFailed(combined);
+}
+
 /// What one run of [publishRelease] did.
 class ReleasePublishReport {
   const ReleasePublishReport({

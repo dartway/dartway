@@ -14,6 +14,8 @@
 /// `CHANGELOG.md`, not something a caret rewrite can decide.
 library;
 
+import 'pubspec_scan.dart';
+
 /// The packages that move in lockstep — root `CLAUDE.md`'s monorepo map,
 /// D-030/D-032. `dartway_generator` carries the same version and is
 /// published in lockstep with the rest, even though it is not a pub
@@ -43,7 +45,9 @@ String? familyLockstepProblem(Map<String, String> familyVersions) {
     return 'the family is missing ${names.join(', ')} from this tree — is '
         'this the repository root?';
   }
-  final versions = {for (final name in familyPackageNames) familyVersions[name]};
+  final versions = {
+    for (final name in familyPackageNames) familyVersions[name],
+  };
   if (versions.length > 1) {
     final detail = (familyPackageNames.toList()..sort())
         .map((name) => '$name ${familyVersions[name]}')
@@ -77,21 +81,46 @@ String? plainOf(String version) {
 String cutFirstMessage(String familyPrerelease) =>
     'cut the release first: family at $familyPrerelease';
 
-/// [contents] with a pubspec's own top-level `version:` field moved from
-/// [from] to [to], or null when it states no such field.
+/// [contents]' own top-level `version:` field moved from [from] to [to], or
+/// null when it does not apply.
+///
+/// Restricted to [familyPackageNames] (D-103, review of PR #358): a
+/// satellite's own version is never this function's to touch, even when its
+/// text happens to carry the same prerelease as the family — [packageName]
+/// is read off `contents` itself (its own `name:` field), not trusted from
+/// the caller, so this cannot be pointed at the wrong file's identity.
 ///
 /// Anchored at the start of a line: a pubspec has exactly one top-level
 /// `version:`, and a same-named key nested under `dependencies:` or
 /// `dependency_overrides:` is always indented, so it never matches `^`. Only
 /// the version token itself is replaced — a trailing comment on the line, if
 /// any, is left exactly as it was.
-String? cutOwnVersion(String contents, {required String from, required String to}) {
+String? cutOwnVersion(
+  String contents, {
+  required String from,
+  required String to,
+}) {
+  final name = _packageNameOf(contents);
+  if (name == null || !familyPackageNames.contains(name)) return null;
+
   final pattern = RegExp(
     '^(version:\\s*)${RegExp.escape(from)}\\b',
     multiLine: true,
   );
   if (!pattern.hasMatch(contents)) return null;
   return contents.replaceFirstMapped(pattern, (match) => '${match[1]}$to');
+}
+
+/// The `name:` field of a pubspec's own [contents], or null when it cannot be
+/// read at all — never thrown from here: a pubspec too broken to parse is a
+/// bug `_rawPubspecs()` already reports elsewhere, not this function's to
+/// raise a second time.
+String? _packageNameOf(String contents) {
+  try {
+    return pubspecValue(parsePubspec(contents), 'name');
+  } on FormatException {
+    return null;
+  }
 }
 
 /// [contents] with every bare-string caret dependency on a family package —
@@ -120,9 +149,10 @@ String? cutDependencyCarets(
 }
 
 /// The rewrite `--cut` applies to one pubspec file's [contents]: its own
-/// version, if it is a family package's pubspec, and every caret it states
-/// on a family package. Null when neither applies — so a caller can tell
-/// which files were actually touched from those that were merely read.
+/// version, if [contents]' own `name:` is a family package's (`cutOwnVersion`
+/// restricts itself to that), and every caret it states on a family package.
+/// Null when neither applies — so a caller can tell which files were
+/// actually touched from those that were merely read.
 String? cutPubspecContents(
   String contents, {
   required String from,

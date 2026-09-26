@@ -17,14 +17,15 @@ void main() {
     expect(limit.isShortWindow, isTrue);
   });
 
-  test('a daily-window answer parses and is not the short window', () {
+  test("pub.dev's real daily-window text parses and is not the short window "
+      '(review of PR #358, N6)', () {
     final limit = PackageCreatedRateLimit.parse(
       'The "package-created" operation is blocked, as its rate limit has '
-      'been reached (12 in the last 1 day).',
+      'been reached (12 in the last day).',
     );
     expect(limit, isNotNull);
     expect(limit!.count, 12);
-    expect(limit.window, '1 day');
+    expect(limit.window, 'day');
     expect(limit.isShortWindow, isFalse);
   });
 
@@ -45,6 +46,18 @@ void main() {
       PackageCreatedRateLimit.parse(
         'FormatException: The lower bound of "sdk: \'>=2.12.0\'" must be '
         'greater than 0.0.0\n',
+      ),
+      isNull,
+    );
+  });
+
+  test("a different pub.dev rate limit — package-published, not "
+      'package-created — is not matched: this feature is about first '
+      'publications only (review of PR #358, N6)', () {
+    expect(
+      PackageCreatedRateLimit.parse(
+        'The "package-published" operation is blocked, as its rate limit '
+        'has been reached (24 in the last day).',
       ),
       isNull,
     );

@@ -29,10 +29,12 @@
 // so in one line instead of listing caret errors (`release_cut.dart`).
 //
 // Exit codes, the same three the other tools use:
-//   0  nothing to publish, the plan printed, the family needs cutting first,
-//      or everything published
-//   1  something is wrong, a cut was refused, or publishing is partial or
-//      failed
+//   0  nothing to publish, the plan printed, or everything published
+//   1  something is wrong: a cut was refused, the family needs cutting
+//      first, a plan cannot be trusted (unresolved dependency, stale
+//      version, a missing CHANGELOG entry), publishing is partial, or a
+//      publish failed. A plan-only run that cannot be trusted is not an
+//      answer either — it exits the same 1 a `--publish` run would.
 //   2  the question could not be put at all — pub.dev unreachable, or this was
 //      not run from the repository root. Not an answer, an unknown; the same
 //      third code the other tools here use, and for the same reason.
@@ -113,6 +115,12 @@ Future<void> main(List<String> args) async {
   // as a wall of caret errors that sends the reader looking for a dependency
   // problem that is not there (#337). A family that disagrees with itself is
   // left to the ordinary caret-by-caret checks below to describe.
+  //
+  // This exits 1, in a plan-only run exactly as it would under `--publish`
+  // (review of PR #358): a plan that cannot work is not a plan to look at
+  // either, and `release.dart` on `master` while the family sits on a
+  // prerelease is exactly that — printing it and exiting 0 would have
+  // `--publish` on the same tree exit clean having published nothing.
   final familyVersions = {
     for (final p in packages)
       if (familyPackageNames.contains(p.name)) p.name: p.version,
@@ -120,8 +128,8 @@ Future<void> main(List<String> args) async {
   if (familyLockstepProblem(familyVersions) == null) {
     final version = familyVersion(familyVersions);
     if (plainOf(version) != null) {
-      stdout.writeln(cutFirstMessage(version));
-      return;
+      stderr.writeln(cutFirstMessage(version));
+      exit(1);
     }
   }
 
@@ -205,6 +213,37 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
+  // The synchronisation law's own item 6 (root CLAUDE.md): the package's
+  // CHANGELOG.md. `dart pub publish --force` (below) is exactly what silences
+  // pub's own warning about a missing entry, so this script has to ask
+  // instead. `--cut` never writes this heading itself — it is human text —
+  // so on a freshly cut tree this is what tells the maintainer to add it.
+  final changelogProblems = <String>[];
+  for (final p in plan) {
+    final changelogFile = File('${p.directory}/CHANGELOG.md');
+    if (!changelogFile.existsSync()) {
+      changelogProblems.add('${p.name}: no CHANGELOG.md in ${p.directory}');
+      continue;
+    }
+    final mismatch = changelogMismatch(
+      changelogFile.readAsStringSync(),
+      p.version,
+    );
+    if (mismatch != null) {
+      changelogProblems.add('${p.name} ${p.version}: $mismatch');
+    }
+  }
+  if (changelogProblems.isNotEmpty) {
+    stderr.writeln(
+      '\nRefusing to plan a release: ${changelogProblems.length} package(s) '
+      "have no CHANGELOG.md entry for the version they'd publish.\n",
+    );
+    for (final problem in changelogProblems) {
+      stderr.writeln('  - $problem');
+    }
+    exit(1);
+  }
+
   if (plan.isEmpty) {
     stdout.writeln(
       '\n✓ every package is published at the version this tree '
@@ -230,19 +269,12 @@ Future<void> main(List<String> args) async {
     );
   }
 
-  // pub.dev's `package-created` operation — a first publication — is limited
-  // to 12 a day (#313); said up front, since a plan with more than that
-  // cannot go out in one calendar day whatever `--publish` does about the
-  // rest of the order.
   final firstPublications = plan
       .where((p) => published[p.name]!.isEmpty)
       .length;
-  if (firstPublications > 0) {
-    stdout.writeln(
-      '\n$firstPublications of these are first publications. pub.dev allows '
-      'at most 12 in a day'
-      '${firstPublications > 12 ? ' — this plan has more than that and cannot all go out today' : ''}.',
-    );
+  final firstPublicationsMessage = firstPublicationsLine(firstPublications);
+  if (firstPublicationsMessage != null) {
+    stdout.writeln('\n$firstPublicationsMessage');
   }
 
   if (!publish) {
@@ -269,58 +301,42 @@ Future<void> main(List<String> args) async {
     log: stdout.writeln,
   );
 
-  if (report.stopped case final stopped?) {
-    stderr.writeln('\n✗ ${stopped.name}: ${stopped.reason}');
-    stderr.writeln(
-      'Published in this run: '
-      '${report.published.isEmpty ? '(nothing)' : report.published.join(', ')}',
-    );
-    if (report.deferred.isNotEmpty) {
-      stderr.writeln('Deferred before the stop: ${report.deferred.keys.join(', ')}');
-    }
-    exit(1);
-  }
-
-  if (report.deferred.isNotEmpty) {
-    stdout.writeln(
-      '\n${report.deferred.length} package(s) deferred by pub.dev\'s '
-      'package-created rate limit:\n',
-    );
-    for (final MapEntry(key: name, value: reason) in report.deferred.entries) {
-      stdout.writeln('  - $name: $reason');
-    }
-    stdout.writeln(
-      '\n✓ published ${report.published.length} of ${plan.length} '
-      'package(s) — the release is PARTIAL.',
-    );
-    exit(1);
-  }
-
-  stdout.writeln('\n✓ published ${report.published.length} package(s).');
-  stdout.writeln(
-    'The release is not finished: `stable` is moved by the '
-    'promotion ritual in CLAUDE.md, not by this script.',
+  final outcome = describePublishOutcome(
+    report,
+    planNames: plan.map((p) => p.name).toList(),
   );
+  for (final line in outcome.stdoutLines) {
+    stdout.writeln(line);
+  }
+  for (final line in outcome.stderrLines) {
+    stderr.writeln(line);
+  }
+  if (outcome.exitCode != 0) exit(outcome.exitCode);
 }
 
 /// Makes one `dart pub publish` attempt for [p] and classifies the result for
 /// `publishRelease` — the only place this script actually shells out to
 /// publish.
+///
+/// Only a successful attempt's output is printed here, live: a failure or a
+/// rate limit is folded into the classification instead and printed exactly
+/// once, by `describePublishOutcome` (via `main`) or by `publishRelease`'s own
+/// retry log — never both (review of PR #358: the previous version printed a
+/// failing attempt's stdout and stderr here, live, and then again in full as
+/// part of the stop report).
 Future<PublishAttempt> _attemptPublish(_Package p) async {
   final result = Process.runSync('dart', [
     'pub',
     'publish',
     '--force',
   ], workingDirectory: p.directory);
-  stdout.write(result.stdout);
-  if (result.exitCode == 0) return const PublishOk();
-
-  final combined = '${result.stdout}\n${result.stderr}';
-  final rateLimit = PackageCreatedRateLimit.parse(combined);
-  if (rateLimit != null) return PublishRateLimited(rateLimit);
-
-  stderr.write(result.stderr);
-  return PublishFailed(combined);
+  final attempt = classifyPublishResult(
+    exitCode: result.exitCode,
+    stdout: result.stdout as String,
+    stderr: result.stderr as String,
+  );
+  if (attempt is PublishOk) stdout.write(result.stdout);
+  return attempt;
 }
 
 /// Why publishing must not start, or null when it may.
@@ -397,11 +413,7 @@ String? _refuseToCutBecause() {
   if (sdk != null) return sdk;
 
   final status =
-      (Process.runSync('git', [
-                'status',
-                '--porcelain',
-              ]).stdout
-              as String)
+      (Process.runSync('git', ['status', '--porcelain']).stdout as String)
           .trim();
   if (status.isNotEmpty) {
     return 'the working tree has uncommitted changes — commit or discard '
@@ -470,11 +482,10 @@ void _cutFamilyPrerelease() {
   stdout.writeln('\nResolving:\n');
   for (final directory in _pubGetDirectories()) {
     stdout.writeln('  pub get in $directory');
-    final result = Process.runSync(
-      'flutter',
-      ['pub', 'get'],
-      workingDirectory: directory,
-    );
+    final result = Process.runSync('flutter', [
+      'pub',
+      'get',
+    ], workingDirectory: directory);
     if (result.exitCode != 0) {
       stdout.write(result.stdout);
       stderr.write(result.stderr);
