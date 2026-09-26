@@ -550,6 +550,93 @@ void main() {
     );
   });
 
+  group(
+    'database: external — its password is delivered, not generated (D-096)',
+    () {
+      final externalStack = stackFrom(extra: '  database: external\n');
+      late DwSecretStore externalStore;
+
+      setUp(() {
+        externalStore = DwSecretStore(
+          ssh: LocalShell(),
+          target: externalStack.target,
+          directory: p.join(root.path, 'external-store'),
+        );
+      });
+
+      Map<String, String> storedIn(DwSecretStore s) => File(s.file).existsSync()
+          ? DwSecretStore.parse(File(s.file).readAsStringSync())
+          : const {};
+
+      test(
+        'is absent from generatedSecrets — the M3 double guard is keyed off that set',
+        () {
+          expect(
+            externalStack.generatedSecrets.containsKey(
+              DwStack.databasePasswordKey,
+            ),
+            isFalse,
+          );
+        },
+      );
+
+      test('--overwrite alone replaces a differing value', () async {
+        await externalStore.setSecret(
+          key: DwStack.databasePasswordKey,
+          value: 'old-providers-password',
+        );
+
+        final result = await _push(
+          stack: externalStack,
+          store: externalStore,
+          section: {DwStack.databasePasswordKey: 'new-providers-password'},
+          overwrite: {DwStack.databasePasswordKey},
+        );
+
+        expect(result.code, 0);
+        expect(
+          storedIn(externalStore)[DwStack.databasePasswordKey],
+          'new-providers-password',
+        );
+      });
+
+      test(
+        '--prune alone drops it, --allow-emptying alone blanks it',
+        () async {
+          await externalStore.setSecret(
+            key: DwStack.databasePasswordKey,
+            value: 'a-providers-password',
+          );
+
+          final pruned = await _push(
+            stack: externalStack,
+            store: externalStore,
+            section: const {},
+            prune: true,
+          );
+          expect(pruned.code, 0);
+          expect(
+            storedIn(externalStore).containsKey(DwStack.databasePasswordKey),
+            isFalse,
+          );
+
+          await externalStore.setSecret(
+            key: DwStack.databasePasswordKey,
+            value: 'a-providers-password',
+          );
+          final emptied = await _push(
+            stack: externalStack,
+            store: externalStore,
+            section: {DwStack.databasePasswordKey: ''},
+            allowEmptying: true,
+          );
+          expect(emptied.code, 0);
+          expect(storedIn(externalStore)[DwStack.databasePasswordKey], '');
+        },
+      );
+    },
+  );
+
   group('the plan-then-write race (M4)', () {
     test(
       'a store that changed since it was planned refuses the write, not overwrites it',

@@ -228,6 +228,9 @@ rm -f "\$dw_new"''';
     '${DwComposeFiles.invoke} run --rm -T ${DwStack.storageInitService} </dev/null',
   );
 
+  /// Starts the bundled Postgres. Nothing to do with `database: external` —
+  /// there is no such service in the rendered stack, and the server reaches
+  /// the managed database directly through the secrets in `.env`.
   Future<DwSshResult> startDatabase() =>
       _compose('up -d --wait ${DwStack.postgresService}');
 
@@ -540,11 +543,12 @@ echo "nginx restarted and running"
         run: startStorage,
         showOutput: true,
       ),
-    DwDeployStep(
-      id: 'database',
-      title: 'Start the database',
-      run: startDatabase,
-    ),
+    if (target.database == DwDatabaseMode.bundled)
+      DwDeployStep(
+        id: 'database',
+        title: 'Start the database',
+        run: startDatabase,
+      ),
     DwDeployStep(
       id: 'server',
       title:

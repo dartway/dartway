@@ -266,18 +266,30 @@ Future<DwDeployVerdict> _checkSecretNames(DwDeployContext context) async {
 
 Future<DwDeployVerdict> _checkStackNames(DwDeployContext context) async {
   final stack = context.stack;
+  final bundledDatabase = context.target.database == DwDatabaseMode.bundled;
+  final bundledStorage = context.target.storage == DwStorageMode.bundled;
   final problems = [
-    if (!RegExp(r'^[a-z_][a-z0-9_]{0,62}$').hasMatch(stack.databaseName))
+    // An external database's name is a managed provider's own, delivered as
+    // DW_DATABASE_NAME — there is nothing derived from the server package to
+    // judge.
+    if (bundledDatabase &&
+        !RegExp(r'^[a-z_][a-z0-9_]{0,62}$').hasMatch(stack.databaseName))
       'database name "${stack.databaseName}"',
-    if (context.target.storage == DwStorageMode.bundled)
+    if (bundledStorage)
       for (final bucket in [stack.publicBucketName, stack.privateBucketName])
         if (!RegExp(r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$').hasMatch(bucket))
           'bucket name "$bucket"',
   ];
   if (problems.isEmpty) {
     return DwDeployVerdict.pass(
-      'database ${stack.databaseName}'
-      '${context.target.storage == DwStorageMode.bundled ? ', buckets ${stack.publicBucketName} and ${stack.privateBucketName}' : ''}',
+      [
+        if (bundledDatabase)
+          'database ${stack.databaseName}'
+        else
+          'database: external',
+        if (bundledStorage)
+          'buckets ${stack.publicBucketName} and ${stack.privateBucketName}',
+      ].join(', '),
     );
   }
   return DwDeployVerdict.fail(

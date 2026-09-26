@@ -46,27 +46,50 @@
   ships (the `admin` case above); a fixed default under the `dw_` prefix does not, on any stock
   image or package, so an operator who leaves `deploy_user` unset never meets the collision. Additive:
   a config that already names `deploy_user` is unaffected.
+- **`database: bundled | external` in `deploy/config.yaml`** (dartway/dartway#325, D-096), the same
+  vocabulary `storage` uses. `external` renders no `postgres` service, volume or `depends_on`;
+  `DW_DATABASE_HOST`, `_PORT`, `_NAME`, `_USER` and `_PASSWORD` become required secrets — a managed
+  provider (DigitalOcean Managed Postgres, RDS, Cloud SQL, …) names its own, none of them derivable
+  the way the bundled container's are — and the secret store accepts these names precisely because
+  the compose file no longer sets them (it still refuses them for `bundled`). `DW_DATABASE_SSL`
+  (default `true`) and `_MAX_CONNECTIONS` (default 10, the pool ceiling — one server holds this many
+  plus one more for its session `LISTEN`, and a managed plan's usable total is often in the tens)
+  stay optional; the server already defaults both. `dartway deploy check` gained
+  `database-reachable`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS` are validated exactly as the
+  server parses them, then on the deployment host over SSH — a managed provider's firewall usually
+  trusts that address, not the maintainer's machine — a throwaway, pinned Postgres client attempts a
+  real connection with the same `sslmode` the server itself will use (`require` unless
+  `DW_DATABASE_SSL` is explicitly `false`) and reports why it failed (a bad stored value, DNS,
+  refused, a timeout, authentication, or TLS not offered), never a bare TCP probe, which would miss
+  the last two. Documents DigitalOcean Managed Postgres specifically: the direct port, not its
+  PgBouncer transaction-mode pooler, which silently breaks the session `LISTEN` and the migration
+  lock. Additive: an existing config with no `database` key keeps deploying exactly as before, so
+  there is no migration note. `sslmode=verify-full` with a CA file is tracked separately
+  (dartway/dartway#342).
 - **BREAKING: `secret push` no longer replaces a server value that differs from the local one — it
   refuses the whole push, naming every differing key, and sends nothing** (#330, D-097). Its default
   is now additive: it sends a key the server lacks or holds empty, leaves a key whose server value
   already matches alone, and — this is the behaviour change — stops rather than silently overwriting
   a key whose server value differs. `--overwrite KEY[,KEY…]` replaces exactly those named keys on
-  purpose; there is no `--overwrite-all`. A generated key (`DW_DATABASE_PASSWORD`, and with
-  `storage: bundled` the storage keys) is bound to the data already on the server on every path that
-  touches it, not only replacing it: dropping it with `--prune` or blanking it with `--allow-emptying`
-  needs it named in `--overwrite` too, on top of whichever of those two flags is otherwise enough on
-  its own for an ordinary key. The comparison runs on the server itself (`DwSecretStore.plan`, over
-  the candidate's own encoded lines sent on stdin, read directly rather than staged in a file of their
-  own) — only key names and a `cksum` fingerprint of the store travel back, never a value. `writeAll`
-  is asked to check that same fingerprint right before it writes, so a second push (or a hand edit)
-  landing in between refuses the write rather than being silently undone by it; a store that exists
-  but cannot be read fails the comparison outright rather than reading as absent, which would have
-  classed every key `add` and let the push through as a full replace; and a candidate key the
-  comparison does not place in any of its three sets is refused rather than sent unexamined. Before
-  sending anything, `push` prints a per-key plan (`add` / `keep (same)` / `overwrite` /
-  `differs — refused` / `drop`) — the same shape `--dry-run` prints, only followed by the actual send.
-  This is a CLI command's own default changing, not a change to generated project code, so there is no
-  migration note.
+  purpose; there is no `--overwrite-all`. A generated key (`DwStack.generatedSecrets` — the database
+  password for `database: bundled`, and with `storage: bundled` the storage keys) is bound to the
+  data already on the server on every path that touches it, not only replacing it: dropping it with
+  `--prune` or blanking it with `--allow-emptying` needs it named in `--overwrite` too, on top of
+  whichever of those two flags is otherwise enough on its own for an ordinary key. The comparison
+  runs on the server itself (`DwSecretStore.plan`, over the candidate's own encoded lines sent on
+  stdin, read directly rather than staged in a file of their own) — only key names (including every
+  name the store currently holds, so `--prune`'s orphaned keys are read in the very same pass rather
+  than by a second, separately-timed call) and a `cksum` fingerprint of the store travel back, never
+  a value. `writeAll` is asked to check that same fingerprint right before it writes, so a second
+  push (or a hand edit) landing in between refuses the write rather than being silently undone by
+  it — its own plaintext, like the rest of the store's writes, is staged inside the store's own
+  directory, never the shared system temp one; a store that exists but cannot be read fails the
+  comparison outright rather than reading as absent, which would have classed every key `add` and
+  let the push through as a full replace; and a candidate key the comparison does not place in any of
+  its three sets is refused rather than sent unexamined. Before sending anything, `push` prints a
+  per-key plan (`add` / `keep (same)` / `overwrite` / `differs — refused` / `drop`) — the same shape
+  `--dry-run` prints, only followed by the actual send. This is a CLI command's own default changing,
+  not a change to generated project code, so there is no migration note.
 
 ## 0.12.0
 

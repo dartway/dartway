@@ -95,6 +95,21 @@ void main() {
       expect(plain, isNot(contains('storage')));
       expect(plain, isNot(contains('certificate')));
     });
+
+    // Left in, every external `deploy run` would try to start a `postgres`
+    // service the rendered compose file no longer declares, and fail there.
+    test('no database step with database: external', () {
+      final external = _ids(
+        DwDeployRunner(
+          ssh: RecordingSsh(),
+          stack: stackFrom(extra: '  database: external\n'),
+        ),
+      );
+      expect(external, isNot(contains('database')));
+      // Everything else keeps its place — this is the one step that leaves.
+      expect(external, contains('server'));
+      expect(external, contains('build'));
+    });
   });
 
   group('the commands a deployment sends', () {

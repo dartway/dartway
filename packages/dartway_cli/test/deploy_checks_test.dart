@@ -83,6 +83,35 @@ void main() {
       },
     );
 
+    test(
+      'stack-names: a name that would be an invalid bundled database name is '
+      'not judged under database: external — it is a managed provider\'s own',
+      () async {
+        final badName = DwStack(
+          target: targetFrom(extra: '  database: external\n'),
+          // The prefix "1shop" starts with a digit: invalid as a bundled
+          // Postgres database/role name, irrelevant once nothing derives one.
+          serverPackage: '1shop_server',
+          flutterPackage: '1shop_flutter',
+        );
+        final verdict = await evaluate('stack-names', badName);
+        expect(verdict.passed, isTrue);
+        expect(verdict.detail, contains('external'));
+
+        // The same name, still bundled, is exactly what this check exists to
+        // catch — proving the external case above skips a real judgement
+        // rather than one that could never fail.
+        final sameNameBundled = DwStack(
+          target: targetFrom(),
+          serverPackage: '1shop_server',
+          flutterPackage: '1shop_flutter',
+        );
+        final bundledVerdict = await evaluate('stack-names', sameNameBundled);
+        expect(bundledVerdict.passed, isFalse);
+        expect(bundledVerdict.detail, contains('database name'));
+      },
+    );
+
     test('server-signals: shell form keeps SIGTERM from the server', () async {
       write('shop_server/Dockerfile', 'FROM alpine\nENTRYPOINT /app/server\n');
       final shell = await evaluate('server-signals');
