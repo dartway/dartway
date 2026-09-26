@@ -66,6 +66,30 @@
   lock. Additive: an existing config with no `database` key keeps deploying exactly as before, so
   there is no migration note. `sslmode=verify-full` with a CA file is tracked separately
   (dartway/dartway#342).
+- **BREAKING: `secret push` no longer replaces a server value that differs from the local one — it
+  refuses the whole push, naming every differing key, and sends nothing** (#330, D-097). Its default
+  is now additive: it sends a key the server lacks or holds empty, leaves a key whose server value
+  already matches alone, and — this is the behaviour change — stops rather than silently overwriting
+  a key whose server value differs. `--overwrite KEY[,KEY…]` replaces exactly those named keys on
+  purpose; there is no `--overwrite-all`. A generated key (`DwStack.generatedSecrets` — the database
+  password for `database: bundled`, and with `storage: bundled` the storage keys) is bound to the
+  data already on the server on every path that touches it, not only replacing it: dropping it with
+  `--prune` or blanking it with `--allow-emptying` needs it named in `--overwrite` too, on top of
+  whichever of those two flags is otherwise enough on its own for an ordinary key. The comparison
+  runs on the server itself (`DwSecretStore.plan`, over the candidate's own encoded lines sent on
+  stdin, read directly rather than staged in a file of their own) — only key names (including every
+  name the store currently holds, so `--prune`'s orphaned keys are read in the very same pass rather
+  than by a second, separately-timed call) and a `cksum` fingerprint of the store travel back, never
+  a value. `writeAll` is asked to check that same fingerprint right before it writes, so a second
+  push (or a hand edit) landing in between refuses the write rather than being silently undone by
+  it — its own plaintext, like the rest of the store's writes, is staged inside the store's own
+  directory, never the shared system temp one; a store that exists but cannot be read fails the
+  comparison outright rather than reading as absent, which would have classed every key `add` and
+  let the push through as a full replace; and a candidate key the comparison does not place in any of
+  its three sets is refused rather than sent unexamined. Before sending anything, `push` prints a
+  per-key plan (`add` / `keep (same)` / `overwrite` / `differs — refused` / `drop`) — the same shape
+  `--dry-run` prints, only followed by the actual send. This is a CLI command's own default changing,
+  not a change to generated project code, so there is no migration note.
 
 ## 0.12.0
 
