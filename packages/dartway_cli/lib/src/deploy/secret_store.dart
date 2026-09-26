@@ -227,9 +227,12 @@ chmod 600 "\$file"
   /// Writes [key], replacing any existing value.
   ///
   /// The encoded line travels on stdin, so the value appears in neither the
-  /// SSH command line nor the remote process list. The file is rewritten
-  /// through a temporary copy and moved into place, so a reader never sees it
-  /// half-written.
+  /// SSH command line nor the remote process list. It is staged in a
+  /// `mktemp` file inside [directory] itself — never the shared system temp
+  /// directory — and that staging file is removed on any failure. The store
+  /// is rewritten through a second temporary copy, in the same directory,
+  /// moved into place so a reader never sees it half-written and the swap is
+  /// one same-filesystem rename, not a copy a crash could catch half-done.
   Future<DwSshResult> setSecret({required String key, required String value}) {
     final line = encodeLine(key, value);
     return ssh.runAsWithInput(target.deployUser, '''
@@ -237,7 +240,7 @@ set -e
 umask 077
 install -d -m 0700 '$directory'
 file='$file'
-line_file=\$(mktemp)
+line_file=\$(mktemp '$directory/.secrets-line.XXXXXX')
 trap 'rm -f "\$line_file"' EXIT
 cat > "\$line_file"
 [ -e "\$file" ] || : > "\$file"
@@ -262,6 +265,12 @@ chmod 600 "\$file"
   /// store used to hold. Omitted, this writes unconditionally, as it always
   /// did — callers other than `secret push` that replace the store outright
   /// have no earlier read to hold it to.
+  ///
+  /// The plaintext is staged in a `mktemp` file inside [directory] itself —
+  /// never in the shared, world-writable system temp directory — removed on
+  /// any failure before it is moved into place, and moved rather than copied
+  /// into [file] so the swap is one rename on one filesystem, never a
+  /// cross-filesystem copy a crash could catch half-done.
   Future<DwSshResult> writeAll(
     Map<String, String> values, {
     String? expectedFingerprint,
@@ -293,7 +302,8 @@ set -e
 umask 077
 install -d -m 0700 '$directory'
 $guard
-staged=\$(mktemp)
+staged=\$(mktemp '$directory/.secrets.XXXXXX')
+trap 'rm -f "\$staged"' EXIT
 cat > "\$staged"
 test -s "\$staged"
 mv "\$staged" '$file'
@@ -305,12 +315,18 @@ chmod 600 '$file'
   /// without moving a value off the server: the comparison itself runs
   /// there, over the candidate's own encoded lines sent on stdin (read
   /// directly, never staged in a file of their own), and only three sets of
-  /// names — plus a fingerprint of the store as read — come back.
+  /// names — plus every key name currently in the store, and a fingerprint
+  /// of it — come back.
   ///
   /// What `secret push` plans its default from: [DwSecretPushPlan.add] is
   /// what the server lacks or holds empty, [DwSecretPushPlan.same] already
   /// matches, and [DwSecretPushPlan.differ] is what a caller must decide
   /// about (`--overwrite`) rather than have replaced silently.
+  /// [DwSecretPushPlan.names] is what a caller computes `--prune`'s orphaned
+  /// keys from, in the same pass as the fingerprint: a separate call to list
+  /// them (as `secret push` once made) reads the store a second time, and a
+  /// key added to it in the gap between the two calls would be missed by
+  /// that guard.
   /// [DwSecretPushPlan.ok] is false, and nothing is classified, when the
   /// store exists but could not be read (permissions, most likely) — an
   /// unreadable store must never be mistaken for an absent one, which would
@@ -323,16 +339,20 @@ chmod 600 '$file'
     final result = await ssh.runAsWithInput(target.deployUser, '''
 set -e
 if [ -f '$file' ]; then
-  # Read (and fingerprinted) before anything is classified against it: a
-  # read failure discovered midway through the loop below would otherwise
-  # leave whatever it had already printed on stdout looking like a
-  # complete, successful plan, and grep failing on one key for the same
-  # reason would look exactly like that key simply not being in the store.
+  # Read (and fingerprinted, and its key names listed) before anything is
+  # classified against it: a read failure discovered midway through the
+  # loop below would otherwise leave whatever it had already printed on
+  # stdout looking like a complete, successful plan, and grep failing on
+  # one key for the same reason would look exactly like that key simply not
+  # being in the store.
   fingerprint=\$(cksum < '$file')
 else
   fingerprint='absent'
 fi
 echo "FINGERPRINT \$fingerprint"
+if [ -f '$file' ]; then
+  sed -n "s/^\\([A-Z_][A-Z0-9_]*\\)=.*/NAME \\1/p" '$file'
+fi
 while IFS= read -r line || [ -n "\$line" ]; do
   key=\${line%%=*}
   [ -n "\$key" ] || continue
@@ -357,6 +377,7 @@ done
         add: const {},
         same: const {},
         differ: const {},
+        names: const {},
         fingerprint: '',
         error: result.firstLine,
       );
@@ -364,6 +385,7 @@ done
     final add = <String>{};
     final same = <String>{};
     final differ = <String>{};
+    final names = <String>{};
     var fingerprint = '';
     for (final raw in result.stdout.split('\n')) {
       final line = raw.trim();
@@ -379,6 +401,8 @@ done
           same.add(rest);
         case 'DIFFER':
           differ.add(rest);
+        case 'NAME':
+          names.add(rest);
         case 'FINGERPRINT':
           fingerprint = rest;
       }
@@ -388,6 +412,7 @@ done
       add: add,
       same: same,
       differ: differ,
+      names: names,
       fingerprint: fingerprint,
       error: '',
     );
@@ -543,6 +568,7 @@ class DwSecretPushPlan {
     required this.add,
     required this.same,
     required this.differ,
+    required this.names,
     required this.fingerprint,
     required this.error,
   });
@@ -557,6 +583,15 @@ class DwSecretPushPlan {
 
   /// The server holds a different, non-empty value.
   final Set<String> differ;
+
+  /// Every key name the store held at the moment this plan read it — read in
+  /// the same pass as [fingerprint], not a separate call: a push computes
+  /// `--prune`'s orphaned keys (the server's names minus the candidate's) by
+  /// diffing against this set, rather than by asking the store to list its
+  /// keys a second time, which would read it again and could miss a key
+  /// added in the gap between the two reads. Empty when there was no store
+  /// yet, or when [ok] is false.
+  final Set<String> names;
 
   /// A fingerprint (`cksum`) of the store exactly as it was when this plan
   /// read it — `'absent'` when there was no store yet. Meant for

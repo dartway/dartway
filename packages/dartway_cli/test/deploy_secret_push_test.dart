@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dartway_cli/src/commands/secret_commands.dart';
+import 'package:dartway_cli/src/deploy/deploy_target.dart';
 import 'package:dartway_cli/src/deploy/secret_store.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
@@ -47,6 +48,26 @@ base class _CapturingIOOverrides extends IOOverrides {
 
   @override
   Stdout get stderr => err;
+}
+
+/// A store that mutates itself the moment it is asked to plan a push — the
+/// same window `runSecretPush` itself leaves open between calling
+/// [DwSecretStore.plan] and calling [DwSecretStore.writeAll]. Standing in for
+/// a second push, or a hand edit, landing in exactly that gap, without
+/// needing two real processes racing each other.
+class _RacingStore extends DwSecretStore {
+  _RacingStore({
+    required DwSshRunner ssh,
+    required DwDeployTarget target,
+    required String directory,
+  }) : super(ssh: ssh, target: target, directory: directory);
+
+  @override
+  Future<DwSecretPushPlan> plan(Map<String, String> candidate) async {
+    final result = await super.plan(candidate);
+    await super.setSecret(key: 'SMS_API_TOKEN', value: 'concurrent');
+    return result;
+  }
 }
 
 /// Runs [runSecretPush] with its stdout/stderr captured instead of printed,
@@ -565,6 +586,37 @@ void main() {
       expect(written.ok, isTrue, reason: written.stderr);
       expect(stored()['SMS_API_TOKEN'], 'updated');
     });
+
+    test(
+      'runSecretPush itself refuses when the store changes between its own plan and write (N2)',
+      () async {
+        final racing = _RacingStore(
+          ssh: LocalShell(),
+          target: stack.target,
+          directory: p.join(root.path, 'racing-store'),
+        );
+        await racing.setSecret(key: 'SMS_API_TOKEN', value: 'original');
+
+        // Nothing here refuses on its own merits — the section matches the
+        // store exactly, "keep (same)" all the way — so the only thing that
+        // can stop this push is runSecretPush actually carrying the
+        // fingerprint `plan` read through to `writeAll`.
+        final result = await _push(
+          stack: stack,
+          store: racing,
+          section: {'SMS_API_TOKEN': 'original'},
+        );
+
+        expect(result.code, 1);
+        expect(result.err, contains('changed'));
+        expect(
+          DwSecretStore.parse(
+            File(racing.file).readAsStringSync(),
+          )['SMS_API_TOKEN'],
+          'concurrent',
+        );
+      },
+    );
   });
 
   group('--dry-run with a refusal (L2)', () {

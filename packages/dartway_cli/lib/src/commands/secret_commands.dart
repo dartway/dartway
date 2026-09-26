@@ -599,7 +599,6 @@ Future<int> runSecretPush({
     return 1;
   }
 
-  final remote = await store.readKeyNames();
   final plan = await store.plan(section);
   if (!plan.ok) {
     stderr.writeln(
@@ -609,9 +608,11 @@ Future<int> runSecretPush({
     return 1;
   }
 
-  final orphaned = remote.ok
-      ? (remote.names.difference(section.keys.toSet()).toList()..sort())
-      : const <String>[];
+  // From the same read `plan` fingerprinted the store at — a separate call
+  // to list the server's keys would read it again, and a key added in that
+  // gap would be missed here, bypassing --prune (and the generated-key
+  // guard below) entirely.
+  final orphaned = plan.names.difference(section.keys.toSet()).toList()..sort();
   final generatedKeys = stack.generatedSecrets.keys.toSet();
 
   // Sorted once so every list below reads the same way run to run.
