@@ -10,8 +10,9 @@ enum DwStorageMode {
   /// The server is deployed without file storage.
   none,
 
-  /// A MinIO container in the stack, reached by browsers on its own domain.
-  minio,
+  /// A storage container in the stack (RustFS), reached by browsers on its
+  /// own domain.
+  bundled,
 
   /// An S3-compatible storage somebody else runs; its coordinates are secrets.
   external,
@@ -80,8 +81,9 @@ class DwDeployTarget {
 
   final DwStorageMode storage;
 
-  /// The public host of the MinIO container. Browsers upload to it directly,
-  /// so it cannot hide behind the app's origin: a presigned URL signs its host.
+  /// The public host of the bundled storage container. Browsers upload to it
+  /// directly, so it cannot hide behind the app's origin: a presigned URL
+  /// signs its host.
   final String? storageDomain;
 
   /// Registry to pull the stack's base images through, e.g. `mirror.gcr.io`.
@@ -235,7 +237,7 @@ class DwDeployTarget {
           .firstOrNull;
       if (mode == null) {
         problems.add(
-          '$source: "storage" is minio or external, got "$storageText"',
+          '$source: "storage" is bundled or external, got "$storageText"',
         );
       } else {
         storage = mode;
@@ -244,15 +246,15 @@ class DwDeployTarget {
     final storageDomain = guarded(
       () => reader.optionalString('storage_domain'),
     );
-    if (storage == DwStorageMode.minio && storageDomain == null) {
+    if (storage == DwStorageMode.bundled && storageDomain == null) {
       problems.add(
-        '$source: "storage: minio" needs "storage_domain" — browsers upload '
-        'to MinIO directly, on a host of its own',
+        '$source: "storage: bundled" needs "storage_domain" — browsers '
+        'upload to it directly, on a host of its own',
       );
     }
-    if (storage != DwStorageMode.minio && storageDomain != null) {
+    if (storage != DwStorageMode.bundled && storageDomain != null) {
       problems.add(
-        '$source: "storage_domain" is only read with "storage: minio"; an '
+        '$source: "storage_domain" is only read with "storage: bundled"; an '
         'external storage is addressed by DW_STORAGE_ENDPOINT in the secret '
         'store',
       );

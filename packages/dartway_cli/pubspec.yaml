@@ -1,6 +1,6 @@
 name: dartway_cli
 description: "DartWay command-line tool: print the agent setup brief, check prerequisites, create projects from the canonical template, install the AI toolkit, run convention checks, deploy."
-version: 0.12.0
+version: 0.13.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -25,5 +25,5 @@ dev_dependencies:
   crypto: ^3.0.0
   # `dartway dev proxy` is proven against a real server's live-socket origin
   # check, not against a reading of it.
-  dartway_core_server: ^0.21.0-dev.6
+  dartway_core_server: ^0.21.0-dev.7
   test: ^1.25.0

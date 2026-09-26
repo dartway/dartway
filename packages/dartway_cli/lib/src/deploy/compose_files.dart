@@ -67,7 +67,7 @@ class DwComposeFiles {
   /// and every agent that has ever opened a shell on the box types
   /// `docker compose up -d`, and in a directory holding only [rendered] that
   /// command applies a strictly smaller stack — Compose exits 0, because from
-  /// its point of view nothing is missing. A staging stand lost its `minio`
+  /// its point of view nothing is missing. A staging stand lost its `storage`
   /// that way and stayed down for eleven hours.
   ///
   /// **Why a bridge and not a copy.** The copy an older CLI wrote was the

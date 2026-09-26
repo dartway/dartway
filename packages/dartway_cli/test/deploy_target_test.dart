@@ -105,7 +105,7 @@ production:
       final target = targetFrom(
         extra:
             '  site:\n    domain: example.com\n    source: app_site/build/\n'
-            '  storage: minio\n  storage_domain: files.example.com\n'
+            '  storage: bundled\n  storage_domain: files.example.com\n'
             '  firewall_ports: [5432]\n'
             '  requires:\n    secrets: [SMS_API_TOKEN]\n    files: [fcm.json]\n',
       );
@@ -113,7 +113,7 @@ production:
       expect(target.apiDomain, 'api.example.com');
       expect(target.appDomain, 'app.example.com');
       expect(target.site!.source, 'app_site/build');
-      expect(target.storage, DwStorageMode.minio);
+      expect(target.storage, DwStorageMode.bundled);
       expect(target.servedDomains, [
         'api.example.com',
         'app.example.com',
@@ -152,7 +152,7 @@ production:
         () => DwDeployTarget.parse('''
 staging:
   host: 203.0.113.10
-  storage: minio
+  storage: bundled
   requires:
     secrets: [smsToken]
     files: ['*.json']
@@ -160,7 +160,7 @@ staging:
         _refusal([
           'missing required key "ssh_user"',
           'missing required key "api_domain"',
-          '"storage: minio" needs "storage_domain"',
+          '"storage: bundled" needs "storage_domain"',
           '"smsToken" is not a secret name',
           '"*.json" is not a file name',
         ]),
@@ -170,18 +170,18 @@ staging:
     test('two roles on one host are refused, because nginx routes by name', () {
       expect(
         () => targetFrom(
-          extra: '  storage: minio\n  storage_domain: APP.example.com\n',
+          extra: '  storage: bundled\n  storage_domain: APP.example.com\n',
         ),
         _refusal(['app_domain and storage_domain are both']),
       );
     });
 
-    test('a storage domain without MinIO is refused', () {
+    test('a storage domain without bundled storage is refused', () {
       expect(
         () => targetFrom(
           extra: '  storage: external\n  storage_domain: files.example.com\n',
         ),
-        _refusal(['only read with "storage: minio"']),
+        _refusal(['only read with "storage: bundled"']),
       );
     });
 

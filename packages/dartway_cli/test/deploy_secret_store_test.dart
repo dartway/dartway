@@ -59,7 +59,7 @@ void main() {
     late Directory root;
     late DwSecretStore store;
     late String appDir;
-    final stack = stackVariants()['minio and a site']!;
+    final stack = stackVariants()['bundled storage and a site']!;
 
     setUp(() {
       root = Directory.systemTemp.createTempSync('dw_store_');

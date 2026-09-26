@@ -272,9 +272,9 @@ final class DwObjectStore {
   /// A GET of [url] without credentials, as anyone could send it. The body is
   /// kept up to [maxBytes] and the rest drained.
   ///
-  /// On a connection of its own, closed after the answer: MinIO at times
-  /// drops the connection right after refusing an anonymous read, and a
-  /// request that picked it up from the pool would fail with "connection
+  /// On a connection of its own, closed after the answer: some S3-compatible
+  /// storages drop the connection right after refusing an anonymous read, and
+  /// a request that picked it up from the pool would fail with "connection
   /// closed before full header" — a check reporting storage as unreachable
   /// when it only said no.
   Future<({int status, List<int> body})> anonymousGet(

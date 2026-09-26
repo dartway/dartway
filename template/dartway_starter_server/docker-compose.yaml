@@ -18,17 +18,17 @@ services:
       - dartway_starter_data:/var/lib/postgresql/data
 
   # Object storage for uploads: the app uploads straight to it by a presigned
-  # URL the server issues, so a local MinIO is the same path production runs.
+  # URL the server issues, so a local RustFS is the same path production runs.
   # The `DW_STORAGE_*` values in ../deploy/config.yaml's `local` section point at it.
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data --console-address ":8101"
+  storage:
+    image: rustfs/rustfs:1.0.0
+    command: ["/data"]
     ports:
       - '127.0.0.1:8100:9000' # S3 API — what the server and the app talk to
-      - '127.0.0.1:8101:8101' # web console, handy for looking at uploads
+      - '127.0.0.1:8101:9001' # web console, handy for looking at uploads
     environment:
-      MINIO_ROOT_USER: dartway_dev
-      MINIO_ROOT_PASSWORD: 'dartway_dev_storage_pw'
+      RUSTFS_ACCESS_KEY: dartway_dev
+      RUSTFS_SECRET_KEY: 'dartway_dev_storage_pw'
     volumes:
       - dartway_starter_uploads:/data
 

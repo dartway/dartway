@@ -162,7 +162,7 @@ void main() {
         configYaml(
               extra:
                   '  site:\n    domain: site.dwproof.test\n    source: app_site/build\n'
-                  '  storage: minio\n  storage_domain: files.dwproof.test\n',
+                  '  storage: bundled\n  storage_domain: files.dwproof.test\n',
             )
             .replaceAll('api.example.com', 'api.dwproof.test')
             .replaceAll('app.example.com', 'app.dwproof.test'),
@@ -464,7 +464,7 @@ void main() {
     test('the server reaches storage by the URL browsers sign', () async {
       final result = await compose(
         'exec -T server wget -q -O /dev/null '
-        '${stack.storageOrigin}/minio/health/live',
+        '${stack.storageOrigin}/health',
       );
       expect(result.ok, isTrue, reason: result.stderr);
     });

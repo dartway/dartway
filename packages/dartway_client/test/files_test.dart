@@ -11,7 +11,7 @@ enum Upload with DwUploadPurpose { avatar }
 
 /// `client.files` against the fake server and the fake storage: the three
 /// steps, progress, retries and every way an upload ends. The same flow
-/// against a real server and MinIO is in dartway_core_server's
+/// against a real server and storage is in dartway_core_server's
 /// `files_client_e2e_test.dart`.
 void main() {
   late DwFakeServer server;

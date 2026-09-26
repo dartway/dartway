@@ -39,12 +39,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_DB: shop
       POSTGRES_PASSWORD: 'dev_pw'
-  minio:
+  storage:
     ports:
       - '127.0.0.1:8100:9000'
     environment:
-      MINIO_ROOT_USER: dev
-      MINIO_ROOT_PASSWORD: 'dev_storage_pw'
+      RUSTFS_ACCESS_KEY: dev
+      RUSTFS_SECRET_KEY: 'dev_storage_pw'
 ''';
 
   const matchingLocal = '''

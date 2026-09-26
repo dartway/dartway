@@ -42,9 +42,9 @@ reads it.
 | `api_domain` | yes | The server, for mobile apps and webhooks |
 | `app_domain` | yes | The Flutter web app |
 | `site` | no | `domain` and `source`: a directory of the repository served as static files, or `none` for a site that lives elsewhere |
-| `storage` | no | `minio` or `external`; absent means no file storage |
-| `storage_domain` | with `minio` | The public host of MinIO; refused without `storage: minio` |
-| `registry_mirror` | no | Pull the official Docker Hub images of the stack (`postgres`, `nginx`) through a mirror such as `mirror.gcr.io`; MinIO (quay.io) and certbot come from where they live |
+| `storage` | no | `bundled` or `external`; absent means no file storage |
+| `storage_domain` | with `bundled` | The public host of the bundled storage; refused without `storage: bundled` |
+| `registry_mirror` | no | Pull the official Docker Hub images of the stack (`postgres`, `nginx`) through a mirror such as `mirror.gcr.io`; the bundled storage and certbot come from where they live |
 | `firewall_ports` | no | TCP ports to open beyond SSH, 80 and 443 |
 | `requires.secrets` | no | Secrets nobody can generate, as environment variable names |
 | `requires.files` | no | Secret documents, by file name, mounted into the server |
@@ -61,7 +61,7 @@ means one of them is never reached.
 
 Names are derived, not configured. The project name is the last segment of `repo` without `.git`;
 the checkout is `/home/<deploy_user>/<project>`. The database and its role are named after the
-server package without `_server`, and the MinIO buckets after the same prefix with dashes.
+server package without `_server`, and the storage buckets after the same prefix with dashes.
 
 ## Three hosts, one server process
 
@@ -69,7 +69,7 @@ server package without `_server`, and the MinIO buckets after the same prefix wi
 app.example.com   →  the web image;  /dw/ (the live socket included) and /health → the server
 api.example.com   →  everything → the server
 example.com       →  the site directory, static            (optional)
-files.example.com →  MinIO                                  (with storage: minio)
+files.example.com →  the bundled storage                    (with storage: bundled)
 ```
 
 **The app calls its own origin.** On the app host the front Nginx serves the web image and
@@ -79,8 +79,8 @@ no preflight, and the server answers none. The web build is given that origin as
 project's own doors (`DwHttpRoute`) such as a webhook. The server serves no static files. Local
 development has the same shape through `dart run dartway_cli:dartway dev` ([The CLI](cli.md)).
 
-**Storage has a host of its own because a presigned URL signs its host.** Browsers upload to MinIO
-directly (see [Uploads](../4-server/uploads.md)); a storage hidden behind the app's origin would be
+**Storage has a host of its own because a presigned URL signs its host.** Browsers upload to the
+bundled storage directly (see [Uploads](../4-server/uploads.md)); a storage hidden behind the app's origin would be
 a different host from the one the URL was signed for. Inside the stack's network that host is an
 alias of the proxy, so the server reaches storage by the very URL a browser uses — no second address
 to configure.
@@ -107,13 +107,13 @@ The rendered Nginx:
 | Service | What it is |
 |---|---|
 | `postgres` | `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck |
-| `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080`, `DW_DATABASE_*` (and, with MinIO, `DW_STORAGE_*`) in the compose file. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
+| `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080`, `DW_DATABASE_*` (and, with the bundled storage, `DW_STORAGE_*`) in the compose file. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
 | `web` | Built from `<project>_flutter/Dockerfile` with the build argument `DW_BACKEND_URL` = the app origin |
-| `minio`, `minio-init` | With `storage: minio`: the storage, and a one-shot job that creates and configures both buckets on every deploy |
+| `storage`, `storage-init` | With `storage: bundled`: RustFS, and a one-shot job (a generic S3 client) that creates and configures both buckets on every deploy |
 | `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443 |
 | `certbot` | Renews the certificate every 12 hours |
 
-**Data-bearing images are pinned** — Postgres to its major, MinIO to its last community release — so a
+**Data-bearing images are pinned** — Postgres to its major, the storage to an exact release — so a
 deploy on a later day cannot move a data directory under a binary that refuses it. The stateless
 proxy and certbot follow upstream. Values in the compose file that the deploy derives win over the
 same names in `.env`, which is why the secret store refuses those names.
@@ -128,22 +128,23 @@ deploy refreshes it. For the command a person types by hand on the server, the d
 no override in the checkout and a foreign file in its place, the deploy refuses, because that file
 may be the only place its services are declared.
 
-## Storage: MinIO or someone else's
+## Storage: bundled or someone else's
 
 Two buckets, whatever the option (D-038b): a **public** one whose objects anyone reads and whose
 listing nobody gets, and a **private** one that reads nothing unsigned. A rule's visibility picks
 the bucket.
 
-**`storage: minio`** runs the storage in the stack. `minio-init` creates `<prefix>-public` and
-`<prefix>-private` (keeping existing buckets and their objects), sets the public bucket's policy to
-anonymous `s3:GetObject` only — not `mc anonymous set download`, which also grants listing — sets the
-private one to nothing, and writes a probe object into both. MinIO's CORS rule admits the app origin,
-which is what a browser's presigned `PUT` needs. The server receives `DW_STORAGE_ENDPOINT` (the
-storage host), both bucket names, `DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<prefix>-public`,
-path-style addressing and **`DW_STORAGE_VERIFY_BUCKETS=false`**: the server reaches MinIO only
-through the proxy, and the proxy starts after the server, so the bucket check a server normally runs
-at startup cannot run there. The outside probe runs the same check once the stack is up.
-`DW_STORAGE_ACCESS_KEY` and `DW_STORAGE_SECRET_KEY` are generated into the secret store.
+**`storage: bundled`** runs RustFS in the stack. `storage-init` (a generic, pinned S3 client) creates
+`<prefix>-public` and `<prefix>-private` (keeping existing buckets and their objects), sets the public
+bucket's policy to anonymous `s3:GetObject` only — never a canned ACL, which would also grant
+listing — clears any policy on the private one, sets bucket CORS admitting the app origin on both
+(what a browser's presigned `PUT` needs), and writes a probe object into both. The server receives
+`DW_STORAGE_ENDPOINT` (the storage host), both bucket names,
+`DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<prefix>-public`, path-style addressing and
+**`DW_STORAGE_VERIFY_BUCKETS=false`**: the server reaches the storage only through the proxy, and the
+proxy starts after the server, so the bucket check a server normally runs at startup cannot run there.
+The outside probe runs the same check once the stack is up. `DW_STORAGE_ACCESS_KEY` and
+`DW_STORAGE_SECRET_KEY` are generated into the secret store.
 
 **`storage: external`** is an S3-compatible storage somebody else runs. Deliver
 `DW_STORAGE_ENDPOINT`, `DW_STORAGE_ACCESS_KEY`, `DW_STORAGE_SECRET_KEY` and the buckets your rules
@@ -160,7 +161,7 @@ bucket anyone can read, or a public one nobody can.
 2. **Base packages and Docker**, installed only where Docker is missing.
 3. **The deployment user**, created if absent and added to the `docker` group.
 4. **The secret store**, with the secrets that are only random strings generated in place:
-   `DW_DATABASE_PASSWORD`, and with MinIO the storage keys. Existing values are never replaced —
+   `DW_DATABASE_PASSWORD`, and with the bundled storage the storage keys. Existing values are never replaced —
    regenerating the database password would lock the server out of a database initialised with the
    old one.
 5. **A repository key**, for a `git@` repository: generated **on** the server, so the private half
@@ -201,7 +202,7 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    when the store is absent, a line is malformed, a key is declared twice, a key is one the compose
    file sets, or a required secret is missing or empty;
 5. checks the merged Compose configuration, then builds the images;
-6. with MinIO, starts it and runs `minio-init`, printing what it did; starts Postgres;
+6. with the bundled storage, starts it and runs `storage-init`, printing what it did; starts Postgres;
 7. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
    flight are answered, live sockets close with "server stopping" — and from then on the proxy
    answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
@@ -316,6 +317,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `local-secrets-untracked` | error | `deploy/secrets.yaml` is not tracked by Git |
 | `local-secrets-cover-environment` | warning | `deploy/secrets.yaml` holds every required secret for the environment (reported by `check` only; `run` does not evaluate it) |
 | `dns-public-hosts` | error | Every served host resolves to the deployment host — a mismatch otherwise burns the Let's Encrypt rate limit |
+| `images-resolve` | error | Every pinned base image (Postgres, nginx, certbot, and with `storage: bundled` the storage and its init image) resolves against its own registry — a manifest HEAD with the anonymous token the registry's challenge asks for, so a vanished tag is caught here rather than mid-`run`, at the step that starts it |
 | `ssh-reachable` | error | Key-based SSH works; when it fails the other server checks are skipped |
 | `deploy-user` | error | The deployment user exists |
 | `docker-available` | error | Docker Compose is usable by the deployment user |

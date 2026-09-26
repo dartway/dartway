@@ -138,12 +138,12 @@ class DwLocalEnvironmentInspector {
       portKey: 'DW_DATABASE_PORT',
     );
     _compareService(
-      services['minio'],
-      source: '$name > minio',
+      services['storage'],
+      source: '$name > storage',
       committed: committed,
       pairs: const {
-        'MINIO_ROOT_USER': 'DW_STORAGE_ACCESS_KEY',
-        'MINIO_ROOT_PASSWORD': 'DW_STORAGE_SECRET_KEY',
+        'RUSTFS_ACCESS_KEY': 'DW_STORAGE_ACCESS_KEY',
+        'RUSTFS_SECRET_KEY': 'DW_STORAGE_SECRET_KEY',
       },
       portKey: null,
     );

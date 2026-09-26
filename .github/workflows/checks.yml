@@ -93,18 +93,18 @@ jobs:
           flutter-version: 3.47.2
           channel: stable
 
-      - name: Start MinIO
-        # Not a service container: those cannot pass the image its `server`
-        # command. The image is the one `dartway deploy` runs.
+      - name: Start the storage
+        # Not a service container: those cannot pass the image its data-path
+        # argument. The image is the one `dartway deploy` runs.
         run: |
-          docker run -d --name minio -p 127.0.0.1:55470:9000 \
-            -e MINIO_ROOT_USER=dartway -e MINIO_ROOT_PASSWORD=dartway-secret \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          docker run -d --name storage -p 127.0.0.1:55470:9000 \
+            -e RUSTFS_ACCESS_KEY=dartway -e RUSTFS_SECRET_KEY=dartway-secret \
+            rustfs/rustfs:1.0.0 /data
           for _ in $(seq 60); do
-            curl -fsS http://127.0.0.1:55470/minio/health/live >/dev/null && exit 0
+            curl -fsS http://127.0.0.1:55470/health >/dev/null && exit 0
             sleep 1
           done
-          docker logs minio
+          docker logs storage
           exit 1
 
       - run: tool/checks.sh services

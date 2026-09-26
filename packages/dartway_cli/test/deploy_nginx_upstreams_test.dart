@@ -7,10 +7,10 @@ void main() {
       expect(
         DwNginxUpstreams.namesIn('''
 location /files/ {
-  proxy_pass http://minio:9000;
+  proxy_pass http://objects:9000;
 }
 '''),
-        {'minio'},
+        {'objects'},
       );
     });
 
@@ -38,20 +38,20 @@ proxy_pass unix:/var/run/app.sock;
       expect(
         DwNginxUpstreams.namesIn('''
 upstream storage {
-  server minio:9000;
-  server minio_backup:9000;
+  server objects:9000;
+  server objects_backup:9000;
 }
 location / {
   proxy_pass http://storage;
 }
 '''),
-        {'minio', 'minio_backup'},
+        {'objects', 'objects_backup'},
       );
     });
 
     test('a commented-out directive is not a requirement', () {
       expect(
-        DwNginxUpstreams.namesIn('# proxy_pass http://minio:9000;\n'),
+        DwNginxUpstreams.namesIn('# proxy_pass http://objects:9000;\n'),
         isEmpty,
       );
     });
@@ -87,12 +87,12 @@ location / {
       expect(
         DwNginxUpstreams.missing(
           snippets: {
-            'app/storage.conf': 'proxy_pass http://minio:9000;',
+            'app/storage.conf': 'proxy_pass http://objects:9000;',
             'api/extra.conf': 'proxy_pass http://backend:8080;',
           },
           services: {'backend', 'web', 'nginx'},
         ),
-        ['app/storage.conf: minio'],
+        ['app/storage.conf: objects'],
       );
     });
 
@@ -108,9 +108,9 @@ location / {
   });
 
   test('a compose --services listing is one name per line', () {
-    expect(DwNginxUpstreams.servicesInListing('backend\nminio\nnginx\n\n'), {
+    expect(DwNginxUpstreams.servicesInListing('backend\nobjects\nnginx\n\n'), {
       'backend',
-      'minio',
+      'objects',
       'nginx',
     });
   });

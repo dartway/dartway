@@ -197,14 +197,14 @@ rm -f "\$dw_new"''';
 
   Future<DwSshResult> build() => _compose('build');
 
-  /// Starts MinIO and runs the initialisation of both buckets, whose output says what
-  /// it did.
+  /// Starts the bundled storage and runs the initialisation of both buckets,
+  /// whose output says what it did.
   ///
   /// `</dev/null` is not decoration: without it `compose run -T` consumes the
   /// rest of the surrounding script from stdin.
   Future<DwSshResult> startStorage() => _as(
-    '${DwComposeFiles.commandIn(appDir, 'up -d --wait ${DwStack.minioService}')} && '
-    '${DwComposeFiles.invoke} run --rm -T ${DwStack.minioInitService} </dev/null',
+    '${DwComposeFiles.commandIn(appDir, 'up -d --wait ${DwStack.storageService}')} && '
+    '${DwComposeFiles.invoke} run --rm -T ${DwStack.storageInitService} </dev/null',
   );
 
   Future<DwSshResult> startDatabase() =>
@@ -502,10 +502,11 @@ echo "nginx restarted and running"
       run: checkComposeConfig,
     ),
     DwDeployStep(id: 'build', title: 'Build images', run: build),
-    if (target.storage == DwStorageMode.minio)
+    if (target.storage == DwStorageMode.bundled)
       DwDeployStep(
         id: 'storage',
-        title: 'Start MinIO and set up its public and private bucket',
+        title: 'Start the bundled storage and set up its public and private '
+            'bucket',
         run: startStorage,
         showOutput: true,
       ),

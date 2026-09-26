@@ -5,8 +5,8 @@ import 'test_database.dart';
 
 /// An S3-compatible storage container that exists for the length of one test
 /// run — the storage twin of [TestDatabase], and for the same reasons: nothing
-/// shared with the development MinIO or with another project, nothing fixed,
-/// nothing that survives.
+/// shared with the development storage or with another project, nothing
+/// fixed, nothing that survives.
 ///
 /// A suite's `DwTestStorage` creates buckets of its own on it per test file
 /// and drops them afterwards, so the container needs nothing but its keys.
@@ -15,7 +15,7 @@ class TestStorage {
 
   final String image;
 
-  /// The root user a suite signs its requests with.
+  /// The access key a suite signs its requests with.
   static const accessKey = 'dartway-test';
 
   /// Generated per run, and never leaves the process: the container listens
@@ -37,14 +37,15 @@ class TestStorage {
       '--rm',
       '--publish',
       '127.0.0.1::9000',
+      // mode=1777: the image runs as a non-root user, and a bare --tmpfs
+      // mount is root-owned.
       '--tmpfs',
-      '/data',
+      '/data:mode=1777',
       '--env',
-      'MINIO_ROOT_USER=$accessKey',
+      'RUSTFS_ACCESS_KEY=$accessKey',
       '--env',
-      'MINIO_ROOT_PASSWORD=$_secretKey',
+      'RUSTFS_SECRET_KEY=$_secretKey',
       image,
-      'server',
       '/data',
     ]);
     if (run == null || run.exitCode != 0) {
@@ -61,8 +62,8 @@ class TestStorage {
     return EphemeralStorage(id: id, port: port, secretKey: _secretKey);
   }
 
-  /// Polls MinIO's readiness endpoint: the container reports "Started" before
-  /// the server inside it answers.
+  /// Polls the storage's health endpoint: the container reports "Started"
+  /// before the server inside it answers.
   Future<bool> waitUntilReady(
     EphemeralStorage storage,
     Duration timeout,
@@ -73,7 +74,7 @@ class TestStorage {
       while (DateTime.now().isBefore(deadline)) {
         try {
           final request = await client.getUrl(
-            storage.endpoint.replace(path: '/minio/health/ready'),
+            storage.endpoint.replace(path: '/health'),
           );
           final response = await request.close();
           await response.drain<void>();

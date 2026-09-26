@@ -97,6 +97,6 @@ jobs:
 
       - name: Run the database suite
         # From the project root: the command finds the `*_server` sibling and
-        # starts a Postgres and a MinIO of its own for the run — DW_DATABASE_*
+        # starts a Postgres and a storage of its own for the run — DW_DATABASE_*
         # and DW_STORAGE_* are set for it, not read from a file.
         run: cd "${{ matrix.directory }}" && dartway test

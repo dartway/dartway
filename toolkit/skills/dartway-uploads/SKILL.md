@@ -7,7 +7,7 @@ description: >-
   a row that stores the file id (`@DwForeignKey('dw_stored_file')`) and a command that checks it with
   `ctx.files.requireOwned`, public URLs resolved in batch with `ctx.files.publicUrls`, private files
   read through `dw.files.getLink`, deletion with `ctx.files.delete`; the app side with
-  `dw.uploader()` (progress, refusal, file) or `dw.files.upload`; local MinIO and `DW_STORAGE_*`
+  `dw.uploader()` (progress, refusal, file) or `dw.files.upload`; local RustFS and `DW_STORAGE_*`
   (`DW_STORAGE_PROVISION`, the startup bucket check); tests with `DwTestStorage` on the server and
   `DwFakeStorage` in widget tests. Use when a feature needs a photo, a document or an attachment,
   when an upload is refused or fails, or when a file does not open by its URL.
@@ -305,10 +305,10 @@ byte.
 
 ---
 
-## 8. Storage locally — MinIO and `DW_STORAGE_*`
+## 8. Storage locally — RustFS and `DW_STORAGE_*`
 
-`docker compose up -d` in `__SERVER_PKG__` starts MinIO beside Postgres: the S3 API on
-`127.0.0.1:8100`, its web console on `8101` (the root user and password are in
+`docker compose up -d` in `__SERVER_PKG__` starts RustFS beside Postgres: the S3 API on
+`127.0.0.1:8100`, its web console on `8101` (the access and secret key are in
 `docker-compose.yaml`). The server reads its storage from the environment (`dartway-run` has the
 whole environment):
 
@@ -318,7 +318,7 @@ whole environment):
 | `DW_STORAGE_ACCESS_KEY`, `DW_STORAGE_SECRET_KEY` | Required with the endpoint |
 | `DW_STORAGE_PUBLIC_BUCKET`, `DW_STORAGE_PRIVATE_BUCKET` | Bucket names; the skeleton defaults them to names derived from the project |
 | `DW_STORAGE_PUBLIC_BASE_URL` | Where public files are served from; the skeleton defaults it to `<endpoint>/<public bucket>` (path style) |
-| `DW_STORAGE_REGION`, `DW_STORAGE_PATH_STYLE` | `us-east-1` and path style by default — what MinIO serves |
+| `DW_STORAGE_REGION`, `DW_STORAGE_PATH_STYLE` | `us-east-1` and path style by default — what RustFS serves |
 | `DW_STORAGE_VERIFY_BUCKETS` | The startup check, on by default |
 | `DW_STORAGE_PROVISION=true` | The skeleton's `bin/server.dart` creates both buckets and sets their access before starting (`DwFileStorageSetup.provision`). **For a storage the project owns only** — it deletes the private bucket's policy |
 
@@ -339,7 +339,7 @@ and what answered what.
 - **A browser uploads cross-origin**, so both buckets' CORS configuration must allow `PUT` from the
   app's origin with the headers `content-type` and `if-none-match`. A storage somebody else
   administers needs this set by hand.
-- **MinIO not running while `DW_STORAGE_ENDPOINT` is set** fails the startup check ("could not be
+- **The storage not running while `DW_STORAGE_ENDPOINT` is set** fails the startup check ("could not be
   checked at …"): start `docker compose`, or unset the endpoint to run without uploads.
 - **A deployed storage the server reaches only through something that starts after it** cannot be
   probed at startup; that is the one case for `DW_STORAGE_VERIFY_BUCKETS=false`, with the same check
@@ -354,7 +354,7 @@ for one object.
 
 The level follows the behaviour (`dartway-testing`).
 
-**The rules — server acceptance on real storage.** `dart run dartway_cli:dartway test` starts a MinIO for the run and
+**The rules — server acceptance on real storage.** `dart run dartway_cli:dartway test` starts a storage for the run and
 passes `DW_STORAGE_ENDPOINT` / `_ACCESS_KEY` / `_SECRET_KEY`; each test file provisions its own pair
 of buckets:
 

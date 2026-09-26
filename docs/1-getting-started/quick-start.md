@@ -58,7 +58,7 @@ docker compose up -d
 dart pub get
 ```
 
-`docker compose up -d` starts Postgres on host port `8090` and MinIO — the object storage for uploads
+`docker compose up -d` starts Postgres on host port `8090` and RustFS — the object storage for uploads
 — on `8100` (its web console on `8101`). There is no test database among them: `dart run dartway_cli:dartway test` starts
 its own for each run. The first run pulls images and can take minutes.
 
@@ -101,7 +101,7 @@ dart run bin/server.dart
 
 **It migrates the database as it starts** — the framework's own tables and yours — and exits
 non-zero naming the migration when one fails, so there is no separate migration step to forget.
-`DW_STORAGE_PROVISION=true` creates the two buckets on the development MinIO; the server then checks
+`DW_STORAGE_PROVISION=true` creates the two buckets on the development storage; the server then checks
 that the public one reads anonymously and the private one does not, and refuses to start otherwise.
 Without `DW_STORAGE_ENDPOINT` it starts without uploads and says so.
 
@@ -213,7 +213,7 @@ From the project root:
 ```bash
 (cd my_app_flutter && dart run dartway_cli:dartway generate --check) # generated code matches its sources
 (cd my_app_server && dart run bin/migrate.dart check)     # migrations produce the schema (DW_DATABASE_*)
-(cd my_app_flutter && dart run dartway_cli:dartway test)  # server tests on a real Postgres and MinIO
+(cd my_app_flutter && dart run dartway_cli:dartway test)  # server tests on a real Postgres and storage
 (cd my_app_shared && dart test)                           # the contract
 (cd my_app_flutter && flutter test)                       # the app, on an in-memory server
 (cd my_app_flutter && dart run dartway_cli:dartway check) # the conventions
@@ -225,7 +225,7 @@ From the project root:
 - **`migrate.dart check`** replays the migrations into throwaway databases next to the one in
   `DW_DATABASE_*`, compares the result with the schema the row classes declare, and rolls them down
   and up again.
-- **`dart run dartway_cli:dartway test`** starts a Postgres and a MinIO for the run, on ports Docker picks, passes them to
+- **`dart run dartway_cli:dartway test`** starts a Postgres and a storage for the run, on ports Docker picks, passes them to
   the suite as `DW_DATABASE_*` and `DW_STORAGE_*`, and removes them when the run ends. Each test file
   creates its own database and buckets. Nothing is shared with the development containers or with
   another project — a fixed test port is how a suite ends up green against a neighbour's database.

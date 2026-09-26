@@ -84,7 +84,7 @@ put `deploy/config.yaml > local` — the coordinates of those two containers, co
     dartway secret list --env local            # what is set, what is missing
     dartway secret set <KEY> --env local       # a value that is yours alone
 
-- **`docker compose up -d`** starts Postgres (host port 8090) and MinIO, the object
+- **`docker compose up -d`** starts Postgres (host port 8090) and RustFS, the object
   storage for uploads (8100, console 8101). The first run pulls images and can take
   minutes. There is no test database among them: `dartway test` starts its own.
 - **Wait for the database to accept connections before starting the server.** A
@@ -93,7 +93,7 @@ put `deploy/config.yaml > local` — the coordinates of those two containers, co
   than sleeping a fixed number of seconds.
 - **The server migrates the database as it starts**, and exits non-zero naming the
   migration when one fails. `DW_STORAGE_PROVISION=true` creates the two buckets on the
-  development MinIO; the server then checks that the public one reads anonymously and
+  development storage; the server then checks that the public one reads anonymously and
   the private one does not, and refuses to start otherwise.
 - **Ask the human which phone number or e-mail should be the administrator** and put it
   in `DW_ADMIN_IDENTIFIER` — the commented line in `deploy/config.yaml > local`. Ask rather than choose, and never invent a value: whoever can
@@ -165,7 +165,7 @@ the server from starting, deliberately.
 Before reporting a change done:
 
     dartway generate --check
-    dartway test                   # server acceptance: a Postgres and a MinIO of its own
+    dartway test                   # server acceptance: a Postgres and a storage of its own
     (cd my_app_shared && dart test)
     (cd my_app_flutter && flutter test)
     dartway check

@@ -4,7 +4,7 @@ description: >-
   How a DartWay project tests itself, by where the behaviour lives: the contract in
   __SHARED_PKG__ (`dart test` — codecs round-trip through the protocol, `validate()` codes and
   fields, a request's `onUpdate` and channels); the server as acceptance tests on a real Postgres
-  and MinIO (`dart run dartway_cli:dartway test`; `DwTestDatabase` per test file, `DwTestServer.start`, the real client
+  and storage (`dart run dartway_cli:dartway test`; `DwTestDatabase` per test file, `DwTestServer.start`, the real client
   from `connectClient()`, raw wire through `caller()` / `openLive()`, `DwTestStorage`, `wakeJobs`);
   screens as widget tests on the in-memory server from `package:dartway_client/testing.dart`
   (`DwFakeServer`, `DwFakeStorage`, `dwFakeTablePage` …) with the app's own `DwFlutterCore` built
@@ -111,7 +111,7 @@ dart run dartway_cli:dartway test --keep                   # leave the database 
 dart run dartway_cli:dartway test --no-storage             # a server without uploads
 ```
 
-`dart run dartway_cli:dartway test` starts a Postgres and a MinIO for the run on ports Docker picks, passes their
+`dart run dartway_cli:dartway test` starts a Postgres and a storage for the run on ports Docker picks, passes their
 coordinates as `DW_DATABASE_*` (the maintenance database `postgres`) and `DW_STORAGE_ENDPOINT` /
 `_ACCESS_KEY` / `_SECRET_KEY`, runs `dart test` in `__SERVER_PKG__`, and removes both containers at
 the end — Ctrl-C included.
@@ -123,7 +123,7 @@ verified nothing. A database that outlives its run turns up as arithmetic — `E
 <3>` — several hypotheses away from the cause.
 
 Running `dart test` by hand works when `DW_DATABASE_*` names a Postgres where the user may create
-databases (the development one does) and, for storage tests, `DW_STORAGE_*` names a MinIO. Without
+databases (the development one does) and, for storage tests, `DW_STORAGE_*` names a storage. Without
 them the suite fails at its first `create`, naming the missing variables.
 
 ### One database and one server per test file
@@ -210,7 +210,7 @@ database what the client could observe — that ties the test to the schema inst
   delivered after commit, nothing delivered if it throws. Use it for a service that has rules of its
   own; what a command publishes to whom is still tested through the command.
 - **`DwTestStorage.create(prefix:)`** provisions a public and a private bucket for the file on the
-  MinIO `dart run dartway_cli:dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
+  storage `dart run dartway_cli:dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
   the server stops. `storage.keys(bucket)` lists what landed where. What to test — `dartway-uploads`.
 
 ### What deserves an acceptance test

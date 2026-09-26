@@ -269,7 +269,7 @@ Future<DwDeployVerdict> _checkStackNames(DwDeployContext context) async {
   final problems = [
     if (!RegExp(r'^[a-z_][a-z0-9_]{0,62}$').hasMatch(stack.databaseName))
       'database name "${stack.databaseName}"',
-    if (context.target.storage == DwStorageMode.minio)
+    if (context.target.storage == DwStorageMode.bundled)
       for (final bucket in [stack.publicBucketName, stack.privateBucketName])
         if (!RegExp(r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$').hasMatch(bucket))
           'bucket name "$bucket"',
@@ -277,7 +277,7 @@ Future<DwDeployVerdict> _checkStackNames(DwDeployContext context) async {
   if (problems.isEmpty) {
     return DwDeployVerdict.pass(
       'database ${stack.databaseName}'
-      '${context.target.storage == DwStorageMode.minio ? ', buckets ${stack.publicBucketName} and ${stack.privateBucketName}' : ''}',
+      '${context.target.storage == DwStorageMode.bundled ? ', buckets ${stack.publicBucketName} and ${stack.privateBucketName}' : ''}',
     );
   }
   return DwDeployVerdict.fail(

@@ -5,13 +5,14 @@ import 'package:yaml/yaml.dart';
 import '../checker/dw_check_type.dart';
 import 'compose_files.dart';
 import 'deploy_check.dart';
+import 'image_registry.dart';
 import 'local_secrets_file.dart';
 import 'outside_probe.dart';
 import 'secret_store.dart';
 import 'stack.dart';
 
-/// Checks that need the network: DNS, the server over SSH, and the deployed
-/// site over HTTPS.
+/// Checks that need the network: DNS, a registry, the server over SSH, and
+/// the deployed site over HTTPS.
 const List<DwDeployCheck> dwRemoteDeployChecks = [
   DwDeployCheck(
     id: 'dns-public-hosts',
@@ -19,6 +20,13 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
     stage: DwDeployCheckStage.remote,
     severity: DwCheckSeverity.error,
     evaluate: _checkDnsPublicHosts,
+  ),
+  DwDeployCheck(
+    id: 'images-resolve',
+    title: 'Every pinned base image resolves from its registry',
+    stage: DwDeployCheckStage.remote,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkImagesResolve,
   ),
   DwDeployCheck(
     id: 'ssh-reachable',
@@ -131,6 +139,33 @@ Future<DwDeployVerdict> _checkDnsPublicHosts(DwDeployContext context) async {
         "host, and repeated failures hit the Let's Encrypt rate limit. "
         'Resolved through the local resolver, so a record changed minutes '
         'ago may still be cached here.',
+  );
+}
+
+/// Every base image the stack pulls (Postgres, nginx, certbot, and the
+/// bundled storage and its init image), resolved against its own registry
+/// before `deploy run` builds anything — the failure this used to be found at
+/// only once the run reached the step that starts that image (#331).
+Future<DwDeployVerdict> _checkImagesResolve(DwDeployContext context) async {
+  final images = context.stack.pinnedImages;
+  final registry = DwImageRegistry();
+  final problems = <String>[];
+  for (final (label, image) in images) {
+    final result = await registry.resolve(image);
+    if (!result.ok) problems.add('$label ($image): ${result.detail}');
+  }
+  if (problems.isEmpty) {
+    return DwDeployVerdict.pass(
+      '${images.length} pinned image(s): ${images.map((e) => e.$2).join(', ')}',
+    );
+  }
+  return DwDeployVerdict.fail(
+    problems.join(' | '),
+    fix:
+        'A pinned tag that no longer resolves has to be repinned in the '
+        'framework itself (packages/dartway_cli/lib/src/deploy/stack.dart) — '
+        'file it there. This is exactly the failure #331 fixed once already, '
+        'for a different image whose registries had all stopped serving it.',
   );
 }
 

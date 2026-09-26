@@ -11,7 +11,7 @@ import 'support/app_harness.dart';
 /// on the profile by its file id, shown by its public URL. Runs against an
 /// S3-compatible storage named by `DW_STORAGE_ENDPOINT`,
 /// `DW_STORAGE_ACCESS_KEY` and `DW_STORAGE_SECRET_KEY` — `dartway test`
-/// starts a MinIO for the run — on a public and a private bucket of its own
+/// starts a storage for the run — on a public and a private bucket of its own
 /// that the server verifies at startup as in production.
 void main() {
   group('configuration from the environment', () {
@@ -31,7 +31,7 @@ void main() {
       );
     });
 
-    test('a development MinIO needs only its endpoint and keys', () {
+    test('a development storage needs only its endpoint and keys', () {
       final config = AppFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:8100/',
         ...credentials,

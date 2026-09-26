@@ -16,7 +16,7 @@ void main() {
   group('the order of a deployment', () {
     final runner = DwDeployRunner(
       ssh: RecordingSsh(),
-      stack: stackVariants()['minio and a site']!,
+      stack: stackVariants()['bundled storage and a site']!,
     );
     final ids = _ids(runner);
 
@@ -75,7 +75,7 @@ void main() {
       before('certificate', 'restart-proxy');
     });
 
-    test('no storage step without MinIO, no certificate without TLS', () {
+    test('no storage step without bundled storage, no certificate without TLS', () {
       final plain = _ids(
         DwDeployRunner(
           ssh: RecordingSsh(),
@@ -110,7 +110,7 @@ void main() {
       final ssh = RecordingSsh();
       await DwDeployRunner(
         ssh: ssh,
-        stack: stackVariants()['minio and a site']!,
+        stack: stackVariants()['bundled storage and a site']!,
       ).issueCertificate();
       final command = ssh.issued.single;
       expect(command, contains("--cert-name 'api.example.com'"));
@@ -255,7 +255,7 @@ esac
               'PATH': '${bin.path}:${Platform.environment['PATH']}',
             },
           ),
-          stack: stackVariants()['minio and a site']!,
+          stack: stackVariants()['bundled storage and a site']!,
           appDir: p.join(temp.path, 'shop'),
         );
         final result = await runner.issueCertificate();
@@ -341,11 +341,11 @@ esac
       final verdict = DwDeployRunner.upstreamVerdict(
         const DwSshResult(
           exitCode: 0,
-          stdout: 'server\n--dw-nginx-d--\nproxy_pass http://minio:9000;\n',
+          stdout: 'server\n--dw-nginx-d--\nproxy_pass http://storage:9000;\n',
           stderr: '',
         ),
       );
-      expect(verdict, contains('minio'));
+      expect(verdict, contains('storage'));
       expect(verdict, contains('Nothing has been restarted'));
     });
 
@@ -432,7 +432,7 @@ esac
       Directory(appDir).createSync(recursive: true);
       runner = DwDeployRunner(
         ssh: LocalShell(),
-        stack: stackVariants()['minio and a site']!,
+        stack: stackVariants()['bundled storage and a site']!,
         appDir: appDir,
       );
     });
@@ -552,7 +552,7 @@ esac
       () async {
         file(
           DwComposeFiles.autoLoaded,
-        ).writeAsStringSync('services:\n  minio: {}\n');
+        ).writeAsStringSync('services:\n  storage: {}\n');
         final result = await bridge();
         expect(result.ok, isFalse);
         expect(file(DwComposeFiles.autoLoaded).existsSync(), isTrue);

@@ -89,7 +89,7 @@ when there is none.
 - **An `http` image is sent without the image**, with a warning naming the URL logged when the
   message is queued. Providers show only `https` images; `http` is what a development storage's
   public URL is, and a picture — decoration — must not fail the command that queued the
-  notification, nor every acceptance test that runs on a local MinIO.
+  notification, nor every acceptance test that runs on a local storage.
 
 ## Who receives it, and when: eligibility
 

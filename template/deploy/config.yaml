@@ -51,7 +51,7 @@ local:
   DW_STORAGE_ENDPOINT: http://127.0.0.1:8100
   DW_STORAGE_ACCESS_KEY: dartway_dev
   DW_STORAGE_SECRET_KEY: dartway_dev_storage_pw
-  # Creates both buckets and sets their access on the first start. For a MinIO
+  # Creates both buckets and sets their access on the first start. For a storage
   # this project owns, never for a storage somebody else administers.
   DW_STORAGE_PROVISION: true
 
@@ -103,7 +103,7 @@ local:
 #   # read by anyone at DW_STORAGE_PUBLIC_BASE_URL/<key>; private ones only
 #   # through short presigned links the server gives after canRead.
 #   #
-#   #   minio    — a MinIO container in the stack, for staging. Browsers upload
+#   #   bundled  — RustFS in the stack, for staging. Browsers upload
 #   #              to it directly, so it needs a host of its own. Its keys are
 #   #              generated into the secret store; its CORS rule admits PUT
 #   #              from app_domain with the headers a presigned upload is bound
@@ -126,7 +126,7 @@ local:
 #   #              content-length and if-none-match. The server checks both
 #   #              buckets as it starts and refuses to start on a bucket more or
 #   #              less public than declared.
-#   storage: minio
+#   storage: bundled
 #   storage_domain: files.example.com
 #
 #   # Optional. Pull the stack's base images through a mirror when Docker Hub

@@ -246,7 +246,7 @@ run and why.
 (cd __SHARED_PKG__ && dart analyze && dart test)            # the contract
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && dart analyze --fatal-infos)            # the lint set and dartway_lints
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server acceptance, real Postgres and MinIO
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server acceptance, real Postgres and storage
 (cd __FLUTTER_PKG__ && flutter test)                        # screens on the in-memory server
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # the conventions; errors fail it
 ```

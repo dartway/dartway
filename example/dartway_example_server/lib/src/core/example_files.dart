@@ -40,7 +40,7 @@ abstract final class ExampleFiles {
 
   /// The example's storage configuration from [environment]: `DW_STORAGE_*` as
   /// [DwFileStorageConfig.fromEnvironment] reads it, with the defaults of a
-  /// development MinIO filled in — buckets `club-public` and `club-private`,
+  /// development storage filled in — buckets `club-public` and `club-private`,
   /// the public one served from itself on the endpoint
   /// (`<DW_STORAGE_ENDPOINT>/club-public`). `null` when `DW_STORAGE_ENDPOINT`
   /// is not set: the server then runs without uploads.

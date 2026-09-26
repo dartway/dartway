@@ -279,7 +279,7 @@ git checkout -B '${target.branch}' 'origin/${target.branch}'
       .toList();
   final expected = {
     '${project}_postgres_data',
-    if (target.storage == DwStorageMode.minio) '${project}_minio_data',
+    if (target.storage == DwStorageMode.bundled) '${project}_storage_data',
   };
   final strangers = existing
       .where((name) => !expected.contains(name) && name.contains('data'))

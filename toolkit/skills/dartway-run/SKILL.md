@@ -2,7 +2,7 @@
 name: dartway-run
 description: >-
   Bring a DartWay project up locally and confirm it is alive (DartWay projects): `dartway doctor`,
-  Postgres (127.0.0.1:8090) and MinIO (8100, console 8101) from docker compose, `pg_isready` polled
+  Postgres (127.0.0.1:8090) and RustFS (8100, console 8101) from docker compose, `pg_isready` polled
   rather than slept on, the environment the server reads (DW_DATABASE_*, DW_STORAGE_*,
   DW_STORAGE_PROVISION, DW_ADMIN_IDENTIFIER asked from the human), `dart run bin/server.dart` in the
   background (it migrates as it starts), the dev seed, `/health` 200 reported as a fact, the sign-in
@@ -76,8 +76,8 @@ The values that section holds, and what each is for:
 | `DW_DATABASE_HOST`, `DW_DATABASE_PORT` | `127.0.0.1`, `8090` | The compose Postgres |
 | `DW_DATABASE_NAME`, `DW_DATABASE_USER`, `DW_DATABASE_PASSWORD` | from `docker-compose.yaml` (`postgres` user) | |
 | `DW_DATABASE_SSL` | `false` | **SSL is on by default**; a local Postgres has none |
-| `DW_STORAGE_ENDPOINT` | `http://127.0.0.1:8100` | The compose MinIO. Unset: the server runs without uploads |
-| `DW_STORAGE_ACCESS_KEY`, `DW_STORAGE_SECRET_KEY` | the MinIO root user and password | |
+| `DW_STORAGE_ENDPOINT` | `http://127.0.0.1:8100` | The compose storage (RustFS). Unset: the server runs without uploads |
+| `DW_STORAGE_ACCESS_KEY`, `DW_STORAGE_SECRET_KEY` | the storage's access and secret key | |
 | `DW_STORAGE_PROVISION` | `true` | Creates both buckets and sets their access before starting — for a storage the project owns, never for one somebody else administers |
 | `DW_ADMIN_IDENTIFIER` | **ask the human** | A commented line in `local`, see below |
 | `PORT` | `8080` (default) | |
@@ -87,7 +87,7 @@ Everything else about storage (`dartway-uploads`) has development defaults in th
 
 ### Why exactly this way
 
-- **`docker compose up -d` starts Postgres and MinIO.** The first run pulls images and can take
+- **`docker compose up -d` starts Postgres and RustFS.** The first run pulls images and can take
   minutes; that is normal. There is no test database in compose: `dart run dartway_cli:dartway test` starts its own.
 - **A container reported "Started" is not yet Postgres listening.** There are seconds between the
   two, and a server started in that window exits on "connection refused". Poll `pg_isready` until it
@@ -179,7 +179,7 @@ only one.
 | `DwMigrationFailed: up of app/… failed: <postgres error>` | A migration ran and Postgres refused it | Read the SQL error; `dartway-migrations` |
 | `- table "x" is declared in the schema and missing from the database: is its migration registered?` | A row class changed without a migration, or the migration is not in `migrations.dart` | `dart run bin/migrate.dart create <name>` (`dartway-migrations`) |
 | `- file storage public bucket "…" does not exist at …` / `is not readable anonymously` / `is readable anonymously` / `lets anyone list its keys` | The bucket probe: the buckets are missing or not exactly as public as declared | Locally: `DW_STORAGE_PROVISION=true` and restart. On a storage someone else runs: fix its policy, never loosen the check |
-| `- file storage … could not be checked at http://127.0.0.1:8100: …` | MinIO is not running, or unreachable | `docker compose up -d`; or unset `DW_STORAGE_ENDPOINT` to run without uploads |
+| `- file storage … could not be checked at http://127.0.0.1:8100: …` | The storage is not running, or unreachable | `docker compose up -d`; or unset `DW_STORAGE_ENDPOINT` to run without uploads |
 | `SocketException: Failed to create server socket … Address already in use` (port 8080) | A server is already running — another terminal, a background run from earlier | Do not start a second one: `curl …/health`. Otherwise find the process holding the port |
 | `port is already allocated` on `docker compose up` (8090 / 8100 / 8101) | Another project's containers or a leftover | `docker ps`; stop the conflicting container. DartWay projects share these development ports |
 | `Invalid argument (DW_ADMIN_IDENTIFIER): is neither a phone number nor an e-mail address` | A mistyped administrator | Ask the human for the value again |

@@ -37,6 +37,45 @@ String _location(String block, String spec) {
 }
 
 void main() {
+  group('pinned images (what deploy check resolves against a registry)', () {
+    test('no storage: Postgres, nginx and certbot, nothing storage-shaped', () {
+      final images = stackFrom().pinnedImages;
+      expect(images.map((e) => e.$1), ['Postgres', 'nginx', 'certbot']);
+      expect(images.map((e) => e.$2), [
+        DwStack.postgresImage,
+        DwStack.nginxImage,
+        DwStack.certbotImage,
+      ]);
+    });
+
+    test('bundled storage adds the storage and its init image', () {
+      final images = stackVariants()['bundled storage and a site']!.pinnedImages;
+      expect(images.map((e) => e.$1), [
+        'Postgres',
+        'nginx',
+        'certbot',
+        'storage',
+        'storage-init',
+      ]);
+      expect(images, contains(('storage', DwStack.storageImage)));
+      expect(images, contains(('storage-init', DwStack.storageInitImage)));
+    });
+
+    test('external storage pulls no storage image at all', () {
+      final images =
+          stackVariants()['external storage, external site, files']!.pinnedImages;
+      expect(images.map((e) => e.$1), ['Postgres', 'nginx', 'certbot']);
+    });
+
+    test('plain HTTP (the local proof) never resolves certbot — nothing '
+        'issues a certificate', () {
+      final images = stackFrom(
+        front: const DwPlainHttpFront(18080),
+      ).pinnedImages;
+      expect(images.map((e) => e.$1), ['Postgres', 'nginx']);
+    });
+  });
+
   group('the rendered compose file', () {
     for (final MapEntry(key: variant, value: stack)
         in stackVariants().entries) {
@@ -44,7 +83,7 @@ void main() {
         final services = (_compose(stack)['services'] as YamlMap).keys.toSet();
         expect(services, containsAll(['postgres', 'server', 'web', 'nginx']));
         expect(
-          services.contains('minio') && services.contains('minio-init'),
+          services.contains('storage') && services.contains('storage-init'),
           stack.target.storageDomain != null,
         );
         expect(services, contains('certbot'));
@@ -119,14 +158,27 @@ void main() {
       expect(args['STUDIO_APP_ORIGIN'], 'https://app.example.com');
     });
 
-    test('MinIO: the bucket, the CORS origin, and the server reaching storage '
-        'by the URL browsers sign', () {
-      final stack = stackVariants()['minio and a site']!;
-      final minio = _service(stack, 'minio');
-      expect(
-        (minio['environment'] as YamlMap)['MINIO_API_CORS_ALLOW_ORIGIN'],
-        'https://app.example.com',
-      );
+    test('storage: the CORS origin, and the server reaching it by the URL '
+        'browsers sign', () {
+      final stack = stackVariants()['bundled storage and a site']!;
+      final script =
+          (_service(stack, 'storage-init')['command'] as YamlList).single
+              as String;
+      final corsStep = script
+          .split('; ')
+          .singleWhere(
+            (step) => step.contains('dw-cors.json') && step.startsWith('printf'),
+          );
+      final cors =
+          jsonDecode(
+                RegExp(
+                  "printf '%s' '(.*)' >",
+                ).firstMatch(corsStep)!.group(1)!,
+              )
+              as Map<String, Object?>;
+      final rule = (cors['CORSRules']! as List).single as Map;
+      expect(rule['AllowedOrigins'], ['https://app.example.com']);
+      expect(rule['AllowedMethods'], ['GET', 'PUT']);
       expect(
         Map.of(_service(stack, 'server')['environment'] as YamlMap),
         containsPair('DW_STORAGE_ENDPOINT', 'https://files.example.com'),
@@ -138,29 +190,30 @@ void main() {
       );
     });
 
-    test('MinIO: two buckets — the public one reads objects to anyone and '
+    test('storage: two buckets — the public one reads objects to anyone and '
         'lists to no one, the private one reads nothing unsigned — and the '
         'server is given both', () {
-      final stack = stackVariants()['minio and a site']!;
+      final stack = stackVariants()['bundled storage and a site']!;
       expect(stack.publicBucketName, 'shop-public');
       expect(stack.privateBucketName, 'shop-private');
       final script =
-          (_service(stack, 'minio-init')['command'] as YamlList).single
+          (_service(stack, 'storage-init')['command'] as YamlList).single
               as String;
       final steps = script.split('; ');
       expect(
         steps,
         containsAllInOrder([
           'set -e',
-          'mc mb --ignore-existing dw/shop-public',
-          'mc mb --ignore-existing dw/shop-private',
-          'mc anonymous set-json /tmp/dw-public-read.json dw/shop-public',
-          'mc anonymous set none dw/shop-private',
+          'aws --endpoint-url http://storage:9000 s3 mb s3://shop-public',
+          'aws --endpoint-url http://storage:9000 s3 mb s3://shop-private',
+          'aws --endpoint-url http://storage:9000 s3api put-bucket-policy '
+              '--bucket shop-public --policy file:///tmp/dw-public-read.json',
+          'aws --endpoint-url http://storage:9000 s3api delete-bucket-policy '
+              '--bucket shop-private',
         ]),
       );
-      // Not `mc anonymous set download`: that grants s3:ListBucket too.
-      expect(script, isNot(contains('set download')));
-      expect(script, isNot(contains('set public')));
+      // A policy, never a canned ACL: that would also grant s3:ListBucket.
+      expect(script, isNot(contains('--acl')));
       final policyStep = steps.singleWhere(
         (step) =>
             step.contains('dw-public-read.json') && step.startsWith('printf'),
@@ -183,7 +236,10 @@ void main() {
       for (final bucket in ['shop-public', 'shop-private']) {
         expect(
           script,
-          contains('mc pipe dw/$bucket/${DwStack.visibilityProbeKey}'),
+          contains(
+            'aws --endpoint-url http://storage:9000 s3 cp - '
+            's3://$bucket/${DwStack.visibilityProbeKey}',
+          ),
         );
       }
 
@@ -242,20 +298,20 @@ void main() {
     test('a registry mirror serves the official images and nothing else', () {
       final stack = stackFrom(
         extra:
-            '  storage: minio\n  storage_domain: files.example.com\n'
+            '  storage: bundled\n  storage_domain: files.example.com\n'
             '  registry_mirror: mirror.gcr.io\n',
       );
       String image(String service) =>
           _service(stack, service)['image'] as String;
       expect(image('postgres'), 'mirror.gcr.io/${DwStack.postgresImage}');
       expect(image('nginx'), 'mirror.gcr.io/${DwStack.nginxImage}');
-      expect(image('minio'), DwStack.minioImage);
-      expect(image('minio-init'), DwStack.minioClientImage);
+      expect(image('storage'), DwStack.storageImage);
+      expect(image('storage-init'), DwStack.storageInitImage);
       expect(image('certbot'), DwStack.certbotImage);
     });
 
     test('a site is mounted from the checkout, read-only', () {
-      final nginx = _service(stackVariants()['minio and a site']!, 'nginx');
+      final nginx = _service(stackVariants()['bundled storage and a site']!, 'nginx');
       expect(nginx['volumes'], contains('./app_site/build:/srv/site:ro'));
     });
 
@@ -282,7 +338,7 @@ void main() {
   });
 
   group('the rendered nginx configuration', () {
-    final stack = stackVariants()['minio and a site']!;
+    final stack = stackVariants()['bundled storage and a site']!;
     final nginx = DwStackRenderer(stack: stack).nginxFile;
 
     test('app: files from the web image, calls and health to the server', () {
@@ -343,9 +399,10 @@ void main() {
       expect(site, isNot(contains('proxy_pass')));
     });
 
-    test('storage: streamed to MinIO with the signed host intact', () {
+    test('storage: streamed to the bundled storage with the signed host '
+        'intact', () {
       final storage = _serverBlock(nginx, 'files.example.com');
-      expect(storage, contains('proxy_pass http://minio:9000;'));
+      expect(storage, contains('proxy_pass http://storage:9000;'));
       expect(storage, contains('client_max_body_size 0;'));
       expect(storage, contains(r'proxy_set_header Host $http_host;'));
     });

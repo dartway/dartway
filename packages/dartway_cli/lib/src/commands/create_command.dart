@@ -81,7 +81,8 @@ class CreateCommand extends Command<int> {
 
   /// The template's bucket names are `dartway-starter-public` and
   /// `dartway-starter-private` — the names `dartway deploy` gives the buckets
-  /// of its MinIO, after the project with dashes (S3 allows no underscore).
+  /// of its bundled storage, after the project with dashes (S3 allows no
+  /// underscore).
   static const _sourceProjectKebabName = 'dartway-starter';
 
   /// The longest bucket name S3 accepts, and the longest suffix the template

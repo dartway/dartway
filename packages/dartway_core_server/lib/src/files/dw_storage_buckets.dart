@@ -6,7 +6,7 @@ import 'dw_file_storage.dart';
 import 'dw_object_store.dart';
 
 /// Creates the two buckets of a [DwFileStorageConfig] on a storage the project
-/// runs itself — MinIO in development, in tests, in a `dartway deploy` stack —
+/// runs itself — RustFS in development, in tests, in a `dartway deploy` stack —
 /// and gives each exactly its access.
 ///
 /// ```dart

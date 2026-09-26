@@ -90,7 +90,7 @@ Six checks, each with the exact fix when it fails:
 | Flutter `>=3.44.0` | |
 | git, with `user.name` and `user.email` | `create` commits the new project. A missing binary fails; a missing identity warns — the project is complete, but has no initial commit |
 | A pub host that answers | `pub get` sets no deadline on a connection that opens and goes quiet, so a filtered route surfaces as a resolve step that hangs without a word. The probe asks for bytes rather than a socket (a TCP connect succeeds even when the TLS handshake after it is filtered), waits 10 seconds, and honours `PUB_HOSTED_URL` |
-| A responding Docker daemon | Postgres and MinIO come from it, for development and for `dart run dartway_cli:dartway test`. Not installed and not running are reported apart |
+| A responding Docker daemon | Postgres and the storage come from it, for development and for `dart run dartway_cli:dartway test`. Not installed and not running are reported apart |
 | The pub global bin directory on `PATH` | The cause of `dartway: command not found` right after a successful install. A warning: `dart pub global run dartway_cli:dartway` works regardless |
 
 Exit code `1` when anything fails, `0` otherwise (warnings included), so an agent or a CI step can
@@ -337,7 +337,7 @@ dart run dartway_cli:dartway test -- --name 'sign-in'    # everything after -- g
 dart run dartway_cli:dartway test --keep                 # leave the containers up to look inside them
 ```
 
-Starts a Postgres and a MinIO for this run on ports Docker picks, waits until both accept
+Starts a Postgres and a storage for this run on ports Docker picks, waits until both accept
 connections, runs `dart test` in the server package with `DW_DATABASE_*` and `DW_STORAGE_*` in its
 environment, and removes both containers afterwards — Ctrl+C included. Each test file then creates
 a database and buckets of its own.
@@ -346,8 +346,8 @@ a database and buckets of its own.
 |---|---|---|
 | `--keep` | off | Leave the containers running and print how to reach and remove them |
 | `--image` | `postgres:17-alpine` | Postgres image — the one a deployment runs |
-| `--[no-]storage` | on | Start MinIO beside Postgres; `--no-storage` for a server without uploads |
-| `--storage-image` | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | MinIO image — the one a deployment runs |
+| `--[no-]storage` | on | Start the storage beside Postgres; `--no-storage` for a server without uploads |
+| `--storage-image` | `rustfs/rustfs:1.0.0` | Storage image — the one a deployment runs |
 
 Why a database per run rather than a compose service, and how a suite uses it, is
 [Testing](testing.md).

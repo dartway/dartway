@@ -68,8 +68,8 @@ class DwStack {
   static const String serverService = 'server';
   static const String webService = 'web';
   static const String postgresService = 'postgres';
-  static const String minioService = 'minio';
-  static const String minioInitService = 'minio-init';
+  static const String storageService = 'storage';
+  static const String storageInitService = 'storage-init';
   static const String nginxService = 'nginx';
   static const String certbotService = 'certbot';
 
@@ -79,14 +79,19 @@ class DwStack {
   /// to its major, which is what its on-disk format follows.
   static const String postgresImage = 'postgres:17-alpine';
 
-  /// MinIO's community edition stopped publishing images after this release,
-  /// so an unpinned tag names nothing that will ever change — pinned to say so.
-  /// From quay.io: MinIO removed its repositories from Docker Hub, and a
-  /// deploy pinned there fails at the pull.
-  static const String minioImage =
-      'quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z';
-  static const String minioClientImage =
-      'quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z';
+  /// The bundled storage. Pinned for the same reason as Postgres above, and
+  /// because it is the second time this stack has pinned a storage image for
+  /// that reason (D-094, dartway/dartway#331): the previous one stopped
+  /// publishing images, and every registry that used to serve them answered
+  /// an anonymous pull with 401. RustFS is Apache-2.0 and pulls anonymously
+  /// from Docker Hub.
+  static const String storageImage = 'rustfs/rustfs:1.0.0';
+
+  /// Creates both buckets and sets their access on every deploy —
+  /// [storageInitService]'s image. Not RustFS's own client (it does not ship
+  /// one that speaks bucket policy and CORS the way the framework needs); a
+  /// generic, pinned S3 client instead.
+  static const String storageInitImage = 'amazon/aws-cli:2.31.13';
 
   /// Pinned too, though stateless: a redeploy weeks later must not pull a
   /// different proxy and call the regression "the deploy broke", and a
@@ -140,9 +145,9 @@ class DwStack {
   String get privateBucketName =>
       '${projectPrefix.replaceAll('_', '-')}-private';
 
-  /// The object `minio-init` writes into both buckets, and the outside probe
-  /// reads without credentials: the key and text the server's own startup
-  /// check uses (`_dartway/visibility-probe`).
+  /// The object `storage-init` writes into both buckets, and the outside
+  /// probe reads without credentials: the key and text the server's own
+  /// startup check uses (`_dartway/visibility-probe`).
   static const String visibilityProbeKey = '_dartway/visibility-probe';
   static const String visibilityProbeText =
       'DartWay checks at startup that this bucket is exactly as public as it '
@@ -186,22 +191,35 @@ class DwStack {
     // The database is a container on the stack's private network, and the
     // image serves no TLS; the driver requires it unless told otherwise.
     'DW_DATABASE_SSL': 'false',
-    if (target.storage == DwStorageMode.minio) ...{
+    if (target.storage == DwStorageMode.bundled) ...{
       storageEndpointKey: storageOrigin!,
       storagePublicBucketKey: publicBucketName,
       storagePublicBaseUrlKey: publicBaseUrl!,
       storagePrivateBucketKey: privateBucketName,
       'DW_STORAGE_REGION': 'us-east-1',
       'DW_STORAGE_PATH_STYLE': 'true',
-      // The server reaches this MinIO only through the proxy's storage host,
-      // and the proxy starts after the server — on a first deploy it does not
-      // exist yet, and its certificate even less. So the server does not
-      // check its buckets while it starts: `minio-init` sets their access on
-      // every deploy, and the outside probe reads both without credentials
-      // once the stack is up.
+      // The server reaches this storage only through the proxy's storage
+      // host, and the proxy starts after the server — on a first deploy it
+      // does not exist yet, and its certificate even less. So the server does
+      // not check its buckets while it starts: `storage-init` sets their
+      // access on every deploy, and the outside probe reads both without
+      // credentials once the stack is up.
       storageVerifyBucketsKey: 'false',
     },
   };
+
+  /// Every base image this stack pulls rather than builds, labelled for a
+  /// report: what `deploy check` asks a registry to resolve before `deploy
+  /// run` gets anywhere near pulling them for real (#331).
+  List<(String, String)> get pinnedImages => [
+    ('Postgres', postgresImage),
+    ('nginx', nginxImage),
+    if (front is DwTlsFront) ('certbot', certbotImage),
+    if (target.storage == DwStorageMode.bundled) ...[
+      ('storage', storageImage),
+      ('storage-init', storageInitImage),
+    ],
+  ];
 
   /// Names the store must not hold, because the compose file sets them.
   Set<String> get reservedSecretKeys => serverEnvironment.keys.toSet();
@@ -212,9 +230,9 @@ class DwStack {
   /// never exists anywhere but the server that uses it.
   Map<String, int> get generatedSecrets => {
     databasePasswordKey: 32,
-    if (target.storage == DwStorageMode.minio) ...{
-      // MinIO takes the access key as the root user name; hex keeps it within
-      // the characters every S3 client accepts.
+    if (target.storage == DwStorageMode.bundled) ...{
+      // Hex keeps the generated key within the characters every S3 client
+      // accepts, and within what RustFS takes as an access key.
       storageAccessKey: 10,
       storageSecretKey: 32,
     },
