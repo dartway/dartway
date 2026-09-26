@@ -227,9 +227,12 @@ chmod 600 "\$file"
   /// Writes [key], replacing any existing value.
   ///
   /// The encoded line travels on stdin, so the value appears in neither the
-  /// SSH command line nor the remote process list. The file is rewritten
-  /// through a temporary copy and moved into place, so a reader never sees it
-  /// half-written.
+  /// SSH command line nor the remote process list. It is staged in a
+  /// `mktemp` file inside [directory] itself — never the shared system temp
+  /// directory — and that staging file is removed on any failure. The store
+  /// is rewritten through a second temporary copy, in the same directory,
+  /// moved into place so a reader never sees it half-written and the swap is
+  /// one same-filesystem rename, not a copy a crash could catch half-done.
   Future<DwSshResult> setSecret({required String key, required String value}) {
     final line = encodeLine(key, value);
     return ssh.runAsWithInput(target.deployUser, '''
@@ -237,7 +240,7 @@ set -e
 umask 077
 install -d -m 0700 '$directory'
 file='$file'
-line_file=\$(mktemp)
+line_file=\$(mktemp '$directory/.secrets-line.XXXXXX')
 trap 'rm -f "\$line_file"' EXIT
 cat > "\$line_file"
 [ -e "\$file" ] || : > "\$file"
@@ -251,7 +254,27 @@ chmod 600 "\$file"
   }
 
   /// Replaces the whole store with [values]. Used by `secret push`.
-  Future<DwSshResult> writeAll(Map<String, String> values) {
+  ///
+  /// [expectedFingerprint], when given, must equal the store's current
+  /// `cksum` (`'absent'` for no store) right before anything is written; a
+  /// mismatch — the store changed since it was read — writes nothing and
+  /// fails instead. This is [DwSecretPushPlan.fingerprint], and it is what
+  /// closes the gap between planning a push and sending it: two calls, not
+  /// one transaction, and a second push (or a hand edit) landing in between
+  /// would otherwise be silently undone by a decision made against what the
+  /// store used to hold. Omitted, this writes unconditionally, as it always
+  /// did — callers other than `secret push` that replace the store outright
+  /// have no earlier read to hold it to.
+  ///
+  /// The plaintext is staged in a `mktemp` file inside [directory] itself —
+  /// never in the shared, world-writable system temp directory — removed on
+  /// any failure before it is moved into place, and moved rather than copied
+  /// into [file] so the swap is one rename on one filesystem, never a
+  /// cross-filesystem copy a crash could catch half-done.
+  Future<DwSshResult> writeAll(
+    Map<String, String> values, {
+    String? expectedFingerprint,
+  }) {
     final buffer = StringBuffer()
       ..writeln('# Written by "dartway deploy secret push".')
       ..writeln(
@@ -261,16 +284,138 @@ chmod 600 "\$file"
     for (final entry in values.entries) {
       buffer.writeln(encodeLine(entry.key, entry.value));
     }
+    final guard = expectedFingerprint == null
+        ? ''
+        : '''
+if [ -f '$file' ]; then
+  current=\$(cksum < '$file')
+else
+  current='absent'
+fi
+if [ "\$current" != '$expectedFingerprint' ]; then
+  echo 'the store changed since it was last read; nothing was written' >&2
+  exit 1
+fi
+''';
     return ssh.runAsWithInput(target.deployUser, '''
 set -e
 umask 077
 install -d -m 0700 '$directory'
-staged=\$(mktemp)
+$guard
+staged=\$(mktemp '$directory/.secrets.XXXXXX')
+trap 'rm -f "\$staged"' EXIT
 cat > "\$staged"
 test -s "\$staged"
 mv "\$staged" '$file'
 chmod 600 '$file'
 ''', buffer.toString());
+  }
+
+  /// Compares [candidate] to what the store already holds, key by key,
+  /// without moving a value off the server: the comparison itself runs
+  /// there, over the candidate's own encoded lines sent on stdin (read
+  /// directly, never staged in a file of their own), and only three sets of
+  /// names — plus every key name currently in the store, and a fingerprint
+  /// of it — come back.
+  ///
+  /// What `secret push` plans its default from: [DwSecretPushPlan.add] is
+  /// what the server lacks or holds empty, [DwSecretPushPlan.same] already
+  /// matches, and [DwSecretPushPlan.differ] is what a caller must decide
+  /// about (`--overwrite`) rather than have replaced silently.
+  /// [DwSecretPushPlan.names] is what a caller computes `--prune`'s orphaned
+  /// keys from, in the same pass as the fingerprint: a separate call to list
+  /// them (as `secret push` once made) reads the store a second time, and a
+  /// key added to it in the gap between the two calls would be missed by
+  /// that guard.
+  /// [DwSecretPushPlan.ok] is false, and nothing is classified, when the
+  /// store exists but could not be read (permissions, most likely) — an
+  /// unreadable store must never be mistaken for an absent one, which would
+  /// class every key `add` and let a push replace it outright.
+  Future<DwSecretPushPlan> plan(Map<String, String> candidate) async {
+    final buffer = StringBuffer();
+    for (final entry in candidate.entries) {
+      buffer.writeln(encodeLine(entry.key, entry.value));
+    }
+    final result = await ssh.runAsWithInput(target.deployUser, '''
+set -e
+if [ -f '$file' ]; then
+  # Read (and fingerprinted, and its key names listed) before anything is
+  # classified against it: a read failure discovered midway through the
+  # loop below would otherwise leave whatever it had already printed on
+  # stdout looking like a complete, successful plan, and grep failing on
+  # one key for the same reason would look exactly like that key simply not
+  # being in the store.
+  fingerprint=\$(cksum < '$file')
+else
+  fingerprint='absent'
+fi
+echo "FINGERPRINT \$fingerprint"
+if [ -f '$file' ]; then
+  sed -n "s/^\\([A-Z_][A-Z0-9_]*\\)=.*/NAME \\1/p" '$file'
+fi
+while IFS= read -r line || [ -n "\$line" ]; do
+  key=\${line%%=*}
+  [ -n "\$key" ] || continue
+  if [ -f '$file' ]; then
+    # grep answers 1 for "no such line", which is not a failure here; 2 is,
+    # and must not be read as the key simply being absent.
+    existing=\$(grep "^\$key=" '$file' || [ \$? -eq 1 ])
+  else
+    existing=''
+  fi
+  case "\$existing" in
+    '' | "\$key=''") echo "ADD \$key" ;;
+    "\$line") echo "SAME \$key" ;;
+    *) echo "DIFFER \$key" ;;
+  esac
+done
+''', buffer.toString());
+
+    if (!result.ok) {
+      return DwSecretPushPlan(
+        ok: false,
+        add: const {},
+        same: const {},
+        differ: const {},
+        names: const {},
+        fingerprint: '',
+        error: result.firstLine,
+      );
+    }
+    final add = <String>{};
+    final same = <String>{};
+    final differ = <String>{};
+    final names = <String>{};
+    var fingerprint = '';
+    for (final raw in result.stdout.split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty) continue;
+      final space = line.indexOf(' ');
+      if (space < 0) continue;
+      final tag = line.substring(0, space);
+      final rest = line.substring(space + 1);
+      switch (tag) {
+        case 'ADD':
+          add.add(rest);
+        case 'SAME':
+          same.add(rest);
+        case 'DIFFER':
+          differ.add(rest);
+        case 'NAME':
+          names.add(rest);
+        case 'FINGERPRINT':
+          fingerprint = rest;
+      }
+    }
+    return DwSecretPushPlan(
+      ok: true,
+      add: add,
+      same: same,
+      differ: differ,
+      names: names,
+      fingerprint: fingerprint,
+      error: '',
+    );
   }
 
   /// Reads the whole store. Only `pull` uses this: routine checks compare key
@@ -412,6 +557,49 @@ class DwSecretKeyNames {
 
   final bool ok;
   final Set<String> names;
+  final String error;
+}
+
+/// The result of [DwSecretStore.plan]: every candidate key sorted into what
+/// pushing it would do, by name only — never a value, from either side.
+class DwSecretPushPlan {
+  const DwSecretPushPlan({
+    required this.ok,
+    required this.add,
+    required this.same,
+    required this.differ,
+    required this.names,
+    required this.fingerprint,
+    required this.error,
+  });
+
+  final bool ok;
+
+  /// The server lacks the key, or holds it empty.
+  final Set<String> add;
+
+  /// The server already holds exactly this value.
+  final Set<String> same;
+
+  /// The server holds a different, non-empty value.
+  final Set<String> differ;
+
+  /// Every key name the store held at the moment this plan read it — read in
+  /// the same pass as [fingerprint], not a separate call: a push computes
+  /// `--prune`'s orphaned keys (the server's names minus the candidate's) by
+  /// diffing against this set, rather than by asking the store to list its
+  /// keys a second time, which would read it again and could miss a key
+  /// added in the gap between the two reads. Empty when there was no store
+  /// yet, or when [ok] is false.
+  final Set<String> names;
+
+  /// A fingerprint (`cksum`) of the store exactly as it was when this plan
+  /// read it — `'absent'` when there was no store yet. Meant for
+  /// [DwSecretStore.writeAll]'s `expectedFingerprint`: passed back there, it
+  /// refuses to write over a store that no longer matches it, closing the
+  /// gap between planning a push and sending it. Empty when [ok] is false.
+  final String fingerprint;
+
   final String error;
 }
 

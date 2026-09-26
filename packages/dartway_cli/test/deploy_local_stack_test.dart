@@ -17,6 +17,7 @@ import 'package:dartway_cli/src/deploy/secret_store.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:dartway_cli/src/vendor_framework.dart';
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -55,6 +56,10 @@ void main() {
   late DwDeployRunner runner;
   late DwOutsideProbe probe;
   late LocalShell shell;
+  // What the example build actually embeds — read out of the copy, not
+  // assumed, so a version bump in the example does not go stale here too.
+  late String contractVersion;
+  late String exampleAppVersion;
   final log = StringBuffer();
 
   Future<DwSshResult> compose(String arguments) =>
@@ -103,7 +108,9 @@ void main() {
       '$origin/dw/$wireName',
       headers: {
         'content-type': 'application/json; charset=utf-8',
-        'dw-protocol': '1',
+        DwHttpContract.protocolHeader: '$dwProtocolVersion',
+        DwHttpContract.contractVersionHeader: contractVersion,
+        DwHttpContract.appVersionHeader: exampleAppVersion,
         'authorization': ?(token == null ? null : 'Bearer $token'),
         'dw-idempotency-key': ?(command
             ? 'proof-${DateTime.now().microsecondsSinceEpoch}'
@@ -128,6 +135,35 @@ void main() {
     root = Directory.systemTemp.createTempSync('dw_stack_proof_');
     project = Directory(p.join(root.path, 'project'));
     copyProject(Directory(p.join(monorepo.path, 'example')), project);
+    // What the copied build actually embeds — the generated contract
+    // version and the app's own build string — read out rather than
+    // hardcoded, so a version bump in the example cannot go stale here.
+    contractVersion = RegExp(r"contractVersion: '([^']+)'")
+        .firstMatch(
+          File(
+            p.join(
+              project.path,
+              'dartway_example_shared',
+              'lib',
+              'generated',
+              'dw_protocol.dart',
+            ),
+          ).readAsStringSync(),
+        )!
+        .group(1)!;
+    exampleAppVersion = RegExp(r"exampleAppVersion = '([^']+)'")
+        .firstMatch(
+          File(
+            p.join(
+              project.path,
+              'dartway_example_flutter',
+              'lib',
+              'core',
+              'app_version.dart',
+            ),
+          ).readAsStringSync(),
+        )!
+        .group(1)!;
     // The example has no site; the proof gives it one, committed-shaped.
     File(p.join(project.path, 'app_site', 'build', 'index.html'))
       ..createSync(recursive: true)
@@ -317,7 +353,8 @@ void main() {
       '${stack.appOrigin}/dw/GetMyProfile',
       headers: {
         'content-type': 'application/json; charset=utf-8',
-        'dw-protocol': '1',
+        DwHttpContract.protocolHeader: '$dwProtocolVersion',
+        DwHttpContract.contractVersionHeader: contractVersion,
       },
       body: utf8.encode('{"pad":"${'x' * (2 << 20)}"}'),
     );
