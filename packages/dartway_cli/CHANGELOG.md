@@ -52,13 +52,21 @@
   already matches alone, and — this is the behaviour change — stops rather than silently overwriting
   a key whose server value differs. `--overwrite KEY[,KEY…]` replaces exactly those named keys on
   purpose; there is no `--overwrite-all`. A generated key (`DW_DATABASE_PASSWORD`, and with
-  `storage: bundled` the storage keys) is refused the same way and needs naming in `--overwrite` just
-  as any other key does — it is bound to the data already on the server, and replacing it can lock the
-  server out of its own database on the next `run`. Before sending anything, `push` now prints a
-  per-key plan (`add` / `keep (same)` / `overwrite` / `differs — refused` / `drop`) — the same shape
-  `--dry-run` prints, only followed by the actual send. `--prune` and `--allow-emptying` are
-  unchanged. This is a CLI command's own default changing, not a change to generated project code, so
-  there is no migration note.
+  `storage: bundled` the storage keys) is bound to the data already on the server on every path that
+  touches it, not only replacing it: dropping it with `--prune` or blanking it with `--allow-emptying`
+  needs it named in `--overwrite` too, on top of whichever of those two flags is otherwise enough on
+  its own for an ordinary key. The comparison runs on the server itself (`DwSecretStore.plan`, over
+  the candidate's own encoded lines sent on stdin, read directly rather than staged in a file of their
+  own) — only key names and a `cksum` fingerprint of the store travel back, never a value. `writeAll`
+  is asked to check that same fingerprint right before it writes, so a second push (or a hand edit)
+  landing in between refuses the write rather than being silently undone by it; a store that exists
+  but cannot be read fails the comparison outright rather than reading as absent, which would have
+  classed every key `add` and let the push through as a full replace; and a candidate key the
+  comparison does not place in any of its three sets is refused rather than sent unexamined. Before
+  sending anything, `push` prints a per-key plan (`add` / `keep (same)` / `overwrite` /
+  `differs — refused` / `drop`) — the same shape `--dry-run` prints, only followed by the actual send.
+  This is a CLI command's own default changing, not a change to generated project code, so there is no
+  migration note.
 
 ## 0.12.0
 

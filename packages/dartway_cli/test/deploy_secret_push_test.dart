@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dartway_cli/src/commands/secret_commands.dart';
 import 'package:dartway_cli/src/deploy/secret_store.dart';
+import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -367,6 +368,220 @@ void main() {
       );
       expect(result.code, 1);
       expect(File(store.file).existsSync(), isFalse);
+    });
+  });
+
+  group('an unreadable store (M1)', () {
+    test(
+      'refuses instead of treating every key as new — chmod 000 the store',
+      () async {
+        await store.setSecret(key: 'SMS_API_TOKEN', value: 'server-value');
+        final before = File(store.file).readAsStringSync();
+        final chmod = await Process.run('chmod', ['000', store.file]);
+        expect(chmod.exitCode, 0, reason: chmod.stderr.toString());
+        addTearDown(() => Process.runSync('chmod', ['600', store.file]));
+
+        final result = await _push(
+          stack: stack,
+          store: store,
+          section: {'SMS_API_TOKEN': 'a-new-value'},
+        );
+
+        expect(result.code, 1);
+        expect(result.err, contains('could not be compared'));
+        // Never claims the push happened.
+        expect(result.out, isNot(contains('Pushed')));
+        expect(result.out, isNot(contains('add: SMS_API_TOKEN')));
+        // The store itself was never touched — restore permissions to read
+        // it back and prove that.
+        await Process.run('chmod', ['600', store.file]);
+        expect(File(store.file).readAsStringSync(), before);
+      },
+    );
+  });
+
+  group('a key the plan does not classify (M2)', () {
+    test(
+      'is treated as refused, not silently sent as part of the section',
+      () async {
+        // A canned answer that never emits ADD/SAME/DIFFER for MYSTERY_KEY —
+        // standing in for a plan that (by a bug, or a future change to the
+        // script) failed to classify a candidate key at all.
+        final recording = RecordingSsh([
+          ('echo "ADD', const DwSshResult(exitCode: 0, stdout: '', stderr: '')),
+        ]);
+        final recordingStore = DwSecretStore(
+          ssh: recording,
+          target: stack.target,
+          directory: p.join(root.path, 'recording-store'),
+        );
+
+        final result = await _push(
+          stack: stack,
+          store: recordingStore,
+          section: {'MYSTERY_KEY': 'value'},
+        );
+
+        expect(result.code, 1);
+        expect(result.err, contains('MYSTERY_KEY'));
+        expect(result.err, contains('not classified'));
+        expect(
+          recording.issued.any(
+            (c) => c.contains('Written by "dartway deploy secret push"'),
+          ),
+          isFalse,
+          reason: 'an unclassified key must never reach a write',
+        );
+      },
+    );
+  });
+
+  group('a generated key — every path, not only --overwrite (M3)', () {
+    final minimalStack = stackVariants()['minimal']!;
+    late DwSecretStore minimalStore;
+
+    setUp(() {
+      minimalStore = DwSecretStore(
+        ssh: LocalShell(),
+        target: minimalStack.target,
+        directory: p.join(root.path, 'minimal-store-m3'),
+      );
+    });
+
+    Map<String, String> storedIn(DwSecretStore s) => File(s.file).existsSync()
+        ? DwSecretStore.parse(File(s.file).readAsStringSync())
+        : const {};
+
+    test(
+      '--prune alone does not drop it; naming it in --overwrite is also required',
+      () async {
+        await minimalStore.ensureDirectory();
+        await minimalStore.generateMissing(minimalStack.generatedSecrets);
+        final generatedPassword = storedIn(
+          minimalStore,
+        )[DwStack.databasePasswordKey]!;
+
+        // A section that simply does not mention the generated key at all —
+        // the shape a maintainer's deploy/secrets.yaml has when it never
+        // held the generated values to begin with.
+        final pruneOnly = await _push(
+          stack: minimalStack,
+          store: minimalStore,
+          section: const {},
+          prune: true,
+        );
+        expect(pruneOnly.code, 1);
+        expect(pruneOnly.err, contains(DwStack.databasePasswordKey));
+        expect(pruneOnly.err, contains('bound to the data'));
+        expect(
+          storedIn(minimalStore)[DwStack.databasePasswordKey],
+          generatedPassword,
+        );
+
+        final pruneAndNamed = await _push(
+          stack: minimalStack,
+          store: minimalStore,
+          section: const {},
+          prune: true,
+          overwrite: {DwStack.databasePasswordKey},
+        );
+        expect(pruneAndNamed.code, 0);
+        expect(
+          storedIn(minimalStore).containsKey(DwStack.databasePasswordKey),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      '--allow-emptying alone does not blank it; naming it in --overwrite is also required',
+      () async {
+        await minimalStore.ensureDirectory();
+        await minimalStore.generateMissing(minimalStack.generatedSecrets);
+        final generatedPassword = storedIn(
+          minimalStore,
+        )[DwStack.databasePasswordKey]!;
+
+        final emptyingOnly = await _push(
+          stack: minimalStack,
+          store: minimalStore,
+          section: {DwStack.databasePasswordKey: ''},
+          allowEmptying: true,
+        );
+        expect(emptyingOnly.code, 1);
+        expect(emptyingOnly.err, contains(DwStack.databasePasswordKey));
+        expect(emptyingOnly.err, contains('bound to the data'));
+        expect(
+          storedIn(minimalStore)[DwStack.databasePasswordKey],
+          generatedPassword,
+        );
+
+        final emptyingAndNamed = await _push(
+          stack: minimalStack,
+          store: minimalStore,
+          section: {DwStack.databasePasswordKey: ''},
+          allowEmptying: true,
+          overwrite: {DwStack.databasePasswordKey},
+        );
+        expect(emptyingAndNamed.code, 0);
+        expect(storedIn(minimalStore)[DwStack.databasePasswordKey], '');
+      },
+    );
+  });
+
+  group('the plan-then-write race (M4)', () {
+    test(
+      'a store that changed since it was planned refuses the write, not overwrites it',
+      () async {
+        await store.setSecret(key: 'SMS_API_TOKEN', value: 'original');
+
+        // The plan a push would have made from the store as it stood a
+        // moment ago.
+        final stalePlan = await store.plan({'SMS_API_TOKEN': 'original'});
+        expect(stalePlan.ok, isTrue, reason: stalePlan.error);
+
+        // Someone else's push (or a hand edit) lands in between.
+        await store.setSecret(key: 'SMS_API_TOKEN', value: 'concurrent');
+
+        final written = await store.writeAll({
+          'SMS_API_TOKEN': 'original',
+        }, expectedFingerprint: stalePlan.fingerprint);
+
+        expect(written.ok, isFalse);
+        expect(written.stderr, contains('changed'));
+        expect(stored()['SMS_API_TOKEN'], 'concurrent');
+      },
+    );
+
+    test('a fingerprint that still matches writes normally', () async {
+      await store.setSecret(key: 'SMS_API_TOKEN', value: 'original');
+      final freshPlan = await store.plan({'SMS_API_TOKEN': 'original'});
+      expect(freshPlan.ok, isTrue, reason: freshPlan.error);
+
+      final written = await store.writeAll({
+        'SMS_API_TOKEN': 'updated',
+      }, expectedFingerprint: freshPlan.fingerprint);
+
+      expect(written.ok, isTrue, reason: written.stderr);
+      expect(stored()['SMS_API_TOKEN'], 'updated');
+    });
+  });
+
+  group('--dry-run with a refusal (L2)', () {
+    test('prints the plan with the refusal and sends nothing', () async {
+      await store.setSecret(key: 'SMS_API_TOKEN', value: 'server-value');
+
+      final result = await _push(
+        stack: stack,
+        store: store,
+        section: {'SMS_API_TOKEN': 'local-value'},
+        dryRun: true,
+      );
+
+      expect(result.code, 1);
+      expect(result.out, contains('differs — refused: SMS_API_TOKEN'));
+      expect(result.err, contains('SMS_API_TOKEN'));
+      expect(stored()['SMS_API_TOKEN'], 'server-value');
     });
   });
 }

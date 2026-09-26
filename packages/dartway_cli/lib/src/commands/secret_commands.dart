@@ -557,11 +557,14 @@ class SecretPushCommand extends _SecretCommandBase {
 /// Default: add what the server lacks or holds empty, keep what already
 /// matches, refuse the whole push — nothing sent — when a value differs from
 /// what the server holds, naming every such key. [overwrite] names the keys
-/// that refusal should not apply to; a key generated on the server
-/// ([DwStack.generatedSecrets]) is bound to the data already there and is
-/// refused just the same unless named. [allowEmptying] is the older, separate
-/// guard against replacing a value the server has with an empty one — it is
-/// unaffected by [overwrite].
+/// that refusal should not apply to. A key generated on the server
+/// ([DwStack.generatedSecrets]) is bound to the data already there on every
+/// path that touches it — replacing it, [prune]-dropping it, or
+/// [allowEmptying]-blanking it all need it named in [overwrite] too, on top
+/// of whichever of those flags would otherwise be enough on its own for an
+/// ordinary key. Writing is guarded by the fingerprint [DwSecretStore.plan]
+/// read the store at, so a push refuses rather than overwrite a store that
+/// changed underneath it between the two calls.
 Future<int> runSecretPush({
   required DwStack stack,
   required DwSecretStore store,
@@ -609,6 +612,7 @@ Future<int> runSecretPush({
   final orphaned = remote.ok
       ? (remote.names.difference(section.keys.toSet()).toList()..sort())
       : const <String>[];
+  final generatedKeys = stack.generatedSecrets.keys.toSet();
 
   // Sorted once so every list below reads the same way run to run.
   final keys = section.keys.toList()..sort();
@@ -616,6 +620,7 @@ Future<int> runSecretPush({
   final kept = <String>[];
   final overwritten = <String>[];
   final refused = <String>[];
+  final dropBlocked = <String>[];
   final refusalNotes = <String>[];
 
   for (final key in keys) {
@@ -628,15 +633,27 @@ Future<int> runSecretPush({
       // The server holds a different, non-empty value. Blanking it (the
       // local value is empty) stays behind the older --allow-emptying flag;
       // replacing it with another non-empty value needs the key named in
-      // --overwrite — that is the gap this function exists to close.
+      // --overwrite — that is the gap this function exists to close. Either
+      // way, a generated key needs naming in --overwrite too: it is bound
+      // to the data already on the server on every path that touches it,
+      // not only this one.
       final wouldEmpty = localValue.isEmpty;
-      final generated = stack.generatedSecrets.containsKey(key);
-      final unlocked = wouldEmpty ? allowEmptying : overwrite.contains(key);
+      final generated = generatedKeys.contains(key);
+      final named = overwrite.contains(key);
+      final unlocked = generated
+          ? (wouldEmpty ? (allowEmptying && named) : named)
+          : (wouldEmpty ? allowEmptying : named);
       if (unlocked) {
         overwritten.add(key);
       } else {
         refused.add(key);
-        if (wouldEmpty) {
+        if (wouldEmpty && generated) {
+          refusalNotes.add(
+            '$key is generated and bound to the data already on the '
+            'server — blanking it needs --allow-emptying and naming it in '
+            '--overwrite.',
+          );
+        } else if (wouldEmpty) {
           refusalNotes.add('$key would be blanked — pass --allow-emptying.');
         } else if (generated) {
           refusalNotes.add(
@@ -650,6 +667,37 @@ Future<int> runSecretPush({
           );
         }
       }
+    } else {
+      // The plan's three sets should cover every candidate key. One that
+      // shows up in none of them is not "nothing to do" — it is
+      // unclassified, and unclassified is refused, never sent unexamined as
+      // part of `section`.
+      refused.add(key);
+      refusalNotes.add(
+        "$key was not classified by the server's comparison — refusing "
+        'rather than sending it unexamined.',
+      );
+    }
+  }
+
+  // Keys the server has and the file does not: normally cleared by --prune;
+  // a generated one needs naming in --overwrite too, the same rule that
+  // guards it everywhere else.
+  for (final key in orphaned) {
+    final generated = generatedKeys.contains(key);
+    final clearedToDrop = generated
+        ? (prune && overwrite.contains(key))
+        : prune;
+    if (!clearedToDrop) {
+      dropBlocked.add(key);
+      refusalNotes.add(
+        generated
+            ? '$key is generated and bound to the data already on the '
+                  'server — dropping it needs --prune and naming it in '
+                  '--overwrite.'
+            : '$key exists on the server and not locally — pass --prune to '
+                  'drop it, or add it locally with "dartway secret pull".',
+      );
     }
   }
 
@@ -665,21 +713,8 @@ Future<int> runSecretPush({
   }
   if (orphaned.isNotEmpty) stdout.writeln('  drop: ${orphaned.join(', ')}');
 
-  if (orphaned.isNotEmpty && !prune) {
-    stderr.writeln(
-      'Refusing to push: the server holds keys this file does not — '
-      '${orphaned.join(', ')}.\n'
-      'Add them locally ("dartway secret pull"), or pass --prune to '
-      'drop them.',
-    );
-    return 1;
-  }
-
-  if (refused.isNotEmpty) {
-    stderr.writeln(
-      'Refusing to push: ${refused.length} value(s) differ from the server. '
-      'Nothing was sent.',
-    );
+  if (refused.isNotEmpty || dropBlocked.isNotEmpty) {
+    stderr.writeln('Refusing to push: nothing was sent.');
     for (final note in refusalNotes) {
       stderr.writeln('  - $note');
     }
@@ -701,7 +736,14 @@ Future<int> runSecretPush({
     return 0;
   }
 
-  final written = await store.writeAll(section);
+  // Guarded by the fingerprint `plan` read the store at: if another push (or
+  // a hand edit) landed in between, this refuses rather than overwrite
+  // whatever that was on the strength of a decision made against older
+  // information.
+  final written = await store.writeAll(
+    section,
+    expectedFingerprint: plan.fingerprint,
+  );
   if (!written.ok) {
     stderr.writeln('Push failed: ${written.firstLine}');
     return 1;

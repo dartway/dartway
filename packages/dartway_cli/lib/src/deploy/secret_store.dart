@@ -251,7 +251,21 @@ chmod 600 "\$file"
   }
 
   /// Replaces the whole store with [values]. Used by `secret push`.
-  Future<DwSshResult> writeAll(Map<String, String> values) {
+  ///
+  /// [expectedFingerprint], when given, must equal the store's current
+  /// `cksum` (`'absent'` for no store) right before anything is written; a
+  /// mismatch — the store changed since it was read — writes nothing and
+  /// fails instead. This is [DwSecretPushPlan.fingerprint], and it is what
+  /// closes the gap between planning a push and sending it: two calls, not
+  /// one transaction, and a second push (or a hand edit) landing in between
+  /// would otherwise be silently undone by a decision made against what the
+  /// store used to hold. Omitted, this writes unconditionally, as it always
+  /// did — callers other than `secret push` that replace the store outright
+  /// have no earlier read to hold it to.
+  Future<DwSshResult> writeAll(
+    Map<String, String> values, {
+    String? expectedFingerprint,
+  }) {
     final buffer = StringBuffer()
       ..writeln('# Written by "dartway deploy secret push".')
       ..writeln(
@@ -261,10 +275,24 @@ chmod 600 "\$file"
     for (final entry in values.entries) {
       buffer.writeln(encodeLine(entry.key, entry.value));
     }
+    final guard = expectedFingerprint == null
+        ? ''
+        : '''
+if [ -f '$file' ]; then
+  current=\$(cksum < '$file')
+else
+  current='absent'
+fi
+if [ "\$current" != '$expectedFingerprint' ]; then
+  echo 'the store changed since it was last read; nothing was written' >&2
+  exit 1
+fi
+''';
     return ssh.runAsWithInput(target.deployUser, '''
 set -e
 umask 077
 install -d -m 0700 '$directory'
+$guard
 staged=\$(mktemp)
 cat > "\$staged"
 test -s "\$staged"
@@ -275,13 +303,18 @@ chmod 600 '$file'
 
   /// Compares [candidate] to what the store already holds, key by key,
   /// without moving a value off the server: the comparison itself runs
-  /// there, over the candidate's own encoded lines sent on stdin, and only
-  /// three sets of names come back.
+  /// there, over the candidate's own encoded lines sent on stdin (read
+  /// directly, never staged in a file of their own), and only three sets of
+  /// names — plus a fingerprint of the store as read — come back.
   ///
   /// What `secret push` plans its default from: [DwSecretPushPlan.add] is
   /// what the server lacks or holds empty, [DwSecretPushPlan.same] already
   /// matches, and [DwSecretPushPlan.differ] is what a caller must decide
   /// about (`--overwrite`) rather than have replaced silently.
+  /// [DwSecretPushPlan.ok] is false, and nothing is classified, when the
+  /// store exists but could not be read (permissions, most likely) — an
+  /// unreadable store must never be mistaken for an absent one, which would
+  /// class every key `add` and let a push replace it outright.
   Future<DwSecretPushPlan> plan(Map<String, String> candidate) async {
     final buffer = StringBuffer();
     for (final entry in candidate.entries) {
@@ -289,15 +322,24 @@ chmod 600 '$file'
     }
     final result = await ssh.runAsWithInput(target.deployUser, '''
 set -e
-file='$file'
-staged=\$(mktemp)
-trap 'rm -f "\$staged"' EXIT
-cat > "\$staged"
+if [ -f '$file' ]; then
+  # Read (and fingerprinted) before anything is classified against it: a
+  # read failure discovered midway through the loop below would otherwise
+  # leave whatever it had already printed on stdout looking like a
+  # complete, successful plan, and grep failing on one key for the same
+  # reason would look exactly like that key simply not being in the store.
+  fingerprint=\$(cksum < '$file')
+else
+  fingerprint='absent'
+fi
+echo "FINGERPRINT \$fingerprint"
 while IFS= read -r line || [ -n "\$line" ]; do
   key=\${line%%=*}
   [ -n "\$key" ] || continue
-  if [ -f "\$file" ]; then
-    existing=\$(grep "^\$key=" "\$file" || true)
+  if [ -f '$file' ]; then
+    # grep answers 1 for "no such line", which is not a failure here; 2 is,
+    # and must not be read as the key simply being absent.
+    existing=\$(grep "^\$key=" '$file' || [ \$? -eq 1 ])
   else
     existing=''
   fi
@@ -306,7 +348,7 @@ while IFS= read -r line || [ -n "\$line" ]; do
     "\$line") echo "SAME \$key" ;;
     *) echo "DIFFER \$key" ;;
   esac
-done < "\$staged"
+done
 ''', buffer.toString());
 
     if (!result.ok) {
@@ -315,26 +357,30 @@ done < "\$staged"
         add: const {},
         same: const {},
         differ: const {},
+        fingerprint: '',
         error: result.firstLine,
       );
     }
     final add = <String>{};
     final same = <String>{};
     final differ = <String>{};
+    var fingerprint = '';
     for (final raw in result.stdout.split('\n')) {
       final line = raw.trim();
       if (line.isEmpty) continue;
       final space = line.indexOf(' ');
       if (space < 0) continue;
       final tag = line.substring(0, space);
-      final key = line.substring(space + 1);
+      final rest = line.substring(space + 1);
       switch (tag) {
         case 'ADD':
-          add.add(key);
+          add.add(rest);
         case 'SAME':
-          same.add(key);
+          same.add(rest);
         case 'DIFFER':
-          differ.add(key);
+          differ.add(rest);
+        case 'FINGERPRINT':
+          fingerprint = rest;
       }
     }
     return DwSecretPushPlan(
@@ -342,6 +388,7 @@ done < "\$staged"
       add: add,
       same: same,
       differ: differ,
+      fingerprint: fingerprint,
       error: '',
     );
   }
@@ -496,6 +543,7 @@ class DwSecretPushPlan {
     required this.add,
     required this.same,
     required this.differ,
+    required this.fingerprint,
     required this.error,
   });
 
@@ -509,6 +557,13 @@ class DwSecretPushPlan {
 
   /// The server holds a different, non-empty value.
   final Set<String> differ;
+
+  /// A fingerprint (`cksum`) of the store exactly as it was when this plan
+  /// read it — `'absent'` when there was no store yet. Meant for
+  /// [DwSecretStore.writeAll]'s `expectedFingerprint`: passed back there, it
+  /// refuses to write over a store that no longer matches it, closing the
+  /// gap between planning a push and sending it. Empty when [ok] is false.
+  final String fingerprint;
 
   final String error;
 }

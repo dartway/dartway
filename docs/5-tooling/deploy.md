@@ -427,11 +427,20 @@ own database on the next `run`.
 
 `--overwrite KEY[,KEY…]` replaces exactly those named keys on purpose — there is no
 `--overwrite-all`, since naming the key is the point. A key `dartway secret list` marks `generated`
-is refused the same way even under a general intent to overwrite; it must be named in `--overwrite`
-too, precisely because it is the kind of value a swap breaks the server over. `push` refuses before
+is bound to the data already on the server on every path that touches it, not only a replace: naming
+it in `--overwrite` is required for `--prune` to drop it or `--allow-emptying` to blank it too, on top
+of whichever of those two flags would otherwise be enough on its own for an ordinary key — it is the
+kind of value a swap, a drop or a blank all break the server over the same way. `push` refuses before
 sending anything when a value cannot be stored at all, and keeps its two older guards against losing
 information, each behind its own flag: `--prune` allows dropping keys the server has and the file
 does not (usually the file is behind, not the server holding junk), and `--allow-emptying` allows
-blanking a value the server has — unaffected by `--overwrite`. Before sending anything, `push` prints
-a per-key plan — `add`, `keep (same)`, `overwrite`, `differs — refused`,
-`drop` — the same shape `--dry-run` prints, which sends nothing. `pull` takes `--dry-run` too.
+blanking a value the server has — unaffected by `--overwrite` for an ordinary key. Before sending
+anything, `push` prints a per-key plan — `add`, `keep (same)`, `overwrite`, `differs — refused`,
+`drop` — the same shape `--dry-run` prints, which sends nothing.
+
+The comparison behind that plan runs on the server itself, over the local values sent on stdin — only
+key names and a checksum of the store travel back, never a value, the same rule the store keeps
+everywhere else. That checksum is checked again right before `push` writes, so a second push, or a
+hand edit, landing in between the two is refused rather than silently undone; and a store that exists
+but cannot be read fails the comparison outright, rather than being read as an absent one that every
+key would then look new against. `pull` takes `--dry-run` too.
