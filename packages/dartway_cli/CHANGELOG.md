@@ -33,6 +33,19 @@
   serve every real file as a 404 from then on. Passes once the expected volume exists, whatever else
   is still on the server beside it: an old volume from before the change is the rollback copy, and
   neither command asks for it to be removed before passing.
+- **`deploy setup` no longer fails the "Deployment user" step when a group named like `deploy_user`
+  already exists** (#328). DigitalOcean's Ubuntu 24.04 image ships an empty system group `admin`
+  (no user); the plain `adduser` setup ran refuses to create a same-named group over it. Setup now
+  reuses the existing group with `--ingroup`, unless the group is one a sudoers rule already grants
+  privileges to (`%admin` on Ubuntu's stock sudoers; `%sudo` on both Debian's and Ubuntu's) —
+  joining one of those would hand the "unprivileged" deploy user a path to root, so setup refuses
+  instead and asks for a `deploy_user` that does not collide with it. This guard alone does not fix
+  a config that sets `deploy_user: admin` explicitly on such a host — that still refuses, by design.
+- **`deploy_user` is optional in `deploy/config.yaml`, defaulting to `dw_admin`** (#328). This is
+  what actually closes #328: a name an operator picks can collide with a group a cloud image already
+  ships (the `admin` case above); a fixed default under the `dw_` prefix does not, on any stock
+  image or package, so an operator who leaves `deploy_user` unset never meets the collision. Additive:
+  a config that already names `deploy_user` is unaffected.
 
 ## 0.12.0
 
