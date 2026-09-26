@@ -1,6 +1,6 @@
 name: dartway_core_flutter
 description: "The Flutter skeleton of a DartWay app: bootstrap runner, guarded UI actions, the AsyncValue rendering contract, notifications and error reporting. Riverpod-native."
-version: 0.21.0-dev.6
+version: 0.21.0-dev.7
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -16,9 +16,9 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_client: ^0.21.0-dev.6
-  dartway_core_shared: ^0.21.0-dev.6
-  dartway_router: ^2.0.0
+  dartway_client: ^0.21.0-dev.7
+  dartway_core_shared: ^0.21.0-dev.7
+  dartway_router: ^3.0.0
   flutter_riverpod: ^3.0.0
   intl: ^0.20.2
   skeletonizer: ^2.1.0
