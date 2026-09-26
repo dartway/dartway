@@ -31,7 +31,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test",
+    "test": "node --test \"test/**/*.test.ts\"",
     "check": "npm run typecheck && npm test && npm run build"
   },
   "peerDependencies": {
@@ -50,7 +50,7 @@
     "vue": "^3.5.0"
   },
   "engines": {
-    "node": ">=22.6"
+    "node": ">=22.18.0"
   },
   "publishConfig": {
     "access": "public"

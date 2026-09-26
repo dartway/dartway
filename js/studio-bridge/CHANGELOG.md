@@ -20,7 +20,17 @@ rather than through a browser channel.
 `tool/checks.sh` and the `checks.yml` workflow discovered only `pubspec.yaml`;
 `npm test` had never executed in CI, so a regression here — including the one
 above — could reach `master` green. Both now run `npm ci && npm run check`
-(typecheck, `node --test`, build) for every `js/*` package.
+(typecheck, `node --test`, build) for every `js/*` package, gated on Node
+being at least the floor below.
+
+**The Node floor is 22.18.0, not 22.6 (`engines.node`).** That is the version
+Node's `.ts` type stripping became unflagged — below it, `node --test`'s
+default file discovery matches no `.ts` file at all and exits 0 having run
+nothing, which looks exactly like a passing suite. `npm test` now names its
+files with an explicit glob so a Node that cannot strip them fails loudly
+instead, and `tool/checks.sh` refuses to run this package below the floor
+named in this `engines.node` (and separately fails if `npm run check` ever
+again exits 0 having run zero tests, for any other reason).
 
 **The README no longer claims `npm install @dartway/studio-bridge` works.**
 This package has never been published to npm; see "Not yet on npm" in the
