@@ -354,8 +354,9 @@ class DwAppRouter<RouterState extends Listenable> {
           'single registry for the whole app and resolves routes by name, so a '
           'name may be declared once and only once. An enum gives its values a '
           'namespace of their own; the router does not. Rename one of the '
-          'two — for a .simple route the name is also its URL segment, so '
-          'the path moves with it.',
+          'two — for a .simple route, set extraPathSegment on it first if the '
+          'URL must stay the same: the new name changes nothing about the '
+          'path once extraPathSegment names it instead.',
     );
 
     // Check for duplicate route paths

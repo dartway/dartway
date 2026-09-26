@@ -88,14 +88,30 @@ void main() {
         expect(descriptor.pathSegment('profile'), 'profile');
       });
 
-      test('should create simple descriptor with extraPathSegment', () {
+      test(
+          'should create simple descriptor with extraPathSegment replacing '
+          'the route name, not prefixing it', () {
         final descriptor = DwNavigationRouteDescriptor.simple(
           pageWidget: const ProfilePage(),
           extraPathSegment: 'users',
         );
 
         expect(descriptor.extraPathSegment, 'users');
-        expect(descriptor.pathSegment('profile'), 'users/profile');
+        // Not 'users/profile': the enum name never appears in the path when
+        // extraPathSegment is set (issue #314 — it used to double up).
+        expect(descriptor.pathSegment('profile'), 'users');
+      });
+
+      test(
+          'an empty extraPathSegment is refused rather than silently '
+          'building a vanishing path segment', () {
+        expect(
+          () => DwNavigationRouteDescriptor.simple(
+            pageWidget: const ProfilePage(),
+            extraPathSegment: '',
+          ),
+          throwsA(isA<AssertionError>()),
+        );
       });
     });
 
@@ -125,6 +141,19 @@ void main() {
         expect(descriptor.extraPathSegment, 'users');
         expect(descriptor.pathSegment('detail'), 'users/:userId');
       });
+
+      test('an empty extraPathSegment is refused here too', () {
+        final parent = TestRoutes.home;
+        expect(
+          () => DwNavigationRouteDescriptor.parameterized(
+            pageWidget: const ProfilePage(),
+            parameter: TestParams.userId,
+            parent: parent,
+            extraPathSegment: '',
+          ),
+          throwsA(isA<AssertionError>()),
+        );
+      });
     });
 
     group('pathSegment', () {
@@ -140,6 +169,16 @@ void main() {
           pageWidget: const ProfilePage(),
         );
         expect(descriptor.pathSegment('profile'), 'profile');
+      });
+
+      test(
+          'simple with extraPathSegment should return it in place of the '
+          'route name (issue #314: not "extra/profile")', () {
+        final descriptor = DwNavigationRouteDescriptor.simple(
+          pageWidget: const ProfilePage(),
+          extraPathSegment: 'edit',
+        );
+        expect(descriptor.pathSegment('editProfile'), 'edit');
       });
 
       test('parameterized should return parameter name with colon', () {

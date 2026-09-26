@@ -44,7 +44,13 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
     required this.pageWidget,
     this.parent,
     this.extraPathSegment,
-  });
+  }) : assert(
+          extraPathSegment == null || extraPathSegment != '',
+          'extraPathSegment must not be the empty string — omit it (leave it '
+          'null) instead. An empty segment used to build a path segment that '
+          'silently disappears (e.g. "/profile/" instead of "/profile/x"), '
+          'invisible to the duplicate-path check.',
+        );
 
   /// The page widget to display when this route is active.
   ///
@@ -60,13 +66,24 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
   /// Set to `null` for root routes (routes at the top level of a zone).
   final DwNavigationRoute<RouterState>? parent;
 
-  /// Optional static path segment placed before the core path segment.
+  /// Optional override of the URL segment this route contributes.
   ///
-  /// This allows you to add a static prefix to a route's path. For example,
-  /// if you want a route to be at `/users/:userId` instead of just `/:userId`,
-  /// you can set `extraPathSegment: 'users'`.
+  /// The meaning depends on the descriptor:
+  ///
+  /// - **Parameterized** routes have no name of their own in the path — the
+  ///   segment is always the parameter pattern (`:userId`) — so
+  ///   [extraPathSegment] is a static *prefix* placed before it. Set it if
+  ///   you want a route at `/users/:userId` instead of just `/:userId`.
+  /// - **Simple** routes contribute their enum name by default. Because route
+  ///   names are a single global namespace (`DwAppRouter` resolves every
+  ///   route by name across all zones), the name is often not a name you'd
+  ///   want two different pages to fight over as a URL, or that reads well
+  ///   in one. [extraPathSegment] *replaces* the enum name with the given
+  ///   segment, decoupling the two: a route named `editProfile` can live at
+  ///   `/profile/edit`.
   ///
   /// Not allowed for zone root routes (they always have an empty path).
+  /// Must not be the empty string when set — asserted in debug mode.
   ///
   /// Example:
   /// ```dart
@@ -75,6 +92,12 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
   ///   parameter: AppParams.userId,
   ///   parent: home,
   ///   extraPathSegment: 'users', // Results in path: 'users/:userId'
+  /// )
+  ///
+  /// DwNavigationRouteDescriptor.simple(
+  ///   pageWidget: EditProfilePage(),
+  ///   parent: profile,
+  ///   extraPathSegment: 'edit', // Results in path: 'edit', not 'edit/editProfile'
   /// )
   /// ```
   final String? extraPathSegment;
@@ -85,19 +108,23 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
   /// the path segment that this route contributes to the URL. The actual
   /// implementation depends on the route type:
   /// - Zone root: returns empty string
-  /// - Simple: returns route name (or with extraPathSegment)
-  /// - Parameterized: returns parameter pattern (e.g., ':userId')
+  /// - Simple: returns route name, or [extraPathSegment] in its place
+  /// - Parameterized: returns parameter pattern (e.g., ':userId'), or
+  ///   [extraPathSegment] followed by it
   ///
   /// [routeName] - The name of the route (from the enum)
   String pathSegment(String routeName);
 
-  /// Helper method to combine [extraPathSegment] with the core segment.
+  /// Helper method to place [extraPathSegment] before [coreSegment].
   ///
   /// If [extraPathSegment] is provided, returns `'$extraPathSegment/$coreSegment'`.
   /// Otherwise, returns [coreSegment] as-is.
   ///
-  /// This is used internally by simple and parameterized route descriptors
-  /// to build their path segments.
+  /// This is used internally by the parameterized route descriptor, whose
+  /// core segment is the parameter pattern rather than a name — prefixing it
+  /// cannot double up with anything. The simple route descriptor does not use
+  /// this: its core segment already *is* the name [extraPathSegment] exists
+  /// to replace, so prefixing there would repeat it (`edit/editProfile`).
   @protected
   String buildPathSegment(String coreSegment) {
     if (extraPathSegment == null) return coreSegment;
@@ -130,7 +157,8 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
   /// Creates a simple route descriptor without parameters.
   ///
   /// Simple routes contribute their enum name as the path segment. They can
-  /// optionally have a parent route (for nesting) and an extraPathSegment.
+  /// optionally have a parent route (for nesting) and an [extraPathSegment]
+  /// that replaces the enum name in the URL.
   ///
   /// Example:
   /// ```dart
@@ -150,6 +178,23 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
   /// ```
   ///
   /// This creates a route accessible at `/settings` (relative to parent).
+  ///
+  /// With extraPathSegment:
+  /// ```dart
+  /// editProfile(
+  ///   DwNavigationRouteDescriptor.simple(
+  ///     pageWidget: EditProfilePage(),
+  ///     parent: profile,
+  ///     extraPathSegment: 'edit',
+  ///   ),
+  /// )
+  /// ```
+  ///
+  /// This creates a route accessible at `/profile/edit` — not
+  /// `/profile/edit/editProfile`. Route names are a single namespace shared
+  /// by every zone (`DwAppRouter` resolves routes by name across all of
+  /// them), so [extraPathSegment] gives the URL a segment of its own instead
+  /// of forcing every page to share the enum's name.
   const factory DwNavigationRouteDescriptor.simple({
     required Widget pageWidget,
     DwNavigationRoute<RouterState>? parent,
@@ -223,8 +268,16 @@ class _ZoneRootRouteDescriptor<RouterState extends Listenable>
 
 /// Internal implementation of simple route descriptor.
 ///
-/// Simple routes contribute their enum name as the path segment, optionally
-/// prefixed with an extraPathSegment.
+/// Simple routes contribute their enum name as the path segment, or
+/// [DwNavigationRouteDescriptor.extraPathSegment] in its place when set.
+///
+/// This does not go through [DwNavigationRouteDescriptor.buildPathSegment]:
+/// that helper prefixes [DwNavigationRouteDescriptor.extraPathSegment] before
+/// its argument, which is right for the parameterized descriptor (whose core
+/// segment is the parameter pattern, not a name) but would double the route's
+/// name here, since [routeName] here *is* the name [extraPathSegment] exists
+/// to replace (`editProfile` + `extraPathSegment: 'edit'` must build `edit`,
+/// not `edit/editProfile`).
 class _SimpleRouteDescriptor<RouterState extends Listenable>
     extends DwNavigationRouteDescriptor<RouterState> {
   const _SimpleRouteDescriptor({
@@ -234,7 +287,7 @@ class _SimpleRouteDescriptor<RouterState extends Listenable>
   }) : super._();
 
   @override
-  String pathSegment(String routeName) => buildPathSegment(routeName);
+  String pathSegment(String routeName) => extraPathSegment ?? routeName;
 }
 
 // -----------------------------------------------------------------------------
