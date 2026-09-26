@@ -127,7 +127,10 @@ plugins: [DwSharedPreferences(), DwPush(transports: [DwRuStorePush(), DwFirebase
   arrive in the background, and a platform call that stays silent is reported by name. Do not read
   `dw.plugins.push.transport` or `.token` right after `dw.init()`, and do not wrap push calls in
   timeouts of your own.
-- Ask permission at a moment the user understands: `dw.plugins.push.requestPermission()`.
+- Ask permission at a moment the user understands: `dw.plugins.push.requestPermission()`. Handle
+  `DwPushPermission.unanswered` (the push service did not answer within `permissionDeadline`,
+  10 s by default): it is neither granted nor denied — do not persist a settings toggle as on
+  because of it, and offer the user a retry instead.
 - A settings toggle: `dw.plugins.push.pause()` / `resume()`, and `DwPush(isEnabled: ...)` reading
   the stored choice at start.
 - Route taps in one listener under `MaterialApp.builder`, by payload type first, link second:

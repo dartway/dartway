@@ -47,10 +47,17 @@ firebase_messaging waits for an APNs registration that the simulator never deliv
 does a device whose bundle id differs from `GoogleService-Info.plist` — and one of them awaited at
 start kept an app on its splash screen. A call still unanswered after
 `DwPush(reportUnansweredAfter:)` (ten seconds) is reported by name, `push: takeInitialOpen did not
-answer in 10000 ms`, and still waited for. Right after `dw.init()`, `push.transport` and
-`push.token` may therefore still be `null`; `requestPermission()` and `permission()` wait for the
-transport. A plugin whose start fails does not block the app (`blocksStartup` is false): the
-failure is reported, and `dw.plugins.maybeOf<DwPush>()` answers `null`.
+answer in 10000 ms`, and — within the background start itself — still waited for. Right after
+`dw.init()`, `push.transport` and `push.token` may therefore still be `null`; `requestPermission()`
+and `permission()` wait for the transport too, but only up to `DwPush(permissionDeadline:)` (ten
+seconds by default, separate from `reportUnansweredAfter` — lowering how soon a background call is
+*reported* must not, as a side effect, shorten how long these two wait on the user's behalf) — past
+that deadline they answer `DwPushPermission.unanswered`: the real state is unknown, not "nobody has
+asked" (`notDetermined` keeps only that meaning) and not a guess at granted or denied. `permission()`
+bounds the transport's own answer by the same deadline once attached; `requestPermission()`'s call to
+the platform is never bounded by it — it may be showing the user a system dialog, and their own time
+answering it is not silence. A plugin whose start fails does not block the app (`blocksStartup` is
+false): the failure is reported, and `dw.plugins.maybeOf<DwPush>()` answers `null`.
 
 The plugin reads everything it needs from the core it is initialized with — the client, its
 protocol, its session — and never the app's `dw`, which does not exist yet while the `plugins:`
@@ -82,6 +89,9 @@ final permission = await dw.plugins.push.requestPermission(); // registers the t
 
 A refusal is an answer, not an error. `DwPushPermission.permanentlyDenied` means only the system
 settings can change it. `dw.plugins.push.permission()` reads the state without asking.
+`DwPushPermission.unanswered` means neither: the push service did not answer within
+`permissionDeadline`, so the real state is unknown — do not treat it as granted or as denied, and
+do not persist a settings toggle as on the strength of it; offer the user a retry instead.
 
 A user who turns notifications off inside the app calls `dw.plugins.push.pause()`: the device's
 registration is removed and nothing is registered until `resume()`. The choice is the app's to
