@@ -35,7 +35,7 @@ reads it.
 |---|---|---|
 | `host` | yes | The server's address |
 | `ssh_user` | yes | Login for provisioning — root, or a user with passwordless sudo |
-| `deploy_user` | yes | The unprivileged user that owns the checkout and runs the stack |
+| `deploy_user` | no | The unprivileged user that owns the checkout and runs the stack; defaults to `dw_admin` |
 | `os` | yes | The server's operating system (`ubuntu`) |
 | `repo`, `branch` | yes | The repository the server checks out, and the branch it deploys |
 | `ssl_email` | yes | Where Let's Encrypt writes about expiring certificates |
@@ -67,7 +67,9 @@ A cloud image can already carry a system group named like `deploy_user` — Digi
 24.04 image ships an empty `admin` group, for instance (#328). Setup reuses that group when the
 user does not exist yet, unless the group is one Debian and Ubuntu's stock `/etc/sudoers` grants
 sudo to (`%admin`, `%sudo`): joining one of those would hand the "unprivileged" deploy user a path
-to root, so setup refuses instead and asks for a `deploy_user` that does not collide with it.
+to root, so setup refuses instead and asks for a `deploy_user` that does not collide with it. The
+default, `dw_admin`, is fixed rather than derived from the project for exactly this reason — no
+stock image or package ships a group under the `dw_` prefix.
 
 ## Three hosts, one server process
 

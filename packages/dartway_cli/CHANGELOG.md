@@ -40,6 +40,10 @@
   `/etc/sudoers` already grants sudo to (`%admin`, `%sudo`) — joining one of those would hand the
   "unprivileged" deploy user a path to root, so setup refuses instead and asks for a `deploy_user`
   that does not collide with it.
+- **`deploy_user` is optional in `deploy/config.yaml`, defaulting to `dw_admin`** (#328). A name an
+  operator picks can collide with a group a cloud image already ships (the `admin` case above); a
+  fixed default under the `dw_` prefix does not, on any stock image or package. Additive: a config
+  that already names `deploy_user` is unaffected.
 
 ## 0.12.0
 

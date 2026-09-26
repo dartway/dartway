@@ -68,7 +68,7 @@ local:
 #   # Everything afterwards runs as the deploy user, who owns the checkout.
 #   host: 203.0.113.10
 #   ssh_user: root
-#   deploy_user: your-project-admin
+#   # deploy_user: dw_admin  # default; set only to use a different name
 #   os: ubuntu
 #
 #   # The server mirrors this repository: a deploy resets the checkout to the
