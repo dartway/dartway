@@ -65,6 +65,8 @@ export {
   type StudioMessageChannel,
 } from './transport.ts';
 
+export { StudioHostPeer, type StudioHostPeerRefusal } from './host-peer.ts';
+
 export {
   attachStudioBridge,
   getStudioBridge,

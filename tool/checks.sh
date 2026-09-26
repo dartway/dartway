@@ -12,7 +12,8 @@
 #
 #   tool/checks.sh             analyze + test: needs no Docker
 #   tool/checks.sh analyze     dart analyze over every resolution root
-#   tool/checks.sh test        every suite that needs no services
+#   tool/checks.sh test        every suite that needs no services, plus every
+#                              `js/*` npm package (typecheck, node --test, build)
 #   tool/checks.sh services    the suites of the packages named in SERVICES,
 #                              against DW_DATABASE_* and DW_STORAGE_*
 #
@@ -215,6 +216,24 @@ test_suites() {
   done
 }
 
+# The JavaScript half of the monorepo: each `js/*` package is its own npm
+# project (no workspace, no shared `resolve`), checked by its own `npm run
+# check` — typecheck, `node --test`, and the build that would ship to npm.
+# There is exactly one today, `js/studio-bridge`; a second one under `js/`
+# with a `package.json` is picked up the same way a new Dart package with a
+# `pubspec.yaml` is by `packages()`.
+js_packages() {
+  find js -mindepth 2 -maxdepth 2 -name package.json \
+    | sed 's|/package.json$||' | sort
+}
+
+js_checks() {
+  echo "══ js"
+  for package in $(js_packages); do
+    run "$package (npm)" bash -c "cd '$package' && npm ci && npm run check"
+  done
+}
+
 # Stops the run, before anything is resolved or run, unless every variable the
 # suites read is set and both services answer on their ports. Forty suites each
 # failing in `setUpAll` say the same thing less clearly.
@@ -258,6 +277,7 @@ service_suites() {
 resolve
 [ "$MODE" = all ] || [ "$MODE" = analyze ] && analyze
 [ "$MODE" = all ] || [ "$MODE" = test ] && test_suites
+[ "$MODE" = all ] || [ "$MODE" = test ] && js_checks
 [ "$MODE" = services ] && service_suites
 
 echo

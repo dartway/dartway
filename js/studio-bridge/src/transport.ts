@@ -1,3 +1,4 @@
+import { StudioHostPeer } from './host-peer.ts';
 import {
   decodeStudioBridgeMessage,
   encodeStudioBridgeMessage,
@@ -28,11 +29,13 @@ export function isEmbeddedInStudioFrame(): boolean {
 /**
  * The app-side transport, or null when there is nothing to attach to.
  *
- * Origin note: the channel accepts the first valid bridge message from the
- * embedding window and pins that origin for its replies. There is no origin
- * allowlist — an embedding page can only drive what the bridge exposes, and
- * what it may drive at all is decided by the access token, not by the frame it
- * sits in.
+ * Origin note: the channel accepts only messages from the window that embeds
+ * it — the parent frame, checked by identity of the window object rather than
+ * by an origin string anybody can have — and pins its replies to the origin of
+ * the first accepted message. See {@link StudioHostPeer}. Beyond that there is
+ * no origin allowlist — an embedding page can only drive what the bridge
+ * exposes, and what it may drive at all is decided by the access token, not by
+ * the frame it sits in.
  */
 export function createStudioHostChannel(): StudioMessageChannel | null {
   if (!isEmbeddedInStudioFrame()) return null;
@@ -42,15 +45,16 @@ export function createStudioHostChannel(): StudioMessageChannel | null {
 class StudioHostWindowChannel implements StudioMessageChannel {
   #listeners = new Set<(message: StudioBridgeMessage) => void>();
 
-  /** Studio's origin once the first valid bridge message arrives; targeted
-   * replies go there instead of `*`. */
-  #peerOrigin: string | null = null;
+  /** Who this channel listens to and answers — see {@link StudioHostPeer}. */
+  #peer = new StudioHostPeer();
 
   #onWindowMessage = (event: MessageEvent): void => {
+    const fromParent = event.source === window.parent;
+    if (this.#peer.refuse({ fromParent, origin: event.origin }) !== null) return;
     if (typeof event.data !== 'string') return;
     const message = decodeStudioBridgeMessage(event.data);
     if (message === null) return;
-    this.#peerOrigin = event.origin;
+    this.#peer.accepted(event.origin);
     for (const listener of this.#listeners) listener(message);
   };
 
@@ -66,7 +70,7 @@ class StudioHostWindowChannel implements StudioMessageChannel {
   }
 
   send(message: StudioBridgeMessage): void {
-    window.parent.postMessage(encodeStudioBridgeMessage(message), this.#peerOrigin ?? '*');
+    window.parent.postMessage(encodeStudioBridgeMessage(message), this.#peer.origin ?? '*');
   }
 
   dispose(): void {

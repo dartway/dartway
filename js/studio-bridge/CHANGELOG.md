@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0
+
+**The app's side of the bridge knows which window is its peer.** It used to
+take the first window message that decoded and answer at whatever origin that
+message came from — with no check that it came from the frame embedding the
+app at all. A page in the same tab, or a preview this app embeds itself, could
+become the address between the token check and the manifest, and the manifest
+carries the passport of every screen. `StudioHostPeer` — exported, so an
+embedder can assert the same rules — now holds two of them: a message counts
+only when it comes from the parent window, by identity of the window object
+and never by an origin string anyone can claim; and the origin is pinned to
+the first accepted message, so a parent that navigates elsewhere ends the
+session instead of moving it. The twin of `StudioHostPeer` in
+`dartway_studio_bridge` 0.10.0, kept as a plain class so it is tested directly
+rather than through a browser channel.
+
+**This package's own tests now run somewhere other than a laptop.**
+`tool/checks.sh` and the `checks.yml` workflow discovered only `pubspec.yaml`;
+`npm test` had never executed in CI, so a regression here — including the one
+above — could reach `master` green. Both now run `npm ci && npm run check`
+(typecheck, `node --test`, build) for every `js/*` package.
+
+**The README no longer claims `npm install @dartway/studio-bridge` works.**
+This package has never been published to npm; see "Not yet on npm" in the
+README for how to consume it from the framework repository until it is
+(dartway/dartway#329).
+
 ## 0.3.0
 
 **`studioBridgeEnvelopeVersion(data)` — a protocol version mismatch stops
