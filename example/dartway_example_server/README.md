@@ -28,12 +28,12 @@ a **public** one, whose objects anyone reads by URL (the avatar), and a
 new rule in `lib/src/example_files.dart` and nothing else.
 
 Without `DW_STORAGE_ENDPOINT` the server runs without uploads. For development,
-a local MinIO:
+a local RustFS:
 
 ```bash
-docker run -d --name club-minio -p 127.0.0.1:9000:9000 \
-  -e MINIO_ROOT_USER=club -e MINIO_ROOT_PASSWORD=club-secret \
-  quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+docker run -d --name club-storage -p 127.0.0.1:9000:9000 \
+  -e RUSTFS_ACCESS_KEY=club -e RUSTFS_SECRET_KEY=club-secret \
+  rustfs/rustfs:1.0.0 /data
 
 export DW_STORAGE_ENDPOINT=http://127.0.0.1:9000 \
        DW_STORAGE_ACCESS_KEY=club DW_STORAGE_SECRET_KEY=club-secret \
@@ -54,11 +54,12 @@ dart run bin/server.dart
 `DW_STORAGE_PROVISION=true` creates both buckets before the server starts and
 sets their access — anonymous `s3:GetObject` on the public one, no policy on
 the private one — idempotently. Use it only on a storage the project owns
-wholly; `dartway deploy` with `storage: minio` does the same in `minio-init`.
+wholly; `dartway deploy` with `storage: bundled` does the same in
+`storage-init`.
 
 As it starts, the server writes a probe object into each bucket and reads it
 back without credentials: the public one must answer, the private one must
 refuse, and neither may list its keys. Anything else stops the start with the
 reason. `DW_STORAGE_VERIFY_BUCKETS=false` skips the check where storage is not
-reachable while the server starts (the deploy's MinIO, checked from outside
-afterwards).
+reachable while the server starts (the deploy's bundled storage, checked from
+outside afterwards).

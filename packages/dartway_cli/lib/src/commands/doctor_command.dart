@@ -229,7 +229,7 @@ class DoctorCommand extends Command<int> {
         'not found on PATH',
         fix:
             'Install Docker Desktop — https://docs.docker.com/get-docker/ '
-            '(Postgres and MinIO run in it, for development and for '
+            '(Postgres and the storage run in it, for development and for '
             '`dartway test`; there is no second path)',
       );
     }

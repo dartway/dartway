@@ -25,7 +25,7 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 ///   `PATH_STYLE`, `VERIFY_BUCKETS`. Without `DW_STORAGE_ENDPOINT` the server
 ///   runs without uploads;
 /// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
-///   before starting (`DwFileStorageSetup.provision`): for a development MinIO
+///   before starting (`DwFileStorageSetup.provision`): for a development storage
 ///   the project owns, never for a storage somebody else administers;
 /// - `DW_ALLOWED_ORIGINS` — browser origins, besides the one the live socket
 ///   is served on, that may open it: comma-separated full origins

@@ -101,7 +101,7 @@ No agent at hand? Every command is in the created project's `README.md`, and the
 | [`example/`](example/) | A complete application on DartWay — a fitness club with a schedule, services, bookings with capacity rules, a staff-only chat, news and an admin panel. **Read it; do not inherit it** |
 | [`docs/`](docs/) | The documentation, kept beside the code it describes |
 | [`toolkit/`](toolkit/) | The AI toolkit installed into your project's `.claude/`: the conventions and the skills that let an agent write features without tearing the project apart |
-| [`tool/`](tool/) | The repository's own checks and release tooling — `tool/checks.sh` is the CI gate: it analyzes every package and runs their suites (`services` for the ones needing a Postgres and a MinIO) |
+| [`tool/`](tool/) | The repository's own checks and release tooling — `tool/checks.sh` is the CI gate: it analyzes every package and runs their suites (`services` for the ones needing a Postgres and a storage) |
 
 ## The packages
 

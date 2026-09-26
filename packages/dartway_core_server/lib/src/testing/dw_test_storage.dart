@@ -20,7 +20,7 @@ final class DwTestStorage {
   DwTestStorage._(this.config, this._store);
 
   /// Both buckets, the public one served from itself on the storage
-  /// (path-style, as a development MinIO serves it), with the bucket check
+  /// (path-style, as a development RustFS serves it), with the bucket check
   /// on: a server started on it verifies them as in production.
   final DwFileStorageConfig config;
 

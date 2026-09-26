@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 
 import '../deploy/compose_files.dart';
-import '../deploy/deploy_target.dart';
+import '../deploy/data_volumes.dart';
 import '../deploy/renderer.dart';
 import '../deploy/secret_store.dart';
 import '../deploy/ssh_runner.dart';
@@ -14,16 +14,26 @@ import '../deploy/stack.dart';
 /// Idempotent throughout: every step either finds what it needs or creates it,
 /// and none replaces a value that already exists. Running it against a live
 /// server is the supported way to pick up a change to the rendered files.
-Future<int> runSetup(DwStack stack, ArgResults results) async {
+///
+/// [connection] is a real connection to [stack.target.host] unless given —
+/// tests pass a fake so the whole function runs against recorded answers,
+/// never a real `ssh` binary.
+Future<int> runSetup(
+  DwStack stack,
+  ArgResults results, {
+  DwSshRunner? connection,
+}) async {
   final projectRoot = Directory.current;
   final target = stack.target;
   final environment = target.environment;
 
-  final ssh = DwSshRunner(
-    host: target.host,
-    user: results.option('as') ?? target.sshUser,
-    identityFile: results.option('identity'),
-  );
+  final ssh =
+      connection ??
+      DwSshRunner(
+        host: target.host,
+        user: results.option('as') ?? target.sshUser,
+        identityFile: results.option('identity'),
+      );
   final store = DwSecretStore(ssh: ssh, target: target);
   final renderer = DwStackRenderer(stack: stack, projectRoot: projectRoot);
 
@@ -257,9 +267,11 @@ git checkout -B '${target.branch}' 'origin/${target.branch}'
     return 1;
   }
 
-  // A rendered compose file names its data volumes. If the server already
-  // carries a differently named one, starting the stack would silently create
-  // an empty database beside the real data and serve it. Refuse instead.
+  // A rendered compose file names its data volumes. If an expected one does
+  // not exist while another data volume of this project does, starting the
+  // stack would silently create it empty beside the real data and serve it —
+  // the same guard `deploy run` runs again right before it starts anything,
+  // because a server is not always `setup` again after a config change.
   final volumes = await ssh.runAs(
     target.deployUser,
     "docker volume ls --format '{{.Name}}'",
@@ -271,28 +283,13 @@ git checkout -B '${target.branch}' 'origin/${target.branch}'
     );
     return 1;
   }
-  final project = target.projectName;
-  final existing = volumes.stdout
-      .split('\n')
-      .map((line) => line.trim())
-      .where((line) => line.startsWith('${project}_'))
-      .toList();
-  final expected = {
-    '${project}_postgres_data',
-    if (target.storage == DwStorageMode.minio) '${project}_minio_data',
-  };
-  final strangers = existing
-      .where((name) => !expected.contains(name) && name.contains('data'))
-      .where((name) => !name.contains('certbot'))
-      .toList();
-  if (strangers.isNotEmpty) {
-    stderr.writeln(
-      '\nRefusing to continue: this server already has the volume(s) '
-      '${strangers.join(', ')}, and the rendered configuration uses '
-      '${expected.join(', ')} instead — fresh, empty data.\n'
-      'Mount the existing volume in deploy/compose.override.yml, or remove it '
-      'deliberately (docker volume rm), then run setup again.',
-    );
+  final volumeVerdict = judgeDataVolumes(
+    volumeListing: volumes.stdout,
+    projectPrefix: target.projectName,
+    expectedDataVolumes: stack.dataVolumeNames,
+  );
+  if (!volumeVerdict.ok) {
+    stderr.writeln('\nRefusing to continue: ${volumeVerdict.detail}');
     return 1;
   }
 

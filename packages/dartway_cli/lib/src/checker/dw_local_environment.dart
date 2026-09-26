@@ -137,16 +137,40 @@ class DwLocalEnvironmentInspector {
       },
       portKey: 'DW_DATABASE_PORT',
     );
-    _compareService(
-      services['minio'],
-      source: '$name > minio',
-      committed: committed,
-      pairs: const {
-        'MINIO_ROOT_USER': 'DW_STORAGE_ACCESS_KEY',
-        'MINIO_ROOT_PASSWORD': 'DW_STORAGE_SECRET_KEY',
-      },
-      portKey: null,
-    );
+    final storage = services['storage'];
+    if (storage == null) {
+      // Not silence: a project whose `local` environment sets storage
+      // credentials but whose compose file has no `storage` service to
+      // create them for is a config a developer cannot actually run,
+      // whatever the compose file calls the service it used to have
+      // instead — this holds no name of any storage product, past or
+      // present, on purpose (a check naming one would need updating every
+      // time the framework's own bundled choice does).
+      final expectsStorage =
+          committed.containsKey('DW_STORAGE_ACCESS_KEY') ||
+          committed.containsKey('DW_STORAGE_SECRET_KEY');
+      if (expectsStorage) {
+        _add(
+          DwCheckType.devComposeDrifted,
+          '$name has no "storage" service, but ${DwLocalEnvironment.configPath} '
+          '> ${DwLocalEnvironment.section} sets storage credentials — nothing '
+          'creates them locally. If this project ran a differently named '
+          'storage service before, docs/migrations/ has the note for renaming '
+          'it.',
+        );
+      }
+    } else {
+      _compareService(
+        storage,
+        source: '$name > storage',
+        committed: committed,
+        pairs: const {
+          'RUSTFS_ACCESS_KEY': 'DW_STORAGE_ACCESS_KEY',
+          'RUSTFS_SECRET_KEY': 'DW_STORAGE_SECRET_KEY',
+        },
+        portKey: null,
+      );
+    }
   }
 
   void _compareService(

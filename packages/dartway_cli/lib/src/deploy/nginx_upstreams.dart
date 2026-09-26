@@ -3,7 +3,7 @@
 ///
 /// The rendered configuration and every snippet under `deploy/nginx.d/` name
 /// Compose services as upstreams —
-/// `proxy_pass http://minio:9000` — and nothing used to check that those
+/// `proxy_pass http://storage:9000` — and nothing used to check that those
 /// services are in the stack that was actually applied. Nginx resolves an
 /// upstream once, at start, so the mismatch is not felt until something
 /// restarts the proxy, which is the deploy's own last step. A staging stand

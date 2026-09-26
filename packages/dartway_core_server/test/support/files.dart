@@ -1,4 +1,4 @@
-// File uploads in the server suites: a real S3-compatible storage (MinIO in
+// File uploads in the server suites: a real S3-compatible storage (RustFS in
 // development), a bucket per test file, and a small project on top of
 // `ctx.files`.
 import 'dart:convert';
@@ -21,9 +21,9 @@ enum TestUpload with DwUploadPurpose { avatar, document, locked, unruled }
 /// database does.
 ///
 /// ```
-/// docker run -d --name dw10-minio -p 127.0.0.1:55470:9000 \
-///   -e MINIO_ROOT_USER=dartway -e MINIO_ROOT_PASSWORD=dartway-secret \
-///   quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+/// docker run -d --name dw10-storage -p 127.0.0.1:55470:9000 \
+///   -e RUSTFS_ACCESS_KEY=dartway -e RUSTFS_SECRET_KEY=dartway-secret \
+///   rustfs/rustfs:1.0.0 /data
 /// DW_STORAGE_ENDPOINT=http://127.0.0.1:55470 DW_STORAGE_ACCESS_KEY=dartway \
 ///   DW_STORAGE_SECRET_KEY=dartway-secret dart test
 /// ```
@@ -42,7 +42,7 @@ DwFileStorageConfig storageConfig({
       pathStyle: true,
       publicBucket: publicBucket,
       // The bucket itself: public objects are served by the storage, path
-      // style, as a development MinIO serves them.
+      // style, as a development RustFS serves them.
       publicBaseUrl: publicBucket == null
           ? null
           : config.endpoint.replace(path: '/$publicBucket'),

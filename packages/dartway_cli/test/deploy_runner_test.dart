@@ -16,7 +16,7 @@ void main() {
   group('the order of a deployment', () {
     final runner = DwDeployRunner(
       ssh: RecordingSsh(),
-      stack: stackVariants()['minio and a site']!,
+      stack: stackVariants()['bundled storage and a site']!,
     );
     final ids = _ids(runner);
 
@@ -33,6 +33,7 @@ void main() {
         'render-stack',
         'render-env',
         'compose-config',
+        'data-volumes',
         'build',
         'storage',
         'database',
@@ -61,6 +62,15 @@ void main() {
       before('render-stack', 'build');
     });
 
+    // Catches an expected volume missing beside real data before the build,
+    // not after the stack is already up and the outside checks are green on
+    // an empty one (#331: storage: minio → storage: bundled).
+    test('the data volumes are checked before anything is built or started', () {
+      before('compose-config', 'data-volumes');
+      before('data-volumes', 'build');
+      before('data-volumes', 'database');
+    });
+
     // Migrations need the database, and the proxy is pointed at the server
     // only once it is the new one.
     test('the server is replaced after the database, before the web app', () {
@@ -75,7 +85,7 @@ void main() {
       before('certificate', 'restart-proxy');
     });
 
-    test('no storage step without MinIO, no certificate without TLS', () {
+    test('no storage step without bundled storage, no certificate without TLS', () {
       final plain = _ids(
         DwDeployRunner(
           ssh: RecordingSsh(),
@@ -110,7 +120,7 @@ void main() {
       final ssh = RecordingSsh();
       await DwDeployRunner(
         ssh: ssh,
-        stack: stackVariants()['minio and a site']!,
+        stack: stackVariants()['bundled storage and a site']!,
       ).issueCertificate();
       final command = ssh.issued.single;
       expect(command, contains("--cert-name 'api.example.com'"));
@@ -255,7 +265,7 @@ esac
               'PATH': '${bin.path}:${Platform.environment['PATH']}',
             },
           ),
-          stack: stackVariants()['minio and a site']!,
+          stack: stackVariants()['bundled storage and a site']!,
           appDir: p.join(temp.path, 'shop'),
         );
         final result = await runner.issueCertificate();
@@ -311,6 +321,62 @@ esac
     });
   });
 
+  group('checkDataVolumes', () {
+    DwDeployRunner runnerWith(RecordingSsh ssh) => DwDeployRunner(
+      ssh: ssh,
+      stack: stackVariants()['bundled storage and a site']!,
+    );
+
+    test('exits 0 and says so when nothing is missing', () async {
+      final ssh = RecordingSsh([
+        (
+          'docker volume ls',
+          const DwSshResult(
+            exitCode: 0,
+            stdout: 'shop_postgres_data\nshop_storage_data\n',
+            stderr: '',
+          ),
+        ),
+      ]);
+      final result = await runnerWith(ssh).checkDataVolumes();
+      expect(result.ok, isTrue);
+      expect(result.stdout, contains('shop_storage_data'));
+    });
+
+    // The regression this exists for: `run` used to have no volume guard at
+    // all, so a server carrying the old `shop_minio_data` (a stranger to the
+    // renamed stack) with no `shop_storage_data` yet would start the latter
+    // empty. This must exit non-zero, and say why, or every check above it
+    // could be quietly removed without a test noticing.
+    test('exits non-zero and names both volumes when a rename is unsafe', () async {
+      final ssh = RecordingSsh([
+        (
+          'docker volume ls',
+          const DwSshResult(
+            exitCode: 0,
+            stdout: 'shop_postgres_data\nshop_minio_data\n',
+            stderr: '',
+          ),
+        ),
+      ]);
+      final result = await runnerWith(ssh).checkDataVolumes();
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('shop_minio_data'));
+      expect(result.stderr, contains('shop_storage_data'));
+    });
+
+    test('exits non-zero when the server cannot even be asked', () async {
+      final ssh = RecordingSsh([
+        (
+          'docker volume ls',
+          const DwSshResult(exitCode: 1, stdout: '', stderr: 'permission denied'),
+        ),
+      ]);
+      final result = await runnerWith(ssh).checkDataVolumes();
+      expect(result.ok, isFalse);
+    });
+  });
+
   group('the upstream guard before the proxy restart', () {
     test(
       'asks the server for the applied stack and the rendered config',
@@ -341,11 +407,11 @@ esac
       final verdict = DwDeployRunner.upstreamVerdict(
         const DwSshResult(
           exitCode: 0,
-          stdout: 'server\n--dw-nginx-d--\nproxy_pass http://minio:9000;\n',
+          stdout: 'server\n--dw-nginx-d--\nproxy_pass http://storage:9000;\n',
           stderr: '',
         ),
       );
-      expect(verdict, contains('minio'));
+      expect(verdict, contains('storage'));
       expect(verdict, contains('Nothing has been restarted'));
     });
 
@@ -432,7 +498,7 @@ esac
       Directory(appDir).createSync(recursive: true);
       runner = DwDeployRunner(
         ssh: LocalShell(),
-        stack: stackVariants()['minio and a site']!,
+        stack: stackVariants()['bundled storage and a site']!,
         appDir: appDir,
       );
     });
@@ -552,7 +618,7 @@ esac
       () async {
         file(
           DwComposeFiles.autoLoaded,
-        ).writeAsStringSync('services:\n  minio: {}\n');
+        ).writeAsStringSync('services:\n  storage: {}\n');
         final result = await bridge();
         expect(result.ok, isFalse);
         expect(file(DwComposeFiles.autoLoaded).existsSync(), isTrue);

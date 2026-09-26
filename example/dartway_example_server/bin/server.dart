@@ -33,7 +33,7 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 ///   notifications but has nothing to send them through;
 /// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
 ///   before starting (`DwFileStorageSetup.provision`): for a development
-///   MinIO the project owns, never for a storage somebody else administers.
+///   storage the project owns, never for a storage somebody else administers.
 Future<void> main() async {
   final env = DwLocalEnvironment.overlay(Platform.environment);
   final storage = ExampleFiles.storageConfig(env);

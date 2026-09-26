@@ -44,7 +44,7 @@ Nothing to export: the entry points read `deploy/config.yaml` > `local` through
 `deploy/secrets.yaml` > `local` (`dartway secret set <KEY> --env local`). An
 exported variable still beats both.
 
-Uploads need file storage — a public and a private bucket; with a local MinIO
+Uploads need file storage — a public and a private bucket; with a local RustFS
 the endpoint and keys are enough (`dartway_example_server/README.md`, "File
 storage"). Without `DW_STORAGE_ENDPOINT` the server runs without them.
 

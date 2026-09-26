@@ -29,13 +29,13 @@ abstract final class AppFiles {
       DwFileStorage(config, rules: uploadRules);
 
   /// The default bucket names: `dartway create` names them after the project,
-  /// as `dartway deploy` names the buckets of its MinIO.
+  /// as `dartway deploy` names the buckets of its bundled storage.
   static const defaultPublicBucket = 'dartway-starter-public';
   static const defaultPrivateBucket = 'dartway-starter-private';
 
   /// The storage configuration from [environment]: `DW_STORAGE_*` as
   /// [DwFileStorageConfig.fromEnvironment] reads it, with the defaults of a
-  /// development MinIO filled in — buckets [AppFiles.defaultPublicBucket] and
+  /// development storage filled in — buckets [AppFiles.defaultPublicBucket] and
   /// [AppFiles.defaultPrivateBucket], the public one served from itself on the endpoint
   /// (`<DW_STORAGE_ENDPOINT>/<public bucket>`, path style). `null` when
   /// `DW_STORAGE_ENDPOINT` is not set: the server then runs without uploads.

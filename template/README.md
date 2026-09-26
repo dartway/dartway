@@ -27,7 +27,7 @@ project up: `dartway quickstart` prints everything it needs to know, and
 
 ```bash
 cd dartway_starter_server
-docker compose up -d          # Postgres on 8090, MinIO on 8100 (console 8101)
+docker compose up -d          # Postgres on 8090, RustFS on 8100 (console 8101)
 
 dart pub get
 dart run bin/server.dart      # applies the migrations, serves :8080
@@ -106,13 +106,13 @@ globally activated `dartway` refuses them when it is another version.
 ```bash
 (cd dartway_starter_flutter && dart run dartway_cli:dartway generate --check) # generated code is up to date
 (cd dartway_starter_server && dart run bin/migrate.dart check)   # migrations produce the schema (DW_DATABASE_*)
-(cd dartway_starter_flutter && dart run dartway_cli:dartway test) # server acceptance, real Postgres and MinIO
+(cd dartway_starter_flutter && dart run dartway_cli:dartway test) # server acceptance, real Postgres and storage
 (cd dartway_starter_shared && dart test)                  # the contract
 (cd dartway_starter_flutter && flutter test)              # the app on an in-memory server
 (cd dartway_starter_flutter && dart run dartway_cli:dartway check) # the conventions
 ```
 
-`dart run dartway_cli:dartway test` starts a Postgres and a MinIO for the run, on ports Docker
+`dart run dartway_cli:dartway test` starts a Postgres and a storage for the run, on ports Docker
 picks, and removes them when it ends: nothing is shared with the development
 containers or with another project, and nothing survives. Each test file
 creates its own database and its own buckets.
@@ -121,7 +121,7 @@ creates its own database and its own buckets.
 
 `deploy/README.md`: one server process configured by its environment, the web
 app on its own host with `/dw/` proxied to the server, Postgres and optional
-MinIO — `dart run dartway_cli:dartway deploy setup`, then `dart run dartway_cli:dartway deploy`.
+bundled storage — `dart run dartway_cli:dartway deploy setup`, then `dart run dartway_cli:dartway deploy`.
 
 ## Continuous integration
 

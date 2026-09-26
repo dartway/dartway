@@ -87,7 +87,7 @@ my_app_server/
       profile_publications.dart what a change publishes, and to whom
     admin/, settings/      the skeleton's other features, the same shape
   test/                    acceptance tests on a real server, database and storage
-  docker-compose.yaml      development Postgres and MinIO
+  docker-compose.yaml      development Postgres and RustFS
   Dockerfile               the server image the deploy builds
 ```
 

@@ -4,8 +4,8 @@ import 'package:meta/meta.dart';
 import '../context/dw_call_context.dart';
 
 /// Where uploaded files are kept: two buckets of an S3-compatible storage
-/// (AWS S3, MinIO, Yandex Object Storage, Cloudflare R2 …), one public and one
-/// private. A rule's visibility picks the bucket.
+/// (AWS S3, RustFS, Yandex Object Storage, Cloudflare R2 …), one public and
+/// one private. A rule's visibility picks the bucket.
 ///
 /// A bucket is public or private as a whole, never by key prefix: a prefix
 /// policy is one mistyped resource away from making every file public, and a
@@ -137,7 +137,7 @@ final class DwFileStorageConfig {
   /// startup.
   final String? privateBucket;
 
-  /// `endpoint/bucket/key` when true — what MinIO and most compatible
+  /// `endpoint/bucket/key` when true — what RustFS and most compatible
   /// storages serve without DNS setup; `bucket.endpoint/key` otherwise.
   final bool pathStyle;
 
@@ -147,8 +147,8 @@ final class DwFileStorageConfig {
   /// private bucket nor either bucket's listing is. On by default; turn it
   /// off only where the check cannot run from the server — a storage host
   /// that answers only once the stack around the server is up (as
-  /// `dartway deploy` renders MinIO, verified from outside after the deploy
-  /// instead).
+  /// `dartway deploy` renders the bundled storage, verified from outside
+  /// after the deploy instead).
   final bool verifyBuckets;
 
   /// Problems with the values, empty when usable.

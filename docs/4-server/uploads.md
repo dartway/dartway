@@ -123,7 +123,7 @@ and refuses to start on any mismatch:
 A private file behind a public bucket is already leaked; a public bucket that does not read means
 no photo opens. Both are configurations a server must not serve on. Turn the probe off
 (`DW_STORAGE_VERIFY_BUCKETS=false`) only where the server cannot reach storage while it starts —
-the `dart run dartway_cli:dartway deploy` MinIO stack, which verifies from outside once the stack is up.
+the `dart run dartway_cli:dartway deploy` bundled storage, which verifies from outside once the stack is up.
 
 ### `DwFileStorageSetup.provision`
 
@@ -133,7 +133,7 @@ await DwFileStorageSetup.provision(config);
 
 Creates both buckets where missing, gives the public one an anonymous-read policy for its objects
 (not its listing) and deletes the private one's policy. Idempotent: an existing bucket keeps its
-objects. For a storage the project owns wholly — MinIO in development, in tests, in a deploy. For a
+objects. For a storage the project owns wholly — RustFS in development, in tests, in a deploy. For a
 bucket someone administers with policies of their own, configure it by hand and let the startup
 probe say whether it is right. The skeleton's `bin/server.dart` provisions when
 `DW_STORAGE_PROVISION=true`.
@@ -158,7 +158,7 @@ passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/src/co
 | `publicBucket` | `PUBLIC_BUCKET` | required when a rule is public |
 | `publicBaseUrl` | `PUBLIC_BASE_URL` | required with a public bucket |
 | `privateBucket` | `PRIVATE_BUCKET` | required when a rule is private |
-| `pathStyle` | `PATH_STYLE` | `true`: `endpoint/bucket/key`, what MinIO serves without DNS setup |
+| `pathStyle` | `PATH_STYLE` | `true`: `endpoint/bucket/key`, what RustFS serves without DNS setup |
 | `verifyBuckets` | `VERIFY_BUCKETS` | the startup probe, on by default |
 
 `DwFileStorageConfig.fromEnvironment(env, {prefix: 'DW_STORAGE_'})` reports every missing or
@@ -316,4 +316,4 @@ where nothing could find them. Delete an account's files through `ctx.files` fir
 
 - [Handlers and the call context](handlers-and-context.md) — where `ctx.files` is used.
 - [Testing](../5-tooling/testing.md) — `DwTestStorage` provisions a pair of buckets per run.
-- [Deploy](../5-tooling/deploy.md) — the MinIO the deploy runs.
+- [Deploy](../5-tooling/deploy.md) — the bundled storage the deploy runs.

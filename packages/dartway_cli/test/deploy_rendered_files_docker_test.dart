@@ -69,7 +69,7 @@ void main() {
           '--rm',
           '-v',
           '${dir.path}/nginx.conf:/etc/nginx/conf.d/default.conf:ro',
-          for (final host in ['server', 'web', 'minio']) ...[
+          for (final host in ['server', 'web', 'storage']) ...[
             '--add-host',
             '$host:127.0.0.1',
           ],

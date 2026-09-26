@@ -87,7 +87,7 @@ class SecretInitCommand extends _SecretCommandBase {
   @override
   String get description =>
       'Create the secret store and generate the database password (and the '
-      'MinIO keys). Existing values are never replaced.';
+      'storage keys). Existing values are never replaced.';
 
   @override
   String get invocation => 'dartway secret init --env <environment>';

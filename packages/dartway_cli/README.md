@@ -29,7 +29,7 @@ dart pub global activate --source git https://github.com/dartway/dartway.git --g
 | `dartway generate` | Runs the project's generator: DTO codecs, the protocol registry, row tables and schema |
 | `dartway check` | The conventions, enforced: layout, generated code, migrations |
 | `dartway dev` | The web app and the server on one origin, shaped like the deployment |
-| `dartway test` | Server acceptance tests against a Postgres and MinIO started for the run |
+| `dartway test` | Server acceptance tests against a Postgres and storage started for the run |
 | `dartway deploy` | The server to a host, from `deploy/config.yaml` — no folder of shell scripts |
 | `dartway secret` | The values that live outside Git |
 | `dartway stats` | Code-size statistics per feature folder |

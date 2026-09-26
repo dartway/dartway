@@ -143,7 +143,7 @@ packages:
       path: "../../packages/dartway_cli"
       relative: true
     source: path
-    version: "0.12.0"
+    version: "0.13.0"
   dartway_client:
     dependency: "direct dev"
     description:

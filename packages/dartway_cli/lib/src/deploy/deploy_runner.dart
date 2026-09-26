@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'compose_files.dart';
+import 'data_volumes.dart';
 import 'deploy_target.dart';
 import 'nginx_upstreams.dart';
 import 'outside_probe.dart';
@@ -195,16 +196,36 @@ rm -f "\$dw_new"''';
   /// a second, not after a ten-minute build.
   Future<DwSshResult> checkComposeConfig() => _compose('config --quiet');
 
+  /// The same guard `deploy setup` runs before it ever writes a compose file
+  /// ([judgeDataVolumes]) — run again here, because `run` starts the stack
+  /// too and a server that has only ever been `run`, never `setup` again
+  /// since a config change, would otherwise start an expected volume empty
+  /// beside real data on it (#331's storage rename was exactly this shape).
+  Future<DwSshResult> checkDataVolumes() async {
+    final listed = await _as("docker volume ls --format '{{.Name}}'");
+    if (!listed.ok) return listed;
+    final verdict = judgeDataVolumes(
+      volumeListing: listed.stdout,
+      projectPrefix: target.projectName,
+      expectedDataVolumes: stack.dataVolumeNames,
+    );
+    return DwSshResult(
+      exitCode: verdict.ok ? 0 : 1,
+      stdout: verdict.ok ? verdict.detail : '',
+      stderr: verdict.ok ? '' : verdict.detail,
+    );
+  }
+
   Future<DwSshResult> build() => _compose('build');
 
-  /// Starts MinIO and runs the initialisation of both buckets, whose output says what
-  /// it did.
+  /// Starts the bundled storage and runs the initialisation of both buckets,
+  /// whose output says what it did.
   ///
   /// `</dev/null` is not decoration: without it `compose run -T` consumes the
   /// rest of the surrounding script from stdin.
   Future<DwSshResult> startStorage() => _as(
-    '${DwComposeFiles.commandIn(appDir, 'up -d --wait ${DwStack.minioService}')} && '
-    '${DwComposeFiles.invoke} run --rm -T ${DwStack.minioInitService} </dev/null',
+    '${DwComposeFiles.commandIn(appDir, 'up -d --wait ${DwStack.storageService}')} && '
+    '${DwComposeFiles.invoke} run --rm -T ${DwStack.storageInitService} </dev/null',
   );
 
   Future<DwSshResult> startDatabase() =>
@@ -501,11 +522,21 @@ echo "nginx restarted and running"
       title: 'Check the merged compose configuration',
       run: checkComposeConfig,
     ),
+    // Before anything starts: an expected data volume that does not exist
+    // while another one of this project's does is a config change about to
+    // start serving fresh data next to the real one, silently — catch it
+    // before the build, not after the stack is already up and green.
+    DwDeployStep(
+      id: 'data-volumes',
+      title: 'Check no data volume would start empty beside existing data',
+      run: checkDataVolumes,
+    ),
     DwDeployStep(id: 'build', title: 'Build images', run: build),
-    if (target.storage == DwStorageMode.minio)
+    if (target.storage == DwStorageMode.bundled)
       DwDeployStep(
         id: 'storage',
-        title: 'Start MinIO and set up its public and private bucket',
+        title: 'Start the bundled storage and set up its public and private '
+            'bucket',
         run: startStorage,
         showOutput: true,
       ),

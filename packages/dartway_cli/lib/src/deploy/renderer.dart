@@ -68,7 +68,7 @@ class DwStackRenderer {
       'dartway deploy renders it from the secret store}';
 
   String get composeFile {
-    final minio = _target.storage == DwStorageMode.minio;
+    final storage = _target.storage == DwStorageMode.bundled;
     final site = _target.site;
     final buffer = StringBuffer()
       ..writeln(
@@ -95,7 +95,9 @@ class DwStackRenderer {
         '      POSTGRES_PASSWORD: ${_q(_secret(DwStack.databasePasswordKey))}',
       )
       ..writeln('    volumes:')
-      ..writeln('      - ${_q('postgres_data:/var/lib/postgresql/data')}')
+      ..writeln(
+        '      - ${_q('${DwStack.postgresDataVolume}:/var/lib/postgresql/data')}',
+      )
       ..writeln('    healthcheck:')
       ..writeln(
         '      test: ["CMD-SHELL", '
@@ -187,9 +189,9 @@ class DwStackRenderer {
       ..writeln('    depends_on:')
       ..writeln('      ${DwStack.postgresService}:')
       ..writeln('        condition: service_healthy');
-    if (minio) {
+    if (storage) {
       buffer
-        ..writeln('      ${DwStack.minioInitService}:')
+        ..writeln('      ${DwStack.storageInitService}:')
         ..writeln('        condition: service_completed_successfully');
     }
     buffer.writeln();
@@ -232,62 +234,57 @@ class DwStackRenderer {
       ..writeln('      retries: 3')
       ..writeln();
 
-    // --- minio
-    if (minio) {
+    // --- storage
+    if (storage) {
       buffer
-        ..writeln('  ${DwStack.minioService}:')
-        ..writeln('    image: ${_q(_image(DwStack.minioImage))}')
+        ..writeln('  ${DwStack.storageService}:')
+        ..writeln('    image: ${_q(_image(DwStack.storageImage))}')
         ..writeln('    restart: unless-stopped')
-        ..writeln('    command: ["server", "/data"]')
+        ..writeln('    command: ["/data"]')
         ..writeln('    environment:')
         ..writeln(
-          '      MINIO_ROOT_USER: ${_q(_secret(DwStack.storageAccessKey))}',
+          '      RUSTFS_ACCESS_KEY: ${_q(_secret(DwStack.storageAccessKey))}',
         )
         ..writeln(
-          '      MINIO_ROOT_PASSWORD: ${_q(_secret(DwStack.storageSecretKey))}',
+          '      RUSTFS_SECRET_KEY: ${_q(_secret(DwStack.storageSecretKey))}',
         )
         ..writeln(
-          '      # The CORS rule a browser needs for a presigned PUT from the '
-          'app. MinIO\'s',
+          '      # No console on a deployment: nothing here is ever meant to '
+          'be browsed by',
         )
         ..writeln(
-          '      # community edition does not implement bucket CORS '
-          '(PutBucketCors answers',
+          '      # a person, and the port is not published even with it on '
+          '— belt and braces.',
         )
-        ..writeln(
-          '      # NotImplemented), so it is set here, for both buckets this '
-          'server holds.',
-        )
-        ..writeln('      MINIO_API_CORS_ALLOW_ORIGIN: ${_q(stack.appOrigin)}')
-        ..writeln('      MINIO_BROWSER: "off"')
+        ..writeln('      RUSTFS_CONSOLE_ENABLE: "false"')
         ..writeln('    volumes:')
-        ..writeln('      - "minio_data:/data"')
+        ..writeln('      - ${_q('${DwStack.storageDataVolume}:/data')}')
         ..writeln('    expose:')
         ..writeln('      - "9000"')
         ..writeln('    healthcheck:')
         ..writeln(
           '      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", '
-          '"http://127.0.0.1:9000/minio/health/live"]',
+          '"http://127.0.0.1:9000/health"]',
         )
         ..writeln('      interval: 5s')
         ..writeln('      timeout: 5s')
         ..writeln('      retries: 30')
         ..writeln()
-        ..writeln('  ${DwStack.minioInitService}:')
-        ..writeln('    image: ${_q(_image(DwStack.minioClientImage))}')
+        ..writeln('  ${DwStack.storageInitService}:')
+        ..writeln('    image: ${_q(_image(DwStack.storageInitImage))}')
         ..writeln('    restart: "no"')
         ..writeln('    depends_on:')
-        ..writeln('      ${DwStack.minioService}:')
+        ..writeln('      ${DwStack.storageService}:')
         ..writeln('        condition: service_healthy')
         ..writeln('    environment:')
         ..writeln(
-          '      ${DwStack.storageAccessKey}: '
-          '${_q(_secret(DwStack.storageAccessKey))}',
+          '      AWS_ACCESS_KEY_ID: ${_q(_secret(DwStack.storageAccessKey))}',
         )
         ..writeln(
-          '      ${DwStack.storageSecretKey}: '
+          '      AWS_SECRET_ACCESS_KEY: '
           '${_q(_secret(DwStack.storageSecretKey))}',
         )
+        ..writeln('      AWS_DEFAULT_REGION: "us-east-1"')
         ..writeln('    entrypoint: ["/bin/sh", "-c"]')
         ..writeln(
           '    # Idempotent: an existing bucket is kept, objects and all, and '
@@ -298,18 +295,19 @@ class DwStackRenderer {
           'to anyone and',
         )
         ..writeln(
-          '    # lists to no one, the private one reads nothing unsigned. The '
-          'probe object',
+          '    # lists to no one, the private one reads nothing unsigned; the '
+          'CORS rule is',
         )
         ..writeln(
-          '    # in each is what the outside check reads without credentials. '
-          r'"$$" is a',
+          '    # what a browser needs for a presigned PUT from the app, on '
+          'both buckets.',
         )
         ..writeln(
-          '    # literal dollar for the shell rather than a Compose variable.',
+          '    # The probe object in each is what the outside check reads '
+          'without credentials.',
         )
         ..writeln('    command:')
-        ..writeln('      - ${_q(_minioInit)}')
+        ..writeln('      - ${_q(_storageInit)}')
         ..writeln();
     }
 
@@ -343,9 +341,9 @@ class DwStackRenderer {
       ..writeln('    depends_on:')
       ..writeln('      - ${DwStack.serverService}')
       ..writeln('      - ${DwStack.webService}');
-    if (minio) {
+    if (storage) {
       buffer
-        ..writeln('      - ${DwStack.minioService}')
+        ..writeln('      - ${DwStack.storageService}')
         ..writeln(
           '    # The server reaches storage by the same URL a browser signs '
           'for: inside',
@@ -387,8 +385,8 @@ class DwStackRenderer {
 
     buffer
       ..writeln('volumes:')
-      ..writeln('  postgres_data:');
-    if (minio) buffer.writeln('  minio_data:');
+      ..writeln('  ${DwStack.postgresDataVolume}:');
+    if (storage) buffer.writeln('  ${DwStack.storageDataVolume}:');
     if (_tls) {
       buffer
         ..writeln('  certbot_data:')
@@ -397,15 +395,23 @@ class DwStackRenderer {
     return buffer.toString();
   }
 
-  /// The script of `minio-init`: both buckets, their access, and the probe
-  /// object in each.
+  /// The script of `storage-init`: both buckets, their access and CORS, and
+  /// the probe object in each.
+  ///
+  /// A generic S3 client (`amazon/aws-cli`, [DwStack.storageInitImage]) rather
+  /// than the storage's own: RustFS ships no client of its own that speaks
+  /// bucket policy and CORS the way this needs, and `aws` reads its
+  /// credentials straight from `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, so
+  /// nothing here has to quote or escape the secret store's values for a
+  /// shell, the way setting up a named alias used to (#331).
   ///
   /// The public policy is the framework's (`DwFileStorageSetup`): anonymous
-  /// `s3:GetObject` and nothing else. Not `mc anonymous set download`, which
-  /// also grants `s3:ListBucket` — anyone could enumerate every public file.
-  String get _minioInit {
+  /// `s3:GetObject` and nothing else — never a canned ACL, which would also
+  /// grant `s3:ListBucket` and let anyone enumerate every public file.
+  String get _storageInit {
     final public = stack.publicBucketName;
     final private = stack.privateBucketName;
+    final endpoint = 'http://${DwStack.storageService}:9000';
     final policy = jsonEncode({
       'Version': '2012-10-17',
       'Statement': [
@@ -420,19 +426,36 @@ class DwStackRenderer {
         },
       ],
     });
+    final cors = jsonEncode({
+      'CORSRules': [
+        {
+          'AllowedOrigins': [stack.appOrigin],
+          'AllowedMethods': ['GET', 'PUT'],
+          'AllowedHeaders': ['*'],
+          'MaxAgeSeconds': 3000,
+        },
+      ],
+    });
+    String aws(String rest) => 'aws --endpoint-url $endpoint $rest';
     return [
       'set -e',
-      'mc alias set dw http://${DwStack.minioService}:9000 '
-          '"\$\$${DwStack.storageAccessKey}" '
-          '"\$\$${DwStack.storageSecretKey}" >/dev/null',
-      'mc mb --ignore-existing dw/$public',
-      'mc mb --ignore-existing dw/$private',
+      for (final bucket in [public, private]) aws('s3 mb s3://$bucket'),
       "printf '%s' '$policy' > /tmp/dw-public-read.json",
-      'mc anonymous set-json /tmp/dw-public-read.json dw/$public',
-      'mc anonymous set none dw/$private',
+      aws(
+        's3api put-bucket-policy --bucket $public '
+        '--policy file:///tmp/dw-public-read.json',
+      ),
+      aws('s3api delete-bucket-policy --bucket $private'),
+      "printf '%s' '$cors' > /tmp/dw-cors.json",
+      for (final bucket in [public, private])
+        aws(
+          's3api put-bucket-cors --bucket $bucket '
+          '--cors-configuration file:///tmp/dw-cors.json',
+        ),
       for (final bucket in [public, private])
         "printf '%s\\n' '${DwStack.visibilityProbeText}' "
-            '| mc pipe dw/$bucket/${DwStack.visibilityProbeKey} >/dev/null',
+            '| ${aws('s3 cp - s3://$bucket/${DwStack.visibilityProbeKey}')} '
+            '>/dev/null',
       'echo "bucket $public reads objects anonymously, bucket $private does '
           'not"',
     ].join('; ');
@@ -595,7 +618,7 @@ class DwStackRenderer {
     }
 
     // --- storage
-    if (_target.storage == DwStorageMode.minio) {
+    if (_target.storage == DwStorageMode.bundled) {
       _openServer(buffer, _target.storageDomain!);
       buffer
         ..writeln(
@@ -611,7 +634,7 @@ class DwStackRenderer {
         ..writeln('    proxy_buffering off;')
         ..writeln()
         ..writeln('    location / {')
-        ..writeln('        proxy_pass http://${DwStack.minioService}:9000;')
+        ..writeln('        proxy_pass http://${DwStack.storageService}:9000;')
         ..writeln('        proxy_http_version 1.1;')
         ..writeln(r'        proxy_set_header Connection "";')
         ..writeln(

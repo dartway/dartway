@@ -10,7 +10,7 @@ import 'package:meta/meta.dart';
 /// is thousands of lines, a release cycle and a platform story for those
 /// four. The algorithm is small and fixed, and it is pinned by AWS's
 /// published test vectors (`test/files_signing_test.dart`) as well as by
-/// real requests against MinIO.
+/// real requests against the storage the suites run against.
 ///
 /// Paths and query parameters are given **decoded**; the signer encodes them
 /// exactly once, the way S3 expects (the generic services of the AWS test

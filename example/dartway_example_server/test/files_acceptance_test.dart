@@ -31,7 +31,7 @@ void main() {
       );
     });
 
-    test('a development MinIO needs only its endpoint and keys', () {
+    test('a development storage needs only its endpoint and keys', () {
       final config = ExampleFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:9000',
         ...credentials,

@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.13.0
+
+- **BREAKING: the bundled storage is RustFS, not MinIO — `storage: minio` in `deploy/config.yaml`
+  becomes `storage: bundled`** (dartway/dartway#331, D-094). MinIO's community edition stopped
+  publishing images, and every registry that used to serve them (Docker Hub, quay.io) now answers an
+  anonymous pull with `401`; `dartway deploy run` failed on a fresh host at the step that started it,
+  and `dartway test`/`dartway_core_server`'s file suites failed the same way on a clean machine. The
+  rendered compose services are renamed `storage`/`storage-init` (were `minio`/`minio-init`), the
+  data volume is renamed `<project>_storage_data`, and `storage-init` is a generic, pinned S3 client
+  (`amazon/aws-cli:2.31.13`) rather than MinIO's own — it sets bucket CORS through the S3 API
+  (`put-bucket-cors`) on both buckets instead of the server-wide environment variable MinIO's
+  community edition needed in its place. Migration note:
+  `docs/migrations/2026-09-26-storage-minio-to-rustfs.md`.
+- **`dartway deploy check` resolves every pinned base image against its registry** (`images-resolve`,
+  new remote check): a manifest `HEAD`, with the anonymous bearer token the registry's own
+  `WWW-Authenticate` challenge asks for — the same handshake `docker pull` performs, without pulling
+  a layer. Catches a vanished tag (Postgres, nginx, certbot, and with `storage: bundled` the storage
+  and its init image) before `deploy run` reaches the step that actually pulls it, which is where
+  this exact failure used to surface for MinIO, well after the images that build locally had already
+  succeeded. Resolved through `registry_mirror` exactly as the renderer resolves them into the
+  compose file, so the check asks about what `run` actually pulls, not the upstream name behind a
+  mirror that serves it instead; a transient answer (no route, a timeout, a rate limit, a 5xx of the
+  registry's own) is reported as a note rather than failing the deploy over this machine's own
+  network.
+- **`deploy run` refuses to start a stack that would create an expected data volume empty beside a
+  data volume of the same project that already holds real state** (`data-volumes`, new step, right
+  after the compose configuration is checked and before anything is built). `deploy setup` has run
+  this guard since the volume rename above; `run` did not, so a server only ever `run` again after a
+  config change — never `setup` again — could start `storage: bundled`'s volume empty, have
+  `storage-init` write its probes into it, watch the outside checks read those probes and pass, and
+  serve every real file as a 404 from then on. Passes once the expected volume exists, whatever else
+  is still on the server beside it: an old volume from before the change is the rollback copy, and
+  neither command asks for it to be removed before passing.
+
 ## 0.12.0
 
 - **BREAKING: `dartway check` holds the server's `lib/src/` to a layout** (D-093, `invalidTopLevelLayout`): folders only — `core/`, `migrations/`, and one per feature declaring its `DwServerFeature` in `<feature>_feature.dart`. A file at the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`, `objects/`, `publications/`, `services/`, `models/`) or a feature folder without its declaration is an error. `src/` used to be "the project's": three projects on the framework arranged it three ways, and the largest arranged it two ways at once, with one area in four folders. The skeleton `dartway create` hands out has the layout. Migration note: `docs/migrations/2026-09-25-server-features.md`.

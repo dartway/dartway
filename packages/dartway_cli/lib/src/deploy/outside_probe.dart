@@ -301,7 +301,7 @@ class DwOutsideProbe {
     }
   }
 
-  /// Without credentials, the probe object `minio-init` writes reads from
+  /// Without credentials, the probe object `storage-init` writes reads from
   /// [publicBucket] and is refused from [privateBucket], and neither bucket
   /// lists its keys: the public files open, the private ones are not public.
   Future<DwProbeResult> storageVisibility({

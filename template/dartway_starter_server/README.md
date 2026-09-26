@@ -22,7 +22,7 @@ The server, on `dartway_core_server`. How to run, seed and test it:
   tables in `*.dw.dart`), one handler per request and command with its access
   rule, rows → data objects, and what a change is published to
 - `lib/src/migrations/` — migrations, written by `bin/migrate.dart create`
-- `test/` — acceptance on real clients, a real server, Postgres and MinIO
+- `test/` — acceptance on real clients, a real server, Postgres and RustFS
 
 ## File storage
 

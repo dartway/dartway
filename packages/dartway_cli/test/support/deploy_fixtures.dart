@@ -38,11 +38,11 @@ DwStack stackFrom({
 Map<String, DwStack> stackVariants({DwFrontMode front = const DwTlsFront()}) =>
     {
       'minimal': stackFrom(front: front),
-      'minio and a site': stackFrom(
+      'bundled storage and a site': stackFrom(
         front: front,
         extra:
             '  site:\n    domain: example.com\n    source: app_site/build\n'
-            '  storage: minio\n  storage_domain: files.example.com\n',
+            '  storage: bundled\n  storage_domain: files.example.com\n',
       ),
       'external storage, external site, files': stackFrom(
         front: front,

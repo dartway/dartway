@@ -59,14 +59,14 @@ class TestCommand extends Command<int> {
         'storage',
         defaultsTo: true,
         help:
-            'Also start a MinIO for the run and pass DW_STORAGE_* to the '
-            'suite. --no-storage for a server without uploads.',
+            'Also start a storage container for the run and pass DW_STORAGE_* '
+            'to the suite. --no-storage for a server without uploads.',
       )
       ..addOption(
         'storage-image',
         help:
-            'MinIO image to run. Defaults to the one a deployment runs '
-            '(${DwStack.minioImage}).',
+            'Storage image to run. Defaults to the one a deployment runs '
+            '(${DwStack.storageImage}).',
       );
   }
 
@@ -113,7 +113,7 @@ class TestCommand extends Command<int> {
     final image = argResults?['image'] as String? ?? _defaultImage;
     final withStorage = argResults?['storage'] as bool? ?? true;
     final storageImage =
-        argResults?['storage-image'] as String? ?? DwStack.minioImage;
+        argResults?['storage-image'] as String? ?? DwStack.storageImage;
     final keep = argResults?['keep'] as bool? ?? false;
 
     final database = TestDatabase(

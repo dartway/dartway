@@ -38,18 +38,18 @@ One server process behind one front proxy:
 | `postgres` | Postgres 17, on a named volume |
 | `server` | the project's server image, configured by environment only; healthcheck on `/health` |
 | `web` | the Flutter web build served by nginx, files only |
-| `minio` + `minio-init` | with `storage: minio`: the storage and its two buckets — `<project>-public`, whose objects anyone reads (never its listing), and `<project>-private`, which reads nothing unsigned; `minio-init` sets both on every deploy |
+| `storage` + `storage-init` | with `storage: bundled`: RustFS and its two buckets — `<project>-public`, whose objects anyone reads (never its listing), and `<project>-private`, which reads nothing unsigned; `storage-init` sets both on every deploy |
 | `nginx` | TLS for every host: **app** → the web image, with `/dw/` (the live socket upgrade included) and `/health` sent to the server; **api** → the server; **site** → the static directory |
 | `certbot` | renews the one certificate every host shares |
 
-The server receives `DW_DATABASE_*` (and, with MinIO, `DW_STORAGE_*`) and `PORT`
+The server receives `DW_DATABASE_*` (and, with the bundled storage, `DW_STORAGE_*`) and `PORT`
 from the compose file, and every secret of the store through `.env`. It serves
 no static files.
 
-With MinIO the storage variables are `DW_STORAGE_PUBLIC_BUCKET`,
+With the bundled storage the storage variables are `DW_STORAGE_PUBLIC_BUCKET`,
 `DW_STORAGE_PRIVATE_BUCKET` and
 `DW_STORAGE_PUBLIC_BASE_URL=https://<storage_domain>/<project>-public`, and
-`DW_STORAGE_VERIFY_BUCKETS=false`: the server reaches MinIO through the
+`DW_STORAGE_VERIFY_BUCKETS=false`: the server reaches the storage through the
 proxy's storage host, which starts after it, so the bucket check a server runs
 at startup is made from outside once the stack is up (step 8). An external
 storage keeps the check on — the server refuses to start on a missing bucket,
@@ -118,7 +118,7 @@ The store is one file on the server, `~/.config/<project>/secrets.env`,
 outside the checkout so the `git reset --hard` of a deploy cannot touch it:
 
 - `secret init` generates what is only a random string — `DW_DATABASE_PASSWORD`,
-  and with MinIO `DW_STORAGE_ACCESS_KEY` / `DW_STORAGE_SECRET_KEY`. `setup` runs
+  and with the bundled storage `DW_STORAGE_ACCESS_KEY` / `DW_STORAGE_SECRET_KEY`. `setup` runs
   it too. Existing values are never replaced;
 - `secret set <KEY>` reads the value from stdin, so it never appears in shell
   history or a process list;

@@ -39,12 +39,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_DB: shop
       POSTGRES_PASSWORD: 'dev_pw'
-  minio:
+  storage:
     ports:
       - '127.0.0.1:8100:9000'
     environment:
-      MINIO_ROOT_USER: dev
-      MINIO_ROOT_PASSWORD: 'dev_storage_pw'
+      RUSTFS_ACCESS_KEY: dev
+      RUSTFS_SECRET_KEY: 'dev_storage_pw'
 ''';
 
   const matchingLocal = '''
@@ -64,6 +64,69 @@ local:
     expect(inspect().run(), 0);
     expect(inspect()..run(), _reports(DwCheckType.devComposeDrifted, isEmpty));
   });
+
+  // Generic, deliberately: this must catch a compose file with no "storage"
+  // service whatever it calls the service it has instead — the check holds
+  // no name of any storage product, past or present (zero-major: no code
+  // recognises the vendor a project used to run).
+  test(
+    'the local environment expects storage credentials but the compose file '
+    'has no "storage" service — named, not silently skipped for having '
+    'nothing to compare',
+    () {
+      writeConfig(matchingLocal);
+      writeCompose('''
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - '127.0.0.1:8090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: shop
+      POSTGRES_PASSWORD: 'dev_pw'
+  objectstore:
+    ports:
+      - '127.0.0.1:8100:9000'
+    environment:
+      SOME_OTHER_PRODUCTS_ACCESS_KEY: dev
+      SOME_OTHER_PRODUCTS_SECRET_KEY: 'dev_storage_pw'
+''');
+
+      final inspector = inspect()..run();
+      expect(
+        inspector.findingsOf(DwCheckType.devComposeDrifted).single,
+        allOf(contains('"storage"'), contains('storage credentials')),
+      );
+    },
+  );
+
+  test(
+    'a project whose local environment sets no storage credentials at all '
+    'has nothing to report, whatever the compose file does or does not have',
+    () {
+      writeConfig('''
+local:
+  DW_DATABASE_PORT: 8090
+  DW_DATABASE_NAME: shop
+  DW_DATABASE_USER: postgres
+  DW_DATABASE_PASSWORD: dev_pw
+''');
+      writeCompose('''
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - '127.0.0.1:8090:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: shop
+      POSTGRES_PASSWORD: 'dev_pw'
+''');
+
+      expect(inspect()..run(), _reports(DwCheckType.devComposeDrifted, isEmpty));
+    },
+  );
 
   test('a password changed in one file only is named with both', () {
     writeConfig(matchingLocal.replaceAll('dev_pw', 'changed_pw'));

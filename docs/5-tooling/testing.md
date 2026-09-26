@@ -43,9 +43,9 @@ dart run dartway_cli:dartway test --keep                 # leave the containers 
 dart run dartway_cli:dartway test --no-storage           # a server without uploads
 ```
 
-The command starts `postgres:17-alpine` and `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` —
+The command starts `postgres:17-alpine` and `rustfs/rustfs:1.0.0` —
 the images a deployment runs — each published on `127.0.0.1` at a port Docker picks and with its data in `tmpfs`,
-waits until Postgres answers `pg_isready` and MinIO its readiness endpoint (60 seconds at most), runs
+waits until Postgres answers `pg_isready` and the storage its health endpoint (60 seconds at most), runs
 `dart test` in the server package, and removes both containers afterwards, on Ctrl+C too. `--image`
 and `--storage-image` name other images. The suite receives the coordinates in its environment:
 
@@ -197,7 +197,7 @@ outside it, then:
 - **services**: the suites of `packages/dartway_orm`, `packages/dartway_core_server` and
   `packages/dartway_push_server`, against the Postgres of `DW_DATABASE_*` and the S3-compatible
   storage of `DW_STORAGE_*`. It is not in the default because it needs two containers, and it is
-  not optional: CI runs it on every pull request with a Postgres service and a MinIO, on the ports
+  not optional: CI runs it on every pull request with a Postgres service and a storage, on the ports
   the script's header gives with its `docker run` and `export` lines. Asked for without every
   variable set, or with nothing answering on the database's or the storage's port, it stops before
   running anything and names what is missing — it never skips.
