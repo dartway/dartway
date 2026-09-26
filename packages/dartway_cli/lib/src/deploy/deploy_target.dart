@@ -75,6 +75,10 @@ class DwDeployTarget {
 
   final String host;
   final String sshUser;
+
+  /// The unprivileged user that owns the checkout and runs the stack.
+  /// Defaults to [defaultDeployUser] when `deploy_user` is absent from
+  /// `deploy/config.yaml`.
   final String deployUser;
   final String os;
   final String repo;
@@ -114,6 +118,13 @@ class DwDeployTarget {
   final List<String> requiredSecretFiles;
 
   static const configRelativePath = 'deploy/config.yaml';
+
+  /// `deploy_user` when `deploy/config.yaml` does not name one. Fixed rather
+  /// than derived from the project, so it never collides with a system group
+  /// a cloud image ships (DigitalOcean's Ubuntu 24.04 image has an empty
+  /// `admin` group, gid 110 — #328) — `dw_` is not a prefix any stock image
+  /// or package uses for a group name.
+  static const defaultDeployUser = 'dw_admin';
 
   /// Project name derived from the repository URL. Names the checkout and the
   /// runtime configuration directory on the server.
@@ -206,7 +217,9 @@ class DwDeployTarget {
 
     final host = guarded(() => reader.requiredString('host'));
     final sshUser = guarded(() => reader.requiredString('ssh_user'));
-    final deployUser = guarded(() => reader.requiredString('deploy_user'));
+    final deployUser =
+        guarded(() => reader.optionalString('deploy_user')) ??
+        defaultDeployUser;
     final os = guarded(() => reader.requiredString('os'));
     final repo = guarded(() => reader.requiredString('repo'));
     final branch = guarded(() => reader.requiredString('branch'));
@@ -328,7 +341,7 @@ class DwDeployTarget {
         environment: environment,
         host: host!,
         sshUser: sshUser!,
-        deployUser: deployUser!,
+        deployUser: deployUser,
         os: os!,
         repo: repo!,
         branch: branch!,

@@ -227,6 +227,39 @@ staging:
         _refusal(['No "production" environment', 'Declared: staging']),
       );
     });
+
+    // #328: DigitalOcean's Ubuntu 24.04 image ships an empty `admin` group,
+    // and a project-derived name is not the fix — `dw_admin` is fixed
+    // because no stock image or package uses the `dw_` prefix for a group.
+    test(
+      'deploy_user defaults to dw_admin when deploy/config.yaml does not '
+      'name one',
+      () {
+        const text = '''
+staging:
+  host: 203.0.113.10
+  ssh_user: root
+  os: ubuntu
+  repo: git@github.com:acme/shop.git
+  branch: master
+  ssl_email: ops@example.com
+  api_domain: api.example.com
+  app_domain: app.example.com
+''';
+
+        final target = DwDeployTarget.parse(text, environment: 'staging');
+
+        expect(target.deployUser, DwDeployTarget.defaultDeployUser);
+        expect(target.deployUser, 'dw_admin');
+      },
+    );
+
+    test('an explicit deploy_user wins over the default', () {
+      final target = targetFrom();
+
+      expect(target.deployUser, 'deployer');
+      expect(target.deployUser, isNot(DwDeployTarget.defaultDeployUser));
+    });
   });
 
   group('secret names', () {
