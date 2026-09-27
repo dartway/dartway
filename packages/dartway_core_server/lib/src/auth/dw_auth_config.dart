@@ -39,6 +39,7 @@ final class DwAuthConfig {
     this.onIdentifierChanged,
     this.onAccountDeleting,
     this.onExternalAccountCreated,
+    this.linkByVerifiedEmail = false,
     this.codeLength = 6,
     this.codeLifetime = const Duration(minutes: 10),
     this.maxAttempts = 5,
@@ -175,6 +176,43 @@ final class DwAuthConfig {
   final Future<void> Function(DwCallContext ctx, int accountId)?
   onAccountDeleting;
 
+  /// Whether the **first** sign-in of a provider identity (`google`,
+  /// `apple` — `DwAccountService.signInWithExternalIdentity`) may attach to
+  /// an existing account instead of creating a new one, when the token says
+  /// its e-mail is verified and an `email` identity of that normalized
+  /// address already belongs to an account. Off by default.
+  ///
+  /// On: the provider identity is attached to that account under the same
+  /// advisory lock as the e-mail identity (so a race with an e-mail sign-in
+  /// cannot split them), `onIdentifierChanged` runs
+  /// ([DwIdentifierChangeCause.linked]) instead of [onExternalAccountCreated],
+  /// and the answered session is not a new account. The e-mail's own
+  /// verification is untouched, and matching does not require it: an e-mail
+  /// sign-in already joins an account whose `email` identity `verified_at`
+  /// is unset (`DwAccountService.ensure` — a seed, an admin bootstrap) the
+  /// same way, so a provider's proof of the same address is held to no
+  /// higher a bar. A token whose e-mail is not verified, or that carries
+  /// none, never links — this is not a fallback to try, it is a
+  /// precondition. Nor does it link when the matched account already holds a
+  /// *different* identity of this same provider — see the risk below.
+  ///
+  /// **Why opt-in.** A provider's "verified" means "verified at the moment
+  /// that provider's account was created", not "verified now" — a Google
+  /// account's e-mail can be a custom domain the person later let lapse,
+  /// which someone else then registers; that new owner's Google sign-in would
+  /// still carry `email_verified: true` for an address they do not otherwise
+  /// control here, and linking would hand them somebody else's account. The
+  /// one narrowing this option does apply on its own: a match is refused when
+  /// the target account already has a *different* identity of the same
+  /// provider — the shape that exact takeover would have, an unrelated Google
+  /// account signing in for the first time under this provider and landing on
+  /// somebody else's e-mail. It is not a defence against a provider identity
+  /// created before this option was turned on, or against a first sign-in
+  /// with a provider the account has never used. Turning this on is a
+  /// project deciding the remaining trade is worth the account its members
+  /// would otherwise get twice.
+  final bool linkByVerifiedEmail;
+
   /// Who may delete an account — required, because either default was wrong
   /// for someone. The framework used to answer `DwDeleteMyAccount` for every
   /// project, and two of them learned it had become live only when a pin
@@ -244,10 +282,18 @@ enum DwIdentifierChangeCause {
 
   /// `DwAccountService.removeIdentities` removed it.
   removed,
+
+  /// A provider identity's first sign-in matched an existing account's
+  /// verified e-mail (`DwAuthConfig.linkByVerifiedEmail`) and was attached to
+  /// it instead of creating a new one. Distinct from [confirmed]: nobody
+  /// confirmed a code here, a provider's token stood in for one.
+  linked,
 }
 
 /// One identifier of one account changed: the argument of
-/// `DwAuthConfig.onIdentifierChanged`.
+/// `DwAuthConfig.onIdentifierChanged`. The identifier is a code identifier
+/// ([kind] set, [provider] `null`) or a provider identity ([provider] set,
+/// [kind] `null`) — exactly one of the two.
 ///
 /// [previous] is the value the account had and [current] the value it has:
 /// an attached identifier has no [previous], a removed one no [current], a
@@ -256,14 +302,20 @@ enum DwIdentifierChangeCause {
 final class DwIdentifierChange {
   const DwIdentifierChange({
     required this.accountId,
-    required this.kind,
+    this.kind,
+    this.provider,
     required this.cause,
     this.previous,
     this.current,
-  }) : assert(previous != null || current != null);
+  }) : assert(previous != null || current != null),
+       assert(
+         (kind == null) != (provider == null),
+         'DwIdentifierChange needs exactly one of kind or provider',
+       );
 
   final int accountId;
-  final DwIdentifierKind kind;
+  final DwIdentifierKind? kind;
+  final String? provider;
   final DwIdentifierChangeCause cause;
   final String? previous;
   final String? current;
@@ -272,7 +324,8 @@ final class DwIdentifierChange {
   /// kind of thing that ends up in a log line.
   @override
   String toString() =>
-      'DwIdentifierChange(account $accountId, ${kind.name}, ${cause.name})';
+      'DwIdentifierChange(account $accountId, ${provider ?? kind!.name}, '
+      '${cause.name})';
 }
 
 /// Who may delete an account ([DwAuthConfig.accountDeletion]).

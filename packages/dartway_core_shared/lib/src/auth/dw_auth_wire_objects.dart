@@ -325,33 +325,53 @@ final class DwSessionKeyInfo extends DwDataObject {
       '${revokedAt == null ? '' : ', revoked'})';
 }
 
-/// An identifier an account signs in with.
+/// An identifier an account signs in with: a code identifier ([kind] set,
+/// [provider] `null`) or a provider identity a token proved ([provider] set,
+/// [kind] `null`) — exactly one of the two, never both, never neither.
 final class DwIdentityInfo extends DwDataObject {
   const DwIdentityInfo({
     required this.id,
     required this.accountId,
-    required this.kind,
+    this.kind,
+    this.provider,
     required this.value,
     required this.createdAt,
     this.verifiedAt,
-  });
+  }) : assert(
+         (kind == null) != (provider == null),
+         'DwIdentityInfo needs exactly one of kind or provider',
+       );
 
   /// The identity's id (`dw_identity.id`); it survives a move to another
   /// account and a replacement of its value.
   @override
   final int id;
   final int accountId;
-  final DwIdentifierKind kind;
 
-  /// The normalized identifier (`DwAuthConfig.normalize`).
+  /// The kind of a code identifier (`phone`, `email`); `null` for a provider
+  /// identity, where [provider] is set instead.
+  final DwIdentifierKind? kind;
+
+  /// The provider's name (`google`, `apple`) for an identity a token proved
+  /// (`DwAccountService.signInWithExternalIdentity`); `null` for a code
+  /// identifier, where [kind] is set instead.
+  final String? provider;
+
+  /// The normalized identifier (`DwAuthConfig.normalize`) for a code
+  /// identity, the provider's subject id for a provider identity.
   final String value;
   final DateTime createdAt;
 
   /// When a one-time code sent to [value] was last confirmed for this
-  /// account — by a sign-in or by `DwConfirmIdentifier`. `null` for an
-  /// identifier a tool attached (`DwAccountService.ensure`) that has not
-  /// signed in since.
+  /// account — by a sign-in or by `DwConfirmIdentifier` — or, for a provider
+  /// identity, when the provider's token proved it. `null` for an identifier
+  /// a tool attached (`DwAccountService.ensure`) that has not signed in
+  /// since.
   final DateTime? verifiedAt;
+
+  /// What `dw_identity.kind` stores, and what a lock key for this identity is
+  /// built from: [provider], or [kind]'s name for a code identifier.
+  String get kindName => provider ?? kind!.name;
 
   @override
   String get dwTypeName => 'DwIdentityInfo';
@@ -360,7 +380,8 @@ final class DwIdentityInfo extends DwDataObject {
   Map<String, Object?> toJson() => {
     'id': id,
     'accountId': accountId,
-    'kind': kind.name,
+    if (kind case final kind?) 'kind': kind.name,
+    'provider': ?provider,
     'value': value,
     'createdAt': DwJsonCodec.encodeDateTime(createdAt),
     if (verifiedAt case final verifiedAt?)
@@ -370,7 +391,10 @@ final class DwIdentityInfo extends DwDataObject {
   static DwIdentityInfo fromJson(Map<String, Object?> json) => DwIdentityInfo(
     id: json['id']! as int,
     accountId: json['accountId']! as int,
-    kind: DwJsonCodec.decodeEnum(json['kind'], DwIdentifierKind.values),
+    kind: json['kind'] == null
+        ? null
+        : DwJsonCodec.decodeEnum(json['kind'], DwIdentifierKind.values),
+    provider: json['provider'] as String?,
     value: json['value']! as String,
     createdAt: DwJsonCodec.decodeDateTime(json['createdAt']),
     verifiedAt: json['verifiedAt'] == null
@@ -384,17 +408,29 @@ final class DwIdentityInfo extends DwDataObject {
       other.id == id &&
       other.accountId == accountId &&
       other.kind == kind &&
+      other.provider == provider &&
       other.value == value &&
       other.createdAt == createdAt &&
       other.verifiedAt == verifiedAt;
 
   @override
-  int get hashCode =>
-      Object.hash(id, accountId, kind, value, createdAt, verifiedAt);
+  int get hashCode => Object.hash(
+    id,
+    accountId,
+    kind,
+    provider,
+    value,
+    createdAt,
+    verifiedAt,
+  );
 
+  /// Without the value for a provider identity: unlike a phone or an e-mail,
+  /// which this already showed, a subject id is only ever meant for the
+  /// provider that issued it.
   @override
-  String toString() =>
-      'DwIdentityInfo($id, account $accountId, ${kind.name} $value)';
+  String toString() => provider != null
+      ? 'DwIdentityInfo($id, account $accountId, $provider)'
+      : 'DwIdentityInfo($id, account $accountId, ${kind!.name} $value)';
 }
 
 /// Asks the server to send a one-time code to an identifier the signed-in

@@ -200,6 +200,55 @@ void main() {
       expect(DwAuthRefusal.identifierTaken.code, 'dw.identifierTaken');
     });
 
+    test('a provider identity carries provider instead of kind, round-trips, '
+        'and needs exactly one of the two', () {
+      final provider = DwIdentityInfo(
+        id: 5,
+        accountId: 7,
+        provider: 'google',
+        value: 'google-subject-1',
+        createdAt: DateTime.utc(2026, 9, 14, 12),
+        verifiedAt: DateTime.utc(2026, 9, 14, 12, 1),
+      );
+      expect(provider.kind, isNull);
+      expect(provider.kindName, 'google');
+      expect(provider.toJson().containsKey('kind'), isFalse);
+      expect(provider.toJson()['provider'], 'google');
+      expect(DwIdentityInfo.fromJson(provider.toJson()), provider);
+      expect(protocol.decodeValue<DwIdentityInfo>(provider.toJson()), provider);
+
+      final code = DwIdentityInfo(
+        id: 3,
+        accountId: 7,
+        kind: DwIdentifierKind.phone,
+        value: '+15550001111',
+        createdAt: DateTime.utc(2026, 9, 14, 12),
+      );
+      expect(code.kindName, 'phone');
+      expect(code.toJson().containsKey('provider'), isFalse);
+
+      expect(
+        () => DwIdentityInfo(
+          id: 1,
+          accountId: 1,
+          value: 'x',
+          createdAt: DateTime.utc(2026),
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => DwIdentityInfo(
+          id: 1,
+          accountId: 1,
+          kind: DwIdentifierKind.email,
+          provider: 'google',
+          value: 'x',
+          createdAt: DateTime.utc(2026),
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
     test('primitives, nullable primitives and void', () {
       expect(wire(const _Command<int>(), 42), 42);
       expect(wire(const _Command<String>(), 'ok'), 'ok');

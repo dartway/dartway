@@ -151,6 +151,14 @@ final class DwSignInProvidersModule extends DwServerModule {
               if (!key.startsWith(DwProviderClaim.prefix)) key: value,
             ...claims,
           },
+          // Read from the claims directly, not fished back out of
+          // `registration` by its `dw.` key: whether an e-mail counts as
+          // verified is this module's call to make, not
+          // `dwEnsureExternalAccount`'s to infer from a string it did not
+          // itself put there.
+          verifiedEmail: claims[DwProviderClaim.emailVerified] == 'true'
+              ? claims[DwProviderClaim.email]
+              : null,
         );
         await _keepRefreshToken(
           ctx,

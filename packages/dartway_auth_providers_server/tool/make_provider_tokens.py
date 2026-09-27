@@ -139,6 +139,30 @@ def main():
                 claims[key] = value
         return sign(apple_header, claims, ec, True)
 
+    google_header = {'alg': 'RS256', 'kid': 'rsa-1', 'typ': 'JWT'}
+    google = {
+        'iss': 'https://accounts.google.com',
+        'sub': '11223344',
+        'aud': '1-android.apps.googleusercontent.com',
+        'exp': 2000000000,
+        'iat': 1700000000,
+        'email': 'ada@example.com',
+        'email_verified': True,
+        'name': 'Ada Lovelace',
+        'given_name': 'Ada',
+        'family_name': 'Lovelace',
+        'picture': 'https://example.com/a.png',
+    }
+
+    def google_token(**changes):
+        claims = dict(google)
+        for key, value in changes.items():
+            if value is None:
+                claims.pop(key, None)
+            else:
+                claims[key] = value
+        return sign(google_header, claims, rsa, False)
+
     tokens = {
         'appleToken': (
             apple_token(),
@@ -188,26 +212,19 @@ def main():
             "/// the oldest forgery there is.",
         ),
         'googleToken': (
-            sign(
-                {'alg': 'RS256', 'kid': 'rsa-1', 'typ': 'JWT'},
-                {
-                    'iss': 'https://accounts.google.com',
-                    'sub': '11223344',
-                    'aud': '1-android.apps.googleusercontent.com',
-                    'exp': 2000000000,
-                    'iat': 1700000000,
-                    'email': 'ada@example.com',
-                    'email_verified': True,
-                    'name': 'Ada Lovelace',
-                    'given_name': 'Ada',
-                    'family_name': 'Lovelace',
-                    'picture': 'https://example.com/a.png',
-                },
-                rsa,
-                False,
-            ),
+            google_token(),
             "A Google ID token: `sub` `11223344`, `aud`\n"
             "/// `1-android.apps.googleusercontent.com`, signed RS256.",
+        ),
+        'googleTokenEmailUnverified': (
+            google_token(sub='11223345', email_verified=False),
+            "The same e-mail, `email_verified: false` — Google's claim, not the\n"
+            "/// app's: `linkByVerifiedEmail` must never link on this.",
+        ),
+        'googleTokenNoEmailVerifiedClaim': (
+            google_token(sub='11223346', email_verified=None),
+            'The same e-mail, no `email_verified` claim at all — absent is not\n'
+            "/// verified either.",
         ),
     }
 

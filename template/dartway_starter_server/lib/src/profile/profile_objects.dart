@@ -42,13 +42,18 @@ abstract final class AppObjects {
       profile: await profile(ctx, row),
       identifiers: [
         for (final identity in identities)
-          UserIdentifier(
-            id: identity.id,
-            kind: identity.kind,
-            value: identity.value,
-            addedAt: identity.createdAt,
-            verifiedAt: identity.verifiedAt,
-          ),
+          // The skeleton signs in by code alone; a provider identity
+          // (`identity.kind` null) has no place in a list the admin panel
+          // reads as "phone or e-mail" — a project offering Google or Apple
+          // sign-in decides for itself how to show those here.
+          if (identity.kind case final kind?)
+            UserIdentifier(
+              id: identity.id,
+              kind: kind,
+              value: identity.value,
+              addedAt: identity.createdAt,
+              verifiedAt: identity.verifiedAt,
+            ),
       ],
       termsAcceptedAt: row.termsAcceptedAt,
     );

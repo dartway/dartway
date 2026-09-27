@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.0-dev.8
+
+- **BREAKING: `DwIdentityInfo.kind` is `DwIdentifierKind?` now, and `provider: String?` joined it —
+  exactly one of the two is ever set.** A provider identity (`google`, `apple`) used to be stored
+  with its provider's name as `kind`, which every reader threw on (dartway/dartway#355); `kindName`
+  answers `provider ?? kind!.name` for the one thing both forms share, a lock key. The wire does not
+  bump for it: `dto.identityInfo`'s own encoding is unchanged, and the new provider-shaped form is a
+  new golden shape, not a changed one — the framework's own `DwConfirmIdentifier` never answers one.
+  Migration note: `docs/migrations/2026-09-27-provider-identity-kind-nullable.md`.
+
 ## 0.21.0-dev.7
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).

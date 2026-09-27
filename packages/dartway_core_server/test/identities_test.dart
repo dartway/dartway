@@ -70,8 +70,7 @@ void main() {
       )).single.get<String>('identifier');
 
   List<String> values(List<DwIdentityInfo> identities) => [
-    for (final identity in identities)
-      '${identity.kind.name}:${identity.value}',
+    for (final identity in identities) '${identity.kindName}:${identity.value}',
   ];
 
   group('listing', () {
@@ -579,5 +578,91 @@ void main() {
         'email:ctx-move@example.com',
       ]);
     });
+  });
+
+  group('provider identities (#355)', () {
+    // On master, `DwAuthStore.identityOf` parses `dw_identity.kind` with
+    // `DwIdentifierKind.values.byName`, which throws `ArgumentError` the
+    // moment a row's kind is a provider's name (`google`, `apple`) rather
+    // than `phone` or `email` — every reader below threw it. Merging a
+    // provider-only account into one with a code identifier, as this test
+    // does, is the shortest way to put both kinds of row on one account
+    // without raw SQL on `dw_identity`.
+    test(
+      'an account with an e-mail and a Google identity: listing, moving '
+      '(kinds null and kinds={email}) and removing all work, and the hook '
+      'sees the provider identity too',
+      () async {
+        final (_, mixed) = await harness().signedIn('mixed@example.com');
+        final google = await accounts().signInWithExternalIdentity(
+          provider: 'google',
+          subject: 'google-mixed-1',
+        );
+        expect(google.isNewAccount, isTrue);
+
+        final changes = app().identifierChanges.length;
+        final moved = await accounts().moveIdentities(google.id, mixed.id);
+        expect(moved, hasLength(1));
+        expect(moved.single.provider, 'google');
+        expect(moved.single.kind, isNull);
+        expect(moved.single.value, 'google-mixed-1');
+        expect(
+          [
+            for (final c in app().identifierChanges.skip(changes))
+              (
+                accountId: c.accountId,
+                provider: c.provider,
+                kind: c.kind,
+                cause: c.cause,
+              ),
+          ],
+          [
+            (
+              accountId: google.id,
+              provider: 'google',
+              kind: null,
+              cause: DwIdentifierChangeCause.moved,
+            ),
+            (
+              accountId: mixed.id,
+              provider: 'google',
+              kind: null,
+              cause: DwIdentifierChangeCause.moved,
+            ),
+          ],
+        );
+
+        // listIdentities and listIdentitiesOf read both kinds of row.
+        expect(values(await accounts().listIdentities(mixed.id)), [
+          'email:mixed@example.com',
+          'google:google-mixed-1',
+        ]);
+        final both = await accounts().listIdentitiesOf([mixed.id, 987654321]);
+        expect(values(both[mixed.id]!), [
+          'email:mixed@example.com',
+          'google:google-mixed-1',
+        ]);
+        expect(both[987654321], isEmpty);
+
+        // moveIdentities(kinds: {email}) selects the code identifier only,
+        // leaving the provider identity where it is.
+        final (_, third) = await harness().signedIn('third@example.com');
+        final movedEmail = await accounts().moveIdentities(
+          mixed.id,
+          third.id,
+          kinds: {DwIdentifierKind.email},
+        );
+        expect(values(movedEmail), ['email:mixed@example.com']);
+        expect(values(await accounts().listIdentities(mixed.id)), [
+          'google:google-mixed-1',
+        ]);
+
+        // removeIdentities(kinds: null) removes a provider identity too.
+        final removed = await accounts().removeIdentities(mixed.id);
+        expect(removed, hasLength(1));
+        expect(removed.single.provider, 'google');
+        expect(await accounts().listIdentities(mixed.id), isEmpty);
+      },
+    );
   });
 }
