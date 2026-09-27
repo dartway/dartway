@@ -170,7 +170,7 @@ packages:
       path: "../../packages/dartway_shared_preferences"
       relative: true
     source: path
-    version: "0.6.0"
+    version: "0.6.1"
   dartway_starter_shared:
     dependency: "direct main"
     description:

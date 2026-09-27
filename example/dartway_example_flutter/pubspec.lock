@@ -206,7 +206,7 @@ packages:
       path: "../../packages/dartway_shared_preferences"
       relative: true
     source: path
-    version: "0.6.0"
+    version: "0.6.1"
   dbus:
     dependency: transitive
     description:
