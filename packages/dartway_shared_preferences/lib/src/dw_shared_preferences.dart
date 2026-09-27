@@ -64,6 +64,16 @@ typedef DwMappedPrefProviderFamily<T, Arg> =
 /// final token = dw.plugins.prefs.raw.getString('token');
 /// ```
 ///
+/// A provider does **not** bind to the plugin instance [provider] was called
+/// on. It resolves the store when its notifier is created — inside each
+/// `ProviderContainer`, from whichever [DwSharedPreferences] most recently
+/// finished `init()` in this isolate. A top-level `final` is therefore safe
+/// across as many `DwFlutterToolbox`s as run in the isolate — one new core per
+/// widget test file, for instance: each test's container reads and writes its
+/// own core's store, never an earlier test's. Reading a provider before any
+/// plugin has finished `init()` throws [StateError], not
+/// `LateInitializationError`.
+///
 /// When the key depends on an entity — one value per project, per chat, per
 /// user — reach for [providerFamily] / [mappedProviderFamily] instead of
 /// calling [provider] per id. The family is the top-level `final`; riverpod
@@ -118,6 +128,33 @@ class DwSharedPreferences extends DwKeyValueStorePlugin {
   @override
   bool get isPersistent => _persistent;
 
+  /// The most recently initialized plugin's [raw] — set at the end of
+  /// [init], on both the normal and the in-memory-fallback path.
+  ///
+  /// `SharedPreferences` is a process-wide slot regardless of how many
+  /// [DwSharedPreferences] instances exist, so "whichever finished `init()`
+  /// last" is the honest current store — not whichever instance a provider
+  /// happened to be declared through. This is what lets [provider] and its
+  /// siblings resolve fresh per `ProviderContainer` instead of binding to the
+  /// instance they were called on: see the class doc.
+  static SharedPreferences? _latestRaw;
+
+  /// The store a provider reads: [_latestRaw], or a [StateError] naming the
+  /// cause when nothing has initialized yet — clearer than the
+  /// `LateInitializationError` a direct `raw` access would give.
+  static SharedPreferences get _current {
+    final latest = _latestRaw;
+    if (latest == null) {
+      throw StateError(
+        'A DwSharedPreferences provider was read before any DwSharedPreferences '
+        "plugin finished dw.init(). Run dw.init() — which awaits every "
+        'declared plugin\'s init(), this one included — before reading '
+        'dw.plugins.prefs.provider(...) or one of its siblings.',
+      );
+    }
+    return latest;
+  }
+
   @override
   Future<void> init(DwFlutterToolbox core) async {
     try {
@@ -146,6 +183,7 @@ class DwSharedPreferences extends DwKeyValueStorePlugin {
         stackTrace,
       );
     }
+    _latestRaw = raw;
   }
 
   @override
@@ -177,7 +215,7 @@ class DwSharedPreferences extends DwKeyValueStorePlugin {
     required T defaultValue,
   }) {
     return NotifierProvider<PrefNotifier<T>, T>(() {
-      return PrefNotifier<T>(raw, key, defaultValue);
+      return PrefNotifier<T>(_current, key, defaultValue);
     });
   }
 
@@ -191,7 +229,7 @@ class DwSharedPreferences extends DwKeyValueStorePlugin {
     required String Function(T) mapTo,
   }) {
     return NotifierProvider<MappedPrefNotifier<T>, T>(() {
-      return MappedPrefNotifier<T>(raw, key, mapFrom, mapTo);
+      return MappedPrefNotifier<T>(_current, key, mapFrom, mapTo);
     });
   }
 
@@ -229,7 +267,7 @@ class DwSharedPreferences extends DwKeyValueStorePlugin {
     required T defaultValue,
   }) {
     return NotifierProvider.family<PrefNotifier<T>, T, Arg>((arg) {
-      return PrefNotifier<T>(raw, keyFor(arg), defaultValue);
+      return PrefNotifier<T>(_current, keyFor(arg), defaultValue);
     });
   }
 
@@ -251,7 +289,7 @@ class DwSharedPreferences extends DwKeyValueStorePlugin {
     required String Function(T) mapTo,
   }) {
     return NotifierProvider.family<MappedPrefNotifier<T>, T, Arg>((arg) {
-      return MappedPrefNotifier<T>(raw, keyFor(arg), mapFrom, mapTo);
+      return MappedPrefNotifier<T>(_current, keyFor(arg), mapFrom, mapTo);
     });
   }
 }
