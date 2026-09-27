@@ -21,7 +21,13 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
   final DwAnalyticsWidgetSpec? initial;
   final DwAnalyticsPeriod period;
 
-  static const List<int> _topChoices = [3, 5, 10, DwAnalyticsBreakdown.maxTop];
+  static const Set<int> _topChoices = {
+    3,
+    5,
+    10,
+    DwAnalyticsBreakdown.labelOrderTop,
+    DwAnalyticsBreakdown.maxTop,
+  };
 
   /// A breakdown as a choice of the "split by" menu, whatever its `top`.
   static String _breakdownKey(DwAnalyticsBreakdown breakdown) =>
@@ -31,12 +37,16 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
         _ => 'none',
       };
 
-  static DwAnalyticsBreakdown _breakdownOf(String? key, {required int top}) {
+  static DwAnalyticsBreakdown _breakdownOf(
+    String? key, {
+    required DwAnalyticsBreakdown previous,
+  }) {
     if (key == null || key == 'none') return const DwAnalyticsBreakdown.none();
     if (key.startsWith('property:')) {
       return DwAnalyticsBreakdown.byProperty(
         key.substring('property:'.length),
-        top: top,
+        top: previous.top == 0 ? 5 : previous.top,
+        order: previous.order,
       );
     }
     return DwAnalyticsBreakdown.byTime(
@@ -111,7 +121,13 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
                 ),
             ],
             selected: {type.value},
-            onSelectionChanged: (selected) => type.value = selected.single,
+            onSelectionChanged: (selected) {
+              type.value = selected.single;
+              // A pie's slices add up only for events, one value each.
+              if (type.value == DwAnalyticsWidgetType.pie) {
+                metric.value = DwAnalyticsMetric.events;
+              }
+            },
           ),
           const Gap(12),
           AppTextFormField(
@@ -140,6 +156,7 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
           ),
           const Gap(12),
           DropdownButtonFormField<DwAnalyticsMetric>(
+            key: ValueKey(metric.value),
             initialValue: metric.value,
             decoration: InputDecoration(labelText: l10n.analyticsMetricLabel),
             isExpanded: true,
@@ -150,7 +167,9 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
                   child: Text(l10n.analyticsMetric(m.name)),
                 ),
             ],
-            onChanged: (m) => metric.value = m ?? metric.value,
+            onChanged: type.value == DwAnalyticsWidgetType.pie
+                ? null
+                : (m) => metric.value = m ?? metric.value,
           ),
           const Gap(16),
           AnalyticsFilterRows(
@@ -183,13 +202,40 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
             ],
             onChanged: (choice) => breakdown.value = _breakdownOf(
               choice,
-              top: breakdown.value.top == 0 ? 5 : breakdown.value.top,
+              previous: breakdown.value,
             ),
           ),
           if (breakdown.value.property case final key?) ...[
             const Gap(12),
+            DropdownButtonFormField<DwAnalyticsBreakdownOrder>(
+              key: ValueKey(('order', key)),
+              initialValue: breakdown.value.order,
+              decoration: InputDecoration(labelText: l10n.analyticsOrderLabel),
+              isExpanded: true,
+              items: [
+                for (final order in DwAnalyticsBreakdownOrder.values)
+                  DropdownMenuItem(
+                    value: order,
+                    child: Text(l10n.analyticsOrder(order.name)),
+                  ),
+              ],
+              // A funnel shows every step: ordered by value, the top grows
+              // to hold a quiz's questions.
+              onChanged: (order) =>
+                  breakdown.value = DwAnalyticsBreakdown.byProperty(
+                    key,
+                    order: order ?? breakdown.value.order,
+                    top:
+                        order == DwAnalyticsBreakdownOrder.byLabel &&
+                            breakdown.value.top <
+                                DwAnalyticsBreakdown.labelOrderTop
+                        ? DwAnalyticsBreakdown.labelOrderTop
+                        : breakdown.value.top,
+                  ),
+            ),
+            const Gap(12),
             DropdownButtonFormField<int>(
-              key: ValueKey(key),
+              key: ValueKey(('top', key, breakdown.value.top)),
               initialValue: breakdown.value.top,
               decoration: InputDecoration(labelText: l10n.analyticsTopValues),
               items: [
@@ -200,8 +246,14 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
                   breakdown.value = DwAnalyticsBreakdown.byProperty(
                     key,
                     top: top ?? breakdown.value.top,
+                    order: breakdown.value.order,
                   ),
             ),
+          ],
+          if (type.value == DwAnalyticsWidgetType.pie &&
+              !spec.report.isPieShaped) ...[
+            const Gap(8),
+            AppText.caption(l10n.analyticsPieNeedsProperty),
           ],
           if (type.value == DwAnalyticsWidgetType.indicator) ...[
             const Gap(12),

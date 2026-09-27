@@ -13,9 +13,12 @@ class AnalyticsPeriodChoice {
     final today = now ?? DateTime.now();
     return AnalyticsPeriodChoice._(
       days,
+      // Up to now, not to midnight: the change against the days before is
+      // then measured between periods of the same shape.
       DwAnalyticsPeriod.localDays(
         today.subtract(Duration(days: days - 1)),
         today,
+        now: today,
       ),
     );
   }

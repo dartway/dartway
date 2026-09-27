@@ -14,7 +14,10 @@ enum DwAnalyticsWidgetType {
   /// The points as bars.
   bar,
 
-  /// The points as slices of the total.
+  /// The points as slices of the whole. Only for counted events broken down
+  /// by a property: each event has one value, so the slices add up to the
+  /// total. Distinct people or devices overlap between values — a person
+  /// who saw steps 1 and 2 is in both — and would draw shares of nothing.
   pie,
 }
 
@@ -42,6 +45,9 @@ final class DwAnalyticsWidgetSpec {
   String? get problem {
     if (title.trim().isEmpty || title.length > maxTitleLength) {
       return 'widget title is empty or longer than $maxTitleLength';
+    }
+    if (type == DwAnalyticsWidgetType.pie && !report.isPieShaped) {
+      return 'a pie counts events broken down by a property';
     }
     return report.problem;
   }

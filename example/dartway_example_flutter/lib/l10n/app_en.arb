@@ -328,5 +328,9 @@
   "analyticsNoData": "Nothing recorded in this period.",
   "refusalAnalyticsBatchInvalid": "The app recorded events the server cannot store.",
   "refusalAnalyticsReportInvalid": "This report cannot be built: check its event, properties and dates.",
-  "refusalAnalyticsDashboardInvalid": "Check the dashboard: it needs a title, and at most 12 widgets, each with a title."
+  "refusalAnalyticsDashboardInvalid": "Check the dashboard: it needs a title, and at most 12 widgets, each with a title.",
+  "analyticsOrderLabel": "Order",
+  "analyticsOrder": "{order, select, largestFirst{Largest first} byLabel{By value: 1, 2, … 10} other{—}}",
+  "@analyticsOrder": {"placeholders": {"order": {"type": "String"}}},
+  "analyticsPieNeedsProperty": "A pie shows events split by a property: choose one under “Split by”."
 }

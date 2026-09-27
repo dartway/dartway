@@ -51,8 +51,10 @@ pick them from a list (`stepNumber`, `sectionName` rather than `p1`).
 
 - In code: `ref.watch(dw.request(DwGetAnalyticsReport(spec: ..., period: ...)))` — a
   `DwAnalyticsReportSpec` (event, `DwAnalyticsMetric` events / accounts / installs,
-  `DwAnalyticsFilter`s, `DwAnalyticsBreakdown` none / by time / by a property's top values) over a
-  `DwAnalyticsPeriod` (`localDays`, `previous`). Distinct counts are counted over the whole period.
+  `DwAnalyticsFilter`s, `DwAnalyticsBreakdown` none / by time / by a property's values, largest
+  first or `DwAnalyticsBreakdownOrder.byLabel` for a funnel's steps) over a `DwAnalyticsPeriod`
+  (`localDays`, which ends at now; `previous`, the same shape earlier). Distinct counts are counted
+  over the whole period, so a pie is only for events by a property.
 - Dashboards change through `dw.plugins.analytics.saveDashboard` / `deleteDashboard`, which refresh
   `DwListAnalyticsDashboards`; `dw.command` with the dashboard commands leaves the list stale.
 - Charts are the UI kit's (`AppBarChart`, `AppPieChart`, `AppStatValue`): a new chart type goes

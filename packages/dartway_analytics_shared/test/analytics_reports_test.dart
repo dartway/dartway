@@ -18,7 +18,11 @@ void main() {
     eventName: 'quizStepSeen',
     metric: DwAnalyticsMetric.accounts,
     filters: [DwAnalyticsFilter(property: 'quiz', value: 'onboarding')],
-    breakdown: DwAnalyticsBreakdown.byProperty('question_number', top: 10),
+    breakdown: DwAnalyticsBreakdown.byProperty(
+      'question_number',
+      top: 10,
+      order: DwAnalyticsBreakdownOrder.byLabel,
+    ),
   );
 
   List<String?> fields(DwSelfValidating call) => [
@@ -125,6 +129,13 @@ void main() {
           top: DwAnalyticsBreakdown.maxTop + 1,
         ),
       ),
+      const DwAnalyticsReportSpec(
+        breakdown: DwAnalyticsBreakdown.byProperty(
+          'x',
+          top: DwAnalyticsBreakdown.maxTop + 1,
+          order: DwAnalyticsBreakdownOrder.byLabel,
+        ),
+      ),
     ]) {
       expect(fields(report(bad)), ['spec'], reason: '$bad');
     }
@@ -174,11 +185,12 @@ void main() {
     );
   });
 
-  test('local days are whole days of this device, and the previous period '
-      'is as long and ends where this one starts', () {
+  test('local days are whole days of this device, and a finished period is '
+      'compared with the same days just before it', () {
     final days = DwAnalyticsPeriod.localDays(
       DateTime(2026, 9, 1, 15),
       DateTime(2026, 9, 7),
+      now: DateTime(2026, 9, 20),
     );
     expect(days.from, DateTime(2026, 9, 1).toUtc());
     expect(days.to, DateTime(2026, 9, 8).toUtc());
@@ -192,6 +204,75 @@ void main() {
       days.to.difference(days.from),
     );
     expect(days.previous.utcOffsetMinutes, days.utcOffsetMinutes);
+  });
+
+  test('"the last 7 days" read in the morning ends now, and its previous '
+      'period is the same six days and a morning, a week earlier', () {
+    final morning = DateTime(2026, 9, 27, 9);
+    final week = DwAnalyticsPeriod.localDays(
+      DateTime(2026, 9, 21),
+      morning,
+      now: morning,
+    );
+    expect(week.from, DateTime(2026, 9, 21).toUtc());
+    expect(week.to, morning.toUtc(), reason: 'not past the clock');
+
+    final before = week.previous;
+    expect(before.from, week.from.subtract(const Duration(days: 7)));
+    expect(before.to, week.to.subtract(const Duration(days: 7)));
+    expect(
+      before.to.difference(before.from),
+      week.to.difference(week.from),
+      reason: 'the same partial last day, not seven whole days',
+    );
+    expect(before.to.isBefore(week.from), isTrue, reason: 'no overlap');
+  });
+
+  test('a pie is for events broken down by a property: its slices add up to '
+      'the total', () {
+    DwAnalyticsWidgetSpec pie(DwAnalyticsReportSpec report) =>
+        DwAnalyticsWidgetSpec(
+          type: DwAnalyticsWidgetType.pie,
+          title: 'Pie',
+          report: report,
+        );
+    expect(
+      pie(
+        const DwAnalyticsReportSpec(
+          breakdown: DwAnalyticsBreakdown.byProperty('block'),
+        ),
+      ).problem,
+      isNull,
+    );
+    for (final report in [
+      const DwAnalyticsReportSpec(
+        metric: DwAnalyticsMetric.accounts,
+        breakdown: DwAnalyticsBreakdown.byProperty('question_number'),
+      ),
+      const DwAnalyticsReportSpec(
+        metric: DwAnalyticsMetric.installs,
+        breakdown: DwAnalyticsBreakdown.byProperty('block'),
+      ),
+      const DwAnalyticsReportSpec(
+        breakdown: DwAnalyticsBreakdown.byTime(DwAnalyticsTimeBucket.day),
+      ),
+      const DwAnalyticsReportSpec(),
+    ]) {
+      expect(pie(report).problem, contains('pie'), reason: '$report');
+      expect(
+        fields(DwSaveAnalyticsDashboard(title: 'D', widgets: [pie(report)])),
+        ['widgets'],
+      );
+      expect(
+        DwAnalyticsWidgetSpec(
+          type: DwAnalyticsWidgetType.bar,
+          title: 'Bars',
+          report: report,
+        ).problem,
+        isNull,
+        reason: 'bars show any of them',
+      );
+    }
   });
 
   test('a dashboard with no title, too many widgets or a broken widget is '

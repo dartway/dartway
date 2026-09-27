@@ -1123,6 +1123,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check the dashboard: it needs a title, and at most 12 widgets, each with a title.'**
   String get refusalAnalyticsDashboardInvalid;
+
+  /// No description provided for @analyticsOrderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get analyticsOrderLabel;
+
+  /// No description provided for @analyticsOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'{order, select, largestFirst{Largest first} byLabel{By value: 1, 2, … 10} other{—}}'**
+  String analyticsOrder(String order);
+
+  /// No description provided for @analyticsPieNeedsProperty.
+  ///
+  /// In en, this message translates to:
+  /// **'A pie shows events split by a property: choose one under “Split by”.'**
+  String get analyticsPieNeedsProperty;
 }
 
 class _AppLocalizationsDelegate

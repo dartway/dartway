@@ -170,5 +170,8 @@
   "analyticsNoData": "За этот период ничего не записано.",
   "refusalAnalyticsBatchInvalid": "Приложение записало события, которые сервер не может сохранить.",
   "refusalAnalyticsReportInvalid": "Такой отчёт не построить: проверьте событие, свойства и даты.",
-  "refusalAnalyticsDashboardInvalid": "Проверьте дашборд: нужно название и не больше 12 виджетов, у каждого — название."
+  "refusalAnalyticsDashboardInvalid": "Проверьте дашборд: нужно название и не больше 12 виджетов, у каждого — название.",
+  "analyticsOrderLabel": "Порядок",
+  "analyticsOrder": "{order, select, largestFirst{Сначала крупные} byLabel{По значению: 1, 2, … 10} other{—}}",
+  "analyticsPieNeedsProperty": "Круговая диаграмма делит события по свойству: выберите его в «Разбить по»."
 }

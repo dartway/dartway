@@ -10,8 +10,8 @@ int _names = 0;
 String uniqueName(String base) => '$base${++_names}';
 
 void main() {
-  group('with the project rule', () {
-    final harness = useAnalyticsHarness();
+  group('with the project rules', () {
+    final harness = useAnalyticsHarness(withEditors: true);
 
     /// Sends [events] from a fresh install, signed in as [as].
     Future<void> record(
@@ -325,7 +325,7 @@ void main() {
     test(
       'dashboards are created, listed in order, replaced and deleted',
       () async {
-        final reader = await harness().reader();
+        final reader = await harness().editor();
         const clicks = DwAnalyticsWidgetSpec(
           type: DwAnalyticsWidgetType.pie,
           title: 'Home clicks',
@@ -408,6 +408,170 @@ void main() {
       },
     );
 
+    test('an account that may read but not edit reads reports, the catalog '
+        'and the dashboards, and is refused dw.forbidden on save and '
+        'delete', () async {
+      final editor = await harness().editor();
+      final reader = await harness().reader();
+      final kept = await harness().send(
+        const DwSaveAnalyticsDashboard(title: 'Kept'),
+        as: editor,
+      );
+      final id = kept.value(const DwSaveAnalyticsDashboard(title: 'Kept')).id;
+
+      for (final call in <DwServerCall<Object?>>[
+        DwGetAnalyticsReport(
+          spec: const DwAnalyticsReportSpec(),
+          period: september,
+        ),
+        DwGetAnalyticsCatalog(period: september),
+        const DwListAnalyticsDashboards(),
+      ]) {
+        final answer = await harness().send(call, as: reader);
+        expect(answer.status, 200, reason: '$call: ${answer.text}');
+      }
+      for (final call in <DwServerCall<Object?>>[
+        const DwSaveAnalyticsDashboard(title: 'Mine'),
+        DwSaveAnalyticsDashboard(id: id, title: 'Renamed'),
+        DwDeleteAnalyticsDashboard(id: id),
+      ]) {
+        final answer = await harness().send(call, as: reader);
+        expect(answer.status, 403, reason: '$call: ${answer.text}');
+        expect(answer.refusal.isCode(DwCoreRefusal.forbidden), isTrue);
+      }
+      final listed = await harness().send(
+        const DwListAnalyticsDashboards(),
+        as: reader,
+      );
+      expect(
+        listed
+            .value(const DwListAnalyticsDashboards())
+            .firstWhere((d) => d.id == id)
+            .title,
+        'Kept',
+        reason: 'nothing the reader sent changed it',
+      );
+    });
+
+    test('"other" counts distinctly too: one account clicking every hidden '
+        'value many times is one in other', () async {
+      final clicked = uniqueName('menuClicked');
+      final reader = await harness().reader();
+      final a = await harness().account();
+      final b = await harness().account();
+      final c = await harness().account();
+      (String, DateTime, Map<String, Object?>) click(String item) =>
+          (clicked, at, {'item': item});
+      await record([click('shown'), click('shown')], as: a);
+      await record([click('shown')], as: b);
+      await record([click('shown')], as: c);
+      // Beyond the top: one account, many clicks on many values.
+      await record([
+        for (var i = 0; i < 6; i++) click('hidden$i'),
+        for (var i = 0; i < 6; i++) click('hidden$i'),
+      ], as: c);
+
+      final people = await report(
+        DwAnalyticsReportSpec(
+          eventName: clicked,
+          metric: DwAnalyticsMetric.accounts,
+          breakdown: const DwAnalyticsBreakdown.byProperty('item', top: 1),
+        ),
+        september,
+        as: reader,
+      );
+      expect(people.points, const [DwAnalyticsPoint(label: 'shown', value: 3)]);
+      expect(people.other, 1, reason: 'account c, once — not 12 events');
+      expect(people.total, 3);
+
+      final events = await report(
+        DwAnalyticsReportSpec(
+          eventName: clicked,
+          breakdown: const DwAnalyticsBreakdown.byProperty('item', top: 1),
+        ),
+        september,
+        as: reader,
+      );
+      expect(events.other, 12);
+    });
+
+    test('events without the property, when they make the top, are a point '
+        'and are not counted again in other', () async {
+      final opened = uniqueName('bannerOpened');
+      final reader = await harness().reader();
+      await record([
+        for (var i = 0; i < 5; i++) (opened, at, const <String, Object?>{}),
+        for (var i = 0; i < 3; i++) (opened, at, {'banner': 'spring'}),
+        (opened, at, {'banner': 'summer'}),
+        (opened, at, {'banner': 'autumn'}),
+      ]);
+      final banners = await report(
+        DwAnalyticsReportSpec(
+          eventName: opened,
+          breakdown: const DwAnalyticsBreakdown.byProperty('banner', top: 2),
+        ),
+        september,
+        as: reader,
+      );
+      expect(banners.points, const [
+        DwAnalyticsPoint(label: null, value: 5),
+        DwAnalyticsPoint(label: 'spring', value: 3),
+      ]);
+      expect(banners.other, 2, reason: 'summer and autumn only');
+      expect(banners.total, 10);
+    });
+
+    test(
+      'a breakdown ordered by label reads as a funnel: numbers in number '
+      'order, text after them, the missing value last, the first N kept',
+      () async {
+        final seen = uniqueName('quizStepSeen');
+        final reader = await harness().reader();
+        await record([
+          for (var step = 1; step <= 12; step++)
+            for (var i = 0; i <= 12 - step; i++)
+              (seen, at, {'question_number': step}),
+          (seen, at, {'question_number': 'done'}),
+          (seen, at, const <String, Object?>{}),
+        ]);
+        final funnel = await report(
+          DwAnalyticsReportSpec(
+            eventName: seen,
+            breakdown: const DwAnalyticsBreakdown.byProperty(
+              'question_number',
+              top: DwAnalyticsBreakdown.labelOrderTop,
+              order: DwAnalyticsBreakdownOrder.byLabel,
+            ),
+          ),
+          september,
+          as: reader,
+        );
+        expect(funnel.points.map((p) => p.label), [
+          for (var step = 1; step <= 12; step++) '$step',
+          'done',
+          null,
+        ]);
+        expect(funnel.points.first.value, 12);
+        expect(funnel.points[11].value, 1);
+        expect(funnel.other, isNull);
+
+        final firstThree = await report(
+          DwAnalyticsReportSpec(
+            eventName: seen,
+            breakdown: const DwAnalyticsBreakdown.byProperty(
+              'question_number',
+              top: 3,
+              order: DwAnalyticsBreakdownOrder.byLabel,
+            ),
+          ),
+          september,
+          as: reader,
+        );
+        expect(firstThree.points.map((p) => p.label), ['1', '2', '3']);
+        expect(firstThree.other, firstThree.total - (12 + 11 + 10));
+      },
+    );
+
     test(
       'an account the rule does not allow is refused dw.forbidden on every '
       'analytics read and change; a signed-out caller is asked to sign in',
@@ -434,6 +598,25 @@ void main() {
           final signedOut = await harness().send(call);
           expect(signedOut.status, 401, reason: '$call: ${signedOut.text}');
         }
+      },
+    );
+  });
+
+  group('with readAccess alone', () {
+    final harness = useAnalyticsHarness();
+
+    test(
+      'editAccess defaults to readAccess: a reader saves and deletes',
+      () async {
+        final reader = await harness().reader();
+        const save = DwSaveAnalyticsDashboard(title: 'Shared');
+        final saved = await harness().send(save, as: reader);
+        expect(saved.status, 200, reason: saved.text);
+        final deleted = await harness().send(
+          DwDeleteAnalyticsDashboard(id: saved.value(save).id),
+          as: reader,
+        );
+        expect(deleted.status, 200, reason: deleted.text);
       },
     );
   });

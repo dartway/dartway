@@ -648,4 +648,21 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get refusalAnalyticsDashboardInvalid =>
       'Проверьте дашборд: нужно название и не больше 12 виджетов, у каждого — название.';
+
+  @override
+  String get analyticsOrderLabel => 'Порядок';
+
+  @override
+  String analyticsOrder(String order) {
+    String _temp0 = intl.Intl.selectLogic(order, {
+      'largestFirst': 'Сначала крупные',
+      'byLabel': 'По значению: 1, 2, … 10',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get analyticsPieNeedsProperty =>
+      'Круговая диаграмма делит события по свойству: выберите его в «Разбить по».';
 }

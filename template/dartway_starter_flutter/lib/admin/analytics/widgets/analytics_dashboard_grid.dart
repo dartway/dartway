@@ -5,10 +5,16 @@ import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 
 /// The widgets of [dashboard] in a grid of as many columns as fit.
-class AnalyticsDashboardGrid extends StatelessWidget {
+///
+/// Every change sends the whole list, so changes go one at a time and each
+/// is built on the list the previous one saved: while a save is under way
+/// the controls are off, and a second tap cannot send a list that still has
+/// the widget the first one removed.
+class AnalyticsDashboardGrid extends HookWidget {
   const AnalyticsDashboardGrid({
     super.key,
     required this.dashboard,
@@ -23,43 +29,105 @@ class AnalyticsDashboardGrid extends StatelessWidget {
   static const double _cardMinWidth = 300;
   static const double _gap = 12;
 
-  /// Saves [widgets] as the dashboard's, in this order.
-  Future<void> _save(
-    BuildContext context,
-    List<DwAnalyticsWidgetSpec> widgets,
-  ) async => dw.action(
-    (_) => dw.plugins.analytics.saveDashboard(
-      id: dashboard.id,
-      title: dashboard.title,
-      widgets: widgets,
-    ),
-  )(context);
-
-  Future<void> _edit(BuildContext context, int? index) async {
-    final widgets = dashboard.widgets;
-    final spec = await context.showAppBottomSheet<DwAnalyticsWidgetSpec>(
-      child: AnalyticsWidgetEditor(
-        initial: index == null ? null : widgets[index],
-        period: period,
-      ),
-    );
-    if (spec == null || !context.mounted) return;
-    await _save(context, [
-      for (final (i, w) in widgets.indexed) i == index ? spec : w,
-      if (index == null) spec,
-    ]);
-  }
-
-  Future<void> _move(BuildContext context, int index, int by) {
-    final widgets = [...dashboard.widgets];
-    widgets.insert(index + by, widgets.removeAt(index));
-    return _save(context, widgets);
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final widgets = dashboard.widgets;
+    final saving = useState(false);
+    // What the last save here answered, until the list read after it arrives
+    // as [dashboard] — then the dashboard is the truth again.
+    final saved = useState<List<DwAnalyticsWidgetSpec>?>(null);
+    useEffect(() {
+      saved.value = null;
+      return null;
+    }, [dashboard.updatedAt]);
+    final latest = useRef(dashboard.widgets);
+    latest.value = saved.value ?? dashboard.widgets;
+    final widgets = latest.value;
+
+    Future<void> save(
+      BuildContext context,
+      List<DwAnalyticsWidgetSpec> Function(List<DwAnalyticsWidgetSpec>) change,
+    ) async {
+      if (saving.value) return;
+      saving.value = true;
+      try {
+        final result = await dw.action(
+          (_) => dw.plugins.analytics.saveDashboard(
+            id: dashboard.id,
+            title: dashboard.title,
+            widgets: change(latest.value),
+          ),
+        )(context);
+        if (result case DwCallOk(:final value) when context.mounted) {
+          saved.value = value.widgets;
+        }
+      } finally {
+        if (context.mounted) saving.value = false;
+      }
+    }
+
+    Future<void> edit(BuildContext context, int? index) async {
+      final spec = await context.showAppBottomSheet<DwAnalyticsWidgetSpec>(
+        child: AnalyticsWidgetEditor(
+          initial: index == null ? null : latest.value[index],
+          period: period,
+        ),
+      );
+      if (spec == null || !context.mounted) return;
+      await save(
+        context,
+        (current) => [
+          for (final (i, w) in current.indexed) i == index ? spec : w,
+          if (index == null) spec,
+        ],
+      );
+    }
+
+    List<Widget> actions(int index) => [
+      IconButton(
+        tooltip: l10n.analyticsMoveWidgetBack,
+        icon: const Icon(Icons.arrow_back),
+        onPressed: saving.value || index == 0
+            ? null
+            : () => save(
+                context,
+                (current) => [...current]
+                  ..insert(index - 1, current[index])
+                  ..removeAt(index + 1),
+              ),
+      ),
+      IconButton(
+        tooltip: l10n.analyticsMoveWidgetForward,
+        icon: const Icon(Icons.arrow_forward),
+        onPressed: saving.value || index == widgets.length - 1
+            ? null
+            : () => save(
+                context,
+                (current) => [...current]
+                  ..insert(index + 2, current[index])
+                  ..removeAt(index),
+              ),
+      ),
+      IconButton(
+        tooltip: l10n.analyticsEditWidget,
+        icon: const Icon(Icons.tune),
+        onPressed: saving.value ? null : () => edit(context, index),
+      ),
+      IconButton(
+        tooltip: l10n.analyticsRemoveWidget,
+        icon: const Icon(Icons.delete_outline),
+        onPressed: saving.value
+            ? null
+            : () => save(
+                context,
+                (current) => [
+                  for (final (i, w) in current.indexed)
+                    if (i != index) w,
+                ],
+              ),
+      ),
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = ((constraints.maxWidth + _gap) / (_cardMinWidth + _gap))
@@ -80,37 +148,7 @@ class AnalyticsDashboardGrid extends StatelessWidget {
                     child: AnalyticsWidgetCard(
                       spec: spec,
                       period: period,
-                      actions: editing
-                          ? [
-                              IconButton(
-                                tooltip: l10n.analyticsMoveWidgetBack,
-                                icon: const Icon(Icons.arrow_back),
-                                onPressed: index == 0
-                                    ? null
-                                    : () => _move(context, index, -1),
-                              ),
-                              IconButton(
-                                tooltip: l10n.analyticsMoveWidgetForward,
-                                icon: const Icon(Icons.arrow_forward),
-                                onPressed: index == widgets.length - 1
-                                    ? null
-                                    : () => _move(context, index, 1),
-                              ),
-                              IconButton(
-                                tooltip: l10n.analyticsEditWidget,
-                                icon: const Icon(Icons.tune),
-                                onPressed: () => _edit(context, index),
-                              ),
-                              IconButton(
-                                tooltip: l10n.analyticsRemoveWidget,
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => _save(context, [
-                                  for (final (i, w) in widgets.indexed)
-                                    if (i != index) w,
-                                ]),
-                              ),
-                            ]
-                          : const [],
+                      actions: editing ? actions(index) : const [],
                     ),
                   ),
               ],
@@ -122,7 +160,9 @@ class AnalyticsDashboardGrid extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: AppButton.secondary(
                   l10n.analyticsAddWidget,
-                  onTap: dw.action((context) => _edit(context, null)),
+                  onTap: saving.value
+                      ? null
+                      : dw.action((context) => edit(context, null)),
                 ),
               ),
             ],

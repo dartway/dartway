@@ -93,6 +93,16 @@ abstract final class DwAnalyticsReports {
     } else if (breakdown.property case final property?) {
       params['key'] = property;
       params['top'] = breakdown.top;
+      // Numbers numerically and before text, the property's absence last:
+      // `1, 2, …, 10` rather than `1, 10, 2`.
+      const number = r"label ~ '^-?[0-9]+(\.[0-9]+)?$'";
+      final order = switch (breakdown.order) {
+        DwAnalyticsBreakdownOrder.largestFirst =>
+          'value DESC, label ASC NULLS LAST',
+        DwAnalyticsBreakdownOrder.byLabel =>
+          'label IS NULL, ($number) DESC, '
+              'CASE WHEN $number THEN label::numeric END, label',
+      };
       // The largest values, then the rest together, then the total — each
       // counted over the events, so a distinct count stays distinct.
       sql =
@@ -100,7 +110,7 @@ abstract final class DwAnalyticsReports {
           '$counted AS counted FROM dw_analytics_event WHERE $where), '
           'g AS (SELECT label, $count AS value FROM e GROUP BY label), '
           'top AS (SELECT label, value, row_number() OVER '
-          '(ORDER BY value DESC, label ASC NULLS LAST) AS ord FROM g '
+          '(ORDER BY $order) AS ord FROM g '
           'ORDER BY ord LIMIT @top::int4) '
           'SELECT $_point AS part, label, value::int8 AS value, ord FROM top '
           'UNION ALL SELECT $_other, NULL, $count::int8, NULL FROM e '

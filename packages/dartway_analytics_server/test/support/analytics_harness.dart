@@ -74,6 +74,7 @@ final class AnalyticsHarness {
   static Future<AnalyticsHarness> start(
     DwAnalyticsSettings settings, {
     required bool withReaders,
+    required bool withEditors,
   }) async {
     final DwDatabaseConfig admin;
     try {
@@ -103,9 +104,11 @@ final class AnalyticsHarness {
             DwServerFeature('orders', handlers: [placeOrderHandler]),
           ],
           modules: [
-            withReaders
-                ? DwAnalyticsModule(settings: settings, readAccess: readers)
-                : DwAnalyticsModule(settings: settings),
+            DwAnalyticsModule(
+              settings: settings,
+              readAccess: withReaders ? readers : null,
+              editAccess: withEditors ? editors : null,
+            ),
           ],
           logger: const _SilentLogger(),
           settings: const DwServerSettings(
@@ -139,6 +142,21 @@ final class AnalyticsHarness {
     return made;
   }
 
+  /// The accounts [editors] lets change dashboards.
+  static final Set<int> _editorIds = {};
+
+  /// The project's edit rule in these suites: an account made by [editor].
+  static final DwAccessRule editors = DwAccessRule.check<DwServerCall<Object?>>(
+    (ctx, call) async => _editorIds.contains(ctx.accountId),
+  );
+
+  /// An account the project lets read analytics and change dashboards.
+  Future<TestAccount> editor() async {
+    final made = await reader();
+    _editorIds.add(made.id);
+    return made;
+  }
+
   Future<TestAccount> account() async {
     final accounts = server.server.accounts;
     final ensured = await accounts.ensure(
@@ -169,16 +187,20 @@ final class AnalyticsHarness {
 }
 
 /// A server for the suite. [withReaders] gives the module the project rule
-/// [AnalyticsHarness.readers]; without it the module has no `readAccess`.
+/// [AnalyticsHarness.readers] as `readAccess`, [withEditors] the rule
+/// [AnalyticsHarness.editors] as `editAccess`; without them the module has
+/// none.
 AnalyticsHarness Function() useAnalyticsHarness({
   DwAnalyticsSettings settings = const DwAnalyticsSettings(),
   bool withReaders = true,
+  bool withEditors = false,
 }) {
   AnalyticsHarness? harness;
   setUpAll(
     () async => harness = await AnalyticsHarness.start(
       settings,
       withReaders: withReaders,
+      withEditors: withEditors,
     ),
   );
   tearDownAll(() async => harness?.stop());

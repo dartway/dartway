@@ -113,7 +113,21 @@ void main() {
     await app.tap(tester, find.text('Pie'));
     await app.enter(tester, find.byType(TextField).last, 'Home clicks');
     await choose(app, tester, 'Any event', 'homeClicked (40)');
+    // A pie counts events, split by a property: until one is chosen it
+    // cannot be saved, and the count cannot be switched to people.
+    expect(find.textContaining('A pie shows events split'), findsOneWidget);
+    await app.tap(tester, find.text('Save').last);
+    expect(dashboards.single.widgets, isEmpty);
+    expect(
+      tester
+          .widget<DropdownButtonFormField<DwAnalyticsMetric>>(
+            find.byType(DropdownButtonFormField<DwAnalyticsMetric>),
+          )
+          .onChanged,
+      isNull,
+    );
     await choose(app, tester, 'Nothing', 'Property “block_name”');
+    expect(find.textContaining('A pie shows events split'), findsNothing);
     await app.tap(tester, find.text('Save').last);
 
     expect(
@@ -132,8 +146,14 @@ void main() {
     expect(find.text('Home clicks'), findsOneWidget);
     expect(find.text('feed'), findsOneWidget);
     expect(find.text('Other'), findsOneWidget);
+    // The last 30 days: from midnight 29 days ago up to now, not midnight.
     final report = app.server.requestsOf<DwGetAnalyticsReport>().last;
-    expect(report.period.to.difference(report.period.from).inDays, 30);
+    final today = DateTime.now();
+    expect(
+      report.period.from,
+      DateTime(today.year, today.month, today.day - 29).toUtc(),
+    );
+    expect(report.period.to.isAfter(today.toUtc()), isFalse);
 
     await app.stop(tester);
   });
@@ -164,6 +184,14 @@ void main() {
       for (final r in app.server.requestsOf<DwGetAnalyticsReport>()) r.period,
     };
     expect(periods, hasLength(2), reason: 'this period and the previous one');
+    // The same shape 30 days earlier: the same partial today, not 30 whole
+    // days against 29 and a morning.
+    final shown = periods.firstWhere(
+      (p) => p.to.isAfter(p.from) && periods.every((q) => !q.to.isAfter(p.to)),
+    );
+    final previous = periods.firstWhere((p) => p != shown);
+    expect(previous, shown.previous);
+    expect(previous.to, shown.to.subtract(const Duration(days: 30)));
 
     await app.tap(tester, find.byTooltip('Edit dashboard'));
     await app.tap(tester, find.text('Add widget'));
@@ -172,14 +200,20 @@ void main() {
     await choose(app, tester, 'Any event', 'quizStepSeen (90)');
     await choose(app, tester, 'Events', 'People (signed-in accounts)');
     await choose(app, tester, 'Nothing', 'Property “question_number”');
+    await choose(app, tester, 'Largest first', 'By value: 1, 2, … 10');
     await app.tap(tester, find.text('Save').last);
 
+    // A funnel: steps in their order, and room for a 15-question quiz.
     expect(
       dashboards.single.widgets.last.report,
       const DwAnalyticsReportSpec(
         eventName: 'quizStepSeen',
         metric: DwAnalyticsMetric.accounts,
-        breakdown: DwAnalyticsBreakdown.byProperty('question_number'),
+        breakdown: DwAnalyticsBreakdown.byProperty(
+          'question_number',
+          top: DwAnalyticsBreakdown.labelOrderTop,
+          order: DwAnalyticsBreakdownOrder.byLabel,
+        ),
       ),
     );
     expect(find.text('Quiz funnel'), findsOneWidget);
@@ -193,12 +227,49 @@ void main() {
     expect(dashboards.single.widgets.map((w) => w.title), ['Quiz funnel']);
 
     await app.tap(tester, find.text('7 days'));
+    final today = DateTime.now();
     expect(
-      app.server.requestsOf<DwGetAnalyticsReport>().last.period.to.difference(
-        app.server.requestsOf<DwGetAnalyticsReport>().last.period.from,
-      ),
-      const Duration(days: 7),
+      app.server.requestsOf<DwGetAnalyticsReport>().last.period.from,
+      DateTime(today.year, today.month, today.day - 6).toUtc(),
     );
+
+    await app.stop(tester);
+  });
+
+  testWidgets('two removals tapped in a row do not undo each other: the '
+      'second waits for the first', (tester) async {
+    final (:fake, :dashboards) = analyticsAdmin();
+    DwAnalyticsWidgetSpec number(String title) => DwAnalyticsWidgetSpec(
+      type: DwAnalyticsWidgetType.indicator,
+      title: title,
+      report: const DwAnalyticsReportSpec(),
+    );
+    dashboards.add(
+      DwAnalyticsDashboard(
+        id: 7,
+        title: 'Numbers',
+        updatedAt: DateTime.utc(2026, 9, 27),
+        widgets: [number('First'), number('Second'), number('Third')],
+      ),
+    );
+    final app = await openDashboard(tester, fake);
+    await app.tap(tester, find.byTooltip('Edit dashboard'));
+
+    final remove = find.byTooltip('Remove widget');
+    await tester.ensureVisible(remove.first);
+    await tester.tap(remove.first);
+    await tester.pump();
+    // Before the first save has answered: built from the old list, this tap
+    // would send First back.
+    await tester.tap(remove.at(1), warnIfMissed: false);
+    await app.settle(tester);
+
+    expect(app.server.callsOf<DwSaveAnalyticsDashboard>(), hasLength(1));
+    expect(dashboards.single.widgets.map((w) => w.title), ['Second', 'Third']);
+
+    // Once it has, the next removal starts from what was saved.
+    await app.tap(tester, find.byTooltip('Remove widget').first);
+    expect(dashboards.single.widgets.map((w) => w.title), ['Third']);
 
     await app.stop(tester);
   });

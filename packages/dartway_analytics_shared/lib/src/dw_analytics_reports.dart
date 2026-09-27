@@ -54,21 +54,40 @@ final class DwAnalyticsFilter {
   String toString() => '$property = $value';
 }
 
+/// Which values of a property a breakdown shows, and in what order.
+enum DwAnalyticsBreakdownOrder {
+  /// The largest values first: "which blocks are clicked most".
+  largestFirst,
+
+  /// By the value itself, numbers numerically and before text — `1, 2, …,
+  /// 10`, not `1, 10, 2` — and the property's absence last: a funnel's steps
+  /// in their order.
+  byLabel,
+}
+
 /// How a report splits its total: not at all, by time, or by the values of a
 /// property.
 final class DwAnalyticsBreakdown {
   /// The total alone.
-  const DwAnalyticsBreakdown.none() : bucket = null, property = null, top = 0;
+  const DwAnalyticsBreakdown.none()
+    : bucket = null,
+      property = null,
+      top = 0,
+      order = DwAnalyticsBreakdownOrder.largestFirst;
 
   /// One point per [bucket] of the period, empty buckets included as zero.
   const DwAnalyticsBreakdown.byTime(DwAnalyticsTimeBucket this.bucket)
     : property = null,
-      top = 0;
+      top = 0,
+      order = DwAnalyticsBreakdownOrder.largestFirst;
 
-  /// One point per value of [property] — the [top] largest, and the rest
-  /// together as the report's `other`.
-  const DwAnalyticsBreakdown.byProperty(String this.property, {this.top = 5})
-    : bucket = null;
+  /// One point per value of [property] — the first [top] in [order], and
+  /// the rest together as the report's `other`.
+  const DwAnalyticsBreakdown.byProperty(
+    String this.property, {
+    this.top = 5,
+    this.order = DwAnalyticsBreakdownOrder.largestFirst,
+  }) : bucket = null;
 
   /// The bucket of a breakdown by time; `null` otherwise.
   final DwAnalyticsTimeBucket? bucket;
@@ -79,14 +98,27 @@ final class DwAnalyticsBreakdown {
   /// How many values of [property] get a point of their own.
   final int top;
 
-  /// The most values a breakdown by property shows apart.
-  static const int maxTop = 20;
+  /// Which values of [property] get the points, and their order.
+  final DwAnalyticsBreakdownOrder order;
+
+  /// The most values a breakdown by property shows apart: one bar per line,
+  /// and 30 lines is what a dashboard card still reads at a glance — a quiz
+  /// of 15–25 questions fits with room; longer is a table, not a chart.
+  static const int maxTop = 30;
+
+  /// The `top` a builder offers for [DwAnalyticsBreakdownOrder.byLabel]: a
+  /// funnel shows every step, and 20 holds a 15-question quiz with room.
+  static const int labelOrderTop = 20;
 
   bool get isNone => bucket == null && property == null;
 
   Map<String, Object?> toJson() => {
     if (bucket case final bucket?) 'bucket': bucket.name,
-    if (property case final property?) ...{'property': property, 'top': top},
+    if (property case final property?) ...{
+      'property': property,
+      'top': top,
+      if (order != DwAnalyticsBreakdownOrder.largestFirst) 'order': order.name,
+    },
   };
 
   static DwAnalyticsBreakdown fromJson(Map<String, Object?> json) {
@@ -94,6 +126,12 @@ final class DwAnalyticsBreakdown {
       return DwAnalyticsBreakdown.byProperty(
         property,
         top: json['top']! as int,
+        order: json['order'] == null
+            ? DwAnalyticsBreakdownOrder.largestFirst
+            : DwJsonCodec.decodeEnum(
+                json['order'],
+                DwAnalyticsBreakdownOrder.values,
+              ),
       );
     }
     if (json['bucket'] case final Object bucket) {
@@ -109,15 +147,16 @@ final class DwAnalyticsBreakdown {
       other is DwAnalyticsBreakdown &&
       other.bucket == bucket &&
       other.property == property &&
-      other.top == top;
+      other.top == top &&
+      other.order == order;
 
   @override
-  int get hashCode => Object.hash(bucket, property, top);
+  int get hashCode => Object.hash(bucket, property, top, order);
 
   @override
   String toString() => switch ((bucket, property)) {
     (final bucket?, _) => 'by ${bucket.name}',
-    (_, final property?) => 'by $property (top $top)',
+    (_, final property?) => 'by $property (top $top, ${order.name})',
     _ => 'no breakdown',
   };
 }
@@ -144,6 +183,12 @@ final class DwAnalyticsReportSpec {
   final DwAnalyticsBreakdown breakdown;
 
   static const int maxFilters = 5;
+
+  /// Whether the points of this spec are parts of its total: events, each
+  /// counted under the one value of the property it carries. What a pie
+  /// draws.
+  bool get isPieShaped =>
+      metric == DwAnalyticsMetric.events && breakdown.property != null;
 
   static final RegExp _eventName = RegExp(r'^[A-Za-z][A-Za-z0-9_.]*$');
   static final RegExp _propertyKey = RegExp(r'^[A-Za-z][A-Za-z0-9_]*$');
@@ -248,12 +293,21 @@ final class DwAnalyticsPeriod {
 
   /// The local calendar days [first] to [last], both included, in this
   /// device's time zone as of [first] — what a date range picker returns.
-  factory DwAnalyticsPeriod.localDays(DateTime first, DateTime last) {
+  ///
+  /// A period never reaches past [now] (the clock by default): "the last 7
+  /// days" read at 09:00 ends at 09:00 today, so its [previous] ends at
+  /// 09:00 a week ago rather than comparing a morning with a whole day.
+  factory DwAnalyticsPeriod.localDays(
+    DateTime first,
+    DateTime last, {
+    DateTime? now,
+  }) {
     final start = DateTime(first.year, first.month, first.day);
     final end = DateTime(last.year, last.month, last.day + 1);
+    final clock = now ?? DateTime.now();
     return DwAnalyticsPeriod(
       from: start.toUtc(),
-      to: end.toUtc(),
+      to: (end.isAfter(clock) && clock.isAfter(start) ? clock : end).toUtc(),
       utcOffsetMinutes: start.timeZoneOffset.inMinutes,
     );
   }
@@ -262,13 +316,21 @@ final class DwAnalyticsPeriod {
   final DateTime to;
   final int utcOffsetMinutes;
 
-  /// The period of the same length just before this one: what a change is
-  /// measured against.
-  DwAnalyticsPeriod get previous => DwAnalyticsPeriod(
-    from: from.subtract(to.difference(from)),
-    to: from,
-    utcOffsetMinutes: utcOffsetMinutes,
-  );
+  /// What a change is measured against: this period moved back by the
+  /// whole days it spans, so it has the same shape — seven whole days before
+  /// seven whole days, and six days and a morning before six days and a
+  /// morning, ending at the same time of day.
+  DwAnalyticsPeriod get previous {
+    final length = to.difference(from);
+    const day = Duration(days: 1);
+    final days = (length.inMicroseconds / day.inMicroseconds).ceil();
+    final shift = day * days;
+    return DwAnalyticsPeriod(
+      from: from.subtract(shift),
+      to: to.subtract(shift),
+      utcOffsetMinutes: utcOffsetMinutes,
+    );
+  }
 
   /// The longest period a report covers: longer is a query nobody waits for.
   static const Duration maxLength = Duration(days: 3660);

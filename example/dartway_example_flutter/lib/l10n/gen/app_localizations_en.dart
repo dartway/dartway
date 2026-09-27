@@ -818,4 +818,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get refusalAnalyticsDashboardInvalid =>
       'Check the dashboard: it needs a title, and at most 12 widgets, each with a title.';
+
+  @override
+  String get analyticsOrderLabel => 'Order';
+
+  @override
+  String analyticsOrder(String order) {
+    String _temp0 = intl.Intl.selectLogic(order, {
+      'largestFirst': 'Largest first',
+      'byLabel': 'By value: 1, 2, … 10',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get analyticsPieNeedsProperty =>
+      'A pie shows events split by a property: choose one under “Split by”.';
 }

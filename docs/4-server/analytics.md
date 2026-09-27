@@ -98,12 +98,18 @@ ref.watch(dw.request(funnel));
   `'true'` the boolean.
 - **Breakdown** (`DwAnalyticsBreakdown`): none; by time — `day`, `week` (from Monday) or `month`,
   every bucket of the period with the empty ones as zero, labelled `YYYY-MM-DD` by its first day;
-  or by a property — the `top` values (at most 20) largest first, events without the property
-  under a `null` label, and the rest together as `other`.
+  or by a property — the first `top` values (at most 30) in the breakdown's `order`, events
+  without the property under a `null` label, and the rest together as `other`, counted by the
+  same metric (one person across many hidden values is one in `other`).
+  `DwAnalyticsBreakdownOrder.largestFirst` (the default) keeps the largest values;
+  `byLabel` keeps them in their own order — numbers numerically and before text, the missing
+  value last — which is how a funnel reads: `question_number` 1, 2, …, 10, not 1, 10, 2.
 - **The period** (`DwAnalyticsPeriod`) runs from `from` (included) to `to` (excluded), bucketed in
   the calendar `utcOffsetMinutes` east of UTC — the viewer's, so a day is the viewer's day.
-  `DwAnalyticsPeriod.localDays(first, last)` builds it from local dates; `.previous` is the period
-  of the same length just before, what a change is measured against.
+  `DwAnalyticsPeriod.localDays(first, last)` builds it from local dates and never past now, so
+  "the last 7 days" read at 09:00 ends at 09:00 today. `.previous`, what a change is measured
+  against, is the same period moved back by the whole days it spans: six days and a morning
+  against the six days and morning a week earlier, not against seven whole days.
 - A distinct count is counted over the whole period: a person active on three days is one in the
   total and one on each day, so the total is not the sum of the points.
 
@@ -120,6 +126,9 @@ property key each carried — what a report builder offers instead of free text.
 A dashboard (`DwAnalyticsDashboard`) is a title and its widgets in order, kept in
 `dw_analytics_dashboard`; a widget (`DwAnalyticsWidgetSpec`) is a report spec, a title and a type —
 `indicator` (the total, optionally with its change against the previous period), `bar` or `pie`.
+A pie counts events broken down by a property — each event has one value, so the slices add up;
+distinct people or devices overlap between values (someone who saw steps 1 and 2 is in both) and
+are refused for a pie (`dw.analyticsDashboardInvalid`), while bars show them.
 The period is not part of a dashboard: the viewer chooses it on top. Dashboards belong to the
 project, not to whoever saved them. `DwListAnalyticsDashboards` lists them;
 `dw.plugins.analytics.saveDashboard(id:, title:, widgets:)` creates or replaces one and
@@ -193,3 +202,9 @@ property, or one widget per step), not as a sequence within a session — that i
 above. No retention cohorts, no comparisons of two properties at once, no export to an outside
 service, no screen views by route, no dashboard per person. Dashboards are not live: a change made
 elsewhere shows on the next read. Each is a later step once a project needs it.
+
+On a large table: a property filter or breakdown reads `properties` of every event of the period
+— no index serves a JSON key, so a report is as fast as the period's `(name, occurred_at)` or
+`occurred_at` range is small. The `occurred_at` index is built by the module's migration at
+start, in its transaction and not `CONCURRENTLY`: on a project with millions of events already
+stored, that start holds a write lock on `dw_analytics_event` while the index builds.
