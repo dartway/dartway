@@ -418,7 +418,7 @@ final class DwAccountService {
     String? verifiedEmail,
     String? label,
   }) {
-    if (!_providerName.hasMatch(provider)) {
+    if (!_isProviderName(provider)) {
       throw ArgumentError.value(provider, 'provider', 'is not a provider name');
     }
     if (subject.isEmpty || subject.length > 255) {
@@ -460,7 +460,17 @@ final class DwAccountService {
     return rows.isEmpty ? null : rows.single.get<int>('account_id');
   });
 
-  static final RegExp _providerName = RegExp(r'^[a-z][a-z0-9_]{1,30}$');
+  /// Whether [provider] is shaped like a provider name **and** is not one of
+  /// `DwIdentifierKind`'s own names (`phone`, `email`) — those are reserved:
+  /// `DwAuthStore.identityOf` tells a code identity from a provider one by
+  /// trying `DwIdentifierKind.values` first and falling back to the stored
+  /// text as a provider name, and a provider actually named `email` would
+  /// read back as a phone/e-mail identity instead.
+  static bool _isProviderName(String provider) =>
+      _providerNamePattern.hasMatch(provider) &&
+      !DwIdentifierKind.values.any((kind) => kind.name == provider);
+
+  static final RegExp _providerNamePattern = RegExp(r'^[a-z][a-z0-9_]{1,30}$');
 
   /// Deletes [accountId] and everything the framework keeps for it, and
   /// answers whether it existed.
@@ -564,21 +574,25 @@ Future<int?> dwAccountOf(
   return rows.isEmpty ? null : rows.single.get<int>('account_id');
 }
 
-/// [dwAccountOf], narrowed to an identity a code has confirmed
-/// (`verified_at` set) — [dwEnsureExternalAccount]'s e-mail match for
-/// `DwAuthConfig.linkByVerifiedEmail`, so a provider's proof of an address
-/// only ever joins an account that has itself proved the same address.
-Future<int?> _verifiedAccountOf(
+/// Whether [accountId] already has an identity of [provider] — a different
+/// subject, since [dwEnsureExternalAccount] only reaches this check once it
+/// has confirmed this [provider]/subject pair is not already on any account.
+/// Its e-mail match for `DwAuthConfig.linkByVerifiedEmail` refuses to link
+/// when this is true: an account that already signed in with this provider
+/// once must not quietly gain a second identity of the same one through an
+/// e-mail match — that is what a lapsed custom domain re-registered by
+/// someone else would look like, `email_verified: true` and all.
+Future<bool> _hasProviderIdentity(
   DwDatabaseHandle db,
-  DwIdentifierKind kind,
-  String identifier,
+  int accountId,
+  String provider,
 ) async {
   final rows = await db.query(
-    'SELECT account_id FROM dw_identity '
-    'WHERE kind = @kind AND value = @value AND verified_at IS NOT NULL',
-    params: {'kind': kind.name, 'value': identifier},
+    'SELECT 1 FROM dw_identity WHERE account_id = @account AND kind = @kind '
+    'LIMIT 1',
+    params: {'account': accountId, 'kind': provider},
   );
-  return rows.isEmpty ? null : rows.single.get<int>('account_id');
+  return rows.isNotEmpty;
 }
 
 /// Finds or creates the account of a normalized [identifier] — the one place
@@ -643,8 +657,13 @@ Future<DwEnsuredAccount> dwEnsureAccount(
 /// the token itself said so) — see `DwAccountService.signInWithExternalIdentity`.
 /// With `DwAuthConfig.linkByVerifiedEmail` on and the identity's first
 /// sign-in, a normalized match against an existing `email` identity attaches
-/// the provider identity to that account instead of creating one; the e-mail
-/// identity itself is untouched.
+/// the provider identity to that account instead of creating one — whether or
+/// not that `email` identity is itself verified: an e-mail sign-in already
+/// joins an unverified one made by `DwAccountService.ensure` (a seed, an
+/// admin bootstrap) the same way, and a provider's proof of the address is
+/// the same proof. The one case this refuses to link: the account already
+/// holds a *different* identity of the same provider — see
+/// [_hasProviderIdentity]. The e-mail identity itself is untouched.
 ///
 /// Must run inside a transaction on `ctx.db`.
 @internal
@@ -689,13 +708,19 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
   if (existing.isNotEmpty) {
     return (accountId: existing.single.get<int>('account_id'), created: false);
   }
-  // Matched only against a **verified** e-mail identity: an account whose
-  // e-mail nobody has confirmed yet (`DwAccountService.ensure`, an invite
-  // provisioned ahead of time) has not proved anyone controls that address
-  // either, so a provider's proof of it is not proof of the same person.
-  final linkTo = normalizedEmail == null
+  final matched = normalizedEmail == null
       ? null
-      : await _verifiedAccountOf(db, DwIdentifierKind.email, normalizedEmail);
+      : await dwAccountOf(db, DwIdentifierKind.email, normalizedEmail);
+  // Not when the account already has a different identity of this same
+  // provider: an account that has signed in with this provider once, under
+  // another subject, is exactly the shape a lapsed custom domain re-registered
+  // by someone else would take — their own, unrelated Google account, whose
+  // token happens to carry `email_verified: true` for an address the
+  // original account's owner no longer controls.
+  final linkTo =
+      matched == null || await _hasProviderIdentity(db, matched, provider)
+      ? null
+      : matched;
   if (linkTo != null) {
     await db.execute(
       'INSERT INTO dw_identity (account_id, kind, value, verified_at) '

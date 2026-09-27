@@ -31,6 +31,7 @@ lock key, a `dw_identity.kind` value).
     +   case (DwIdentifierKind.phone, _): ...
     +   case (DwIdentifierKind.email, _): ...
     +   case (_, final provider?): ... // a Google or Apple identity
+    +   case (null, null): throw StateError('neither kind nor provider set');
     + }
 
 A place that only ever sees code identifiers (a phone/e-mail settings screen, say) can instead
@@ -43,8 +44,12 @@ filter provider identities out and keep reading `kind` non-null:
 account by e-mail (below) rather than a confirmed code — handle it the same way your `moved` and
 `removed` cases decide what to do, or leave it to the default case if you only mirror `confirmed`.
 
-An app on protocol 2 cannot decode a provider-shaped `DwIdentityInfo` from a server on this version
-(`dwProtocolVersion` moved to 3): rebuild it against this release.
+The wire shape of `DwIdentityInfo` gained a new, additional form (`provider` instead of `kind`) —
+recorded as a new shape, not a protocol bump: the framework's own built-in command that answers one,
+`DwConfirmIdentifier`, only ever attaches a code identifier, so no installed app meets this shape
+from the framework itself. A project that hands its own `DwIdentityInfo` list to the wire (an admin
+command built on `ctx.accounts.listIdentities`, say) decides for itself whether an old build of its
+own app needs to keep up — the framework's protocol version does not move for it.
 
 ## New, opt-in: `DwAuthConfig.linkByVerifiedEmail`
 

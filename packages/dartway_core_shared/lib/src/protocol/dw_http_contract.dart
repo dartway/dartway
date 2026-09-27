@@ -2,12 +2,7 @@
 /// `DwApiResponse` body, the transport, the live messages. A client sends it
 /// on every call (`Dw-Protocol`) and on the live upgrade (`?protocol=`); a
 /// server that does not speak it answers `426` with `dw.protocolUnsupported`.
-///
-/// 3: `DwIdentityInfo.kind` became optional and `provider` joined it — a
-/// provider identity (`google`, `apple`) now reads as one, where it used to
-/// throw before any answer reached the wire (dartway/dartway#355). A build
-/// compiled against 2 cannot decode the new shape.
-const int dwProtocolVersion = 3;
+const int dwProtocolVersion = 2;
 
 /// The HTTP contract between a DartWay client and its server, declared once
 /// for both sides:

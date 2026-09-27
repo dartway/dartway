@@ -58,7 +58,7 @@ DwAuthConfig({
 | `generateCode` | The code this request gets, inside the ticket's transaction. `null` — whether `generateCode` is unset, or returns it for this call — draws `codeLength` random digits (`dwRandomCode`, exported for reuse); a project returns one of its own for a fixed code — a store reviewer, a test account, a default code out of its own settings — and `deliverCode` decides, independently, whether that code goes anywhere (issue #310: the two used to be coupled — a fixed code skipped `deliverCode` outright, so a fixed code that also had to be sent could not be expressed). |
 | `onAccountCreated` | Runs in the transaction that creates an account: the place to insert the profile. Refusing here refuses the sign-in, nothing is created, and the code stays usable. `origin` says who created the account (below). |
 | `onIdentifierChanged` | Runs in the transaction that changes an existing account's identifiers, once per account and identifier affected, after the change: the place to mirror an identifier into project rows, or to publish. Throwing undoes the change. Not called for the identity an account is created with, nor when a sign-in re-verifies an identifier the account already has. |
-| `linkByVerifiedEmail` | Off by default. On, the **first** sign-in of a provider identity (`dartway_auth_providers_server`) whose token proves a verified e-mail matching an existing, itself-**verified** `email` identity attaches to that account instead of making a new one — see below. |
+| `linkByVerifiedEmail` | Off by default. On, the **first** sign-in of a provider identity (`dartway_auth_providers_server`) whose token proves a verified e-mail matching an existing `email` identity attaches to that account instead of making a new one, unless the account already holds a different identity of the same provider — see below. |
 | `codeLength` | Digits in a delivered code, 4 to 12. |
 | `codeLifetime` | How long a ticket accepts its code. |
 | `maxAttempts` | Wrong codes per ticket before it is dead. |
@@ -319,11 +319,12 @@ exactly one of the two is ever set.
 default).** Without it, someone who signed up by e-mail code and later taps "Continue with Google"
 with the same address gets a second, empty account — their data is still there, just unreachable
 from the new one. On, the **first** sign-in of a provider identity checks the token's e-mail: if the
-provider says it is verified and the normalized address already belongs to an account as an
-**already-verified** `email` identity — one nobody has confirmed yet (`DwAccountService.ensure`, an
-invite provisioned ahead of time) does not match, since it has not proved anyone controls that
-address either — the provider identity is attached to that account instead — under the same advisory lock
-as an e-mail sign-in, so the two cannot race into two accounts — `onIdentifierChanged` runs
+provider says it is verified and the normalized address already belongs to an account as an `email`
+identity, the provider identity is attached to that account instead — whether or not that `email`
+identity is itself verified: an e-mail sign-in already joins an account whose `email` identity nobody
+confirmed (`DwAccountService.ensure` — a seed, an admin bootstrap) the same way, and a provider's
+proof of the address is held to no higher a bar. The link runs under the same advisory lock as an
+e-mail sign-in, so the two cannot race into two accounts; `onIdentifierChanged` runs
 (`DwIdentifierChangeCause.linked`) instead of `onExternalAccountCreated`, and the answered session's
 `isNewAccount` is `false`. An unverified e-mail (or none) never links; this is the reason it defaults
 off rather than trying and falling back: a provider's "verified" means "verified when that provider
@@ -331,6 +332,15 @@ account was created", not "verified now" — a Google account's custom-domain e-
 registered by someone else, whose Google sign-in would still say `email_verified: true` for an
 address they do not otherwise control here. Apple's private relay address (`…@privaterelay.appleid.com`)
 simply never matches an e-mail identity, which is correct without any special case.
+
+**The one narrowing this option does apply on its own: a match is refused when the target account
+already holds a *different* identity of the same provider.** That is the shape the lapsed-domain
+takeover above would actually take on this side, too — an unrelated Google account signing in for
+the first time and landing, by e-mail, on somebody else's account that already has its own Google
+identity. It is not a defence against a provider identity created before this option was turned on,
+nor against a first sign-in with a provider the account has never used at all; turning the option on
+is still a project deciding that remaining trade is worth the account its members would otherwise
+get twice.
 
 **Deleting an account tells Apple.** Sign in with Apple requires that an app revoke the person's
 tokens when they delete their account, and the only thing that can do it is a refresh token, which

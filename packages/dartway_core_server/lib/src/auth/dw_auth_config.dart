@@ -179,30 +179,38 @@ final class DwAuthConfig {
   /// Whether the **first** sign-in of a provider identity (`google`,
   /// `apple` — `DwAccountService.signInWithExternalIdentity`) may attach to
   /// an existing account instead of creating a new one, when the token says
-  /// its e-mail is verified and an already **verified** `email` identity of
-  /// that normalized address belongs to an account — an identity nobody has
-  /// confirmed yet (`DwAccountService.ensure`, an invite provisioned ahead of
-  /// time) does not match: it has not proved anyone controls that address
-  /// either, so a provider's proof of it proves nothing about that account.
-  /// Off by default.
+  /// its e-mail is verified and an `email` identity of that normalized
+  /// address already belongs to an account. Off by default.
   ///
   /// On: the provider identity is attached to that account under the same
   /// advisory lock as the e-mail identity (so a race with an e-mail sign-in
   /// cannot split them), `onIdentifierChanged` runs
   /// ([DwIdentifierChangeCause.linked]) instead of [onExternalAccountCreated],
   /// and the answered session is not a new account. The e-mail's own
-  /// verification is untouched. A token whose e-mail is not verified, or that
-  /// carries none, never links — this is not a fallback to try, it is a
-  /// precondition.
+  /// verification is untouched, and matching does not require it: an e-mail
+  /// sign-in already joins an account whose `email` identity `verified_at`
+  /// is unset (`DwAccountService.ensure` — a seed, an admin bootstrap) the
+  /// same way, so a provider's proof of the same address is held to no
+  /// higher a bar. A token whose e-mail is not verified, or that carries
+  /// none, never links — this is not a fallback to try, it is a
+  /// precondition. Nor does it link when the matched account already holds a
+  /// *different* identity of this same provider — see the risk below.
   ///
   /// **Why opt-in.** A provider's "verified" means "verified at the moment
   /// that provider's account was created", not "verified now" — a Google
   /// account's e-mail can be a custom domain the person later let lapse,
   /// which someone else then registers; that new owner's Google sign-in would
   /// still carry `email_verified: true` for an address they do not otherwise
-  /// control here, and linking would hand them somebody else's account.
-  /// Turning this on is a project deciding that trade is worth the account
-  /// its members would otherwise get twice.
+  /// control here, and linking would hand them somebody else's account. The
+  /// one narrowing this option does apply on its own: a match is refused when
+  /// the target account already has a *different* identity of the same
+  /// provider — the shape that exact takeover would have, an unrelated Google
+  /// account signing in for the first time under this provider and landing on
+  /// somebody else's e-mail. It is not a defence against a provider identity
+  /// created before this option was turned on, or against a first sign-in
+  /// with a provider the account has never used. Turning this on is a
+  /// project deciding the remaining trade is worth the account its members
+  /// would otherwise get twice.
   final bool linkByVerifiedEmail;
 
   /// Who may delete an account — required, because either default was wrong

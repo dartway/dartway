@@ -329,7 +329,7 @@ final class DwSessionKeyInfo extends DwDataObject {
 /// [provider] `null`) or a provider identity a token proved ([provider] set,
 /// [kind] `null`) — exactly one of the two, never both, never neither.
 final class DwIdentityInfo extends DwDataObject {
-  DwIdentityInfo({
+  const DwIdentityInfo({
     required this.id,
     required this.accountId,
     this.kind,

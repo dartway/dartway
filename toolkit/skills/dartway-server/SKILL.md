@@ -520,10 +520,13 @@ it. `DwAuthConfig` in `lib/src/`:
   name only at the very first authorization, so an app that wants it sends it with that sign-in;
 - **`linkByVerifiedEmail` (off by default) attaches a provider identity's first sign-in to an
   existing account** instead of making a second one, when the token's e-mail is verified and matches
-  an `email` identity already there — `onIdentifierChanged` fires
-  (`DwIdentifierChangeCause.linked`), `onExternalAccountCreated` does not. Off is the safer default:
-  a provider's "verified" is only as good as the moment that provider account was made, and a lapsed
-  custom domain can change hands. Details in `docs/4-server/auth-identity.md`;
+  an `email` identity already there (verified or not — an e-mail sign-in already joins an unverified
+  one the same way) — `onIdentifierChanged` fires (`DwIdentifierChangeCause.linked`),
+  `onExternalAccountCreated` does not. It refuses to link when the matched account already holds a
+  *different* identity of this same provider — the shape a lapsed custom domain re-registered by
+  someone else would take. Off is the safer default even so: a provider's "verified" is only as good
+  as the moment that provider account was made, and the guard does not cover a first sign-in with a
+  provider the account has never used. Details in `docs/4-server/auth-identity.md`;
 - `onIdentifierChanged(ctx, change)` runs in the transaction of every identifier change the framework
   makes to an existing account (a confirmed attach or replace, `moveIdentities`, `removeIdentities`)
   — the place to mirror an identifier into a project row, or to republish the profile that shows it.

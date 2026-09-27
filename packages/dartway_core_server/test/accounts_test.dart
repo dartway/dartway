@@ -95,6 +95,28 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test(
+      "a code identifier's own kind name (email, phone) is not a provider "
+      'name: DwAuthStore.identityOf tells the two apart by trying the enum '
+      'first, and a provider actually called "email" would read back wrong',
+      () async {
+        expect(
+          () => accounts().signInWithExternalIdentity(
+            provider: 'email',
+            subject: 'x',
+          ),
+          throwsArgumentError,
+        );
+        expect(
+          () => accounts().signInWithExternalIdentity(
+            provider: 'phone',
+            subject: 'x',
+          ),
+          throwsArgumentError,
+        );
+      },
+    );
   });
 
   group('linking a provider identity by a verified e-mail (#356)', () {
@@ -211,8 +233,9 @@ void main() {
 
     test(
       'the matching e-mail identity itself unverified (DwAccountService.ensure '
-      '— an invite provisioned ahead of time, say): does not link, a proof of '
-      'the address is not a proof of that account',
+      '— a seed, an admin bootstrap): links anyway. An e-mail sign-in already '
+      'joins that account the same way; a provider proving the same address '
+      'is held to no higher a bar',
       () async {
         final linked = await linkingHarness();
         try {
@@ -220,23 +243,77 @@ void main() {
             DwIdentifierKind.email,
             'invited@example.com',
           );
+          final changes = linked.app.identifierChanges.length;
+          final createdBefore = linked.app.createdAccounts.length;
           final result = await linked.server.server.accounts
               .signInWithExternalIdentity(
                 provider: 'google',
                 subject: 'google-link-6',
                 verifiedEmail: 'invited@example.com',
               );
-          expect(result.isNewAccount, isTrue);
-          expect(result.id, isNot(tool.accountId));
+          expect(result.id, tool.accountId);
+          expect(result.isNewAccount, isFalse);
           expect(
-            linked.app.externalAccounts[result.id],
-            'google:google-link-6',
+            linked.app.createdAccounts.length,
+            createdBefore,
+            reason:
+                'onExternalAccountCreated must not run for a linked '
+                'identity',
+          );
+          expect(
+            linked.app.identifierChanges.skip(changes).single.cause,
+            DwIdentifierChangeCause.linked,
           );
         } finally {
           await linked.stop();
         }
       },
     );
+
+    test('the matched account already holds a different identity of this same '
+        'provider: refuses to link — the shape a lapsed custom domain '
+        "re-registered by someone else would take, that account's own Google "
+        'identity aside', () async {
+      final linked = await linkingHarness();
+      try {
+        // The account already signed in with Google once, under a subject
+        // of its own — an identity linking must never silently join a
+        // second one to.
+        final owner = await linked.server.server.accounts
+            .signInWithExternalIdentity(
+              provider: 'google',
+              subject: 'google-original-owner',
+            );
+        await linked.server.server.accounts.moveIdentities(
+          owner.id,
+          (await linked.signedIn('takeover@example.com')).$2.id,
+        );
+        final target = await linked.server.server.accounts.find(
+          DwIdentifierKind.email,
+          'takeover@example.com',
+        );
+        final changes = linked.app.identifierChanges.length;
+        final result = await linked.server.server.accounts
+            .signInWithExternalIdentity(
+              provider: 'google',
+              subject: 'google-new-claimant',
+              verifiedEmail: 'takeover@example.com',
+            );
+        expect(result.id, isNot(target));
+        expect(result.isNewAccount, isTrue);
+        expect(
+          linked.app.externalAccounts[result.id],
+          'google:google-new-claimant',
+        );
+        expect(
+          linked.app.identifierChanges.skip(changes),
+          isEmpty,
+          reason: 'nothing about the existing account changed',
+        );
+      } finally {
+        await linked.stop();
+      }
+    });
 
     test(
       'linked only on the first sign-in: signing in again with the same '
@@ -271,6 +348,48 @@ void main() {
         }
       },
     );
+
+    test("two provider identities racing to link one e-mail serialise on it: "
+        "exactly one links, the other's same-provider guard sees the first's "
+        "identity and refuses, making its own account — proves the e-mail's "
+        "own advisory lock is actually held (not only the provider's), or both "
+        "would land on the one account at once", () async {
+      final linked = await linkingHarness();
+      try {
+        final (_, session) = await linked.signedIn('racer@example.com');
+        final results = await Future.wait([
+          linked.server.server.accounts.signInWithExternalIdentity(
+            provider: 'google',
+            subject: 'google-race-a',
+            verifiedEmail: 'racer@example.com',
+          ),
+          linked.server.server.accounts.signInWithExternalIdentity(
+            provider: 'google',
+            subject: 'google-race-b',
+            verifiedEmail: 'racer@example.com',
+          ),
+        ]);
+        expect(
+          results.where((r) => r.id == session.id),
+          hasLength(1),
+          reason: 'exactly one of the two landed on the e-mail account',
+        );
+        final identities = await linked.db.query(
+          'SELECT count(*) AS n FROM dw_identity '
+          'WHERE account_id = @id AND kind = @kind',
+          params: {'id': session.id, 'kind': 'google'},
+        );
+        expect(
+          identities.single.get<int>('n'),
+          1,
+          reason:
+              'never two identities of the same provider on one '
+              'account',
+        );
+      } finally {
+        await linked.stop();
+      }
+    });
   });
 
   group('deleting an account', () {
