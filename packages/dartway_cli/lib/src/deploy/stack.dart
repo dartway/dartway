@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'deploy_target.dart';
 
 /// How the front proxy meets the outside world.
@@ -51,12 +53,19 @@ final class DwPlainHttpFront extends DwFrontMode {
 class DwStack {
   DwStack({
     required this.target,
+    required this.projectRoot,
     required this.serverPackage,
     required this.flutterPackage,
     this.front = const DwTlsFront(),
   });
 
   final DwDeployTarget target;
+
+  /// The project this stack was resolved for — found once, in
+  /// `deployProjectRoot()`, and carried from there so every step of a
+  /// deployment reads the same directory instead of a `Directory.current`
+  /// each recomputes for itself and can disagree with (dartway/dartway#343).
+  final Directory projectRoot;
   final String serverPackage;
   final String flutterPackage;
   final DwFrontMode front;

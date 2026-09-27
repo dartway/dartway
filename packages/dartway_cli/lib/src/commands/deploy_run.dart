@@ -16,7 +16,11 @@ import '../deploy/stack.dart';
 /// Lives beside the command rather than inside it so the orchestration reads
 /// top to bottom without the argument plumbing in the way.
 Future<int> runDeploy(DwStack stack, ArgResults results) async {
-  final projectRoot = Directory.current;
+  // The root `deployProjectRoot()` already found and built [stack] from —
+  // read once, not recomputed from `Directory.current` here, which silently
+  // disagreed with it whenever the CLI ran from inside a package rather than
+  // the project root (dartway/dartway#343).
+  final projectRoot = stack.projectRoot;
   final target = stack.target;
   final environment = target.environment;
   final progress = results.option('progress') == 'json'

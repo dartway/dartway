@@ -30,15 +30,18 @@ class DeployCommand extends Command<int> {
 
 /// The environment named by `--env`, read and validated, with the project's
 /// packages found by suffix.
-/// The project a deploy command was invoked for: the one around the working
-/// directory, which is not always the working directory itself —
+/// The project a deploy command was invoked for: the one around [from]
+/// (`Directory.current` unless given, the only way production code calls
+/// this), which is not always the working directory itself —
 /// `dart run dartway_cli:dartway deploy …` runs from the package that pins
-/// the CLI.
-Directory deployProjectRoot() {
-  final root = findPackageProjectRoot(Directory.current);
+/// the CLI. [from] exists so a test can ask the question from a directory it
+/// built without changing the process's actual working directory.
+Directory deployProjectRoot([Directory? from]) {
+  final start = from ?? Directory.current;
+  final root = findPackageProjectRoot(start);
   if (root == null) {
     throw StateError(
-      'No DartWay project at or above ${Directory.current.path}: a project is '
+      'No DartWay project at or above ${start.path}: a project is '
       'a directory holding <name>_server and <name>_shared.',
     );
   }
@@ -64,6 +67,7 @@ DwStack resolveDeployStack(
       projectRoot: projectRoot,
       environment: environment,
     ),
+    projectRoot: projectRoot,
     serverPackage: layout.serverPackage,
     flutterPackage: layout.flutterPackage,
   );
