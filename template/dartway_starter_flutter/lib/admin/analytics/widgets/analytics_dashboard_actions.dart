@@ -11,10 +11,15 @@ class AnalyticsDashboardActions extends StatelessWidget {
     super.key,
     required this.dashboard,
     required this.onDeleted,
+    this.enabled = true,
   });
 
   final DwAnalyticsDashboard dashboard;
   final VoidCallback onDeleted;
+
+  /// Off while a change of the dashboard is under way: a rename sends its
+  /// widgets, and would send them as they were before that change.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -24,29 +29,33 @@ class AnalyticsDashboardActions extends StatelessWidget {
       children: [
         AppButton.text(
           l10n.analyticsRenameDashboard,
-          onTap: dw.action((context) async {
-            final title = await context.showAppBottomSheet<String>(
-              child: AnalyticsTitleSheet(initial: dashboard.title),
-            );
-            if (title == null) return null;
-            return dw.plugins.analytics.saveDashboard(
-              id: dashboard.id,
-              title: title,
-              widgets: dashboard.widgets,
-            );
-          }),
+          onTap: !enabled
+              ? null
+              : dw.action((context) async {
+                  final title = await context.showAppBottomSheet<String>(
+                    child: AnalyticsTitleSheet(initial: dashboard.title),
+                  );
+                  if (title == null) return null;
+                  return dw.plugins.analytics.saveDashboard(
+                    id: dashboard.id,
+                    title: title,
+                    widgets: dashboard.widgets,
+                  );
+                }),
         ),
         AppButton.text(
           l10n.analyticsDeleteDashboard,
-          onTap: dw.action(
-            (_) => dw.plugins.analytics.deleteDashboard(dashboard.id),
-            confirmation: DwUiConfirmation(
-              l10n.analyticsDeleteDashboardConfirmation(dashboard.title),
-            ),
-            followUpIfMountedAction: (_, result) {
-              if (result is DwCallOk) onDeleted();
-            },
-          ),
+          onTap: !enabled
+              ? null
+              : dw.action(
+                  (_) => dw.plugins.analytics.deleteDashboard(dashboard.id),
+                  confirmation: DwUiConfirmation(
+                    l10n.analyticsDeleteDashboardConfirmation(dashboard.title),
+                  ),
+                  followUpIfMountedAction: (_, result) {
+                    if (result is DwCallOk) onDeleted();
+                  },
+                ),
         ),
       ],
     );

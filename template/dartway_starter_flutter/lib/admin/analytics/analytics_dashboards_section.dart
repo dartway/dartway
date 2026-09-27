@@ -60,6 +60,9 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
     final l10n = context.l10n;
     final selectedId = useState<int?>(null);
     final editing = useState(false);
+    // A dashboard change under way. Every change sends a whole dashboard, so
+    // the next one — a widget, a rename, a delete — waits for it.
+    final saving = useState(false);
     final choice = useState(
       AnalyticsPeriodChoice.lastDays(AnalyticsPeriodChoice.defaultDays),
     );
@@ -132,15 +135,22 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
                     onChanged: (next) => choice.value = next,
                   ),
                   const Gap(16),
+                  // Keyed by the dashboard: what the grid keeps of a save
+                  // belongs to that dashboard, and a switch — even with a save
+                  // under way — starts the next one's grid afresh.
                   AnalyticsDashboardGrid(
+                    key: ValueKey(dashboard.id),
                     dashboard: dashboard,
                     period: choice.value.period,
                     editing: editing.value,
+                    saving: saving.value,
+                    onSaving: (value) => saving.value = value,
                   ),
                   if (editing.value) ...[
                     const Gap(16),
                     AnalyticsDashboardActions(
                       dashboard: dashboard,
+                      enabled: !saving.value,
                       onDeleted: () {
                         selectedId.value = null;
                         editing.value = false;

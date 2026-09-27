@@ -12,19 +12,25 @@ import 'package:gap/gap.dart';
 ///
 /// Every change sends the whole list, so changes go one at a time and each
 /// is built on the list the previous one saved: while a save is under way
-/// the controls are off, and a second tap cannot send a list that still has
-/// the widget the first one removed.
+/// ([saving], held by the section for every change of the dashboard) the
+/// controls are off, and a second tap cannot send a list that still has the
+/// widget the first one removed. The section keys the grid by the dashboard,
+/// so what it keeps of a save never outlives a switch to another one.
 class AnalyticsDashboardGrid extends HookWidget {
   const AnalyticsDashboardGrid({
     super.key,
     required this.dashboard,
     required this.period,
     required this.editing,
+    required this.saving,
+    required this.onSaving,
   });
 
   final DwAnalyticsDashboard dashboard;
   final DwAnalyticsPeriod period;
   final bool editing;
+  final bool saving;
+  final ValueChanged<bool> onSaving;
 
   static const double _cardMinWidth = 300;
   static const double _gap = 12;
@@ -32,7 +38,6 @@ class AnalyticsDashboardGrid extends HookWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final saving = useState(false);
     // What the last save here answered, until the list read after it arrives
     // as [dashboard] — then the dashboard is the truth again.
     final saved = useState<List<DwAnalyticsWidgetSpec>?>(null);
@@ -41,6 +46,8 @@ class AnalyticsDashboardGrid extends HookWidget {
       return null;
     }, [dashboard.updatedAt]);
     final latest = useRef(dashboard.widgets);
+    // Read when tapped, not when built: two taps in one frame see it set.
+    final busy = useRef(false);
     latest.value = saved.value ?? dashboard.widgets;
     final widgets = latest.value;
 
@@ -48,8 +55,9 @@ class AnalyticsDashboardGrid extends HookWidget {
       BuildContext context,
       List<DwAnalyticsWidgetSpec> Function(List<DwAnalyticsWidgetSpec>) change,
     ) async {
-      if (saving.value) return;
-      saving.value = true;
+      if (saving || busy.value) return;
+      busy.value = true;
+      onSaving(true);
       try {
         final result = await dw.action(
           (_) => dw.plugins.analytics.saveDashboard(
@@ -58,11 +66,16 @@ class AnalyticsDashboardGrid extends HookWidget {
             widgets: change(latest.value),
           ),
         )(context);
-        if (result case DwCallOk(:final value) when context.mounted) {
+        // Unmounted: the viewer switched to another dashboard, whose grid
+        // is a new one; this answer is this dashboard's and is dropped.
+        if (result case DwCallOk(
+          :final value,
+        ) when context.mounted && value.id == dashboard.id) {
           saved.value = value.widgets;
         }
       } finally {
-        if (context.mounted) saving.value = false;
+        busy.value = false;
+        onSaving(false);
       }
     }
 
@@ -87,7 +100,7 @@ class AnalyticsDashboardGrid extends HookWidget {
       IconButton(
         tooltip: l10n.analyticsMoveWidgetBack,
         icon: const Icon(Icons.arrow_back),
-        onPressed: saving.value || index == 0
+        onPressed: saving || index == 0
             ? null
             : () => save(
                 context,
@@ -99,7 +112,7 @@ class AnalyticsDashboardGrid extends HookWidget {
       IconButton(
         tooltip: l10n.analyticsMoveWidgetForward,
         icon: const Icon(Icons.arrow_forward),
-        onPressed: saving.value || index == widgets.length - 1
+        onPressed: saving || index == widgets.length - 1
             ? null
             : () => save(
                 context,
@@ -111,12 +124,12 @@ class AnalyticsDashboardGrid extends HookWidget {
       IconButton(
         tooltip: l10n.analyticsEditWidget,
         icon: const Icon(Icons.tune),
-        onPressed: saving.value ? null : () => edit(context, index),
+        onPressed: saving ? null : () => edit(context, index),
       ),
       IconButton(
         tooltip: l10n.analyticsRemoveWidget,
         icon: const Icon(Icons.delete_outline),
-        onPressed: saving.value
+        onPressed: saving
             ? null
             : () => save(
                 context,
@@ -160,7 +173,7 @@ class AnalyticsDashboardGrid extends HookWidget {
                 alignment: Alignment.centerLeft,
                 child: AppButton.secondary(
                   l10n.analyticsAddWidget,
-                  onTap: saving.value
+                  onTap: saving
                       ? null
                       : dw.action((context) => edit(context, null)),
                 ),

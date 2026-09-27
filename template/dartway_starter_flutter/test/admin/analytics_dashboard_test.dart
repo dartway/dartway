@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -270,6 +272,80 @@ void main() {
     // Once it has, the next removal starts from what was saved.
     await app.tap(tester, find.byTooltip('Remove widget').first);
     expect(dashboards.single.widgets.map((w) => w.title), ['Third']);
+
+    await app.stop(tester);
+  });
+
+  testWidgets('switching dashboards while a save is under way keeps each '
+      "dashboard's widgets its own", (tester) async {
+    final (:fake, :dashboards) = analyticsAdmin();
+    DwAnalyticsWidgetSpec number(String title) => DwAnalyticsWidgetSpec(
+      type: DwAnalyticsWidgetType.indicator,
+      title: title,
+      report: const DwAnalyticsReportSpec(),
+    );
+    dashboards.addAll([
+      DwAnalyticsDashboard(
+        id: 1,
+        title: 'Alpha',
+        updatedAt: DateTime.utc(2026, 9, 27),
+        widgets: [number('A one'), number('A two')],
+      ),
+      DwAnalyticsDashboard(
+        id: 2,
+        title: 'Beta',
+        updatedAt: DateTime.utc(2026, 9, 26),
+        widgets: [number('B one')],
+      ),
+    ]);
+    // The first save is held until the test releases it; every save stores
+    // a new updatedAt, as the server does.
+    final held = Completer<void>();
+    var saves = 0;
+    fake.server.onCommand<DwSaveAnalyticsDashboard>((command, call) async {
+      if (saves++ == 0) await held.future;
+      final saved = DwAnalyticsDashboard(
+        id: command.id!,
+        title: command.title,
+        widgets: command.widgets,
+        updatedAt: DateTime.utc(2026, 9, 28).add(Duration(minutes: saves)),
+      );
+      dashboards[dashboards.indexWhere((d) => d.id == saved.id)] = saved;
+      return DwCallOk(saved);
+    });
+    final app = await openDashboard(tester, fake);
+    await app.tap(tester, find.byTooltip('Edit dashboard'));
+
+    // Alpha loses its first widget; the save has not answered yet.
+    await tester.ensureVisible(find.byTooltip('Remove widget').first);
+    await tester.tap(find.byTooltip('Remove widget').first);
+    await app.settle(tester);
+    expect(dashboards.first.widgets.map((w) => w.title), ['A one', 'A two']);
+
+    await app.tap(tester, find.byType(DropdownButton<int>));
+    await app.tap(tester, find.text('Beta').last);
+    expect(find.text('B one'), findsOneWidget);
+    expect(find.text('A two'), findsNothing);
+
+    held.complete();
+    await app.settle(tester);
+    expect(dashboards.first.widgets.map((w) => w.title), ['A two']);
+    expect(find.text('B one'), findsOneWidget, reason: "Beta's own widgets");
+    expect(
+      find.text('A two'),
+      findsNothing,
+      reason: "Alpha's answer stays Alpha's",
+    );
+
+    // The next change is Beta's, built on Beta's list.
+    await app.tap(tester, find.byTooltip('Remove widget').first);
+    final last =
+        app.server.callsOf<DwSaveAnalyticsDashboard>().last.call!
+            as DwSaveAnalyticsDashboard;
+    expect(last.id, 2);
+    expect(last.widgets, isEmpty);
+    expect(dashboards.first.widgets.map((w) => w.title), ['A two']);
+    expect(dashboards.last.widgets, isEmpty);
 
     await app.stop(tester);
   });
