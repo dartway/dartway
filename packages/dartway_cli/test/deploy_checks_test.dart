@@ -89,6 +89,7 @@ void main() {
       () async {
         final badName = DwStack(
           target: targetFrom(extra: '  database: external\n'),
+          projectRoot: root,
           // The prefix "1shop" starts with a digit: invalid as a bundled
           // Postgres database/role name, irrelevant once nothing derives one.
           serverPackage: '1shop_server',
@@ -103,6 +104,7 @@ void main() {
         // rather than one that could never fail.
         final sameNameBundled = DwStack(
           target: targetFrom(),
+          projectRoot: root,
           serverPackage: '1shop_server',
           flutterPackage: '1shop_flutter',
         );
@@ -452,6 +454,7 @@ dependencies:
           projectRoot: root,
           stack: DwStack(
             target: targetFrom(),
+            projectRoot: root,
             serverPackage: 'dartway_example_server',
             flutterPackage: 'dartway_example_flutter',
           ),

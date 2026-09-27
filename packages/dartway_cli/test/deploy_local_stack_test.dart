@@ -204,6 +204,7 @@ void main() {
             .replaceAll('app.example.com', 'app.dwproof.test'),
         environment: 'staging',
       ),
+      projectRoot: project,
       serverPackage: 'dartway_example_server',
       flutterPackage: 'dartway_example_flutter',
       front: DwPlainHttpFront(port),

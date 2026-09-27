@@ -23,7 +23,9 @@ Future<int> runSetup(
   ArgResults results, {
   DwSshRunner? connection,
 }) async {
-  final projectRoot = Directory.current;
+  // The root `deployProjectRoot()` already found and built [stack] from —
+  // read once, not recomputed from `Directory.current` here (dartway/dartway#343).
+  final projectRoot = stack.projectRoot;
   final target = stack.target;
   final environment = target.environment;
 

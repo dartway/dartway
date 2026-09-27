@@ -27,8 +27,14 @@ DwDeployTarget targetFrom({String extra = ''}) =>
 DwStack stackFrom({
   String extra = '',
   DwFrontMode front = const DwTlsFront(),
+  Directory? projectRoot,
 }) => DwStack(
   target: targetFrom(extra: extra),
+  // Most fixtures test rendering or the wire to a server, neither of which
+  // touches the working copy — a real, harmless directory stands in unless a
+  // test passes its own (as the checks and the local-stack proof do, because
+  // they read files under it).
+  projectRoot: projectRoot ?? Directory.systemTemp,
   serverPackage: 'shop_server',
   flutterPackage: 'shop_flutter',
   front: front,

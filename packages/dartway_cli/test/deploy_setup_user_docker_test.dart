@@ -72,6 +72,9 @@ staging:
     );
     final stack = DwStack(
       target: target,
+      // This test proves the SSH script "Deployment user" sends, not
+      // anything read from the working copy.
+      projectRoot: Directory.systemTemp,
       serverPackage: 'shop_server',
       flutterPackage: 'shop_flutter',
     );

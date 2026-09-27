@@ -106,6 +106,15 @@
   changed. Where a task comes from and how it is handed over is not a repository rule: the task's own
   brief carries what the work needs, the same stance this repository's own root `CLAUDE.md` already
   takes for itself.
+- **Fix: `deploy run` and `deploy setup` resolve the project root from where the CLI actually runs**
+  (dartway/dartway#343). `deploy check` already walked up from the working directory to find the
+  project (`deployProjectRoot()`), so a project pinned to its Flutter package (`cd u90_flutter &&
+  dart run dartway_cli:dartway deploy …`) passed `deploy check --local` — but `runDeploy` and
+  `runSetup` each read `Directory.current` a second time instead of the root the check had already
+  found, so `deploy run` refused with "missing Dockerfile" for files that were one level up, and
+  `deploy setup` rendered `deploy/compose.override.yml` and `deploy/nginx.d` from the wrong directory.
+  `DwStack` now carries the project root it was built from; both commands read it from there instead
+  of recomputing it.
 
 ## 0.12.0
 
