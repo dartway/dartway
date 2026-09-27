@@ -32,14 +32,31 @@ abstract final class DwAuthStore {
     revokedAt: row['revoked_at'] as DateTime?,
   );
 
-  static DwIdentityInfo identityOf(DwResultRow row) => DwIdentityInfo(
-    id: row.get<int>('id'),
-    accountId: row.get<int>('account_id'),
-    kind: DwIdentifierKind.values.byName(row.get<String>('kind')),
-    value: row.get<String>('value'),
-    createdAt: row.get<DateTime>('created_at'),
-    verifiedAt: row['verified_at'] as DateTime?,
-  );
+  static DwIdentityInfo identityOf(DwResultRow row) {
+    final stored = row.get<String>('kind');
+    final kind = _codeKind(stored);
+    return DwIdentityInfo(
+      id: row.get<int>('id'),
+      accountId: row.get<int>('account_id'),
+      kind: kind,
+      // `dw_identity.kind` is a code kind (`phone`, `email`) or a provider's
+      // name (`google`, `apple` — `dwEnsureExternalAccount`); a name outside
+      // `DwIdentifierKind` is the provider's.
+      provider: kind == null ? stored : null,
+      value: row.get<String>('value'),
+      createdAt: row.get<DateTime>('created_at'),
+      verifiedAt: row['verified_at'] as DateTime?,
+    );
+  }
+
+  /// [stored] as a `DwIdentifierKind`, or `null` when it names a provider
+  /// instead.
+  static DwIdentifierKind? _codeKind(String stored) {
+    for (final kind in DwIdentifierKind.values) {
+      if (kind.name == stored) return kind;
+    }
+    return null;
+  }
 
   /// [key] as last used at [at].
   static DwSessionKeyInfo touched(DwSessionKeyInfo key, DateTime at) =>

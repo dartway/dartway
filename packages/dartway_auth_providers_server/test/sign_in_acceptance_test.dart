@@ -108,6 +108,69 @@ void main() {
     );
   });
 
+  group('linkByVerifiedEmail (#356)', () {
+    test(
+      'the token\'s verified e-mail matches an existing account: the '
+      'provider identity joins it, not a new one',
+      () async {
+        await club.stop();
+        club = await _ProviderHarness.start(
+          appleKeys,
+          apple,
+          linkByVerifiedEmail: true,
+        );
+        const request = DwRequestCode(
+          kind: DwIdentifierKind.email,
+          identifier: 'ada@example.com',
+        );
+        final ticket = (await club.send(request)).value(request);
+        final verify = DwVerifyCode(ticketId: ticket.id, code: '654321');
+        final emailSession = (await club.send(verify)).value(verify);
+
+        // The Apple token fixture's claims carry `ada@example.com`,
+        // `email_verified: true` (asserted above) — the same address.
+        final session = (await signIn()).value(_signIn());
+        expect(session.id, emailSession.id);
+        expect(session.isNewAccount, isFalse);
+        expect(
+          club.created,
+          isEmpty,
+          reason: 'onExternalAccountCreated must not run for a linked '
+              'identity',
+        );
+        expect(
+          await club.db.query(
+            'SELECT kind FROM dw_identity WHERE account_id = @id ORDER BY id',
+            params: {'id': session.id},
+          ),
+          [
+            isA<DwResultRow>().having((r) => r.get<String>('kind'), '', 'email'),
+            isA<DwResultRow>().having((r) => r.get<String>('kind'), '', 'apple'),
+          ],
+        );
+      },
+    );
+
+    test(
+      'linkByVerifiedEmail off (the default in every other test here): the '
+      'same matching e-mail still makes a new account',
+      () async {
+        const request = DwRequestCode(
+          kind: DwIdentifierKind.email,
+          identifier: 'ada@example.com',
+        );
+        final ticket = (await club.send(request)).value(request);
+        final verify = DwVerifyCode(ticketId: ticket.id, code: '654321');
+        final emailSession = (await club.send(verify)).value(verify);
+
+        final session = (await signIn()).value(_signIn());
+        expect(session.id, isNot(emailSession.id));
+        expect(session.isNewAccount, isTrue);
+        expect(club.created, hasLength(1));
+      },
+    );
+  });
+
   test('a token that does not hold up is refused, and nothing is created',
       () async {
     final refused = await signIn(token: appleTokenUnsigned);
@@ -270,6 +333,7 @@ final class _ProviderHarness {
     FakeKeySet appleKeys,
     FakeApple apple, {
     bool withSigningKey = true,
+    bool linkByVerifiedEmail = false,
   }) async {
     final DwDatabaseConfig admin;
     try {
@@ -297,8 +361,12 @@ final class _ProviderHarness {
           database: database.config,
           auth: DwAuthConfig(
             accountDeletion: DwAccountDeletion.byMember,
+            linkByVerifiedEmail: linkByVerifiedEmail,
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
+            // Fixed, so a test that needs an e-mail account first (linking)
+            // can confirm it without a real delivery to read the code from.
+            generateCode: (ctx, kind, identifier, accountId) async => '654321',
             onExternalAccountCreated:
                 (ctx, accountId, provider, subject, registration) async {
                   harness.created.add((

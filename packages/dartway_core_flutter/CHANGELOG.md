@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.8
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#355, #356).
+
 ## 0.21.0-dev.7
 
 - **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`

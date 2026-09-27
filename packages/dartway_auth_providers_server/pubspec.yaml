@@ -1,6 +1,6 @@
 name: dartway_auth_providers_server
 description: Sign in with Google and Apple on a DartWay server — their tokens verified against the providers' published keys, and the account signed in behind the framework's own identities.
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 resolution: workspace
@@ -9,7 +9,7 @@ environment:
 dependencies:
   crypto: ^3.0.6
   dartway_auth_providers_shared: ^0.1.0
-  dartway_core_server: ^0.21.0-dev.7
+  dartway_core_server: ^0.21.0-dev.8
   meta: ^1.16.0
 dev_dependencies:
   lints: ^6.0.0

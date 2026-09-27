@@ -7,7 +7,7 @@
 
 const String wireGolden = r'''
 {
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "shapes": {
     "http.contract": {
       "callPath": "/dw/RenameBooking",
@@ -546,6 +546,14 @@ const String wireGolden = r'''
       "accountId": 7,
       "kind": "email",
       "value": "ada@example.com",
+      "createdAt": 1789468200000000,
+      "verifiedAt": 1789468800000000
+    },
+    "dto.identityInfoProvider": {
+      "id": 4,
+      "accountId": 7,
+      "provider": "google",
+      "value": "google-subject-1",
       "createdAt": 1789468200000000,
       "verifiedAt": 1789468800000000
     },

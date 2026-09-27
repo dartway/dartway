@@ -518,6 +518,12 @@ it. `DwAuthConfig` in `lib/src/`:
   **required** to sign in externally at all. The verified claims are in `registration` under
   `DwProviderClaim` keys (`dw.email`, `dw.name`, …), which the app cannot write. Apple tells the
   name only at the very first authorization, so an app that wants it sends it with that sign-in;
+- **`linkByVerifiedEmail` (off by default) attaches a provider identity's first sign-in to an
+  existing account** instead of making a second one, when the token's e-mail is verified and matches
+  an `email` identity already there — `onIdentifierChanged` fires
+  (`DwIdentifierChangeCause.linked`), `onExternalAccountCreated` does not. Off is the safer default:
+  a provider's "verified" is only as good as the moment that provider account was made, and a lapsed
+  custom domain can change hands. Details in `docs/4-server/auth-identity.md`;
 - `onIdentifierChanged(ctx, change)` runs in the transaction of every identifier change the framework
   makes to an existing account (a confirmed attach or replace, `moveIdentities`, `removeIdentities`)
   — the place to mirror an identifier into a project row, or to republish the profile that shows it.

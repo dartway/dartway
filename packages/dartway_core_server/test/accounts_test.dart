@@ -97,6 +97,158 @@ void main() {
     });
   });
 
+  group('linking a provider identity by a verified e-mail (#356)', () {
+    Future<Harness> linkingHarness() => Harness.start(
+      app: TestApp(),
+      build: (app, config) =>
+          app.server(config, auth: app.auth(linkByVerifiedEmail: true)),
+    );
+
+    test(
+      'linkByVerifiedEmail on, the token\'s e-mail verified and matching an '
+      'existing email identity: the provider identity joins that account, '
+      'onIdentifierChanged fires (cause linked) and onExternalAccountCreated '
+      'does not',
+      () async {
+        final linked = await linkingHarness();
+        try {
+          final (_, session) = await linked.signedIn('linked@example.com');
+          final changes = linked.app.identifierChanges.length;
+          final createdBefore = linked.app.createdAccounts.length;
+
+          final again = await linked.server.server.accounts
+              .signInWithExternalIdentity(
+                provider: 'google',
+                subject: 'google-link-1',
+                // Normalized the same way `DwAuthConfig.normalize` would —
+                // proving the match is on the normalized form, not the raw
+                // one the provider happened to send.
+                verifiedEmail: 'Linked@Example.com',
+              );
+
+          expect(again.id, session.id);
+          expect(again.isNewAccount, isFalse);
+          expect(
+            linked.app.createdAccounts.length,
+            createdBefore,
+            reason: 'onExternalAccountCreated must not run for a linked '
+                'identity',
+          );
+          expect(linked.app.externalAccounts.containsKey(session.id), isFalse);
+
+          final change = linked.app.identifierChanges.skip(changes).single;
+          expect(change.accountId, session.id);
+          expect(change.provider, 'google');
+          expect(change.kind, isNull);
+          expect(change.cause, DwIdentifierChangeCause.linked);
+          expect(change.previous, isNull);
+          expect(change.current, 'google-link-1');
+
+          final all = await linked.server.server.accounts.listIdentities(
+            session.id,
+          );
+          expect(all.map((i) => i.provider ?? i.kind!.name).toSet(), {
+            'email',
+            'google',
+          });
+          expect(
+            all.firstWhere((i) => i.provider == 'google').verifiedAt,
+            isNotNull,
+          );
+        } finally {
+          await linked.stop();
+        }
+      },
+    );
+
+    test(
+      'email_verified false — no verifiedEmail passed at all — never links, '
+      'even with a matching identity and linking on',
+      () async {
+        final linked = await linkingHarness();
+        try {
+          final (_, session) = await linked.signedIn('unverified@example.com');
+          final result = await linked.server.server.accounts
+              .signInWithExternalIdentity(
+                provider: 'google',
+                subject: 'google-link-2',
+                // The real module only ever passes verifiedEmail when the
+                // token's own `email_verified` claim is true; omitting it
+                // here is that "false or missing" case.
+              );
+          expect(result.isNewAccount, isTrue);
+          expect(result.id, isNot(session.id));
+        } finally {
+          await linked.stop();
+        }
+      },
+    );
+
+    test('linkByVerifiedEmail off (the default): a matching verified e-mail '
+        'still makes a new account', () async {
+      final (_, session) = await harness().signedIn('nolinking@example.com');
+      final result = await accounts().signInWithExternalIdentity(
+        provider: 'google',
+        subject: 'google-link-3',
+        verifiedEmail: 'nolinking@example.com',
+      );
+      expect(result.isNewAccount, isTrue);
+      expect(result.id, isNot(session.id));
+      expect(harness().app.externalAccounts[result.id], 'google:google-link-3');
+    });
+
+    test('linkByVerifiedEmail on, but no account has that e-mail identity: a '
+        'new account, as usual', () async {
+      final linked = await linkingHarness();
+      try {
+        final result = await linked.server.server.accounts
+            .signInWithExternalIdentity(
+              provider: 'google',
+              subject: 'google-link-4',
+              verifiedEmail: 'nobody-here@example.com',
+            );
+        expect(result.isNewAccount, isTrue);
+        expect(linked.app.externalAccounts[result.id], 'google:google-link-4');
+      } finally {
+        await linked.stop();
+      }
+    });
+
+    test(
+      'linked only on the first sign-in: signing in again with the same '
+      'provider identity answers the same account without re-linking',
+      () async {
+        final linked = await linkingHarness();
+        try {
+          final (_, session) = await linked.signedIn('twice@example.com');
+          final first = await linked.server.server.accounts
+              .signInWithExternalIdentity(
+                provider: 'google',
+                subject: 'google-link-5',
+                verifiedEmail: 'twice@example.com',
+              );
+          expect(first.id, session.id);
+          final changes = linked.app.identifierChanges.length;
+          final second = await linked.server.server.accounts
+              .signInWithExternalIdentity(
+                provider: 'google',
+                subject: 'google-link-5',
+                verifiedEmail: 'twice@example.com',
+              );
+          expect(second.id, session.id);
+          expect(second.isNewAccount, isFalse);
+          expect(
+            linked.app.identifierChanges.length,
+            changes,
+            reason: 'the identity already exists: nothing changed',
+          );
+        } finally {
+          await linked.stop();
+        }
+      },
+    );
+  });
+
   group('deleting an account', () {
     Future<int> countOf(String table, int accountId) async =>
         (await harness().db.query(

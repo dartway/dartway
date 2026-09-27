@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.21.0-dev.8
+
+- **BREAKING: a provider identity (`google`, `apple`) is a first-class identity — `listIdentities`,
+  `listIdentitiesOf`, `moveIdentities` and `removeIdentities` no longer throw `ArgumentError` the
+  moment an account has one (dartway/dartway#355).** `DwIdentityInfo.kind`/`DwIdentifierChange.kind`
+  are `DwIdentifierKind?`, `provider: String?` joined both; `DwAuthStore.identityOf` tells the two
+  apart instead of assuming every stored `kind` is `phone`/`email`. `DwIdentifierChangeCause` gained
+  `linked`. Migration note: `docs/migrations/2026-09-27-provider-identity-kind-nullable.md`.
+- **`DwAuthConfig.linkByVerifiedEmail`** (opt-in, default `false`): a provider identity's first
+  sign-in whose token proves a verified e-mail matching an existing `email` identity attaches to
+  that account instead of making a second one — `onIdentifierChanged` fires
+  (`DwIdentifierChangeCause.linked`), `onExternalAccountCreated` does not
+  (dartway/dartway#356). `DwAccountService.signInWithExternalIdentity` and the internal
+  `dwEnsureExternalAccount` take the token's verified e-mail as an explicit `verifiedEmail:`
+  parameter.
+
 ## 0.21.0-dev.7
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).

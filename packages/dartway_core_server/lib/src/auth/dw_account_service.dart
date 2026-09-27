@@ -224,6 +224,7 @@ final class DwAccountService {
           DwIdentifierChange(
             accountId: fromAccountId,
             kind: identity.kind,
+            provider: identity.provider,
             cause: DwIdentifierChangeCause.moved,
             previous: identity.value,
           ),
@@ -233,6 +234,7 @@ final class DwAccountService {
           DwIdentifierChange(
             accountId: toAccountId,
             kind: identity.kind,
+            provider: identity.provider,
             cause: DwIdentifierChangeCause.moved,
             current: identity.value,
           ),
@@ -269,6 +271,7 @@ final class DwAccountService {
         DwIdentifierChange(
           accountId: accountId,
           kind: identity.kind,
+          provider: identity.provider,
           cause: DwIdentifierChangeCause.removed,
           previous: identity.value,
         ),
@@ -302,7 +305,7 @@ final class DwAccountService {
     // queue instead of deadlocking.
     final keys = {
       for (final identity in await read())
-        dwLockKey('${identity.kind.name}:${identity.value}'),
+        dwLockKey('${identity.kindName}:${identity.value}'),
     }.toList()..sort();
     for (final key in keys) {
       await db.advisoryLock(DwLockSpace.identifier, key);
@@ -402,10 +405,17 @@ final class DwAccountService {
   /// provider's token, and nothing else should: the identity counts as
   /// verified. [registration] reaches `DwAuthConfig.onAccountCreated` as it
   /// does for a code sign-in, with `DwExternalOrigin` naming the provider.
+  ///
+  /// [verifiedEmail] is the e-mail the provider's token proved, if any —
+  /// **only** when the token itself says so (`email_verified`); pass `null`
+  /// otherwise. It is read only on the identity's first sign-in, and only
+  /// when `DwAuthConfig.linkByVerifiedEmail` is on, to attach to the account
+  /// of a matching `email` identity instead of creating a new one.
   Future<DwAuthSession> signInWithExternalIdentity({
     required String provider,
     required String subject,
     Map<String, String> registration = const {},
+    String? verifiedEmail,
     String? label,
   }) {
     if (!_providerName.hasMatch(provider)) {
@@ -421,6 +431,7 @@ final class DwAccountService {
         provider,
         subject,
         registration,
+        verifiedEmail: verifiedEmail,
       );
       final issued = (await DwAuthStore.insertKey(
         ctx.db,
@@ -611,6 +622,13 @@ Future<DwEnsuredAccount> dwEnsureAccount(
 /// The account of an external provider's [subject], created when the identity
 /// is new: the external twin of [dwEnsureAccount].
 ///
+/// [verifiedEmail] is the e-mail the provider's token proved (`null` unless
+/// the token itself said so) — see `DwAccountService.signInWithExternalIdentity`.
+/// With `DwAuthConfig.linkByVerifiedEmail` on and the identity's first
+/// sign-in, a normalized match against an existing `email` identity attaches
+/// the provider identity to that account instead of creating one; the e-mail
+/// identity itself is untouched.
+///
 /// Must run inside a transaction on `ctx.db`.
 @internal
 Future<DwEnsuredAccount> dwEnsureExternalAccount(
@@ -618,8 +636,9 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
   DwAuthConfig auth,
   String provider,
   String subject,
-  Map<String, String> registration,
-) async {
+  Map<String, String> registration, {
+  String? verifiedEmail,
+}) async {
   final db = ctx.db;
   if (!db.inTransaction) {
     throw StateError('dwEnsureExternalAccount needs a transaction');
@@ -631,11 +650,20 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
       'would leave an account without the project row that belongs to it',
     );
   }
-  // Two first sign-ins of one provider identity at once make one account.
-  await db.advisoryLock(
-    DwLockSpace.identifier,
+  final normalizedEmail = auth.linkByVerifiedEmail && verifiedEmail != null
+      ? auth.normalize(DwIdentifierKind.email, verifiedEmail)
+      : null;
+  // Two first sign-ins of one provider identity at once make one account; a
+  // link additionally touches the matching e-mail identity, in the same
+  // fixed (sorted) order `_lockedIdentities` locks several identities in, so
+  // this and a concurrent e-mail sign-in cannot deadlock over the two.
+  final keys = {
     dwLockKey('$provider:$subject'),
-  );
+    if (normalizedEmail != null) dwLockKey('email:$normalizedEmail'),
+  }.toList()..sort();
+  for (final key in keys) {
+    await db.advisoryLock(DwLockSpace.identifier, key);
+  }
   final existing = await db.query(
     'UPDATE dw_identity SET verified_at = now() '
     'WHERE kind = @kind AND value = @value RETURNING account_id',
@@ -643,6 +671,26 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
   );
   if (existing.isNotEmpty) {
     return (accountId: existing.single.get<int>('account_id'), created: false);
+  }
+  final linkTo = normalizedEmail == null
+      ? null
+      : await dwAccountOf(db, DwIdentifierKind.email, normalizedEmail);
+  if (linkTo != null) {
+    await db.execute(
+      'INSERT INTO dw_identity (account_id, kind, value, verified_at) '
+      'VALUES (@account, @kind, @value, now())',
+      params: {'account': linkTo, 'kind': provider, 'value': subject},
+    );
+    await auth.onIdentifierChanged?.call(
+      ctx,
+      DwIdentifierChange(
+        accountId: linkTo,
+        provider: provider,
+        cause: DwIdentifierChangeCause.linked,
+        current: subject,
+      ),
+    );
+    return (accountId: linkTo, created: false);
   }
   final accountId = (await db.query(
     'INSERT INTO dw_account DEFAULT VALUES RETURNING id',

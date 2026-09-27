@@ -624,6 +624,19 @@ List<_WireShape> _wireShapes() {
         verifiedAt: later,
       ),
     ),
+    // New at protocol 3 (dartway/dartway#355): a provider identity has no
+    // `kind` on the wire, `provider` instead.
+    dto(
+      'dto.identityInfoProvider',
+      DwIdentityInfo(
+        id: 4,
+        accountId: 7,
+        provider: 'google',
+        value: 'google-subject-1',
+        createdAt: at,
+        verifiedAt: later,
+      ),
+    ),
     dto(
       'dto.sessionKeyInfo',
       DwSessionKeyInfo(
