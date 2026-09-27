@@ -564,6 +564,23 @@ Future<int?> dwAccountOf(
   return rows.isEmpty ? null : rows.single.get<int>('account_id');
 }
 
+/// [dwAccountOf], narrowed to an identity a code has confirmed
+/// (`verified_at` set) — [dwEnsureExternalAccount]'s e-mail match for
+/// `DwAuthConfig.linkByVerifiedEmail`, so a provider's proof of an address
+/// only ever joins an account that has itself proved the same address.
+Future<int?> _verifiedAccountOf(
+  DwDatabaseHandle db,
+  DwIdentifierKind kind,
+  String identifier,
+) async {
+  final rows = await db.query(
+    'SELECT account_id FROM dw_identity '
+    'WHERE kind = @kind AND value = @value AND verified_at IS NOT NULL',
+    params: {'kind': kind.name, 'value': identifier},
+  );
+  return rows.isEmpty ? null : rows.single.get<int>('account_id');
+}
+
 /// Finds or creates the account of a normalized [identifier] — the one place
 /// accounts are made, shared by sign-in and [DwAccountService.ensure].
 ///
@@ -672,9 +689,13 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
   if (existing.isNotEmpty) {
     return (accountId: existing.single.get<int>('account_id'), created: false);
   }
+  // Matched only against a **verified** e-mail identity: an account whose
+  // e-mail nobody has confirmed yet (`DwAccountService.ensure`, an invite
+  // provisioned ahead of time) has not proved anyone controls that address
+  // either, so a provider's proof of it is not proof of the same person.
   final linkTo = normalizedEmail == null
       ? null
-      : await dwAccountOf(db, DwIdentifierKind.email, normalizedEmail);
+      : await _verifiedAccountOf(db, DwIdentifierKind.email, normalizedEmail);
   if (linkTo != null) {
     await db.execute(
       'INSERT INTO dw_identity (account_id, kind, value, verified_at) '

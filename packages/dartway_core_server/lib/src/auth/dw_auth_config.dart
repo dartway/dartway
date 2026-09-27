@@ -179,8 +179,12 @@ final class DwAuthConfig {
   /// Whether the **first** sign-in of a provider identity (`google`,
   /// `apple` — `DwAccountService.signInWithExternalIdentity`) may attach to
   /// an existing account instead of creating a new one, when the token says
-  /// its e-mail is verified and an `email` identity of that normalized
-  /// address already belongs to an account. Off by default.
+  /// its e-mail is verified and an already **verified** `email` identity of
+  /// that normalized address belongs to an account — an identity nobody has
+  /// confirmed yet (`DwAccountService.ensure`, an invite provisioned ahead of
+  /// time) does not match: it has not proved anyone controls that address
+  /// either, so a provider's proof of it proves nothing about that account.
+  /// Off by default.
   ///
   /// On: the provider identity is attached to that account under the same
   /// advisory lock as the e-mail identity (so a race with an e-mail sign-in

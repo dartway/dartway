@@ -9,12 +9,12 @@
   apart instead of assuming every stored `kind` is `phone`/`email`. `DwIdentifierChangeCause` gained
   `linked`. Migration note: `docs/migrations/2026-09-27-provider-identity-kind-nullable.md`.
 - **`DwAuthConfig.linkByVerifiedEmail`** (opt-in, default `false`): a provider identity's first
-  sign-in whose token proves a verified e-mail matching an existing `email` identity attaches to
-  that account instead of making a second one — `onIdentifierChanged` fires
+  sign-in whose token proves a verified e-mail matching an existing, itself-**verified** `email`
+  identity attaches to that account instead of making a second one — `onIdentifierChanged` fires
   (`DwIdentifierChangeCause.linked`), `onExternalAccountCreated` does not
   (dartway/dartway#356). `DwAccountService.signInWithExternalIdentity` and the internal
   `dwEnsureExternalAccount` take the token's verified e-mail as an explicit `verifiedEmail:`
-  parameter.
+  parameter. An `email` identity nobody has confirmed yet (`DwAccountService.ensure`) never matches.
 
 ## 0.21.0-dev.7
 
