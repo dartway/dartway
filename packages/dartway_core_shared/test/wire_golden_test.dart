@@ -624,6 +624,22 @@ List<_WireShape> _wireShapes() {
         verifiedAt: later,
       ),
     ),
+    // A new shape, not a bump (dartway/dartway#355): `dto.identityInfo`
+    // above is unchanged, and the framework's own built-in command that
+    // answers a `DwIdentityInfo` — `DwConfirmIdentifier` — only ever
+    // attaches a code identifier, never a provider one. A provider identity
+    // has no `kind` on the wire, `provider` instead.
+    dto(
+      'dto.identityInfoProvider',
+      DwIdentityInfo(
+        id: 4,
+        accountId: 7,
+        provider: 'google',
+        value: 'google-subject-1',
+        createdAt: at,
+        verifiedAt: later,
+      ),
+    ),
     dto(
       'dto.sessionKeyInfo',
       DwSessionKeyInfo(

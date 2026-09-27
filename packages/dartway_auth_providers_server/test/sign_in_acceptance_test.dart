@@ -108,29 +108,162 @@ void main() {
     );
   });
 
-  test('a token that does not hold up is refused, and nothing is created',
-      () async {
-    final refused = await signIn(token: appleTokenUnsigned);
-    expect(refused.refusal.code, DwProviderRefusal.credentialRejected.code);
-    expect(refused.refusal.field, 'idToken');
-    expect(club.created, isEmpty);
-    expect(
-      await club.db.query('SELECT 1 FROM dw_account'),
-      isEmpty,
-      reason: 'a refused sign-in leaves no account behind',
-    );
+  group('linkByVerifiedEmail (#356)', () {
+    test('the token\'s verified e-mail matches an existing account: the '
+        'provider identity joins it, not a new one', () async {
+      await club.stop();
+      club = await _ProviderHarness.start(
+        appleKeys,
+        apple,
+        linkByVerifiedEmail: true,
+      );
+      const request = DwRequestCode(
+        kind: DwIdentifierKind.email,
+        identifier: 'ada@example.com',
+      );
+      final ticket = (await club.send(request)).value(request);
+      final verify = DwVerifyCode(ticketId: ticket.id, code: '654321');
+      final emailSession = (await club.send(verify)).value(verify);
+
+      // The Apple token fixture's claims carry `ada@example.com`,
+      // `email_verified: true` (asserted above) — the same address.
+      final session = (await signIn()).value(_signIn());
+      expect(session.id, emailSession.id);
+      expect(session.isNewAccount, isFalse);
+      expect(
+        club.created,
+        isEmpty,
+        reason:
+            'onExternalAccountCreated must not run for a linked '
+            'identity',
+      );
+      expect(
+        await club.db.query(
+          'SELECT kind FROM dw_identity WHERE account_id = @id ORDER BY id',
+          params: {'id': session.id},
+        ),
+        [
+          isA<DwResultRow>().having((r) => r.get<String>('kind'), '', 'email'),
+          isA<DwResultRow>().having((r) => r.get<String>('kind'), '', 'apple'),
+        ],
+      );
+    });
+
+    test('linkByVerifiedEmail off (the default in every other test here): the '
+        'same matching e-mail still makes a new account', () async {
+      const request = DwRequestCode(
+        kind: DwIdentifierKind.email,
+        identifier: 'ada@example.com',
+      );
+      final ticket = (await club.send(request)).value(request);
+      final verify = DwVerifyCode(ticketId: ticket.id, code: '654321');
+      final emailSession = (await club.send(verify)).value(verify);
+
+      final session = (await signIn()).value(_signIn());
+      expect(session.id, isNot(emailSession.id));
+      expect(session.isNewAccount, isTrue);
+      expect(club.created, hasLength(1));
+    });
   });
 
-  test('a provider this server does not configure is a door it does not have',
+  group('linkByVerifiedEmail: the email_verified gate is real (#356)', () {
+    // Real Google tokens, checked against a real key: replacing the gate
+    // (`dw_sign_in_providers_module.dart`'s `claims[...emailVerified] == '
+    // 'true'`) with `true` keeps every test above green — none of them
+    // sends a token whose e-mail is unverified. These do, against an
+    // account that already matches the address, so a gate that always
+    // says yes links here and fails.
+    late FakeKeySet googleKeys;
+
+    setUp(() async {
+      googleKeys = FakeKeySet(googleJwks);
+      await club.stop();
+      club = await _ProviderHarness.start(
+        appleKeys,
+        apple,
+        linkByVerifiedEmail: true,
+        googleKeys: googleKeys,
+      );
+    });
+
+    Future<DwAuthSession> emailAccount(String identifier) async {
+      final request = DwRequestCode(
+        kind: DwIdentifierKind.email,
+        identifier: identifier,
+      );
+      final ticket = (await club.send(request)).value(request);
+      final verify = DwVerifyCode(ticketId: ticket.id, code: '654321');
+      return (await club.send(verify)).value(verify);
+    }
+
+    test("Google's own email_verified: false — an account matching the "
+        "address exists, and it is not linked", () async {
+      final emailSession = await emailAccount('ada@example.com');
+      final session = (await signIn(
+        provider: DwAuthProvider.google,
+        token: googleTokenEmailUnverified,
+        nonce: null,
+      )).value(_signIn());
+      expect(session.id, isNot(emailSession.id));
+      expect(session.isNewAccount, isTrue);
+    });
+
+    test(
+      'no email_verified claim at all — an account matching the address '
+      'exists, and it is not linked: absent is not verified either',
       () async {
-    final refused = await signIn(
-      provider: DwAuthProvider.google,
-      token: googleToken,
-      nonce: null,
+        final emailSession = await emailAccount('ada@example.com');
+        final session = (await signIn(
+          provider: DwAuthProvider.google,
+          token: googleTokenNoEmailVerifiedClaim,
+          nonce: null,
+        )).value(_signIn());
+        expect(session.id, isNot(emailSession.id));
+        expect(session.isNewAccount, isTrue);
+      },
     );
-    expect(refused.refusal.code, DwCoreRefusal.forbidden.code);
-    expect(refused.refusal.field, 'provider');
+
+    test('email_verified: true (Google, real token) — the same account an '
+        'Apple token linked to above links here too: the gate is not '
+        'provider-specific', () async {
+      final emailSession = await emailAccount('ada@example.com');
+      final session = (await signIn(
+        provider: DwAuthProvider.google,
+        token: googleToken,
+        nonce: null,
+      )).value(_signIn());
+      expect(session.id, emailSession.id);
+      expect(session.isNewAccount, isFalse);
+    });
   });
+
+  test(
+    'a token that does not hold up is refused, and nothing is created',
+    () async {
+      final refused = await signIn(token: appleTokenUnsigned);
+      expect(refused.refusal.code, DwProviderRefusal.credentialRejected.code);
+      expect(refused.refusal.field, 'idToken');
+      expect(club.created, isEmpty);
+      expect(
+        await club.db.query('SELECT 1 FROM dw_account'),
+        isEmpty,
+        reason: 'a refused sign-in leaves no account behind',
+      );
+    },
+  );
+
+  test(
+    'a provider this server does not configure is a door it does not have',
+    () async {
+      final refused = await signIn(
+        provider: DwAuthProvider.google,
+        token: googleToken,
+        nonce: null,
+      );
+      expect(refused.refusal.code, DwCoreRefusal.forbidden.code);
+      expect(refused.refusal.field, 'provider');
+    },
+  );
 
   test('a provider that cannot be reached is told apart from a bad token: '
       'the app may try again', () async {
@@ -144,8 +277,9 @@ void main() {
   group("what deleting an account owes Apple", () {
     test('the authorization code is exchanged once and the refresh token '
         'kept — the only thing that can revoke this person later', () async {
-      final session = (await signIn(authorizationCode: 'apple-code-1'))
-          .value(_signIn());
+      final session = (await signIn(
+        authorizationCode: 'apple-code-1',
+      )).value(_signIn());
 
       final exchanges = apple.to('/auth/token');
       expect(exchanges, hasLength(1));
@@ -170,8 +304,9 @@ void main() {
 
     test('deleting the account hands the token back to Apple and keeps '
         'nothing', () async {
-      final session = (await signIn(authorizationCode: 'apple-code-2'))
-          .value(_signIn());
+      final session = (await signIn(
+        authorizationCode: 'apple-code-2',
+      )).value(_signIn());
       expect(await club.deleteAccount(session.id), isTrue);
 
       expect(
@@ -189,8 +324,9 @@ void main() {
 
     test('an Apple that is down does not keep a person from leaving: the '
         'account goes and the revocation waits', () async {
-      final session = (await signIn(authorizationCode: 'apple-code-3'))
-          .value(_signIn());
+      final session = (await signIn(
+        authorizationCode: 'apple-code-3',
+      )).value(_signIn());
       apple.failWith = 500;
       expect(await club.deleteAccount(session.id), isTrue);
       expect(
@@ -219,12 +355,14 @@ void main() {
       expect(await club.db.query('SELECT 1 FROM dw_provider_token'), isEmpty);
     });
 
-    test('a sign-in without a code keeps nothing and asks Apple nothing',
-        () async {
-      await signIn();
-      expect(apple.calls, isEmpty);
-      expect(await club.db.query('SELECT 1 FROM dw_provider_token'), isEmpty);
-    });
+    test(
+      'a sign-in without a code keeps nothing and asks Apple nothing',
+      () async {
+        await signIn();
+        expect(apple.calls, isEmpty);
+        expect(await club.db.query('SELECT 1 FROM dw_provider_token'), isEmpty);
+      },
+    );
   });
 
   test('a repeat of the very same call mints a new session rather than '
@@ -270,6 +408,8 @@ final class _ProviderHarness {
     FakeKeySet appleKeys,
     FakeApple apple, {
     bool withSigningKey = true,
+    bool linkByVerifiedEmail = false,
+    FakeKeySet? googleKeys,
   }) async {
     final DwDatabaseConfig admin;
     try {
@@ -297,8 +437,12 @@ final class _ProviderHarness {
           database: database.config,
           auth: DwAuthConfig(
             accountDeletion: DwAccountDeletion.byMember,
+            linkByVerifiedEmail: linkByVerifiedEmail,
             normalize: (kind, raw) => raw.trim().toLowerCase(),
             deliverCode: (ctx, kind, identifier, code, accountId) async {},
+            // Fixed, so a test that needs an e-mail account first (linking)
+            // can confirm it without a real delivery to read the code from.
+            generateCode: (ctx, kind, identifier, accountId) async => '654321',
             onExternalAccountCreated:
                 (ctx, accountId, provider, subject, registration) async {
                   harness.created.add((
@@ -323,6 +467,11 @@ final class _ProviderHarness {
                       )
                     : null,
               ),
+              if (googleKeys != null)
+                DwGoogleSignIn(
+                  clientIds: const ['1-android.apps.googleusercontent.com'],
+                  fetchKeys: googleKeys.fetch,
+                ),
             ]),
           ],
           logger: const _SilentLogger(),
@@ -377,7 +526,9 @@ final class _SilentLogger implements DwServerLogger {
     StackTrace? stackTrace,
   }) {
     if (Platform.environment['DW_TEST_LOG'] != null) {
-      stderr.writeln('${level.name} $message${error == null ? '' : ': $error'}');
+      stderr.writeln(
+        '${level.name} $message${error == null ? '' : ': $error'}',
+      );
     }
   }
 

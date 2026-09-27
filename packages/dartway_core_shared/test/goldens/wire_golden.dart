@@ -549,6 +549,14 @@ const String wireGolden = r'''
       "createdAt": 1789468200000000,
       "verifiedAt": 1789468800000000
     },
+    "dto.identityInfoProvider": {
+      "id": 4,
+      "accountId": 7,
+      "provider": "google",
+      "value": "google-subject-1",
+      "createdAt": 1789468200000000,
+      "verifiedAt": 1789468800000000
+    },
     "dto.sessionKeyInfo": {
       "id": 4,
       "accountId": 7,
