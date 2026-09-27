@@ -1,3 +1,4 @@
+import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 import 'app_l10n.dart';
@@ -11,6 +12,7 @@ extension AppRefusalText on AppLocalizations {
       ...DwCoreRefusal.values,
       ...DwAuthRefusal.values,
       ...DwUploadRefusal.values,
+      ...DwAnalyticsRefusal.values,
     ])
       code.code: code,
   };
@@ -27,6 +29,7 @@ extension AppRefusalText on AppLocalizations {
     final DwCoreRefusal code => _coreText(code, refusal),
     final DwAuthRefusal code => _authText(code),
     final DwUploadRefusal code => _uploadText(code, refusal),
+    final DwAnalyticsRefusal code => _analyticsText(code),
     _ => refusalGeneric,
   };
 
@@ -65,6 +68,12 @@ extension AppRefusalText on AppLocalizations {
 
   String _authText(DwAuthRefusal code) => switch (code) {
     DwAuthRefusal.identifierTaken => refusalIdentifierTaken,
+  };
+
+  String _analyticsText(DwAnalyticsRefusal code) => switch (code) {
+    DwAnalyticsRefusal.batchInvalid => refusalAnalyticsBatchInvalid,
+    DwAnalyticsRefusal.reportInvalid => refusalAnalyticsReportInvalid,
+    DwAnalyticsRefusal.dashboardInvalid => refusalAnalyticsDashboardInvalid,
   };
 
   String _uploadText(DwUploadRefusal code, DwCallRefusal refusal) =>

@@ -182,8 +182,13 @@ void main() {
       };
     }
 
-    expect(overridden('shop_shared'), {'dartway_core_shared'});
+    expect(overridden('shop_shared'), {
+      'dartway_analytics_shared',
+      'dartway_core_shared',
+    });
     expect(overridden('shop_server'), {
+      'dartway_analytics_server',
+      'dartway_analytics_shared',
       'dartway_client',
       'dartway_core_server',
       'dartway_core_shared',
@@ -191,6 +196,8 @@ void main() {
       'dartway_orm',
     });
     expect(overridden('shop_flutter'), {
+      'dartway_analytics_flutter',
+      'dartway_analytics_shared',
       'dartway_cli',
       'dartway_client',
       'dartway_core_flutter',

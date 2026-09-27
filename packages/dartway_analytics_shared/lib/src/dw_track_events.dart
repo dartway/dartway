@@ -8,7 +8,17 @@ enum DwAnalyticsRefusal implements DwRefusalCode {
   /// The batch breaks a limit of [DwTrackEvents]: too many events, a name or
   /// a property the store does not take, or a malformed install id. The
   /// field is `events` or `installId`.
-  batchInvalid('dw.analyticsBatchInvalid');
+  batchInvalid('dw.analyticsBatchInvalid'),
+
+  /// A report or catalog request the store cannot answer: a name or a key
+  /// no event can have, too many filters, a period that ends before it
+  /// starts or holds too many buckets. The field is `spec` or `period`.
+  reportInvalid('dw.analyticsReportInvalid'),
+
+  /// A dashboard that cannot be saved: an empty or too long title, too many
+  /// widgets, or a widget whose report is invalid. The field is `title` or
+  /// `widgets`.
+  dashboardInvalid('dw.analyticsDashboardInvalid');
 
   const DwAnalyticsRefusal(this.code);
 
@@ -196,15 +206,3 @@ final class DwTrackEvents extends DwActionCommand<void>
   String toString() =>
       'DwTrackEvents($installId, ${platform.name}, ${events.length} events)';
 }
-
-/// The analytics calls, for the project's protocol:
-///
-/// ```dart
-/// final appProtocol = DwWireProtocol(
-///   dwAnalyticsProtocolEntries,
-///   include: shopProtocol,
-/// );
-/// ```
-const List<DwProtocolEntry> dwAnalyticsProtocolEntries = [
-  DwProtocolEntry<DwTrackEvents>('DwTrackEvents', DwTrackEvents.fromJson),
-];

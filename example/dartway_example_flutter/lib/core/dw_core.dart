@@ -1,3 +1,4 @@
+import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
@@ -28,7 +29,8 @@ abstract final class ExampleDwCore {
   /// no storage plugin at all.
   ///
   /// [pushTransports] deliver notifications — FCM when Firebase is configured;
-  /// a test passes a fake one. With none, push is inert.
+  /// a test passes a fake one. With none, push is inert. A test passes an
+  /// in-memory [analyticsStore] too, where the recorded events wait.
   static DwFlutterCore create({
     required Uri baseUrl,
     required String appVersion,
@@ -37,6 +39,7 @@ abstract final class ExampleDwCore {
     DwTokenStore? tokenStore,
     DwClientOptions clientOptions = const DwClientOptions(),
     List<DwPushTransportClient> pushTransports = const [],
+    DwAnalyticsStore? analyticsStore,
   }) => dw = DwFlutterCore(
     config: DwFlutterConfig(
       appVersion: appVersion,
@@ -54,6 +57,8 @@ abstract final class ExampleDwCore {
     plugins: [
       if (tokenStore == null) DwSharedPreferences(),
       DwPush(transports: pushTransports),
+      // Opening, resuming and signing in are recorded from the first build.
+      DwAnalytics(store: analyticsStore),
     ],
   );
 

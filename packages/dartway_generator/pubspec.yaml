@@ -17,6 +17,8 @@ dependencies:
   pub_semver: ^2.2.0
   yaml: ^3.1.2
 dev_dependencies:
+  dartway_analytics_shared:
+    path: ../dartway_analytics_shared
   dartway_core_server:
     path: ../dartway_core_server
   dartway_core_shared:
@@ -33,6 +35,8 @@ dev_dependencies:
 # Outside the workspace, the framework packages the generator's tests compile
 # generated code against resolve from this tree, not from pub.dev.
 dependency_overrides:
+  dartway_analytics_shared:
+    path: ../dartway_analytics_shared
   dartway_client:
     path: ../dartway_client
   dartway_core_server:

@@ -655,4 +655,166 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get refusalUploadFailed => 'Файл не загрузился. Попробуйте ещё раз.';
+
+  @override
+  String get analyticsTitle => 'Аналитика';
+
+  @override
+  String get analyticsNoDashboards =>
+      'Дашбордов пока нет. Создайте первый и соберите на нём цифры, за которыми следите.';
+
+  @override
+  String get analyticsNewDashboard => 'Новый дашборд';
+
+  @override
+  String get analyticsDashboardTitle => 'Название дашборда';
+
+  @override
+  String get analyticsRenameDashboard => 'Переименовать дашборд';
+
+  @override
+  String get analyticsDeleteDashboard => 'Удалить дашборд';
+
+  @override
+  String analyticsDeleteDashboardConfirmation(String title) {
+    return 'Удалить дашборд «$title»? Виджеты удалятся вместе с ним, события останутся.';
+  }
+
+  @override
+  String get analyticsEditDashboard => 'Редактировать дашборд';
+
+  @override
+  String get analyticsDoneEditing => 'Готово';
+
+  @override
+  String get analyticsAddWidget => 'Добавить виджет';
+
+  @override
+  String get analyticsEditWidget => 'Изменить виджет';
+
+  @override
+  String get analyticsRemoveWidget => 'Удалить виджет';
+
+  @override
+  String get analyticsMoveWidgetBack => 'Сдвинуть назад';
+
+  @override
+  String get analyticsMoveWidgetForward => 'Сдвинуть вперёд';
+
+  @override
+  String get analyticsNoWidgets => 'На этом дашборде пока нет виджетов.';
+
+  @override
+  String analyticsLastDays(int days) {
+    return '$days дн.';
+  }
+
+  @override
+  String get analyticsPickDates => 'Даты…';
+
+  @override
+  String analyticsWidgetType(String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'indicator': 'Число',
+      'bar': 'Столбцы',
+      'pie': 'Круговая',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get analyticsWidgetTitle => 'Название';
+
+  @override
+  String get analyticsEvent => 'Событие';
+
+  @override
+  String get analyticsEveryEvent => 'Любое событие';
+
+  @override
+  String analyticsEventWithCount(String name, int count) {
+    return '$name ($count)';
+  }
+
+  @override
+  String get analyticsMetricLabel => 'Считать';
+
+  @override
+  String analyticsMetric(String metric) {
+    String _temp0 = intl.Intl.selectLogic(metric, {
+      'events': 'События',
+      'accounts': 'Людей (аккаунты)',
+      'installs': 'Устройства (установки)',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get analyticsFilters => 'Только где';
+
+  @override
+  String get analyticsAddFilter => 'Добавить условие';
+
+  @override
+  String get analyticsFilterProperty => 'Свойство';
+
+  @override
+  String get analyticsFilterValue => 'равно';
+
+  @override
+  String get analyticsRemoveFilter => 'Убрать условие';
+
+  @override
+  String get analyticsBreakdownLabel => 'Разбить по';
+
+  @override
+  String get analyticsBreakdownNone => 'Без разбивки';
+
+  @override
+  String analyticsBucket(String bucket) {
+    String _temp0 = intl.Intl.selectLogic(bucket, {
+      'day': 'Дням',
+      'week': 'Неделям',
+      'month': 'Месяцам',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String analyticsByProperty(String key) {
+    return 'Свойству «$key»';
+  }
+
+  @override
+  String get analyticsTopValues => 'Сколько значений показать';
+
+  @override
+  String get analyticsComparePrevious => 'Сравнить с предыдущим периодом';
+
+  @override
+  String get analyticsVsPrevious => 'к предыдущему периоду';
+
+  @override
+  String get analyticsOther => 'Остальное';
+
+  @override
+  String get analyticsNotSet => 'Не задано';
+
+  @override
+  String get analyticsNoData => 'За этот период ничего не записано.';
+
+  @override
+  String get refusalAnalyticsBatchInvalid =>
+      'Приложение записало события, которые сервер не может сохранить.';
+
+  @override
+  String get refusalAnalyticsReportInvalid =>
+      'Такой отчёт не построить: проверьте событие, свойства и даты.';
+
+  @override
+  String get refusalAnalyticsDashboardInvalid =>
+      'Проверьте дашборд: нужно название и не больше 12 виджетов, у каждого — название.';
 }

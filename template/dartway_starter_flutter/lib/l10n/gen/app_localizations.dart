@@ -871,6 +871,258 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This app and its server speak different versions. We are on it — please try again later.'**
   String get serverMismatchBody;
+
+  /// No description provided for @analyticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analytics'**
+  String get analyticsTitle;
+
+  /// No description provided for @analyticsNoDashboards.
+  ///
+  /// In en, this message translates to:
+  /// **'No dashboards yet. Create one and put on it the numbers you watch.'**
+  String get analyticsNoDashboards;
+
+  /// No description provided for @analyticsNewDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'New dashboard'**
+  String get analyticsNewDashboard;
+
+  /// No description provided for @analyticsDashboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard title'**
+  String get analyticsDashboardTitle;
+
+  /// No description provided for @analyticsRenameDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename dashboard'**
+  String get analyticsRenameDashboard;
+
+  /// No description provided for @analyticsDeleteDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete dashboard'**
+  String get analyticsDeleteDashboard;
+
+  /// No description provided for @analyticsDeleteDashboardConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the dashboard “{title}”? Its widgets go with it; the events stay.'**
+  String analyticsDeleteDashboardConfirmation(String title);
+
+  /// No description provided for @analyticsEditDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit dashboard'**
+  String get analyticsEditDashboard;
+
+  /// No description provided for @analyticsDoneEditing.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get analyticsDoneEditing;
+
+  /// No description provided for @analyticsAddWidget.
+  ///
+  /// In en, this message translates to:
+  /// **'Add widget'**
+  String get analyticsAddWidget;
+
+  /// No description provided for @analyticsEditWidget.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit widget'**
+  String get analyticsEditWidget;
+
+  /// No description provided for @analyticsRemoveWidget.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove widget'**
+  String get analyticsRemoveWidget;
+
+  /// No description provided for @analyticsMoveWidgetBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Move back'**
+  String get analyticsMoveWidgetBack;
+
+  /// No description provided for @analyticsMoveWidgetForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Move forward'**
+  String get analyticsMoveWidgetForward;
+
+  /// No description provided for @analyticsNoWidgets.
+  ///
+  /// In en, this message translates to:
+  /// **'This dashboard has no widgets yet.'**
+  String get analyticsNoWidgets;
+
+  /// No description provided for @analyticsLastDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days'**
+  String analyticsLastDays(int days);
+
+  /// No description provided for @analyticsPickDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Dates…'**
+  String get analyticsPickDates;
+
+  /// No description provided for @analyticsWidgetType.
+  ///
+  /// In en, this message translates to:
+  /// **'{type, select, indicator{Number} bar{Bars} pie{Pie} other{—}}'**
+  String analyticsWidgetType(String type);
+
+  /// No description provided for @analyticsWidgetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get analyticsWidgetTitle;
+
+  /// No description provided for @analyticsEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Event'**
+  String get analyticsEvent;
+
+  /// No description provided for @analyticsEveryEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Any event'**
+  String get analyticsEveryEvent;
+
+  /// No description provided for @analyticsEventWithCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} ({count})'**
+  String analyticsEventWithCount(String name, int count);
+
+  /// No description provided for @analyticsMetricLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Count'**
+  String get analyticsMetricLabel;
+
+  /// No description provided for @analyticsMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'{metric, select, events{Events} accounts{People (signed-in accounts)} installs{Devices (installs)} other{—}}'**
+  String analyticsMetric(String metric);
+
+  /// No description provided for @analyticsFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Only where'**
+  String get analyticsFilters;
+
+  /// No description provided for @analyticsAddFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a condition'**
+  String get analyticsAddFilter;
+
+  /// No description provided for @analyticsFilterProperty.
+  ///
+  /// In en, this message translates to:
+  /// **'Property'**
+  String get analyticsFilterProperty;
+
+  /// No description provided for @analyticsFilterValue.
+  ///
+  /// In en, this message translates to:
+  /// **'equals'**
+  String get analyticsFilterValue;
+
+  /// No description provided for @analyticsRemoveFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the condition'**
+  String get analyticsRemoveFilter;
+
+  /// No description provided for @analyticsBreakdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Split by'**
+  String get analyticsBreakdownLabel;
+
+  /// No description provided for @analyticsBreakdownNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing'**
+  String get analyticsBreakdownNone;
+
+  /// No description provided for @analyticsBucket.
+  ///
+  /// In en, this message translates to:
+  /// **'{bucket, select, day{Day} week{Week} month{Month} other{—}}'**
+  String analyticsBucket(String bucket);
+
+  /// No description provided for @analyticsByProperty.
+  ///
+  /// In en, this message translates to:
+  /// **'Property “{key}”'**
+  String analyticsByProperty(String key);
+
+  /// No description provided for @analyticsTopValues.
+  ///
+  /// In en, this message translates to:
+  /// **'Values shown'**
+  String get analyticsTopValues;
+
+  /// No description provided for @analyticsComparePrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare with the previous period'**
+  String get analyticsComparePrevious;
+
+  /// No description provided for @analyticsVsPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'vs the previous period'**
+  String get analyticsVsPrevious;
+
+  /// No description provided for @analyticsOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get analyticsOther;
+
+  /// No description provided for @analyticsNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get analyticsNotSet;
+
+  /// No description provided for @analyticsNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing recorded in this period.'**
+  String get analyticsNoData;
+
+  /// No description provided for @refusalAnalyticsBatchInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The app recorded events the server cannot store.'**
+  String get refusalAnalyticsBatchInvalid;
+
+  /// No description provided for @refusalAnalyticsReportInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This report cannot be built: check its event, properties and dates.'**
+  String get refusalAnalyticsReportInvalid;
+
+  /// No description provided for @refusalAnalyticsDashboardInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the dashboard: it needs a title, and at most 12 widgets, each with a title.'**
+  String get refusalAnalyticsDashboardInvalid;
 }
 
 class _AppLocalizationsDelegate

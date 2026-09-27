@@ -1,12 +1,14 @@
 /// The server of the app.
 library;
 
+import 'package:dartway_analytics_server/dartway_analytics_server.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 import 'generated/dw_schema.dart';
 import 'src/core/auth.dart';
 import 'src/core/bootstrap.dart';
+import 'src/core/call_context.dart';
 import 'src/admin/admin_feature.dart';
 import 'src/core/files.dart';
 import 'src/profile/profile_feature.dart';
@@ -33,7 +35,7 @@ abstract final class DartwayStarterServer {
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
   }) => DwAppServer(
-    protocol: dartwayStarterProtocol,
+    protocol: appProtocol,
     schema: dartwayStarterSchema,
     migrations: appMigrations,
     migrationsDirectory: 'lib/src/migrations',
@@ -41,6 +43,9 @@ abstract final class DartwayStarterServer {
     auth: auth ?? AppAuth.config(),
     features: [profileFeature, adminFeature, settingsFeature],
     startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+    // The app's events, and the admin panel's reports and dashboards over
+    // them: admins read and edit, nobody else.
+    modules: [DwAnalyticsModule(readAccess: AppAccess.admin)],
     files: storage == null ? null : AppFiles.storage(storage),
     port: port,
     settings: settings,

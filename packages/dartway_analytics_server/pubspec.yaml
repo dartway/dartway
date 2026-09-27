@@ -1,6 +1,6 @@
 name: dartway_analytics_server
-description: Analytics for a DartWay server — events from the app stored in the project's own Postgres in batches, sessions, events recorded by the server itself, and retention.
-version: 0.1.0
+description: Analytics for a DartWay server — app events stored in the project's own Postgres, sessions, server-side events, retention, reports and dashboards.
+version: 0.2.0
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 resolution: workspace
@@ -8,7 +8,7 @@ environment:
   sdk: ^3.11.0
 dependencies:
   crypto: ^3.0.6
-  dartway_analytics_shared: ^0.1.0
+  dartway_analytics_shared: ^0.2.0
   dartway_core_server: ^0.21.0-dev.7
   meta: ^1.16.0
 dev_dependencies:

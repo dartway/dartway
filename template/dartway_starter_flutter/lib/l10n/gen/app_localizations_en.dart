@@ -488,4 +488,166 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get serverMismatchBody =>
       'This app and its server speak different versions. We are on it — please try again later.';
+
+  @override
+  String get analyticsTitle => 'Analytics';
+
+  @override
+  String get analyticsNoDashboards =>
+      'No dashboards yet. Create one and put on it the numbers you watch.';
+
+  @override
+  String get analyticsNewDashboard => 'New dashboard';
+
+  @override
+  String get analyticsDashboardTitle => 'Dashboard title';
+
+  @override
+  String get analyticsRenameDashboard => 'Rename dashboard';
+
+  @override
+  String get analyticsDeleteDashboard => 'Delete dashboard';
+
+  @override
+  String analyticsDeleteDashboardConfirmation(String title) {
+    return 'Delete the dashboard “$title”? Its widgets go with it; the events stay.';
+  }
+
+  @override
+  String get analyticsEditDashboard => 'Edit dashboard';
+
+  @override
+  String get analyticsDoneEditing => 'Done';
+
+  @override
+  String get analyticsAddWidget => 'Add widget';
+
+  @override
+  String get analyticsEditWidget => 'Edit widget';
+
+  @override
+  String get analyticsRemoveWidget => 'Remove widget';
+
+  @override
+  String get analyticsMoveWidgetBack => 'Move back';
+
+  @override
+  String get analyticsMoveWidgetForward => 'Move forward';
+
+  @override
+  String get analyticsNoWidgets => 'This dashboard has no widgets yet.';
+
+  @override
+  String analyticsLastDays(int days) {
+    return '$days days';
+  }
+
+  @override
+  String get analyticsPickDates => 'Dates…';
+
+  @override
+  String analyticsWidgetType(String type) {
+    String _temp0 = intl.Intl.selectLogic(type, {
+      'indicator': 'Number',
+      'bar': 'Bars',
+      'pie': 'Pie',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get analyticsWidgetTitle => 'Title';
+
+  @override
+  String get analyticsEvent => 'Event';
+
+  @override
+  String get analyticsEveryEvent => 'Any event';
+
+  @override
+  String analyticsEventWithCount(String name, int count) {
+    return '$name ($count)';
+  }
+
+  @override
+  String get analyticsMetricLabel => 'Count';
+
+  @override
+  String analyticsMetric(String metric) {
+    String _temp0 = intl.Intl.selectLogic(metric, {
+      'events': 'Events',
+      'accounts': 'People (signed-in accounts)',
+      'installs': 'Devices (installs)',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get analyticsFilters => 'Only where';
+
+  @override
+  String get analyticsAddFilter => 'Add a condition';
+
+  @override
+  String get analyticsFilterProperty => 'Property';
+
+  @override
+  String get analyticsFilterValue => 'equals';
+
+  @override
+  String get analyticsRemoveFilter => 'Remove the condition';
+
+  @override
+  String get analyticsBreakdownLabel => 'Split by';
+
+  @override
+  String get analyticsBreakdownNone => 'Nothing';
+
+  @override
+  String analyticsBucket(String bucket) {
+    String _temp0 = intl.Intl.selectLogic(bucket, {
+      'day': 'Day',
+      'week': 'Week',
+      'month': 'Month',
+      'other': '—',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String analyticsByProperty(String key) {
+    return 'Property “$key”';
+  }
+
+  @override
+  String get analyticsTopValues => 'Values shown';
+
+  @override
+  String get analyticsComparePrevious => 'Compare with the previous period';
+
+  @override
+  String get analyticsVsPrevious => 'vs the previous period';
+
+  @override
+  String get analyticsOther => 'Other';
+
+  @override
+  String get analyticsNotSet => 'Not set';
+
+  @override
+  String get analyticsNoData => 'Nothing recorded in this period.';
+
+  @override
+  String get refusalAnalyticsBatchInvalid =>
+      'The app recorded events the server cannot store.';
+
+  @override
+  String get refusalAnalyticsReportInvalid =>
+      'This report cannot be built: check its event, properties and dates.';
+
+  @override
+  String get refusalAnalyticsDashboardInvalid =>
+      'Check the dashboard: it needs a title, and at most 12 widgets, each with a title.';
 }

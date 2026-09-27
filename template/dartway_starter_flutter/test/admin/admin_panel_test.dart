@@ -31,6 +31,10 @@ void main() {
       )
       ..onRequest<ListUserProfiles>(
         (request, call) => DwCallOk(dwFakeTablePage(members, request)),
+      )
+      // The panel opens on the dashboard, analytics under the counters.
+      ..onRequest<DwListAnalyticsDashboards>(
+        (request, call) => const DwCallOk(<DwAnalyticsDashboard>[]),
       );
     return fake;
   }

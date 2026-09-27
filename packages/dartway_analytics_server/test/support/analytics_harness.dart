@@ -71,7 +71,10 @@ final class AnalyticsHarness {
   final DwTestDatabase database;
   final DwTestServer server;
 
-  static Future<AnalyticsHarness> start(DwAnalyticsSettings settings) async {
+  static Future<AnalyticsHarness> start(
+    DwAnalyticsSettings settings, {
+    required bool withReaders,
+  }) async {
     final DwDatabaseConfig admin;
     try {
       admin = DwDatabaseConfig.fromEnvironment(Platform.environment);
@@ -99,7 +102,11 @@ final class AnalyticsHarness {
           features: [
             DwServerFeature('orders', handlers: [placeOrderHandler]),
           ],
-          modules: [DwAnalyticsModule(settings: settings)],
+          modules: [
+            withReaders
+                ? DwAnalyticsModule(settings: settings, readAccess: readers)
+                : DwAnalyticsModule(settings: settings),
+          ],
           logger: const _SilentLogger(),
           settings: const DwServerSettings(
             jobPollInterval: Duration(seconds: 30),
@@ -116,6 +123,21 @@ final class AnalyticsHarness {
   DwDatabaseHandle get db => server.db;
 
   int _accounts = 0;
+
+  /// The accounts [readers] lets read analytics.
+  static final Set<int> _readerIds = {};
+
+  /// The project's rule in these suites: an account made by [reader].
+  static final DwAccessRule readers = DwAccessRule.check<DwServerCall<Object?>>(
+    (ctx, call) async => _readerIds.contains(ctx.accountId),
+  );
+
+  /// An account the project lets read analytics.
+  Future<TestAccount> reader() async {
+    final made = await account();
+    _readerIds.add(made.id);
+    return made;
+  }
 
   Future<TestAccount> account() async {
     final accounts = server.server.accounts;
@@ -146,11 +168,19 @@ final class AnalyticsHarness {
   }
 }
 
+/// A server for the suite. [withReaders] gives the module the project rule
+/// [AnalyticsHarness.readers]; without it the module has no `readAccess`.
 AnalyticsHarness Function() useAnalyticsHarness({
   DwAnalyticsSettings settings = const DwAnalyticsSettings(),
+  bool withReaders = true,
 }) {
   AnalyticsHarness? harness;
-  setUpAll(() async => harness = await AnalyticsHarness.start(settings));
+  setUpAll(
+    () async => harness = await AnalyticsHarness.start(
+      settings,
+      withReaders: withReaders,
+    ),
+  );
   tearDownAll(() async => harness?.stop());
   return () => harness!;
 }

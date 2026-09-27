@@ -2,7 +2,9 @@ import 'package:dartway_analytics_shared/dartway_analytics_shared.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
 
 import 'dw_analytics_batches.dart';
+import 'dw_analytics_dashboards.dart';
 import 'dw_analytics_migrations.dart';
+import 'dw_analytics_reports.dart';
 import 'dw_analytics_settings.dart';
 
 /// Analytics on a DartWay server.
@@ -19,11 +21,26 @@ import 'dw_analytics_settings.dart';
 /// ```
 ///
 /// It brings the `analytics` tables, the `DwTrackEvents` handler the app's
-/// `DwAnalytics` plugin sends batches to, and the retention job
-/// (`dw.analytics.cleanup`). Everything stays in the project's database:
-/// nothing is sent to a third party.
+/// `DwAnalytics` plugin sends batches to, the retention job
+/// (`dw.analytics.cleanup`), and the reads of what was recorded: reports
+/// (`DwGetAnalyticsReport`), the catalog of names and keys
+/// (`DwGetAnalyticsCatalog`) and saved dashboards. Everything stays in the
+/// project's database: nothing is sent to a third party.
+///
+/// Who reads is the project's to say — the framework knows no roles:
+///
+/// ```dart
+/// DwAnalyticsModule(readAccess: AppAccess.admin)
+/// ```
+///
+/// Without [readAccess] every read is refused `dw.forbidden`.
 final class DwAnalyticsModule extends DwServerModule {
-  DwAnalyticsModule({this.settings = const DwAnalyticsSettings()});
+  DwAnalyticsModule({
+    this.settings = const DwAnalyticsSettings(),
+    DwAccessRule? readAccess,
+    DwAccessRule? editAccess,
+  }) : readAccess = readAccess ?? _closed,
+       editAccess = editAccess ?? readAccess ?? _closed;
 
   /// The recurring retention job.
   static const String cleanupJob = 'dw.analytics.cleanup';
@@ -32,6 +49,18 @@ final class DwAnalyticsModule extends DwServerModule {
   static const int cleanupBatch = 10000;
 
   final DwAnalyticsSettings settings;
+
+  /// Who reads reports, the catalog and the dashboards. By default nobody:
+  /// a signed-in caller is refused `dw.forbidden`.
+  final DwAccessRule readAccess;
+
+  /// Who saves and deletes dashboards; by default whoever has [readAccess].
+  final DwAccessRule editAccess;
+
+  /// The rule of a module given none: every call refused `dw.forbidden`.
+  static final DwAccessRule _closed = DwAccessRule.check<DwServerCall<Object?>>(
+    (ctx, call) async => false,
+  );
 
   @override
   String get namespace => dwAnalyticsNamespace;
@@ -42,6 +71,8 @@ final class DwAnalyticsModule extends DwServerModule {
   @override
   late final List<DwCallHandler> handlers = [
     DwAnalyticsBatches(settings).handler(),
+    ...DwAnalyticsReports.handlers(readAccess),
+    ...DwAnalyticsDashboards.handlers(read: readAccess, edit: editAccess),
   ];
 
   @override
@@ -72,10 +103,33 @@ final class DwAnalyticsModule extends DwServerModule {
   }
 
   @override
-  List<String> problems(DwWireProtocol protocol) => [
-    ...settings.problems,
-    if (!protocol.knows(DwTrackEvents))
-      'analytics: the protocol does not register DwTrackEvents — build it as '
-          'DwWireProtocol(dwAnalyticsProtocolEntries, include: appProtocol)',
+  List<String> problems(DwWireProtocol protocol) {
+    final missing = [
+      for (final type in _calls)
+        if (!protocol.knows(type)) type,
+    ];
+    return [
+      ...settings.problems,
+      for (final (name, rule) in [
+        ('readAccess', readAccess),
+        ('editAccess', editAccess),
+      ])
+        if (rule == DwAccessRule.anonymous)
+          'analytics: $name is DwAccessRule.anonymous — anyone, signed in or '
+              'not, would read what the app records',
+      if (missing.isNotEmpty)
+        'analytics: the protocol does not register ${missing.join(', ')} — '
+            'build it as '
+            'DwWireProtocol(dwAnalyticsProtocolEntries, include: appProtocol)',
+    ];
+  }
+
+  static const List<Type> _calls = [
+    DwTrackEvents,
+    DwGetAnalyticsReport,
+    DwGetAnalyticsCatalog,
+    DwListAnalyticsDashboards,
+    DwSaveAnalyticsDashboard,
+    DwDeleteAnalyticsDashboard,
   ];
 }

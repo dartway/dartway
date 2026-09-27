@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_starter_flutter/core/app_version.dart';
@@ -9,6 +12,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+export 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 export 'package:dartway_client/testing.dart';
 export 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
@@ -58,6 +62,11 @@ final class FakeApp {
             ? const DwNotAuthenticated<UserProfile>()
             : DwCallOk<UserProfile>(profile),
       )
+      // The app's own events, recorded from its first build.
+      ..onCommand<DwTrackEvents>((command, call) {
+        trackedEvents.addAll(command.events);
+        return const DwCallOk<void>(null);
+      })
       ..onRequest<ListAppSettings>(
         (request, call) => DwCallOk(<AppSetting>[...settings]),
       )
@@ -77,7 +86,10 @@ final class FakeApp {
       });
   }
 
-  final server = DwFakeServer(protocol: dartwayStarterProtocol);
+  final server = DwFakeServer(protocol: appProtocol);
+
+  /// The events the app sent.
+  final trackedEvents = <DwTrackedEvent>[];
 
   UserProfile profile;
   final settings = <AppSetting>[];
@@ -137,6 +149,7 @@ final class TestApp {
       storageTransport: storageTransport,
       tokenStore: DwMemoryTokenStore(session),
       clientOptions: dwFakeClientOptions,
+      analyticsStore: DwMemoryAnalyticsStore(),
     );
     // Disposing twice is harmless; this one is for a test that failed before
     // [stop], so the next test can build its own core.
@@ -243,6 +256,9 @@ final class TestApp {
   Future<void> stop(WidgetTester tester) async {
     await waitOutNotifications(tester);
     await tester.pumpWidget(const SizedBox());
+    await settle(tester);
+    // Its send timer would outlive the test.
+    unawaited(core.plugins.analytics.dispose());
     await settle(tester);
     await core.dispose();
     debugPrint = _debugPrint;

@@ -129,6 +129,20 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
+  dartway_analytics_flutter:
+    dependency: "direct main"
+    description:
+      path: "../../packages/dartway_analytics_flutter"
+      relative: true
+    source: path
+    version: "0.2.0"
+  dartway_analytics_shared:
+    dependency: "direct overridden"
+    description:
+      path: "../../packages/dartway_analytics_shared"
+      relative: true
+    source: path
+    version: "0.2.0"
   dartway_cli:
     dependency: "direct dev"
     description:

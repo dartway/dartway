@@ -10,6 +10,8 @@ dependencies:
   dartway_core_shared: ^0.21.0-dev.7
   # Push categories and the token registration calls the app and server share.
   dartway_push_shared: ^0.5.0
+  # Events, reports and dashboards: the analytics calls both sides speak.
+  dartway_analytics_shared: ^0.2.0
 
 dev_dependencies:
   lints: ^6.0.0
@@ -17,6 +19,8 @@ dev_dependencies:
 
 # The example lives in the framework repository and builds against this tree.
 dependency_overrides:
+  dartway_analytics_shared:
+    path: ../../packages/dartway_analytics_shared
   dartway_core_shared:
     path: ../../packages/dartway_core_shared
   dartway_push_shared:

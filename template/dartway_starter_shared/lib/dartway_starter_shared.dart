@@ -7,6 +7,7 @@ export 'package:dartway_core_shared/dartway_core_shared.dart';
 
 export 'generated/dw_protocol.dart';
 export 'src/admin.dart';
+export 'src/app_protocol.dart';
 export 'src/auth_identifier.dart';
 export 'src/dartway_starter_channel.dart';
 export 'src/dartway_starter_refusal.dart';

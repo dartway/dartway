@@ -2,7 +2,8 @@
 
 With the analytics module: `DwAnalyticsModule` on the server (`dartway_analytics_server`) and the
 `DwAnalytics` plugin in the app (`dartway_analytics_flutter`). Events are stored in the project's
-own Postgres — nothing goes to a third party — and read with SQL.
+own Postgres — nothing goes to a third party — and read as reports, on dashboards the team builds
+in the admin panel, or with SQL.
 
 ```dart
 // shared: the project's events, by name
@@ -11,8 +12,12 @@ enum ShopEvent with DwAnalyticsEvent { catalogOpened, productViewed, orderPlaced
 // both sides: the protocol knows DwTrackEvents
 final appProtocol = DwWireProtocol(dwAnalyticsProtocolEntries, include: shopProtocol);
 
-// server
-DwAppServer(protocol: appProtocol, modules: [DwAnalyticsModule()], ...);
+// server: who reads reports and dashboards is the project's rule
+DwAppServer(
+  protocol: appProtocol,
+  modules: [DwAnalyticsModule(readAccess: AppAccess.admin)],
+  ...,
+);
 
 // app
 dw = DwFlutterCore(protocol: appProtocol, plugins: [DwAnalytics(attribution: readUtm)], ...);
@@ -66,6 +71,83 @@ session is written back.
 `dw.analytics.cleanup` removes events older than `retention` (180 days) and installs not seen for
 as long, in batches of 10 000.
 
+## Reports
+
+`DwGetAnalyticsReport` counts one thing over a period and answers a `DwAnalyticsReport`: a `total`
+and the `points` of a breakdown.
+
+```dart
+// "saw quiz step N": distinct accounts, by question number
+final funnel = DwGetAnalyticsReport(
+  spec: const DwAnalyticsReportSpec(
+    eventName: 'quizStepSeen',
+    metric: DwAnalyticsMetric.accounts,
+    filters: [DwAnalyticsFilter(property: 'quiz', value: 'onboarding')],
+    breakdown: DwAnalyticsBreakdown.byProperty('question_number', top: 10),
+  ),
+  period: DwAnalyticsPeriod.localDays(firstDay, lastDay),
+);
+ref.watch(dw.request(funnel));
+```
+
+- **What is counted** (`DwAnalyticsMetric`): `events`; `accounts` — distinct signed-in accounts,
+  people; `installs` — distinct installs, devices. `eventName: null` counts every event: installs
+  over any event is "active devices".
+- **Filters** (`DwAnalyticsFilter`) are `property = value`, all of them together. A property is
+  compared as the text of its JSON value, so `'3'` matches the number 3 and the string "3", and
+  `'true'` the boolean.
+- **Breakdown** (`DwAnalyticsBreakdown`): none; by time — `day`, `week` (from Monday) or `month`,
+  every bucket of the period with the empty ones as zero, labelled `YYYY-MM-DD` by its first day;
+  or by a property — the `top` values (at most 20) largest first, events without the property
+  under a `null` label, and the rest together as `other`.
+- **The period** (`DwAnalyticsPeriod`) runs from `from` (included) to `to` (excluded), bucketed in
+  the calendar `utcOffsetMinutes` east of UTC — the viewer's, so a day is the viewer's day.
+  `DwAnalyticsPeriod.localDays(first, last)` builds it from local dates; `.previous` is the period
+  of the same length just before, what a change is measured against.
+- A distinct count is counted over the whole period: a person active on three days is one in the
+  total and one on each day, so the total is not the sum of the points.
+
+One parametrised statement over `dw_analytics_event`, on the `(name, occurred_at)` index — or
+`occurred_at` for every event. Event names and property keys are checked by the rules events are
+stored by before anything runs (`dw.analyticsReportInvalid`); nothing from the call reaches the
+statement's text.
+
+`DwGetAnalyticsCatalog` answers the event names recorded in a period, how many of each, and every
+property key each carried — what a report builder offers instead of free text.
+
+## Dashboards
+
+A dashboard (`DwAnalyticsDashboard`) is a title and its widgets in order, kept in
+`dw_analytics_dashboard`; a widget (`DwAnalyticsWidgetSpec`) is a report spec, a title and a type —
+`indicator` (the total, optionally with its change against the previous period), `bar` or `pie`.
+The period is not part of a dashboard: the viewer chooses it on top. Dashboards belong to the
+project, not to whoever saved them. `DwListAnalyticsDashboards` lists them;
+`dw.plugins.analytics.saveDashboard(id:, title:, widgets:)` creates or replaces one and
+`deleteDashboard(id)` removes it — both read the list again for every screen watching it, since
+the module has no channel to announce a change. At most 12 widgets.
+
+The framework draws none of it: it ships no design. The viewer is source in the skeleton,
+`lib/admin/analytics/` of the app — a period filter, the three widget types drawn by the UI kit's
+`AppStatValue`, `AppBarChart` and `AppPieChart`, and a builder that adds, edits, moves and removes
+widgets — the project's to change like any other screen. A project created before it copies the
+folder, the kit's `ui_kit/3_special/charts/` and the strings from `template/` in the DartWay
+repository.
+
+## Who reads
+
+The framework knows accounts, not roles, so the rule is the project's:
+
+```dart
+DwAnalyticsModule(
+  readAccess: AppAccess.admin,      // reports, the catalog, the dashboard list
+  editAccess: AppAccess.admin,      // saving and deleting dashboards; readAccess when omitted
+)
+```
+
+Without `readAccess` every read is refused `dw.forbidden`, and a signed-out caller is asked to sign
+in. `DwAccessRule.anonymous` for either rule stops the server at start: what the app records is not
+for everyone. `DwTrackEvents` stays open to a signed-out app.
+
 ## Tables
 
 | `dw_analytics_install` | |
@@ -82,8 +164,14 @@ as long, in batches of 10 000.
 | `install_id`, `sequence`, `session_number` | app events only |
 | `account_id`, `platform`, `app_version` | |
 
-Indexed by `(name, occurred_at)`, `(account_id, occurred_at)`, `(install_id, occurred_at)` and
-`received_at`.
+Indexed by `(name, occurred_at)`, `occurred_at`, `(account_id, occurred_at)`,
+`(install_id, occurred_at)` and `received_at`.
+
+| `dw_analytics_dashboard` | |
+|---|---|
+| `id`, `title` | |
+| `widgets` (jsonb) | the widgets in order, each the JSON of a `DwAnalyticsWidgetSpec` |
+| `created_at`, `updated_at` | |
 
 ```sql
 -- daily active installs
@@ -100,5 +188,8 @@ WHERE c.name = 'catalogOpened';
 
 ## What it does not do yet
 
-No reports or screens: the tables and SQL are the interface. No export to an outside service. No
-screen views by route. Each is a later step once a project needs it.
+Reports count one event at a time: a funnel is read step by step (a breakdown by the step's
+property, or one widget per step), not as a sequence within a session — that is still SQL, as
+above. No retention cohorts, no comparisons of two properties at once, no export to an outside
+service, no screen views by route, no dashboard per person. Dashboards are not live: a change made
+elsewhere shows on the next read. Each is a later step once a project needs it.

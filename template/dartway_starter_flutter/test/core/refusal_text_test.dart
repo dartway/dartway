@@ -1,3 +1,4 @@
+import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/refusal_text.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
@@ -14,6 +15,7 @@ void main() {
         ...DwCoreRefusal.values,
         ...DwAuthRefusal.values,
         ...DwUploadRefusal.values,
+        ...DwAnalyticsRefusal.values,
       ];
       for (final code in codes) {
         expect(
