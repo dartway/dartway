@@ -220,7 +220,7 @@ void main() {
 
   test('a protocol without the analytics calls is named at start', () {
     expect(DwAnalyticsModule().problems(DwWireProtocol.core), [
-      contains('DwTrackEvents'),
+      allOf(contains('DwTrackEvents'), contains('DwGetAnalyticsReport')),
     ]);
   });
 }

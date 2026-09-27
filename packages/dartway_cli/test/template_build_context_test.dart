@@ -119,18 +119,25 @@ void main() {
       );
     }
   });
-  test('the shared package depends on the shared half of the framework '
+  test('the shared package depends on shared halves of the framework '
       'and nothing else', () {
     // The constraint is the whole design: whatever the contract package pulls
     // in is compiled into the server and into the app alike, so a dependency
     // on either side's half — or on Flutter, or IO — would make it the
-    // contract of one side only.
+    // contract of one side only. A satellite's shared half (analytics) is
+    // pure Dart on the core's shared half, and speaks for both sides.
     final document = loadYaml(
       File(
         p.join(template.path, 'dartway_starter_shared', 'pubspec.yaml'),
       ).readAsStringSync(),
     );
     final dependencies = (document as YamlMap)['dependencies'] as YamlMap;
-    expect(dependencies.keys, ['dartway_core_shared']);
+    expect(dependencies.keys, contains('dartway_core_shared'));
+    expect(
+      dependencies.keys.where(
+        (name) => !RegExp(r'^dartway_[a-z_]+_shared$').hasMatch(name as String),
+      ),
+      isEmpty,
+    );
   });
 }

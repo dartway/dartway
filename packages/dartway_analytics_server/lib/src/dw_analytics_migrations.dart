@@ -17,6 +17,11 @@ final List<DwDatabaseMigration> dwAnalyticsMigrations = List.unmodifiable([
     _initialUp,
     _initialDown,
   ),
+  const _AnalyticsSqlMigration(
+    '20260927_000000_analytics_dashboards',
+    _dashboardsUp,
+    _dashboardsDown,
+  ),
 ]);
 
 final class _AnalyticsSqlMigration extends DwDatabaseMigration {
@@ -109,4 +114,26 @@ CREATE TABLE dw_analytics_event (
 const List<String> _initialDown = [
   'DROP TABLE dw_analytics_event',
   'DROP TABLE dw_analytics_install',
+];
+
+const List<String> _dashboardsUp = [
+  // A saved dashboard, the project's rather than an account's: its widgets
+  // in order, each the JSON of a `DwAnalyticsWidgetSpec`.
+  '''
+CREATE TABLE dw_analytics_dashboard (
+  id bigserial PRIMARY KEY,
+  title text NOT NULL,
+  widgets jsonb NOT NULL DEFAULT '[]',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+)''',
+  // Reports over every event ("active installs") and the catalog read a
+  // period without a name: `(name, occurred_at)` cannot serve them.
+  'CREATE INDEX dw_analytics_event_occurred '
+      'ON dw_analytics_event (occurred_at)',
+];
+
+const List<String> _dashboardsDown = [
+  'DROP INDEX dw_analytics_event_occurred',
+  'DROP TABLE dw_analytics_dashboard',
 ];

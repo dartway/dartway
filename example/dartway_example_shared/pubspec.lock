@@ -81,6 +81,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
+  dartway_analytics_shared:
+    dependency: "direct main"
+    description:
+      path: "../../packages/dartway_analytics_shared"
+      relative: true
+    source: path
+    version: "0.2.0"
   dartway_core_shared:
     dependency: "direct main"
     description:

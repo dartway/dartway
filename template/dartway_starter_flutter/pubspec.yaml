@@ -34,6 +34,9 @@ dependencies:
   # claimed the DwKeyValueStorePlugin role, and without one there is nowhere to
   # put the session.
   dartway_shared_preferences: ^0.6.0
+  # Analytics: the app's events, sent in batches to the server, and the calls
+  # the admin panel's dashboards change through (`dw.plugins.analytics`).
+  dartway_analytics_flutter: ^0.2.0
 
   flutter_hooks: ^0.21.2
   hooks_riverpod: ^3.0.0
@@ -76,6 +79,10 @@ dev_dependencies:
 # Inside the monorepo the template builds against the LOCAL framework packages.
 # `dartway create` removes this whole block when it copies the template.
 dependency_overrides:
+  dartway_analytics_flutter:
+    path: ../../packages/dartway_analytics_flutter
+  dartway_analytics_shared:
+    path: ../../packages/dartway_analytics_shared
   dartway_cli:
     path: ../../packages/dartway_cli
   dartway_client:

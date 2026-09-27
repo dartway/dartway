@@ -6,8 +6,10 @@ description: >-
   `dwAnalyticsProtocolEntries`, the project's event enum `with DwAnalyticsEvent` in the shared
   package, the app plugin `DwAnalytics` (`dartway_analytics_flutter`, `dw.plugins.analytics.track`)
   with `attribution`, events the server records with `ctx.analytics.track` in a command's
-  transaction, sessions, retention, and reading the tables with SQL. Use when a feature must be
-  measured — a funnel, activation, usage of a screen — or when numbers look wrong.
+  transaction, sessions, retention, reports (`DwGetAnalyticsReport`), the catalog, saved dashboards
+  and who may read them (`readAccess`), the admin viewer in `lib/admin/analytics/`, and SQL. Use
+  when a feature must be measured — a funnel, activation, usage of a screen — when the team needs a
+  dashboard, or when numbers look wrong.
 ---
 
 # DartWay — analytics (`dartway-analytics`)
@@ -21,7 +23,10 @@ description: >-
   lowerCamelCase that say what happened (`orderPlaced`, not `clickButton3`). `dw.` is the
   framework's.
 - Both protocols: `DwWireProtocol(dwAnalyticsProtocolEntries, include: appProtocol)`.
-- `__SERVER_PKG__`: `DwAnalyticsModule()` in `modules:`; its migrations apply at start.
+- `__SERVER_PKG__`: `DwAnalyticsModule(readAccess: <the project's rule>)` in `modules:` — the
+  admin rule the skeleton declares, or a narrower one; its migrations apply at start. Without
+  `readAccess` every report and dashboard read is refused `dw.forbidden`; `DwAccessRule.anonymous`
+  refuses to start. `editAccess` (saving dashboards) defaults to `readAccess`.
 - `__FLUTTER_PKG__`: `DwAnalytics(attribution: ...)` in `plugins:`.
 
 ## Tracking
@@ -38,12 +43,32 @@ description: >-
 
 ## Reading
 
-SQL over `dw_analytics_event` (`name`, `source`, `occurred_at`, `install_id`, `session_number`,
+**A number the team watches is a dashboard widget, not code.** The skeleton's admin panel has the
+viewer (`lib/admin/analytics/`, source the project owns): a period on top, widgets of three types —
+a number with its change, bars, a pie — built from the catalog of recorded names and keys. A new
+event shows up there once the app records it; name events and properties so a non-developer can
+pick them from a list (`stepNumber`, `sectionName` rather than `p1`).
+
+- In code: `ref.watch(dw.request(DwGetAnalyticsReport(spec: ..., period: ...)))` — a
+  `DwAnalyticsReportSpec` (event, `DwAnalyticsMetric` events / accounts / installs,
+  `DwAnalyticsFilter`s, `DwAnalyticsBreakdown` none / by time / by a property's values, largest
+  first or `DwAnalyticsBreakdownOrder.byLabel` for a funnel's steps) over a `DwAnalyticsPeriod`
+  (`localDays`, which ends at now; `previous`, the same shape earlier). Distinct counts are counted
+  over the whole period, so a pie is only for events by a property.
+- Dashboards change through `dw.plugins.analytics.saveDashboard` / `deleteDashboard`, which refresh
+  `DwListAnalyticsDashboards`; `dw.command` with the dashboard commands leaves the list stale.
+- Charts are the UI kit's (`AppBarChart`, `AppPieChart`, `AppStatValue`): a new chart type goes
+  into `ui_kit/3_special/charts/`, never as raw styling in the feature.
+
+What reports do not answer — a sequence within a session, cohorts — is SQL over
+`dw_analytics_event` (`name`, `source`, `occurred_at`, `install_id`, `session_number`,
 `account_id`, `properties` jsonb) and `dw_analytics_install`. Count installs for activity (one per
 device, before and after sign-in), accounts for people. Sessions end after 30 minutes of silence.
 
 ## Tests
 
-- Server: call the command that records and read `dw_analytics_event` in the test database.
+- Server: call the command that records and read `dw_analytics_event` in the test database; a
+  report through a signed-in admin client, and `dw.forbidden` for a member.
 - App: `DwAnalytics(store: DwMemoryAnalyticsStore())` against `DwFakeServer` answering
-  `DwTrackEvents`; `await analytics.flush()` sends what waits.
+  `DwTrackEvents`; `await analytics.flush()` sends what waits. Widget tests of admin screens answer
+  `DwListAnalyticsDashboards` (and the reports a dashboard shows) on the fake server.

@@ -221,4 +221,101 @@ void main() {
       contains(contains('dwAnalyticsProtocolEntries')),
     );
   });
+
+  test('a saved or deleted dashboard is read again by the list a screen '
+      'watches; a refused save reads nothing', () async {
+    final dashboards = <DwAnalyticsDashboard>[];
+    var listed = 0;
+    world.server
+      ..onRequest<DwListAnalyticsDashboards>((request, call) {
+        listed++;
+        return DwCallOk(List.of(dashboards));
+      })
+      ..onCommand<DwSaveAnalyticsDashboard>((command, call) {
+        if (command.title == 'refused') {
+          return DwCallRefused(DwCallRefusal(DwCoreRefusal.forbidden));
+        }
+        final saved = DwAnalyticsDashboard(
+          id: dashboards.length + 1,
+          title: command.title,
+          widgets: command.widgets,
+          updatedAt: DateTime.utc(2026, 9, 27),
+        );
+        dashboards.add(saved);
+        return DwCallOk(saved);
+      })
+      ..onCommand<DwDeleteAnalyticsDashboard>((command, call) {
+        dashboards.removeWhere((d) => d.id == command.id);
+        return const DwCallOk<void>(null);
+      });
+    final (core, analytics) = await world.start(session: alice);
+    final watch = core.client.watch(const DwListAnalyticsDashboards());
+    addTearDown(watch.close);
+    await settle();
+    expect(listed, 1);
+
+    const widget = DwAnalyticsWidgetSpec(
+      type: DwAnalyticsWidgetType.indicator,
+      title: 'Orders',
+      report: DwAnalyticsReportSpec(eventName: 'orderPlaced'),
+    );
+    final saved = await analytics.saveDashboard(
+      title: 'Sales',
+      widgets: const [widget],
+    );
+    expect(saved, isA<DwCallOk<DwAnalyticsDashboard>>());
+    await settle();
+    expect(listed, 2);
+    expect(watch.state, isA<DwRequestData<List<DwAnalyticsDashboard>>>());
+    final shown =
+        (watch.state as DwRequestData<List<DwAnalyticsDashboard>>).value;
+    expect(shown.single.widgets, const [widget]);
+
+    final refused = await analytics.saveDashboard(
+      title: 'refused',
+      widgets: const [],
+    );
+    expect(refused, isA<DwCallRefused<DwAnalyticsDashboard>>());
+    await settle();
+    expect(listed, 2, reason: 'nothing changed, nothing is read');
+
+    await analytics.deleteDashboard(shown.single.id);
+    await settle();
+    expect(listed, 3);
+    expect(
+      (watch.state as DwRequestData<List<DwAnalyticsDashboard>>).value,
+      isEmpty,
+    );
+  });
+
+  testWidgets('dispose completes in a widget test\'s pumped time', (
+    tester,
+  ) async {
+    final server = DwFakeServer(protocol: protocol)
+      ..onCommand<DwTrackEvents>((command, call) => const DwCallOk<void>(null));
+    final analytics = DwAnalytics(store: DwMemoryAnalyticsStore());
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '2.1.0+40',
+        refusalText: (refusal) => refusal.code,
+      ),
+      protocol: protocol,
+      baseUrl: server.baseUrl,
+      httpTransport: server.httpTransport,
+      liveConnector: server.liveConnector,
+      tokenStore: DwMemoryTokenStore(null),
+      clientOptions: dwFakeClientOptions,
+      plugins: [analytics],
+    );
+    await core.init();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    var disposed = false;
+    analytics.dispose().then((_) => disposed = true);
+    for (var i = 0; i < 20 && !disposed; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    expect(disposed, isTrue, reason: 'it used to wait for the test to end');
+    await core.dispose();
+  });
 }

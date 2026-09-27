@@ -8,6 +8,8 @@ environment:
 dependencies:
   dartway_core_server: ^0.21.0-dev.8
   dartway_push_server: ^0.5.0
+  # The app's events in the club's Postgres, and the admin dashboards over them.
+  dartway_analytics_server: ^0.2.0
   dartway_example_shared:
     path: ../dartway_example_shared
 
@@ -18,6 +20,10 @@ dev_dependencies:
 
 # The example builds against this tree of the framework.
 dependency_overrides:
+  dartway_analytics_server:
+    path: ../../packages/dartway_analytics_server
+  dartway_analytics_shared:
+    path: ../../packages/dartway_analytics_shared
   dartway_client:
     path: ../../packages/dartway_client
   dartway_core_server:

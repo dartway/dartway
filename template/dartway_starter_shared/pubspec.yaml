@@ -17,6 +17,8 @@ environment:
 # reach for Flutter, a database or IO.
 dependencies:
   dartway_core_shared: ^0.21.0-dev.8
+  # The analytics calls both sides speak: events, reports, dashboards.
+  dartway_analytics_shared: ^0.2.0
 
 dev_dependencies:
   lints: ^6.0.0
@@ -25,5 +27,7 @@ dev_dependencies:
 # Inside the monorepo the template builds against the LOCAL framework packages.
 # `dartway create` removes this whole block when it copies the template.
 dependency_overrides:
+  dartway_analytics_shared:
+    path: ../../packages/dartway_analytics_shared
   dartway_core_shared:
     path: ../../packages/dartway_core_shared

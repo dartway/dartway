@@ -1,3 +1,4 @@
+import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_example_flutter/core/app_version.dart';
@@ -10,6 +11,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+export 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 export 'package:dartway_client/testing.dart';
 export 'package:dartway_example_shared/dartway_example_shared.dart';
 export 'package:dartway_push_flutter/testing.dart';
@@ -59,10 +61,18 @@ final class FakeClub {
       // The push plugin registers the device of a signed-in member.
       ..onCommand<DwRegisterPushToken>(
         (command, call) => const DwCallOk<void>(null),
-      );
+      )
+      // The app's own events, recorded from its first build.
+      ..onCommand<DwTrackEvents>((command, call) {
+        trackedEvents.addAll(command.events);
+        return const DwCallOk<void>(null);
+      });
   }
 
   final server = DwFakeServer(protocol: exampleProtocol);
+
+  /// The events the app sent.
+  final trackedEvents = <DwTrackedEvent>[];
 
   UserProfile profile;
   final sessions = <ClubSession>[];
@@ -128,6 +138,7 @@ final class ExampleTestApp {
       tokenStore: DwMemoryTokenStore(session),
       clientOptions: dwFakeClientOptions,
       pushTransports: pushTransports,
+      analyticsStore: DwMemoryAnalyticsStore(),
     );
     // Disposing twice is harmless; this one is for a test that failed before
     // [stop], so the next test can build its own core.
@@ -228,6 +239,9 @@ final class ExampleTestApp {
     await waitOutNotifications(tester);
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
+    // Its send timer would outlive the test; bounded, so a dispose that
+    // stalls fails here instead of hanging the suite.
+    await run(tester, core.plugins.analytics.dispose());
     await core.dispose();
     debugPrint = _debugPrint;
     expect(server.errors, isEmpty, reason: 'the fake server met a surprise');

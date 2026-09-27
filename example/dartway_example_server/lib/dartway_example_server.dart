@@ -1,6 +1,7 @@
 /// The DartWay example server: a fitness club.
 library;
 
+import 'package:dartway_analytics_server/dartway_analytics_server.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
@@ -8,6 +9,7 @@ import 'package:dartway_push_server/dartway_push_server.dart';
 import 'generated/dw_schema.dart';
 import 'src/core/example_auth.dart';
 import 'src/core/example_bootstrap.dart';
+import 'src/core/example_context.dart';
 import 'src/core/example_files.dart';
 import 'src/core/example_push.dart';
 import 'src/admin/admin_feature.dart';
@@ -58,7 +60,12 @@ abstract final class ExampleServer {
     ],
     startup: [DwFirstAdministrator(grant: ExampleBootstrap.grantAdmin)],
     files: storage == null ? null : ExampleFiles.storage(storage),
-    modules: [push ?? ExamplePush.module()],
+    modules: [
+      push ?? ExamplePush.module(),
+      // The admin panel's dashboards: admins read and edit, staff and
+      // members do not.
+      DwAnalyticsModule(readAccess: ExampleAccess.admin),
+    ],
     port: port,
     settings: settings,
   );

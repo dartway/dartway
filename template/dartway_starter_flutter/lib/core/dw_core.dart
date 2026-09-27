@@ -1,3 +1,4 @@
+import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
@@ -9,7 +10,7 @@ import 'update_required_page.dart';
 
 /// The app's DartWay core: `dw.request`, `dw.table`, `dw.window`,
 /// `dw.command`, `dw.uploader`, `dw.action`, `dw.notify` — reachable from
-/// anywhere in the app.
+/// anywhere in the app — and its plugins: `dw.plugins.analytics`.
 ///
 /// Assigned by [AppDwCore.create]: once by the app bootstrap, and once per
 /// test by a widget test, which disposes it in `tearDown`. It is not `final`
@@ -26,7 +27,8 @@ abstract final class AppDwCore {
   /// [httpTransport] and [liveConnector] (and a fake storage's
   /// [storageTransport]), an in-memory [tokenStore] and short
   /// [clientOptions] instead — and with a token store of its own the core needs
-  /// no storage plugin at all.
+  /// no storage plugin at all. It passes an in-memory [analyticsStore] too:
+  /// the events the app records wait there instead of on the device.
   static DwFlutterCore create({
     required Uri baseUrl,
     required String appVersion,
@@ -35,6 +37,7 @@ abstract final class AppDwCore {
     DwStorageTransport? storageTransport,
     DwTokenStore? tokenStore,
     DwClientOptions clientOptions = const DwClientOptions(),
+    DwAnalyticsStore? analyticsStore,
   }) => dw = DwFlutterCore(
     config: DwFlutterConfig(
       appVersion: appVersion,
@@ -43,14 +46,19 @@ abstract final class AppDwCore {
           UpdateRequiredPage(refusal: refusal),
       onErrorReport: _onErrorReport,
     ),
-    protocol: dartwayStarterProtocol,
+    protocol: appProtocol,
     baseUrl: baseUrl,
     httpTransport: httpTransport,
     liveConnector: liveConnector,
     storageTransport: storageTransport,
     tokenStore: tokenStore,
     clientOptions: clientOptions,
-    plugins: [if (tokenStore == null) DwSharedPreferences()],
+    plugins: [
+      if (tokenStore == null) DwSharedPreferences(),
+      // The app opening, resuming and signing in are recorded from the first
+      // build: the admin dashboard has something to show on day one.
+      DwAnalytics(store: analyticsStore),
+    ],
   );
 
   /// What the app does with an error the framework intercepted.

@@ -7,6 +7,9 @@ environment:
 
 dependencies:
   dartway_core_server: ^0.21.0-dev.8
+  # Events from the app in this project's Postgres, and the reports and
+  # dashboards the admin panel reads from them.
+  dartway_analytics_server: ^0.2.0
   # The contract with the app. A path dependency, so the server image copies
   # this directory too — an image that does not is unbuildable, and pub says
   # so three layers from the cause.
@@ -23,6 +26,10 @@ dev_dependencies:
 # Inside the monorepo the template builds against the LOCAL framework packages.
 # `dartway create` removes this whole block when it copies the template.
 dependency_overrides:
+  dartway_analytics_server:
+    path: ../../packages/dartway_analytics_server
+  dartway_analytics_shared:
+    path: ../../packages/dartway_analytics_shared
   dartway_client:
     path: ../../packages/dartway_client
   dartway_core_server:

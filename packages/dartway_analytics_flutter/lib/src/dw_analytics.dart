@@ -31,6 +31,10 @@ import 'dw_analytics_store.dart';
 /// changing (`DwAppEvent`). The install id is created once and kept: it ties
 /// what a person did before signing in to the account they signed in as.
 ///
+/// Dashboards are changed through [saveDashboard] and [deleteDashboard];
+/// reports, the catalog and the dashboard list are read as any request —
+/// `ref.watch(dw.request(DwGetAnalyticsReport(...)))`.
+///
 /// A batch is attributed by the server to the account the call is signed in
 /// as. Events waiting at a sign-in are sent right away, so they go out under
 /// the account that recorded them unless the send itself is outrun.
@@ -207,6 +211,44 @@ class DwAnalytics extends DwFlutterPlugin with WidgetsBindingObserver {
     }
   }
 
+  /// Saves a dashboard — a new one when [id] is `null` — and reads the
+  /// dashboard list (`DwListAnalyticsDashboards`) again for everyone
+  /// watching it.
+  ///
+  /// The call to make instead of `dw.command(DwSaveAnalyticsDashboard(...))`:
+  /// the module declares no channel, so a list cannot hear of a change it did
+  /// not ask for, and a save that leaves it stale is a screen showing the
+  /// dashboard as it was. Returns the command's result, for `dw.action`.
+  Future<DwCallResult<DwAnalyticsDashboard>> saveDashboard({
+    int? id,
+    required String title,
+    required List<DwAnalyticsWidgetSpec> widgets,
+  }) => _changeDashboards(
+    DwSaveAnalyticsDashboard(id: id, title: title, widgets: widgets),
+  );
+
+  /// Deletes dashboard [id] and reads the dashboard list again, as
+  /// [saveDashboard].
+  Future<DwCallResult<void>> deleteDashboard(int id) =>
+      _changeDashboards(DwDeleteAnalyticsDashboard(id: id));
+
+  Future<DwCallResult<R>> _changeDashboards<R>(
+    DwActionCommand<R> command,
+  ) async {
+    final result = await _core.command(command);
+    if (result is DwCallOk<R>) {
+      // Every watch of an equal request shares one entry: reading it again
+      // through a watch of our own refreshes what every screen shows.
+      final watch = _core.client.watch(const DwListAnalyticsDashboards());
+      try {
+        await watch.refetch();
+      } finally {
+        watch.close();
+      }
+    }
+    return result;
+  }
+
   void _remove(List<DwTrackedEvent> sent) {
     final numbers = {for (final event in sent) event.sequence};
     _queue.removeWhere((event) => numbers.contains(event.sequence));
@@ -239,9 +281,14 @@ class DwAnalytics extends DwFlutterPlugin with WidgetsBindingObserver {
     }
   }
 
+  /// Stops sending and listening, and completes once everything recorded is
+  /// written to the store.
   Future<void> dispose() async {
     _timer?.cancel();
-    await _accounts?.cancel();
+    // Cancelled at once; its future is not waited for: it carries nothing,
+    // and under a widget test's fake time it completes only after the test.
+    unawaited(_accounts?.cancel());
+    _accounts = null;
     WidgetsBinding.instance.removeObserver(this);
     await _persisting;
   }

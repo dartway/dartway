@@ -16,7 +16,7 @@ e-mail, with the terms accepted on sign-up; a profile with a name, a photo
 (uploaded straight to object storage) and the sign-in identifiers, each added
 or changed by a code; roles; an admin panel with live counters, a members
 table (search, role filter, pages), a card per member with a live role change,
-and app settings; the "update the app" screen; widget tests on an in-memory
+app settings, and analytics dashboards built from the app's events without code; the "update the app" screen; widget tests on an in-memory
 server and acceptance tests on a real one. Zero domain models — yours go next.
 
 ## Getting started

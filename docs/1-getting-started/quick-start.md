@@ -41,7 +41,8 @@ in `.claude/`, and a git repository with an initial commit (which is why git nee
 
 What is inside is a skeleton, not somebody's product: sign-in by a one-time code to a phone or an
 e-mail with the terms accepted on sign-up, a profile with a photo, roles, an admin panel (live
-counters, a members table, a card per member, settings), navigation with zone guards, a UI kit as
+counters, analytics dashboards, a members table, a card per member, settings), the app's events
+recorded by the [analytics module](../4-server/analytics.md), navigation with zone guards, a UI kit as
 source you own, and tests on both sides. No domain models. What each folder is for:
 [project layout](project-layout.md).
 
