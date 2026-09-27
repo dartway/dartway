@@ -281,9 +281,14 @@ class DwAnalytics extends DwFlutterPlugin with WidgetsBindingObserver {
     }
   }
 
+  /// Stops sending and listening, and completes once everything recorded is
+  /// written to the store.
   Future<void> dispose() async {
     _timer?.cancel();
-    await _accounts?.cancel();
+    // Cancelled at once; its future is not waited for: it carries nothing,
+    // and under a widget test's fake time it completes only after the test.
+    unawaited(_accounts?.cancel());
+    _accounts = null;
     WidgetsBinding.instance.removeObserver(this);
     await _persisting;
   }

@@ -5,6 +5,8 @@
   to announce a change. Reports and the catalog are read as any request,
   `dw.request(DwGetAnalyticsReport(...))`. No widgets: the viewer is the app's, scaffolded into the
   starter's admin panel.
+- `dispose()` no longer waits for the account subscription's cancellation, which under a widget
+  test's fake time completed only after the test: it now completes once the queue is stored.
 
 ## 0.1.0
 

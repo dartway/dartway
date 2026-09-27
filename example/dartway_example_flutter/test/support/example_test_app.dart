@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
@@ -241,9 +239,9 @@ final class ExampleTestApp {
     await waitOutNotifications(tester);
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
-    // Its send timer would outlive the test.
-    unawaited(core.plugins.analytics.dispose());
-    await settle(tester);
+    // Its send timer would outlive the test; bounded, so a dispose that
+    // stalls fails here instead of hanging the suite.
+    await run(tester, core.plugins.analytics.dispose());
     await core.dispose();
     debugPrint = _debugPrint;
     expect(server.errors, isEmpty, reason: 'the fake server met a surprise');

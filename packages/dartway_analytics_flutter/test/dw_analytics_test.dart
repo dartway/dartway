@@ -287,4 +287,35 @@ void main() {
       isEmpty,
     );
   });
+
+  testWidgets('dispose completes in a widget test\'s pumped time', (
+    tester,
+  ) async {
+    final server = DwFakeServer(protocol: protocol)
+      ..onCommand<DwTrackEvents>((command, call) => const DwCallOk<void>(null));
+    final analytics = DwAnalytics(store: DwMemoryAnalyticsStore());
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '2.1.0+40',
+        refusalText: (refusal) => refusal.code,
+      ),
+      protocol: protocol,
+      baseUrl: server.baseUrl,
+      httpTransport: server.httpTransport,
+      liveConnector: server.liveConnector,
+      tokenStore: DwMemoryTokenStore(null),
+      clientOptions: dwFakeClientOptions,
+      plugins: [analytics],
+    );
+    await core.init();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    var disposed = false;
+    analytics.dispose().then((_) => disposed = true);
+    for (var i = 0; i < 20 && !disposed; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    expect(disposed, isTrue, reason: 'it used to wait for the test to end');
+    await core.dispose();
+  });
 }
