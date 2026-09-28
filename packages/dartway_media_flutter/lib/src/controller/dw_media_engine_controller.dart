@@ -48,7 +48,7 @@ abstract class DwMediaEngineController extends DwMediaController {
        _speed = initialSpeed ?? options.defaultSpeed,
        _muted = initialMuted,
        _autoRetriesLeft = options.autoRetryCount {
-    unawaited(_load());
+    unawaited(_track(_load()));
   }
 
   @override
@@ -88,7 +88,19 @@ abstract class DwMediaEngineController extends DwMediaController {
   bool _loaded = false;
   bool _playWhenLoaded = false;
   bool _failed = false;
+
+  /// The load in flight — the first one or a reload — which a retry joins.
+  /// Cleared the moment it settles, a timeout included, so a load that
+  /// overran is never joined.
   Future<void>? _reloading;
+
+  Future<void> _track(Future<void> load) {
+    late final Future<void> tracked;
+    tracked = load.whenComplete(() {
+      if (identical(_reloading, tracked)) _reloading = null;
+    });
+    return _reloading = tracked;
+  }
 
   int _autoRetriesLeft;
   Timer? _autoRetryTimer;
@@ -133,6 +145,7 @@ abstract class DwMediaEngineController extends DwMediaController {
     bool stale() => _disposed || generation != _loadGeneration;
     _loaded = false;
     _failed = false;
+    var overran = false;
     try {
       final policy = options.resume;
       final startAt =
@@ -151,8 +164,13 @@ abstract class DwMediaEngineController extends DwMediaController {
           timeout,
           onTimeout: () {
             // The load that overran may still finish; it is stale from here
-            // on and never joined or applied.
-            _loadGeneration++;
+            // on and never joined or applied. Only the load still in charge
+            // moves the generation — a superseded one must not push a newer
+            // load into looking stale.
+            if (!stale()) {
+              overran = true;
+              _loadGeneration++;
+            }
             throw TimeoutException('the item did not load', timeout);
           },
         );
@@ -171,9 +189,7 @@ abstract class DwMediaEngineController extends DwMediaController {
         await play();
       }
     } catch (error, stackTrace) {
-      if (error is TimeoutException || !stale()) {
-        reportFailure(error, stackTrace);
-      }
+      if (overran || !stale()) reportFailure(error, stackTrace);
     }
   }
 
@@ -205,8 +221,9 @@ abstract class DwMediaEngineController extends DwMediaController {
   }
 
   /// Loads the item again from where it failed. The error is gone the moment
-  /// it starts — the person sees it loading, not the old error — and a second
-  /// call while it runs joins the first instead of loading twice.
+  /// it starts — the person sees it loading, not the old error — and a call
+  /// while any load runs, the first one included, joins it instead of
+  /// loading twice.
   Future<void> _reload() {
     final running = _reloading;
     if (running != null) return running;
@@ -218,10 +235,7 @@ abstract class DwMediaEngineController extends DwMediaController {
         errorMessage: null,
       ),
     );
-    final reload = _load(
-      restoreTo: position > Duration.zero ? position : null,
-    ).whenComplete(() => _reloading = null);
-    return _reloading = reload;
+    return _track(_load(restoreTo: position > Duration.zero ? position : null));
   }
 
   @override

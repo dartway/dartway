@@ -86,8 +86,8 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
 - The playback state is `loading`, `ready`, `buffering`, `playing`, `paused`, `ended` or `error`,
   with the position, duration, buffered position, speed, volume and mute. **An error stays inside
   the player**: the state turns `error`, `onError` fires, and `retry()` re-resolves the source and
-  returns to where playback failed. A retry shows `loading` at once, and a second tap while it runs
-  joins it rather than loading twice. A load that does not settle within `loadTimeout` fails the
+  returns to where playback failed. A retry shows `loading` at once, and a tap while any load runs —
+  the first one included — joins it rather than loading twice. A load that does not settle within `loadTimeout` fails the
   same way, so a joined retry can never hang; the load that overran is dropped, never joined.
 
 ## Real playback, not a position

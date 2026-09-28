@@ -726,6 +726,32 @@ void main() {
       await endSession(tester, session);
     });
 
+    testWidgets('a retry while the first load still hangs joins it: one '
+        'load, one timeout, and the next retry loads', (tester) async {
+      final asked = <int>[];
+      Object? failure;
+      final session = open(
+        [hanging(asked)],
+        config: const DwMediaConfig(loadTimeout: Duration(seconds: 5)),
+        callbacks: DwMediaCallbacks(onError: (_, error) => failure = error),
+      );
+      await tester.pump(const Duration(seconds: 2));
+      var settled = false;
+      unawaited(session.retry().whenComplete(() => settled = true));
+      await tester.pump(const Duration(seconds: 1));
+      expect(asked, [1], reason: 'the retry joined the load in flight');
+      await tester.pump(const Duration(seconds: 2));
+      expect(settled, isTrue);
+      expect(session.playback.value.isError, isTrue);
+      expect(failure, isA<TimeoutException>());
+
+      unawaited(session.retry());
+      await rig.loadVideo(tester);
+      expect(asked, [1, 2]);
+      expect(session.playback.value.playState, DwMediaPlayState.ready);
+      await endSession(tester, session);
+    });
+
     testWidgets('withoutLoadTimeout: it waits for ever', (tester) async {
       final session = open([
         hanging([]),
