@@ -27,7 +27,9 @@ final class DwAudioMediaController extends DwMediaEngineController {
 
   @override
   Future<void> engineLoad(Uri uri) async {
-    await _release();
+    // The old player goes on its own: a failed `AudioPlayer` may still be
+    // tearing its platform down, and the new one does not wait for that.
+    unawaited(_release().catchError((Object _) {}));
     final player = AudioPlayer();
     _player = player;
     void onChange(Object? _) => _onUpdate(player);

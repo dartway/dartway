@@ -27,7 +27,7 @@ void main() {
   }) async {
     await session.play();
     await rig.playVideoTo(tester, duration - const Duration(seconds: 2));
-    rig.video.emitCompleted(rig.lastVideo);
+    rig.video.latest.finish();
     await tester.pump();
   }
 

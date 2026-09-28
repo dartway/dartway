@@ -36,6 +36,9 @@ base class DwFakeJustAudioPlatform extends JustAudioPlatform {
       if (!track.isReleased) track,
   ];
 
+  /// Every track ever opened, released ones included.
+  List<DwFakeAudio> get opened => List.unmodifiable(_opened);
+
   /// The track opened last.
   DwFakeAudio get latest => _opened.last;
 
@@ -110,9 +113,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
-    if (request.audioSourceMessage case UriAudioSourceMessage(:final uri)) {
-      this.uri = uri;
-    }
+    uri = _firstUri(request.audioSourceMessage.toMap()) ?? uri;
     position = request.initialPosition ?? Duration.zero;
     _report(ProcessingStateMessage.ready);
     return LoadResponse(duration: length);
@@ -181,6 +182,22 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   Future<DisposeResponse> dispose(DisposeRequest request) async {
     _release();
     return DisposeResponse();
+  }
+
+  /// The address inside a source message — `just_audio` may wrap a single
+  /// URL in a playlist.
+  static String? _firstUri(Object? node) {
+    if (node is Map) {
+      if (node['uri'] case final String found) return found;
+      for (final value in node.values) {
+        if (_firstUri(value) case final found?) return found;
+      }
+    } else if (node is List) {
+      for (final value in node) {
+        if (_firstUri(value) case final found?) return found;
+      }
+    }
+    return null;
   }
 
   void _release() {

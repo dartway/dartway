@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
+import 'package:dartway_media_flutter/src/controller/dw_media_controller.dart';
 import 'package:dartway_media_flutter/src/controller/dw_media_controller_factory.dart';
 import 'package:dartway_media_flutter/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
-import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
-export 'package:dartway_media_flutter/src/controller/dw_media_controller_factory.dart';
+export 'package:dartway_media_flutter/src/controller/dw_media_controller.dart';
 
 DwMediaItem videoItem(String id) => DwMediaItem(
   id: id,
@@ -23,44 +22,42 @@ DwMediaItem audioItem(String id) => DwMediaItem(
 
 /// Both fake engines, installed fresh for every test.
 final class MediaRig {
-  MediaRig()
-    : video = DwFakeVideoPlayerPlatform(initializeOnCreate: false),
-      audio = DwFakeJustAudioPlatform(
-        defaultDuration: const Duration(seconds: 100),
-      ) {
-    VideoPlayerPlatform.instance = video;
-    JustAudioPlatform.instance = audio;
-  }
+  MediaRig({bool readyOnOpen = true})
+    : video = DwFakeVideoPlayerPlatform.install(
+        length: const Duration(seconds: 100),
+        readyOnOpen: readyOnOpen,
+      ),
+      audio = DwFakeJustAudioPlatform.install(
+        length: const Duration(seconds: 100),
+      );
 
   final DwFakeVideoPlayerPlatform video;
   final DwFakeJustAudioPlatform audio;
 
-  /// The newest video player — the one the last load created.
-  int get lastVideo => video.livePlayers.last;
-
-  /// Lets the newest video load: the platform answers `initialized`.
-  Future<int> loadVideo(
+  /// Lets the video opened last load, [duration] long.
+  Future<DwFakeVideo> loadVideo(
     WidgetTester tester, {
     Duration duration = const Duration(seconds: 100),
   }) async {
+    video.length = duration;
     await tester.pump();
-    final id = lastVideo;
-    video.emitInitialized(id, duration: duration);
+    final opened = video.latest;
+    opened.ready(length: duration);
     await tester.pump();
     await tester.pump();
-    return id;
+    return opened;
   }
 
-  /// Lets the newest audio player load.
-  Future<DwFakeAudioPlayerPlatform> loadAudio(WidgetTester tester) async {
+  /// Lets the track opened last load.
+  Future<DwFakeAudio> loadAudio(WidgetTester tester) async {
     await dwSettleMedia(tester);
-    return audio.players.values.last;
+    return audio.latest;
   }
 
-  /// Real playback of the newest video up to [position]: the platform
+  /// Real playback of the video opened last, up to [position]: the platform
   /// reports it and `video_player`'s 100 ms poll picks it up.
   Future<void> playVideoTo(WidgetTester tester, Duration position) async {
-    video.setPosition(lastVideo, position);
+    video.latest.advanceTo(position);
     await tester.pump(const Duration(milliseconds: 100));
   }
 }

@@ -62,10 +62,10 @@ void main() {
     final first = rig.lastVideo;
     await session.next(autoplay: false);
     await rig.loadVideo(tester);
-    expect(rig.video.livePlayers, isNot(contains(first)));
-    expect(rig.video.livePlayers, hasLength(1));
+    expect(rig.video.videos, isNot(contains(first)));
+    expect(rig.video.videos, hasLength(1));
     await endSession(tester, session);
-    expect(rig.video.livePlayers, isEmpty);
+    expect(rig.video.videos, isEmpty);
   });
 
   testWidgets('playback follows the queue from item to item', (tester) async {
