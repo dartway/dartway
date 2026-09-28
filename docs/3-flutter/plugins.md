@@ -216,13 +216,15 @@ cost more than they save:
 |---|---|---|
 | `dartway_shared_preferences` | `dw.plugins.prefs` | Typed Riverpod providers over local storage (`provider`, `mappedProvider`, `providerFamily`, `mappedProviderFamily`, and `raw` for imperative reads); claims `DwKeyValueStorePlugin`, so it is also where the signed-in session lives. `DwSharedPreferences(whenUnavailable:)` decides between running from memory and failing when the platform has no store. |
 | `dartway_telegram` | `dw.plugins.telegram` | Telegram Mini App: `isRunningInTelegram`, `platform`, `safeAreaInset`, `telegramUserId`, configured by `DwTelegramWebAppConfig`. |
+| `dartway_media_flutter` | `dw.plugins.media` | Video and audio: one `DwMediaController` over `video_player`/`just_audio`, a `DwMediaSession` that survives route changes, a queue, resume, fullscreen, a mini-player — mechanism only, controls are source in `example/`. |
 
 `dartway_telegram` shows the other half of what a plugin buys you: `DwTelegramWebApp.create()` returns
 the real bridge on web and an inert stub on mobile and desktop, and outside Telegram every getter answers
 as if Telegram were absent instead of throwing. One declaration, every platform still builds. Its
 `telegramUserId` comes from Telegram's unsigned init data — a hint, never a proof of identity.
 
-Push on the device is a page of its own: [push notifications](push-notifications.md).
+Push on the device is a page of its own: [push notifications](push-notifications.md). Video and audio
+are a page of their own too: [media](media.md).
 
 ## Writing your own
 
