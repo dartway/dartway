@@ -2,6 +2,13 @@
 
 ## 0.21.0-dev.8
 
+- **`DwAppServer.handlers` and `.jobs` now include modules' calls and jobs, not just features'**
+  (dartway/dartway#366, D-106). Before, both getters read `features` only, while `start` separately
+  spliced in every module's handlers and jobs — so a project walking `server.handlers` for its own
+  purposes (an access-matrix test, say) silently missed every call a `DwServerModule` answers
+  (`DwAnalyticsModule`'s report/catalog/dashboards, `DwPushModule`'s). `channels` and `routes` are
+  unaffected: `DwServerModule` exposes neither. Not breaking in type; the lists these getters return
+  are simply more complete than before.
 - **BREAKING: a provider identity (`google`, `apple`) is a first-class identity — `listIdentities`,
   `listIdentitiesOf`, `moveIdentities` and `removeIdentities` no longer throw `ArgumentError` the
   moment an account has one (dartway/dartway#355).** `DwIdentityInfo.kind`/`DwIdentifierChange.kind`
