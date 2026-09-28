@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/dw_media_config.dart';
@@ -155,7 +156,7 @@ abstract class DwMediaEngineController extends DwMediaController {
         _startedFired = true;
         _callbacks.onStarted?.call(item);
       }
-      final now = DateTime.now();
+      final now = clock.now();
       if (_lastProgressAt == null ||
           now.difference(_lastProgressAt!) >= _options.progressInterval) {
         _lastProgressAt = now;

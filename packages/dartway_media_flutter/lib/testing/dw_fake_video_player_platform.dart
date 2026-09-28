@@ -50,6 +50,9 @@ final class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
   Stream<VideoEvent> videoEventsFor(int playerId) => _events[playerId]!.stream;
 
   @override
+  Future<void> setMixWithOthers(bool mixWithOthers) async {}
+
+  @override
   Future<void> play(int playerId) async {}
 
   @override
