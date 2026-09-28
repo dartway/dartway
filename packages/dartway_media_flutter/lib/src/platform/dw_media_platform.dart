@@ -1,26 +1,27 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
-/// Overrides [dwMediaIsWeb] in a test — the web rules (`webMutedStart`) are
-/// otherwise unreachable from a VM test. Reset it to `null` in `tearDown`.
+/// Overrides [dwMediaIsWeb] in a test — the web rules are otherwise
+/// unreachable from a VM test. Reset it to `null` in `tearDown`.
 @visibleForTesting
 bool? debugDwMediaIsWebOverride;
 
 /// Whether the web rules apply.
 bool get dwMediaIsWeb => debugDwMediaIsWebOverride ?? kIsWeb;
 
-/// Errors a browser raises for a race the player itself caused — a `seek`
-/// or `pause` interrupted by the next one, an element already gone from the
-/// page — which mean nothing to the person watching. Reporting them as
-/// `DwMediaPlayState.error` would put a retry screen over a video that
-/// plays fine.
-bool dwMediaIsBenignError(Object error) {
-  final text = error.toString();
-  return text.contains('AbortError') ||
-      text.contains('interrupted') ||
-      text.contains('removed from the document');
-}
+/// The `DOMException` name `video_player_web` carries as the code of a
+/// `PlatformException`, or `null` off the web and for anything else.
+String? _domExceptionName(Object error) =>
+    dwMediaIsWeb && error is PlatformException ? error.code : null;
 
-/// The browser refusing to start playback without a gesture — the answer is
-/// to stay paused until the person presses play, not an error screen.
+/// A browser aborting a media request the player itself superseded — a
+/// `play()` interrupted by the `pause()` after it, a seek by the next seek.
+/// It means nothing to the person watching; everywhere else, and for any
+/// other error, a failure is a failure.
+bool dwMediaIsBenignError(Object error) =>
+    _domExceptionName(error) == 'AbortError';
+
+/// A browser refusing to start playback without a gesture — the item stays
+/// paused until the person presses play.
 bool dwMediaIsPlayRefusal(Object error) =>
-    error.toString().contains('NotAllowedError');
+    _domExceptionName(error) == 'NotAllowedError';

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show DeviceOrientation;
-import 'package:flutter/widgets.dart' show Alignment, Size;
+import 'package:flutter/widgets.dart'
+    show Alignment, RouteTransitionsBuilder, Size;
 
 import '../resume/dw_media_position_store.dart';
 
@@ -37,6 +38,29 @@ final class DwMediaResumePolicy {
   final bool saveOnDispose;
 }
 
+/// Which edges a released mini-player settles on
+/// (`DwMediaConfig.miniPlayerSnapEdges`).
+enum DwMiniPlayerSnapEdges {
+  /// The nearer of left and right; it stays where it was dropped vertically.
+  horizontal,
+
+  /// The nearest of all four.
+  all,
+}
+
+/// What happens to a session when its page goes and there is no mini-player
+/// to take it (`DwMediaConfig.onLeaveWithoutMiniPlayer`).
+enum DwMediaLeaveAction {
+  /// Pause it; opening the same item again comes back to it.
+  pause,
+
+  /// End it and release its engine.
+  stop,
+
+  /// Let it play on with no picture — for audio an app controls elsewhere.
+  keepPlaying,
+}
+
 /// Every behaviour of `dartway_media_flutter`, with its default — the global
 /// floor a project sets once on `DwMedia(config:)`. **Nothing in the package
 /// is a fixed policy**: each field is overridden for one session with a
@@ -52,6 +76,7 @@ final class DwMediaConfig {
     this.autoplayNext = false,
     this.autoplayCountdown = true,
     this.autoplayCountdownDuration = const Duration(seconds: 5),
+    this.autoplayCountdownTick = const Duration(seconds: 1),
     this.nextPreview = false,
     this.nextPreviewLeadTime = const Duration(seconds: 10),
     this.completedThreshold = 0.9,
@@ -71,13 +96,19 @@ final class DwMediaConfig {
     this.exitOrientations = const [DeviceOrientation.portraitUp],
     this.autoEnterFullscreenOnPlay = false,
     this.keepFullscreenAcrossItems = true,
+    this.fullscreenTransitionDuration = const Duration(milliseconds: 200),
+    this.fullscreenTransitionBuilder,
+    this.fallbackAspectRatio = 16 / 9,
     this.miniPlayer = true,
     this.miniPlayerInitialSize = const Size(160, 90),
     this.miniPlayerInitialAlignment = Alignment.bottomRight,
     this.miniPlayerMinScale = 0.75,
     this.miniPlayerMaxScale = 2.0,
     this.miniPlayerSnapToEdges = true,
+    this.miniPlayerSnapEdges = DwMiniPlayerSnapEdges.horizontal,
+    this.miniPlayerSnapThreshold = double.infinity,
     this.miniPlayerCloseStopsPlayback = true,
+    this.onLeaveWithoutMiniPlayer = DwMediaLeaveAction.pause,
     this.pauseVideoInBackground = true,
     this.backgroundAudio = false,
     this.wakelockWhilePlaying = true,
@@ -96,7 +127,12 @@ final class DwMediaConfig {
          miniPlayerMinScale > 0 && miniPlayerMinScale <= miniPlayerMaxScale,
          'miniPlayerMinScale must be positive and not above miniPlayerMaxScale',
        ),
-       assert(autoRetryCount >= 0, 'autoRetryCount must not be negative');
+       assert(autoRetryCount >= 0, 'autoRetryCount must not be negative'),
+       assert(fallbackAspectRatio > 0, 'fallbackAspectRatio must be positive'),
+       assert(
+         miniPlayerSnapThreshold >= 0,
+         'miniPlayerSnapThreshold must not be negative',
+       );
 
   /// `DwMedia.open()` starts playing the first item at once.
   final bool autoplayOnOpen;
@@ -108,7 +144,14 @@ final class DwMediaConfig {
   /// the end, counting down in `DwMediaQueueState.autoplayCountdown`, and
   /// `DwMediaSession.cancelAutoplay()` stops it. Off, the move is immediate.
   final bool autoplayCountdown;
+
+  /// How long the countdown lasts; the move comes exactly then.
   final Duration autoplayCountdownDuration;
+
+  /// How often `DwMediaQueueState.autoplayCountdown` updates while the
+  /// countdown runs — the display, not the moment of the move. Zero shows
+  /// only the starting value.
+  final Duration autoplayCountdownTick;
 
   /// The queue reports the next item as coming up
   /// (`DwMediaQueueState.showNextPreview`) [nextPreviewLeadTime] before the
@@ -161,6 +204,15 @@ final class DwMediaConfig {
   /// The queue moving on while fullscreen stays fullscreen; off leaves it.
   final bool keepFullscreenAcrossItems;
 
+  /// How long the fullscreen route takes to come and go.
+  final Duration fullscreenTransitionDuration;
+
+  /// How the fullscreen route comes and goes; `null` fades.
+  final RouteTransitionsBuilder? fullscreenTransitionBuilder;
+
+  /// The ratio `DwVideoSurface` keeps while a video does not report its own.
+  final double fallbackAspectRatio;
+
   /// Whether `DwMediaSession.minimize()` hands the session to
   /// `DwMiniPlayerHost`. Off, minimize does nothing.
   final bool miniPlayer;
@@ -172,11 +224,24 @@ final class DwMediaConfig {
   final double miniPlayerMinScale;
   final double miniPlayerMaxScale;
 
-  /// A dragged mini-player settles on the nearer side of the screen.
+  /// A released mini-player settles on an edge of the screen.
   final bool miniPlayerSnapToEdges;
 
-  /// Closing the mini-player ends the session; off only pauses and hides it.
+  /// Which edges it settles on.
+  final DwMiniPlayerSnapEdges miniPlayerSnapEdges;
+
+  /// How close to an edge, in logical pixels, a released mini-player must be
+  /// to settle on it; further away it stays where it was dropped. The
+  /// default snaps from anywhere.
+  final double miniPlayerSnapThreshold;
+
+  /// Closing the mini-player ends the session. Off, it pauses and hides it:
+  /// the session stays open, and opening the same item comes back to it.
   final bool miniPlayerCloseStopsPlayback;
+
+  /// What `DwMediaSession.minimize()` does with [miniPlayer] off — the page
+  /// is gone and nothing shows the session.
+  final DwMediaLeaveAction onLeaveWithoutMiniPlayer;
 
   /// A playing video pauses when the app goes to the background.
   final bool pauseVideoInBackground;
@@ -204,8 +269,8 @@ final class DwMediaConfig {
   final int autoRetryCount;
   final Duration autoRetryDelay;
 
-  /// How long the project's controls stay visible without a touch. The
-  /// package draws no controls; the ones copied from `example/` read this.
+  /// How long `DwMediaSession.controlsVisible` stays true while the item
+  /// plays and nobody touches the controls. `Duration.zero` never hides them.
   final Duration controlsAutoHideDelay;
 
   /// Where resume positions live. `null` keeps them in memory for the life of
@@ -223,6 +288,8 @@ final class DwMediaConfig {
       autoplayCountdown: options.autoplayCountdown ?? autoplayCountdown,
       autoplayCountdownDuration:
           options.autoplayCountdownDuration ?? autoplayCountdownDuration,
+      autoplayCountdownTick:
+          options.autoplayCountdownTick ?? autoplayCountdownTick,
       nextPreview: options.nextPreview ?? nextPreview,
       nextPreviewLeadTime: options.nextPreviewLeadTime ?? nextPreviewLeadTime,
       completedThreshold: options.completedThreshold ?? completedThreshold,
@@ -243,6 +310,11 @@ final class DwMediaConfig {
           options.autoEnterFullscreenOnPlay ?? autoEnterFullscreenOnPlay,
       keepFullscreenAcrossItems:
           options.keepFullscreenAcrossItems ?? keepFullscreenAcrossItems,
+      fullscreenTransitionDuration:
+          options.fullscreenTransitionDuration ?? fullscreenTransitionDuration,
+      fullscreenTransitionBuilder:
+          options.fullscreenTransitionBuilder ?? fullscreenTransitionBuilder,
+      fallbackAspectRatio: options.fallbackAspectRatio ?? fallbackAspectRatio,
       miniPlayer: options.miniPlayer ?? miniPlayer,
       miniPlayerInitialSize:
           options.miniPlayerInitialSize ?? miniPlayerInitialSize,
@@ -252,8 +324,13 @@ final class DwMediaConfig {
       miniPlayerMaxScale: options.miniPlayerMaxScale ?? miniPlayerMaxScale,
       miniPlayerSnapToEdges:
           options.miniPlayerSnapToEdges ?? miniPlayerSnapToEdges,
+      miniPlayerSnapEdges: options.miniPlayerSnapEdges ?? miniPlayerSnapEdges,
+      miniPlayerSnapThreshold:
+          options.miniPlayerSnapThreshold ?? miniPlayerSnapThreshold,
       miniPlayerCloseStopsPlayback:
           options.miniPlayerCloseStopsPlayback ?? miniPlayerCloseStopsPlayback,
+      onLeaveWithoutMiniPlayer:
+          options.onLeaveWithoutMiniPlayer ?? onLeaveWithoutMiniPlayer,
       pauseVideoInBackground:
           options.pauseVideoInBackground ?? pauseVideoInBackground,
       backgroundAudio: options.backgroundAudio ?? backgroundAudio,
@@ -281,6 +358,7 @@ final class DwMediaOpenOptions {
     this.autoplayNext,
     this.autoplayCountdown,
     this.autoplayCountdownDuration,
+    this.autoplayCountdownTick,
     this.nextPreview,
     this.nextPreviewLeadTime,
     this.completedThreshold,
@@ -298,13 +376,19 @@ final class DwMediaOpenOptions {
     this.exitOrientations,
     this.autoEnterFullscreenOnPlay,
     this.keepFullscreenAcrossItems,
+    this.fullscreenTransitionDuration,
+    this.fullscreenTransitionBuilder,
+    this.fallbackAspectRatio,
     this.miniPlayer,
     this.miniPlayerInitialSize,
     this.miniPlayerInitialAlignment,
     this.miniPlayerMinScale,
     this.miniPlayerMaxScale,
     this.miniPlayerSnapToEdges,
+    this.miniPlayerSnapEdges,
+    this.miniPlayerSnapThreshold,
     this.miniPlayerCloseStopsPlayback,
+    this.onLeaveWithoutMiniPlayer,
     this.pauseVideoInBackground,
     this.backgroundAudio,
     this.wakelockWhilePlaying,
@@ -324,6 +408,7 @@ final class DwMediaOpenOptions {
   final bool? autoplayNext;
   final bool? autoplayCountdown;
   final Duration? autoplayCountdownDuration;
+  final Duration? autoplayCountdownTick;
   final bool? nextPreview;
   final Duration? nextPreviewLeadTime;
   final double? completedThreshold;
@@ -347,13 +432,19 @@ final class DwMediaOpenOptions {
   final List<DeviceOrientation>? exitOrientations;
   final bool? autoEnterFullscreenOnPlay;
   final bool? keepFullscreenAcrossItems;
+  final Duration? fullscreenTransitionDuration;
+  final RouteTransitionsBuilder? fullscreenTransitionBuilder;
+  final double? fallbackAspectRatio;
   final bool? miniPlayer;
   final Size? miniPlayerInitialSize;
   final Alignment? miniPlayerInitialAlignment;
   final double? miniPlayerMinScale;
   final double? miniPlayerMaxScale;
   final bool? miniPlayerSnapToEdges;
+  final DwMiniPlayerSnapEdges? miniPlayerSnapEdges;
+  final double? miniPlayerSnapThreshold;
   final bool? miniPlayerCloseStopsPlayback;
+  final DwMediaLeaveAction? onLeaveWithoutMiniPlayer;
   final bool? pauseVideoInBackground;
   final bool? backgroundAudio;
   final bool? wakelockWhilePlaying;

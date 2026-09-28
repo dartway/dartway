@@ -8,9 +8,7 @@
 library;
 
 export 'src/config/dw_media_config.dart';
-export 'src/controller/dw_media_controller.dart';
 export 'src/dw_media.dart';
-export 'src/fullscreen/dw_media_fullscreen_route.dart';
 export 'src/miniplayer/dw_mini_player_host.dart';
 export 'src/model/dw_media_callbacks.dart';
 export 'src/model/dw_media_item.dart';

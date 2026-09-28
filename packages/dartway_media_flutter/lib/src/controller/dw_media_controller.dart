@@ -3,19 +3,22 @@ import 'package:flutter/foundation.dart';
 import '../model/dw_media_item.dart';
 import '../model/dw_media_playback_state.dart';
 
-/// One controller API over both engines — a controls widget is written once
-/// against this type and works for a video item and an audio item alike.
-///
-/// A controller is bound to exactly one [DwMediaItem] for its whole life:
-/// `DwMediaSession` creates a fresh one for whichever item is current and
-/// disposes it when the queue moves on, rather than re-pointing one instance
-/// at a new source.
+/// One engine for one item, over `video_player` or `just_audio` — internal to
+/// the package: `DwMediaSession` creates one for its current item, disposes
+/// it when the queue moves on, and is the only way an app reaches it.
 abstract class DwMediaController {
   const DwMediaController();
 
   DwMediaItem get item;
 
   ValueListenable<DwMediaPlaybackState> get state;
+
+  /// A `play()` waits for the item to load.
+  bool get wantsToPlay;
+
+  /// The item stands at its end because real playback took it there — not a
+  /// seek. Cleared by the next seek.
+  bool get endedByPlayback;
 
   Future<void> play();
 

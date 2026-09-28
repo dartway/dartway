@@ -62,33 +62,8 @@ final class DwMedia extends DwFlutterPlugin with WidgetsBindingObserver {
   );
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.hidden:
-      case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
-        for (final session in sessionManager.sessions) {
-          _toBackground(session);
-        }
-      case AppLifecycleState.resumed:
-      case AppLifecycleState.inactive:
-        break;
-    }
-  }
-
-  void _toBackground(DwMediaSession session) {
-    if (session.isDisposed) return;
-    final options = session.options;
-    if (options.resume?.saveOnBackground ?? false) {
-      unawaited(session.controller.savePosition());
-    }
-    if (!session.playback.value.isPlaying) return;
-    final pause = switch (session.currentItem.kind) {
-      DwMediaKind.video => options.pauseVideoInBackground,
-      DwMediaKind.audio => !options.backgroundAudio,
-    };
-    if (pause) unawaited(session.pause());
-  }
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      sessionManager.handleAppLifecycle(state);
 
   /// Ends every session and stops watching the app's lifecycle.
   Future<void> dispose() async {

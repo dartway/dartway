@@ -25,6 +25,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
     required super.options,
     super.initialSpeed,
     super.initialMuted,
+    super.onPlaybackEnd,
   });
 
   VideoPlayerController? _controller;
@@ -113,6 +114,14 @@ final class DwVideoMediaController extends DwMediaEngineController {
             : value.buffered.last.end,
       ),
     );
+  }
+
+  /// A failed video is not playing, whatever its last value said: the
+  /// screen may sleep again.
+  @override
+  void reportFailure(Object error, [StackTrace? stackTrace]) {
+    DwWakelockCoordinator.instance.setWants(this, false);
+    super.reportFailure(error, stackTrace);
   }
 
   @override

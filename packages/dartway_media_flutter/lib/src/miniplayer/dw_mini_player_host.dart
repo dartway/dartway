@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/widgets.dart';
 
@@ -124,12 +125,34 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     );
   }
 
+  /// Settles a released mini-player on an edge: the nearer side, or the
+  /// nearest of all four (`miniPlayerSnapEdges`), and only when it is within
+  /// `miniPlayerSnapThreshold` of that edge.
   void _snapToEdge(DwMediaSession session, Size screenSize, Size size) {
-    if (!session.options.miniPlayerSnapToEdges || _position == null) return;
+    final options = session.options;
+    if (!options.miniPlayerSnapToEdges || _position == null) return;
     final current = _clamp(_position!, screenSize, size);
     final maxX = (screenSize.width - size.width).clamp(0.0, double.infinity);
-    final snappedX = current.dx <= maxX / 2 ? 0.0 : maxX;
-    setState(() => _position = Offset(snappedX, current.dy));
+    final maxY = (screenSize.height - size.height).clamp(0.0, double.infinity);
+    final toLeft = current.dx;
+    final toRight = maxX - current.dx;
+    final toTop = current.dy;
+    final toBottom = maxY - current.dy;
+    final horizontalGap = min(toLeft, toRight);
+    final verticalGap = min(toTop, toBottom);
+    final threshold = options.miniPlayerSnapThreshold;
+    var snapped = current;
+    final useVertical =
+        options.miniPlayerSnapEdges == DwMiniPlayerSnapEdges.all &&
+        verticalGap < horizontalGap;
+    if (useVertical) {
+      if (verticalGap <= threshold) {
+        snapped = Offset(current.dx, toTop <= toBottom ? 0 : maxY);
+      }
+    } else if (horizontalGap <= threshold) {
+      snapped = Offset(toLeft <= toRight ? 0 : maxX, current.dy);
+    }
+    if (snapped != current) setState(() => _position = snapped);
   }
 
   Offset _initialOffset(DwMediaConfig options, Size screenSize, Size size) {

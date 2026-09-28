@@ -14,6 +14,7 @@ DwMediaController createDwMediaController({
   required DwMediaConfig options,
   double? initialSpeed,
   bool? initialMuted,
+  void Function()? onPlaybackEnd,
 }) => switch (item.kind) {
   DwMediaKind.video => DwVideoMediaController(
     item: item,
@@ -21,6 +22,7 @@ DwMediaController createDwMediaController({
     options: options,
     initialSpeed: initialSpeed,
     initialMuted: initialMuted,
+    onPlaybackEnd: onPlaybackEnd,
   ),
   DwMediaKind.audio => DwAudioMediaController(
     item: item,
@@ -28,5 +30,6 @@ DwMediaController createDwMediaController({
     options: options,
     initialSpeed: initialSpeed,
     initialMuted: initialMuted,
+    onPlaybackEnd: onPlaybackEnd,
   ),
 };

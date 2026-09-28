@@ -42,7 +42,9 @@ abstract class DwMediaEngineController extends DwMediaController {
     required this.options,
     double? initialSpeed,
     bool? initialMuted,
+    VoidCallback? onPlaybackEnd,
   }) : _callbacks = callbacks,
+       _onPlaybackEnd = onPlaybackEnd,
        _speed = initialSpeed ?? options.defaultSpeed,
        _muted = initialMuted,
        _autoRetriesLeft = options.autoRetryCount {
@@ -56,6 +58,7 @@ abstract class DwMediaEngineController extends DwMediaController {
   final DwMediaConfig options;
 
   final DwMediaCallbacks _callbacks;
+  final VoidCallback? _onPlaybackEnd;
 
   final ValueNotifier<DwMediaPlaybackState> _state = ValueNotifier(
     const DwMediaPlaybackState(),
@@ -75,12 +78,14 @@ abstract class DwMediaEngineController extends DwMediaController {
   bool _startedFired = false;
   bool _completedFired = false;
   bool _reachedEndFired = false;
+  bool _endedByPlayback = false;
   DateTime? _lastProgressAt;
   DateTime? _lastSaveAt;
 
   bool _loaded = false;
   bool _playWhenLoaded = false;
   bool _failed = false;
+  Future<void>? _reloading;
 
   int _autoRetriesLeft;
   Timer? _autoRetryTimer;
@@ -88,6 +93,12 @@ abstract class DwMediaEngineController extends DwMediaController {
   bool _disposed = false;
 
   bool get isDisposed => _disposed;
+
+  @override
+  bool get wantsToPlay => _playWhenLoaded;
+
+  @override
+  bool get endedByPlayback => _endedByPlayback;
 
   DwMediaPositionStore get _store =>
       options.positionStore ?? _inMemoryPositionStore;
@@ -171,20 +182,30 @@ abstract class DwMediaEngineController extends DwMediaController {
     _callbacks.onError?.call(item, error);
   }
 
+  /// Loads the item again from where it failed. The error is gone the moment
+  /// it starts — the person sees it loading, not the old error — and a second
+  /// call while it runs joins the first instead of loading twice.
   Future<void> _reload() {
+    final running = _reloading;
+    if (running != null) return running;
     final position = _state.value.position;
+    _failed = false;
     updateState(
       (current) => current.copyWith(
         playState: DwMediaPlayState.loading,
         errorMessage: null,
       ),
     );
-    return _load(restoreTo: position > Duration.zero ? position : null);
+    final reload = _load(
+      restoreTo: position > Duration.zero ? position : null,
+    ).whenComplete(() => _reloading = null);
+    return _reloading = reload;
   }
 
   @override
   Future<void> retry() {
     if (_disposed) return Future.value();
+    if (_reloading != null) return _reloading!;
     _autoRetryTimer?.cancel();
     _autoRetriesLeft = options.autoRetryCount;
     return _reload();
@@ -225,6 +246,7 @@ abstract class DwMediaEngineController extends DwMediaController {
     if (next.isEnded && !previous.isEnded && !seeking && _playedSinceSeek) {
       _reachEnd();
     }
+    if (!next.isEnded && previous.isEnded) _endedByPlayback = false;
     if (!_completedFired &&
         next.duration > Duration.zero &&
         next.position.inMicroseconds >=
@@ -263,7 +285,13 @@ abstract class DwMediaEngineController extends DwMediaController {
     }
   }
 
+  /// Real playback reached the end: the session hears it every time, the
+  /// app's `onReachedEnd` once per item.
   void _reachEnd() {
+    if (!_endedByPlayback) {
+      _endedByPlayback = true;
+      _onPlaybackEnd?.call();
+    }
     if (_reachedEndFired) return;
     _reachedEndFired = true;
     _callbacks.onReachedEnd?.call(item);
@@ -324,6 +352,7 @@ abstract class DwMediaEngineController extends DwMediaController {
     if (duration > Duration.zero && target > duration) target = duration;
     _seeksInFlight++;
     _playedSinceSeek = false;
+    _endedByPlayback = false;
     try {
       await _quietly(() => engineSeek(target));
     } finally {
