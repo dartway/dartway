@@ -26,6 +26,10 @@ final class DwMediaSessionManager {
 
   final List<DwMediaSession> _sessions = [];
 
+  /// Every session currently open — what the lifecycle observer walks to
+  /// apply the background pause rules to all of them, not only [active].
+  List<DwMediaSession> get sessions => List.unmodifiable(_sessions);
+
   /// Opens a queue as a new session, resolving [options] against the plugin's
   /// [DwMediaConfig]. When `DwMediaConfig.singleActiveItem` holds for the new
   /// session, whatever session was previously active is paused.

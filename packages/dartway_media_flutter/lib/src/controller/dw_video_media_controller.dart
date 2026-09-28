@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
 
+import '../lifecycle/dw_media_wakelock.dart';
 import '../model/dw_media_playback_state.dart';
 import 'dw_media_engine_controller.dart';
 
@@ -76,6 +77,12 @@ final class DwVideoMediaController extends DwMediaEngineController {
       unawaited(controller.setVolume(_desiredVolume));
     }
     if (value.isCompleted) markReachedEnd();
+    unawaited(
+      DwWakelockCoordinator.instance.setWants(
+        this,
+        value.isPlaying && options.wakelockWhilePlaying,
+      ),
+    );
     updateState(
       (current) => current.copyWith(
         playState: !value.isInitialized
@@ -127,6 +134,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
     final controller = _controller;
     _controller = null;
     controller?.removeListener(_onUpdate);
+    await DwWakelockCoordinator.instance.setWants(this, false);
     await controller?.dispose();
   }
 }
