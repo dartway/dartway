@@ -1,8 +1,8 @@
 # dartway_media_flutter
 
-Video and audio for a DartWay app, reached as `dw.plugins.media`: one controller over
-`video_player` and `just_audio`, sessions owned by the plugin that outlive the page that opened
-them, a queue with an autoplay countdown, resume, a fullscreen route and a mini-player host. Every
+Video and audio for a DartWay app, reached as `dw.plugins.media`: sessions owned by the plugin
+that outlive the page that opened them, one engine per item over `video_player` and `just_audio`,
+a queue with an autoplay countdown, resume, a fullscreen route and a mini-player host. Every
 behaviour is a `DwMediaConfig` setting, overridable per session with `DwMediaOpenOptions`.
 
 Mechanism only — no `chewie`, no colours, no text, no controls. The default controls (play/pause,

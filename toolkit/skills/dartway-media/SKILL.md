@@ -22,9 +22,20 @@ the one list of every setting and its default; this skill does not repeat it.
 
 ## 1. Add the package and the plugin — `__FLUTTER_PKG__`
 
-```bash
-flutter pub add dartway_media_flutter
+The package is not on pub.dev yet. Until it is, it comes from the framework repository like the
+project's other `dartway_*` git dependencies — the same `url` and `ref` as theirs, so all of them
+lock to one commit (`frameworkRefsDiverged` warns otherwise):
+
+```yaml
+dependencies:
+  dartway_media_flutter:
+    git:
+      url: https://github.com/dartway/dartway.git
+      ref: master          # the ref the other dartway_* packages use
+      path: packages/dartway_media_flutter
 ```
+
+Once it is published, this becomes `flutter pub add dartway_media_flutter`.
 
 In the core's `plugins:`:
 
@@ -62,7 +73,12 @@ final session = dw.plugins.media.open(
   load and on every retry, so an expired signed link is fetched again instead of ending the player.
 - **The plugin owns the session.** Do not keep it in a page's `State` and do not dispose it when the
   page goes: `dw.plugins.media.sessionManager.active` holds it, and that is what lets the
-  mini-player carry on. A page reads the active session with a `ValueListenableBuilder`.
+  mini-player carry on. A page reads the active session with a `ValueListenableBuilder` — or simply
+  opens its item again: `open()` for an item a live session stands on returns that session, never a
+  second engine.
+- **Everything goes through the session.** Its engine is not public; commands are `session.play()`,
+  `seek`, `setSpeed` (a speed from `options.speeds` only — it throws otherwise), `retry`, the queue
+  and the rest.
 - **Settings are per session when they must be.** One `DwMediaConfig` for the app, a
   `DwMediaOpenOptions` for the session that differs (`withoutResume: true` for a clip feed).
 - **Pick the right callback.** `onCompleted` — "watched enough", fires at `completedThreshold`,
@@ -77,7 +93,7 @@ to end, copy what the feature needs into `__FLUTTER_PKG__/lib/ui_kit/3_special/m
 
 | Widget | What it reads and calls |
 |---|---|
-| `AppMediaPlayer` | the inline player: `DwMediaFullscreenHost` around the picture, controls that hide after `session.options.controlsAutoHideDelay` while playing, the next card, the error view |
+| `AppMediaPlayer` | the inline player: `DwMediaFullscreenHost` around the picture, the controls while `session.controlsVisible` (the session hides them after `controlsAutoHideDelay` of playback; a tap calls `toggleControls`), the next card, the error view |
 | `AppMediaControlBar` | `session.playback`, `session.isFullscreen`; `play`/`pause`, `skipBack`/`skipForward`, `setMuted`, `setSpeed` (hidden when `options.speeds` is empty), `enterFullscreen`/`exitFullscreen` (hidden when `options.fullscreen` is off or the item is audio) |
 | `AppMediaTimeline` | `session.playback` position, buffered, duration; one `seek` on release, not one per drag frame |
 | `AppMediaNextItemCard` | `session.queue`: `showNextPreview`, `next`, `autoplayCountdown`; `next()`, `cancelAutoplay()` |
@@ -91,8 +107,10 @@ Every visible string goes through `context.l10n` — the keys the example uses a
 ## 4. Fullscreen, the mini-player, the page
 
 - **Fullscreen**: wrap the inline player in `DwMediaFullscreenHost(session:, builder:, child:)`.
-  `session.enterFullscreen()` — or `autoEnterFullscreenOnPlay` — pushes the package's own route;
-  `exitFullscreen()` and a back gesture both leave it; orientations come from the config.
+  `session.enterFullscreen()` — or `autoEnterFullscreenOnPlay` — pushes the package's own route
+  (not exported: the host is the one way in); `exitFullscreen()` and a back gesture both leave it;
+  orientations and the transition come from the config. With no host mounted — from the
+  mini-player — there is no fullscreen.
 - **Mini-player**: mount `DwMiniPlayerHost` once, in `MaterialApp.builder`, over the router's
   child:
 
@@ -113,7 +131,8 @@ builder: (context, child) => Stack(
 
   It sits above the navigator, where there is no `Overlay`: no tooltips in its chrome.
 - **The player page** calls `session.restore()` in `initState` and `session.minimize()` in
-  `dispose` — both are safe there.
+  `dispose` — both are safe there. With `miniPlayer: false`, `minimize()` does what
+  `onLeaveWithoutMiniPlayer` says (pause by default), so nothing plays on with no screen.
 
 ## 5. Platform setup
 
@@ -129,14 +148,16 @@ builder: (context, child) => Stack(
 ```dart
 import 'package:dartway_media_flutter/testing.dart';
 
+late DwFakeVideoPlayerPlatform video;
+
 setUp(() {
-  DwFakeVideoPlayerPlatform.install();
+  video = DwFakeVideoPlayerPlatform.install();
   DwFakeJustAudioPlatform.install();
 });
 ```
 
-- Real playback is `setPosition` (video) / `emitPosition` (audio) after `play()`; a scrub is
-  `session.seek(...)`; the engine's end is `emitCompleted`, a failure `emitError`. Prove "a scrub
+- Real playback is `video.latest.advanceTo(...)` (audio: `latest.advanceTo`) after `play()`; a scrub
+  is `session.seek(...)`; the platform's end is `finish()`, a failure `fail(...)`. Prove "a scrub
   does not count as the end" with those, not with a position alone.
 - After an audio command, `await dwSettleMedia(tester)` — `just_audio` finishes outside a widget
   test's fake clock, and a bare `pump` leaves the item loading.
