@@ -1,15 +1,15 @@
 part of '../../ui_kit.dart';
 
-/// Play/pause, skip, speed, mute and fullscreen for a `DwMediaSession` — one
-/// row. Mechanism (`session.play`/`pause`/`skipBack`/`skipForward`/`setSpeed`/
-/// `setMuted`, `showDwMediaFullscreen`) comes from `dartway_media_flutter`;
-/// the row, the icons and the speed menu are the project's own.
+/// Skip back, play/pause, skip forward, mute, speed and fullscreen — one
+/// row over the picture. Each control asks the session; none decides
+/// anything itself.
 ///
-/// Copied from the framework's example into a project's own `ui_kit/` and
-/// restyled — see the `dartway-media` toolkit skill. The speed button hides
-/// itself when `session.options.speeds` is empty, and the fullscreen button
-/// when `session.options.fullscreen` is off — a project that turns a
-/// capability off in `DwMediaConfig` need not also edit this widget.
+/// A capability switched off in `DwMediaConfig` disappears here on its own:
+/// no speed menu while `speeds` is empty, no fullscreen button while
+/// `fullscreen` is off or the item is audio.
+///
+/// Copied into a project's own `ui_kit/` and restyled — see the
+/// `dartway-media` toolkit skill.
 class AppMediaControlBar extends StatelessWidget {
   const AppMediaControlBar({super.key, required this.session});
 
@@ -17,82 +17,76 @@ class AppMediaControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: session.controller.state,
-      builder: (context, _) {
-        final state = session.controller.state.value;
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.replay_10),
-              onPressed: () => session.skipBack(),
-            ),
-            IconButton(
-              iconSize: 40,
-              icon: Icon(state.isPlaying ? Icons.pause_circle : Icons.play_circle),
-              onPressed: () =>
-                  state.isPlaying ? session.pause() : session.play(),
-            ),
-            IconButton(
-              icon: const Icon(Icons.forward_10),
-              onPressed: () => session.skipForward(),
-            ),
-            IconButton(
-              icon: Icon(state.muted ? Icons.volume_off : Icons.volume_up),
-              onPressed: () => session.setMuted(!state.muted),
-            ),
-            if (session.options.speeds.isNotEmpty)
-              PopupMenuButton<double>(
-                initialValue: state.speed,
-                onSelected: session.setSpeed,
-                itemBuilder: (context) => [
-                  for (final speed in session.options.speeds)
-                    PopupMenuItem(value: speed, child: Text('${speed}x')),
-                ],
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: AppText.caption('${state.speed}x'),
-                ),
-              ),
-            if (session.options.fullscreen && session.currentItem.kind == DwMediaKind.video)
+    final options = session.options;
+    return IconTheme(
+      data: const IconThemeData(color: Colors.white),
+      child: ListenableBuilder(
+        listenable: Listenable.merge([session.playback, session.isFullscreen]),
+        builder: (context, _) {
+          final playback = session.playback.value;
+          final fullscreen = session.isFullscreen.value;
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               IconButton(
-                icon: const Icon(Icons.fullscreen),
-                onPressed: () => showDwMediaFullscreen(
-                  context,
-                  session: session,
-                  builder: (context) => AppMediaFullscreenPage(session: session),
-                ),
+                tooltip: context.l10n.mediaSkipBack,
+                icon: const Icon(Icons.replay),
+                onPressed: session.skipBack,
               ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// What plays inside the package's own fullscreen route — the video surface
-/// plus the same control bar, on black.
-class AppMediaFullscreenPage extends StatelessWidget {
-  const AppMediaFullscreenPage({super.key, required this.session});
-
-  final DwMediaSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(child: Center(child: DwVideoSurface(session: session))),
-            AppMediaControlBar(session: session),
-            IconButton(
-              icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
-              onPressed: session.exitFullscreen,
-            ),
-          ],
-        ),
+              IconButton(
+                key: const Key('app-media-play'),
+                tooltip: playback.isPlaying
+                    ? context.l10n.mediaPause
+                    : context.l10n.mediaPlay,
+                iconSize: 40,
+                icon: Icon(
+                  playback.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                ),
+                onPressed: playback.isPlaying ? session.pause : session.play,
+              ),
+              IconButton(
+                tooltip: context.l10n.mediaSkipForward,
+                icon: const Icon(Icons.forward_10),
+                onPressed: session.skipForward,
+              ),
+              IconButton(
+                tooltip: context.l10n.mediaMute,
+                icon: Icon(playback.muted ? Icons.volume_off : Icons.volume_up),
+                onPressed: () => session.setMuted(!playback.muted),
+              ),
+              if (options.speeds.isNotEmpty)
+                PopupMenuButton<double>(
+                  key: const Key('app-media-speed'),
+                  tooltip: context.l10n.mediaSpeed,
+                  initialValue: playback.speed,
+                  onSelected: session.setSpeed,
+                  itemBuilder: (context) => [
+                    for (final speed in options.speeds)
+                      PopupMenuItem(value: speed, child: Text('$speed×')),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      '${playback.speed}×',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              if (options.fullscreen &&
+                  session.currentItem.kind == DwMediaKind.video)
+                IconButton(
+                  key: const Key('app-media-fullscreen'),
+                  tooltip: context.l10n.mediaFullscreen,
+                  icon: Icon(
+                    fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  ),
+                  onPressed: fullscreen
+                      ? session.exitFullscreen
+                      : session.enterFullscreen,
+                ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -164,6 +164,12 @@ abstract class AppLocalizations {
   /// **'Team chat'**
   String get tabChat;
 
+  /// No description provided for @tabWorkouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts'**
+  String get tabWorkouts;
+
   /// No description provided for @tabProfile.
   ///
   /// In en, this message translates to:
@@ -1483,6 +1489,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A pie shows events split by a property: choose one under “Split by”.'**
   String get analyticsPieNeedsProperty;
+
+  /// No description provided for @workoutsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts'**
+  String get workoutsTitle;
+
+  /// No description provided for @workoutVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get workoutVideo;
+
+  /// No description provided for @workoutAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get workoutAudio;
+
+  /// No description provided for @mediaPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get mediaPlay;
+
+  /// No description provided for @mediaPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get mediaPause;
+
+  /// No description provided for @mediaSkipBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get mediaSkipBack;
+
+  /// No description provided for @mediaSkipForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get mediaSkipForward;
+
+  /// No description provided for @mediaMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound'**
+  String get mediaMute;
+
+  /// No description provided for @mediaSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get mediaSpeed;
+
+  /// No description provided for @mediaFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen'**
+  String get mediaFullscreen;
+
+  /// No description provided for @mediaClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get mediaClose;
+
+  /// No description provided for @mediaFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This could not be played.'**
+  String get mediaFailed;
+
+  /// No description provided for @mediaUpNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Up next'**
+  String get mediaUpNext;
+
+  /// No description provided for @mediaNextIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Next in {seconds} s'**
+  String mediaNextIn(int seconds);
+
+  /// No description provided for @mediaStayHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay on this one'**
+  String get mediaStayHere;
 }
 
 class _AppLocalizationsDelegate

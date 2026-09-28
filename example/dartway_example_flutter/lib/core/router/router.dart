@@ -12,6 +12,7 @@ import '../../app/news/news_page.dart';
 import '../../app/profile/profile_page/profile_page.dart';
 import '../../app/schedule/schedule_page.dart';
 import '../../app/services/services_page.dart';
+import '../../app/workouts/workouts_page.dart';
 import '../../auth/auth_page.dart';
 import 'app_router_state.dart';
 

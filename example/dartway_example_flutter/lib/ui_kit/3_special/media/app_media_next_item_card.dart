@@ -1,41 +1,63 @@
 part of '../../ui_kit.dart';
 
-/// "Up next", shown ahead of time (`DwMediaConfig.nextPreview`) and, when
-/// `autoplayNext` is also on, counting down to it
-/// (`session.queue.value.autoplayCountdownSeconds`).
+/// "Up next": shown ahead of the end (`DwMediaConfig.nextPreview`) and during
+/// the autoplay countdown, with the seconds left and a way to stay on this
+/// item. A tap goes to the next item at once.
 ///
-/// Copied from the framework's example into a project's own `ui_kit/` and
-/// restyled — see the `dartway-media` toolkit skill.
+/// Copied into a project's own `ui_kit/` and restyled — see the
+/// `dartway-media` toolkit skill.
 class AppMediaNextItemCard extends StatelessWidget {
   const AppMediaNextItemCard({super.key, required this.session});
 
   final DwMediaSession session;
 
   @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: session.queue,
-      builder: (context, _) {
-        final queue = session.queue.value;
-        final next = queue.next;
-        if (!queue.showNextPreview || next == null) {
-          return const SizedBox.shrink();
-        }
-        final countdown = queue.autoplayCountdownSeconds;
-        return InkWell(
-          onTap: () => session.next(),
-          child: AppCard(
-            child: Row(
-              children: [
-                Expanded(
-                  child: AppText.body(next.title ?? context.l10n.mediaUpNext),
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<DwMediaQueueState>(
+        valueListenable: session.queue,
+        builder: (context, queue, _) {
+          final next = queue.next;
+          if (!queue.showNextPreview || next == null) {
+            return const SizedBox.shrink();
+          }
+          final countdown = queue.autoplayCountdown;
+          return GestureDetector(
+            key: const Key('app-media-next'),
+            onTap: session.next,
+            child: SizedBox(
+              width: 220,
+              child: AppCard(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppText.caption(
+                            countdown == null
+                                ? context.l10n.mediaUpNext
+                                : context.l10n.mediaNextIn(countdown.inSeconds),
+                          ),
+                          AppText.body(
+                            next.title ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (countdown != null)
+                      IconButton(
+                        tooltip: context.l10n.mediaStayHere,
+                        icon: const Icon(Icons.close),
+                        onPressed: session.cancelAutoplay,
+                      ),
+                  ],
                 ),
-                if (countdown != null) AppText.caption('$countdown'),
-              ],
+              ),
             ),
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
 }

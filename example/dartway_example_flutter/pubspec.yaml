@@ -38,6 +38,9 @@ dependencies:
   # through (`dw.plugins.analytics`).
   dartway_analytics_flutter: ^0.2.0
   dartway_push_firebase: ^0.5.0
+  # Video and audio: workout videos, the mini-player (`dw.plugins.media`).
+  # The controls are this app's own, in `ui_kit/3_special/media/`.
+  dartway_media_flutter: ^0.1.0
   firebase_core: ">=3.13.1 <5.0.0"
 
   flutter_hooks: ^0.21.2
@@ -85,6 +88,8 @@ dependency_overrides:
     path: ../../packages/dartway_core_flutter
   dartway_core_shared:
     path: ../../packages/dartway_core_shared
+  dartway_media_flutter:
+    path: ../../packages/dartway_media_flutter
   dartway_push_firebase:
     path: ../../packages/dartway_push_firebase
   dartway_push_flutter:

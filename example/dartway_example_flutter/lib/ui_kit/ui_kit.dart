@@ -44,6 +44,7 @@ part '3_special/common/connection_status_indicator.dart';
 part '3_special/media/app_media_control_bar.dart';
 part '3_special/media/app_media_error_view.dart';
 part '3_special/media/app_media_next_item_card.dart';
+part '3_special/media/app_media_player.dart';
 part '3_special/media/app_media_timeline.dart';
 part '3_special/media/app_mini_player_chrome.dart';
 part 'layout/device_frame_shell.dart';

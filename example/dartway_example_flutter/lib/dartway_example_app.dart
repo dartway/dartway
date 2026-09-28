@@ -1,3 +1,4 @@
+import 'package:dartway_media_flutter/dartway_media_flutter.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -69,7 +70,26 @@ class ExampleApp extends ConsumerWidget {
       builder: (context, child) => DwNotificationsListener(
         handlers: {DwUiNotification: DwUiNotificationHandler()},
         child: PushOpenedListener(
-          child: SignedInGate(child: child ?? const SizedBox.shrink()),
+          child: SignedInGate(
+            child: Stack(
+              children: [
+                child ?? const SizedBox.shrink(),
+                // Mounted once, over every page: a workout left playing
+                // follows the member around the app.
+                DwMiniPlayerHost(
+                  sessionManager: dw.plugins.media.sessionManager,
+                  onExpand: (_) =>
+                      router.router.goNamed(AppNavigationZone.workouts.name),
+                  builder: (context, session, expand, close) =>
+                      AppMiniPlayerChrome(
+                        session: session,
+                        onExpand: expand,
+                        onClose: close,
+                      ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
       routerConfig: router.router,

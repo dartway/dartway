@@ -68,6 +68,7 @@ class _AppBottomNavigationBar extends StatelessWidget {
       (route: AppNavigationZone.bookings, icon: Icons.event_available),
       (route: AppNavigationZone.news, icon: Icons.article),
       if (isStaffMember) (route: AppNavigationZone.chat, icon: Icons.chat),
+      (route: AppNavigationZone.workouts, icon: Icons.play_circle),
       (route: AppNavigationZone.profile, icon: Icons.person),
     ];
     final currentIndex = tabs.indexWhere((tab) => tab.route.isActive(context));
@@ -95,6 +96,7 @@ class _AppBottomNavigationBar extends StatelessWidget {
         AppNavigationZone.bookings => l10n.tabBookings,
         AppNavigationZone.news => l10n.tabNews,
         AppNavigationZone.chat => l10n.tabChat,
+        AppNavigationZone.workouts => l10n.tabWorkouts,
         _ => l10n.tabProfile,
       };
 }

@@ -1,10 +1,15 @@
 part of '../../ui_kit.dart';
 
-/// What `DwMiniPlayerHost`'s builder returns — mechanics (visibility, drag,
-/// scale, `expand`/`close`) all come from the package; this is only the look.
+/// What `DwMiniPlayerHost` shows: the picture, play/pause and close. Where it
+/// sits, how it is dragged, pinched and snapped, and what expand and close do
+/// are the package's; this is only the look.
 ///
-/// Copied from the framework's example into a project's own `ui_kit/` and
-/// restyled — see the `dartway-media` toolkit skill.
+/// It sits above the app's navigator, where there is no overlay for a
+/// tooltip: the buttons are labelled for accessibility with `Semantics`
+/// instead.
+///
+/// Copied into a project's own `ui_kit/` and restyled — see the
+/// `dartway-media` toolkit skill.
 class AppMiniPlayerChrome extends StatelessWidget {
   const AppMiniPlayerChrome({
     super.key,
@@ -18,36 +23,59 @@ class AppMiniPlayerChrome extends StatelessWidget {
   final VoidCallback onClose;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onExpand,
-      child: Material(
-        elevation: 4,
-        borderRadius: BorderRadius.circular(8),
-        clipBehavior: Clip.antiAlias,
+  Widget build(BuildContext context) => GestureDetector(
+    key: const Key('app-mini-player'),
+    onTap: onExpand,
+    child: Material(
+      color: Colors.black,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: IconTheme(
+        data: const IconThemeData(color: Colors.white),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (session.currentItem.kind == DwMediaKind.video)
-              DwVideoSurface(session: session)
-            else
-              ColoredBox(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                child: const Icon(Icons.music_note),
+            Center(
+              child: session.currentItem.kind == DwMediaKind.video
+                  ? DwVideoSurface(session: session)
+                  : const Icon(Icons.graphic_eq),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: ValueListenableBuilder<DwMediaPlaybackState>(
+                valueListenable: session.playback,
+                builder: (context, playback, _) => Semantics(
+                  label: playback.isPlaying
+                      ? context.l10n.mediaPause
+                      : context.l10n.mediaPlay,
+                  child: IconButton(
+                    iconSize: 20,
+                    icon: Icon(
+                      playback.isPlaying ? Icons.pause : Icons.play_arrow,
+                    ),
+                    onPressed: playback.isPlaying
+                        ? session.pause
+                        : session.play,
+                  ),
+                ),
               ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: IconButton(
-                iconSize: 16,
-                color: Colors.white,
-                icon: const Icon(Icons.close),
-                onPressed: onClose,
+            ),
+            Align(
+              alignment: Alignment.topRight,
+              child: Semantics(
+                label: context.l10n.mediaClose,
+                child: IconButton(
+                  key: const Key('app-mini-player-close'),
+                  iconSize: 16,
+                  icon: const Icon(Icons.close),
+                  onPressed: onClose,
+                ),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }

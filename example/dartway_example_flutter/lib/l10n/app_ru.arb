@@ -14,6 +14,7 @@
   "tabBookings": "Мои записи",
   "tabNews": "Новости",
   "tabChat": "Чат команды",
+  "tabWorkouts": "Тренировки",
   "tabProfile": "Профиль",
 
   "helloUser": "Привет, {name}",
@@ -243,5 +244,21 @@
   "refusalAnalyticsDashboardInvalid": "Проверьте дашборд: нужно название и не больше 12 виджетов, у каждого — название.",
   "analyticsOrderLabel": "Порядок",
   "analyticsOrder": "{order, select, largestFirst{Сначала крупные} byLabel{По значению: 1, 2, … 10} other{—}}",
-  "analyticsPieNeedsProperty": "Круговая диаграмма делит события по свойству: выберите его в «Разбить по»."
+  "analyticsPieNeedsProperty": "Круговая диаграмма делит события по свойству: выберите его в «Разбить по».",
+
+  "workoutsTitle": "Тренировки",
+  "workoutVideo": "Видео",
+  "workoutAudio": "Аудио",
+  "mediaPlay": "Воспроизвести",
+  "mediaPause": "Пауза",
+  "mediaSkipBack": "Назад",
+  "mediaSkipForward": "Вперёд",
+  "mediaMute": "Звук",
+  "mediaSpeed": "Скорость",
+  "mediaFullscreen": "Во весь экран",
+  "mediaClose": "Закрыть",
+  "mediaFailed": "Не удалось воспроизвести.",
+  "mediaUpNext": "Дальше",
+  "mediaNextIn": "Дальше через {seconds} с",
+  "mediaStayHere": "Остаться здесь"
 }
