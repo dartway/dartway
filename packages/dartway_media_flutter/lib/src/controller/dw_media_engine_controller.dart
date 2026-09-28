@@ -80,6 +80,7 @@ abstract class DwMediaEngineController extends DwMediaController {
 
   bool _loaded = false;
   bool _playWhenLoaded = false;
+  bool _failed = false;
 
   int _autoRetriesLeft;
   Timer? _autoRetryTimer;
@@ -117,6 +118,7 @@ abstract class DwMediaEngineController extends DwMediaController {
     final generation = ++_loadGeneration;
     bool stale() => _disposed || generation != _loadGeneration;
     _loaded = false;
+    _failed = false;
     try {
       final policy = options.resume;
       final startAt =
@@ -165,6 +167,7 @@ abstract class DwMediaEngineController extends DwMediaController {
         errorMessage: error.toString(),
       ),
     );
+    _failed = true;
     _callbacks.onError?.call(item, error);
   }
 
@@ -200,6 +203,9 @@ abstract class DwMediaEngineController extends DwMediaController {
     if (_disposed) return;
     final previous = _state.value;
     var next = update(previous);
+    // A failed engine keeps talking — an idle player, a reset value — and
+    // none of it may cover the error until a retry loads again.
+    if (_failed) next = next.copyWith(playState: DwMediaPlayState.error);
     if (next.playState == DwMediaPlayState.paused && !_everPlayed) {
       next = next.copyWith(playState: DwMediaPlayState.ready);
     }

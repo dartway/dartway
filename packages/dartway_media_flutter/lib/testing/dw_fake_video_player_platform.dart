@@ -21,7 +21,22 @@ import 'package:video_player_platform_interface/video_player_platform_interface.
 /// controller-side seek landing on the duration (which flips
 /// `VideoPlayerValue.isCompleted` on its own, without this platform doing
 /// anything — exactly the trap `DwVideoMediaController` is guarded against).
-final class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
+base class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
+  /// With [initializeOnCreate] (the default) every player reports itself
+  /// initialized, [defaultDuration] long, as soon as it is created — a test
+  /// that does not care about loading just pumps. Off, the test calls
+  /// [emitInitialized] itself, and `DwMediaController.play()` / `retry()`
+  /// wait for it.
+  DwFakeVideoPlayerPlatform({
+    this.defaultDuration = const Duration(minutes: 1),
+    this.initializeOnCreate = true,
+  });
+
+  /// The duration a player reports under [initializeOnCreate] — settable
+  /// between loads.
+  Duration defaultDuration;
+  final bool initializeOnCreate;
+
   int _nextPlayerId = 0;
   final Map<int, StreamController<VideoEvent>> _events = {};
   final Map<int, Duration> _positions = {};
@@ -52,6 +67,7 @@ final class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
       onCancel: () => Future<void>.value(),
     );
     _positions[id] = Duration.zero;
+    if (initializeOnCreate) emitInitialized(id, duration: defaultDuration);
     return id;
   }
 

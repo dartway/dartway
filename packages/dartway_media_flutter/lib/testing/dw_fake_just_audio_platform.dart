@@ -1,20 +1,15 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 
-/// `JustAudioPlatform.instance = DwFakeJustAudioPlatform()` — drives
-/// `DwAudioMediaController` (and, through it, `just_audio`'s own
-/// `AudioPlayer`) in a widget test without a plugin registered for any
-/// platform.
+/// `JustAudioPlatform.instance = DwFakeJustAudioPlatform()` — plays audio
+/// items in a widget test without a plugin for any platform.
 ///
-/// Each `AudioPlayer` created while this is the platform gets its own
-/// [DwFakeAudioPlayerPlatform], reachable through [players] once the test has
-/// pumped past `DwMediaController.forItem`'s construction. [defaultDuration]
-/// is what every one of them reports from `load` unless the test overwrites
-/// its `duration` field first.
-final class DwFakeJustAudioPlatform extends JustAudioPlatform {
+/// Every `AudioPlayer` created while this is the platform gets its own
+/// [DwFakeAudioPlayerPlatform], reachable through [players] once the item has
+/// loaded — which, inside `testWidgets`, takes `dwSettleMedia`, not a bare
+/// `pump`. Each reports [defaultDuration] from `load`.
+base class DwFakeJustAudioPlatform extends JustAudioPlatform {
   DwFakeJustAudioPlatform({this.defaultDuration = const Duration(minutes: 1)});
 
   final Duration defaultDuration;
@@ -43,7 +38,7 @@ final class DwFakeJustAudioPlatform extends JustAudioPlatform {
   }
 }
 
-final class DwFakeAudioPlayerPlatform extends AudioPlayerPlatform {
+base class DwFakeAudioPlayerPlatform extends AudioPlayerPlatform {
   DwFakeAudioPlayerPlatform(super.id, {required this.duration});
 
   /// What `load` reports as the track's duration — settable up to the point
@@ -161,15 +156,19 @@ final class DwFakeAudioPlayerPlatform extends AudioPlayerPlatform {
   }
 
   /// A failure of a track already loaded — the network dropping mid-play.
-  void emitError(String message) {
-    for (final listener in List.of(_listeners)) {
-      listener.addError(
-        PlatformException(code: 'dw_fake_audio_error', message: message),
-      );
-    }
-  }
+  /// Reported the way a real platform reports it: as an error code on the
+  /// playback event, which `just_audio` surfaces on `AudioPlayer.errorStream`.
+  void emitError(String message, {int code = 1}) => _emit(
+    ProcessingStateMessage.idle,
+    errorCode: code,
+    errorMessage: message,
+  );
 
-  void _emit(ProcessingStateMessage state) {
+  void _emit(
+    ProcessingStateMessage state, {
+    int? errorCode,
+    String? errorMessage,
+  }) {
     final message = PlaybackEventMessage(
       processingState: state,
       updateTime: DateTime.now(),
@@ -179,6 +178,8 @@ final class DwFakeAudioPlayerPlatform extends AudioPlayerPlatform {
       icyMetadata: null,
       currentIndex: 0,
       androidAudioSessionId: null,
+      errorCode: errorCode,
+      errorMessage: errorMessage,
     );
     for (final listener in List.of(_listeners)) {
       listener.add(message);

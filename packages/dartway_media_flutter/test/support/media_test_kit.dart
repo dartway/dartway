@@ -24,7 +24,7 @@ DwMediaItem audioItem(String id) => DwMediaItem(
 /// Both fake engines, installed fresh for every test.
 final class MediaRig {
   MediaRig()
-    : video = DwFakeVideoPlayerPlatform(),
+    : video = DwFakeVideoPlayerPlatform(initializeOnCreate: false),
       audio = DwFakeJustAudioPlatform(
         defaultDuration: const Duration(seconds: 100),
       ) {
@@ -69,7 +69,8 @@ DwMediaController controllerFor(
   DwMediaItem item, {
   DwMediaConfig options = const DwMediaConfig(),
   DwMediaCallbacks callbacks = const DwMediaCallbacks(),
-}) => createDwMediaController(item: item, callbacks: callbacks, options: options);
+}) =>
+    createDwMediaController(item: item, callbacks: callbacks, options: options);
 
 /// Disposes [controller] and lets the engine's own teardown finish.
 Future<void> release(WidgetTester tester, DwMediaController controller) async {

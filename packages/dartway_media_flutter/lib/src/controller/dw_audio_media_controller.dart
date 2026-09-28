@@ -9,9 +9,9 @@ import 'dw_media_engine_controller.dart';
 /// [DwMediaController] over `just_audio`.
 ///
 /// A failure after a successful load — the network dropping mid-track —
-/// arrives only as an error on `playbackEventStream`: `playerStateStream`
-/// swallows the errors of the events it is built from, so a player listening
-/// to it alone never learns the track died.
+/// arrives on `AudioPlayer.errorStream` only: the state and event streams
+/// swallow the platform's errors, so a player listening to them alone never
+/// learns the track died.
 final class DwAudioMediaController extends DwMediaEngineController {
   DwAudioMediaController({
     required super.item,
@@ -34,12 +34,9 @@ final class DwAudioMediaController extends DwMediaEngineController {
       player.playerStateStream.listen(onChange),
       player.positionStream.listen(onChange),
       player.bufferedPositionStream.listen(onChange),
-      player.playbackEventStream.listen(
-        onChange,
-        onError: (Object error, StackTrace stackTrace) {
-          if (identical(_player, player)) reportFailure(error, stackTrace);
-        },
-      ),
+      player.errorStream.listen((error) {
+        if (identical(_player, player)) reportFailure(error);
+      }),
     ]);
     await player.setUrl(uri.toString());
     _onUpdate(player);
