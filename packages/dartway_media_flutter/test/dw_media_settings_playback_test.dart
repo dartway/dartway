@@ -2,6 +2,8 @@
 // the default and what turning it off or changing it does. The table in
 // docs/3-flutter/media.md lists the same settings in the same order.
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/media_test_kit.dart';
@@ -158,6 +160,68 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(session.currentItem.id, 'b');
       await endSession(tester, session);
+    });
+
+    testWidgets('2.5 s: the move comes at 2.5 s, not at a whole second', (
+      tester,
+    ) async {
+      final session = open(
+        [videoItem('a'), videoItem('b')],
+        config: const DwMediaConfig(
+          autoplayNext: true,
+          autoplayCountdownDuration: Duration(milliseconds: 2500),
+        ),
+      );
+      await rig.loadVideo(tester, duration: const Duration(seconds: 10));
+      await playToEnd(tester, session);
+      await tester.pump(const Duration(milliseconds: 2400));
+      expect(session.currentItem.id, 'a');
+      expect(
+        session.queue.value.autoplayCountdown,
+        const Duration(milliseconds: 500),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(session.currentItem.id, 'b');
+      await endSession(tester, session);
+    });
+  });
+
+  group('autoplayCountdownTick', () {
+    Future<List<Duration?>> shownOverOneSecond(
+      WidgetTester tester,
+      Duration tick,
+    ) async {
+      final session = open(
+        [videoItem('a'), videoItem('b')],
+        config: DwMediaConfig(autoplayNext: true, autoplayCountdownTick: tick),
+      );
+      await rig.loadVideo(tester, duration: const Duration(seconds: 10));
+      await playToEnd(tester, session);
+      final shown = <Duration?>[];
+      void record() => shown.add(session.queue.value.autoplayCountdown);
+      session.queue.addListener(record);
+      await tester.pump(const Duration(seconds: 1));
+      session.queue.removeListener(record);
+      await endSession(tester, session);
+      return shown;
+    }
+
+    testWidgets('1 s (default): one update in a second', (tester) async {
+      expect(await shownOverOneSecond(tester, const Duration(seconds: 1)), [
+        const Duration(seconds: 4),
+      ]);
+    });
+
+    testWidgets('250 ms: four updates in the same second', (tester) async {
+      expect(
+        await shownOverOneSecond(tester, const Duration(milliseconds: 250)),
+        [
+          const Duration(milliseconds: 4750),
+          const Duration(milliseconds: 4500),
+          const Duration(milliseconds: 4250),
+          const Duration(seconds: 4),
+        ],
+      );
     });
   });
 
@@ -334,17 +398,29 @@ void main() {
   });
 
   group('speeds', () {
-    test('empty (default): the speed control is off', () {
-      expect(const DwMediaConfig().speeds, isEmpty);
-    });
+    testWidgets(
+      'empty (default): the speed control is off — setSpeed refuses',
+      (tester) async {
+        final session = open([videoItem('a')]);
+        await rig.loadVideo(tester);
+        await expectLater(session.setSpeed(1.5), throwsArgumentError);
+        expect(session.playback.value.speed, 1.0);
+        expect(rig.video.latest.speed, 1.0);
+        await endSession(tester, session);
+      },
+    );
 
-    testWidgets('a list reaches the controls through session.options', (
+    testWidgets('a list: a listed speed is set, another is refused', (
       tester,
     ) async {
       final session = open([
         videoItem('a'),
       ], config: const DwMediaConfig(speeds: [1, 1.5, 2]));
-      expect(session.options.speeds, [1, 1.5, 2]);
+      await rig.loadVideo(tester);
+      await session.setSpeed(1.5);
+      expect(session.playback.value.speed, 1.5);
+      await expectLater(session.setSpeed(3), throwsArgumentError);
+      expect(session.playback.value.speed, 1.5);
       await endSession(tester, session);
     });
   });
@@ -372,7 +448,11 @@ void main() {
       WidgetTester tester,
       DwMediaConfig config,
     ) async {
-      final session = open([videoItem('a'), videoItem('b')], config: config);
+      final session = open(
+        [videoItem('a'), videoItem('b')],
+        config: config,
+        options: const DwMediaOpenOptions(speeds: [1, 1.5]),
+      );
       await rig.loadVideo(tester);
       await session.setSpeed(1.5);
       await session.next(autoplay: false);
@@ -548,18 +628,74 @@ void main() {
   });
 
   group('controlsAutoHideDelay', () {
-    testWidgets('reaches the controls through session.options', (tester) async {
+    Future<List<bool>> visibleAt(
+      WidgetTester tester,
+      DwMediaConfig config,
+      List<Duration> checkpoints,
+    ) async {
+      final session = open([videoItem('a')], config: config);
+      await rig.loadVideo(tester);
+      final seen = [session.controlsVisible.value];
+      await session.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 1));
+      for (final wait in checkpoints) {
+        await tester.pump(wait);
+        seen.add(session.controlsVisible.value);
+      }
+      await session.pause();
+      await tester.pump();
+      seen.add(session.controlsVisible.value);
+      await endSession(tester, session);
+      return seen;
+    }
+
+    testWidgets('3 s (default): up until 3 s of playback, then hidden; '
+        'back on pause', (tester) async {
       expect(
-        const DwMediaConfig().controlsAutoHideDelay,
-        const Duration(seconds: 3),
+        await visibleAt(tester, const DwMediaConfig(), const [
+          Duration(seconds: 2),
+          Duration(seconds: 1),
+        ]),
+        [true, true, false, true],
       );
-      final session = open(
-        [videoItem('a')],
-        config: const DwMediaConfig(
-          controlsAutoHideDelay: Duration(seconds: 7),
+    });
+
+    testWidgets('7 s: still up at 3 s', (tester) async {
+      expect(
+        await visibleAt(
+          tester,
+          const DwMediaConfig(controlsAutoHideDelay: Duration(seconds: 7)),
+          const [Duration(seconds: 3), Duration(seconds: 4)],
         ),
+        [true, true, false, true],
       );
-      expect(session.options.controlsAutoHideDelay, const Duration(seconds: 7));
+    });
+
+    testWidgets('zero: never hidden', (tester) async {
+      expect(
+        await visibleAt(
+          tester,
+          const DwMediaConfig(controlsAutoHideDelay: Duration.zero),
+          const [Duration(seconds: 30)],
+        ),
+        [true, true, true],
+      );
+    });
+
+    testWidgets('showControls brings them back for another delay; '
+        'toggleControls hides shown ones', (tester) async {
+      final session = open([videoItem('a')]);
+      await rig.loadVideo(tester);
+      await session.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 3));
+      expect(session.controlsVisible.value, isFalse);
+      session.toggleControls();
+      expect(session.controlsVisible.value, isTrue);
+      await tester.pump(const Duration(seconds: 2));
+      expect(session.controlsVisible.value, isTrue);
+      session.toggleControls();
+      expect(session.controlsVisible.value, isFalse);
       await endSession(tester, session);
     });
   });
@@ -580,6 +716,115 @@ void main() {
       expect(plain.options.skipForward, const Duration(seconds: 10));
       await endSession(tester, custom);
       await endSession(tester, plain);
+    });
+
+    test('every field of an override reaches the resolved settings', () {
+      final store = DwMediaInMemoryPositionStore();
+      Widget transition(
+        BuildContext context,
+        Animation<double> animation,
+        Animation<double> secondary,
+        Widget child,
+      ) => child;
+      const policy = DwMediaResumePolicy(minimum: Duration(seconds: 9));
+      final options = DwMediaOpenOptions(
+        autoplayOnOpen: true,
+        autoplayNext: true,
+        autoplayCountdown: false,
+        autoplayCountdownDuration: const Duration(seconds: 11),
+        autoplayCountdownTick: const Duration(milliseconds: 250),
+        nextPreview: true,
+        nextPreviewLeadTime: const Duration(seconds: 12),
+        completedThreshold: 0.5,
+        reachedEndTolerance: const Duration(milliseconds: 750),
+        progressInterval: const Duration(seconds: 2),
+        resume: policy,
+        speeds: const [0.5, 1],
+        defaultSpeed: 0.5,
+        rememberSpeedAcrossItems: false,
+        skipBack: const Duration(seconds: 13),
+        skipForward: const Duration(seconds: 14),
+        fullscreen: false,
+        fullscreenOrientations: const [DeviceOrientation.portraitDown],
+        exitOrientations: const [DeviceOrientation.landscapeLeft],
+        autoEnterFullscreenOnPlay: true,
+        keepFullscreenAcrossItems: false,
+        fullscreenTransitionDuration: const Duration(milliseconds: 450),
+        fullscreenTransitionBuilder: transition,
+        fallbackAspectRatio: 4 / 3,
+        miniPlayer: false,
+        miniPlayerInitialSize: const Size(200, 100),
+        miniPlayerInitialAlignment: Alignment.topLeft,
+        miniPlayerMinScale: 0.6,
+        miniPlayerMaxScale: 3,
+        miniPlayerSnapToEdges: false,
+        miniPlayerSnapEdges: DwMiniPlayerSnapEdges.all,
+        miniPlayerSnapThreshold: 40,
+        miniPlayerCloseStopsPlayback: false,
+        onLeaveWithoutMiniPlayer: DwMediaLeaveAction.stop,
+        pauseVideoInBackground: false,
+        backgroundAudio: true,
+        wakelockWhilePlaying: false,
+        singleActiveItem: false,
+        webMutedStart: false,
+        rememberSound: false,
+        autoRetryCount: 4,
+        autoRetryDelay: const Duration(seconds: 15),
+        controlsAutoHideDelay: const Duration(seconds: 16),
+        positionStore: store,
+      );
+      final r = const DwMediaConfig().merge(options);
+      expect(r.autoplayOnOpen, isTrue);
+      expect(r.autoplayNext, isTrue);
+      expect(r.autoplayCountdown, isFalse);
+      expect(r.autoplayCountdownDuration, const Duration(seconds: 11));
+      expect(r.autoplayCountdownTick, const Duration(milliseconds: 250));
+      expect(r.nextPreview, isTrue);
+      expect(r.nextPreviewLeadTime, const Duration(seconds: 12));
+      expect(r.completedThreshold, 0.5);
+      expect(r.reachedEndTolerance, const Duration(milliseconds: 750));
+      expect(r.progressInterval, const Duration(seconds: 2));
+      expect(r.resume, same(policy));
+      expect(r.speeds, [0.5, 1]);
+      expect(r.defaultSpeed, 0.5);
+      expect(r.rememberSpeedAcrossItems, isFalse);
+      expect(r.skipBack, const Duration(seconds: 13));
+      expect(r.skipForward, const Duration(seconds: 14));
+      expect(r.fullscreen, isFalse);
+      expect(r.fullscreenOrientations, [DeviceOrientation.portraitDown]);
+      expect(r.exitOrientations, [DeviceOrientation.landscapeLeft]);
+      expect(r.autoEnterFullscreenOnPlay, isTrue);
+      expect(r.keepFullscreenAcrossItems, isFalse);
+      expect(r.fullscreenTransitionDuration, const Duration(milliseconds: 450));
+      expect(r.fullscreenTransitionBuilder, same(transition));
+      expect(r.fallbackAspectRatio, 4 / 3);
+      expect(r.miniPlayer, isFalse);
+      expect(r.miniPlayerInitialSize, const Size(200, 100));
+      expect(r.miniPlayerInitialAlignment, Alignment.topLeft);
+      expect(r.miniPlayerMinScale, 0.6);
+      expect(r.miniPlayerMaxScale, 3);
+      expect(r.miniPlayerSnapToEdges, isFalse);
+      expect(r.miniPlayerSnapEdges, DwMiniPlayerSnapEdges.all);
+      expect(r.miniPlayerSnapThreshold, 40);
+      expect(r.miniPlayerCloseStopsPlayback, isFalse);
+      expect(r.onLeaveWithoutMiniPlayer, DwMediaLeaveAction.stop);
+      expect(r.pauseVideoInBackground, isFalse);
+      expect(r.backgroundAudio, isTrue);
+      expect(r.wakelockWhilePlaying, isFalse);
+      expect(r.singleActiveItem, isFalse);
+      expect(r.webMutedStart, isFalse);
+      expect(r.rememberSound, isFalse);
+      expect(r.autoRetryCount, 4);
+      expect(r.autoRetryDelay, const Duration(seconds: 15));
+      expect(r.controlsAutoHideDelay, const Duration(seconds: 16));
+      expect(r.positionStore, same(store));
+
+      expect(
+        const DwMediaConfig()
+            .merge(const DwMediaOpenOptions(withoutResume: true))
+            .resume,
+        isNull,
+      );
     });
   });
 }
