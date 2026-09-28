@@ -75,7 +75,7 @@ final session = dw.plugins.media.open(
   page goes: `dw.plugins.media.sessionManager.active` holds it, and that is what lets the
   mini-player carry on. A page reads the active session with a `ValueListenableBuilder` — or simply
   opens its item again: `open()` for an item a live session stands on returns that session, never a
-  second engine.
+  second engine — with this open's callbacks, settings and queue, and playing under `autoplayOnOpen`.
 - **Everything goes through the session.** Its engine is not public; commands are `session.play()`,
   `seek`, `setSpeed` (a speed from `options.speeds` only — it throws otherwise), `retry`, the queue
   and the rest.
@@ -109,8 +109,9 @@ Every visible string goes through `context.l10n` — the keys the example uses a
 - **Fullscreen**: wrap the inline player in `DwMediaFullscreenHost(session:, builder:, child:)`.
   `session.enterFullscreen()` — or `autoEnterFullscreenOnPlay` — pushes the package's own route
   (not exported: the host is the one way in); `exitFullscreen()` and a back gesture both leave it;
-  orientations and the transition come from the config. With no host mounted — from the
-  mini-player — there is no fullscreen.
+  orientations and the transition come from the config. A request made before the host mounts
+  (autoplay on open, the page's `initState`) waits for it; from the mini-player there is no
+  fullscreen.
 - **Mini-player**: mount `DwMiniPlayerHost` once, in `MaterialApp.builder`, over the router's
   child:
 

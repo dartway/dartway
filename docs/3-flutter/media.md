@@ -54,8 +54,14 @@ fullscreen possible without a reload. The engine itself is not public: everythin
 session. It ends with `session.dispose()`, or with the mini-player's close.
 
 - **One item, one engine.** `open()` for an item a live session stands on returns that session —
-  the page coming back reattaches to what the mini-player shows instead of loading a second copy.
-  Its callbacks and options stay as they were opened.
+  the page coming back reattaches to what the mini-player shows instead of loading a second copy —
+  and the new open's request applies to it: its callbacks replace the old ones (a page that is
+  gone hears nothing more), its settings replace the old ones, a different queue replaces the old
+  one around the same item with the engine kept, and `autoplayOnOpen` plays the item if it is
+  paused or hidden. Three settings only a load applies stay as the item was loaded: the start speed
+  (`defaultSpeed`), the web's muted start (`webMutedStart`), and the iOS half of
+  `wakelockWhilePlaying` (`video_player`'s display-sleep option is fixed when its controller is
+  created). The mini-player's initial size and position apply only before it first shows.
 - `dw.plugins.media.sessionManager.active` is the session the mini-player shows: the one played
   last, or opened last while nothing plays — opening without autoplay never takes it from a playing
   session. Under `singleActiveItem`, playing a session pauses every other.
@@ -81,7 +87,8 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   with the position, duration, buffered position, speed, volume and mute. **An error stays inside
   the player**: the state turns `error`, `onError` fires, and `retry()` re-resolves the source and
   returns to where playback failed. A retry shows `loading` at once, and a second tap while it runs
-  joins it rather than loading twice.
+  joins it rather than loading twice. A load that does not settle within `loadTimeout` fails the
+  same way, so a joined retry can never hang; the load that overran is dropped, never joined.
 
 ## Real playback, not a position
 
@@ -119,9 +126,12 @@ flight, and the position has moved past where playback started or the last seek 
   and, only if it set any, `exitOrientations` when it goes; it leaves on `exitFullscreen()` or a
   back gesture alike, and the flag changes after the frame, so a page listening to it rebuilds
   safely. The route itself is not exported: the host is the one way in, so the flag and the route
-  cannot disagree. **Without a host mounted there is no fullscreen**: from the mini-player,
-  `enterFullscreen()` and `autoEnterFullscreenOnPlay` do nothing rather than leave a flag up with
-  nothing showing it. The queue moving on keeps it up (`keepFullscreenAcrossItems`). System bars are
+  cannot disagree. **A request waits for its host**: `enterFullscreen()` or
+  `autoEnterFullscreenOnPlay` before any host for the session is mounted — autoplay on open playing
+  before the page has built, a call from the page's own `initState` — is kept, and the first host
+  that mounts honours it; `isFullscreen` turns true only then. From the mini-player (the page has
+  called `minimize()`) a request does nothing, rather than leave anything claiming fullscreen with
+  no page to show it. The queue moving on keeps it up (`keepFullscreenAcrossItems`). System bars are
   the app's: its fullscreen page sets them if it wants them hidden.
 - **The mini-player is mounted once, at the root** — `DwMiniPlayerHost(sessionManager:,
   builder:, onExpand:)` in `MaterialApp.builder`. It shows the active session while
@@ -176,13 +186,14 @@ The package's tests cover every row, default against changed, in
 | `completedThreshold` | `0.9` | the fraction of the duration at which `onCompleted` fires |
 | `reachedEndTolerance` | 500 ms | how close to the end a real tick counts as the end; zero leaves only the engine's event |
 | `progressInterval` | 1 s | the shortest gap between two `onProgress` calls |
-| `speeds` | `[]` | the speeds `setSpeed` accepts and the controls offer; empty turns speed off |
-| `defaultSpeed` | `1.0` | the speed an item starts at |
+| `speeds` | `[]` | the speeds `setSpeed` accepts and the controls offer; empty turns speed off and every item plays at `defaultSpeed` |
+| `defaultSpeed` | `1.0` | the speed an item starts at; with `speeds` non-empty it must be one of them (asserted) |
 | `rememberSpeedAcrossItems` | `true` | a chosen speed stays for the next items; off, each starts at `defaultSpeed` |
 | `skipBack` / `skipForward` | 10 s / 10 s | how far `skipBack()` and `skipForward()` move |
 | `singleActiveItem` | `true` | opening or playing a session pauses every other; off, several play at once |
 | `autoRetryCount` | `0` | how many times a failed load retries itself before the error state |
 | `autoRetryDelay` | 3 s | the wait before each of those retries |
+| `loadTimeout` | 30 s | how long one load (resolving the source and opening it) may take before it is an error with `onError`; `null` — per open `withoutLoadTimeout: true` — waits for ever |
 | `controlsAutoHideDelay` | 3 s | how long `controlsVisible` stays true while playing untouched; zero never hides |
 | `resume` | `DwMediaResumePolicy()` | the resume policy; `null` reads and writes no positions |
 | `resume.saveInterval` | 5 s | how often the position is saved during real playback |
