@@ -32,9 +32,11 @@ abstract class DwMediaEngineController extends DwMediaController {
     required DwMediaCallbacks callbacks,
     required DwMediaConfig options,
     double? initialSpeed,
+    bool? initialMuted,
   }) : _callbacks = callbacks,
        _options = options,
-       _initialSpeed = initialSpeed ?? options.defaultSpeed {
+       _initialSpeed = initialSpeed ?? options.defaultSpeed,
+       _initialMuted = initialMuted {
     _autoRetriesLeft = options.autoRetryCount;
     unawaited(_start());
   }
@@ -45,6 +47,7 @@ abstract class DwMediaEngineController extends DwMediaController {
   final DwMediaCallbacks _callbacks;
   final DwMediaConfig _options;
   final double _initialSpeed;
+  final bool? _initialMuted;
 
   final ValueNotifier<DwMediaPlaybackState> _stateNotifier = ValueNotifier(
     const DwMediaPlaybackState(),
@@ -103,6 +106,7 @@ abstract class DwMediaEngineController extends DwMediaController {
       if (_disposed) return;
       await engineSetSpeed(_initialSpeed);
       updateState((current) => current.copyWith(speed: _initialSpeed));
+      if (_initialMuted != null) await setMuted(_initialMuted);
       if (resumeFrom != null && resumeFrom > Duration.zero) {
         await engineSeek(resumeFrom);
       }

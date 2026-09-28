@@ -30,6 +30,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
     required super.callbacks,
     required super.options,
     super.initialSpeed,
+    super.initialMuted,
   });
 
   VideoPlayerController? _controller;

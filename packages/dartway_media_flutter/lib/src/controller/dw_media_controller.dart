@@ -26,6 +26,7 @@ abstract class DwMediaController {
     required DwMediaCallbacks callbacks,
     required DwMediaConfig options,
     double? initialSpeed,
+    bool? initialMuted,
   }) {
     return switch (item.kind) {
       DwMediaKind.video => DwVideoMediaController(
@@ -33,12 +34,14 @@ abstract class DwMediaController {
         callbacks: callbacks,
         options: options,
         initialSpeed: initialSpeed,
+        initialMuted: initialMuted,
       ),
       DwMediaKind.audio => DwAudioMediaController(
         item: item,
         callbacks: callbacks,
         options: options,
         initialSpeed: initialSpeed,
+        initialMuted: initialMuted,
       ),
     };
   }
