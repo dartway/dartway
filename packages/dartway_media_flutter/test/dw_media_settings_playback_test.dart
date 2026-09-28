@@ -1,6 +1,8 @@
 // One group per `DwMediaConfig` setting of playback and the queue: each shows
 // the default and what turning it off or changing it does. The table in
 // docs/3-flutter/media.md lists the same settings in the same order.
+import 'dart:async';
+
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -410,6 +412,40 @@ void main() {
       },
     );
 
+    testWidgets('empty: the speed stays fixed at defaultSpeed', (tester) async {
+      final session = open([
+        videoItem('a'),
+      ], config: const DwMediaConfig(defaultSpeed: 1.25));
+      await rig.loadVideo(tester);
+      await expectLater(session.setSpeed(1.25), throwsArgumentError);
+      expect(session.playback.value.speed, 1.25);
+      await endSession(tester, session);
+    });
+
+    test('a list must hold defaultSpeed — in the plugin config and in a '
+        'session\'s resolved settings', () {
+      expect(
+        () => DwMediaSessionManager(
+          config: const DwMediaConfig(speeds: [1.5, 2]),
+        ),
+        throwsAssertionError,
+      );
+      expect(
+        () => const DwMediaConfig().merge(
+          const DwMediaOpenOptions(speeds: [1.5, 2]),
+        ),
+        throwsAssertionError,
+      );
+      expect(
+        const DwMediaConfig()
+            .merge(
+              const DwMediaOpenOptions(speeds: [1.5, 2], defaultSpeed: 1.5),
+            )
+            .defaultSpeed,
+        1.5,
+      );
+    });
+
     testWidgets('a list: a listed speed is set, another is refused', (
       tester,
     ) async {
@@ -627,6 +663,79 @@ void main() {
     });
   });
 
+  group('loadTimeout', () {
+    DwMediaItem hanging(List<int> asked, {int hangs = 1}) => DwMediaItem(
+      id: 'hanging',
+      kind: DwMediaKind.video,
+      source: DwMediaSource.resolve(() {
+        asked.add(asked.length + 1);
+        if (asked.length <= hangs) return Completer<Uri>().future;
+        return Future.value(Uri.parse('https://example.com/fresh.mp4'));
+      }),
+    );
+
+    testWidgets('30 s (default): a load that never settles is an error at '
+        '30 s, and retry works after it', (tester) async {
+      final asked = <int>[];
+      Object? failure;
+      final session = open([
+        hanging(asked),
+      ], callbacks: DwMediaCallbacks(onError: (_, error) => failure = error));
+      await tester.pump(const Duration(seconds: 29));
+      expect(session.playback.value.playState, DwMediaPlayState.loading);
+      await tester.pump(const Duration(seconds: 1));
+      expect(session.playback.value.isError, isTrue);
+      expect(failure, isA<TimeoutException>());
+
+      unawaited(session.retry());
+      await rig.loadVideo(tester);
+      expect(asked, [1, 2]);
+      expect(session.playback.value.playState, DwMediaPlayState.ready);
+      await endSession(tester, session);
+    });
+
+    testWidgets('5 s: the error comes at 5 s', (tester) async {
+      final session = open([
+        hanging([]),
+      ], config: const DwMediaConfig(loadTimeout: Duration(seconds: 5)));
+      await tester.pump(const Duration(seconds: 5));
+      expect(session.playback.value.isError, isTrue);
+      await endSession(tester, session);
+    });
+
+    testWidgets('a retry joined to a hanging reload settles at the timeout, '
+        'and the next retry loads', (tester) async {
+      final asked = <int>[];
+      final session = open([
+        hanging(asked, hangs: 2),
+      ], config: const DwMediaConfig(loadTimeout: Duration(seconds: 5)));
+      await tester.pump(const Duration(seconds: 5));
+      expect(session.playback.value.isError, isTrue);
+      var settled = 0;
+      unawaited(session.retry().whenComplete(() => settled++));
+      unawaited(session.retry().whenComplete(() => settled++));
+      await tester.pump(const Duration(seconds: 1));
+      expect(asked, [1, 2], reason: 'the second tap joined the first');
+      await tester.pump(const Duration(seconds: 4));
+      expect(settled, 2);
+      expect(session.playback.value.isError, isTrue);
+      unawaited(session.retry());
+      await rig.loadVideo(tester);
+      expect(asked, [1, 2, 3]);
+      expect(session.playback.value.isError, isFalse);
+      await endSession(tester, session);
+    });
+
+    testWidgets('withoutLoadTimeout: it waits for ever', (tester) async {
+      final session = open([
+        hanging([]),
+      ], options: const DwMediaOpenOptions(withoutLoadTimeout: true));
+      await tester.pump(const Duration(minutes: 10));
+      expect(session.playback.value.playState, DwMediaPlayState.loading);
+      await endSession(tester, session);
+    });
+  });
+
   group('controlsAutoHideDelay', () {
     Future<List<bool>> visibleAt(
       WidgetTester tester,
@@ -770,6 +879,7 @@ void main() {
         rememberSound: false,
         autoRetryCount: 4,
         autoRetryDelay: const Duration(seconds: 15),
+        loadTimeout: const Duration(seconds: 17),
         controlsAutoHideDelay: const Duration(seconds: 16),
         positionStore: store,
       );
@@ -816,6 +926,7 @@ void main() {
       expect(r.rememberSound, isFalse);
       expect(r.autoRetryCount, 4);
       expect(r.autoRetryDelay, const Duration(seconds: 15));
+      expect(r.loadTimeout, const Duration(seconds: 17));
       expect(r.controlsAutoHideDelay, const Duration(seconds: 16));
       expect(r.positionStore, same(store));
 
@@ -823,6 +934,12 @@ void main() {
         const DwMediaConfig()
             .merge(const DwMediaOpenOptions(withoutResume: true))
             .resume,
+        isNull,
+      );
+      expect(
+        const DwMediaConfig()
+            .merge(const DwMediaOpenOptions(withoutLoadTimeout: true))
+            .loadTimeout,
         isNull,
       );
     });

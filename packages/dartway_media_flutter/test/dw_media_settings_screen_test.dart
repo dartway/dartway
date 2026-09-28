@@ -344,6 +344,60 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('on: opened with autoplay before the page mounts, the page\'s '
+        'host picks the request up and goes fullscreen', (tester) async {
+      final session = DwMediaSessionManager(
+        config: const DwMediaConfig(
+          autoEnterFullscreenOnPlay: true,
+          autoplayOnOpen: true,
+        ),
+      ).open(items: [videoItem('v')]);
+      await rig.loadVideo(tester);
+      expect(session.isFullscreen.value, isFalse, reason: 'no host yet');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DwMediaFullscreenHost(
+              session: session,
+              builder: (_) => const SizedBox.expand(key: fullscreenPage),
+              child: const SizedBox(key: inline),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(session.isFullscreen.value, isTrue);
+      expect(find.byKey(fullscreenPage), findsOneWidget);
+      await endSession(tester, session);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('enterFullscreen() from the page\'s own initState goes '
+        'fullscreen', (tester) async {
+      final session = DwMediaSessionManager(
+        config: const DwMediaConfig(),
+      ).open(items: [videoItem('v')]);
+      await rig.loadVideo(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _EnterOnInit(
+            session: session,
+            child: Scaffold(
+              body: DwMediaFullscreenHost(
+                session: session,
+                builder: (_) => const SizedBox.expand(key: fullscreenPage),
+                child: const SizedBox(key: inline),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(fullscreenPage), findsOneWidget);
+      await endSession(tester, session);
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('on: playing audio does not', (tester) async {
       final session = DwMediaSessionManager(
         config: const DwMediaConfig(autoEnterFullscreenOnPlay: true),
@@ -720,4 +774,27 @@ final class _FullscreenLabelState extends State<_FullscreenLabel> {
   @override
   Widget build(BuildContext context) =>
       Text(widget.session.isFullscreen.value ? 'fullscreen' : 'inline');
+}
+
+/// A page that asks for fullscreen from its own `initState` — before the
+/// host inside it has mounted.
+final class _EnterOnInit extends StatefulWidget {
+  const _EnterOnInit({required this.session, required this.child});
+
+  final DwMediaSession session;
+  final Widget child;
+
+  @override
+  State<_EnterOnInit> createState() => _EnterOnInitState();
+}
+
+final class _EnterOnInitState extends State<_EnterOnInit> {
+  @override
+  void initState() {
+    super.initState();
+    widget.session.enterFullscreen();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

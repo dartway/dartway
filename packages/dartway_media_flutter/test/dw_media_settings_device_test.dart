@@ -7,7 +7,7 @@ import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
 import 'package:dartway_media_flutter/src/platform/dw_media_platform.dart';
 import 'package:dartway_media_flutter/testing.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -530,6 +530,49 @@ void main() {
       expect(rig.video.videos, isEmpty);
     });
 
+    testWidgets('stop, from the page\'s State.dispose with the mini-player '
+        'host mounted at the root: no write inside the locked tree', (
+      tester,
+    ) async {
+      final manager = DwMediaSessionManager(
+        config: const DwMediaConfig(
+          miniPlayer: false,
+          onLeaveWithoutMiniPlayer: DwMediaLeaveAction.stop,
+        ),
+      );
+      late DwMediaSession session;
+      Widget app({required bool page}) => MaterialApp(
+        home: Stack(
+          children: [
+            if (page)
+              _PlayerPage(
+                onOpen: () => session = manager.open(items: [videoItem('v')]),
+                onLeave: () => session.minimize(),
+              )
+            else
+              const SizedBox.expand(),
+            DwMiniPlayerHost(
+              sessionManager: manager,
+              onExpand: (_) {},
+              builder: (context, session, expand, close) =>
+                  const SizedBox.expand(),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(app(page: true));
+      await rig.loadVideo(tester);
+      await session.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 1));
+      await tester.pumpWidget(app(page: false));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(session.isDisposed, isTrue);
+      expect(manager.active.value, isNull);
+      await dwSettleMedia(tester);
+      expect(rig.video.videos, isEmpty);
+    });
+
     testWidgets('keepPlaying, per open: it plays on', (tester) async {
       final session = await leftWhilePlaying(
         tester,
@@ -671,4 +714,32 @@ void main() {
       await endSession(tester, second);
     });
   });
+}
+
+/// A player page: opens in `initState`, leaves in `dispose`.
+final class _PlayerPage extends StatefulWidget {
+  const _PlayerPage({required this.onOpen, required this.onLeave});
+
+  final VoidCallback onOpen;
+  final VoidCallback onLeave;
+
+  @override
+  State<_PlayerPage> createState() => _PlayerPageState();
+}
+
+final class _PlayerPageState extends State<_PlayerPage> {
+  @override
+  void initState() {
+    super.initState();
+    widget.onOpen();
+  }
+
+  @override
+  void dispose() {
+    widget.onLeave();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.expand();
 }

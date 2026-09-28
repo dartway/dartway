@@ -198,6 +198,114 @@ void main() {
     });
   });
 
+  group('reuse honours the new open', () {
+    testWidgets('the new callbacks replace the old ones', (tester) async {
+      final stale = <String>[];
+      final fresh = <String>[];
+      final first = manager.open(
+        items: [videoItem('a')],
+        callbacks: DwMediaCallbacks(
+          onProgress: (item, _, _) => stale.add(item.id),
+          onStarted: (item) => stale.add('started'),
+        ),
+      );
+      await rig.loadVideo(tester);
+      final again = manager.open(
+        items: [videoItem('a')],
+        callbacks: DwMediaCallbacks(
+          onProgress: (item, _, _) => fresh.add(item.id),
+        ),
+      );
+      expect(again, same(first));
+      await again.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 1));
+      await rig.playVideoTo(tester, const Duration(seconds: 3));
+      expect(stale, isEmpty, reason: 'the page that opened first is gone');
+      expect(fresh, isNotEmpty);
+      await endSession(tester, first);
+    });
+
+    testWidgets('the new settings are adopted, the engine included', (
+      tester,
+    ) async {
+      final progress = <Duration>[];
+      final first = manager.open(
+        items: [videoItem('a')],
+        callbacks: DwMediaCallbacks(onProgress: (_, p, _) => progress.add(p)),
+      );
+      await rig.loadVideo(tester);
+      final again = manager.open(
+        items: [videoItem('a')],
+        callbacks: DwMediaCallbacks(onProgress: (_, p, _) => progress.add(p)),
+        options: const DwMediaOpenOptions(
+          skipForward: Duration(seconds: 30),
+          progressInterval: Duration(milliseconds: 100),
+        ),
+      );
+      expect(again.options.skipForward, const Duration(seconds: 30));
+      await again.play();
+      for (var tenth = 1; tenth <= 5; tenth++) {
+        await rig.playVideoTo(tester, Duration(milliseconds: 100 * tenth));
+      }
+      expect(progress, hasLength(5), reason: 'the engine reads 100 ms now');
+      await endSession(tester, first);
+    });
+
+    testWidgets('a queue of [lesson1] replaces [lesson1, lesson2]: the '
+        'engine stays, autoplayNext does not go to lesson2', (tester) async {
+      final autoplay = DwMediaSessionManager(
+        config: const DwMediaConfig(
+          autoplayNext: true,
+          autoplayCountdown: false,
+        ),
+      );
+      final first = autoplay.open(
+        items: [videoItem('lesson1'), videoItem('lesson2')],
+      );
+      final engine = await rig.loadVideo(
+        tester,
+        duration: const Duration(seconds: 10),
+      );
+      final again = autoplay.open(items: [videoItem('lesson1')]);
+      expect(again, same(first));
+      expect(again.queue.value.items, [videoItem('lesson1')]);
+      expect(again.queue.value.hasNext, isFalse);
+      await again.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 9));
+      engine.finish();
+      await tester.pump(const Duration(seconds: 1));
+      expect(again.currentItem.id, 'lesson1');
+      expect(rig.video.opened, [engine]);
+      await endSession(tester, first);
+    });
+
+    testWidgets('closed from the mini-player (not stopped), opened again with '
+        'autoplay: it plays', (tester) async {
+      final keeping = DwMediaSessionManager(
+        config: const DwMediaConfig(miniPlayerCloseStopsPlayback: false),
+      );
+      final first = keeping.open(items: [videoItem('a')]);
+      await rig.loadVideo(tester);
+      await first.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 1));
+      first.minimize();
+      await first.closeFromMiniPlayer();
+      await tester.pump();
+      expect(first.playback.value.isPlaying, isFalse);
+
+      final again = keeping.open(
+        items: [videoItem('a')],
+        options: const DwMediaOpenOptions(autoplayOnOpen: true),
+      );
+      await tester.pump();
+      await rig.playVideoTo(tester, const Duration(seconds: 2));
+      expect(again, same(first));
+      expect(again.playback.value.isPlaying, isTrue);
+      expect(keeping.active.value, same(again));
+      await endSession(tester, first);
+    });
+  });
+
   testWidgets('the engine survives page → mini-player → page → fullscreen', (
     tester,
   ) async {
