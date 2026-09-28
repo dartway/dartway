@@ -28,13 +28,11 @@ class NewsPostCard extends StatelessWidget {
             const Gap(12),
             Row(
               children: [
-                Expanded(
-                  child: AppText.caption(
+                Expanded(child: AppText.caption(
                     post.author.isDeleted
                         ? context.l10n.chatDeletedMember
                         : post.author.firstName,
-                  ),
-                ),
+                  )),
                 AppText.caption(
                   '${post.createdAt.dayLabel} · ${post.createdAt.timeLabel}',
                 ),

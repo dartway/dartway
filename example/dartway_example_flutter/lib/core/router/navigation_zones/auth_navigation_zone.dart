@@ -30,7 +30,9 @@ enum AuthNavigationZone implements DwNavigationRoute<AppRouterState> {
   /// so a link opened without a session still ends where it pointed.
   static String signInFrom(DwNavigationTarget target) => Uri(
     path: auth.fullPath,
-    queryParameters: target.location == '/' ? null : {'from': target.location},
+    queryParameters: target.location == '/'
+        ? null
+        : {'from': target.location},
   ).toString();
 
   /// The location [signInFrom] remembered on this sign-in page, when it is
