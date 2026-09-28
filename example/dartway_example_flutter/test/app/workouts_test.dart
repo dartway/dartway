@@ -56,6 +56,26 @@ void main() {
     await stop(tester, app);
   });
 
+  testWidgets('a longer controlsAutoHideDelay keeps the controls up longer', (
+    tester,
+  ) async {
+    final app = await ExampleTestApp.start(tester, FakeClub());
+    dw.plugins.media.open(
+      items: [workoutVideo('slow-hide')],
+      options: const DwMediaOpenOptions(
+        autoplayOnOpen: true,
+        controlsAutoHideDelay: Duration(seconds: 10),
+      ),
+    );
+    await app.tap(tester, find.text('Workouts').last);
+    await playTo(tester, const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 3));
+    expect(controls, findsOneWidget);
+    await tester.pump(const Duration(seconds: 7));
+    expect(controls, findsNothing);
+    await stop(tester, app);
+  });
+
   testWidgets('the speed menu offers the speeds the app configured', (
     tester,
   ) async {

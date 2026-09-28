@@ -59,6 +59,7 @@ class _AppMediaStageState extends State<_AppMediaStage> {
   void initState() {
     super.initState();
     _session.playback.addListener(_onPlayback);
+    _onPlayback();
   }
 
   @override

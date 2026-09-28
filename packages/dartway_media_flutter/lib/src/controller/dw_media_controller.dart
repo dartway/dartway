@@ -25,9 +25,8 @@ abstract class DwMediaController {
   /// Seeks to an absolute [position], clamped to `[0, duration]`.
   Future<void> seek(Duration position);
 
-  /// Seeks by [offset] relative to the current position (negative rewinds),
-  /// clamped to `[0, duration]`. `DwMediaSession.skipBack`/`skipForward` call
-  /// this with `options.skipBack`/`skipForward`.
+  /// Seeks by [offset] from the current position (negative rewinds), clamped
+  /// to `[0, duration]`.
   Future<void> skip(Duration offset);
 
   Future<void> setSpeed(double speed);
@@ -49,5 +48,7 @@ abstract class DwMediaController {
   /// the app goes to the background (`DwMediaResumePolicy.saveOnBackground`).
   Future<void> savePosition();
 
+  /// Releases the engine. The session disposes the controllers it creates;
+  /// app code ends a session instead (`DwMediaSession.dispose`).
   Future<void> dispose();
 }

@@ -85,7 +85,7 @@ to end, copy what the feature needs into `__FLUTTER_PKG__/lib/ui_kit/3_special/m
 | `AppMiniPlayerChrome` | the `builder` of `DwMiniPlayerHost`: the picture, play/pause, close |
 
 Every visible string goes through `context.l10n` — the keys the example uses are `media*` in its
-`.arb` files. A kit widget carries no string literal: `dartway check` reports one as
+`.arb` files. A kit widget carries no string literal: `dart run dartway_cli:dartway check` reports one as
 `uiKitContainsText`, which is why tests find these widgets by type and tooltip, not by `Key`.
 
 ## 4. Fullscreen, the mini-player, the page

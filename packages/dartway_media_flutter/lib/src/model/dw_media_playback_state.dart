@@ -2,12 +2,11 @@ import 'package:flutter/foundation.dart';
 
 /// Where a [DwMediaController] is in its lifecycle.
 enum DwMediaPlayState {
-  /// The source is being resolved and the engine is preparing it — nothing
-  /// has played yet.
+  /// The source is being resolved and the engine is preparing it, or a
+  /// failed load waits for its automatic retry.
   loading,
 
-  /// Prepared, not started — used briefly between [loading] and the first
-  /// [playing]/[paused], and after a seek settles.
+  /// Loaded, and nothing has really played yet.
   ready,
 
   /// Playing but waiting on data.
@@ -16,17 +15,16 @@ enum DwMediaPlayState {
   playing,
   paused,
 
-  /// Reached the end of real playback (see [DwMediaController.retry] docs on
-  /// why this is never derived from position == duration alone).
+  /// The engine stands at the end — by playback or by a seek. Whether it
+  /// was real playback is `DwMediaCallbacks.onReachedEnd`'s question.
   ended,
 
-  error;
-
-  bool get isTerminalError => this == DwMediaPlayState.error;
+  /// Failed; the controller waits for `retry()`.
+  error,
 }
 
-/// A snapshot of one [DwMediaController] — what a controls widget reads to
-/// draw itself.
+/// A snapshot of one item's playback — what a controls widget reads to draw
+/// itself (`DwMediaSession.playback`).
 @immutable
 final class DwMediaPlaybackState {
   const DwMediaPlaybackState({
@@ -52,8 +50,8 @@ final class DwMediaPlaybackState {
   final double volume;
   final bool muted;
 
-  /// Set only while [playState] is [DwMediaPlayState.error]; the app decides
-  /// what to show, this is the cause for logging.
+  /// The failure, while [playState] is [DwMediaPlayState.error] — for a log;
+  /// what the person sees is the app's own text.
   final String? errorMessage;
 
   bool get isPlaying => playState == DwMediaPlayState.playing;

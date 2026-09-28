@@ -21,7 +21,8 @@ typedef DwMiniPlayerBuilder =
       VoidCallback close,
     );
 
-/// The mini-player overlay — mounted once at the app root. Mechanics only:
+/// The mini-player — mounted once at the app root, above the navigator
+/// (where there is no `Overlay`, so its chrome carries no tooltips). Mechanics only:
 /// which session to show (`sessionManager.active`, while it is
 /// `session.minimized`), drag, pinch-to-scale within
 /// `DwMediaConfig.miniPlayerMinScale`/`maxScale`, snapping to the nearest
@@ -36,8 +37,9 @@ typedef DwMiniPlayerBuilder =
 ///       if (child != null) child,
 ///       DwMiniPlayerHost(
 ///         sessionManager: dw.plugins.media.sessionManager,
-///         onExpand: (item) => context.go('/player/${item.id}'),
-///         builder: (context, session, expand, close) => MiniPlayerChrome(...),
+///         // The router object, not `context`: this sits above the router.
+///         onExpand: (item) => router.goNamed('player'),
+///         builder: (context, session, expand, close) => AppMiniPlayerChrome(...),
 ///       ),
 ///     ],
 ///   ),

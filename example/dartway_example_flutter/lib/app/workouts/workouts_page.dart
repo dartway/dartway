@@ -1,4 +1,4 @@
-import 'package:dartway_example_flutter/app/workouts/workout_catalog.dart';
+import 'package:dartway_example_flutter/app/workouts/logic/workout_catalog.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
