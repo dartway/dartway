@@ -1,10 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 /// Whether a [DwMediaItem] plays through the video or the audio engine.
-enum DwMediaKind {
-  video,
-  audio;
-}
+enum DwMediaKind { video, audio }
 
 /// How a [DwMediaItem] finds its bytes.
 ///

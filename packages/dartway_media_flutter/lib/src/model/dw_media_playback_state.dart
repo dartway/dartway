@@ -62,10 +62,9 @@ final class DwMediaPlaybackState {
   bool get isEnded => playState == DwMediaPlayState.ended;
 
   /// `position / duration`, or `0` while the duration is unknown.
-  double get progress =>
-      duration <= Duration.zero
-          ? 0
-          : (position.inMicroseconds / duration.inMicroseconds).clamp(0, 1);
+  double get progress => duration <= Duration.zero
+      ? 0
+      : (position.inMicroseconds / duration.inMicroseconds).clamp(0, 1);
 
   DwMediaPlaybackState copyWith({
     DwMediaPlayState? playState,
@@ -84,15 +83,13 @@ final class DwMediaPlaybackState {
     speed: speed ?? this.speed,
     volume: volume ?? this.volume,
     muted: muted ?? this.muted,
-    errorMessage:
-        identical(errorMessage, _unset)
-            ? this.errorMessage
-            : errorMessage as String?,
+    errorMessage: identical(errorMessage, _unset)
+        ? this.errorMessage
+        : errorMessage as String?,
   );
 
   @override
-  String toString() =>
-      'DwMediaPlaybackState($playState, $position/$duration)';
+  String toString() => 'DwMediaPlaybackState($playState, $position/$duration)';
 }
 
 const Object _unset = Object();

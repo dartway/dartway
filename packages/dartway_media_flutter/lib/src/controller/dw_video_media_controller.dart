@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:video_player/video_player.dart';
 
 import '../lifecycle/dw_media_wakelock.dart';
@@ -9,22 +10,14 @@ import 'dw_media_engine_controller.dart';
 
 /// [DwMediaController] over `video_player`.
 ///
-/// **The trap this guards against:** `VideoPlayerValue.isCompleted` becomes
-/// `true` on *any* seek that lands on the duration, not only on real playback
-/// reaching the end — a scrub to the end sets it exactly the same way. So
-/// [markReachedEnd] is never called from watching `isCompleted` directly;
-/// every seek this controller performs runs through [guardedSeek], which
-/// suppresses it for the one synchronous state update the seek itself causes.
-/// A real end-of-playback still calls it, because `VideoPlayerController`
-/// reaches `isCompleted` there through its own internal `pause()`+`seekTo()`,
-/// outside this controller's [guardedSeek].
-///
-/// **Web:** starting unmuted throws `NotAllowedError` outside a user gesture,
-/// so with `options.webMutedStart` the controller loads muted and applies the
-/// real volume once playback is actually granted (the first `isPlaying`
-/// tick). `options.webRememberSoundChoice` is read by `DwMediaSession`, which
-/// carries the last chosen volume into the next item's `initialSpeed`-like
-/// wiring (see its docs).
+/// `video_player`'s own background rule is switched off
+/// (`allowBackgroundPlayback: true`): it pauses on `paused` and resumes by
+/// itself on `resumed`, which would override
+/// `DwMediaConfig.pauseVideoInBackground` both ways. `DwMedia` applies the
+/// config's rule instead. The screen is kept on through
+/// `preventsDisplaySleepDuringVideoPlayback` where the platform supports it
+/// (iOS) and through `wakelock_plus` everywhere, both following
+/// `DwMediaConfig.wakelockWhilePlaying`.
 final class DwVideoMediaController extends DwMediaEngineController {
   DwVideoMediaController({
     required super.item,
@@ -35,53 +28,72 @@ final class DwVideoMediaController extends DwMediaEngineController {
   });
 
   VideoPlayerController? _controller;
-  bool _webSoundApplied = false;
-  double _desiredVolume = 1;
+  final ValueNotifier<VideoPlayerController?> _view = ValueNotifier(null);
+  bool _initialized = false;
+  bool _failureReported = false;
 
-  /// The underlying controller, once [engineLoad] completes — `null` before
-  /// that and after [engineDispose]. `DwVideoSurface` reads this through
-  /// `DwMediaSession.videoController`.
-  VideoPlayerController? get videoController => _controller;
+  /// The `video_player` controller to draw, once it has initialized — what
+  /// `DwVideoSurface` renders. `null` while loading, and between a retry
+  /// dropping the old one and the new one initializing.
+  ValueListenable<VideoPlayerController?> get videoController => _view;
 
   @override
   Future<void> engineLoad(Uri uri) async {
     final previous = _controller;
     _controller = null;
+    _view.value = null;
     if (previous != null) {
-      previous.removeListener(_onUpdate);
-      await previous.dispose();
+      previous.removeListener(_onValue);
+      unawaited(_disposeAfterFrame(previous));
     }
-    final muteForWeb = kIsWeb && options.webMutedStart;
     final controller = VideoPlayerController.networkUrl(
       uri,
-      videoPlayerOptions: VideoPlayerOptions(allowBackgroundPlayback: false),
+      videoPlayerOptions: VideoPlayerOptions(
+        allowBackgroundPlayback: true,
+        preventsDisplaySleepDuringVideoPlayback: options.wakelockWhilePlaying,
+      ),
     );
     _controller = controller;
-    _webSoundApplied = !muteForWeb;
-    controller.addListener(_onUpdate);
-    if (muteForWeb) await controller.setVolume(0);
+    _initialized = false;
+    _failureReported = false;
+    controller.addListener(_onValue);
     await controller.initialize();
-    _onUpdate();
+    if (!identical(_controller, controller)) return;
+    _initialized = true;
+    _view.value = controller;
+    _onValue();
   }
 
-  void _onUpdate() {
+  /// On the web the video is a platform view: disposing its controller while
+  /// the view is still in the tree throws in the browser. The surface drops
+  /// the view on the frame after [_view] clears, and the controller goes
+  /// after that frame.
+  Future<void> _disposeAfterFrame(VideoPlayerController controller) async {
+    try {
+      await controller.pause();
+    } catch (_) {
+      // Pausing a controller on its way out: a failure changes nothing.
+    }
+    await SchedulerBinding.instance.endOfFrame;
+    await controller.dispose();
+  }
+
+  void _onValue() {
     final controller = _controller;
     if (controller == null) return;
     final value = controller.value;
     if (value.hasError) {
-      handleError(value.errorDescription ?? 'video playback error');
+      // A failure during `initialize()` throws from `engineLoad` and is
+      // reported there; this is the failure of a video already playing.
+      if (_initialized && !_failureReported) {
+        _failureReported = true;
+        reportFailure(value.errorDescription ?? 'video playback failed');
+      }
       return;
     }
-    if (kIsWeb && value.isPlaying && !_webSoundApplied) {
-      _webSoundApplied = true;
-      unawaited(controller.setVolume(_desiredVolume));
-    }
-    if (value.isCompleted) markReachedEnd();
-    unawaited(
-      DwWakelockCoordinator.instance.setWants(
-        this,
-        value.isPlaying && options.wakelockWhilePlaying,
-      ),
+    DwWakelockCoordinator.instance.setWants(
+      this,
+      value.isPlaying && options.wakelockWhilePlaying,
     );
     updateState(
       (current) => current.copyWith(
@@ -99,16 +111,12 @@ final class DwVideoMediaController extends DwMediaEngineController {
         buffered: value.buffered.isEmpty
             ? Duration.zero
             : value.buffered.last.end,
-        speed: value.playbackSpeed,
-        volume: _desiredVolume,
       ),
     );
   }
 
   @override
-  Future<void> enginePlay() async {
-    await _controller?.play();
-  }
+  Future<void> enginePlay() async => _controller?.play();
 
   @override
   Future<void> enginePause() async => _controller?.pause();
@@ -122,19 +130,16 @@ final class DwVideoMediaController extends DwMediaEngineController {
       _controller?.setPlaybackSpeed(speed);
 
   @override
-  Future<void> engineSetVolume(double volume) async {
-    _desiredVolume = volume;
-    // Stay muted until the web grants playback — see class docs.
-    if (kIsWeb && !_webSoundApplied) return;
-    await _controller?.setVolume(volume);
-  }
+  Future<void> engineSetVolume(double volume) async =>
+      _controller?.setVolume(volume);
 
   @override
   Future<void> engineDispose() async {
     final controller = _controller;
     _controller = null;
-    controller?.removeListener(_onUpdate);
-    await DwWakelockCoordinator.instance.setWants(this, false);
+    _view.value = null;
+    controller?.removeListener(_onValue);
+    DwWakelockCoordinator.instance.setWants(this, false);
     await controller?.dispose();
   }
 }

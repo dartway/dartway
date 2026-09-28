@@ -1,12 +1,12 @@
+import 'dart:async';
+
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-/// Refcounts every `DwVideoMediaController` that currently wants the screen
-/// kept awake (`DwMediaConfig.wakelockWhilePlaying`), so
-/// `WakelockPlus.toggle` is called only on the 0→1 and 1→0 transitions even
-/// with several video sessions open at once.
-///
-/// A test substitutes `wakelockPlusPlatformInstance` from `package:wakelock_plus/wakelock_plus.dart`
-/// rather than this class — there is nothing DartWay-specific to fake here.
+/// Holds the screen on while any video controller wants it
+/// (`DwMediaConfig.wakelockWhilePlaying`), calling `wakelock_plus` only on
+/// the first want and after the last: two sessions playing at once
+/// (`singleActiveItem: false`) must not have one's pause release the other's
+/// lock. Internal to the package.
 final class DwWakelockCoordinator {
   DwWakelockCoordinator._();
 
@@ -14,8 +14,10 @@ final class DwWakelockCoordinator {
 
   final Set<Object> _wanters = {};
 
-  /// Whether [owner] currently wants the wakelock held.
-  Future<void> setWants(Object owner, bool wants) async {
+  /// Records whether [owner] wants the screen on. Never waits on the
+  /// platform, and a platform without the plugin (a widget test) changes
+  /// nothing but the lock itself.
+  void setWants(Object owner, bool wants) {
     final before = _wanters.isNotEmpty;
     if (wants) {
       _wanters.add(owner);
@@ -24,11 +26,10 @@ final class DwWakelockCoordinator {
     }
     final after = _wanters.isNotEmpty;
     if (before == after) return;
-    await WakelockPlus.toggle(enable: after);
+    unawaited(
+      WakelockPlus.toggle(enable: after).catchError((Object _) {
+        // No wakelock on this platform: playback goes on regardless.
+      }),
+    );
   }
-
-  /// Test-only: drops every wanter without calling [WakelockPlus.toggle] —
-  /// tests that create controllers without awaiting `dispose` would otherwise
-  /// leak a "wants" entry into the next test.
-  void resetForTest() => _wanters.clear();
 }

@@ -1,39 +1,83 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
-import '../session/dw_media_session.dart';
+import '../session/dw_media_session_manager.dart';
 
-/// Pushes [session] into its own fullscreen route — own route, no chewie,
-/// per `dartway/dartway#372`. [builder] is the app's own fullscreen player
-/// widget (video surface + controls); it renders whichever item [session] is
-/// currently on, so the queue advancing while fullscreen
-/// (`DwMediaConfig.keepFullscreenAcrossItems`) needs no action here — the
-/// route stays mounted and `builder` re-renders through `session`'s own
-/// listenables.
+/// Wraps the inline player of a page and puts [session] fullscreen whenever
+/// it asks to be: pushes a [DwMediaFullscreenRoute] onto the root navigator
+/// when `session.isFullscreen` turns `true` — by `enterFullscreen()`, by
+/// `autoEnterFullscreenOnPlay`, already `true` when the page is built — and
+/// the route leaves when it turns `false`. One way in, whoever asks.
 ///
-/// Does nothing when `session.options.fullscreen` is off.
-Future<void> showDwMediaFullscreen(
-  BuildContext context, {
-  required DwMediaSession session,
-  required WidgetBuilder builder,
-}) async {
-  if (!session.options.fullscreen) return;
-  final navigator = Navigator.of(context, rootNavigator: true);
-  session.isFullscreen.value = true;
-  final orientations = session.options.fullscreenOrientations;
-  if (orientations.isNotEmpty) {
-    await SystemChrome.setPreferredOrientations(orientations);
-  }
-  await navigator.push<void>(
-    DwMediaFullscreenRoute(session: session, builder: builder),
-  );
+/// [builder] draws the fullscreen page (the project's surface and controls);
+/// [child] is what the page shows inline.
+final class DwMediaFullscreenHost extends StatefulWidget {
+  const DwMediaFullscreenHost({
+    super.key,
+    required this.session,
+    required this.builder,
+    required this.child,
+  });
+
+  final DwMediaSession session;
+  final WidgetBuilder builder;
+  final Widget child;
+
+  @override
+  State<DwMediaFullscreenHost> createState() => _DwMediaFullscreenHostState();
 }
 
-/// The route [showDwMediaFullscreen] pushes. Exposed for a project that wants
-/// to push it itself (a custom transition, a nested navigator) rather than
-/// through the helper function.
+final class _DwMediaFullscreenHostState extends State<DwMediaFullscreenHost> {
+  DwMediaFullscreenRoute? _route;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.session.isFullscreen.addListener(_sync);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+  }
+
+  @override
+  void didUpdateWidget(DwMediaFullscreenHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.session, widget.session)) return;
+    oldWidget.session.isFullscreen.removeListener(_sync);
+    widget.session.isFullscreen.addListener(_sync);
+    _sync();
+  }
+
+  void _sync() {
+    final session = widget.session;
+    if (!mounted || _route != null || !session.isFullscreen.value) return;
+    final route = DwMediaFullscreenRoute(
+      session: session,
+      builder: widget.builder,
+    );
+    _route = route;
+    unawaited(
+      Navigator.of(context, rootNavigator: true).push(route).whenComplete(() {
+        if (identical(_route, route)) _route = null;
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    widget.session.isFullscreen.removeListener(_sync);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// The fullscreen route: sets `DwMediaConfig.fullscreenOrientations` while it
+/// stands and `exitOrientations` when it goes, and keeps
+/// `session.isFullscreen` true to its presence — a back gesture ends
+/// fullscreen, `session.exitFullscreen()` pops the route. Pushed by
+/// [DwMediaFullscreenHost].
 final class DwMediaFullscreenRoute extends PageRoute<void> {
   DwMediaFullscreenRoute({required this.session, required this.builder});
 
@@ -42,9 +86,6 @@ final class DwMediaFullscreenRoute extends PageRoute<void> {
 
   @override
   bool get opaque => true;
-
-  @override
-  bool get barrierDismissible => false;
 
   @override
   Color? get barrierColor => null;
@@ -63,7 +104,7 @@ final class DwMediaFullscreenRoute extends PageRoute<void> {
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
-  ) => _DwMediaFullscreenWatcher(
+  ) => _FullscreenPresence(
     session: session,
     child: Builder(builder: builder),
   );
@@ -77,40 +118,46 @@ final class DwMediaFullscreenRoute extends PageRoute<void> {
   ) => FadeTransition(opacity: animation, child: child);
 }
 
-/// Restores orientation and flips `session.isFullscreen` back to `false`
-/// exactly once, on `dispose` — reached the same way whether fullscreen ends
-/// by a system back gesture, `Navigator.pop`, or the app calling
-/// `session.exitFullscreen()` while this route is still current (the
-/// listener below then pops it).
-final class _DwMediaFullscreenWatcher extends StatefulWidget {
-  const _DwMediaFullscreenWatcher({required this.session, required this.child});
+final class _FullscreenPresence extends StatefulWidget {
+  const _FullscreenPresence({required this.session, required this.child});
 
   final DwMediaSession session;
   final Widget child;
 
   @override
-  State<_DwMediaFullscreenWatcher> createState() =>
-      _DwMediaFullscreenWatcherState();
+  State<_FullscreenPresence> createState() => _FullscreenPresenceState();
 }
 
-final class _DwMediaFullscreenWatcherState
-    extends State<_DwMediaFullscreenWatcher> {
+final class _FullscreenPresenceState extends State<_FullscreenPresence> {
+  bool _popping = false;
+
   @override
   void initState() {
     super.initState();
-    widget.session.isFullscreen.addListener(_onFullscreenChanged);
+    widget.session.isFullscreen.addListener(_onFullscreen);
+    final orientations = widget.session.options.fullscreenOrientations;
+    if (orientations.isNotEmpty) {
+      unawaited(SystemChrome.setPreferredOrientations(orientations));
+    }
   }
 
-  void _onFullscreenChanged() {
-    if (widget.session.isFullscreen.value) return;
+  void _onFullscreen() {
+    if (widget.session.isFullscreen.value || _popping || !mounted) return;
     final route = ModalRoute.of(context);
-    if (route != null && route.isCurrent) Navigator.of(context).pop();
+    if (route == null || !route.isActive) return;
+    _popping = true;
+    final navigator = Navigator.of(context);
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
   }
 
   @override
   void dispose() {
-    widget.session.isFullscreen.removeListener(_onFullscreenChanged);
-    if (!widget.session.isDisposed) widget.session.isFullscreen.value = false;
+    widget.session.isFullscreen.removeListener(_onFullscreen);
+    widget.session.exitFullscreen();
     unawaited(
       SystemChrome.setPreferredOrientations(
         widget.session.options.exitOrientations,

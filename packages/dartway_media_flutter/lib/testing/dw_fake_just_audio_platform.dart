@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 
 /// `JustAudioPlatform.instance = DwFakeJustAudioPlatform()` — drives
@@ -13,9 +14,7 @@ import 'package:just_audio_platform_interface/just_audio_platform_interface.dart
 /// is what every one of them reports from `load` unless the test overwrites
 /// its `duration` field first.
 final class DwFakeJustAudioPlatform extends JustAudioPlatform {
-  DwFakeJustAudioPlatform({
-    this.defaultDuration = const Duration(minutes: 1),
-  });
+  DwFakeJustAudioPlatform({this.defaultDuration = const Duration(minutes: 1)});
 
   final Duration defaultDuration;
 
@@ -50,12 +49,24 @@ final class DwFakeAudioPlayerPlatform extends AudioPlayerPlatform {
   /// the test calls `AudioPlayer.setUrl`.
   Duration? duration;
 
-  final _events = StreamController<PlaybackEventMessage>.broadcast();
+  // One single-subscription stream per listener, each cancelling with a
+  // future of the test's own zone — see `DwFakeVideoPlayerPlatform` on why a
+  // broadcast stream would hang `AudioPlayer.dispose` inside `testWidgets`.
+  final List<StreamController<PlaybackEventMessage>> _listeners = [];
   Duration _position = Duration.zero;
 
   @override
-  Stream<PlaybackEventMessage> get playbackEventMessageStream =>
-      _events.stream;
+  Stream<PlaybackEventMessage> get playbackEventMessageStream {
+    late final StreamController<PlaybackEventMessage> controller;
+    controller = StreamController<PlaybackEventMessage>(
+      onCancel: () {
+        _listeners.remove(controller);
+        return Future<void>.value();
+      },
+    );
+    _listeners.add(controller);
+    return controller.stream;
+  }
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
@@ -130,7 +141,10 @@ final class DwFakeAudioPlayerPlatform extends AudioPlayerPlatform {
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
     _emit(ProcessingStateMessage.idle);
-    unawaited(_events.close());
+    for (final listener in List.of(_listeners)) {
+      unawaited(listener.close());
+    }
+    _listeners.clear();
     return DisposeResponse();
   }
 
@@ -145,18 +159,28 @@ final class DwFakeAudioPlayerPlatform extends AudioPlayerPlatform {
     _emit(ProcessingStateMessage.ready);
   }
 
+  /// A failure of a track already loaded — the network dropping mid-play.
+  void emitError(String message) {
+    for (final listener in List.of(_listeners)) {
+      listener.addError(
+        PlatformException(code: 'dw_fake_audio_error', message: message),
+      );
+    }
+  }
+
   void _emit(ProcessingStateMessage state) {
-    _events.add(
-      PlaybackEventMessage(
-        processingState: state,
-        updateTime: DateTime.now(),
-        updatePosition: _position,
-        bufferedPosition: _position,
-        duration: duration,
-        icyMetadata: null,
-        currentIndex: 0,
-        androidAudioSessionId: null,
-      ),
+    final message = PlaybackEventMessage(
+      processingState: state,
+      updateTime: DateTime.now(),
+      updatePosition: _position,
+      bufferedPosition: _position,
+      duration: duration,
+      icyMetadata: null,
+      currentIndex: 0,
+      androidAudioSessionId: null,
     );
+    for (final listener in List.of(_listeners)) {
+      listener.add(message);
+    }
   }
 }

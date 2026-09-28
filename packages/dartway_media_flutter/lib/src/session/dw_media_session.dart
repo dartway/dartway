@@ -1,264 +1,335 @@
-import 'dart:async';
+part of 'dw_media_session_manager.dart';
 
-import 'package:flutter/foundation.dart';
-import 'package:video_player/video_player.dart';
-
-import '../config/dw_media_config.dart';
-import '../controller/dw_media_controller.dart';
-import '../controller/dw_video_media_controller.dart';
-import '../model/dw_media_callbacks.dart';
-import '../model/dw_media_item.dart';
-import 'dw_media_queue_state.dart';
-import 'dw_media_session_manager.dart';
-
-/// A queue, its current controller, fullscreen and minimized state — one
-/// `DwMedia.open()` call. **Survives route changes**: the widget tree can be
-/// torn down and rebuilt (a page popped and pushed again, the mini-player
-/// taking over) without this object being touched, which is what lets
-/// playback continue uninterrupted. Held by `DwMediaSessionManager`, not by
-/// any widget's `State`.
+/// One `DwMedia.open()`: a queue, the controller of its current item, and
+/// whether it is fullscreen or minimized. **Owned by the plugin, not by a
+/// widget**: pages come and go, the mini-player takes over, and the session
+/// plays on untouched. It ends with [dispose] — or with the mini-player's
+/// close, under `DwMediaConfig.miniPlayerCloseStopsPlayback`.
+///
+/// A controls widget reads [playback] (the current item's state, following
+/// the queue), [queue], [isFullscreen] and [minimized], and calls the
+/// commands below; [options] carries the knobs it shows (`speeds`,
+/// `controlsAutoHideDelay`).
 final class DwMediaSession {
   DwMediaSession._({
     required List<DwMediaItem> items,
     required int startIndex,
-    required DwMediaCallbacks appCallbacks,
-    required DwMediaConfig options,
+    required DwMediaCallbacks callbacks,
+    required this.options,
     required DwMediaSessionManager manager,
-  }) : _appCallbacks = appCallbacks,
-       options = options,
+  }) : _callbacks = callbacks,
        _manager = manager,
+       _speed = options.defaultSpeed,
        queue = ValueNotifier(
          DwMediaQueueState(items: items, currentIndex: startIndex),
        ) {
-    _controllerCallbacks = DwMediaCallbacks(
-      onStarted: appCallbacks.onStarted,
-      onProgress: appCallbacks.onProgress,
-      progressInterval: options.progressInterval,
-      onReachedEnd: (item) {
-        appCallbacks.onReachedEnd?.call(item);
-        if (options.autoplayNext) unawaited(next());
-      },
-      onCompleted: appCallbacks.onCompleted,
-      completedThreshold: options.completedThreshold,
-      onError: appCallbacks.onError,
-    );
-    _openCurrent(autoplay: options.autoplayOnOpen);
+    _open(autoplay: options.autoplayOnOpen);
   }
 
-  /// Factory used by `DwMediaSessionManager.open` — not a public constructor,
-  /// since a session is always owned by the manager.
-  static DwMediaSession open({
-    required List<DwMediaItem> items,
-    required int startIndex,
-    required DwMediaCallbacks callbacks,
-    required DwMediaConfig options,
-    required DwMediaSessionManager manager,
-  }) => DwMediaSession._(
-    items: items,
-    startIndex: startIndex,
-    appCallbacks: callbacks,
-    options: options,
-    manager: manager,
-  );
-
-  final DwMediaCallbacks _appCallbacks;
-  late final DwMediaCallbacks _controllerCallbacks;
-
-  /// The resolved settings this session was opened with — read by a controls
-  /// widget for `speeds`, `controlsAutoHideDelay`, and so on.
+  /// The resolved settings: the plugin's `DwMediaConfig` with this open's
+  /// `DwMediaOpenOptions` laid over it.
   final DwMediaConfig options;
 
+  final DwMediaCallbacks _callbacks;
   final DwMediaSessionManager _manager;
 
   final ValueNotifier<DwMediaQueueState> queue;
   final ValueNotifier<bool> isFullscreen = ValueNotifier(false);
 
-  /// Whether `DwMiniPlayerHost` should show this session shrunk down. Set by
-  /// the app's own navigation (`minimize()` on leaving the full player page,
-  /// `restore()` on reopening it) — the plugin has no opinion on routing.
+  /// Shown by `DwMiniPlayerHost` while `true`. The app's navigation sets it:
+  /// [minimize] when the person leaves the player page, [restore] when they
+  /// come back.
   final ValueNotifier<bool> minimized = ValueNotifier(false);
 
-  DwMediaController? _controller;
-  double? _rememberedSpeed;
-  bool? _rememberedMuted;
-  Timer? _previewTimer;
+  final ValueNotifier<DwMediaPlaybackState> _playback = ValueNotifier(
+    const DwMediaPlaybackState(),
+  );
+  final ValueNotifier<VideoPlayerController?> _videoView = ValueNotifier(null);
+
+  late DwMediaController _controller;
+  double _speed;
+  bool _reachedEnd = false;
+  Timer? _countdown;
   bool _disposed = false;
 
   bool get isDisposed => _disposed;
-  DwMediaController get controller => _controller!;
+
+  /// The controller of the current item. It changes when the queue moves —
+  /// a widget that must follow the queue reads [playback] instead.
+  DwMediaController get controller => _controller;
+
   DwMediaItem get currentItem => queue.value.current;
 
-  /// The playing `VideoPlayerController`, when the current item is a video —
-  /// what `DwVideoSurface` renders. `null` for an audio item or before the
-  /// video finishes loading.
-  VideoPlayerController? get videoController {
-    final controller = _controller;
-    return controller is DwVideoMediaController
-        ? controller.videoController
-        : null;
-  }
+  /// The current item's playback state, following the queue from item to
+  /// item — what a controls widget listens to.
+  ValueListenable<DwMediaPlaybackState> get playback => _playback;
 
-  void _openCurrent({required bool autoplay}) {
+  /// The `video_player` controller of the current item once it can be
+  /// drawn, `null` for audio, while loading and after [dispose] — what
+  /// `DwVideoSurface` renders.
+  ValueListenable<VideoPlayerController?> get videoView => _videoView;
+
+  // --- The current item ------------------------------------------------------
+
+  void _open({required bool autoplay}) {
     final item = queue.value.current;
-    _controller = DwMediaController.forItem(
+    _reachedEnd = false;
+    final controller = createDwMediaController(
       item: item,
-      callbacks: _controllerCallbacks,
+      callbacks: DwMediaCallbacks(
+        onStarted: _callbacks.onStarted,
+        onProgress: _callbacks.onProgress,
+        onReachedEnd: (item) {
+          _reachedEnd = true;
+          _callbacks.onReachedEnd?.call(item);
+        },
+        onCompleted: _callbacks.onCompleted,
+        onError: _callbacks.onError,
+      ),
       options: options,
-      initialSpeed: options.rememberSpeedAcrossItems ? _rememberedSpeed : null,
-      initialMuted: options.webRememberSoundChoice ? _rememberedMuted : null,
+      initialSpeed: _speed,
+      initialMuted: _initialMuted(item),
     );
-    _previewTimer?.cancel();
-    if (options.nextPreview || options.autoplayNext) {
-      _previewTimer = Timer.periodic(
-        const Duration(seconds: 1),
-        (_) => _tickPreview(),
-      );
+    _controller = controller;
+    controller.state.addListener(_onPlayback);
+    if (controller is DwVideoMediaController) {
+      controller.videoController.addListener(_onVideoView);
     }
+    _onPlayback();
+    _onVideoView();
     if (autoplay) unawaited(play());
   }
 
-  void _tickPreview() {
-    if (_disposed) return;
+  bool? _initialMuted(DwMediaItem item) {
+    final remembered = options.rememberSound ? _manager._rememberedMuted : null;
+    if (remembered != null) return remembered;
+    if (dwMediaIsWeb &&
+        options.webMutedStart &&
+        item.kind == DwMediaKind.video) {
+      return true;
+    }
+    return null;
+  }
+
+  void _detach(DwMediaController controller) {
+    controller.state.removeListener(_onPlayback);
+    if (controller is DwVideoMediaController) {
+      controller.videoController.removeListener(_onVideoView);
+    }
+  }
+
+  void _onVideoView() {
+    final controller = _controller;
+    _videoView.value = controller is DwVideoMediaController
+        ? controller.videoController.value
+        : null;
+  }
+
+  void _onPlayback() {
+    final previous = _playback.value;
+    final next = _controller.state.value;
+    _playback.value = next;
+    if (next.isEnded && !previous.isEnded && _reachedEnd) _onEnded();
+    _updatePreview(next);
+  }
+
+  void _updatePreview(DwMediaPlaybackState playback) {
     final current = queue.value;
-    final playback = _controller?.state.value;
-    if (playback == null || !current.hasNext || playback.duration <= Duration.zero) {
-      if (current.showNextPreview || current.autoplayCountdownSeconds != null) {
-        queue.value = current.copyWith(
-          showNextPreview: false,
-          autoplayCountdownSeconds: null,
-        );
-      }
+    final remaining = playback.duration - playback.position;
+    final show =
+        _countdown != null ||
+        (options.nextPreview &&
+            current.hasNext &&
+            playback.duration > Duration.zero &&
+            remaining <= options.nextPreviewLeadTime);
+    if (show != current.showNextPreview) {
+      queue.value = current.copyWith(showNextPreview: show);
+    }
+  }
+
+  // --- Autoplay ------------------------------------------------------------
+
+  void _onEnded() {
+    if (!options.autoplayNext || !queue.value.hasNext) return;
+    if (!options.autoplayCountdown ||
+        options.autoplayCountdownDuration <= Duration.zero) {
+      unawaited(next());
       return;
     }
-    final remaining = playback.duration - playback.position;
-    final showPreview =
-        options.nextPreview && remaining <= options.nextPreviewLeadTime;
-    int? countdown;
-    if (options.autoplayNext &&
-        options.autoplayCountdown &&
-        remaining <= options.autoplayCountdownDuration) {
-      countdown = remaining.inSeconds.clamp(
-        0,
-        options.autoplayCountdownDuration.inSeconds,
-      );
-    }
-    if (showPreview != current.showNextPreview ||
-        countdown != current.autoplayCountdownSeconds) {
-      queue.value = current.copyWith(
-        showNextPreview: showPreview,
-        autoplayCountdownSeconds: countdown,
-      );
-    }
+    var left = options.autoplayCountdownDuration;
+    queue.value = queue.value.copyWith(
+      showNextPreview: true,
+      autoplayCountdown: () => left,
+    );
+    _countdown = Timer.periodic(const Duration(seconds: 1), (timer) {
+      left -= const Duration(seconds: 1);
+      if (left > Duration.zero) {
+        queue.value = queue.value.copyWith(autoplayCountdown: () => left);
+        return;
+      }
+      _countdown = null;
+      timer.cancel();
+      unawaited(next());
+    });
   }
 
-  // --- Playback delegated to the current controller ------------------------
+  /// Stops a running autoplay countdown; the queue stays on this item.
+  void cancelAutoplay() {
+    if (_countdown == null) return;
+    _countdown?.cancel();
+    _countdown = null;
+    queue.value = queue.value.copyWith(autoplayCountdown: () => null);
+    _updatePreview(_playback.value);
+  }
 
+  // --- Commands --------------------------------------------------------------
+
+  /// Plays the current item. Pauses every other session first under
+  /// `singleActiveItem`, and goes fullscreen under
+  /// `autoEnterFullscreenOnPlay`.
   Future<void> play() async {
     if (_disposed) return;
-    if (options.singleActiveItem) _manager.claimActive(this);
+    cancelAutoplay();
+    _manager._claim(this);
     if (options.autoEnterFullscreenOnPlay &&
-        currentItem.kind == DwMediaKind.video &&
-        options.fullscreen) {
-      isFullscreen.value = true;
+        currentItem.kind == DwMediaKind.video) {
+      enterFullscreen();
     }
-    await controller.play();
+    await _controller.play();
   }
 
-  Future<void> pause() => _disposed ? Future.value() : controller.pause();
+  Future<void> pause() async {
+    if (_disposed) return;
+    await _controller.pause();
+  }
 
-  Future<void> seek(Duration position) =>
-      _disposed ? Future.value() : controller.seek(position);
+  Future<void> seek(Duration position) async {
+    if (_disposed) return;
+    cancelAutoplay();
+    await _controller.seek(position);
+  }
 
-  Future<void> skipBack() =>
-      _disposed ? Future.value() : controller.skip(-options.skipBack);
+  Future<void> skipBack() => seek(_playback.value.position - options.skipBack);
 
   Future<void> skipForward() =>
-      _disposed ? Future.value() : controller.skip(options.skipForward);
+      seek(_playback.value.position + options.skipForward);
 
+  /// Sets the speed of the current item — and of the items after it, under
+  /// `rememberSpeedAcrossItems`.
   Future<void> setSpeed(double speed) async {
     if (_disposed) return;
-    _rememberedSpeed = speed;
-    await controller.setSpeed(speed);
+    if (options.rememberSpeedAcrossItems) _speed = speed;
+    await _controller.setSpeed(speed);
   }
 
+  /// Mutes or unmutes — and, under `rememberSound`, every item opened after
+  /// this, in any session.
   Future<void> setMuted(bool muted) async {
     if (_disposed) return;
-    _rememberedMuted = muted;
-    await controller.setMuted(muted);
+    if (options.rememberSound) _manager._rememberedMuted = muted;
+    await _controller.setMuted(muted);
   }
 
-  Future<void> setVolume(double volume) => controller.setVolume(volume);
+  Future<void> setVolume(double volume) async {
+    if (_disposed) return;
+    await _controller.setVolume(volume);
+  }
 
-  Future<void> retry() => controller.retry();
+  Future<void> retry() async {
+    if (_disposed) return;
+    await _controller.retry();
+  }
 
-  // --- Queue -----------------------------------------------------------
+  // --- Queue ---------------------------------------------------------------
 
-  Future<void> next({bool autoplay = true}) => _disposed || !queue.value.hasNext
-      ? Future.value()
-      : _advanceTo(queue.value.currentIndex + 1, autoplay: autoplay);
+  Future<void> next({bool autoplay = true}) async {
+    if (_disposed || !queue.value.hasNext) return;
+    await _moveTo(queue.value.currentIndex + 1, autoplay: autoplay);
+  }
 
-  Future<void> previous({bool autoplay = true}) =>
-      _disposed || !queue.value.hasPrevious
-      ? Future.value()
-      : _advanceTo(queue.value.currentIndex - 1, autoplay: autoplay);
+  Future<void> previous({bool autoplay = true}) async {
+    if (_disposed || !queue.value.hasPrevious) return;
+    await _moveTo(queue.value.currentIndex - 1, autoplay: autoplay);
+  }
 
-  Future<void> jumpTo(int index, {bool autoplay = true}) =>
-      _disposed || index < 0 || index >= queue.value.items.length
-      ? Future.value()
-      : _advanceTo(index, autoplay: autoplay);
+  Future<void> jumpTo(int index, {bool autoplay = true}) async {
+    if (_disposed || index < 0 || index >= queue.value.items.length) return;
+    await _moveTo(index, autoplay: autoplay);
+  }
 
-  Future<void> _advanceTo(int index, {required bool autoplay}) async {
+  Future<void> _moveTo(int index, {required bool autoplay}) async {
+    cancelAutoplay();
     final old = _controller;
-    _rememberedSpeed = old?.state.value.speed ?? _rememberedSpeed;
-    _rememberedMuted = old?.state.value.muted ?? _rememberedMuted;
-    await old?.dispose();
+    _detach(old);
     queue.value = queue.value.copyWith(
       currentIndex: index,
       showNextPreview: false,
-      autoplayCountdownSeconds: null,
+      autoplayCountdown: () => null,
     );
     if (isFullscreen.value && !options.keepFullscreenAcrossItems) {
       isFullscreen.value = false;
     }
-    _openCurrent(autoplay: autoplay);
-    _appCallbacks.onItemChanged?.call(queue.value.current);
+    _open(autoplay: autoplay);
+    _callbacks.onItemChanged?.call(currentItem);
+    unawaited(_disposeAfterFrame(old));
   }
 
-  // --- Fullscreen / mini-player --------------------------------------------
+  /// The old item's video view leaves the tree on the next frame; its engine
+  /// goes after that — on the web, disposing a video whose element is still
+  /// on the page throws in the browser.
+  static Future<void> _disposeAfterFrame(DwMediaController controller) async {
+    await SchedulerBinding.instance.endOfFrame;
+    await controller.dispose();
+  }
 
+  // --- Fullscreen and the mini-player --------------------------------------
+
+  /// Goes fullscreen — `DwMediaFullscreenHost` pushes the route. Does
+  /// nothing with `DwMediaConfig.fullscreen` off.
   void enterFullscreen() {
-    if (options.fullscreen) isFullscreen.value = true;
+    if (!_disposed && options.fullscreen) isFullscreen.value = true;
   }
 
-  void exitFullscreen() => isFullscreen.value = false;
+  void exitFullscreen() {
+    if (!_disposed) isFullscreen.value = false;
+  }
 
+  /// Hands the session to `DwMiniPlayerHost`. Does nothing with
+  /// `DwMediaConfig.miniPlayer` off.
   void minimize() {
-    if (options.miniPlayer) minimized.value = true;
+    if (!_disposed && options.miniPlayer) minimized.value = true;
   }
 
-  void restore() => minimized.value = false;
+  void restore() {
+    if (!_disposed) minimized.value = false;
+  }
 
-  /// What `DwMiniPlayerHost`'s close control calls —
-  /// `options.miniPlayerCloseStopsPlayback` decides whether that stops the
-  /// session outright or only pauses and hides it.
+  /// The mini-player's close: ends the session under
+  /// `miniPlayerCloseStopsPlayback`, otherwise pauses and hides it.
   Future<void> closeFromMiniPlayer() async {
+    if (_disposed) return;
     if (options.miniPlayerCloseStopsPlayback) {
       await dispose();
-    } else {
-      await pause();
-      minimized.value = false;
-      _manager.forget(this);
+      return;
     }
+    minimized.value = false;
+    _manager._release(this);
+    await pause();
   }
 
+  /// Ends the session: saves under `saveOnDispose`, drops the video view,
+  /// and releases the engine after the next frame.
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    _previewTimer?.cancel();
-    await _controller?.dispose();
-    _manager.onSessionDisposed(this);
-    queue.dispose();
-    isFullscreen.dispose();
-    minimized.dispose();
+    _countdown?.cancel();
+    _countdown = null;
+    final controller = _controller;
+    _detach(controller);
+    _videoView.value = null;
+    isFullscreen.value = false;
+    minimized.value = false;
+    _manager._remove(this);
+    unawaited(_disposeAfterFrame(controller));
   }
 }

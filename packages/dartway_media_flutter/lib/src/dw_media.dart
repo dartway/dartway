@@ -6,42 +6,39 @@ import 'package:flutter/widgets.dart';
 import 'config/dw_media_config.dart';
 import 'model/dw_media_callbacks.dart';
 import 'model/dw_media_item.dart';
-import 'session/dw_media_session.dart';
 import 'session/dw_media_session_manager.dart';
 
-/// A video/audio player for a DartWay app — `dw.plugins.media`.
+/// Video and audio for a DartWay app — `dw.plugins.media`.
 ///
-/// Mechanism only: no colours, no icons, no built-in controls (see
-/// `docs/3-flutter/ui-kit.md` on why DartWay ships no design). The default
-/// controls a project actually shows live in its own `ui_kit/` — copy them
-/// from `example/` (the `dartway-media` toolkit skill walks through it) and
-/// restyle them; this package only makes them possible.
+/// Mechanism only: no colours, no icons, no text, no built-in controls. The
+/// controls a project shows are its own widgets, copied from `example/`'s
+/// `ui_kit/3_special/media/` (the `dartway-media` toolkit skill walks
+/// through it).
 ///
 /// ```dart
-/// dw = DwFlutterToolbox(
-///   plugins: [DwMedia(config: DwMediaConfig(speeds: [1.0, 1.5, 2.0]))],
-/// );
+/// DwFlutterToolbox(plugins: [DwMedia(config: DwMediaConfig(speeds: [1, 1.5, 2]))]);
 ///
 /// final session = dw.plugins.media.open(
-///   items: [DwMediaItem(id: 'lesson-1', kind: DwMediaKind.video, source: DwMediaSource.url(url))],
+///   items: [DwMediaItem(id: 'intro', kind: DwMediaKind.video, source: DwMediaSource.url(url))],
 /// );
 /// ```
 ///
-/// **The plugin owns the session**, not the widget that opened it: a
-/// `DwMediaSession` survives the widget tree being torn down and rebuilt,
-/// which is what lets the mini-player and fullscreen keep playing without
-/// reloading. `DwMediaSessionManager.active` is what `DwMiniPlayerHost`
-/// watches.
+/// **The plugin owns the sessions**, not the widgets that opened them, which
+/// is what lets playback survive navigation, the mini-player and fullscreen.
+/// It also applies the background rules to every open session: on the app
+/// going to the background (`hidden`, `paused`, `detached` — never
+/// `inactive`, which a system dialog or a permission prompt raises too) it
+/// saves positions under `DwMediaResumePolicy.saveOnBackground` and pauses
+/// under `pauseVideoInBackground` / `backgroundAudio`. Coming back resumes
+/// nothing on its own.
 final class DwMedia extends DwFlutterPlugin with WidgetsBindingObserver {
-  DwMedia({this.config = const DwMediaConfig()});
+  DwMedia({this.config = const DwMediaConfig()})
+    : sessionManager = DwMediaSessionManager(config: config);
 
-  /// The project-wide default — every field also overridable per
-  /// [open] with a [DwMediaOpenOptions].
+  /// The project-wide defaults, each overridable per [open].
   final DwMediaConfig config;
 
-  late final DwMediaSessionManager sessionManager = DwMediaSessionManager(
-    config: config,
-  );
+  final DwMediaSessionManager sessionManager;
 
   @override
   bool get blocksStartup => false;
@@ -64,32 +61,14 @@ final class DwMedia extends DwFlutterPlugin with WidgetsBindingObserver {
     options: options,
   );
 
-  /// Pauses on the app going to the background — `paused`/`hidden`/
-  /// `detached` — never on `inactive`: it fires for a system dialog, an
-  /// incoming call banner or entering the OS's own fullscreen transition, and
-  /// pausing on it broke a project's fullscreen video in practice (see
-  /// `docs/3-flutter/media.md`). `resumed` does not auto-resume — the app
-  /// decides that, same as "resume or start over" on open.
-  ///
-  /// Applied to every open session (`DwMediaConfig.pauseVideoInBackground`,
-  /// `backgroundAudio`), not only the active one — a project with several
-  /// sessions open (`singleActiveItem: false`) wants every video paused in
-  /// the background, not just the foreground one.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
-      case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
       case AppLifecycleState.detached:
         for (final session in sessionManager.sessions) {
-          if (session.isDisposed) continue;
-          if (!session.controller.state.value.isPlaying) continue;
-          final item = session.currentItem;
-          final shouldPause = switch (item.kind) {
-            DwMediaKind.video => session.options.pauseVideoInBackground,
-            DwMediaKind.audio => !session.options.backgroundAudio,
-          };
-          if (shouldPause) unawaited(session.pause());
+          _toBackground(session);
         }
       case AppLifecycleState.resumed:
       case AppLifecycleState.inactive:
@@ -97,6 +76,21 @@ final class DwMedia extends DwFlutterPlugin with WidgetsBindingObserver {
     }
   }
 
+  void _toBackground(DwMediaSession session) {
+    if (session.isDisposed) return;
+    final options = session.options;
+    if (options.resume?.saveOnBackground ?? false) {
+      unawaited(session.controller.savePosition());
+    }
+    if (!session.playback.value.isPlaying) return;
+    final pause = switch (session.currentItem.kind) {
+      DwMediaKind.video => options.pauseVideoInBackground,
+      DwMediaKind.audio => !options.backgroundAudio,
+    };
+    if (pause) unawaited(session.pause());
+  }
+
+  /// Ends every session and stops watching the app's lifecycle.
   Future<void> dispose() async {
     WidgetsBinding.instance.removeObserver(this);
     await sessionManager.dispose();

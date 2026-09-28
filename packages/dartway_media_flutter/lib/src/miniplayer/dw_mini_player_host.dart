@@ -4,7 +4,6 @@ import 'package:flutter/widgets.dart';
 
 import '../config/dw_media_config.dart';
 import '../model/dw_media_item.dart';
-import '../session/dw_media_session.dart';
 import '../session/dw_media_session_manager.dart';
 
 /// Builds the mini-player's chrome — look and content only, no mechanics.
@@ -106,7 +105,8 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
         },
         onScaleUpdate: (details) {
           setState(() {
-            _position = (_position ?? _dragStartPosition) + details.focalPointDelta;
+            _position =
+                (_position ?? _dragStartPosition) + details.focalPointDelta;
             _scale = (_scaleAtGestureStart * details.scale).clamp(
               options.miniPlayerMinScale,
               options.miniPlayerMaxScale,
@@ -114,15 +114,10 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
           });
         },
         onScaleEnd: (_) => _snapToEdge(session, screenSize, size),
-        child: widget.builder(
-          context,
-          session,
-          () {
-            session.restore();
-            widget.onExpand(session.currentItem);
-          },
-          () => unawaited(session.closeFromMiniPlayer()),
-        ),
+        child: widget.builder(context, session, () {
+          session.restore();
+          widget.onExpand(session.currentItem);
+        }, () => unawaited(session.closeFromMiniPlayer())),
       ),
     );
   }

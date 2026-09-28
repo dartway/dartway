@@ -8,19 +8,14 @@
 library;
 
 export 'src/config/dw_media_config.dart';
-export 'src/controller/dw_audio_media_controller.dart';
 export 'src/controller/dw_media_controller.dart';
-export 'src/controller/dw_media_engine_controller.dart' show DwMediaEngineController;
-export 'src/controller/dw_video_media_controller.dart';
 export 'src/dw_media.dart';
 export 'src/fullscreen/dw_media_fullscreen_route.dart';
-export 'src/lifecycle/dw_media_wakelock.dart';
 export 'src/miniplayer/dw_mini_player_host.dart';
 export 'src/model/dw_media_callbacks.dart';
 export 'src/model/dw_media_item.dart';
 export 'src/model/dw_media_playback_state.dart';
 export 'src/resume/dw_media_position_store.dart';
 export 'src/session/dw_media_queue_state.dart';
-export 'src/session/dw_media_session.dart';
 export 'src/session/dw_media_session_manager.dart';
 export 'src/widgets/dw_video_surface.dart';

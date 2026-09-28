@@ -1,11 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import '../config/dw_media_config.dart';
-import '../model/dw_media_callbacks.dart';
 import '../model/dw_media_item.dart';
 import '../model/dw_media_playback_state.dart';
-import 'dw_audio_media_controller.dart';
-import 'dw_video_media_controller.dart';
 
 /// One controller API over both engines — a controls widget is written once
 /// against this type and works for a video item and an audio item alike.
@@ -17,43 +13,13 @@ import 'dw_video_media_controller.dart';
 abstract class DwMediaController {
   const DwMediaController();
 
-  /// Builds the right engine for `item.kind` — used by `DwMediaSession`, not
-  /// normally called directly by app code. [options] is the session's already
-  /// resolved [DwMediaConfig] (`DwMediaConfig.merge`), never the sparse
-  /// per-open override.
-  factory DwMediaController.forItem({
-    required DwMediaItem item,
-    required DwMediaCallbacks callbacks,
-    required DwMediaConfig options,
-    double? initialSpeed,
-    bool? initialMuted,
-  }) {
-    return switch (item.kind) {
-      DwMediaKind.video => DwVideoMediaController(
-        item: item,
-        callbacks: callbacks,
-        options: options,
-        initialSpeed: initialSpeed,
-        initialMuted: initialMuted,
-      ),
-      DwMediaKind.audio => DwAudioMediaController(
-        item: item,
-        callbacks: callbacks,
-        options: options,
-        initialSpeed: initialSpeed,
-        initialMuted: initialMuted,
-      ),
-    };
-  }
-
   DwMediaItem get item;
 
   ValueListenable<DwMediaPlaybackState> get state;
 
   Future<void> play();
 
-  /// Pauses and, when a resume policy is set with
-  /// `DwMediaResumePolicy.saveOnLifecycleEvents`, saves the position.
+  /// Pauses and, with `DwMediaResumePolicy.saveOnPause`, saves the position.
   Future<void> pause();
 
   /// Seeks to an absolute [position], clamped to `[0, duration]`.
@@ -72,10 +38,16 @@ abstract class DwMediaController {
   /// Mutes without losing the volume to restore on `setMuted(false)`.
   Future<void> setMuted(bool muted);
 
-  /// Re-resolves `item.source` and reloads — the way an expired signed link
-  /// recovers. Callable from [DwMediaPlayState.error] and at any other time;
-  /// also what `options.autoRetryCount` calls on a load failure.
+  /// Re-resolves `item.source`, reloads, and returns to the position the
+  /// failure left — the way an expired signed link recovers. What the
+  /// retry control of an error state calls, and what
+  /// `DwMediaConfig.autoRetryCount` calls on its own.
   Future<void> retry();
+
+  /// Saves the position now, under the resume policy's rules (`minimum`,
+  /// `clearPastFraction`) — a no-op with resume off. `DwMedia` calls it when
+  /// the app goes to the background (`DwMediaResumePolicy.saveOnBackground`).
+  Future<void> savePosition();
 
   Future<void> dispose();
 }

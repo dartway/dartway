@@ -34,14 +34,23 @@ final class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
 
   @override
   Future<void> dispose(int playerId) async {
-    await _events.remove(playerId)?.close();
+    // Not awaited: a closed stream's done future completes outside a widget
+    // test's fake clock, and `VideoPlayerController.dispose` would never
+    // return inside `testWidgets`.
+    unawaited(_events.remove(playerId)?.close());
     _positions.remove(playerId);
   }
 
   @override
   Future<int?> createWithOptions(VideoCreationOptions options) async {
     final id = _nextPlayerId++;
-    _events[id] = StreamController<VideoEvent>.broadcast();
+    // Single-subscription with an `onCancel` future of the test's own zone:
+    // cancelling a broadcast subscription returns a future bound to the root
+    // zone, which never completes inside `testWidgets` — and
+    // `VideoPlayerController.dispose` awaits exactly that cancel.
+    _events[id] = StreamController<VideoEvent>(
+      onCancel: () => Future<void>.value(),
+    );
     _positions[id] = Duration.zero;
     return id;
   }
@@ -102,7 +111,9 @@ final class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
   }
 
   void emitBufferingStart(int playerId) {
-    _events[playerId]!.add(VideoEvent(eventType: VideoEventType.bufferingStart));
+    _events[playerId]!.add(
+      VideoEvent(eventType: VideoEventType.bufferingStart),
+    );
   }
 
   void emitBufferingEnd(int playerId) {
