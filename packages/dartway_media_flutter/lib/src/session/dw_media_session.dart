@@ -303,13 +303,26 @@ final class DwMediaSession {
   }
 
   /// Hands the session to `DwMiniPlayerHost`. Does nothing with
-  /// `DwMediaConfig.miniPlayer` off.
+  /// `DwMediaConfig.miniPlayer` off. Safe to call from a page's
+  /// `State.dispose`, where the change waits for the end of the frame.
   void minimize() {
-    if (!_disposed && options.miniPlayer) minimized.value = true;
+    if (options.miniPlayer) _setMinimized(true);
   }
 
-  void restore() {
-    if (!_disposed) minimized.value = false;
+  /// Takes the session back from the mini-player — the player page coming
+  /// back. Safe from `initState` and `dispose` alike.
+  void restore() => _setMinimized(false);
+
+  void _setMinimized(bool value) {
+    if (_disposed) return;
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      scheduler.addPostFrameCallback((_) {
+        if (!_disposed) minimized.value = value;
+      });
+      return;
+    }
+    minimized.value = value;
   }
 
   /// The mini-player's close: ends the session under

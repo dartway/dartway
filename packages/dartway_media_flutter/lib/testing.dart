@@ -4,10 +4,13 @@
 ///
 /// ```dart
 /// setUp(() {
-///   VideoPlayerPlatform.instance = DwFakeVideoPlayerPlatform();
-///   JustAudioPlatform.instance = DwFakeJustAudioPlatform();
+///   DwFakeVideoPlayerPlatform.install();
+///   DwFakeJustAudioPlatform.install();
 /// });
 /// ```
+///
+/// Inside `testWidgets`, let the engines finish with `dwSettleMedia(tester)`
+/// where a bare `pump` would leave an audio item loading.
 library;
 
 export 'testing/dw_fake_just_audio_platform.dart';

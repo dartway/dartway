@@ -12,6 +12,16 @@ import 'package:just_audio_platform_interface/just_audio_platform_interface.dart
 base class DwFakeJustAudioPlatform extends JustAudioPlatform {
   DwFakeJustAudioPlatform({this.defaultDuration = const Duration(minutes: 1)});
 
+  /// Builds a fake and makes it `JustAudioPlatform.instance` — a project's
+  /// test calls this in `setUp` without depending on the platform interface.
+  static DwFakeJustAudioPlatform install({
+    Duration defaultDuration = const Duration(minutes: 1),
+  }) {
+    final fake = DwFakeJustAudioPlatform(defaultDuration: defaultDuration);
+    JustAudioPlatform.instance = fake;
+    return fake;
+  }
+
   final Duration defaultDuration;
 
   /// Every player created so far, keyed by the id `just_audio` assigned it —

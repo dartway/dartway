@@ -32,6 +32,20 @@ base class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
     this.initializeOnCreate = true,
   });
 
+  /// Builds a fake and makes it `VideoPlayerPlatform.instance` — a project's
+  /// test calls this in `setUp` without depending on the platform interface.
+  static DwFakeVideoPlayerPlatform install({
+    Duration defaultDuration = const Duration(minutes: 1),
+    bool initializeOnCreate = true,
+  }) {
+    final fake = DwFakeVideoPlayerPlatform(
+      defaultDuration: defaultDuration,
+      initializeOnCreate: initializeOnCreate,
+    );
+    VideoPlayerPlatform.instance = fake;
+    return fake;
+  }
+
   /// The duration a player reports under [initializeOnCreate] — settable
   /// between loads.
   Duration defaultDuration;

@@ -70,25 +70,28 @@ class _WorkoutsPageState extends State<WorkoutsPage> {
         children: [
           if (session != null) AppMediaPlayer(session: session),
           Expanded(
-            child: ListView(
-              children: [
-                for (final (index, workout) in workoutCatalog.indexed)
-                  ListTile(
-                    leading: Icon(
-                      workout.kind == DwMediaKind.video
-                          ? Icons.ondemand_video
-                          : Icons.headphones,
+            child: ListenableBuilder(
+              listenable: Listenable.merge([session?.queue]),
+              builder: (context, _) => ListView(
+                children: [
+                  for (final (index, workout) in workoutCatalog.indexed)
+                    ListTile(
+                      leading: Icon(
+                        workout.kind == DwMediaKind.video
+                            ? Icons.ondemand_video
+                            : Icons.headphones,
+                      ),
+                      title: AppText.body(workout.title ?? ''),
+                      subtitle: AppText.caption(
+                        workout.kind == DwMediaKind.video
+                            ? context.l10n.workoutVideo
+                            : context.l10n.workoutAudio,
+                      ),
+                      selected: session?.currentItem == workout,
+                      onTap: () => _play(index),
                     ),
-                    title: AppText.body(workout.title ?? ''),
-                    subtitle: AppText.caption(
-                      workout.kind == DwMediaKind.video
-                          ? context.l10n.workoutVideo
-                          : context.l10n.workoutAudio,
-                    ),
-                    selected: session?.currentItem == workout,
-                    onTap: () => _play(index),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
