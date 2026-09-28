@@ -27,11 +27,13 @@ final class DwVideoSurface extends StatelessWidget {
           return ListenableBuilder(
             listenable: controller,
             builder: (context, _) {
-              final ratio = controller.value.aspectRatio;
+              // video_player answers 1.0 for a video with no size yet.
+              final value = controller.value;
+              final ratio = value.size.isEmpty
+                  ? session.options.fallbackAspectRatio
+                  : value.aspectRatio;
               return AspectRatio(
-                aspectRatio: ratio > 0
-                    ? ratio
-                    : session.options.fallbackAspectRatio,
+                aspectRatio: ratio,
                 child: VideoPlayer(controller),
               );
             },
