@@ -197,7 +197,7 @@ final class DwMediaSession {
   // --- Autoplay ------------------------------------------------------------
 
   /// Once per ending: the item stands at its end and real playback took it
-  /// there. A seek clears that (`DwMediaController.endedByPlayback`), so a
+  /// there. A seek clears that (the engine's `endedByPlayback`), so a
   /// scrub to the end — before or after a real end — never moves the queue.
   void _maybeAutoplay() {
     if (_disposed || _autoplayHandled) return;

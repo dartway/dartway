@@ -1,4 +1,4 @@
-/// Where a [DwMediaController] keeps "how far into this item was I".
+/// Where a session keeps "how far into this item was I".
 ///
 /// The default, [DwMediaInMemoryPositionStore], forgets on restart — a
 /// project that wants resume across launches gives `DwMediaConfig` a store

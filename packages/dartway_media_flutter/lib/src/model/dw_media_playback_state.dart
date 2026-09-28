@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// Where a [DwMediaController] is in its lifecycle.
+/// Where an item is in its playback.
 enum DwMediaPlayState {
   /// The source is being resolved and the engine is preparing it, or a
   /// failed load waits for its automatic retry.

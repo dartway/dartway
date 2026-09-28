@@ -6,7 +6,7 @@ enum DwMediaKind { video, audio }
 /// How a [DwMediaItem] finds its bytes.
 ///
 /// [DwMediaSource.url] is a plain address. [DwMediaSource.resolve] is called
-/// again on every load **and on every [DwMediaController.retry]** — the shape
+/// again on every load **and on every `DwMediaSession.retry`** — the shape
 /// that turns an expired signed link into a retry rather than a dead end: a
 /// project wraps its own "ask the server for a fresh URL" call and the player
 /// never needs to know the link expires.
@@ -22,7 +22,7 @@ final class DwMediaSource {
   final Future<Uri> Function()? _resolveUri;
 
   /// Resolves the URI to play — called once per load attempt, so a resolver
-  /// backed by a signed link is asked again on every [DwMediaController.retry].
+  /// backed by a signed link is asked again on every `DwMediaSession.retry`.
   Future<Uri> resolve() {
     final resolver = _resolveUri;
     if (resolver != null) return resolver();
