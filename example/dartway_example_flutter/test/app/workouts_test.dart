@@ -23,7 +23,7 @@ void main() {
 
   /// Real playback of the current video up to [position].
   Future<void> playTo(WidgetTester tester, Duration position) async {
-    video.setPosition(video.livePlayers.last, position);
+    video.latest.advanceTo(position);
     await tester.pump(const Duration(milliseconds: 100));
   }
 

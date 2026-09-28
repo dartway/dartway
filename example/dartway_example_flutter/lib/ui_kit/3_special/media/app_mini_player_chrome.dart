@@ -35,10 +35,13 @@ class AppMiniPlayerChrome extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(
-              child: session.currentItem.kind == DwMediaKind.video
-                  ? DwVideoSurface(session: session)
-                  : const Icon(Icons.graphic_eq),
+            ValueListenableBuilder<DwMediaQueueState>(
+              valueListenable: session.queue,
+              builder: (context, queue, _) => Center(
+                child: queue.current.kind == DwMediaKind.video
+                    ? DwVideoSurface(session: session)
+                    : const Icon(Icons.graphic_eq),
+              ),
             ),
             Align(
               alignment: Alignment.bottomLeft,

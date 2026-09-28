@@ -258,7 +258,8 @@ class _SearchControls extends HookConsumerWidget {
       );
       return timer.cancel;
     }, [query]);
-    final active = debounced.value.length >= ListChatMessagesMatching.minQueryLength;
+    final active =
+        debounced.value.length >= ListChatMessagesMatching.minQueryLength;
     final results = active
         ? ref.watch(
             dw.request(
