@@ -55,7 +55,10 @@ abstract class DwMediaEngineController extends DwMediaController {
   final DwMediaItem item;
 
   /// The resolved settings this controller runs on.
-  final DwMediaConfig options;
+  DwMediaConfig options;
+
+  @override
+  void adoptOptions(DwMediaConfig next) => options = next;
 
   final DwMediaCallbacks _callbacks;
   final VoidCallback? _onPlaybackEnd;
@@ -134,9 +137,26 @@ abstract class DwMediaEngineController extends DwMediaController {
       final policy = options.resume;
       final startAt =
           restoreTo ?? (policy == null ? null : await _store.read(item.id));
-      final uri = await item.source.resolve();
-      if (stale()) return;
-      await engineLoad(uri);
+      Future<void> open() async {
+        final uri = await item.source.resolve();
+        if (stale()) return;
+        await engineLoad(uri);
+      }
+
+      final timeout = options.loadTimeout;
+      if (timeout == null) {
+        await open();
+      } else {
+        await open().timeout(
+          timeout,
+          onTimeout: () {
+            // The load that overran may still finish; it is stale from here
+            // on and never joined or applied.
+            _loadGeneration++;
+            throw TimeoutException('the item did not load', timeout);
+          },
+        );
+      }
       if (stale()) return;
       await engineSetSpeed(_speed);
       final muted = _muted;
@@ -151,7 +171,9 @@ abstract class DwMediaEngineController extends DwMediaController {
         await play();
       }
     } catch (error, stackTrace) {
-      if (!stale()) reportFailure(error, stackTrace);
+      if (error is TimeoutException || !stale()) {
+        reportFailure(error, stackTrace);
+      }
     }
   }
 

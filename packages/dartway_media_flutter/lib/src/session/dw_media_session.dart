@@ -15,20 +15,23 @@ final class DwMediaSession {
     required List<DwMediaItem> items,
     required int startIndex,
     required DwMediaCallbacks callbacks,
-    required this.options,
+    required DwMediaConfig options,
     required DwMediaSessionManager manager,
-  }) : _callbacks = callbacks,
+  }) : _options = options,
+       _callbacks = callbacks,
        _manager = manager,
        _speed = options.defaultSpeed,
        _queue = ValueNotifier(
          DwMediaQueueState(items: items, currentIndex: startIndex),
        );
 
-  /// The resolved settings: the plugin's `DwMediaConfig` with this open's
-  /// `DwMediaOpenOptions` laid over it.
-  final DwMediaConfig options;
+  /// The resolved settings: the plugin's `DwMediaConfig` with the latest
+  /// `DwMediaOpenOptions` for this session laid over it — an open that
+  /// returned this session replaces them (see `DwMediaSessionManager.open`).
+  DwMediaConfig get options => _options;
+  DwMediaConfig _options;
 
-  final DwMediaCallbacks _callbacks;
+  DwMediaCallbacks _callbacks;
   final DwMediaSessionManager _manager;
 
   final ValueNotifier<DwMediaQueueState> _queue;
@@ -48,6 +51,8 @@ final class DwMediaSession {
   Timer? _countdownEnd;
   Timer? _hideControls;
   int _fullscreenHosts = 0;
+  bool _fullscreenRequested = false;
+  bool _leftForMiniPlayer = false;
   bool _hidden = false;
   bool _disposed = false;
 
@@ -88,12 +93,15 @@ final class DwMediaSession {
     _autoplayHandled = false;
     final controller = createDwMediaController(
       item: item,
+      // Read at the moment of the call, so an open that reuses this session
+      // with callbacks of its own replaces them for the playing item too.
       callbacks: DwMediaCallbacks(
-        onStarted: _callbacks.onStarted,
-        onProgress: _callbacks.onProgress,
-        onReachedEnd: _callbacks.onReachedEnd,
-        onCompleted: _callbacks.onCompleted,
-        onError: _callbacks.onError,
+        onStarted: (item) => _callbacks.onStarted?.call(item),
+        onProgress: (item, position, duration) =>
+            _callbacks.onProgress?.call(item, position, duration),
+        onReachedEnd: (item) => _callbacks.onReachedEnd?.call(item),
+        onCompleted: (item) => _callbacks.onCompleted?.call(item),
+        onError: (item, error) => _callbacks.onError?.call(item, error),
       ),
       options: options,
       initialSpeed: _speed,
@@ -370,17 +378,37 @@ final class DwMediaSession {
 
   // --- Fullscreen and the mini-player --------------------------------------
 
-  /// Goes fullscreen. Takes effect only while a `DwMediaFullscreenHost` for
-  /// this session is mounted — without one nothing could show it, and a
-  /// flag left up would lie. Does nothing with `DwMediaConfig.fullscreen`
-  /// off.
+  /// Goes fullscreen through a `DwMediaFullscreenHost` for this session.
+  ///
+  /// With no host mounted yet — `autoplayOnOpen` playing before the page has
+  /// built, a call from the page's own `initState` — the request waits, and
+  /// the first host that mounts honours it. From the mini-player (the page
+  /// handed the session over with [minimize]) it does nothing: no page will
+  /// come to show it, and a flag left up would lie. Does nothing with
+  /// `DwMediaConfig.fullscreen` off.
   void enterFullscreen() {
-    if (!options.fullscreen || _fullscreenHosts == 0) return;
+    if (_disposed || !options.fullscreen) return;
+    if (_fullscreenHosts > 0) {
+      _setLater(_fullscreen, true);
+    } else if (!_leftForMiniPlayer && !_hidden) {
+      _fullscreenRequested = true;
+    }
+  }
+
+  /// What a host calls when it mounts: honours a request that waited for it.
+  void _hostAttached() {
+    _fullscreenHosts++;
+    if (!_fullscreenRequested) return;
+    _fullscreenRequested = false;
     _setLater(_fullscreen, true);
   }
 
-  /// Leaves fullscreen. Safe from a `State.dispose`.
-  void exitFullscreen() => _setLater(_fullscreen, false);
+  /// Leaves fullscreen, and drops a request still waiting for a host. Safe
+  /// from a `State.dispose`.
+  void exitFullscreen() {
+    _fullscreenRequested = false;
+    _setLater(_fullscreen, false);
+  }
 
   /// Hands the session to `DwMiniPlayerHost` — what the player page calls
   /// when it goes. With `DwMediaConfig.miniPlayer` off, nothing would show
@@ -388,7 +416,9 @@ final class DwMediaSession {
   /// Safe from a `State.dispose`.
   void minimize() {
     if (_disposed) return;
+    _fullscreenRequested = false;
     if (options.miniPlayer) {
+      _leftForMiniPlayer = true;
       _setLater(_minimized, true);
       return;
     }
@@ -407,6 +437,7 @@ final class DwMediaSession {
   /// back. Safe from `initState`.
   void restore() {
     _hidden = false;
+    _leftForMiniPlayer = false;
     _setLater(_minimized, false);
   }
 
@@ -414,14 +445,9 @@ final class DwMediaSession {
   /// locked (a `State.dispose`, a build).
   void _setLater(ValueNotifier<bool> notifier, bool value) {
     if (_disposed) return;
-    final scheduler = SchedulerBinding.instance;
-    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
-      scheduler.addPostFrameCallback((_) {
-        if (!_disposed) notifier.value = value;
-      });
-      return;
-    }
-    notifier.value = value;
+    _whenUnlocked(() {
+      if (!_disposed) notifier.value = value;
+    });
   }
 
   /// The mini-player's close: ends the session under
@@ -472,17 +498,55 @@ final class DwMediaSession {
 
   /// Ends the session: saves under `saveOnDispose`, drops the video view,
   /// and releases the engine after the next frame.
+  ///
+  /// Safe from a `State.dispose` — `onLeaveWithoutMiniPlayer: stop` ends the
+  /// session exactly there: what its listeners hear is written once the tree
+  /// is unlocked.
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _fullscreenRequested = false;
     _stopCountdown();
     _hideControls?.cancel();
     final controller = _controller;
     _detach(controller);
-    _videoView.value = null;
-    _fullscreen.value = false;
-    _minimized.value = false;
+    _whenUnlocked(() {
+      _videoView.value = null;
+      _fullscreen.value = false;
+      _minimized.value = false;
+    });
     _manager._remove(this);
     unawaited(_disposeAfterFrame(controller));
+  }
+
+  // --- Reuse -----------------------------------------------------------------
+
+  /// An open for the item this session stands on: the caller's request wins.
+  /// The callbacks and the settings are replaced — the engine takes the
+  /// settings that can still apply ([DwMediaController.adoptOptions]); a
+  /// different queue replaces this one around the same item, keeping its
+  /// engine; and `autoplayOnOpen` plays the item if it is paused or hidden.
+  void _reopen({
+    required List<DwMediaItem> items,
+    required int startIndex,
+    required DwMediaCallbacks callbacks,
+    required DwMediaConfig options,
+  }) {
+    _callbacks = callbacks;
+    _options = options;
+    // Opened again: a page wants it, not only the mini-player.
+    _leftForMiniPlayer = false;
+    _controller.adoptOptions(options);
+    final queue = _queue.value;
+    final sameQueue =
+        queue.currentIndex == startIndex && listEquals(queue.items, items);
+    if (!sameQueue) {
+      cancelAutoplay();
+      _queue.value = DwMediaQueueState(items: items, currentIndex: startIndex);
+      _updatePreview(_playback.value);
+    }
+    if (options.autoplayOnOpen && !_playback.value.isPlaying) {
+      unawaited(play());
+    }
   }
 }

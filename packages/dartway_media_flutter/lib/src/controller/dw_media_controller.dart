@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../config/dw_media_config.dart';
 import '../model/dw_media_item.dart';
 import '../model/dw_media_playback_state.dart';
 
@@ -15,6 +16,11 @@ abstract class DwMediaController {
 
   /// A `play()` waits for the item to load.
   bool get wantsToPlay;
+
+  /// Takes the settings of a session reopened with new ones. What only
+  /// applies at load — the start speed, the web's muted start, the iOS
+  /// display-sleep option — stays as the item was loaded.
+  void adoptOptions(DwMediaConfig options);
 
   /// The item stands at its end because real playback took it there — not a
   /// seek. Cleared by the next seek.

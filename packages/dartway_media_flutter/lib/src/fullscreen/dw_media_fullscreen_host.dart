@@ -6,8 +6,10 @@ part of '../session/dw_media_session_manager.dart';
 /// `autoEnterFullscreenOnPlay`, already true when the page builds — and the
 /// route leaves when it turns false. One way in, whoever asks.
 ///
-/// A session goes fullscreen only while a host for it is mounted: from the
-/// mini-player, with the page gone, `enterFullscreen()` does nothing.
+/// A request made before any host for the session is mounted — autoplay on
+/// open playing before the page builds, a call from the page's `initState` —
+/// waits, and the first host that mounts honours it. From the mini-player,
+/// with the page handed over, `enterFullscreen()` does nothing.
 ///
 /// [builder] draws the fullscreen page (the project's surface and controls);
 /// [child] is what the page shows inline. The route's transition is
@@ -49,8 +51,8 @@ final class _DwMediaFullscreenHostState extends State<DwMediaFullscreenHost> {
   }
 
   void _attach(DwMediaSession session) {
-    session._fullscreenHosts++;
     session._fullscreen.addListener(_sync);
+    session._hostAttached();
   }
 
   void _detach(DwMediaSession session) {

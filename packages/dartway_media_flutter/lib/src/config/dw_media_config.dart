@@ -117,6 +117,7 @@ final class DwMediaConfig {
     this.rememberSound = true,
     this.autoRetryCount = 0,
     this.autoRetryDelay = const Duration(seconds: 3),
+    this.loadTimeout = const Duration(seconds: 30),
     this.controlsAutoHideDelay = const Duration(seconds: 3),
     this.positionStore,
   }) : assert(
@@ -174,12 +175,19 @@ final class DwMediaConfig {
   /// The resume policy, or `null` for no resume at all.
   final DwMediaResumePolicy? resume;
 
-  /// Speeds the controls offer. Empty turns the speed control off.
+  /// The speeds `DwMediaSession.setSpeed` accepts and the controls offer.
+  /// Empty turns the speed control off: every item plays at [defaultSpeed].
   final List<double> speeds;
 
   /// The speed an item starts at, unless [rememberSpeedAcrossItems] carries
-  /// another one over.
+  /// another one over. With [speeds] non-empty it must be one of them
+  /// ([speedsHoldDefault], asserted wherever a session's settings resolve).
   final double defaultSpeed;
+
+  /// Whether [defaultSpeed] is one [speeds] offers, or the list is empty — a
+  /// start speed the speed control could not show or return to is a
+  /// contradiction, not a setting.
+  bool get speedsHoldDefault => speeds.isEmpty || speeds.contains(defaultSpeed);
 
   /// The speed chosen for one item stays for the next one in the queue.
   final bool rememberSpeedAcrossItems;
@@ -269,6 +277,11 @@ final class DwMediaConfig {
   final int autoRetryCount;
   final Duration autoRetryDelay;
 
+  /// How long one load — resolving the source and opening it — may take
+  /// before it counts as failed: an error state and `onError`, so a retry
+  /// is possible again. `null` waits for ever.
+  final Duration? loadTimeout;
+
   /// How long `DwMediaSession.controlsVisible` stays true while the item
   /// plays and nobody touches the controls. `Duration.zero` never hides them.
   final Duration controlsAutoHideDelay;
@@ -281,7 +294,16 @@ final class DwMediaConfig {
   /// This config with [options] laid over it — what `DwMedia.open()` hands
   /// the session. A field left `null` in [options] keeps this config's value.
   DwMediaConfig merge(DwMediaOpenOptions? options) {
-    if (options == null) return this;
+    final merged = options == null ? this : _mergeWith(options);
+    assert(
+      merged.speedsHoldDefault,
+      'defaultSpeed ${merged.defaultSpeed} is not one of speeds '
+      '${merged.speeds}',
+    );
+    return merged;
+  }
+
+  DwMediaConfig _mergeWith(DwMediaOpenOptions options) {
     return DwMediaConfig(
       autoplayOnOpen: options.autoplayOnOpen ?? autoplayOnOpen,
       autoplayNext: options.autoplayNext ?? autoplayNext,
@@ -341,6 +363,9 @@ final class DwMediaConfig {
       rememberSound: options.rememberSound ?? rememberSound,
       autoRetryCount: options.autoRetryCount ?? autoRetryCount,
       autoRetryDelay: options.autoRetryDelay ?? autoRetryDelay,
+      loadTimeout: options.withoutLoadTimeout
+          ? null
+          : options.loadTimeout ?? loadTimeout,
       controlsAutoHideDelay:
           options.controlsAutoHideDelay ?? controlsAutoHideDelay,
       positionStore: options.positionStore ?? positionStore,
@@ -397,9 +422,15 @@ final class DwMediaOpenOptions {
     this.rememberSound,
     this.autoRetryCount,
     this.autoRetryDelay,
+    this.loadTimeout,
+    this.withoutLoadTimeout = false,
     this.controlsAutoHideDelay,
     this.positionStore,
   }) : assert(
+         !withoutLoadTimeout || loadTimeout == null,
+         'withoutLoadTimeout and loadTimeout contradict each other',
+       ),
+       assert(
          !withoutResume || resume == null,
          'withoutResume and resume contradict each other',
        );
@@ -453,6 +484,11 @@ final class DwMediaOpenOptions {
   final bool? rememberSound;
   final int? autoRetryCount;
   final Duration? autoRetryDelay;
+  final Duration? loadTimeout;
+
+  /// No load timeout for this session — `loadTimeout: null` cannot say it,
+  /// since `null` already means "keep the plugin's".
+  final bool withoutLoadTimeout;
   final Duration? controlsAutoHideDelay;
   final DwMediaPositionStore? positionStore;
 }

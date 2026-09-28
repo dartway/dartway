@@ -17,6 +17,7 @@ import '../platform/dw_media_platform.dart';
 import 'dw_media_queue_state.dart';
 
 part '../fullscreen/dw_media_fullscreen_host.dart';
+part 'dw_media_when_unlocked.dart';
 part 'dw_media_session.dart';
 
 /// Every `DwMediaSession` the app has open — held by `DwMedia`, reached as
@@ -26,7 +27,12 @@ part 'dw_media_session.dart';
 /// opened last while nothing else plays. Under
 /// `DwMediaConfig.singleActiveItem`, playing a session pauses every other.
 final class DwMediaSessionManager {
-  DwMediaSessionManager({required this.config});
+  DwMediaSessionManager({required this.config})
+    : assert(
+        config.speedsHoldDefault,
+        'defaultSpeed ${config.defaultSpeed} is not one of speeds '
+        '${config.speeds}',
+      );
 
   /// The plugin's defaults; each session lays its `DwMediaOpenOptions` over
   /// them.
@@ -50,9 +56,13 @@ final class DwMediaSessionManager {
   ///
   /// **One item, one engine**: when a session still open stands on the same
   /// item — the one the mini-player shows, one the mini-player's close only
-  /// hid — that session is returned as it is, and [callbacks] and [options]
-  /// are not applied again. The page reattaches to what is already playing
-  /// instead of loading it a second time.
+  /// hid — that session is returned instead of a second engine, and this
+  /// open's request applies to it: [callbacks] replace the old ones, the
+  /// settings resolved from [options] replace the old ones (those only a
+  /// load applies — the start speed, the web's muted start, the iOS
+  /// display-sleep option — stay as the item was loaded), a different
+  /// queue replaces the old one around the same item, and `autoplayOnOpen`
+  /// plays it if it is paused or hidden.
   DwMediaSession open({
     required List<DwMediaItem> items,
     int startIndex = 0,
@@ -64,9 +74,16 @@ final class DwMediaSessionManager {
     }
     RangeError.checkValidIndex(startIndex, items, 'startIndex');
     final wanted = items[startIndex];
+    final resolved = config.merge(options);
     for (final session in _sessions) {
       if (!session.isDisposed && session.currentItem == wanted) {
         session._hidden = false;
+        session._reopen(
+          items: items,
+          startIndex: startIndex,
+          callbacks: callbacks,
+          options: resolved,
+        );
         final current = _active.value;
         if (current == null || !current.playback.value.isPlaying) {
           _active.value = session;
@@ -79,7 +96,7 @@ final class DwMediaSessionManager {
       items: items,
       startIndex: startIndex,
       callbacks: callbacks,
-      options: config.merge(options),
+      options: resolved,
       manager: this,
     );
     _sessions.add(session);
@@ -115,7 +132,9 @@ final class DwMediaSessionManager {
   }
 
   void _release(DwMediaSession session) {
-    if (identical(_active.value, session)) _active.value = null;
+    _whenUnlocked(() {
+      if (identical(_active.value, session)) _active.value = null;
+    });
   }
 
   void _remove(DwMediaSession session) {
