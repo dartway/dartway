@@ -1,153 +1,209 @@
 # Video and audio: what does the package do, and what does the project draw?
 
-Every DartWay project that plays media used to write its own player. Tvaity grew a full one —
-speed, fullscreen, resume, an in-app mini-player, a next-item card, an audio playlist, background
-audio, one active player app-wide, the web's autoplay rules. Molodey has bare `video_player`/
-`just_audio` widgets whose error state takes over the whole lesson
-(`dartway/molodey#128`) and a signed link that expires after two hours. `dartway_media_flutter`
-is the one player every project builds on instead, reached as `dw.plugins.media`.
+`dartway_media_flutter` is the player every DartWay app builds on, reached as `dw.plugins.media`:
+one controller over `video_player` and `just_audio`, sessions that outlive the page that opened
+them, a queue, resume, fullscreen and a mini-player.
 
-**Mechanism only — no look.** The package has no button, no timeline widget, no colour (see
-[the UI kit](ui-kit.md)), and no `chewie`: `chewie` ships Material/Cupertino controls, which is a
-design decision the package does not make. The default controls a project actually shows live in
-`example/dartway_example_flutter/lib/ui_kit/3_special/media/`, copied into the project's own
-`ui_kit/` and restyled — the `dartway-media` toolkit skill walks through it. A project that plays
-nothing does not add this package at all, and does not download `video_player`.
+**Mechanism only — no look.** The package has no button, no timeline, no colour and no text (see
+[the UI kit](ui-kit.md)), and no `chewie`, which ships Material and Cupertino controls — a design
+decision the package does not make. The controls an app shows are its own widgets: the default
+set lives in `example/dartway_example_flutter/lib/ui_kit/3_special/media/`, and a project copies
+it into its own `ui_kit/` and restyles it (the `dartway-media` toolkit skill walks through it). A
+project that plays nothing does not add the package, and does not download `video_player`.
 
-## The shape
+**Nothing is fixed policy.** Every behaviour below is a setting with a default on `DwMediaConfig`,
+and every one can be overridden for a single session — see [every setting](#every-setting).
 
-- **`DwMediaItem`** — one thing to play: a stable `id` (the identity used for resume, for "is this
-  the active item", and as the queue's key), a `kind` (`video`/`audio`), and a `DwMediaSource`.
-- **`DwMediaSource.url(...)`** for a plain address; **`DwMediaSource.resolve(...)`** for anything
-  time-limited — an async function called again on every load *and* on every
-  `DwMediaController.retry()`, so an expired signed link is re-fetched instead of dead-ending the
-  player.
-- **`DwMedia.open(items:, callbacks:, options:)`** returns a `DwMediaSession` — a queue, the
-  current controller, fullscreen and minimized state. **The session survives the widget that opened
-  it.** Hold it outside a `State`'s lifetime (a controller/provider both the page and the
-  mini-player reach), not as a local variable — that is what lets the mini-player and fullscreen
-  keep playing through navigation, and it is the plugin, not any widget, that owns it.
-- **`DwMediaController`** — one API over both engines: `play`/`pause`/`seek`/`skip`/`setSpeed`/
-  `setVolume`/`setMuted`/`retry`, and a `state` (`ValueListenable<DwMediaPlaybackState>`):
-  `loading`/`buffering`/`playing`/`paused`/`ended`/`error`, with position, duration, buffered range,
-  speed, volume and an error message.
-- **Callbacks are supplied once, at `open()`**, and cover the whole queue: `onStarted`,
-  `onProgress` (throttled), `onReachedEnd`, `onCompleted` (at a configurable threshold), `onError`,
-  `onItemChanged` (the queue advancing).
-- **State is `ValueListenable`, not a riverpod `Provider`.** `dw.plugins.prefs.provider(...)`
-  declares a provider once, as a top-level `final`, because a preferences key is known at compile
-  time; a `DwMediaSession`'s identity is created at `open()`, so there is nothing to declare a
-  top-level provider of. Read `session.controller.state`/`session.queue`/`session.isFullscreen`/
-  `session.minimized` and `dw.plugins.media.sessionManager.active` with `ValueListenableBuilder`/
-  `ListenableBuilder`, the way `DwVideoSurface` and `DwMiniPlayerHost` do internally.
+## Wiring
 
-## The trap both engines share, and how the package avoids it
+```dart
+dw = DwFlutterCore(
+  // ...
+  plugins: [
+    DwMedia(config: const DwMediaConfig(speeds: [1, 1.25, 1.5, 2], autoplayNext: true)),
+  ],
+);
+```
 
-`onReachedEnd` must fire when real playback reaches the end, and must **not** fire when someone
-scrubs the timeline to the very end. Both engines make the naive check wrong:
+```dart
+final session = dw.plugins.media.open(
+  items: [
+    DwMediaItem(id: lesson.id, kind: DwMediaKind.video, title: lesson.title,
+        source: DwMediaSource.resolve(() => fetchSignedUrl(lesson.id))),
+  ],
+  callbacks: DwMediaCallbacks(onCompleted: (item) => markWatched(item.id)),
+  options: const DwMediaOpenOptions(autoplayOnOpen: true),
+);
+```
 
-- `video_player`'s `VideoPlayerValue.isCompleted` becomes `true` on *any* `seekTo` that lands on the
-  duration — including a scrub — not only when playback actually finishes.
-- `just_audio` on Android can reach `ProcessingState.completed` after a seek performed while
-  paused, with `play()` never called in the session (`dartway/molodey#128`'s origin).
+- **`DwMediaItem`** — one thing to play: a stable `id` (the queue's key, the resume key, "is this
+  the item playing"), a `kind` (`video` or `audio`), a `DwMediaSource`, and `title`/`artworkUrl`/
+  `extras` the package carries without reading.
+- **`DwMediaSource.url(...)`** for a plain address, **`DwMediaSource.resolve(...)`** for anything
+  that expires: the function is called on every load and again on every retry, so an expired
+  signed link is fetched afresh instead of ending the player.
+- **`DwMediaCallbacks`** are given once, at `open()`, and cover the whole queue: `onStarted`,
+  `onProgress`, `onReachedEnd`, `onCompleted`, `onError`, `onItemChanged`.
 
-So `onReachedEnd` is never derived from a position/duration comparison by itself. Every seek
-`DwMediaController` performs — from `seek`, `skip`, or resuming a saved position — runs through a
-guard that suppresses the one synchronous state update that seek itself causes; the engine's own,
-independent "real end of playback" event is never suppressed, because it arrives without this
-controller having called `seek`. `DwMediaConfig.reachedEndTolerance` adds one documented exception
-on top of the guard: a tick that is still genuinely *playing* and lands within tolerance of the
-duration also counts, since that is continued playback, not a scrub.
+## Sessions
 
-## Session, queue, fullscreen, mini-player
+`open()` returns a `DwMediaSession`: the queue, the controller of its current item, whether it is
+fullscreen or minimized. **The plugin owns it, not the widget that opened it** — pages come and go
+and the session plays on, which is what makes the mini-player and fullscreen possible without a
+reload. It ends with `session.dispose()`, or with the mini-player's close.
 
-- **One active item app-wide** by default (`DwMediaConfig.singleActiveItem`): opening a session, or
-  calling `play()` on one, pauses whichever session was previously active. Off allows several
-  sessions to play at once.
-- **The queue** advances with `next`/`previous`/`jumpTo`; a next-item preview and an autoplay
-  countdown are each their own flag, independent of one another and of `autoplayNext` itself.
-- **Fullscreen** is the package's own route (`showDwMediaFullscreen`/`DwMediaFullscreenRoute`), with
-  configurable orientations for both fullscreen and after exit, restored however the route ends —
-  a system back gesture, `Navigator.pop`, or the app calling `session.exitFullscreen()`.
-- **The mini-player** (`DwMiniPlayerHost`) is mounted once, at the app root; it decides *whether* to
-  show a session (active and minimized) and the drag/pinch-to-scale/edge-snap mechanics, and calls
-  `onExpand(item)` — where that expands *to* is the app's own route, this widget has no opinion. Its
-  look comes entirely from the `builder` a project supplies.
+- `dw.plugins.media.sessionManager.active` is the session opened or played last — the one the
+  mini-player shows. Under `singleActiveItem`, opening or playing a session pauses every other.
+- A controls widget reads `session.playback` (the current item's `DwMediaPlaybackState`, following
+  the queue), `session.queue` (`DwMediaQueueState`: the items, the current index, the next-item
+  preview and the autoplay countdown), `session.isFullscreen` and `session.minimized`, all
+  `ValueListenable`s — a session is created at `open()`, so there is no provider to declare for it
+  ahead of time. `session.options` carries the resolved settings a control reads (`speeds`,
+  `controlsAutoHideDelay`, `fullscreen`).
+- Commands: `play`, `pause`, `seek`, `skipBack`, `skipForward`, `setSpeed`, `setMuted`,
+  `setVolume`, `retry`, `next`, `previous`, `jumpTo`, `cancelAutoplay`, `enterFullscreen`,
+  `exitFullscreen`, `minimize`, `restore`.
+- The playback state is `loading`, `ready`, `buffering`, `playing`, `paused`, `ended` or `error`,
+  with the position, duration, buffered position, speed, volume and mute. **An error stays inside
+  the player**: the state turns `error`, `onError` fires, and `retry()` re-resolves the source and
+  returns to where playback failed.
 
-## Background, wakelock, web
+## Real playback, not a position
 
-- Video pauses on the app going to the background (`paused`/`hidden`/`detached`) unless
-  `pauseVideoInBackground` is off; **`inactive` is deliberately never treated as background** — it
-  fires for a system dialog, an incoming call banner, or the OS's own fullscreen transition, and
-  pausing on it broke a project's fullscreen video in practice.
-- Audio keeps playing in the background when `backgroundAudio` is on — which additionally needs, on
-  iOS, `audio` in `Info.plist`'s `UIBackgroundModes` (Android needs nothing extra).
-- The screen is kept awake while a video plays (`wakelockWhilePlaying`), refcounted across however
-  many sessions want it at once.
-- On the web, a video starts muted and is unmuted once playback is actually granted
-  (`webMutedStart`) — starting unmuted throws `NotAllowedError` outside a user gesture — and the
-  chosen sound state can carry across items in the same session (`webRememberSoundChoice`).
+Both engines report a seek to the end as "completed": `video_player` sets `isCompleted` on any seek
+landing on the duration, and `just_audio` on Android reaches `completed` after a seek made while
+paused. And `video_player` reports `isPlaying` the moment `play()` is called, before the platform
+answers — a web `play()` the browser refused still reads as playing.
 
-## Every knob
+So the controller counts only **real playback**: the engine plays, no seek of its own is in
+flight, and the position has moved past where playback started or the last seek landed.
 
-**Nothing here is fixed policy.** Every field below is a `DwMediaConfig` default a project sets
-once, and every one of them can be overridden for a single `DwMedia.open()` call with a
-`DwMediaOpenOptions` — a project can run a lecture queue with resume and a countdown next to a
-short-clip feed with neither, off one shared default.
+- `onStarted` fires on the first real playback of an item — not on a refused `play()`.
+- `onReachedEnd` fires when the engine turns "ended" after real playback since the last seek —
+  never on a scrub to the end, a resume point near the end, or a completed event that arrives late
+  after a paused seek. `reachedEndTolerance` lets a real tick just short of the end count too.
+- `onCompleted` is the other question — "watched enough" — and it fires when the position first
+  crosses `completedThreshold`, by playback or by a seek. A project that counts a lesson as done
+  when the member drags to the end listens to this one.
+- `onProgress` and the periodic resume save run on real playback only.
 
-| Knob | Default | What it does |
+## Queue, fullscreen, mini-player
+
+- **Autoplay.** With `autoplayNext`, an item that really ended moves the queue on: at once, or after
+  a countdown (`autoplayCountdown`) that `queue.autoplayCountdown` shows and `cancelAutoplay()`
+  stops. The next-item preview (`nextPreview`) is its own switch, independent of autoplay.
+- **Fullscreen is a route of the package's own.** Wrap the inline player in
+  `DwMediaFullscreenHost(session:, builder:, child:)`: whenever `session.isFullscreen` turns true —
+  `enterFullscreen()`, `autoEnterFullscreenOnPlay`, already true when the page builds — it pushes a
+  `DwMediaFullscreenRoute` drawing `builder` onto the root navigator; the route sets
+  `fullscreenOrientations`, restores `exitOrientations` when it goes, and leaves on
+  `exitFullscreen()` or a back gesture alike. The queue moving on keeps it up
+  (`keepFullscreenAcrossItems`). System bars are the app's: its fullscreen page sets them if it
+  wants them hidden.
+- **The mini-player is mounted once, at the root** — `DwMiniPlayerHost(sessionManager:,
+  builder:, onExpand:)` in `MaterialApp.builder`. It shows the active session while
+  `session.minimized` is true, drags, pinches within its scale bounds and snaps to a side; the
+  `builder` draws it, and `onExpand(item)` navigates to the app's own player page — the package
+  has no opinion on routes. The player page calls `session.minimize()` when it goes and
+  `session.restore()` when it comes back, both safe from `initState`/`dispose`. It sits above the
+  navigator, where there is no overlay: its buttons cannot carry tooltips.
+- `DwVideoSurface(session:)` draws the current video at its own aspect ratio — the one widget the
+  package draws, a texture with no chrome.
+
+## Background, the screen, the web
+
+- On the app going to the background — `hidden`, `paused`, `detached`, **never `inactive`**, which a
+  permission prompt or a system sheet raises too — positions are saved (`saveOnBackground`), a video
+  pauses (`pauseVideoInBackground`) and audio pauses unless `backgroundAudio` is on. Coming back
+  resumes nothing on its own. `video_player`'s own background rule, which would pause and resume by
+  itself, is switched off so that these settings decide.
+- **Background audio needs the platform's permission too.** iOS: `audio` in `UIBackgroundModes` in
+  `Info.plist`. Android: nothing to declare for playback with the screen locked while the app lives;
+  a notification with controls and a foreground service are not part of the package.
+- The screen stays on while a video plays (`wakelockWhilePlaying`), through `wakelock_plus` and,
+  on iOS, `video_player`'s own option; two sessions playing at once share one lock.
+- **The web.** A browser refuses to start sound without a gesture, so a video starts muted
+  (`webMutedStart`) until the person turns the sound on; with `rememberSound`, that choice carries
+  to every item after it. A refused `play()` leaves the item paused, not in error, and the errors a
+  browser raises for the player's own races (an aborted seek, an element already gone) are not
+  errors either. An item's engine is released only after the frame that removed its video from the
+  page — disposing a video still on the page throws in the browser.
+
+## Every setting
+
+Each row is a `DwMediaConfig` field with its default; each is overridden per session by the field
+of the same name on `DwMediaOpenOptions` (`withoutResume: true` turns resume off for one session).
+The package's tests cover every row, default against changed, in
+`packages/dartway_media_flutter/test/dw_media_settings_*_test.dart`.
+
+| Setting | Default | What it changes |
 |---|---|---|
-| `autoplayOnOpen` | `false` | `open()` starts playing the first item immediately |
-| `autoplayNext` | `false` | reaching the end of an item advances the queue |
-| `autoplayCountdown` | `true` | shows a counting-down number before autoplay fires (ignored unless `autoplayNext` is also on) |
-| `autoplayCountdownDuration` | 5 s | how long that countdown runs |
-| `nextPreview` | `false` | the queue reports "next item is coming up" ahead of time — independent of `autoplayNext` |
-| `nextPreviewLeadTime` | 10 s | how long before the end the preview becomes visible |
-| `completedThreshold` | `0.9` | fraction of the duration at which `onCompleted` fires |
-| `reachedEndTolerance` | 500 ms | how close to the duration a still-playing tick counts as "reached the end", on top of the engine's own event; `Duration.zero` disables the leniency |
-| `progressInterval` | 1 s | how often `onProgress` may fire |
-| `resume` | on, its own defaults | resume policy, or `null` to turn resume off entirely |
-| `resume.saveInterval` | 5 s | how often the position is saved while playing |
+| `autoplayOnOpen` | `false` | `open()` plays the first item as soon as it loads |
+| `autoplayNext` | `false` | an item that really ended moves the queue to the next one |
+| `autoplayCountdown` | `true` | with `autoplayNext`, the move waits for a countdown; off, it is immediate |
+| `autoplayCountdownDuration` | 5 s | how long that countdown is |
+| `nextPreview` | `false` | the queue announces the next item before the current one ends |
+| `nextPreviewLeadTime` | 10 s | how long before the end the announcement comes |
+| `completedThreshold` | `0.9` | the fraction of the duration at which `onCompleted` fires |
+| `reachedEndTolerance` | 500 ms | how close to the end a real tick counts as the end; zero leaves only the engine's event |
+| `progressInterval` | 1 s | the shortest gap between two `onProgress` calls |
+| `speeds` | `[]` | the speeds the controls offer; empty hides the speed control |
+| `defaultSpeed` | `1.0` | the speed an item starts at |
+| `rememberSpeedAcrossItems` | `true` | a chosen speed stays for the next items; off, each starts at `defaultSpeed` |
+| `skipBack` / `skipForward` | 10 s / 10 s | how far `skipBack()` and `skipForward()` move |
+| `singleActiveItem` | `true` | opening or playing a session pauses every other; off, several play at once |
+| `autoRetryCount` | `0` | how many times a failed load retries itself before the error state |
+| `autoRetryDelay` | 3 s | the wait before each of those retries |
+| `controlsAutoHideDelay` | 3 s | how long the project's controls stay up while playing (read by the controls) |
+| `resume` | `DwMediaResumePolicy()` | the resume policy; `null` reads and writes no positions |
+| `resume.saveInterval` | 5 s | how often the position is saved during real playback |
 | `resume.minimum` | 5 s | a position under this is never saved |
 | `resume.clearPastFraction` | `0.9` | past this fraction the saved position is cleared, not updated |
-| `resume.saveOnLifecycleEvents` | `true` | also save immediately on pause, background, and dispose |
-| `speeds` | `[]` | speeds a controls widget may offer; empty turns the speed control off |
-| `defaultSpeed` | `1.0` | the speed a freshly opened item starts at |
-| `rememberSpeedAcrossItems` | `true` | the chosen speed carries to the next item in the queue |
-| `skipBack` / `skipForward` | 10 s each | how far `session.skipBack`/`skipForward` move |
-| `fullscreen` | `true` | whether `showDwMediaFullscreen`/the mini-player's expand may push the fullscreen route at all |
-| `fullscreenOrientations` | landscape (both) | orientations allowed while fullscreen; empty leaves the platform default |
-| `exitOrientations` | portrait up | orientations restored on leaving fullscreen; empty leaves whatever was set before untouched |
-| `autoEnterFullscreenOnPlay` | `false` | starting playback of a video enters fullscreen on its own |
-| `keepFullscreenAcrossItems` | `true` | the queue advancing while fullscreen keeps fullscreen open |
-| `miniPlayer` | `true` | whether a minimized session is offered to `DwMiniPlayerHost` at all |
-| `miniPlayerInitialSize` | 160×90 | its starting size |
-| `miniPlayerInitialAlignment` | bottom-right | its starting position |
-| `miniPlayerMinScale` / `maxScale` | 0.5 / 1.5 | pinch-to-scale bounds |
-| `miniPlayerSnapToEdges` | `true` | dragging snaps horizontally to the nearest edge on release |
-| `miniPlayerCloseStopsPlayback` | `true` | closing the mini-player stops the session; off only pauses and hides it |
-| `pauseVideoInBackground` | `true` | video pauses when the app goes to the background |
-| `backgroundAudio` | `false` | audio keeps playing when the app goes to the background |
-| `wakelockWhilePlaying` | `true` | the screen is kept awake while a video plays |
-| `singleActiveItem` | `true` | opening/playing a session pauses whatever else was active |
-| `webMutedStart` | `true` | a web video starts muted, unmuted once playback is granted |
-| `webRememberSoundChoice` | `true` | the sound choice carries across items in the same session |
-| `autoRetryCount` | `0` | how many times a load failure retries itself before surfacing `DwMediaPlayState.error` |
-| `autoRetryDelay` | 3 s | the delay between automatic retries |
-| `controlsAutoHideDelay` | 3 s | published on the resolved options for a controls widget's own auto-hide timer — the package starts no timer itself |
-| `positionStore` | in-memory | where resume positions are kept; pass one backed by `dw.plugins.prefs` or a project's own storage to resume across launches |
+| `resume.saveOnPause` | `true` | `pause()` saves |
+| `resume.saveOnDispose` | `true` | ending the item or the session saves |
+| `resume.saveOnBackground` | `true` | the app going to the background saves |
+| `positionStore` | in memory | where positions live; pass one over `dw.plugins.prefs` or the project's storage to resume across launches |
+| `pauseVideoInBackground` | `true` | a playing video pauses in the background |
+| `backgroundAudio` | `false` | playing audio keeps playing in the background (platform setup above) |
+| `wakelockWhilePlaying` | `true` | the screen stays on while a video plays |
+| `webMutedStart` | `true` | on the web, a video starts muted until the person turns the sound on |
+| `rememberSound` | `true` | the last mute choice carries to every item opened after it |
+| `fullscreen` | `true` | whether a session may go fullscreen at all |
+| `fullscreenOrientations` | both landscapes | orientations while fullscreen; empty leaves them alone |
+| `exitOrientations` | portrait up | orientations set when fullscreen ends; empty allows every one |
+| `autoEnterFullscreenOnPlay` | `false` | playing a video goes fullscreen |
+| `keepFullscreenAcrossItems` | `true` | the queue moving on stays fullscreen; off, it leaves |
+| `miniPlayer` | `true` | whether `minimize()` hands the session to the mini-player |
+| `miniPlayerInitialSize` | 160 × 90 | the mini-player's size before any pinch |
+| `miniPlayerInitialAlignment` | bottom right | where it first appears |
+| `miniPlayerMinScale` / `miniPlayerMaxScale` | 0.75 / 2.0 | pinch bounds, in multiples of the initial size |
+| `miniPlayerSnapToEdges` | `true` | a dragged mini-player settles on the nearer side |
+| `miniPlayerCloseStopsPlayback` | `true` | its close ends the session; off, it pauses and hides it |
 
 ## Testing
 
-`dartway_media_flutter/testing.dart` ships `DwFakeVideoPlayerPlatform` and `DwFakeJustAudioPlatform`
-— assign them to `VideoPlayerPlatform.instance`/`JustAudioPlatform.instance` in `setUp` to drive
-`DwMediaController` in a widget test without a real plugin on any platform. Each exposes the one
-distinction the reached-end guard depends on as two explicit calls: `emitCompleted` (the engine's
-real end-of-playback signal) versus driving a plain `seek` to the duration (which flips
-`isCompleted`/reaches `ProcessingState.completed` on its own, without the fake doing anything) —
-so a project's own regression test for "a scrub must not count as the end" is one line.
+`package:dartway_media_flutter/testing.dart` plays items in a widget test without a plugin for any
+platform:
 
-## Not now
+```dart
+setUp(() {
+  DwFakeVideoPlayerPlatform.install();   // every video loads at once, a minute long
+  DwFakeJustAudioPlatform.install();
+});
+```
 
-OS picture-in-picture, lock-screen/notification controls, HLS/quality/subtitles, and offline files
-(with `dartway_offline` when it returns, dartway/dartway#262).
+- `DwFakeVideoPlayerPlatform`: `setPosition` moves a video the way playback does, `emitCompleted`
+  is the engine's own end, `emitError` a failure mid-play; `initializeOnCreate: false` holds each
+  load until the test calls `emitInitialized`.
+- `DwFakeJustAudioPlatform`: each player in `players` has `emitPosition`, `emitCompleted` and
+  `emitError`. `just_audio` finishes part of its work outside a widget test's fake clock, so after
+  an audio command a test calls `dwSettleMedia(tester)` rather than `pump`.
+- A scrub is a `session.seek(...)`; real playback is `setPosition` / `emitPosition` after `play()`.
+  A test of "a scrub to the end must not count" is those two lines apart.
+- A playing video polls its position on a timer: end the sessions (`dw.plugins.media.dispose()`)
+  before a test finishes.
+
+## Not in the package
+
+OS picture-in-picture, lock-screen and notification controls, HLS quality, subtitles, and offline
+files (with `dartway_offline` when it returns, dartway/dartway#262).

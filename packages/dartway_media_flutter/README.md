@@ -1,12 +1,15 @@
 # dartway_media_flutter
 
-A video/audio player for a DartWay app, reached as `dw.plugins.media`: one `DwMediaController` API
-over `video_player` and `just_audio`, a `DwMediaSession` that survives route changes (so the
-mini-player and fullscreen keep playing without a reload), a queue with resume, and a mini-player
-host — mechanism only, no `chewie`, no colours, no built-in controls.
+Video and audio for a DartWay app, reached as `dw.plugins.media`: one controller over
+`video_player` and `just_audio`, sessions owned by the plugin that outlive the page that opened
+them, a queue with an autoplay countdown, resume, a fullscreen route and a mini-player host. Every
+behaviour is a `DwMediaConfig` setting, overridable per session with `DwMediaOpenOptions`.
 
-The default controls (play/pause, timeline, speed, fullscreen, next-item card, mini-player chrome,
-error with retry) live as source in `example/dartway_example_flutter/lib/ui_kit/3_special/media/`,
-copied into a project's own `ui_kit/` and restyled — see the `dartway-media` toolkit skill.
+Mechanism only — no `chewie`, no colours, no text, no controls. The default controls (play/pause,
+timeline, speed, fullscreen, next-item card, mini-player look, error with retry) are source in the
+framework's `example/dartway_example_flutter/lib/ui_kit/3_special/media/`, copied into a project's
+own `ui_kit/` and restyled — the `dartway-media` toolkit skill walks through it.
 
-Documentation: `docs/3-flutter/media.md`.
+`package:dartway_media_flutter/testing.dart` fakes both platforms for a project's widget tests.
+
+Documentation, with the table of every setting: `docs/3-flutter/media.md`.

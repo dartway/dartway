@@ -16,8 +16,8 @@ void main() {
     DwFakeJustAudioPlatform.install();
   });
 
-  const controls = Key('app-media-controls');
-  const miniPlayer = Key('app-mini-player');
+  final controls = find.byType(AppMediaTimeline);
+  final miniPlayer = find.byType(AppMiniPlayerChrome);
 
   DwMediaSession active() => dw.plugins.media.sessionManager.active.value!;
 
@@ -44,14 +44,14 @@ void main() {
     await playTo(tester, const Duration(seconds: 1));
     expect(find.byType(AppMediaPlayer), findsOneWidget);
     expect(active().playback.value.isPlaying, isTrue);
-    expect(find.byKey(controls), findsOneWidget);
+    expect(controls, findsOneWidget);
 
     await tester.pump(dw.plugins.media.config.controlsAutoHideDelay);
-    expect(find.byKey(controls), findsNothing);
+    expect(controls, findsNothing);
 
     await tester.tap(find.byType(AppMediaPlayer));
     await tester.pump();
-    expect(find.byKey(controls), findsOneWidget);
+    expect(controls, findsOneWidget);
 
     await stop(tester, app);
   });
@@ -62,7 +62,7 @@ void main() {
     final app = await ExampleTestApp.start(tester, FakeClub());
     await app.tap(tester, find.text('Workouts').last);
     await app.tap(tester, find.text('Morning mobility'));
-    await tester.tap(find.byKey(const Key('app-media-speed')));
+    await tester.tap(find.byTooltip('Speed'));
     await app.settle(tester);
     await app.tap(tester, find.text('1.5×').last);
     expect(active().playback.value.speed, 1.5);
@@ -83,9 +83,9 @@ void main() {
       ),
     );
     await app.settle(tester);
-    expect(find.byKey(const Key('app-media-play')), findsOneWidget);
-    expect(find.byKey(const Key('app-media-speed')), findsNothing);
-    expect(find.byKey(const Key('app-media-fullscreen')), findsNothing);
+    expect(find.byTooltip('Play'), findsOneWidget);
+    expect(find.byTooltip('Speed'), findsNothing);
+    expect(find.byTooltip('Fullscreen'), findsNothing);
     await stop(tester, app);
   });
 
@@ -140,19 +140,22 @@ void main() {
     await app.tap(tester, find.text('Workouts').last);
     await app.tap(tester, find.text('Morning mobility'));
     await playTo(tester, const Duration(seconds: 1));
-    expect(find.byKey(miniPlayer), findsNothing);
+    expect(miniPlayer, findsNothing);
 
     await app.tap(tester, find.text('News'));
-    expect(find.byKey(miniPlayer), findsOneWidget);
+    expect(miniPlayer, findsOneWidget);
     expect(active().playback.value.isPlaying, isTrue);
 
-    await app.tap(tester, find.byKey(miniPlayer));
+    await app.tap(tester, miniPlayer);
     expect(find.byType(AppMediaPlayer), findsOneWidget);
-    expect(find.byKey(miniPlayer), findsNothing);
+    expect(miniPlayer, findsNothing);
 
     await app.tap(tester, find.text('News'));
-    await app.tap(tester, find.byKey(const Key('app-mini-player-close')));
-    expect(find.byKey(miniPlayer), findsNothing);
+    await app.tap(
+      tester,
+      find.descendant(of: miniPlayer, matching: find.byIcon(Icons.close)),
+    );
+    expect(miniPlayer, findsNothing);
     expect(dw.plugins.media.sessionManager.sessions, isEmpty);
     await stop(tester, app);
   });

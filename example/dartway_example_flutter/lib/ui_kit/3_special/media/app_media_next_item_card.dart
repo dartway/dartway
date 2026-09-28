@@ -22,7 +22,6 @@ class AppMediaNextItemCard extends StatelessWidget {
           }
           final countdown = queue.autoplayCountdown;
           return GestureDetector(
-            key: const Key('app-media-next'),
             onTap: session.next,
             child: SizedBox(
               width: 220,

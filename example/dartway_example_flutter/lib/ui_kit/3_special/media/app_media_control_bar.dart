@@ -34,7 +34,6 @@ class AppMediaControlBar extends StatelessWidget {
                 onPressed: session.skipBack,
               ),
               IconButton(
-                key: const Key('app-media-play'),
                 tooltip: playback.isPlaying
                     ? context.l10n.mediaPause
                     : context.l10n.mediaPlay,
@@ -56,7 +55,6 @@ class AppMediaControlBar extends StatelessWidget {
               ),
               if (options.speeds.isNotEmpty)
                 PopupMenuButton<double>(
-                  key: const Key('app-media-speed'),
                   tooltip: context.l10n.mediaSpeed,
                   initialValue: playback.speed,
                   onSelected: session.setSpeed,
@@ -75,7 +73,6 @@ class AppMediaControlBar extends StatelessWidget {
               if (options.fullscreen &&
                   session.currentItem.kind == DwMediaKind.video)
                 IconButton(
-                  key: const Key('app-media-fullscreen'),
                   tooltip: context.l10n.mediaFullscreen,
                   icon: Icon(
                     fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,

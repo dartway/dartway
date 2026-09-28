@@ -118,7 +118,6 @@ class _AppMediaStageState extends State<_AppMediaStage> {
           ),
           if (_controlsVisible)
             ColoredBox(
-              key: const Key('app-media-controls'),
               color: Colors.black38,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,

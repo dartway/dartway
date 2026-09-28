@@ -24,7 +24,6 @@ class AppMiniPlayerChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    key: const Key('app-mini-player'),
     onTap: onExpand,
     child: Material(
       color: Colors.black,
@@ -66,7 +65,6 @@ class AppMiniPlayerChrome extends StatelessWidget {
               child: Semantics(
                 label: context.l10n.mediaClose,
                 child: IconButton(
-                  key: const Key('app-mini-player-close'),
                   iconSize: 16,
                   icon: const Icon(Icons.close),
                   onPressed: onClose,

@@ -1,156 +1,144 @@
 ---
 name: dartway-media
 description: >-
-  Video/audio playback in a DartWay project: the plugin `DwMedia` (`dartway_media_flutter`,
-  `dw.plugins.media`) with `DwMediaConfig`/`DwMediaOpenOptions`, `DwMediaItem`/`DwMediaSource`,
-  opening a queue with `DwMedia.open(...)`, `DwMediaSession` (play/pause/seek/skip/setSpeed/
-  setVolume/setMuted/retry, next/previous/jumpTo, fullscreen, minimize/restore),
-  `DwVideoSurface`, `showDwMediaFullscreen`, `DwMiniPlayerHost`. **The package ships no controls** —
-  play/pause, the timeline, speed, fullscreen, the next-item card, mini-player chrome and the error
-  state with retry live as the project's own widgets, copied from `example/` and restyled. Use when
-  a feature plays a video or an audio track, when a project needs a mini-player or a queue, or when
-  a player's error, resume or background behaviour needs tuning.
+  Video and audio in a DartWay app: the plugin `DwMedia` (`dartway_media_flutter`,
+  `dw.plugins.media`) with `DwMediaConfig` and per-session `DwMediaOpenOptions`, `DwMediaItem` /
+  `DwMediaSource` (a URL or a resolver re-called on retry), `DwMediaSession` (play, pause, seek,
+  skip, speed, mute, retry, next/previous/jumpTo, autoplay countdown, fullscreen, minimize/restore),
+  `DwMediaCallbacks`, `DwVideoSurface`, `DwMediaFullscreenHost`, `DwMiniPlayerHost`, and the
+  fakes of `testing.dart`. **The package ships no controls**: play/pause, the timeline, speed,
+  fullscreen, the next-item card, the mini-player's look and the error state with retry are the
+  project's own widgets, copied from the framework's example and restyled. Use when a feature plays
+  a video or an audio track, needs a queue, resume, a mini-player or fullscreen, or when a player's
+  error, background or web behaviour needs tuning.
 ---
 
-# DartWay — media playback (`dartway-media`)
+# DartWay — video and audio (`dartway-media`)
 
 **Mechanism in the package, look in the project.** `dartway_media_flutter` has no button, no
-timeline, no colour — see `docs/3-flutter/ui-kit.md`. The default controls a project actually
-shows are `example/dartway_example_flutter/lib/ui_kit/3_special/media/`: read them end to end
-before writing a feature, then copy the ones the project needs into `__FLUTTER_PKG__/lib/ui_kit/3_special/media/`
-and restyle from there — they become the project's code the moment they are copied, same as the
-rest of the kit (`dartway-ui-kit`).
+timeline, no colour and no text. The controls an app shows are its own `ui_kit/` widgets. The
+framework's page is `docs/3-flutter/media.md` in the framework repository: its settings table is
+the one list of every setting and its default; this skill does not repeat it.
 
-The framework's own page is `docs/3-flutter/media.md` — the knob table there is the source of
-truth for every default; this skill does not repeat it.
-
-## 1. Add the package and declare the plugin — `__FLUTTER_PKG__`
+## 1. Add the package and the plugin — `__FLUTTER_PKG__`
 
 ```bash
 flutter pub add dartway_media_flutter
 ```
 
+In the core's `plugins:`:
+
 ```dart
-dw = DwFlutterToolbox(
-  plugins: [
-    DwMedia(
-      config: DwMediaConfig(
-        speeds: [1.0, 1.25, 1.5, 2.0],   // empty (the default) turns the speed control off
-        resume: const DwMediaResumePolicy(),
-        // ... every other knob is docs/3-flutter/media.md's table, not repeated here
-      ),
-    ),
-  ],
-);
+DwMedia(
+  config: const DwMediaConfig(
+    speeds: [1, 1.25, 1.5, 2],   // empty (the default) hides the speed control
+    autoplayNext: true,
+    nextPreview: true,
+  ),
+),
 ```
 
-**A project that plays nothing does not add this package at all** — that is the whole point of it
-being a plugin rather than a `DwFlutterConfig` field, and why the template does not ship it.
+A project that plays nothing does not add the package: `video_player` and `just_audio` come with
+it.
 
-## 2. Open a queue and read state
+## 2. Open a session
 
 ```dart
 final session = dw.plugins.media.open(
   items: [
-    DwMediaItem(id: lesson.id, kind: DwMediaKind.video, source: DwMediaSource.resolve(fetchFreshUrl)),
+    DwMediaItem(
+      id: item.id.toString(),
+      kind: DwMediaKind.video,
+      title: item.title,
+      source: DwMediaSource.resolve(() => fetchPlaybackUrl(item.id)),
+    ),
   ],
-  callbacks: DwMediaCallbacks(
-    onCompleted: (item) => dw.plugins.analytics.track(LessonEvent.videoCompleted, {'lessonId': item.id}),
-    onError: (item, error) => dw.handleError(error, StackTrace.current),
-  ),
-  options: const DwMediaOpenOptions(autoplayOnOpen: true),   // per-open override, see below
+  callbacks: DwMediaCallbacks(onCompleted: (item) => markWatched(item.id)),
+  options: const DwMediaOpenOptions(autoplayOnOpen: true),
 );
 ```
 
-- **`DwMediaSource.resolve(fetchFreshUrl)`, not `.url(...)`, for anything time-limited** — a signed
-  link that can expire. The resolver runs again on `retry()`, so an expired link recovers instead
-  of dead-ending the player (`dartway/molodey#128`).
-- **Callbacks are supplied once, at `open()`**, not per item — they cover the whole queue.
-  `onItemChanged` fires when the queue advances; `onStarted`/`onProgress`/`onReachedEnd`/
-  `onCompleted`/`onError` are about whichever item is current.
-- **A session survives the widget that opened it.** Hold the `DwMediaSession` outside a
-  `State.dispose` boundary (a controller/provider your screen and the mini-player both reach), not
-  as a local variable of one page — that is what lets the mini-player and fullscreen keep playing
-  through navigation.
-- **Every knob is overridable per `open()`** with `DwMediaOpenOptions` — a project that wants
-  resume and a countdown for lectures and neither for short clips passes one `DwMediaConfig`
-  default and overrides per call, never two configs.
+- **Anything that expires is a resolver, not a URL.** `DwMediaSource.resolve` is called on every
+  load and on every retry, so an expired signed link is fetched again instead of ending the player.
+- **The plugin owns the session.** Do not keep it in a page's `State` and do not dispose it when the
+  page goes: `dw.plugins.media.sessionManager.active` holds it, and that is what lets the
+  mini-player carry on. A page reads the active session with a `ValueListenableBuilder`.
+- **Settings are per session when they must be.** One `DwMediaConfig` for the app, a
+  `DwMediaOpenOptions` for the session that differs (`withoutResume: true` for a clip feed).
+- **Pick the right callback.** `onCompleted` — "watched enough", fires at `completedThreshold`,
+  a seek counts. `onReachedEnd` — "played to the end", real playback only, a scrub never counts.
+  `onStarted` — the first real playback, not a `play()` the browser refused.
 
-## 3. Controls widgets — copy, don't import
+## 3. The controls: copy, then restyle
 
-Build your own over `DwMediaController`/`DwMediaSession`, reading `session.controller.state`
-(`ValueListenable<DwMediaPlaybackState>`) and `session.queue`
-(`ValueListenable<DwMediaQueueState>`) with `ValueListenableBuilder`/`ListenableBuilder` — the
-package exposes state this way rather than as riverpod providers, because a session's identity is
-created at `open()` time, not declared once like `dw.plugins.prefs.provider(...)`.
+Read `example/dartway_example_flutter/lib/ui_kit/3_special/media/` in the framework repository end
+to end, copy what the feature needs into `__FLUTTER_PKG__/lib/ui_kit/3_special/media/`, add the
+`part` lines to `ui_kit.dart`, and restyle there. From then on they are the project's widgets.
 
-What to copy from `example/.../ui_kit/3_special/media/` and restyle:
-
-| Widget | Reads |
+| Widget | What it reads and calls |
 |---|---|
-| Play/pause | `state.playState`, calls `session.play`/`session.pause` |
-| Timeline (scrub + buffered range) | `state.position`/`duration`/`buffered`, calls `session.seek` |
-| Skip ±  | calls `session.skipBack`/`skipForward` (their durations are `options.skipBack`/`skipForward`) |
-| Speed | `session.options.speeds` (hidden when empty), calls `session.setSpeed` |
-| Mute | `state.muted`, calls `session.setMuted` |
-| Fullscreen | calls `showDwMediaFullscreen(context, session: session, builder: ...)` |
-| Error + retry | `state.errorMessage`, calls `session.retry` |
-| Next-item card | `session.queue.value.next`/`showNextPreview`/`autoplayCountdownSeconds` |
-| Mini-player chrome | the `builder` given to `DwMiniPlayerHost` |
+| `AppMediaPlayer` | the inline player: `DwMediaFullscreenHost` around the picture, controls that hide after `session.options.controlsAutoHideDelay` while playing, the next card, the error view |
+| `AppMediaControlBar` | `session.playback`, `session.isFullscreen`; `play`/`pause`, `skipBack`/`skipForward`, `setMuted`, `setSpeed` (hidden when `options.speeds` is empty), `enterFullscreen`/`exitFullscreen` (hidden when `options.fullscreen` is off or the item is audio) |
+| `AppMediaTimeline` | `session.playback` position, buffered, duration; one `seek` on release, not one per drag frame |
+| `AppMediaNextItemCard` | `session.queue`: `showNextPreview`, `next`, `autoplayCountdown`; `next()`, `cancelAutoplay()` |
+| `AppMediaErrorView` | `playback.isError`; `retry()` — the error stays inside the player |
+| `AppMiniPlayerChrome` | the `builder` of `DwMiniPlayerHost`: the picture, play/pause, close |
 
-`DwVideoSurface(session: session)` is the one widget the package does ship pixels for — a plain
-texture at the correct aspect ratio, deliberately with no chrome around it.
+Every visible string goes through `context.l10n` — the keys the example uses are `media*` in its
+`.arb` files. A kit widget carries no string literal: `dartway check` reports one as
+`uiKitContainsText`, which is why tests find these widgets by type and tooltip, not by `Key`.
 
-## 4. Mini-player — mounted once, at the app root
+## 4. Fullscreen, the mini-player, the page
+
+- **Fullscreen**: wrap the inline player in `DwMediaFullscreenHost(session:, builder:, child:)`.
+  `session.enterFullscreen()` — or `autoEnterFullscreenOnPlay` — pushes the package's own route;
+  `exitFullscreen()` and a back gesture both leave it; orientations come from the config.
+- **Mini-player**: mount `DwMiniPlayerHost` once, in `MaterialApp.builder`, over the router's
+  child:
 
 ```dart
-MaterialApp.router(
-  builder: (context, child) => Stack(
-    children: [
-      if (child != null) child,
-      DwMiniPlayerHost(
-        sessionManager: dw.plugins.media.sessionManager,
-        onExpand: (item) => context.go('/player/${item.id}'),   // the app's own route
-        builder: (context, session, expand, close) => YourMiniPlayerChrome(
-          session: session,
-          onTap: expand,
-          onClose: close,
-        ),
-      ),
-    ],
-  ),
-)
+builder: (context, child) => Stack(
+  children: [
+    child ?? const SizedBox.shrink(),
+    DwMiniPlayerHost(
+      sessionManager: dw.plugins.media.sessionManager,
+      // `router` is `ref.watch(appRouterProvider)`, already in `build`.
+      onExpand: (_) => router.router.goNamed(AppNavigationZone.player.name),
+      builder: (context, session, expand, close) =>
+          AppMiniPlayerChrome(session: session, onExpand: expand, onClose: close),
+    ),
+  ],
+),
 ```
 
-`DwMiniPlayerHost` decides *whether* to show it (`session.minimized` and `options.miniPlayer`) and
-the drag/scale/snap mechanics; it has no opinion on where `expand` navigates to, or what the
-chrome looks like.
+  It sits above the navigator, where there is no `Overlay`: no tooltips in its chrome.
+- **The player page** calls `session.restore()` in `initState` and `session.minimize()` in
+  `dispose` — both are safe there.
 
-## 5. Platform configuration
+## 5. Platform setup
 
-- **`options.backgroundAudio: true`** needs, additionally: iOS — `UIBackgroundModes` with `audio`
-  in `Info.plist`; Android — nothing extra (a foreground playback session is enough for
-  `just_audio` without a background service). Without this, audio still pauses on background
-  regardless of the flag, and the failure looks like the flag doing nothing.
-- **Fullscreen orientations** (`options.fullscreenOrientations`/`exitOrientations`) need no platform
-  config — they go through `SystemChrome`, already available.
-- **Web**: nothing to add; `options.webMutedStart`/`webRememberSoundChoice` are handled entirely in
-  Dart.
+- **Background audio** (`backgroundAudio: true`): iOS needs `audio` in `UIBackgroundModes` in
+  `ios/Runner/Info.plist`; without it audio stops with the screen whatever the flag says. Android
+  needs nothing for playback with the screen locked; a notification with controls is not part of
+  the package.
+- **Web**: nothing to add. Video starts muted until the person unmutes (`webMutedStart`), and the
+  choice carries on (`rememberSound`).
 
 ## 6. Tests
 
 ```dart
+import 'package:dartway_media_flutter/testing.dart';
+
 setUp(() {
-  VideoPlayerPlatform.instance = DwFakeVideoPlayerPlatform();
-  JustAudioPlatform.instance = DwFakeJustAudioPlatform();
+  DwFakeVideoPlayerPlatform.install();
+  DwFakeJustAudioPlatform.install();
 });
 ```
 
-(`import 'package:dartway_media_flutter/testing.dart';`) — drives `DwMediaController` without a
-real plugin on any platform. `fake.emitInitialized`/`emitCompleted` (video) and
-`player.emitCompleted`/`emitPosition` (audio, via `fake.players`) are the engine's *real*
-end-of-playback signals; `session.seek(duration)` is a scrub, which must never fire
-`onReachedEnd` on its own — if a test needs to prove a fix around the end of playback, drive it
-through one of these two paths deliberately, not through position alone. See
-`packages/dartway_media_flutter/test/` in the framework repository for the full set, including one
-test per config knob turning its behaviour on and off.
+- Real playback is `setPosition` (video) / `emitPosition` (audio) after `play()`; a scrub is
+  `session.seek(...)`; the engine's end is `emitCompleted`, a failure `emitError`. Prove "a scrub
+  does not count as the end" with those, not with a position alone.
+- After an audio command, `await dwSettleMedia(tester)` — `just_audio` finishes outside a widget
+  test's fake clock, and a bare `pump` leaves the item loading.
+- A playing video polls on a timer: `await dw.plugins.media.dispose()` (through the test app's
+  pumping helper) before the test ends.
