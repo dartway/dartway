@@ -43,6 +43,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabChat => 'Team chat';
 
   @override
+  String get tabWorkouts => 'Workouts';
+
+  @override
   String get tabProfile => 'Profile';
 
   @override
@@ -835,4 +838,51 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get analyticsPieNeedsProperty =>
       'A pie shows events split by a property: choose one under “Split by”.';
+
+  @override
+  String get workoutsTitle => 'Workouts';
+
+  @override
+  String get workoutVideo => 'Video';
+
+  @override
+  String get workoutAudio => 'Audio';
+
+  @override
+  String get mediaPlay => 'Play';
+
+  @override
+  String get mediaPause => 'Pause';
+
+  @override
+  String get mediaSkipBack => 'Back';
+
+  @override
+  String get mediaSkipForward => 'Forward';
+
+  @override
+  String get mediaMute => 'Sound';
+
+  @override
+  String get mediaSpeed => 'Speed';
+
+  @override
+  String get mediaFullscreen => 'Fullscreen';
+
+  @override
+  String get mediaClose => 'Close';
+
+  @override
+  String get mediaFailed => 'This could not be played.';
+
+  @override
+  String get mediaUpNext => 'Up next';
+
+  @override
+  String mediaNextIn(int seconds) {
+    return 'Next in $seconds s';
+  }
+
+  @override
+  String get mediaStayHere => 'Stay on this one';
 }

@@ -14,6 +14,7 @@
   "tabBookings": "My bookings",
   "tabNews": "News",
   "tabChat": "Team chat",
+  "tabWorkouts": "Workouts",
   "tabProfile": "Profile",
 
   "helloUser": "Hello, {name}",
@@ -332,5 +333,22 @@
   "analyticsOrderLabel": "Order",
   "analyticsOrder": "{order, select, largestFirst{Largest first} byLabel{By value: 1, 2, … 10} other{—}}",
   "@analyticsOrder": {"placeholders": {"order": {"type": "String"}}},
-  "analyticsPieNeedsProperty": "A pie shows events split by a property: choose one under “Split by”."
+  "analyticsPieNeedsProperty": "A pie shows events split by a property: choose one under “Split by”.",
+
+  "workoutsTitle": "Workouts",
+  "workoutVideo": "Video",
+  "workoutAudio": "Audio",
+  "mediaPlay": "Play",
+  "mediaPause": "Pause",
+  "mediaSkipBack": "Back",
+  "mediaSkipForward": "Forward",
+  "mediaMute": "Sound",
+  "mediaSpeed": "Speed",
+  "mediaFullscreen": "Fullscreen",
+  "mediaClose": "Close",
+  "mediaFailed": "This could not be played.",
+  "mediaUpNext": "Up next",
+  "mediaNextIn": "Next in {seconds} s",
+  "@mediaNextIn": {"placeholders": {"seconds": {"type": "int"}}},
+  "mediaStayHere": "Stay on this one"
 }

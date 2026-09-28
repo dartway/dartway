@@ -43,6 +43,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tabChat => 'Чат команды';
 
   @override
+  String get tabWorkouts => 'Тренировки';
+
+  @override
   String get tabProfile => 'Профиль';
 
   @override
@@ -834,4 +837,51 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get analyticsPieNeedsProperty =>
       'Круговая диаграмма делит события по свойству: выберите его в «Разбить по».';
+
+  @override
+  String get workoutsTitle => 'Тренировки';
+
+  @override
+  String get workoutVideo => 'Видео';
+
+  @override
+  String get workoutAudio => 'Аудио';
+
+  @override
+  String get mediaPlay => 'Воспроизвести';
+
+  @override
+  String get mediaPause => 'Пауза';
+
+  @override
+  String get mediaSkipBack => 'Назад';
+
+  @override
+  String get mediaSkipForward => 'Вперёд';
+
+  @override
+  String get mediaMute => 'Звук';
+
+  @override
+  String get mediaSpeed => 'Скорость';
+
+  @override
+  String get mediaFullscreen => 'Во весь экран';
+
+  @override
+  String get mediaClose => 'Закрыть';
+
+  @override
+  String get mediaFailed => 'Не удалось воспроизвести.';
+
+  @override
+  String get mediaUpNext => 'Дальше';
+
+  @override
+  String mediaNextIn(int seconds) {
+    return 'Дальше через $seconds с';
+  }
+
+  @override
+  String get mediaStayHere => 'Остаться здесь';
 }

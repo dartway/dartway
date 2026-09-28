@@ -23,6 +23,12 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
       parent: schedule,
     ),
   ),
+  workouts(
+    DwNavigationRouteDescriptor.simple(
+      pageWidget: WorkoutsPage(),
+      parent: schedule,
+    ),
+  ),
   services(
     DwNavigationRouteDescriptor.simple(
       pageWidget: ServicesPage(),

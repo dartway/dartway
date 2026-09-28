@@ -1,6 +1,7 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:dartway_media_flutter/dartway_media_flutter.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:flutter/foundation.dart';
@@ -59,6 +60,15 @@ abstract final class ExampleDwCore {
       DwPush(transports: pushTransports),
       // Opening, resuming and signing in are recorded from the first build.
       DwAnalytics(store: analyticsStore),
+      // Workout videos: speeds on, the next workout previewed and started
+      // after a countdown; everything else is the package's default.
+      DwMedia(
+        config: const DwMediaConfig(
+          speeds: [1, 1.25, 1.5, 2],
+          autoplayNext: true,
+          nextPreview: true,
+        ),
+      ),
     ],
   );
 
