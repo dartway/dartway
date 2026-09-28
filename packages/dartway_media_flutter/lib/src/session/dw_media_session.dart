@@ -49,6 +49,7 @@ final class DwMediaSession {
   late DwMediaController _controller;
   double _speed;
   bool _reachedEnd = false;
+  bool _autoplayHandled = false;
   Timer? _countdown;
   bool _disposed = false;
 
@@ -74,6 +75,7 @@ final class DwMediaSession {
   void _open({required bool autoplay}) {
     final item = queue.value.current;
     _reachedEnd = false;
+    _autoplayHandled = false;
     final controller = createDwMediaController(
       item: item,
       callbacks: DwMediaCallbacks(
@@ -82,6 +84,7 @@ final class DwMediaSession {
         onReachedEnd: (item) {
           _reachedEnd = true;
           _callbacks.onReachedEnd?.call(item);
+          _maybeAutoplay();
         },
         onCompleted: _callbacks.onCompleted,
         onError: _callbacks.onError,
@@ -126,10 +129,10 @@ final class DwMediaSession {
   }
 
   void _onPlayback() {
-    final previous = _playback.value;
     final next = _controller.state.value;
     _playback.value = next;
-    if (next.isEnded && !previous.isEnded && _reachedEnd) _onEnded();
+    if (!next.isEnded) _autoplayHandled = false;
+    _maybeAutoplay();
     _updatePreview(next);
   }
 
@@ -149,7 +152,12 @@ final class DwMediaSession {
 
   // --- Autoplay ------------------------------------------------------------
 
-  void _onEnded() {
+  /// Once per ending: the item has really played to its end (the
+  /// controller's `onReachedEnd`, which may come a tick before or after the
+  /// state turns ended) and now stands ended.
+  void _maybeAutoplay() {
+    if (_autoplayHandled || !_reachedEnd || !_playback.value.isEnded) return;
+    _autoplayHandled = true;
     if (!options.autoplayNext || !queue.value.hasNext) return;
     if (!options.autoplayCountdown ||
         options.autoplayCountdownDuration <= Duration.zero) {
