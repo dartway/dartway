@@ -12,3 +12,4 @@ library;
 
 export 'testing/dw_fake_just_audio_platform.dart';
 export 'testing/dw_fake_video_player_platform.dart';
+export 'testing/dw_settle_media.dart';

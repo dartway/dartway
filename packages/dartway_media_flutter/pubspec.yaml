@@ -24,13 +24,14 @@ dependencies:
   wakelock_plus: ^1.5.2
   # `testing.dart`'s fakes speak the same platform protocol video_player and
   # just_audio do — declared rather than reached transitively, since they are
-  # used by name.
+  # used by name. `flutter_test` answers the audio-session channel just_audio
+  # waits on in a widget test; only `testing.dart` imports it.
   video_player_platform_interface: ^6.9.0
   just_audio_platform_interface: ^4.6.0
-
-dev_dependencies:
   flutter_test:
     sdk: flutter
+
+dev_dependencies:
   flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
