@@ -51,6 +51,7 @@ build it on a free port against their own database.
 | `auth` | yes | a `DwAuthConfig` — [auth and identity](auth-identity.md) |
 | `features` | yes | the project's areas, each a `DwServerFeature(name, handlers:, channels:, jobs:, routes:)` declared in its own folder: one `DwCallHandler` per request and command ([handlers](handlers-and-context.md)), a `DwChannelRule` per channel kind it owns ([channels](../2-core/channels-and-realtime.md)), its jobs ([jobs](jobs.md)) and its doors for callers that are not the app ([routes](routes.md)). `server.handlers` and `.jobs` read them together with every module's ([`modules:`](push-delivery.md#wiring), a `DwServerModule` answers calls and runs jobs too); `server.channels` and `.routes` read features' only — a module has neither. A feature's name is its folder under `lib/src/`: lower-case, and once |
 | `files` | no | a `DwFileStorage`; without it file calls fail — [uploads](uploads.md) |
+| `modules` | no | framework satellites — push, analytics — each a `DwServerModule` contributing its own migrations, calls and jobs; their calls and jobs are part of `server.handlers` and `.jobs`, alongside features' (a module has neither channels nor routes) — [push delivery](push-delivery.md), [analytics](analytics.md) |
 | `port` | no | `8080`; `0` binds a free port (`server.boundPort` tells which) |
 | `address` | no | `InternetAddress.anyIPv4` |
 | `alerts` | no | a `DwAlertSink`; the log by default — [alerts](alerts.md) |
