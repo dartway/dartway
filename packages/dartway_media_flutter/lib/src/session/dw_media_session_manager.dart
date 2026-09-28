@@ -59,7 +59,9 @@ final class DwMediaSessionManager {
       manager: this,
     );
     _sessions.add(session);
-    _claim(session);
+    // Autoplay claims the session through `play()`; otherwise opening does.
+    if (!session.options.autoplayOnOpen) _claim(session);
+    session._open(autoplay: session.options.autoplayOnOpen);
     return session;
   }
 

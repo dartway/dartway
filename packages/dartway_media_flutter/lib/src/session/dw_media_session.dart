@@ -22,9 +22,7 @@ final class DwMediaSession {
        _speed = options.defaultSpeed,
        queue = ValueNotifier(
          DwMediaQueueState(items: items, currentIndex: startIndex),
-       ) {
-    _open(autoplay: options.autoplayOnOpen);
-  }
+       );
 
   /// The resolved settings: the plugin's `DwMediaConfig` with this open's
   /// `DwMediaOpenOptions` laid over it.
