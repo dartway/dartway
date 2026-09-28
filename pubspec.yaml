@@ -16,6 +16,7 @@ workspace:
   - packages/dartway_core_flutter
   - packages/dartway_core_server
   - packages/dartway_core_shared
+  - packages/dartway_media_flutter
   - packages/dartway_orm
   - packages/dartway_push_firebase
   - packages/dartway_push_flutter
