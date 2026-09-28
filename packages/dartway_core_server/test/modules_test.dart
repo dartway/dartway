@@ -16,6 +16,18 @@ final class CountVisit extends DwActionCommand<int> {
   Map<String, Object?> toJson() => const {};
 }
 
+/// A command a feature answers — distinct from [CountVisit] so a server
+/// mixing one feature with one module can be told apart by call type.
+final class TouchNote extends DwActionCommand<void> {
+  const TouchNote();
+
+  @override
+  String get dwTypeName => 'TouchNote';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+}
+
 final protocol = DwWireProtocol([
   DwProtocolEntry<CountVisit>('CountVisit', (_) => const CountVisit()),
 ], include: DwWireProtocol.core);
@@ -227,6 +239,87 @@ void main() {
           'module namespace "visits" is used twice',
           'CountVisit has more than one handler',
         ]),
+      );
+    },
+  );
+
+  test(
+    "handlers and jobs enumerate both a feature's and a module's calls "
+    '(#366: a module used to be missing from both)',
+    () {
+      final module = VisitsModule();
+      final server = DwAppServer(
+        protocol: protocol,
+        migrations: const [],
+        database: unreachable,
+        auth: DwAuthConfig(
+          accountDeletion: DwAccountDeletion.byMember,
+          normalize: (kind, raw) => raw,
+          deliverCode: (ctx, kind, identifier, code, accountId) async {},
+        ),
+        features: [
+          DwServerFeature(
+            'notes',
+            handlers: [
+              DwCallHandler.command<TouchNote, void>(
+                access: DwAccessRule.anonymous,
+                handle: (ctx, command) async {},
+              ),
+            ],
+            jobs: [
+              DwQueuedJob(
+                DwJobKind.withoutPayload('app.touch'),
+                handle: (ctx, _) async {},
+              ),
+            ],
+          ),
+        ],
+        modules: [module],
+        logger: RecordingLogger(),
+      );
+
+      expect(
+        server.handlers.map((handler) => handler.callType),
+        containsAll(<Type>[TouchNote, CountVisit]),
+      );
+      expect(
+        server.jobs.map((job) => job.name),
+        containsAll(['app.touch', module.jobName]),
+      );
+    },
+  );
+
+  test(
+    'a feature handler colliding with a module handler is still refused',
+    () async {
+      final found = await problemsOf(
+        DwAppServer(
+          protocol: protocol,
+          migrations: const [],
+          database: unreachable,
+          auth: DwAuthConfig(
+            accountDeletion: DwAccountDeletion.byMember,
+            normalize: (kind, raw) => raw,
+            deliverCode: (ctx, kind, identifier, code, accountId) async {},
+          ),
+          features: [
+            DwServerFeature(
+              'notes',
+              handlers: [
+                DwCallHandler.command<CountVisit, int>(
+                  access: DwAccessRule.anonymous,
+                  handle: (ctx, command) async => 0,
+                ),
+              ],
+            ),
+          ],
+          modules: [VisitsModule()],
+          logger: RecordingLogger(),
+        ),
+      );
+      expect(
+        found,
+        contains('CountVisit has a built-in handler and cannot have another'),
       );
     },
   );

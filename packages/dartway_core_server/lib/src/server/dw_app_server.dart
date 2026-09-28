@@ -114,22 +114,47 @@ final class DwAppServer {
   /// comes from one of them. See [DwServerFeature].
   final List<DwServerFeature> features;
 
-  /// Every feature's handlers.
-  List<DwCallHandler> get handlers => [
+  List<DwCallHandler> get _featureHandlers => [
     for (final feature in features) ...feature.handlers,
   ];
 
-  /// Every feature's channel rules.
+  /// Every call this server answers because the project configured it:
+  /// [features]' handlers and [modules]' handlers (a module answers calls
+  /// too — push, analytics). **Not here:** the framework's own auth calls
+  /// (`DwAuthService.handlers()`) and file calls (`DwFileStore.handlers()`)
+  /// — their access rule is the framework's, not something the project
+  /// declared, and the handler objects themselves exist only once [start]
+  /// has built them. A test that walks every call the project is
+  /// responsible for (an access matrix, say) reads this; [start] reads it
+  /// too, alongside the framework's own, so a call is registered in one
+  /// place only.
+  List<DwCallHandler> get handlers => [
+    ..._featureHandlers,
+    for (final module in modules) ...module.handlers,
+  ];
+
+  /// Every feature's channel rules. Modules have none — [DwServerModule]
+  /// exposes no `channels`, so there is nothing of theirs to add here.
   List<DwChannelRule> get channels => [
     for (final feature in features) ...feature.channels,
   ];
 
-  /// Every feature's jobs.
-  List<DwJobDefinition> get jobs => [
+  List<DwJobDefinition> get _featureJobs => [
     for (final feature in features) ...feature.jobs,
   ];
 
-  /// Every feature's routes.
+  /// Every job this server runs because the project configured it:
+  /// [features]' jobs and [modules]' jobs (named `dw.<namespace>.…`, see
+  /// [DwServerModule.namespace]). The framework's own cleanup job is not
+  /// here for the same reason the framework's own calls are not in
+  /// [handlers]: it is not something the project declared.
+  List<DwJobDefinition> get jobs => [
+    ..._featureJobs,
+    for (final module in modules) ...module.jobs,
+  ];
+
+  /// Every feature's routes. Modules have none — [DwServerModule] exposes
+  /// no `routes`, so there is nothing of theirs to add here.
   List<DwHttpRoute> get routes => [
     for (final feature in features) ...feature.routes,
   ];
@@ -341,7 +366,6 @@ final class DwAppServer {
           ...jobs,
           _cleanupJob(),
           ...?fileStore?.jobs(),
-          for (final module in modules) ...module.jobs,
         ],
         listen: openedDatabase.listen,
         workers: settings.jobWorkers,
@@ -377,7 +401,6 @@ final class DwAppServer {
               ...handlers,
               ...authService.handlers(),
               ...fileStore?.handlers() ?? DwFileStore.unconfiguredHandlers(),
-              for (final module in modules) ...module.handlers,
             ])
               handler.callType: handler,
           },
@@ -514,7 +537,7 @@ final class DwAppServer {
       for (final module in modules)
         for (final handler in module.handlers) handler.callType,
     };
-    for (final handler in handlers) {
+    for (final handler in _featureHandlers) {
       final type = handler.callType;
       if (DwAuthService.builtInTypes.contains(type) ||
           DwFileStore.builtInTypes.contains(type) ||
@@ -560,7 +583,7 @@ final class DwAppServer {
       }
     }
     final jobNames = <String>{};
-    for (final job in jobs) {
+    for (final job in _featureJobs) {
       if (job.name.startsWith('dw.')) {
         problems.add(
           'job "${job.name}": names starting with "dw." are the '
