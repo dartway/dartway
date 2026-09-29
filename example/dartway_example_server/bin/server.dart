@@ -34,6 +34,9 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 /// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
 ///   before starting (`DwFileStorageSetup.provision`): for a development
 ///   storage the project owns, never for a storage somebody else administers;
+/// - `DW_ADMIN_IDENTIFIER` — the phone or e-mail of the first administrator,
+///   made one on every start by the framework's `DwFirstAdministrator` step;
+///   unset for none;
 /// - `FCM_SERVICE_ACCOUNT_FILE`, `FCM_WEB_LINK_BASE`,
 ///   `RUSTORE_PUSH_PROJECT_ID`, `RUSTORE_PUSH_SERVICE_TOKEN` — push providers
 ///   (`AppPushEnvironment`); without them the server queues and records
@@ -52,6 +55,7 @@ Future<void> main() async {
     port: env.server.port,
     push: AppPush.module(providers: AppPush.providers(env.push)),
     settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
+    adminIdentifier: env.server.adminIdentifier,
   );
-  await server.start();
+  await server.start(migrateOnly: env.server.migrateOnly);
 }

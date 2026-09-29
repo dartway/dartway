@@ -14,6 +14,8 @@ import 'dw_environment_reader.dart';
 /// | `DW_STORAGE_PROVISION` | [provisionStorage] |
 /// | `PORT` | [port], 8080 by default |
 /// | `DW_ALLOWED_ORIGINS` | [allowedOrigins], comma-separated |
+/// | `DW_ADMIN_IDENTIFIER` | [adminIdentifier], for `DwFirstAdministrator` |
+/// | `DW_MIGRATE_ONLY` | [migrateOnly], for `DwAppServer.start` |
 ///
 /// Read as a part of the project's own environment, so one start reports
 /// every missing variable of both:
@@ -31,6 +33,8 @@ final class DwServerEnvironment {
     this.provisionStorage = false,
     this.port = 8080,
     this.allowedOrigins = const {},
+    this.adminIdentifier,
+    this.migrateOnly = false,
   });
 
   /// The framework's variables out of [read], problems recorded there.
@@ -70,6 +74,8 @@ final class DwServerEnvironment {
       provisionStorage: provision && storage != null,
       port: port,
       allowedOrigins: read.list('DW_ALLOWED_ORIGINS').toSet(),
+      adminIdentifier: read.optional('DW_ADMIN_IDENTIFIER')?.trim(),
+      migrateOnly: read.flag(migrateOnlyVariable),
     );
   }
 
@@ -77,6 +83,11 @@ final class DwServerEnvironment {
   /// their access before starting (`DwFileStorageSetup.provision`): for a
   /// storage the project owns, never for one somebody else administers.
   static const String provisionVariable = 'DW_STORAGE_PROVISION';
+
+  /// The variable that turns `DwAppServer.start` into a one-off migration
+  /// ([migrateOnly]): how `dartway deploy` migrates between the old server
+  /// and the new one.
+  static const String migrateOnlyVariable = 'DW_MIGRATE_ONLY';
 
   static const String _endpoint = 'DW_STORAGE_ENDPOINT';
 
@@ -99,6 +110,14 @@ final class DwServerEnvironment {
   /// is served on, that may open it — `DwServerSettings.allowedOrigins`. A
   /// web app served through the same host needs none.
   final Set<String> allowedOrigins;
+
+  /// `DW_ADMIN_IDENTIFIER`: the phone or e-mail made an administrator at
+  /// every start (`DwFirstAdministrator(identifier:)`); `null` for none.
+  final String? adminIdentifier;
+
+  /// `DW_MIGRATE_ONLY=true`: apply the migrations and exit without serving
+  /// (`DwAppServer.start(migrateOnly:)`).
+  final bool migrateOnly;
 
   static DwDatabaseConfig _database(DwEnvironmentReader read) {
     try {

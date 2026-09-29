@@ -146,6 +146,7 @@ app on one server process.
 | `alertsPerSignature` | 5 | Alerts of one failure signature per `alertWindow` ([alerts](alerts.md)). |
 | `alertWindow` | 1 h | The window of that ceiling. |
 | `outboundTimeout` | 30 s | How long one outbound request (`ctx.http`) may take, connecting to last byte, unless the call names its own ([handlers](handlers-and-context.md#outbound-http)). |
+| `outboundMaxResponseBytes` | 10 MiB | The largest response body one outbound request reads, unless the call names its own; past it the exchange fails with `DwOutboundException`. |
 
 ## Configuration comes from the environment
 
@@ -198,10 +199,12 @@ hears about all three in one start. A problem never repeats a text value; a numb
 | `DW_STORAGE_PROVISION=true` | `provisionStorage`: `DwFileStorageSetup.provision` before starting — for a storage the project owns; a problem without an endpoint |
 | `PORT` | `port`, 8080 by default |
 | `DW_ALLOWED_ORIGINS` | `allowedOrigins`, comma-separated, for `DwServerSettings.allowedOrigins` |
+| `DW_ADMIN_IDENTIFIER` | `adminIdentifier`, for `DwFirstAdministrator(identifier:)` (below) |
+| `DW_MIGRATE_ONLY=true` | `migrateOnly`, for `DwAppServer.start(migrateOnly:)`: apply the migrations and exit |
 
-Two more are read where they act rather than here: `DW_MIGRATE_ONLY` by `DwAppServer.start`, and
-`DW_ADMIN_IDENTIFIER` by `DwFirstAdministrator` (below). The two groups `DwServerEnvironment` reads
-are the framework's own parsers:
+Every one of them comes through the local overlay and into the one error list — nothing of the
+framework's reads `Platform.environment` behind the project's back. The two groups above that have
+parsers of their own are:
 
 - `DwDatabaseConfig.fromEnvironment(env)` reads `DW_DATABASE_HOST`, `_PORT` (5432), `_NAME`,
   `_USER`, `_PASSWORD`, `_SSL` (`true` unless `false`), `_CA_FILE` (unset) and `_MAX_CONNECTIONS`
@@ -284,11 +287,14 @@ edit and no `down` that would delete rows somebody has since corrected.
 
 The case every project has. The admin role is granted by an admin, which leaves the first one
 nowhere to come from; `DW_ADMIN_IDENTIFIER` names it per environment, and there is no default
-because whoever receives the codes sent to that identifier *is* the administrator.
+because whoever receives the codes sent to that identifier *is* the administrator. It is read into
+`DwServerEnvironment.adminIdentifier`, and `bin/server.dart` hands it to the server factory:
 
 ```dart
 DwAppServer(
-  startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+  startup: [
+    DwFirstAdministrator(grant: AppBootstrap.grantAdmin, identifier: adminIdentifier),
+  ],
   ...
 );
 

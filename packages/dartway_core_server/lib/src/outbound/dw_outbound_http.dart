@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
@@ -45,24 +46,29 @@ final class DwOutboundHttp {
     this._transport, {
     required DwServerLogger log,
     required Duration timeout,
+    required int maxResponseBytes,
   }) : _log = log,
-       _timeout = timeout;
+       _timeout = timeout,
+       _maxResponseBytes = maxResponseBytes;
 
   final DwOutboundTransport _transport;
   final DwServerLogger _log;
   final Duration _timeout;
+  final int _maxResponseBytes;
 
   /// `GET` [url].
   Future<DwOutboundResponse> get(
     Uri url, {
     Map<String, String> headers = const {},
     Duration? timeout,
+    int? maxResponseBytes,
     bool followRedirects = true,
   }) => send(
     'GET',
     url,
     headers: headers,
     timeout: timeout,
+    maxResponseBytes: maxResponseBytes,
     followRedirects: followRedirects,
   );
 
@@ -73,6 +79,7 @@ final class DwOutboundHttp {
     Object? body,
     Object? json,
     Duration? timeout,
+    int? maxResponseBytes,
     bool followRedirects = true,
   }) => send(
     'POST',
@@ -81,6 +88,7 @@ final class DwOutboundHttp {
     body: body,
     json: json,
     timeout: timeout,
+    maxResponseBytes: maxResponseBytes,
     followRedirects: followRedirects,
   );
 
@@ -91,6 +99,7 @@ final class DwOutboundHttp {
     Object? body,
     Object? json,
     Duration? timeout,
+    int? maxResponseBytes,
     bool followRedirects = true,
   }) => send(
     'PUT',
@@ -99,6 +108,7 @@ final class DwOutboundHttp {
     body: body,
     json: json,
     timeout: timeout,
+    maxResponseBytes: maxResponseBytes,
     followRedirects: followRedirects,
   );
 
@@ -109,6 +119,7 @@ final class DwOutboundHttp {
     Object? body,
     Object? json,
     Duration? timeout,
+    int? maxResponseBytes,
     bool followRedirects = true,
   }) => send(
     'PATCH',
@@ -117,6 +128,7 @@ final class DwOutboundHttp {
     body: body,
     json: json,
     timeout: timeout,
+    maxResponseBytes: maxResponseBytes,
     followRedirects: followRedirects,
   );
 
@@ -127,6 +139,7 @@ final class DwOutboundHttp {
     Object? body,
     Object? json,
     Duration? timeout,
+    int? maxResponseBytes,
     bool followRedirects = true,
   }) => send(
     'DELETE',
@@ -135,6 +148,7 @@ final class DwOutboundHttp {
     body: body,
     json: json,
     timeout: timeout,
+    maxResponseBytes: maxResponseBytes,
     followRedirects: followRedirects,
   );
 
@@ -150,7 +164,10 @@ final class DwOutboundHttp {
   /// redirect would carry to wherever it points.
   ///
   /// Throws [DwOutboundException] when no response arrives within [timeout]
-  /// (`DwServerSettings.outboundTimeout` by default), or at all.
+  /// (`DwServerSettings.outboundTimeout` by default), or at all, and when the
+  /// response body is larger than [maxResponseBytes]
+  /// (`DwServerSettings.outboundMaxResponseBytes` by default); throws
+  /// [ArgumentError] for a URL that is not `http` or `https` with a host.
   Future<DwOutboundResponse> send(
     String method,
     Uri url, {
@@ -158,8 +175,16 @@ final class DwOutboundHttp {
     Object? body,
     Object? json,
     Duration? timeout,
+    int? maxResponseBytes,
     bool followRedirects = true,
   }) async {
+    if ((url.scheme != 'http' && url.scheme != 'https') || url.host.isEmpty) {
+      throw ArgumentError.value(
+        '${url.scheme}:',
+        'url',
+        'An outbound request goes to an http or https URL with a host',
+      );
+    }
     final request = DwOutboundRequest.encode(
       method,
       url,
@@ -169,15 +194,19 @@ final class DwOutboundHttp {
       followRedirects: followRedirects,
     );
     final limit = timeout ?? _timeout;
+    final maxBytes = maxResponseBytes ?? _maxResponseBytes;
     final watch = Stopwatch()..start();
     try {
       final response = await _transport
-          .exchange(request, limit)
+          .exchange(request, limit, maxBytes)
           .timeout(
             limit,
             onTimeout: () =>
                 throw DwOutboundException(request, timedOutAfter: limit),
           );
+      if (response.bodyBytes.length > maxBytes) {
+        throw DwOutboundException.tooLarge(request, maxBytes);
+      }
       _log.info(
         'outbound ${request.method} ${request.origin} → '
         '${response.statusCode} in ${watch.elapsedMilliseconds} ms',
@@ -256,9 +285,10 @@ final class DwOutboundRequest {
   /// A form body as its fields.
   Map<String, String> get form => Uri.splitQueryString(body);
 
-  /// Scheme, host and port: what the log names, since a path or a query may
-  /// hold a credential.
-  String get origin => url.hasAuthority ? url.origin : '$url';
+  /// Scheme, host and port — never the user info, the path or the query,
+  /// where credentials travel: what the log and every error name.
+  String get origin =>
+      '${url.scheme}://${url.host}${url.hasPort ? ':${url.port}' : ''}';
 
   @override
   String toString() => 'DwOutboundRequest($method $origin)';
@@ -328,6 +358,16 @@ final class DwOutboundException implements Exception {
           ? 'timed out after ${timedOutAfter.inMilliseconds} ms'
           : cause ?? 'no response';
 
+  /// The response body was larger than [maxBytes]: it was not read further.
+  DwOutboundException.tooLarge(DwOutboundRequest request, int maxBytes)
+    : this(
+        request,
+        cause:
+            'the response is larger than $maxBytes bytes '
+            '(DwServerSettings.outboundMaxResponseBytes, or the call\'s '
+            'maxResponseBytes)',
+      );
+
   final DwOutboundRequest request;
 
   /// The limit it ran out of; `null` when it failed another way.
@@ -347,10 +387,12 @@ final class DwOutboundException implements Exception {
 /// network in a running server, a `DwFakeOutboundHttp` in a test.
 @internal
 abstract interface class DwOutboundTransport {
-  /// Throws [DwOutboundException] when no response arrives within [timeout].
+  /// Throws [DwOutboundException] when no response arrives within [timeout],
+  /// or its body is larger than [maxResponseBytes].
   Future<DwOutboundResponse> exchange(
     DwOutboundRequest request,
     Duration timeout,
+    int maxResponseBytes,
   );
 
   void close();
@@ -369,9 +411,12 @@ final class DwNetworkTransport implements DwOutboundTransport {
   Future<DwOutboundResponse> exchange(
     DwOutboundRequest request,
     Duration timeout,
+    int maxResponseBytes,
   ) async {
     final abort = Completer<void>();
-    final timer = Timer(timeout, abort.complete);
+    final timer = Timer(timeout, () {
+      if (!abort.isCompleted) abort.complete();
+    });
     try {
       final outgoing =
           http.AbortableRequest(
@@ -383,11 +428,22 @@ final class DwNetworkTransport implements DwOutboundTransport {
             ..headers.addAll(request.headers)
             ..bodyBytes = request.bodyBytes;
       final streamed = await _client.send(outgoing);
-      final bytes = await streamed.stream.toBytes();
+      if ((streamed.contentLength ?? 0) > maxResponseBytes) {
+        if (!abort.isCompleted) abort.complete();
+        throw DwOutboundException.tooLarge(request, maxResponseBytes);
+      }
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in streamed.stream) {
+        bytes.add(chunk);
+        if (bytes.length > maxResponseBytes) {
+          if (!abort.isCompleted) abort.complete();
+          throw DwOutboundException.tooLarge(request, maxResponseBytes);
+        }
+      }
       return DwOutboundResponse._(
         streamed.statusCode,
         headers: streamed.headers,
-        bodyBytes: bytes,
+        bodyBytes: bytes.takeBytes(),
       );
     } on http.RequestAbortedException {
       throw DwOutboundException(request, timedOutAfter: timeout);

@@ -9,10 +9,14 @@ affects:
 
 Every project: `dart run dartway_cli:dartway check` now fails on `Platform.environment` in the server package's `lib/`
 outside `lib/src/core/environment.dart` (`forbiddenEnvironmentRead`), and on `HttpClient(` or an
-import of `package:http/…` in its `lib/src/` (`forbiddenHttpClient`). A project whose
-`bin/server.dart` parses `PORT`, `DW_ALLOWED_ORIGINS` or `DW_STORAGE_PROVISION` by hand, or that
-calls `AppFiles.storageConfig` (the skeleton's, now gone), moves too. A class that implements
-`DwCallContext` itself adds `http`.
+import of `package:http/…` anywhere in its `lib/` (`forbiddenHttpClient`) — and, in its `bin/`, on
+`Platform.environment` outside `DwLocalEnvironment.overlay(…)` and on any map read by a variable's
+name (`env['PORT']`). So every project whose `bin/server.dart` parses `PORT`, `DW_ALLOWED_ORIGINS` or
+`DW_STORAGE_PROVISION` by hand moves, as does one that calls `AppFiles.storageConfig` (the
+skeleton's, now gone). `DwFirstAdministrator` no longer reads the environment (`variable:` and
+`environment:` are gone; it takes `identifier:`), and `DwAppServer.start` no longer reads
+`DW_MIGRATE_ONLY` (it takes `migrateOnly:`). A class that implements `DwCallContext` itself adds
+`http`.
 
 ## What to change
 
@@ -61,13 +65,23 @@ as constants on `AppFiles` (`defaultPublicBucket`, `defaultPrivateBucket`) and d
     + port: env.server.port,
     + settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
 
-and hand each sub-config to the server factory, which passes it to what uses it. `bin/seed_dev.dart`
-reads `AppEnvironment` the same way.
+and hand each sub-config to the server factory, which passes it to what uses it. The first
+administrator and migrate-only come from the same read — without these two lines the server makes
+no administrator and a deploy's migration step starts serving instead of exiting:
+
+    + adminIdentifier: env.server.adminIdentifier,   // → DwFirstAdministrator(identifier: …)
+    - await server.start();
+    + await server.start(migrateOnly: env.server.migrateOnly);
+
+In the factory: `DwFirstAdministrator(grant: …, identifier: adminIdentifier)`. `bin/seed_dev.dart`
+reads `AppEnvironment` the same way; any other `env['NAME']` in `bin/` becomes a field of
+`AppEnvironment`.
 
 Studio: `StudioEnvironment`, `WorkerConfiguration.fromEnvironment` and
 `AutomationConfiguration.fromEnvironment` fold into sub-configs of `AppEnvironment`, and so do the
 reads of `STUDIO_CLAUDE_EXECUTABLE`, `STUDIO_WORKSPACES`, `STUDIO_DARTWAY_CLI` and `PATH` — a child
-process's `PATH` is a field (`read.optional('PATH')`) passed to what spawns it.
+process's `PATH` is a field (`read.optional('PATH')`) passed to what spawns it. `bin/import_github.dart`'s `STUDIO_TOKEN` is read
+through `AppEnvironment` too.
 
 **3. Outbound HTTP through `ctx.http`.** Replace each client of your own:
 
@@ -84,7 +98,11 @@ process's `PATH` is a field (`read.optional('PATH')`) passed to what spawns it.
 non-2xx status is still an answer (`response.statusCode`, `isSuccess`); what used to be a
 `SocketException`, `TimeoutException` or `ClientException` is `DwOutboundException`
 (`timedOut`). A redirect that must not carry a token is `followRedirects: false`. A service class
-takes `ctx` (or `ctx.http`) per call instead of holding a client.
+takes `ctx.http` (a `DwOutboundHttp`) per call instead of holding a client.
+
+A client used only by a command-line entry point that has no server context — Studio's
+`studio_remote_caller.dart`, used by `bin/import_github.dart` alone — is not the server's: move it to
+`bin/` (or a tool package of its own). The check judges `lib/`, not `bin/`.
 
 **4. Tests drop their transport seams.** A transport interface threaded through the server factory
 for tests (Molodey's SMSC and amoCRM transports) is deleted together with its parameter; the test
@@ -100,7 +118,15 @@ scripts the test server's fake instead:
 A request no rule answers fails the call with a `StateError`, so every test that reaches a provider
 now says what the provider answers.
 
-**5. A `DwCallContext` of your own** (a test double) adds `DwOutboundHttp get http`.
+**5. Unit tests of a client class** (no server) hand it the fake's client instead of a transport of
+their own:
+
+    final http = DwFakeOutboundHttp()
+      ..when((request) => true, (request) => DwOutboundResponse(200, body: 'OK'));
+    await SmscGateway(settings).send(http.client(), phone, text);
+    expect(http.requests.single.form['phones'], phone);
+
+A `DwCallContext` of your own (a test double) adds `DwOutboundHttp get http` — `fake.client()`.
 
 ## How to check
 

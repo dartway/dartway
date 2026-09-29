@@ -37,6 +37,17 @@ void main() {
           case '/slow':
             await Future<void>.delayed(const Duration(seconds: 2));
             response.write('late');
+          case '/stall':
+            response.contentLength = 10;
+            response.write('half');
+            await response.flush();
+            await Future<void>.delayed(const Duration(seconds: 2));
+            response.write('the rest');
+          case '/big':
+            response.write('x' * 5000);
+          case '/big-declared':
+            response.contentLength = 5000;
+            response.write('x' * 5000);
           case '/missing':
             response.statusCode = 404;
             response.write('no such thing');
@@ -59,6 +70,7 @@ void main() {
         transport,
         log: log,
         timeout: const Duration(seconds: 5),
+        maxResponseBytes: 1000,
       );
       RecordingLogger.lines.clear();
     });
@@ -139,6 +151,61 @@ void main() {
       expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
     });
 
+    test('bounds reading the body too, not only the headers', () async {
+      await expectLater(
+        http.get(at('/stall'), timeout: const Duration(milliseconds: 300)),
+        throwsA(
+          isA<DwOutboundException>().having(
+            (e) => e.timedOut,
+            'timedOut',
+            isTrue,
+          ),
+        ),
+      );
+    });
+
+    test('stops reading a response larger than its cap', () async {
+      for (final path in ['/big', '/big-declared']) {
+        await expectLater(
+          http.get(at(path)),
+          throwsA(
+            isA<DwOutboundException>()
+                .having((e) => e.timedOut, 'timedOut', isFalse)
+                .having(
+                  (e) => e.reason,
+                  'reason',
+                  contains('larger than 1000 bytes'),
+                ),
+          ),
+          reason: path,
+        );
+      }
+      final allowed = await http.get(at('/big'), maxResponseBytes: 10000);
+      expect(allowed.bodyBytes, hasLength(5000));
+    });
+
+    test('refuses a URL that is not http or https', () {
+      for (final url in [
+        'ftp://files.example.com/a',
+        'ws://example.com',
+        'mailto:a@b.c',
+      ]) {
+        expect(
+          () => http.get(Uri.parse(url)),
+          throwsArgumentError,
+          reason: url,
+        );
+      }
+    });
+
+    test('never names the user info of a URL', () async {
+      final url = Uri.parse('http://user:s3cr3t@127.0.0.1:${remote.port}/x');
+      final request = DwOutboundRequest('GET', url);
+      expect(request.origin, 'http://127.0.0.1:${remote.port}');
+      await http.get(url);
+      expect(RecordingLogger.lines.join(), isNot(contains('s3cr3t')));
+    });
+
     test('throws DwOutboundException when nothing answers', () async {
       final port = remote.port;
       await remote.close(force: true);
@@ -196,10 +263,10 @@ void main() {
 
     setUp(() {
       fake = DwFakeOutboundHttp();
-      http = DwOutboundHttp(
-        fake,
-        log: RecordingLogger(),
+      http = fake.client(
         timeout: const Duration(milliseconds: 200),
+        maxResponseBytes: 100,
+        log: RecordingLogger(),
       );
     });
 
@@ -245,7 +312,10 @@ void main() {
           isA<StateError>().having(
             (e) => e.message,
             'message',
-            contains('GET https://api.example.com/x'),
+            allOf(
+              contains('GET https://api.example.com:'),
+              isNot(contains('/x')),
+            ),
           ),
         ),
       );
@@ -278,6 +348,14 @@ void main() {
       );
     });
 
+    test("answers a client's own cap like the network would", () async {
+      fake.when((_) => true, (_) => DwOutboundResponse(200, body: 'x' * 101));
+      await expectLater(
+        http.get(Uri.parse('https://api.example.com/')),
+        throwsA(isA<DwOutboundException>()),
+      );
+    });
+
     test('forgets everything on reset', () async {
       fake.when((_) => true, (_) => DwOutboundResponse(200));
       await http.get(Uri.parse('https://api.example.com/'));
@@ -294,7 +372,18 @@ void main() {
     final harness = useHarness(
       build: (app, config) => app.server(
         config,
+        settings: const DwServerSettings(
+          outboundTimeout: Duration(milliseconds: 200),
+        ),
         routes: [
+          DwHttpRoute.get('/hang', (ctx, request) async {
+            try {
+              await ctx.http.get(Uri.parse('https://slow.example.com/'));
+              return DwHttpResponse.text('answered');
+            } on DwOutboundException catch (error) {
+              return DwHttpResponse.text(error.reason);
+            }
+          }),
           DwHttpRoute.post('/notify', (ctx, request) async {
             final response = await ctx.http.post(
               Uri.parse('https://hooks.example.com/notify'),
@@ -332,5 +421,22 @@ void main() {
       expect(answer.status, 500);
       expect(server.http.requests, hasLength(1));
     });
+
+    test("the server's outboundTimeout bounds ctx.http", () async {
+      harness().server.http.when(
+        (request) => request.url.host == 'slow.example.com',
+        (_) => Completer<DwOutboundResponse>().future,
+      );
+      final answer = await harness().caller().raw('GET', '/hang');
+      expect(answer.text, 'timed out after 200 ms');
+    });
+  });
+
+  test('stopping the server closes what ctx.http sends through', () async {
+    final harness = await Harness.start();
+    final fake = harness.server.http;
+    expect(fake.isClosed, isFalse);
+    await harness.stop();
+    expect(fake.isClosed, isTrue);
   });
 }

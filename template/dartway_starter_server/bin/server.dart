@@ -51,8 +51,9 @@ Future<void> main() async {
     storage: storage,
     port: env.server.port,
     settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
+    adminIdentifier: env.server.adminIdentifier,
   );
-  await server.start();
+  await server.start(migrateOnly: env.server.migrateOnly);
 
   if (storage == null) {
     server.logger.warning(

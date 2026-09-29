@@ -677,8 +677,10 @@ final class AppEnvironment {
   (`DwEnvironmentException`) after the object is built — never a value checked on first use. A text
   value is never repeated in a problem; a number or flag read with `secret: true` is not either.
 - `bin/server.dart` reads it — `AppEnvironment.read(DwLocalEnvironment.overlay(Platform.environment))`
-  — and hands the sub-configs to the server factory, which passes each to what uses it. `bin/` parses
-  nothing by hand.
+  — and hands the sub-configs (and `env.server.adminIdentifier`) to the server factory, which passes
+  each to what uses it, then `server.start(migrateOnly: env.server.migrateOnly)`. `bin/` parses
+  nothing by hand: `Platform.environment` there only inside `DwLocalEnvironment.overlay(…)`, and no
+  `env['NAME']`, or the check fails.
 - `Platform.environment` anywhere else in `lib/` is `forbiddenEnvironmentRead`, an error of
   `dart run dartway_cli:dartway check`: a variable read on first use fails hours after a deploy, and never sees the local overlay.
 
@@ -699,10 +701,13 @@ if (!response.isSuccess) throw SmsDeliveryException(response.statusCode);
 - Any status is an answer (`DwOutboundResponse`: `statusCode`, `isSuccess`, `body`, `json`); no
   answer throws `DwOutboundException` (`timedOut`).
 - **No call out inside a transaction**: commit first (`transactional: false`, or a job), then call.
-- `HttpClient(` or `package:http` in `lib/src/` is `forbiddenHttpClient`. A service class that talks
-  to a provider takes `ctx` (or `ctx.http`) per call — not a client of its own, and not a transport
-  parameter threaded through the server factory for tests: the test server fakes `ctx.http` itself
-  (`dartway-testing`).
+- A response body is capped at `DwServerSettings.outboundMaxResponseBytes` (10 MiB) or the call's
+  `maxResponseBytes:`; only `http`/`https` URLs.
+- `HttpClient(` or `package:http` in `lib/` is `forbiddenHttpClient`. A service class that talks
+  to a provider takes `ctx.http` (a `DwOutboundHttp`) per call — not a client of its own, and not a
+  transport parameter threaded through the server factory for tests: the test server fakes
+  `ctx.http` itself, and a unit test hands the class `DwFakeOutboundHttp().client()`
+  (`dartway-testing`). A client only a command-line entry point uses, with no server, lives in `bin/`.
 
 ## 10. Checks
 

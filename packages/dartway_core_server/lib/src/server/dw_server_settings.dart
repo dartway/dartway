@@ -21,6 +21,7 @@ final class DwServerSettings {
     this.alertWindow = const Duration(hours: 1),
     this.alertsPerMinute = 10,
     this.outboundTimeout = const Duration(seconds: 30),
+    this.outboundMaxResponseBytes = 10 << 20,
   }) : assert(maxBodyBytes > 0),
        assert(outboundLimitBytes > 0),
        assert(maxLiveMessageBytes > 0),
@@ -116,4 +117,10 @@ final class DwServerSettings {
   /// stops answering otherwise holds the handler, the job worker and the
   /// connection for as long as TCP lets it.
   final Duration outboundTimeout;
+
+  /// The largest response body one outbound request (`ctx.http`) reads,
+  /// unless the call names its own; past it the exchange is abandoned with a
+  /// `DwOutboundException`. The answer is held in memory whole, so a provider
+  /// that streams without end would otherwise take the process with it.
+  final int outboundMaxResponseBytes;
 }

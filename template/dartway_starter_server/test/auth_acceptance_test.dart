@@ -182,17 +182,16 @@ void main() {
     final server = app.server.server;
     DwFirstAdministrator declaring(String identifier) => DwFirstAdministrator(
       grant: AppBootstrap.grantAdmin,
-      environment: {DwFirstAdministrator.defaultVariable: identifier},
+      identifier: identifier,
     );
     Future<void> start(String identifier) =>
         server.runInContext(declaring(identifier).run);
 
     // A mistyped identifier is a server that does not start, judged before
     // anything opens.
-    expect(
-      declaring('not an identifier').problems(AppAuth.config()),
-      [contains(DwFirstAdministrator.defaultVariable)],
-    );
+    expect(declaring('not an identifier').problems(AppAuth.config()), [
+      contains('DW_ADMIN_IDENTIFIER'),
+    ]);
     expect(declaring('Admin@Example.com').problems(AppAuth.config()), isEmpty);
 
     await start('Admin@Example.com');

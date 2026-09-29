@@ -11,13 +11,18 @@ import 'dw_check_type.dart';
 /// - [DwCheckType.forbiddenEnvironmentRead] — `Platform.environment` in the
 ///   server package's `lib/` outside `lib/src/core/environment.dart`, where
 ///   the project's `AppEnvironment` reads every variable at start
-///   (`DwEnvironmentReader`). `bin/` hands the environment in and is not
-///   judged;
+///   (`DwEnvironmentReader`). In `bin/`, which hands the environment in,
+///   `Platform.environment` only as the argument of
+///   `DwLocalEnvironment.overlay(…)`, and no map read by a variable's name
+///   (`env['PORT']`): an entry point reads through `AppEnvironment.read`;
 /// - [DwCheckType.forbiddenHttpClient] — `dart:io`'s `HttpClient(` or an
-///   import of `package:http/…` in `lib/src/`: an outbound request is
+///   import of `package:http/…` anywhere in `lib/`: an outbound request is
 ///   `ctx.http`, bounded, logged and faked by the test server.
 ///
-/// Comments and strings are not code; an interpolation is.
+/// Comments and strings are not code; an interpolation is. Known limits:
+/// another client package (`dio`, `package:http`'s re-exports through a
+/// third package), `WebSocket.connect`, and a conditional import naming
+/// `package:http` are not seen.
 class DwServerOutsideWorldInspector {
   DwServerOutsideWorldInspector({
     required this.serverPackageDir,
@@ -63,35 +68,76 @@ class DwServerOutsideWorldInspector {
     r'''^\s*(import|export)\s+['"]package:http/''',
     multiLine: true,
   );
+  static final _overlayCall = RegExp(
+    r'DwLocalEnvironment\s*\.\s*overlay\s*\(\s*$',
+  );
+  static final _readByName = RegExp(r'''\[\s*(['"])([A-Z][A-Z0-9_]*)\1\s*\]''');
 
   /// Lines of [content] that read `Platform.environment`.
   static List<int> environmentReadsIn(String content) =>
       _lines(withoutCommentsAndStrings(content), _environment);
 
+  /// What an entry point in `bin/` reads of the environment by itself, as
+  /// `(line, what)`: `Platform.environment` anywhere but inside
+  /// `DwLocalEnvironment.overlay(…)`, and a map read by a variable's name.
+  static List<(int, String)> entryPointReadsIn(String content) {
+    final code = withoutCommentsAndStrings(content);
+    final withStrings = withoutCommentsAndStrings(content, keepStrings: true);
+    return [
+      for (final match in _environment.allMatches(code))
+        if (!_overlayCall.hasMatch(code.substring(0, match.start)))
+          (_lineOf(code, match.start), '`Platform.environment`'),
+      for (final match in _readByName.allMatches(withStrings))
+        (_lineOf(withStrings, match.start), "`['${match.group(2)}']`"),
+    ]..sort((a, b) => a.$1.compareTo(b.$1));
+  }
+
   /// Lines of [content] that construct `HttpClient` or import `package:http`.
   static List<int> httpClientsIn(String content) => {
     ..._lines(withoutCommentsAndStrings(content), _httpClient),
-    ..._lines(content, _httpImport),
+    ..._lines(
+      withoutCommentsAndStrings(content, keepStrings: true),
+      _httpImport,
+    ),
   }.toList()..sort();
 
+  static final _wordOrPath = RegExp(r'^[\w:/.\-]*$');
+
+  static int _lineOf(String text, int offset) =>
+      '\n'.allMatches(text.substring(0, offset)).length + 1;
+
   static List<int> _lines(String text, RegExp pattern) => [
-    for (final match in pattern.allMatches(text))
-      '\n'.allMatches(text.substring(0, match.start)).length + 1,
+    for (final match in pattern.allMatches(text)) _lineOf(text, match.start),
   ];
 
   int run({DwCheckTally? tally}) {
     final server = serverPackageDir;
     if (server == null || !(_environmentEnabled || _httpEnabled)) return 0;
-    final lib = Directory(p.join(server.path, 'lib'));
-    if (!lib.existsSync()) return 0;
-    final files =
-        lib
-            .listSync(recursive: true)
-            .whereType<File>()
-            .where((file) => file.path.endsWith('.dart'))
-            .toList()
-          ..sort((a, b) => a.path.compareTo(b.path));
-    for (final file in files) {
+    List<File> sources(String folder) {
+      final directory = Directory(p.join(server.path, folder));
+      if (!directory.existsSync()) return const [];
+      return directory
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'))
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
+    }
+
+    if (_environmentEnabled) {
+      for (final file in sources('bin')) {
+        final shown = p.relative(file.path, from: server.parent.path);
+        for (final (line, what) in entryPointReadsIn(file.readAsStringSync())) {
+          _findings.add((
+            DwCheckType.forbiddenEnvironmentRead,
+            '$what — $shown:$line; an entry point reads the environment '
+                'through AppEnvironment.read(DwLocalEnvironment.overlay('
+                'Platform.environment)) and nothing else',
+          ));
+        }
+      }
+    }
+    for (final file in sources('lib')) {
       final relative = p.relative(file.path, from: server.path);
       final shown = p.relative(file.path, from: server.parent.path);
       final content = file.readAsStringSync();
@@ -105,7 +151,7 @@ class DwServerOutsideWorldInspector {
           ));
         }
       }
-      if (_httpEnabled && p.isWithin(p.join('lib', 'src'), relative)) {
+      if (_httpEnabled) {
         for (final line in httpClientsIn(content)) {
           _findings.add((
             DwCheckType.forbiddenHttpClient,
@@ -129,7 +175,14 @@ class DwServerOutsideWorldInspector {
   /// [content] with comments removed and string contents blanked, newlines
   /// kept so a match is reported on its own line. An interpolation is code:
   /// `'${Platform.environment['X']}'` reads the environment.
-  static String withoutCommentsAndStrings(String content) {
+  ///
+  /// With [keepStrings] a string that is one word or a path stays as it is —
+  /// what an import names, and a map read by a literal key, are strings — and
+  /// only comments and other strings go.
+  static String withoutCommentsAndStrings(
+    String content, {
+    bool keepStrings = false,
+  }) {
     final out = StringBuffer();
     var i = 0;
     void newlinesOf(String skipped) =>
@@ -150,6 +203,28 @@ class DwServerOutsideWorldInspector {
       }
       final char = content[i];
       if (char == "'" || char == '"') {
+        if (keepStrings) {
+          final raw = i > 0 && content[i - 1] == 'r';
+          final delimiter = content.startsWith(char * 3, i) ? char * 3 : char;
+          var j = i + delimiter.length;
+          while (j < content.length && !content.startsWith(delimiter, j)) {
+            j += !raw && content[j] == r'\' ? 2 : 1;
+          }
+          final end = j + delimiter.length > content.length
+              ? content.length
+              : j + delimiter.length;
+          final literal = content.substring(i, end);
+          final inside = content.substring(
+            i + delimiter.length,
+            j > content.length ? content.length : j,
+          );
+          // A word or a path — a variable's name, a `package:` URI — stays;
+          // prose, which could hold anything, is blanked like code's strings.
+          out.write(_wordOrPath.hasMatch(inside) ? literal : '""');
+          out.write('\n' * '\n'.allMatches(literal).length);
+          i = end;
+          continue;
+        }
         final raw = i > 0 && content[i - 1] == 'r';
         final delimiter = content.startsWith(char * 3, i) ? char * 3 : char;
         var j = i + delimiter.length;

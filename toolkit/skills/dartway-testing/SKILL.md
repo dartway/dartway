@@ -238,6 +238,9 @@ expect(server.http.requests.single.form['phones'], '79990000001');
 - A rule that throws `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one
   whose future never completes runs into the call's timeout.
 - `server.http.reset()` forgets requests and rules — between tests of one file that share a server.
+- **Without a server**, a class that takes a `DwOutboundHttp` is unit-tested over the same fake:
+  `final http = DwFakeOutboundHttp()..when(…);` then `SmsGateway(settings).send(http.client(), …)`,
+  and `http.requests` as above.
 
 ### What deserves an acceptance test
 

@@ -181,19 +181,22 @@ enum DwCheckType {
   devComposeDrifted,
 
   /// `Platform.environment` in the server package's `lib/` outside
-  /// `lib/src/core/environment.dart` (dartway/dartway#386).
+  /// `lib/src/core/environment.dart`; in its `bin/`, `Platform.environment`
+  /// anywhere but inside `DwLocalEnvironment.overlay(…)`, or a map read by a
+  /// variable's name (`env['PORT']`) (dartway/dartway#386).
   ///
   /// The project's variables are read in that one file, into a typed
   /// `AppEnvironment` at start (`DwEnvironmentReader`), and the framework's
   /// with it (`DwServerEnvironment`). A variable read anywhere else is read
   /// on first use — a missing one surfaces as a failure hours after a deploy
   /// that looked fine — and past the local overlay, so a value in
-  /// `deploy/config.yaml > local` never reaches it. `bin/` is not judged: it
-  /// is what hands the environment in.
+  /// `deploy/config.yaml > local` never reaches it. An entry point in `bin/`
+  /// hands the environment in — `AppEnvironment.read(DwLocalEnvironment
+  /// .overlay(Platform.environment))` — and parses nothing itself.
   forbiddenEnvironmentRead,
 
   /// `dart:io`'s `HttpClient(` or an import of `package:http/…` in the
-  /// server package's `lib/src/` (dartway/dartway#386).
+  /// server package's `lib/` (dartway/dartway#386).
   ///
   /// An outbound request is `ctx.http`: bounded by a timeout, logged through
   /// the server's log, and answered by the test server's fake. A client of a

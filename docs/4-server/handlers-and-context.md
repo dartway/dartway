@@ -237,12 +237,15 @@ final response = await ctx.http.post(
 if (!response.isSuccess) throw SmsException(response.statusCode, response.body);
 ```
 
-- `get`, `post`, `put`, `patch`, `delete` and `send(method, url)`; a body is `json:` (encoded, with
-  its content type) or `body:` — a `String`, bytes, or a `Map<String, String>` sent as a form.
+- `get`, `post`, `put`, `patch`, `delete` and `send(method, url)` to an `http` or `https` URL (anything
+  else is an `ArgumentError`); a body is `json:` (encoded, with its content type) or `body:` — a
+  `String`, bytes, or a `Map<String, String>` sent as a form.
 - **Bounded.** The whole exchange, from connecting to the last byte of the answer, by
   `DwServerSettings.outboundTimeout` (30 s), or the call's own `timeout:`.
-- **Logged** through `ctx.log`: method, origin, status and time. Never the path, the query, a header
-  or a body — that is where credentials travel (`/bot<token>/`, `?psw=`).
+- **Capped.** A response body larger than `DwServerSettings.outboundMaxResponseBytes` (10 MiB), or the
+  call's `maxResponseBytes:`, is not read further: `DwOutboundException`.
+- **Logged** through `ctx.log`: method, origin, status and time. Never the user info, the path, the
+  query, a header or a body — that is where credentials travel (`/bot<token>/`, `?psw=`).
 - **An answer is an answer.** Any status comes back as a `DwOutboundResponse` (`statusCode`,
   `isSuccess`, `body`, `json`, `headers`). What throws is not getting one: `DwOutboundException`,
   with `timedOut` telling a timeout from an unreachable host.
@@ -265,7 +268,12 @@ expect(server.http.requests.single.json, {'phone': '79990000001', 'text': 'Code:
 ```
 
 The rule added last is asked first, so a test overrides what its harness scripted; a rule that throws
-`DwOutboundException` makes the provider unreachable.
+`DwOutboundException` makes the provider unreachable. A class that talks to a provider takes a
+`DwOutboundHttp` (`ctx.http`) per call, so it is unit-tested without a server over the same fake:
+`DwFakeOutboundHttp().client()`.
+
+A client used only by a command-line entry point, with no server and no context, is not the server's:
+it lives in `bin/` (or a tool package of its own), where the checker does not look for one.
 
 Framework satellites keep their own clients for now — push delivery (`dartway_push_server`) and the
 sign-in providers' key fetches (`dartway_auth_providers_server`) — as does the storage client inside the

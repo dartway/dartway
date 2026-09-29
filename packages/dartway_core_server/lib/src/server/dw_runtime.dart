@@ -33,6 +33,7 @@ final class DwRuntime {
     required this.channelRules,
     required this.outbound,
     required this.outboundTimeout,
+    required this.outboundMaxResponseBytes,
     this.files,
     List<DwServerModule> modules = const [],
   }) : modules = {for (final module in modules) module.runtimeType: module};
@@ -56,6 +57,9 @@ final class DwRuntime {
   /// `DwServerSettings.outboundTimeout`.
   final Duration outboundTimeout;
 
+  /// `DwServerSettings.outboundMaxResponseBytes`.
+  final int outboundMaxResponseBytes;
+
   /// The file storage; `null` when the server has none.
   final DwFileStore? files;
 
@@ -77,8 +81,12 @@ final class DwRuntime {
     protocol: protocol,
     log: log.scoped(scope),
     jobs: jobsFor,
-    http: (ctx) =>
-        DwOutboundHttp(outbound, log: ctx.log, timeout: outboundTimeout),
+    http: (ctx) => DwOutboundHttp(
+      outbound,
+      log: ctx.log,
+      timeout: outboundTimeout,
+      maxResponseBytes: outboundMaxResponseBytes,
+    ),
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
     modules: modules,

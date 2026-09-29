@@ -70,8 +70,9 @@ From the project root or from inside the `*_flutter` package, in this order:
 3. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
    (`generatedCodeStale`);
 4. **the environment and outbound HTTP** in the server package: `Platform.environment` outside
-   `lib/src/core/environment.dart` (`forbiddenEnvironmentRead`), an `HttpClient(` or `package:http`
-   import in `lib/src/` (`forbiddenHttpClient`);
+   `lib/src/core/environment.dart`, and in `bin/` anything but `DwLocalEnvironment.overlay(Platform.environment)`
+   or a map read by a variable's name (`forbiddenEnvironmentRead`); an `HttpClient(` or a
+   `package:http` import in `lib/` (`forbiddenHttpClient`);
 5. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
 6. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
    and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
@@ -137,8 +138,8 @@ Seventeen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
-| `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start |
-| `forbiddenHttpClient` | error | `HttpClient(` or an import of `package:http/…` in the server's `lib/src/` — an outbound request is `ctx.http` |
+| `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start; in `bin/`, `Platform.environment` outside `DwLocalEnvironment.overlay(…)` or a map read by a variable's name (`env['PORT']`) |
+| `forbiddenHttpClient` | error | `HttpClient(` or an import of `package:http/…` in the server's `lib/` — an outbound request is `ctx.http` |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
 | `fileLong` | info | Over 200 lines |
@@ -233,10 +234,16 @@ server that refuses to start in the next environment. See [Migrations](../4-serv
 reaches outside itself. The environment is read in `lib/src/core/environment.dart`, into a typed
 `AppEnvironment` at start: a variable read anywhere else is read on first use — a missing one surfaces
 hours after a deploy that looked fine — and past the local overlay, so `deploy/config.yaml > local`
-never reaches it. `bin/` is not judged: it is what hands the environment in. An outbound request is
+never reaches it. An entry point in `bin/` hands the environment in and reads nothing itself:
+`Platform.environment` there only as the argument of `DwLocalEnvironment.overlay(…)`, and no map
+read by a variable's name — `bin/server.dart` reads through `AppEnvironment.read`. An outbound request is
 `ctx.http`, bounded by a timeout, logged and answered by the test server's fake; a client of a project's
 own has none of that unless it is written again, with a test seam of its own threaded through the
-server's factory. See [The app server](../4-server/app-server.md#configuration-comes-from-the-environment)
+server's factory; a client a command-line entry point uses with no server behind it lives in `bin/`,
+which this check does not judge. **Known limits:** another client package (`dio`, or `package:http`
+reached through a package that re-exports it), `WebSocket.connect`, a conditional import naming
+`package:http`, and an environment read through a helper in `bin/` that does not subscript a literal
+name are not seen. See [The app server](../4-server/app-server.md#configuration-comes-from-the-environment)
 and [Handlers and the call context](../4-server/handlers-and-context.md#outbound-http).
 
 **`localSecretMissing` and `devComposeDrifted`** judge the environment this machine starts a server

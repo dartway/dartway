@@ -57,12 +57,53 @@ final HttpClient Function() c = HttpClient.new;
       expect(
         DwServerOutsideWorldInspector.httpClientsIn('''
 // import 'package:http/http.dart';
+/*
+import 'package:http/http.dart' as http;
+*/
 /// Not an `HttpClient()`: `ctx.http`.
 final text = 'HttpClient()';
 Future<void> send(HttpClientRequest request, HttpClient client) async {}
 final response = await ctx.http.post(url, json: body);
 '''),
         isEmpty,
+      );
+    });
+  });
+
+  group('entry points', () {
+    test('pass the environment to the overlay and read nothing themselves', () {
+      expect(
+        DwServerOutsideWorldInspector.entryPointReadsIn(r'''
+final env = AppEnvironment.read(
+  DwLocalEnvironment.overlay(Platform.environment),
+);
+final cli = DwMigrationCli(
+  environment: DwLocalEnvironment.overlay(Platform.environment),
+);
+// final port = env['PORT'];
+final text = 'env["PORT"] in a string is not a read';
+final list = ['a', 'b'];
+'''),
+        isEmpty,
+      );
+    });
+
+    test('are refused a read of their own', () {
+      expect(
+        DwServerOutsideWorldInspector.entryPointReadsIn(r'''
+final raw = Platform.environment;
+final env = DwLocalEnvironment.overlay(raw);
+final port = int.parse(env['PORT'] ?? '8080');
+final origins = env["DW_ALLOWED_ORIGINS"];
+final home = Platform.environment['HOME'];
+'''),
+        [
+          (1, '`Platform.environment`'),
+          (3, "`['PORT']`"),
+          (4, "`['DW_ALLOWED_ORIGINS']`"),
+          (5, '`Platform.environment`'),
+          (5, "`['HOME']`"),
+        ],
       );
     });
   });
@@ -81,8 +122,8 @@ final response = await ctx.http.post(url, json: body);
       ..createSync(recursive: true)
       ..writeAsStringSync(content);
 
-    test('fails on lib/ and lib/src/, names each file and line, and leaves '
-        'core/environment.dart, bin/ and test/ alone', () {
+    test('fails on lib/ and bin/, names each file and line, and leaves '
+        'core/environment.dart and test/ alone', () {
       write('lib/src/core/environment.dart', '''
 final home = Platform.environment['HOME'];
 ''');
@@ -96,20 +137,30 @@ final port = Platform.environment['PORT'];
 final client = HttpClient();
 ''');
       write('bin/server.dart', '''
-final env = Platform.environment;
+final env = AppEnvironment.read(
+  DwLocalEnvironment.overlay(Platform.environment),
+);
 final client = HttpClient();
+''');
+      write('bin/seed_dev.dart', '''
+final env = DwLocalEnvironment.overlay(Platform.environment);
+final port = int.parse(env['PORT'] ?? '8080');
 ''');
       write('test/sms_test.dart', "import 'package:http/http.dart';\n");
 
       final tally = DwCheckTally();
       final inspector = DwServerOutsideWorldInspector(serverPackageDir: server);
-      expect(inspector.run(tally: tally), 3);
+      expect(inspector.run(tally: tally), 5);
       final findings = inspector.findings;
       expect(
         findings
             .where((f) => f.$1 == DwCheckType.forbiddenEnvironmentRead)
             .map((f) => f.$2),
         [
+          allOf(
+            contains("['PORT']"),
+            contains(p.join('shop_server', 'bin', 'seed_dev.dart:2;')),
+          ),
           contains(p.join('shop_server', 'lib', 'shop_server.dart:1;')),
           contains(
             p.join('shop_server', 'lib', 'src', 'sms', 'sms_handlers.dart:3;'),
@@ -121,15 +172,16 @@ final client = HttpClient();
             .where((f) => f.$1 == DwCheckType.forbiddenHttpClient)
             .map((f) => f.$2),
         [
+          contains(p.join('shop_server', 'lib', 'shop_server.dart:2;')),
           contains(
             p.join('shop_server', 'lib', 'src', 'sms', 'sms_handlers.dart:1;'),
           ),
         ],
-        reason: 'the package library is not lib/src/',
+        reason: 'bin/ may make a client of its own; lib/ may not',
       );
       expect(tally.counts, {
-        DwCheckType.forbiddenEnvironmentRead: 2,
-        DwCheckType.forbiddenHttpClient: 1,
+        DwCheckType.forbiddenEnvironmentRead: 3,
+        DwCheckType.forbiddenHttpClient: 2,
       });
     });
 

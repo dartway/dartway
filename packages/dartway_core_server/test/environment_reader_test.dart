@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:test/test.dart';
 
@@ -221,6 +223,56 @@ void main() {
         }, (read) => DwServerEnvironment.read(read)),
         [contains('DW_STORAGE_PROVISION is true and DW_STORAGE_ENDPOINT')],
       );
+    });
+
+    test('reads the first administrator and migrate-only', () {
+      final environment = read({
+        ...database,
+        'DW_ADMIN_IDENTIFIER': ' admin@example.com ',
+        'DW_MIGRATE_ONLY': 'true',
+      });
+      expect(environment.adminIdentifier, 'admin@example.com');
+      expect(environment.migrateOnly, isTrue);
+      final none = read(database);
+      expect(none.adminIdentifier, isNull);
+      expect(none.migrateOnly, isFalse);
+      expect(
+        problemsReading({
+          ...database,
+          'DW_MIGRATE_ONLY': 'yes',
+        }, (read) => DwServerEnvironment.read(read)),
+        [contains('DW_MIGRATE_ONLY must be "true" or "false"')],
+      );
+    });
+
+    test('honours what only the local overlay sets (#402)', () {
+      final root = Directory.systemTemp.createTempSync('dw_env_overlay');
+      addTearDown(() => root.deleteSync(recursive: true));
+      File('${root.path}/deploy/config.yaml')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('''
+local:
+  DW_ADMIN_IDENTIFIER: admin@example.com
+  DW_MIGRATE_ONLY: true
+  PORT: 9100
+''');
+      final environment = read(
+        DwLocalEnvironment.overlay(database, from: root, report: (_) {}),
+      );
+      expect(environment.adminIdentifier, 'admin@example.com');
+      expect(environment.migrateOnly, isTrue);
+      expect(environment.port, 9100);
+    });
+
+    test('never names the credentials in a storage URL', () {
+      final problems = problemsReading({
+        ...database,
+        'DW_STORAGE_ENDPOINT': 'ftp://key:s3cr3t@storage.example.com',
+        'DW_STORAGE_ACCESS_KEY': 'key',
+        'DW_STORAGE_SECRET_KEY': 'secret',
+      }, (read) => DwServerEnvironment.read(read));
+      expect(problems.join(), contains('ftp://storage.example.com'));
+      expect(problems.join(), isNot(contains('s3cr3t')));
     });
 
     test('refuses a port out of range', () {

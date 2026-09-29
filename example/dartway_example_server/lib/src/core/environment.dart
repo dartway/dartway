@@ -57,7 +57,7 @@ final class AppPushEnvironment {
     final webLinkBase = read.optional('FCM_WEB_LINK_BASE');
     final webLink = webLinkBase == null ? null : Uri.tryParse(webLinkBase);
     if (webLinkBase != null && webLink?.scheme != 'https') {
-      read.report('FCM_WEB_LINK_BASE must be an https URL, got "$webLinkBase"');
+      read.report('FCM_WEB_LINK_BASE must be an https URL');
     }
     return AppPushEnvironment(
       fcmServiceAccountFile: read.optional('FCM_SERVICE_ACCOUNT_FILE'),

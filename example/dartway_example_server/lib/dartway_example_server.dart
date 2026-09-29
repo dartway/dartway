@@ -39,12 +39,17 @@ abstract final class DartwayExampleServer {
   ///
   /// [push] sends notifications (`AppPush.module`); by default it has no providers
   /// and records deliveries it has nobody to send through.
+  ///
+  /// [adminIdentifier] is made an administrator at every start
+  /// (`DwFirstAdministrator`): `bin/server.dart` passes `DW_ADMIN_IDENTIFIER`,
+  /// read into `DwServerEnvironment.adminIdentifier`.
   static DwAppServer build({
     required DwDatabaseConfig database,
     DwFileStorageConfig? storage,
     int port = 8080,
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
+    String? adminIdentifier,
     DwPushModule? push,
   }) => DwAppServer(
     protocol: appProtocol,
@@ -61,7 +66,12 @@ abstract final class DartwayExampleServer {
       chatFeature,
       adminFeature,
     ],
-    startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+    startup: [
+      DwFirstAdministrator(
+        grant: AppBootstrap.grantAdmin,
+        identifier: adminIdentifier,
+      ),
+    ],
     files: storage == null ? null : AppFiles.storage(storage),
     modules: [
       push ?? AppPush.module(),

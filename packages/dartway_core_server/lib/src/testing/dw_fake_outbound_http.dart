@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../alerts/dw_server_logger.dart';
 import '../outbound/dw_outbound_http.dart';
 
 /// What a test server's `ctx.http` talks to instead of the network: it
@@ -23,9 +24,36 @@ import '../outbound/dw_outbound_http.dart';
 /// how a test makes the provider unreachable; a rule whose future never
 /// completes runs into the call's timeout. The rule added last is asked
 /// first, so a test overrides what its harness scripted.
+///
+/// A class that talks to a provider is unit-tested without a server through
+/// [client], the same `DwOutboundHttp` a context hands it:
+///
+/// ```dart
+/// final http = DwFakeOutboundHttp()..when((_) => true, (_) => DwOutboundResponse(200));
+/// await SmsGateway(settings).send(http.client(), phone, text);
+/// ```
 final class DwFakeOutboundHttp implements DwOutboundTransport {
   final List<DwOutboundRequest> _requests = [];
   final List<_Rule> _rules = [];
+  bool _closed = false;
+
+  /// A `DwOutboundHttp` over this fake, for code tested without a server:
+  /// what `ctx.http` is under a `DwTestServer`, with [timeout] and
+  /// [maxResponseBytes] in place of the server's settings and [log] (the
+  /// console by default) in place of the context's.
+  DwOutboundHttp client({
+    Duration timeout = const Duration(seconds: 30),
+    int maxResponseBytes = 10 << 20,
+    DwServerLogger log = const DwConsoleLogger(scope: 'outbound'),
+  }) => DwOutboundHttp(
+    this,
+    log: log,
+    timeout: timeout,
+    maxResponseBytes: maxResponseBytes,
+  );
+
+  /// Whether the server that used it has stopped: it answers nothing more.
+  bool get isClosed => _closed;
 
   /// Every request sent, answered or not, oldest first.
   List<DwOutboundRequest> get requests => List.unmodifiable(_requests);
@@ -46,19 +74,21 @@ final class DwFakeOutboundHttp implements DwOutboundTransport {
   Future<DwOutboundResponse> exchange(
     DwOutboundRequest request,
     Duration timeout,
+    int maxResponseBytes,
   ) async {
+    if (_closed) throw StateError('DwFakeOutboundHttp is closed');
     _requests.add(request);
     for (final rule in _rules) {
       if (rule.matches(request)) return rule.respond(request);
     }
     throw StateError(
-      'No DwFakeOutboundHttp rule answers ${request.method} ${request.url}: '
+      'No DwFakeOutboundHttp rule answers ${request.method} ${request.origin}: '
       'script it with server.http.when(…)',
     );
   }
 
   @override
-  void close() {}
+  void close() => _closed = true;
 }
 
 typedef _Rule = ({
