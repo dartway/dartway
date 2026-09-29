@@ -1,10 +1,10 @@
 import 'package:dartway_example_flutter/admin/settings/widgets/admin_setting_row.dart';
 import 'package:dartway_example_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// Every setting the app declares, one row each.
 ///

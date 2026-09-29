@@ -162,7 +162,7 @@ provider in one file — provider first.
 2. **The public widget**, `implements DwFeatureWidget` with its `DwFeatureSpec` (below). Without it
    `dart run dartway_cli:dartway check` warns `featureSpecMissing`.
 3. **Reads:** `ref.watch(dw.request(...))` (or `dw.pages` / `dw.table` / `dw.window`), with the section
-   it exists for rendering its error — the skeleton's shared section extension (`dartway-data-layer`).
+   it exists for rendering its error — the skeleton's section extension in `lib/core/` (`dartway-data-layer`).
 4. **Changes:** `dw.command` in the feature's `logic/<feature>_commands.dart`, run by
    `dw.action((_) => <Feature>Commands.x(...))` on the button of the widget that owns it; a refusal is
    shown by itself (`dartway-data-layer`).
@@ -232,6 +232,8 @@ class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
       body: ref.watch(request).dwBuildAsync(
         loadingWidget: const Center(child: CircularProgressIndicator()),
         errorBuilder: (_, _) => LoadFailedMessage(
+          message: l10n.loadFailed,
+          retryLabel: l10n.retry,
           onRetry: dw.action((_) => ref.read(request.notifier).refetch()),
         ),
         childBuilder: (invoices) => invoices.isEmpty

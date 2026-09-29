@@ -62,7 +62,7 @@ class SessionCard extends StatelessWidget {
             // the session, and both lists on screen take them before the
             // command completes; other devices get them on their channels.
             if (booking != null)
-              CancelBookingButton(booking: booking)
+              CancelBookingButton(booking: booking, compact: true)
             else if (session.startsAt.isAfter(DateTime.now()))
               session.spotsLeft > 0
                   ? AppButton.primary(

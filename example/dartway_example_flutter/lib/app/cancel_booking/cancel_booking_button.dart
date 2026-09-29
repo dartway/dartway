@@ -8,7 +8,11 @@ import 'package:flutter/material.dart';
 /// Cancels one active booking — on the schedule's session card and in "my
 /// bookings" alike, so both cancel the same way.
 class CancelBookingButton extends StatelessWidget implements DwFeatureWidget {
-  const CancelBookingButton({required this.booking, super.key});
+  const CancelBookingButton({
+    required this.booking,
+    this.compact = false,
+    super.key,
+  });
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
@@ -16,6 +20,7 @@ class CancelBookingButton extends StatelessWidget implements DwFeatureWidget {
     title: 'Cancel a booking',
     behaviors: [
       'Cancels the booking and says so; the spot goes back to the session.',
+      'Reads "Cancel booking"; on the schedule\'s session card, "Cancel".',
       'The session card and the bookings list both change at once, here and '
           'on the member\'s other devices.',
     ],
@@ -27,9 +32,13 @@ class CancelBookingButton extends StatelessWidget implements DwFeatureWidget {
 
   final SessionBooking booking;
 
+  /// "Cancel" instead of "Cancel booking", for a card whose row has no room
+  /// for the longer label and already says what it is about.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) => AppButton.secondary(
-    context.l10n.cancel,
+    compact ? context.l10n.cancel : context.l10n.cancelBooking,
     onTap: dw.action(
       (_) => CancelBookingCommands.cancel(booking),
       onSuccessNotification: context.l10n.bookingCancelled,

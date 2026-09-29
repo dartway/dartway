@@ -12,6 +12,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// One channel of the staff chat: its history, the pinned bar, the floating
 /// date, the "↓" button, and the composer — or, while searching, the way

@@ -101,6 +101,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get cancelBooking => 'Cancel booking';
+
+  @override
   String get leaveReview => 'Leave a review';
 
   @override

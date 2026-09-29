@@ -30,6 +30,7 @@
 
   "noBookingsYet": "Пока нет записей — выберите занятие!",
   "bookingStatus": "{status, select, booked{Записан} cancelled{Отменена} attended{Посещено} other{—}}",
+  "cancelBooking": "Отменить запись",
   "leaveReview": "Оставить отзыв",
   "thanksForReview": "Спасибо за отзыв!",
   "reviewSheetTitle": "Как прошло занятие?",

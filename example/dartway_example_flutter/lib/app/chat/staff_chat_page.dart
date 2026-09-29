@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// Staff-only chat. The UI hides the tab for clients; the real protection is
 /// the server: the requests refuse a client, and so do the channels and the

@@ -6,6 +6,7 @@ import 'package:dartway_starter_flutter/admin/role_picker/role_picker.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_starter_flutter/core/async_section.dart';
 
 /// One page of members, with the role editable inline and the pager under it.
 /// The page is live: rows change in place, and a new member reads it again.

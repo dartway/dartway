@@ -315,7 +315,8 @@ ref.watch(dw.request(const ListNews())).dwBuildListAsync(
 screen exists for may not — an empty page reads as "nothing here yet", not "the read failed". The
 example and the skeleton wrap this in one app extension, `section(...)`, which always renders a
 message with a retry and skips the not-authenticated case, where the sign-in screen is already the
-message (`lib/ui_kit/2_frequent/load_failed_message.dart` in both).
+message (`lib/core/async_section.dart` in both, drawing the kit's
+`ui_kit/2_frequent/load_failed_message.dart` with the app's texts).
 
 A refusal or a not-authenticated answer rendered this way still reaches `DwFlutterConfig.onErrorReport`; the
 app's policy is what keeps it out of the incident log — see [error reporting](error-reporting.md).

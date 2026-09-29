@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// The project's analytics dashboards: one shown at a time, every widget of
 /// it over the period chosen on top, and — in edit mode — widgets added,

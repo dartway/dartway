@@ -67,9 +67,10 @@ error branch is `SizedBox.shrink()`** — right for a decoration, wrong for the 
 for, where a failed read would look exactly like an empty one. So the section a screen exists for
 always renders its error.
 
-The skeleton ships this as one extension over `AsyncValue` in the UI kit (`ui_kit/2_frequent/`): a
+The skeleton ships this as one extension over `AsyncValue` in `lib/core/async_section.dart`: a
 section with a stand-in loading value, a load-failed message (a sentence from `context.l10n` and a
-retry) and nothing for `DwNotAuthenticatedException`. Use it; do not write a second one.
+retry — the kit's `LoadFailedMessage`, handed its texts) and nothing for
+`DwNotAuthenticatedException`. Use it; do not write a second one.
 
 ```dart
 final request = dw.request(GetInvoice(invoiceId: invoiceId));
@@ -84,6 +85,8 @@ if (invoice case AsyncError(
 return invoice.dwBuildAsync(
   loadingWidget: const Center(child: CircularProgressIndicator()),
   errorBuilder: (_, _) => LoadFailedMessage(
+    message: context.l10n.loadFailed,
+    retryLabel: context.l10n.retry,
     onRetry: dw.action((_) => ref.read(request.notifier).refetch()),
   ),
   childBuilder: (invoice) => InvoiceDetails(invoice: invoice),

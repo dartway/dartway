@@ -1,4 +1,5 @@
 import 'package:dartway_starter_flutter/auth/profile_name_page.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
@@ -51,6 +52,8 @@ class SignedInGate extends HookConsumerWidget {
         body: profile.isLoading
             ? const Center(child: CircularProgressIndicator())
             : LoadFailedMessage(
+                message: context.l10n.loadFailed,
+                retryLabel: context.l10n.retry,
                 onRetry: dw.action(
                   (_) => ref
                       .read(dw.request(const GetMyProfile()).notifier)

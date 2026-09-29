@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// One widget of a dashboard: its title and its report over [period], drawn
 /// as its type says. [actions], while the dashboard is edited, sit under it.

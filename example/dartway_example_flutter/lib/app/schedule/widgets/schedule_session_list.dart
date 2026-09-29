@@ -7,6 +7,7 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 typedef _Schedule = ({List<ClubSession> sessions, List<SessionBooking> mine});
 
